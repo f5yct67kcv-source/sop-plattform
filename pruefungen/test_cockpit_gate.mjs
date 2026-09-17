@@ -21,6 +21,7 @@
 // -- sichtbar erst am Bildschirm, nicht im Quelltext.
 import { WURZEL, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
 
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
@@ -261,11 +262,16 @@ const TEXTE_HAUPT = [
   // test_cockpit_gate.mjs weiter oben.
   // Der frueher hier gepruefte Begleittext "Bitte melden Sie sich..." ist
   // entfernt (auf Ansage des Projektinhabers: die Maske erklaert sich
-  // selbst). An seiner Stelle liegt jetzt die Herstellersignatur auf dem
-  // Video -- als Fusszeile sogar ueber dem unteren Bildbereich, wo die
-  // Strassenlaternen stehen. Sie braucht denselben Nachweis.
-  ['Etikett "powered by"', '.gate-sig .go-label'],
-  ['Herstellersignatur (Logo)', '.gate-sig .go-sig'],
+  // selbst). An seiner Stelle liegt jetzt der Fuss auf dem Video -- ueber
+  // dem unteren Bildbereich, wo die Strassenlaternen stehen. Er braucht
+  // denselben Nachweis, und zwar mehr denn je: Seit dem 2026-09-17 liegt
+  // kein Schleier mehr zwischen Text und Szene.
+  // Die Herstellersignatur steht hier NICHT mehr in der Liste -- sie ist
+  // ohne Mandantenlogo unsichtbar, und an einem unsichtbaren Element misst
+  // man keinen Kontrast. Ihren Nachweis fuehrt test_gate_signatur.mjs im
+  // nachgebauten Mandantenfall.
+  ['Rechtszeile (Impressum)', '.gate-recht a'],
+  ['Anmeldehilfe-Knopf', '.gate-recht .gate-hilfe-knopf'],
   ['Beschriftung "Name"', 'label[for="gName"]'],
   ['Beschriftung "Passwort"', 'label[for="gPass"]'],
 ];
@@ -281,8 +287,24 @@ await page.emulateMedia({ reducedMotion: 'reduce' });
 await page.waitForTimeout(150);
 check('KRITISCH: bei reduzierter Bewegung ist das Video unsichtbar',
   await ev(page, () => getComputedStyle(document.querySelector('.gate-video')).display === 'none'));
-check('KRITISCH: und auch der Schleier -- sonst legt sich eine dunkle Flaeche ohne rechtfertigendes Video darueber',
-  await ev(page, () => getComputedStyle(document.querySelector('.gate-schleier')).display === 'none'));
+// Der Schleier ist am 2026-09-17 ganz entfallen (Skizze des
+// Projektinhabers, Punkt 9). Geprueft wird deshalb nicht mehr, ob er im
+// richtigen Moment verschwindet, sondern dass er nirgends wieder
+// auftaucht: weder als Ebene im Dokument noch als Farbschicht im
+// Hintergrund von #gate. Beides waere ein stiller Rueckbau -- die Szene
+// saehe wieder gedaempft aus, ohne dass eine Pruefung anschluege.
+// Die Gegenprobe dazu ist gemacht: mit wieder eingesetztem
+// linear-gradient in der #gate-Regel schlaegt dieser Punkt an.
+check('KRITISCH: es gibt keine Schleier-Ebene mehr im Anmeldebildschirm',
+  await ev(page, () => !document.querySelector('.gate-schleier')));
+check('KRITISCH: und auch keine Schleier-Schicht im Hintergrund von #gate',
+  await ev(page, () => {
+    const b = getComputedStyle(document.getElementById('gate')).backgroundImage;
+    // Der radial-gradient oben bleibt -- er ist Tiefenwirkung am Kopf, kein
+    // flaechiger Schleier. Ein linear-gradient ueber die ganze Flaeche war
+    // der Schleier.
+    return !b.includes('linear-gradient');
+  }));
 check('KRITISCH: das Hintergrundfoto ist als CSS-Ausweiche eingebunden',
   await ev(page, () => getComputedStyle(document.getElementById('gate')).backgroundImage.includes('anmeldung-nacht.webp')));
 for (const [bezeichnung, sel] of TEXTE_HAUPT) {
@@ -367,6 +389,139 @@ const kHell = await textKontrastAufFoto(hell, '.gate-oben .wm');
 check('KRITISCH: die Wortmarke "Cockpit" bleibt auch im hellen Thema lesbar (>= 4.5:1)',
   kHell !== null && kHell >= 4.5);
 await hell.close();
+
+// ══════════════════════════════════════════════════════════════════════
+// FUSS UND ANMELDEHILFE (Ansage des Projektinhabers, 2026-09-17)
+//
+// Der wichtigste Punkt hier ist kein Gestaltungspunkt: Im Anmeldebildschirm
+// darf es KEINEN Weg geben, ueber eine eingetippte Adresse ein Passwort
+// zuruecksetzen zu lassen. Das waere ein Zugang ins Cockpit, der an der
+// Verwaltung des Betriebs vorbeifuehrt. Geprueft wird darum, welche
+// Eingabefelder im Gate ueberhaupt stehen -- und zwar auch im geoeffneten
+// Hilfetext, denn genau dort waere so ein Feld naheliegend.
+// ══════════════════════════════════════════════════════════════════════
+const fuss = await seiteOeffnen('dunkel', 1400, 950);
+
+const felder = await ev(fuss, () =>
+  [...document.querySelectorAll('#gate input, #gate textarea')]
+    .map(e => e.id || e.type));
+check('KRITISCH: im Anmeldebildschirm stehen nur Name, Passwort und die beiden 2FA-Felder -- kein weiteres Eingabefeld',
+  Array.isArray(felder) && felder.length === 4
+  && ['gName', 'gPass', 'gCode', 'gMerken'].every(id => felder.includes(id)));
+
+// Die Hilfe aufklappen und noch einmal zaehlen.
+await fuss.click('#gateHilfeKnopf');
+await fuss.waitForTimeout(150);
+const hilfe = await ev(fuss, () => {
+  const f = document.getElementById('gateHilfe');
+  return {
+    offen: !f.hidden && f.getBoundingClientRect().height > 0,
+    text: f.textContent.trim(),
+    eigeneFelder: f.querySelectorAll('input, textarea, form').length,
+    gemeldet: document.getElementById('gateHilfeKnopf').getAttribute('aria-expanded'),
+  };
+});
+check('Die Anmeldehilfe klappt auf Klick auf', hilfe !== null && hilfe.offen);
+check('KRITISCH: die Anmeldehilfe ist ein Text und kein Formular -- kein Feld, kein Absenden',
+  hilfe !== null && hilfe.eigeneFelder === 0);
+check('Sie sagt auch etwas, statt leer aufzugehen', hilfe !== null && hilfe.text.length > 30);
+check('Ihr Zustand wird auch angesagt (aria-expanded)', hilfe !== null && hilfe.gemeldet === 'true');
+const felderOffen = await ev(fuss, () => document.querySelectorAll('#gate input, #gate textarea').length);
+check('KRITISCH: auch mit offener Hilfe kommt kein Eingabefeld dazu',
+  felderOffen === 4);
+
+// Rechtszeile. Relative Pfade waeren hier tot: impressum.html und
+// datenschutz.html liegen nur im guardops-Buendel (deploy-hostpoint.yml).
+const rechtsLinks = await ev(fuss, () =>
+  [...document.querySelectorAll('.gate-recht a')].map(a => a.getAttribute('href')));
+check('KRITISCH: Impressum und Datenschutz sind verlinkt',
+  Array.isArray(rechtsLinks) && rechtsLinks.length === 2);
+check('KRITISCH: und zwar absolut auf guardops.ch -- relativ liefen sie in diesem Buendel ins Leere',
+  Array.isArray(rechtsLinks) && rechtsLinks.every(h => /^https:\/\/guardops\.ch\//.test(h))
+  && rechtsLinks.some(h => h.endsWith('impressum.html'))
+  && rechtsLinks.some(h => h.endsWith('datenschutz.html')));
+
+// Trefferflaechen: Die Fusszeile ist die einzige Stelle der Maske mit
+// kleiner Schrift. Auf dem Handy muessen die Ziele trotzdem 44 px hoch
+// sein (CLAUDE.md) -- geprueft wird darum am Handy, nicht am Desktop.
+await fuss.close();
+const fussHandy = await seiteOeffnen('dunkel', 390, 844);
+const ziele = await ev(fussHandy, () =>
+  [...document.querySelectorAll('.gate-recht a, .gate-recht button')]
+    .map(e => Math.round(e.getBoundingClientRect().height)));
+check('KRITISCH: die Ziele im Fuss sind am Handy mindestens 44 px hoch',
+  Array.isArray(ziele) && ziele.length === 3 && ziele.every(h => h >= 44));
+await fussHandy.close();
+
+// ══════════════════════════════════════════════════════════════════════
+// MANDANTENFALL: DIE SIGNATUR LIEGT JETZT UNGESCHUETZT AUF DER SZENE
+// Solange der Schleier da war, hat er die Fusszeile mitgetragen. Er ist
+// weg (2026-09-17), die Signatur erscheint aber weiterhin -- naemlich beim
+// Mandanten, dessen Buendel die Wortmarke durch sein eigenes Bild ersetzt.
+// Genau dieser Fall wird hier nachgebaut und gemessen. Ohne ihn stuende
+// die einzige Textzeile, die den Schleier wirklich brauchte, ungeprueft
+// auf dem hellsten Teil des Bildes.
+// ══════════════════════════════════════════════════════════════════════
+const mandant = await seiteOeffnen('dunkel', 1400, 950);
+const umgebaut = await ev(mandant, () => {
+  const svg = document.querySelector('.gate-oben svg.marke');
+  if (!svg) { return false; }
+  const img = document.createElement('img');
+  img.className = 'marke'; img.src = 'icons/cupi24-badge.png'; img.alt = 'Mandantenlogo';
+  img.style.width = '170px';
+  svg.replaceWith(img);
+  return true;
+});
+check('Der Mandantenfall laesst sich nachbauen (Wortmarke -> Bildlogo)', umgebaut === true);
+check('KRITISCH: mit Mandantenlogo signiert Guard OpS unten',
+  await ev(mandant, () => document.querySelector('.gate-sig').getBoundingClientRect().height > 0));
+await pruefeVideoKontrast(mandant, [
+  ['Etikett "powered by" (Mandant)', '.gate-sig .go-label'],
+  ['Herstellersignatur (Mandant)', '.gate-sig .go-sig'],
+]);
+await mandant.emulateMedia({ reducedMotion: 'reduce' });
+await mandant.waitForTimeout(150);
+for (const [bezeichnung, sel] of [['Etikett "powered by" (Mandant)', '.gate-sig .go-label'],
+                                  ['Herstellersignatur (Mandant)', '.gate-sig .go-sig']]) {
+  const k = await textKontrastAufFoto(mandant, sel);
+  check(`KRITISCH: ${bezeichnung} bleibt vor dem echten Foto lesbar (>= 4.5:1)`, k !== null && k >= 4.5);
+}
+await mandant.close();
+
+// ══════════════════════════════════════════════════════════════════════
+// DEMOBEREICH: GRUSS STATT BEREICHSNAME
+// Der Deploy ersetzt '__APP_ENV__' in testumgebung.js. Lokal steht der
+// Platzhalter da, darum wird die Datei hier unterwegs ausgetauscht --
+// geprueft wird die Verdrahtung, nicht eine nachgestellte Behauptung.
+// ══════════════════════════════════════════════════════════════════════
+const demo = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+demo.on('pageerror', e => bad.push('JS-Fehler (Demo): ' + e.message));
+const umgebungRoh = readFileSync(`${WURZEL}/testumgebung.js`, 'utf8');
+await demo.route('**/testumgebung.js', r => r.fulfill({
+  status: 200, contentType: 'text/javascript',
+  body: umgebungRoh.replace("'__APP_ENV__'", "'demo'") }));
+await demo.goto(`file://${WURZEL}/dashboard.html`);
+await demo.waitForTimeout(400);
+const kopf = await ev(demo, () => {
+  const h = e => !!e && e.getBoundingClientRect().height > 0;
+  return {
+    wm: h(document.getElementById('gateWm')),
+    gruss: h(document.getElementById('gateDemoGruss')),
+    grussText: (document.getElementById('gateDemoGruss')?.textContent || '').trim(),
+  };
+});
+check('KRITISCH: im Demobereich sagt der Gruss, wo man ist', kopf !== null && kopf.gruss);
+check('KRITISCH: und der Bereichsname steht nicht zusaetzlich daneben -- nicht zwei Ortsangaben untereinander',
+  kopf !== null && !kopf.wm);
+check('Der Gruss nennt den Demobereich', kopf !== null && /demo/i.test(kopf.grussText));
+// Die Hilfe sagt im Demobereich etwas anderes als im Betrieb: Wer hier
+// keinen Zugang hat, ist ein Interessent, kein Mitarbeitender.
+await demo.click('#gateHilfeKnopf');
+await demo.waitForTimeout(150);
+const hilfeDemo = await ev(demo, () => document.getElementById('gateHilfe').textContent.trim());
+check('KRITISCH: die Anmeldehilfe im Demobereich verweist nicht an eine Betriebsverwaltung, die es hier nicht gibt',
+  typeof hilfeDemo === 'string' && hilfeDemo.length > 30 && !/Verwaltung/i.test(hilfeDemo));
+await demo.close();
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden`);

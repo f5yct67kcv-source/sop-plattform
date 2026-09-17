@@ -38,6 +38,16 @@
 //   8. Beim Entfernen des Begruessungssatzes faellt der Satz im
 //      Abweisungs-Zweig mit weg. Der ist kein Fuelltext, sondern die
 //      einzige Erklaerung, warum jemand nicht hereinkommt.
+//   9. Sie steht, wo sie nicht hingehoert. Seit dem 2026-09-17 signiert
+//      Guard OpS nur noch da, wo oben ein FREMDES Logo haengt -- beim
+//      Mandanten also. Wo oben schon die eigene Wortmarke steht, stuende
+//      der Name zweimal auf derselben Maske.
+//
+// DARUM BAUT DIESE DATEI DEN MANDANTENFALL NACH: Sie ersetzt das
+// <svg class="marke"> durch ein <img class="marke">, genau wie es
+// .github/workflows/deploy-hostpoint.yml beim Bauen des cupi24-Buendels
+// tut. Ohne diese Ersetzung ist die Signatur zu Recht unsichtbar, und die
+// Punkte 1 bis 8 waeren nicht mehr pruefbar.
 //
 // Gemessen wird am gerenderten Zustand (CLAUDE.md), nicht im Quelltext
 // nachgelesen: Ein vorhandenes <svg> beweist nicht, dass es auch zeichnet.
@@ -62,9 +72,30 @@ async function seite(breite, hoehe) {
   return p;
 }
 
+// Der Mandantenfall, nachgebaut wie im Deploy: Wortmarke raus, Bildlogo
+// rein. Danach greift die CSS-Regel "#gate:has(.gate-oben img.marke)" und
+// die Signatur erscheint -- ohne Neuladen, weil :has() live auswertet.
+const MANDANT = () => {
+  const svg = document.querySelector('.gate-oben svg.marke');
+  if (!svg) { return false; }
+  const img = document.createElement('img');
+  img.className = 'marke';
+  img.src = 'icons/cupi24-badge.png';
+  img.alt = 'Mandantenlogo';
+  img.style.width = '170px';
+  svg.replaceWith(img);
+  return true;
+};
+
 // Eine Messung, mehrfach gebraucht.
 const MESSEN = () => {
   const wrap = document.querySelector('.gate-sig');
+  // Seit dem 2026-09-17 ist die Signatur nicht mehr das unterste Element:
+  // Unter ihr stehen die Rechtszeile und die Anmeldehilfe. Alles, was mit
+  // "unten am Rand" und "ueberdeckt das Formular" zu tun hat, wird darum
+  // am FUSS gemessen, nicht mehr an der Signatur -- sonst misst man den
+  // Abstand zu einem Rand, an dem sie gar nicht mehr steht.
+  const fuss = document.querySelector('.gate-fuss');
   const sig = document.querySelector('.gate-sig .go-sig');
   const label = document.querySelector('.gate-sig .go-label');
   const mitte = document.querySelector('.gate-mitte');
@@ -72,7 +103,7 @@ const MESSEN = () => {
   const gate = document.getElementById('gate');
   if (!wrap || !sig || !mitte) { return null; }
   const rs = sig.getBoundingClientRect();
-  const rw = wrap.getBoundingClientRect();
+  const rw = (fuss || wrap).getBoundingClientRect();
   const rm = mitte.getBoundingClientRect();
 
   // Tinte: getBBox in Nutzereinheiten, ueber die Bildschirmmatrix in Punkte.
@@ -116,8 +147,26 @@ const MESSEN = () => {
   };
 };
 
+// ── Punkt 9: ohne fremdes Logo KEINE Signatur ─────────────────────────
+// Gemessen am gerenderten Zustand, nicht am Vorhandensein im Quelltext:
+// Das Element steht immer im Dokument, sichtbar ist es nur im einen Fall.
+const roh = await seite(1440, 1000);
+check('KRITISCH: ohne Mandantenlogo signiert Guard OpS NICHT -- der Name stuende sonst zweimal da',
+  await roh.evaluate(() => {
+    const w = document.querySelector('.gate-sig');
+    return !!w && w.getBoundingClientRect().height === 0;
+  }));
+check('KRITISCH: und die Rechtszeile steht trotzdem da -- der Fuss faellt nicht mit weg',
+  await roh.evaluate(() => {
+    const r = document.querySelector('.gate-recht');
+    return !!r && r.getBoundingClientRect().height > 0;
+  }));
+await roh.close();
+
 // ── Desktop ────────────────────────────────────────────────────────────
 const d = await seite(1440, 1000);
+check('Der Mandantenfall laesst sich nachbauen (Wortmarke -> Bildlogo)', await d.evaluate(MANDANT));
+await d.waitForTimeout(120);
 const m = await d.evaluate(MESSEN);
 
 check('Die Signatur ist im Anmeldebildschirm vorhanden', m !== null);
@@ -169,6 +218,8 @@ await d.close();
 // im Alltag die Hoehe frisst.
 for (const [w, h] of [[430, 932], [390, 844], [360, 640], [320, 568]]) {
   const p = await seite(w, h);
+  await p.evaluate(MANDANT);
+  await p.waitForTimeout(120);
   for (const zweifaktor of [false, true]) {
     if (zweifaktor) {
       await p.evaluate(() => { document.getElementById('gate2fa').style.display = ''; });

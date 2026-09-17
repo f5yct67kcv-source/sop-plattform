@@ -278,7 +278,14 @@ svg.i-sm { width: 15px; height: 15px; }
   --sh-1: none;
   --sh-2: 0 8px 28px -8px rgba(0,0,0,.6);
   color-scheme: dark;
-  --gate-schleier: linear-gradient(rgba(10,11,15,.66), rgba(10,11,15,.82));
+  /* KEIN --gate-schleier mehr. Er ist auf Ansage des Projektinhabers
+     entfallen (Skizze 2026-09-17, Punkt 9): Die Nachtszene soll offen
+     daliegen, nicht gedaempft. app.html zeigt dieselbe Szene weiterhin MIT
+     Schleier -- das ist kein Versehen, sondern eine eigene Maske.
+     Was der Schleier bisher mitgetragen hat, traegt jetzt der Verlauf oben
+     (radial-gradient) allein. Ob der Text davor lesbar bleibt, ist keine
+     Geschmacksfrage: test_cockpit_gate.mjs misst den Kontrast an fuenf
+     Zeitpunkten des laufenden Videos und noch einmal am Standbild. */
 }
 /* margin:auto statt align-items/justify-content:center (wie app.html):
    reicht die Hoehe nicht (kleines Geraet, offene Tastatur, 2FA-Feld
@@ -331,18 +338,63 @@ svg.i-sm { width: 15px; height: 15px; }
    360x640. Am Desktop sieht das Ergebnis unveraendert aus, nur die
    Mechanik ist eine andere -- und eine, die nicht kippt.
    "position: relative; z-index: 2" ist Pflicht und keine Zierde: Ab 900 px
-   liegen Video und .gate-schleier als absolut gesetzte Ebenen ueber dem
-   Fluss. Solange die Signatur in .gate-mitte stand, schuetzte sie deren
-   z-index; als eigenes Kind von #gate verschwand sie beim ersten Versuch
-   unter dem Schleier. Gemessen war sie dabei vorhanden, sichtbar, richtig
-   gross und richtig gefaerbt -- nur eben uebermalt. Gesehen hat es erst
-   ein Bildschirmfoto, gehalten wird es jetzt von der Deckungspruefung in
-   test_gate_signatur.mjs. */
-.gate-sig { flex: none; margin-top: 34px; display: flex; align-items: center;
-            justify-content: center; gap: 10px; position: relative; z-index: 2; }
+   liegt das Video als absolut gesetzte Ebene ueber dem Fluss. Solange die
+   Signatur in .gate-mitte stand, schuetzte sie deren z-index; als eigenes
+   Kind von #gate verschwand sie beim ersten Versuch unter dem damaligen
+   Schleier. Gemessen war sie dabei vorhanden, sichtbar, richtig gross und
+   richtig gefaerbt -- nur eben uebermalt. Gesehen hat es erst ein
+   Bildschirmfoto, gehalten wird es jetzt von der Deckungspruefung in
+   test_gate_signatur.mjs. Der Schleier ist inzwischen weg, das Video
+   liegt weiterhin dort -- die Regel bleibt also noetig. */
+.gate-fuss { flex: none; margin-top: 34px; position: relative; z-index: 2;
+             display: flex; flex-direction: column; align-items: center; gap: 12px; }
+/* Die Herstellersignatur steht nur da, wo oben ein FREMDES Logo haengt --
+   beim Mandanten also, dessen Buendel die Wortmarke durch ein <img> mit
+   dem eigenen Logo ersetzt (deploy-hostpoint.yml). Wo oben schon Guard OpS
+   steht, stuende der Name sonst zweimal auf einer Maske, die sonst kaum
+   Text traegt (Befund des Projektinhabers, Skizze 2026-09-17, Punkte 7
+   und 8).
+   Bewusst in CSS und nicht im Skript: Die Ersetzung beim Deploy ist eine
+   einzige sed-Zeile, und :has() fragt genau das ab, was sie hinterlaesst.
+   Ein Schalter im Skript braeuchte eine zweite Kennzeichnung, die beim
+   naechsten Umbau des Buendels vergessen werden koennte -- und waere
+   abhaengig davon, wann er laeuft. */
+.gate-sig { display: none; align-items: center; justify-content: center; gap: 10px; }
+#gate:has(.gate-oben img.marke) .gate-sig { display: flex; }
 .gate-sig .go-label { font-size: 11px; letter-spacing: .08em;
                       color: var(--ink-3); opacity: .8; }
 .gate-sig .go-sig { height: 27px; width: auto; display: block; color: var(--ink-3); }
+/* Rechtszeile und Hilfe. --ink-2 und nicht die zurueckgenommenere Stufe
+   --ink-3 der Signatur: Gemessen reicht #868D9A auf der Nachtszene OHNE
+   Schleier an der Fussleiste nicht mehr auf 4.5:1 -- dort liegt der helle
+   Boden mit den Spiegelungen. Vor dem 2026-09-17 trug das der Schleier;
+   seit er weg ist, muss es die Schriftfarbe tragen. Nachgewiesen in
+   test_cockpit_gate.mjs an fuenf Zeitpunkten des Videos und am Standbild. */
+.gate-recht { display: flex; flex-wrap: wrap; align-items: center;
+              justify-content: center; gap: 2px; font-size: 12px; color: var(--ink-2); }
+/* min-height statt Innenabstand: 44 px sind die Trefferflaeche am Handy
+   (CLAUDE.md), und die muss stehen, egal wie hoch die Zeile gerade ist.
+   inline-flex, weil ein min-height an einem Inline-Element wirkungslos
+   bliebe -- die Regel waere da und taete nichts. */
+.gate-recht a, .gate-recht .gate-hilfe-knopf {
+  color: var(--ink-2); text-decoration: none; font: inherit; background: none;
+  border: none; cursor: pointer; padding: 0 6px;
+  min-height: 44px; display: inline-flex; align-items: center; }
+.gate-recht a:hover, .gate-recht .gate-hilfe-knopf:hover {
+  color: var(--ink); text-decoration: underline; }
+.gate-recht .trenn { opacity: .5; }
+/* Die Hilfe ist ein Textfeld, kein Formular -- und genau das ist der
+   Punkt: Wer hier eine Adresse eintippen koennte, um ein Passwort
+   zuruecksetzen zu lassen, haette einen Weg ins Cockpit, der an der
+   Verwaltung des Betriebs vorbeifuehrt. Den gibt es nicht und soll es
+   nicht geben (Ansage des Projektinhabers, 2026-09-17).
+   test_cockpit_gate.mjs weist nach, dass im Gate ausser Name, Passwort
+   und 2FA-Code kein Eingabefeld steht. */
+.gate-hilfe { max-width: 348px; padding: 12px 14px; border-radius: 10px;
+  background: rgba(15,17,23,.72); border: 1px solid var(--line);
+  font-size: 12.5px; line-height: 1.55; color: var(--ink-2); text-align: center; }
+.gate-hilfe[hidden] { display: none; }
+.gate-hilfe a { color: var(--accent); }
 #gate .inp { background: var(--surface-2); }
 #gate .inp:focus { background: var(--surface); }
 #gate .pw-toggle { opacity: .75; }
@@ -366,27 +418,40 @@ svg.i-sm { width: 15px; height: 15px; }
    Medienabfrage unten stehen -- genau der Fehler, der beim ersten Bau
    dieser Datei (ENT-395) tatsaechlich passiert ist und nur am
    gerenderten Zustand auffiel, nicht im Quelltext. */
-.gate-video, .gate-schleier { display: none; }
+.gate-video { display: none; }
 @media (min-width: 900px) {
   #gate { background:
     radial-gradient(80% 68% at 50% 14%, #1C2639 0%, rgba(28,38,57,0) 66%),
-    var(--gate-schleier),
     url('img/anmeldung-nacht.webp') 62% center / cover no-repeat,
     #0F1117; }
   .gate-mitte { max-width: 400px; }
-  .gate-oben .marke { width: 340px; height: auto;
+  /* 255 statt 340 px breit -- das ergibt bei einem Seitenverhaeltnis von
+     4.23:1 die 60 px Hoehe aus der Skizze (Punkt 2). Gesetzt wird die
+     BREITE: eine gesetzte Hoehe bei gesetzter Breite verzerrt die
+     Zeichnung, und die Skizze misst nur das Ergebnis des Ziehens, nicht
+     den Weg dahin.
+     Nur hier im Desktop-Block: Der Handy-Zuschnitt ist eine eigene
+     Entscheidung und wurde nicht beanstandet (CLAUDE.md). */
+  .gate-oben .marke { width: 255px; height: auto;
     filter: drop-shadow(0 22px 44px rgba(0,0,0,.8)); }
   .gate-oben .gate-demo-gruss { margin-top: 20px; font-size: 17px; }
   .gate-oben { margin-bottom: 44px; }
+  /* Luft zwischen Passwortfeld und Anmeldeknopf (Skizze 2026-09-17,
+     Punkt 6). Nur am Desktop: Am Handy waere derselbe Abstand verlorene
+     Hoehe, und der mobile Zuschnitt wurde nicht beanstandet.
+     118 statt der 58 px aus der Skizze: Die Skizze nennt den Zug des
+     Knopfes, ihr Zielwert ist die Endlage (y=648 bei 1728x971). Weil
+     .gate-mitte mittig haengt, verteilt sich jeder zusaetzliche Abstand
+     zur Haelfte nach oben -- 58 px Abstand ergaeben 44 px Weg. Gemessen
+     landet der Knopf mit 118 px bei y=644, die Marke bei y=216.
+     Die Deckelung ueber vh: Auf einem flachen Schirm (1280x720) frisst
+     ein fester Abstand die Hoehe, die das Formular braucht, und alles
+     wandert in den Bildlauf. min() nimmt dort den kleineren Wert. */
+  #gate #gBtn { margin-top: min(118px, 12vh); }
   .gate-video { display: block; position: absolute; inset: 0; width: 100%; height: 100%;
     object-fit: cover; object-position: 62% center; z-index: 0; }
-  /* Deutlich kraeftiger als vor ENT-396 (.42/.58): dort schuetzte die
-     Karte den Text, der Schleier war reine Tiefenwirkung. Jetzt liegt
-     Text direkt auf dem Video -- derselbe Wert wie in app.html. */
-  .gate-schleier { display: block; position: absolute; inset: 0; z-index: 1;
-    background: var(--gate-schleier); }
   @media (prefers-reduced-motion: reduce) {
-    .gate-video, .gate-schleier { display: none; }
+    .gate-video { display: none; }
   }
 }
 
@@ -5003,10 +5068,16 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     <source src="img/anmeldung-nacht.webm" type="video/webm">
     <source src="img/anmeldung-nacht.mp4" type="video/mp4">
   </video>
-  <div class="gate-schleier"></div>
   <div class="gate-mitte">
     <div class="gate-oben">
       <svg class="marke" viewBox="0.00 0.00 649.83 153.56" role="img" aria-label="Guard OpS"><use href="#go-wort"/></svg>
+      <!-- Bereichsname und Demo-Gruss schliessen sich aus (Skizze
+           2026-09-17, Punkt 3): Im Demobereich sagt der Gruss, wo man ist,
+           und "Cockpit" darueber waere eine zweite Ortsangabe in zwei
+           Zeilen. Ueberall sonst bleibt der Bereichsname stehen -- ohne
+           ihn saehe die Maske eines Mandanten aus wie jede andere
+           Anmeldung dieses Betriebs, und der Weg in die Mitarbeiter-App
+           heisst nicht Cockpit. Umgeschaltet wird unten im Skript. -->
       <div class="wm" id="gateWm">Cockpit</div>
       <div class="gate-demo-gruss" id="gateDemoGruss" hidden>Willkommen im Demobereich</div>
     </div>
@@ -5054,17 +5125,33 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     </div>
   </div>
 
-  <!-- Guard OpS als Herstellersignatur. Geschwister von .gate-mitte und
-       NICHT darin: Erst als eigenes Kind von #gate schiebt die
-       Aussenabstand-Automatik von .gate-mitte sie an den unteren Rand
-       (siehe die Regel zu .gate-sig im Stilblock). Innerhalb des Blocks
-       waere sie Teil des zentrierten Inhalts und stuende mitten auf der
-       Flaeche.
-       Das aria-label traegt den Namen, weil "uard OpS" ohne die
-       Bildmarke wie ein Tippfehler laese. -->
-    <div class="gate-sig">
-      <span class="go-label">powered by</span>
-      <svg class="go-sig" viewBox="0.00 0.00 649.83 153.56" role="img" aria-label="Guard OpS"><use href="#go-wort"/></svg>
+  <!-- Fuss. Geschwister von .gate-mitte und NICHT darin: Erst als eigenes
+       Kind von #gate schiebt die Aussenabstand-Automatik von .gate-mitte
+       ihn an den unteren Rand (siehe die Regel zu .gate-fuss im
+       Stilblock). Innerhalb des Blocks waere er Teil des zentrierten
+       Inhalts und stuende mitten auf der Flaeche. -->
+    <div class="gate-fuss">
+      <!-- Herstellersignatur. Nur beim Mandanten sichtbar, siehe die Regel
+           zu .gate-sig. Das aria-label traegt den Namen, weil "uard OpS"
+           ohne die Bildmarke wie ein Tippfehler laese. -->
+      <div class="gate-sig" id="gateSig">
+        <span class="go-label">powered by</span>
+        <svg class="go-sig" viewBox="0.00 0.00 649.83 153.56" role="img" aria-label="Guard OpS"><use href="#go-wort"/></svg>
+      </div>
+      <!-- Absolute Adressen, kein relativer Pfad: impressum.html und
+           datenschutz.html liegen nur im guardops-Buendel
+           (deploy-hostpoint.yml). Ein relativer Link liefe hier, im
+           Demo-, Mandanten- und Portal-Buendel, ins Leere. -->
+      <div class="gate-recht">
+        <a href="https://guardops.ch/impressum.html">Impressum</a>
+        <span class="trenn" aria-hidden="true">·</span>
+        <a href="https://guardops.ch/datenschutz.html">Datenschutz</a>
+        <span class="trenn" aria-hidden="true">·</span>
+        <button type="button" class="gate-hilfe-knopf" id="gateHilfeKnopf"
+                aria-expanded="false" aria-controls="gateHilfe"
+                onclick="gateHilfeUmschalten()">Probleme bei der Anmeldung?</button>
+      </div>
+      <div class="gate-hilfe" id="gateHilfe" hidden></div>
     </div>
 </div>
 
@@ -32719,6 +32806,31 @@ function kdRapportTeilen(id, knopf) {
   });
 }
 
+// ══════════════════════════════════════════ ANMELDEHILFE
+// Ein Textfeld, kein Formular. Es gibt hier bewusst KEINEN Weg, ueber eine
+// eingetippte Adresse ein Passwort zuruecksetzen zu lassen: Das waere ein
+// Zugang ins Cockpit, der an der Verwaltung des Betriebs vorbeifuehrt
+// (Ansage des Projektinhabers, 2026-09-17). Wer nicht hereinkommt, wendet
+// sich an die Stelle, die sein Konto angelegt hat -- im Demobereich an uns.
+const GATE_HILFE_DEMO =
+  'Der Demobereich läuft mit festen Zugangsdaten. Sie stehen in der E-Mail, '
+  + 'mit der Sie den Zugang bekommen haben. Noch keinen Zugang? '
+  + '<a href="https://guardops.ch/#demo">Demo anfragen</a>.';
+const GATE_HILFE_BETRIEB =
+  'Zugangsdaten vergibt die Verwaltung Ihres Betriebs. Ein Passwort lässt '
+  + 'sich hier nicht selbst zurücksetzen — wer Ihr Konto verwaltet, kann es '
+  + 'neu setzen.';
+
+function gateHilfeUmschalten() {
+  const feld = $('gateHilfe'), knopf = $('gateHilfeKnopf');
+  if (!feld.innerHTML) {
+    feld.innerHTML = window.APP_UMGEBUNG_DEMO ? GATE_HILFE_DEMO : GATE_HILFE_BETRIEB;
+  }
+  const zu = feld.hidden;
+  feld.hidden = !zu;
+  knopf.setAttribute('aria-expanded', zu ? 'true' : 'false');
+}
+
 // ══════════════════════════════════════════ START
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
@@ -32748,7 +32860,10 @@ $('sideWm').textContent = APP_NAME;
 
 // Gruss auf der Anmeldemaske nur in der Demo-Umgebung (testumgebung.js setzt
 // das Flag) -- ein echter Mandant soll nie "Willkommen im Demobereich" lesen.
-if (window.APP_UMGEBUNG_DEMO) { $('gateDemoGruss').hidden = false; }
+if (window.APP_UMGEBUNG_DEMO) {
+  $('gateDemoGruss').hidden = false;
+  $('gateWm').hidden = true;
+}
 
 // Wer automatisch abgemeldet wurde, steht sonst vor einer leeren
 // Anmeldemaske und haelt es fuer einen Fehler (ENT-293). "Abgelaufen" und
