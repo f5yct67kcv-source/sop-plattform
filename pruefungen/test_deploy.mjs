@@ -119,7 +119,8 @@ for (const seite of [...seiten, ...phpDateien]) {
    ein Schluessel, der nie ankommt; eine Ersetzung ohne Platzhalter waere
    eine Zeile, die nichts tut. */
 for (const [datei, platzhalter] of [
-  ['backend/push.php', ['__VAPID_PRIVATE_PEM_B64__', '__VAPID_KONTAKT__']],
+  ['backend/push.php', ['__VAPID_PRIVATE_PEM_B64__', '__VAPID_KONTAKT__',
+    '__APNS_KEY_P8_B64__', '__APNS_KEY_ID__', '__APNS_TEAM_ID__']],
   ['backend/api/push_versand.php', ['__PUSH_CRON_SCHLUESSEL__']],
 ]) {
   const inhalt = readFileSync(`${WURZEL}/${datei}`, 'utf8');
@@ -127,6 +128,20 @@ for (const [datei, platzhalter] of [
     check(`${datei} traegt den Platzhalter ${ph}`, inhalt.includes(ph));
     check(`KRITISCH: ${ph} wird beim Deploy auch ersetzt`,
       new RegExp(`sed -i "s\\|${ph}\\|`).test(workflow));
+  }
+}
+
+/* push.php geht in ZWEI Buendel (dist/ und dist-cupi24/, ENT-604) -- die
+   generische Pruefung oben schlaegt schon an, wenn IRGENDEINE der beiden
+   Zeilen existiert. Hier zusaetzlich JEDES Ziel einzeln, dieselbe Strenge
+   wie bei __MAPS_JS_KEY__ weiter oben. Gegenprobe gemacht: eine der sechs
+   Zeilen entfernt, genau diese Aussage wurde rot -- die generische blieb
+   gruen. */
+for (const ziel of ['dist/push.php', 'dist-cupi24/push.php']) {
+  for (const ph of ['__APNS_KEY_P8_B64__', '__APNS_KEY_ID__', '__APNS_TEAM_ID__']) {
+    check(`KRITISCH: ${ph} wird auch in ${ziel} ersetzt (nicht nur im jeweils anderen Buendel)`,
+      new RegExp(`sed -i "s\\|${ph}\\|\\$EFF_${ph.slice(2, -2)}\\|g" ${ziel.replace('.', '\\.')}`)
+        .test(workflow));
   }
 }
 
@@ -1486,16 +1501,61 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     /CUPI 24 – Mitarbeitende/.test(bauen) && /dist-cupi24\/manifest-app\.json/.test(bauen)
     && /Stundenrapport – CUPI 24/.test(bauen) && /dist-cupi24\/manifest\.json/.test(bauen));
 
+  // sw.js traegt seit ENT-603 die MARKE im Quelltext (nicht mehr die
+  // Mandantin) -- das cupi24-Bündel haengt PUSH_TITEL, Icon/Badge und das
+  // Benachrichtigungs-Kennzeichen im Deploy-Workflow um, dieselbe Bauart
+  // wie bei den Web-App-Manifesten.
   {
     const swjs = readFileSync(`${WURZEL}/sw.js`, 'utf8');
-    check('KRITISCH: PUSH_TITEL in sw.js ist mandantenseitig und trägt bereits "CUPI 24" (ENT-568) -- keine Ersetzung im Deploy nötig',
-      /const PUSH_TITEL = 'CUPI 24'/.test(swjs));
+    check('KRITISCH: PUSH_TITEL in sw.js trägt im Quelltext die Marke (GuardOpS), nicht die Mandantin',
+      /const PUSH_TITEL = 'GuardOpS'/.test(swjs));
   }
+
+  check('KRITISCH: das cupi24-Bündel haengt PUSH_TITEL im sw.js auf CUPI 24 um',
+    /sed -i "s\|const PUSH_TITEL = 'GuardOpS';\|const PUSH_TITEL = 'CUPI 24';\|[\s\S]{0,120}dist-cupi24\/sw\.js/.test(bauen));
+
+  check('KRITISCH: sw.js ist Teil DERSELBEN icons/guardops- -> icons/cupi24--Umhaengung wie das Favicon (Push-Icon/-Badge)',
+    /sed -i "s\|icons\/guardops-\|icons\/cupi24-\|g" \\[\s\S]{0,250}dist-cupi24\/sw\.js/.test(bauen));
 
   for (const tok of ['icons/cupi24-', 'cupi24-badge.png']) {
     const zaehlung = (text) => (text.match(new RegExp(tok.replace(/[.]/g, '\\.'), 'g')) || []).length;
     check(`KRITISCH: "${tok}" kommt im ganzen Workflow ausschliesslich im cupi24-Bau-Schritt vor -- sonst bliebe das GuardOpS-Branding der geteilten Bündel nicht unangetastet`,
       zaehlung(bauen) > 0 && zaehlung(workflow) === zaehlung(bauen));
+  }
+}
+
+/* GitHub selbst weist einen einzelnen "run:"-Block ab, sobald sein
+   Rohtext eine bestimmte Laenge ueberschreitet -- ohne dass irgendeine
+   YAML-Regel das anzeigt: die Datei bleibt gueltiges YAML, ein Duplikat-
+   Schluessel-Pruefer findet nichts, und lokal laeuft alles. Es faellt
+   erst beim echten Deploy auf, und dann sofort komplett: GitHub kann die
+   Datei dann ueberhaupt nicht mehr einlesen (0 Jobs, der Lauf traegt statt
+   des Namens den Dateipfad).
+   Genau das ist beim Bauen von ENT-604 passiert: der grosse "Umgebung
+   waehlen"-Schritt lag mit 24909 Zeichen schon nahe an der Grenze; neun weitere
+   Zeilen fuer APNs (ENT-604) haben sie auf 25561 gerissen. Empirisch
+   eingegrenzt (ueber echte, manuell ausgeloeste Laeufe -- nicht geraten):
+   24765 Zeichen laufen durch, 25561 nicht. Die genaue Grenze dazwischen
+   ist nicht bekannt; die Zahl 21000 aus GitHubs eigener Fehlermeldung
+   ("Exceeded max expression length 21000") ist jedenfalls nicht direkt
+   die Rohlaenge. GRENZE liegt darum nahe dem bestaetigt LAUFENDEN Wert,
+   mit etwas Luft nach oben -- wer sie anhebt, um diese Pruefung stumm zu
+   schalten, hebt sie ueber Boden auf, den niemand vermessen hat. */
+{
+  const GRENZE = 25000;
+  // Jeden "run: |"-Block bis zum naechsten Geschwister-Schritt (naechstes
+  // "- name:") oder Dateiende vermessen.
+  const namen = [...workflow.matchAll(/\n( +)- name: ([^\n]*)\n/g)];
+  for (let i = 0; i < namen.length; i++) {
+    const [, einrueckung, name] = namen[i];
+    const start = namen[i].index + namen[i][0].length;
+    const ende = i + 1 < namen.length ? namen[i + 1].index : workflow.length;
+    const abschnitt = workflow.slice(start, ende);
+    const runStart = abschnitt.indexOf(`${einrueckung}  run: |\n`);
+    if (runStart === -1) { continue; }
+    const laenge = abschnitt.length - runStart;
+    check(`KRITISCH: run-Block "${name}" bleibt unter ${GRENZE} Zeichen (GitHub weist zu grosse Bloecke komplett ab) -- ${laenge}`,
+      laenge < GRENZE);
   }
 }
 

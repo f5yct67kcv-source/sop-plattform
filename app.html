@@ -237,6 +237,20 @@ svg.i-sm { width: 17px; height: 17px; }
 .btn-pos { background: var(--pos-soft); color: var(--pos); border-color: var(--pos-line); }
 .btn-neg { background: var(--neg-soft); color: var(--neg); border-color: var(--neg-line); }
 .btn-wide { width: 100%; }
+/* Ein Knopf, der allein in seiner Zeile steht, wird nicht ueber die volle
+   Breite gestreckt, nur weil Platz da ist. Gestreckt sass der Einstieg im
+   Reiter "Rapport" als breiter Farbblock direkt unter dem Kopf und las
+   sich wie dessen Fortsetzung. Schmaler und mittig steht er als eigenes
+   Element da. .btn ist inline-flex -- fuers Mittigstellen ueber
+   margin-inline braucht es display:flex. Die Obergrenze haelt ihn am
+   Desktop in Knopfgroesse, statt ihn auf 72 % von 1200 px mitwachsen zu
+   lassen. */
+.btn-mitte, .cta-unter { width: 72%; max-width: 280px; margin-inline: auto; }
+.btn-mitte { display: flex; }
+/* Die Unterzeile gehoert zum Knopf und bekommt darum dieselbe Breite --
+   sonst stuende sie weiter mittig, waehrend der Knopf am Schreibtisch nach
+   links rueckt. */
+.cta-unter { font-size: 13px; color: var(--ink-3); text-align: center; margin-bottom: 6px; }
 /* Ein Knopf mit Unterzeile (ENT-324). Der Grundknopf ist eine waagrechte
    Flex-Reihe mit nowrap -- ein zweizeiliger Inhalt braucht darum beides
    umgestellt, sonst stuenden Titel und Erklaerung nebeneinander und der
@@ -1732,6 +1746,12 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
      Text; sie ueber 1590 px zu ziehen macht sie nicht lesbarer, nur
      leerer. Dieselbe Grenze wie fuer jede andere Textseite. */
   #plan-inhalt-sperren, #plan-inhalt-abwesenheit { max-width: 1200px; }
+  /* Aus demselben Grund steht der mittige Knopf am Schreibtisch links:
+     Mittig in einer 1200 px breiten Spalte schwebte er allein ueber der
+     linksbuendigen Ueberschrift und der Liste darunter -- gemessen, Mitte
+     bei 626 px gegen eine Kante bei 26 px. Am Handy bleibt er mittig; dort
+     ist die Spalte schmal und die Unterzeile steht ohnehin mittig. */
+  .btn-mitte, .cta-unter { margin-inline: 0 auto; }
 
   /* ── Zweite Leiste (ENT-447) ────────────────────────────────────────
      Am Schreibtisch fuehrt die Schreibtisch-Leiste, die Handy-Leiste
@@ -2944,6 +2964,7 @@ function starten() {
   // der keine Leiste passt, sieht aus wie ein Fehler.
   if (amSchreibtisch()) zeigeTisch('plan'); else tischMarkeSetzen();
   allesLaden();
+  pushNativEinrichten();
   // Ueberlebt einen Geraeteneustart oder App-Neuinstallation zwischen den
   // Sitzungen: liegen aus einer frueheren, offline gebliebenen Rundgang-
   // Meldung noch Eintraege in localStorage, wird jetzt ein Sendeversuch
@@ -3971,11 +3992,16 @@ function zeichneRapport() {
   // Keine Stundensumme mehr aus den Rapporten (ENT-049) -- massgeblich ist
   // die abgeglichene Zeit unter Profil > Meine Stunden. Eine zweite Zahl
   // zwei Fingertipps daneben haette ihr nur widersprochen.
-  let html = `<a class="btn btn-primary btn-wide" href="index.html" style="margin-bottom:8px">
+  // Das Rapport Tool liegt im Buendel unter "rapport-tool.html" neben der
+  // kopierten app.html (siehe mobile-buendel-erstellen.py) -- bleibt damit
+  // in der App statt extern in Safari zu oeffnen (anders als der
+  // Cockpit-Link: dashboard.html gehoert nicht zum Werkzeug der Waechter
+  // und wird bewusst nicht mitgebuendelt).
+  let html = `<a class="btn btn-primary btn-mitte" href="${nativeAppHuelle() ? 'rapport-tool.html' : 'index.html'}" style="margin-top:10px;margin-bottom:8px">
       <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       ${esc(w('neuerRapport'))}
     </a>
-    <p style="font-size:13px;color:var(--ink-3);text-align:center;margin-bottom:6px">${esc(w('zurErfassung'))}</p>
+    <p class="cta-unter">${esc(w('zurErfassung'))}</p>
     <div class="titel">${esc(w('meineRapporte'))}</div>`;
 
   if (!rapporte.length) {
@@ -4280,6 +4306,70 @@ function pushGeraeteName() {
             : /Macintosh/.test(ua) ? 'Mac'
             : /Windows/.test(ua) ? 'Windows' : 'Gerät';
   return art + (appInstalliert() ? ' (App)' : ' (Browser)');
+}
+
+/* ── Natives Push in der Store-App-Huelle (ENT-604) ─────────────────────
+
+   Eigener, von pushMoeglichHier()/pushStand GETRENNTER Weg: Jenes Sechs-
+   Zustaende-Modell ist auf den Browser zugeschnitten (Notification.
+   permission, Service-Worker-Registrierung) -- in der nativen Huelle gibt
+   es beides nicht, dafuer das Capacitor-Plugin. Statt das Modell zu
+   verbiegen, fragt die native Huelle die Erlaubnis wie jede gewoehnliche
+   App: einmal, automatisch, über den System-Dialog. Kein eigener Schalter
+   im Menü dafür -- lehnt jemand ab, steht die Rücknahme wie ueberall auf
+   dem iPhone/Android in den System-Einstellungen, nicht in dieser App.
+
+   Der Knopf "Benachrichtigungen" im Menü bleibt darum in der nativen
+   Huelle weiterhin ausgeblendet (pushMoeglichHier() bleibt unveraendert
+   false dort) -- er gehoert zum Web-Push-Weg, nicht zu diesem. */
+function pushMoeglichNativ() {
+  return nativeAppHuelle() && !!(window.Capacitor && window.Capacitor.Plugins
+    && window.Capacitor.Plugins.PushNotifications);
+}
+
+// 'apns' auf iOS, 'fcm' auf Android -- dieselben Kanalnamen wie in
+// backend/push.php (PUSH_KANAELE). FCM ist dort noch nicht zustellfaehig
+// (ENT-604, zweiter Bauabschnitt); die Registrierung darf trotzdem schon
+// laufen, sie wird serverseitig nur noch nicht angeschrieben.
+function nativePlattform() {
+  const p = (window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || '';
+  return p === 'ios' ? 'apns' : (p === 'android' ? 'fcm' : '');
+}
+
+function pushNativEinrichten() {
+  if (!pushMoeglichNativ()) { return; }
+  const PN = window.Capacitor.Plugins.PushNotifications;
+
+  PN.addListener('registration', token => {
+    const kanal = nativePlattform();
+    if (!kanal || !token || !token.value) { return; }
+    // Eigene Daten, dieselbe Sitzung wie ueberall -- kein besonderes Recht
+    // noetig (siehe push_einrichtung.php).
+    api('push_einrichtung.php', { method: 'POST',
+      body: { kanal, endpunkt: token.value, geraet: pushGeraeteName() } }).catch(() => {});
+  });
+  // Kein Alarm bei einem einzelnen Geraet, das sich nicht registrieren
+  // laesst -- das ist kein Systemfehler, hoechstens ein einzelnes
+  // fehlendes Geraet in der Empfaengerliste.
+  PN.addListener('registrationError', () => {});
+  // Tipp auf die Benachrichtigung: Die App laedt beim Sichtbarwerden
+  // ohnehin neu (allesLaden()) -- hier ist nichts weiter zu tun, genau wie
+  // beim Web-Push-Gegenstueck in sw.js.
+  PN.addListener('pushNotificationActionPerformed', () => {});
+
+  PN.checkPermissions().then(stand => {
+    const erlaubnis = stand && stand.receive;
+    if (erlaubnis === 'granted') { return PN.register(); }
+    // NUR bei "prompt" fragen -- ein bereits "denied" nicht ein zweites
+    // Mal versuchen: iOS zeigt den Systemdialog dafuer ohnehin kein
+    // zweites Mal, und ein eigener Hinweis waere eine Aufforderung zu
+    // etwas, das die Person schon einmal abgelehnt hat.
+    if (erlaubnis === 'prompt' || erlaubnis === 'prompt-with-rationale') {
+      return PN.requestPermissions().then(ergebnis => {
+        if (ergebnis && ergebnis.receive === 'granted') { return PN.register(); }
+      });
+    }
+  }).catch(() => {});
 }
 
 // Der erklaerende Satz zum aktuellen Zustand. Getrennt vom Zeichnen,
@@ -5218,7 +5308,7 @@ function rundgangUebersichtLaden() {
         // nicht vorbei; dort waere der Knopf eine leere Zusage.
         + (gesperrt ? '' : `<button class="btn btn-plain btn-wide" style="margin-top:10px"
              onclick="rundgangUebersichtOeffnen()">${esc(w('nochmal'))}</button>`);
-      $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="zeige('waechter')">${esc(w('zurueck'))}</button>`;
+      $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="blattZu()">${esc(w('zurueck'))}</button>`;
       blattZeigen();
       return;
     }
@@ -5231,7 +5321,7 @@ function rundgangUebersichtLaden() {
           </button>`).join('')}</div>`
       : LEER(w('waechterUebersichtLeer'), w('waechterUebersichtLeerText'),
           '<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/>');
-    $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="zeige('waechter')">${esc(w('zurueck'))}</button>`;
+    $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="blattZu()">${esc(w('zurueck'))}</button>`;
     blattZeigen();
   });
 }

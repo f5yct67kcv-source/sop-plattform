@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<!--
+  DATENSCHUTZERKLAERUNG FUER DEN DEMOBEREICH (demo.guardops.ch).
+
+  EIGENE SEITE, NICHT EINE ERWEITERUNG VON datenschutz.html: Jene
+  beschreibt die Verkaufsseite guardops.ch -- eine Seite ohne Anmeldung,
+  ohne Sitzung und ohne Datenbank. Der Demobereich ist die Software
+  selbst: Er meldet an, legt eine Sitzung an und schreibt in eine
+  Datenbank. Beides in einen Text zu zwingen hiesse, jeden Absatz mit
+  "auf der Verkaufsseite ... im Demobereich dagegen ..." zu beginnen.
+
+  JEDE AUSSAGE HIER IST AUS DEM CODE ABGELEITET, nicht aus einer Vorlage
+  abgeschrieben:
+    - keine Cookies:            dashboard.html setzt keine (kein
+                                document.cookie), die Sitzung liegt im
+                                lokalen Speicher des Browsers
+    - Fehlversuche:             backend/anmeldung.php -- Login-Name und
+                                Absenderadresse im Klartext, Aufraeumen
+                                nach einem Tag
+    - Sitzung:                  in "sessions" steht nur der Abdruck des
+                                Tokens (sitzung_abdruck(), ENT-501), nie
+                                der Rohwert
+    - naechtliches Leeren:      .github/workflows/demo-reset.yml (02:00
+                                UTC) ueber backend/demo_reset.php, das
+                                JEDE Tabelle der Demo-Datenbank leert
+    - ein gemeinsamer Zugang:   ENT-523/ENT-587 -- die Zugangsdaten sind
+                                fuer alle Interessenten dieselben
+  Aendert sich einer dieser Punkte im Code, wird diese Seite falsch --
+  test_recht.mjs haelt die pruefbaren davon gegen den Code.
+
+  DER ABSCHNITT ZUR NUTZUNGSANALYSE BESCHREIBT EIN VORHABEN, KEINEN
+  ZUSTAND. Er steht auf ausdruecklichen Wunsch des Projektinhabers
+  (2026-09-17) hier, damit die Absicht offenliegt, bevor sie gebaut wird.
+  Solange er in dieser Form dasteht, wird nichts gemessen; das haelt
+  test_recht.mjs gegen den Code. Wird die Auswertung gebaut, muss dieser
+  Abschnitt VORHER in die Gegenwart gesetzt werden.
+
+  KEINE RECHTSBERATUNG. Der Text beschreibt, was die Software tut. Ob er
+  als Datenschutzerklaerung genuegt, ist eine juristische Frage und
+  ausdruecklich offen (OP-564).
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Datenschutz im Demobereich – GuardOpS</title>
+<meta name="description" content="Welche Daten im Demobereich von GuardOpS anfallen – Anmeldung, Sitzung, Beispieldaten und das nächtliche Leeren der Demo-Datenbank.">
+<link rel="canonical" href="https://guardops.ch/datenschutz-demo.html">
+<meta name="robots" content="index,follow">
+<link rel="icon" href="icons/guardops-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icons/guardops-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="icons/guardops-180.png">
+<link rel="stylesheet" href="recht.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="marke" viewBox="0 0 460 593">
+    <path fill="currentColor" d="M230 0 460 79 460 154 416 154 416 109.9 230 46 44 109.9 44 364.4 230 535 416 364.4 416 308 206 308 233 264 460 264 460 382 230 593 0 382 0 79Z"/>
+  </symbol>
+</svg>
+
+<header class="kopf">
+  <div class="innen">
+    <a class="marke" href="index.html">
+      <svg aria-hidden="true"><use href="#marke"></use></svg>
+      <span class="wortmarke" data-brand>GuardOpS</span>
+    </a>
+    <a class="zurueck" href="index.html">Zurück zur Startseite</a>
+  </div>
+</header>
+
+<main>
+  <p class="vorzeile">Rechtliches</p>
+  <h1>Datenschutz im Demobereich</h1>
+  <p class="stand">Stand: 17. September 2026</p>
+
+  <h2>Kurz gefasst</h2>
+  <p>Der Demobereich ist eine Vorführanlage, keine Betriebsumgebung. Alle
+     Interessenten melden sich mit <strong>denselben Zugangsdaten</strong> an und
+     sehen dieselben Daten. Was Sie dort eintragen, sehen die anderen also auch.
+     Jede Nacht wird der gesamte Inhalt gelöscht und der Musterbetrieb neu
+     aufgebaut.</p>
+  <p><strong>Tragen Sie dort keine echten Personen-, Kunden- oder Objektdaten
+     ein.</strong> Weder Ihre eigenen noch die Ihrer Auftraggeber oder
+     Mitarbeitenden.</p>
+  <p>Für die Verkaufsseite guardops.ch gilt eine
+     <a href="datenschutz.html">eigene Datenschutzerklärung</a>. Sie beschreibt das
+     Kontaktformular; diese Seite beschreibt die Software.</p>
+
+  <h2>1. Wer verantwortlich ist</h2>
+  <p>Verantwortlich für die Bearbeitung der im Demobereich anfallenden Daten ist
+     die <strong>pzu consulting gmbh</strong>, Hochgasse 7, 4632 Trimbach, Schweiz.
+     Die vollständigen Angaben stehen im <a href="impressum.html">Impressum</a>.</p>
+  <p>Fragen zum Datenschutz gehen an
+     <a href="mailto:info@guardops.ch">info@guardops.ch</a>.</p>
+
+  <h2>2. Was der Demobereich ist</h2>
+  <p>Er läuft auf einer <strong>eigenen Datenbank</strong>, getrennt von jeder
+     produktiv genutzten Anlage. Er ist mit einem erfundenen Bewachungsbetrieb
+     gefüllt: erfundene Mitarbeitende, erfundene Kunden, erfundene Objekte. Keine
+     dieser Angaben gehört einem echten Menschen oder einem echten Betrieb.</p>
+  <p>Der Zugang ist <strong>ein einziger, gemeinsamer</strong>. Er wird auf Anfrage
+     weitergegeben. Unter den Besuchern des Demobereichs gibt es deshalb keine
+     Vertraulichkeit: Wer die Zugangsdaten hat, sieht alles, was ein anderer
+     Besucher eingetragen hat.</p>
+
+  <h2>3. Das nächtliche Leeren</h2>
+  <p>Ein Zeitplan löscht jede Nacht um <strong>02:00 UTC</strong> — 03:00 Schweizer
+     Zeit im Winter, 04:00 im Sommer — den gesamten Inhalt der Demo-Datenbank und
+     baut den Musterbetrieb neu auf. Gelöscht wird dabei jede Tabelle, nicht eine
+     gepflegte Auswahl; auch die Anmeldeversuche und die Sitzungen sind danach
+     weg.</p>
+  <p>Was Sie im Demobereich eintragen, überlebt also längstens bis zur nächsten
+     Nacht. Das ist eine Eigenschaft der Vorführanlage, keine Zusage über
+     Löschfristen im Rechtssinn.</p>
+
+  <h2>4. Beim blossen Aufruf</h2>
+  <p>Der Demobereich wird bei der Hostpoint AG in der Schweiz betrieben. Wie jeder
+     Webserver führt sie technische Zugriffsprotokolle: IP-Adresse, Zeitpunkt des
+     Abrufs, aufgerufene Datei, übertragene Datenmenge sowie Browser- und
+     Systemkennung. Sie dienen dem Betrieb und der Sicherheit des Servers.</p>
+  <p>Was der Demobereich <strong>nicht</strong> tut:</p>
+  <ul>
+    <li>Er setzt keine Cookies.</li>
+    <li>Er bindet kein Analysewerkzeug ein und misst heute kein Verhalten
+        (siehe Abschnitt 8).</li>
+    <li>Er lädt nichts von fremden Servern nach. Auch die Schriften und das
+        Hintergrundvideo der Anmeldung liegen auf demselben Server.</li>
+    <li>Er bindet kein Werbenetzwerk ein und erstellt kein Profil.</li>
+  </ul>
+
+  <h2>5. Bei der Anmeldung</h2>
+  <h3>Was erhoben wird</h3>
+  <p>Name und Passwort des gemeinsamen Demo-Zugangs. Beide geben Sie selbst ein;
+     wir kennen sie ohnehin, weil wir sie Ihnen geschickt haben.</p>
+  <h3>Schutz vor Passwort-Raten</h3>
+  <p>Jeder <strong>Fehl</strong>versuch wird mit dem eingegebenen Anmeldenamen und
+     Ihrer Internetadresse festgehalten. Beide stehen dabei im Klartext in der
+     Demo-Datenbank — anders als bei der Bremse des Kontaktformulars auf der
+     Verkaufsseite, die nur einen Prüfwert ablegt. Häufen sich Fehlversuche, wird
+     der Anmeldename oder die Adresse für 15 Minuten gesperrt. Die Einträge
+     werden nach einem Tag gelöscht, spätestens beim nächtlichen Leeren.</p>
+  <p>Eine <strong>erfolgreiche</strong> Anmeldung wird nicht protokolliert — abgesehen
+     von dem, was der Webserver ohnehin mitschreibt (Abschnitt 4).</p>
+  <h3>Die Sitzung</h3>
+  <p>Nach der Anmeldung erhalten Sie eine zufällige Zeichenfolge, die Ihren
+     Browser gegenüber dem Server ausweist. In der Datenbank liegt davon
+     <strong>nur ein Prüfwert</strong>, nie die Zeichenfolge selbst. Im Browser
+     liegt sie im lokalen Speicher, nicht in einem Cookie. Nach längerer
+     Untätigkeit werden Sie automatisch abgemeldet.</p>
+
+  <h2>6. Was Sie im Demobereich eintragen</h2>
+  <p>Alles, was Sie dort anlegen — Schichten, Rapporte, Meldungen, hochgeladene
+     Bilder —, landet in der Demo-Datenbank. Es ist für jeden anderen Besucher
+     sichtbar und wird in der folgenden Nacht gelöscht.</p>
+  <p>Darum noch einmal: Tragen Sie dort nichts ein, was einen echten Menschen
+     betrifft. Wenn Sie ausprobieren wollen, wie sich Ihr eigener Betrieb
+     abbildet, fragen Sie uns — dafür ist eine Vorführung der richtige Weg, nicht
+     die offene Demo.</p>
+
+  <h2>7. Was Ihr Browser sich merkt</h2>
+  <p>Im lokalen Speicher Ihres Browsers legt der Demobereich Ihre Sitzung, Ihren
+     Anmeldenamen und Ihre Ansichtseinstellungen ab — Farbthema, Anordnung der
+     Kacheln und Ähnliches. Das bleibt auf Ihrem Gerät und wird nicht an uns
+     übermittelt. Sie können es jederzeit über die Einstellungen Ihres Browsers
+     löschen; die Abmeldung im Demobereich entfernt die Sitzung ebenfalls.</p>
+
+  <h2>8. Auswertung der Nutzung — geplant, heute nicht in Betrieb</h2>
+  <p><strong>Heute wird nichts davon gemessen.</strong> Ausser den
+     Zugriffsprotokollen des Webservers (Abschnitt 4) entsteht keine Aufzeichnung
+     darüber, was Sie im Demobereich anschauen oder anklicken.</p>
+  <p>Geplant ist es aber, und wir sagen das lieber vorher als nachher: Wir möchten
+     künftig auswerten, <strong>welche Bereiche des Demobereichs geöffnet werden,
+     wie lange sie betrachtet werden und wo geklickt wird</strong>. Der Zweck ist
+     die Weiterentwicklung des Produkts — wir wollen sehen, was Interessenten
+     tatsächlich interessiert und wo sie hängen bleiben, statt es zu vermuten.</p>
+  <p>Wie das technisch aussieht, ist offen: ob im eigenen Haus gemessen wird oder
+     über einen Dienst, ob die Aufzeichnung einer einzelnen Sitzung zugeordnet
+     bleibt oder nur als Summe entsteht, und wie lange sie aufbewahrt wird. Auch
+     die rechtliche Prüfung steht aus.</p>
+  <p>Bis dahin gilt der erste Satz dieses Abschnitts. Bevor eine solche Messung
+     eingeschaltet wird, wird diese Seite geändert, und das Datum oben sagt Ihnen,
+     welche Fassung gerade gilt.</p>
+
+  <h2>9. Weitergabe</h2>
+  <p>Wir geben diese Daten nicht zu Werbezwecken weiter und verkaufen sie nicht.
+     Technisch beteiligt ist die <strong>Hostpoint AG</strong> als Betreiberin des
+     Servers und der Datenbank.</p>
+
+  <h2>10. Wo die Daten liegen</h2>
+  <p>Server und Datenbank werden in der Schweiz betrieben. Eine Übermittlung ins
+     Ausland findet von unserer Seite aus nicht statt.</p>
+
+  <h2>11. Ihre Rechte</h2>
+  <p>Sie können jederzeit Auskunft darüber verlangen, welche Daten wir über Sie
+     bearbeiten, und deren Berichtigung oder Löschung verlangen. Eine E-Mail an
+     <a href="mailto:info@guardops.ch">info@guardops.ch</a> genügt. Zum Schutz vor
+     unberechtigten Auskünften können wir dabei einen Identitätsnachweis
+     verlangen.</p>
+  <p>Beim gemeinsamen Demo-Zugang stossen diese Rechte an eine praktische Grenze:
+     Die Anmeldung unterscheidet die Besucher nicht. Wir können darum meist nicht
+     feststellen, welcher Eintrag von Ihnen stammt. Das nächtliche Leeren löscht
+     ihn ohnehin.</p>
+
+  <h2>12. Änderungen</h2>
+  <p>Es gilt die jeweils auf dieser Seite veröffentlichte Fassung. Das oben
+     genannte Datum sagt, welche das ist.</p>
+</main>
+
+<footer class="fuss">
+  <div class="innen">
+    <span>© 2026 <span data-brand>GuardOpS</span></span>
+    <a href="impressum.html">Impressum</a>
+    <a href="datenschutz.html">Datenschutz (Verkaufsseite)</a>
+    <a href="index.html">Startseite</a>
+  </div>
+</footer>
+</body>
+</html>

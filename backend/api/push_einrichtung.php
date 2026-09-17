@@ -12,6 +12,11 @@ declare(strict_types=1);
 //         wie lautet der oeffentliche Schluessel, und habe ich hier schon
 //         ein Abo?
 // POST -- Abo anlegen ("an": endpunkt, keys) oder abmelden ("aus": endpunkt).
+//
+// SEIT ENT-604 auch fuer natives Push (APNs): `endpunkt` traegt dann das
+// Geraete-Token statt einer URL, `kanal` steht auf 'apns'. Dieselbe
+// Tabelle, derselbe Endpunkt -- nur die Gueltigkeitspruefung und die
+// "eingerichtet"-Frage verzweigen nach Kanal (push.php, Festlegung 1).
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../push.php';
 
@@ -55,6 +60,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         'schluessel'    => push_oeffentlicher_schluessel(),
         'dieses_geraet' => $abo !== null,
         'geraete'       => $geraete,
+        // Eigene, zusaetzliche Felder fuer die native Huelle (ENT-604) --
+        // additiv, damit ein bestehender Abruf aus dem Browser unveraendert
+        // bleibt.
+        'apns_eingerichtet' => $tabelleDa && push_apns_konfiguriert(),
+        'apns_grund'        => $tabelleDa ? push_apns_grund() : 'keine_tabelle',
     ]);
 }
 
@@ -69,9 +79,18 @@ if (!$tabelleDa) {
 
 $in = json_decode(file_get_contents('php://input'), true) ?? [];
 $endpunkt = trim((string)($in['endpunkt'] ?? ''));
+// Der Kanal entscheidet, WAS "endpunkt" ueberhaupt ist -- bei Web Push
+// eine URL, bei APNs ein Geraete-Token. Vor der Anmelden-Pruefung
+// gebraucht (siehe unten), darum schon hier gelesen; beim Abmelden bleibt
+// der bisherige, kanal-unabhaengige Weg (der Wert kollidiert praktisch
+// nie zwischen den Formen).
+$kanalEingabe = trim((string)($in['kanal'] ?? 'webpush'));
+$istApns = $kanalEingabe === 'apns';
 
-if ($endpunkt === '' || push_ursprung($endpunkt) === null) {
-    json_response(['status' => 'error', 'message' => 'Kein gültiger Endpunkt (https erwartet)'], 400);
+if ($endpunkt === '' || (!$istApns && push_ursprung($endpunkt) === null)
+                     || ($istApns && !push_apns_token_gueltig($endpunkt))) {
+    json_response(['status' => 'error', 'message' => $istApns
+        ? 'Kein gültiges Geräte-Token' : 'Kein gültiger Endpunkt (https erwartet)'], 400);
 }
 
 // ── Abmelden
@@ -89,24 +108,27 @@ if (!empty($in['aus'])) {
 }
 
 // ── Anmelden
-$kanal = trim((string)($in['kanal'] ?? 'webpush'));
+$kanal = $kanalEingabe;
 if (!push_kanal_gueltig($kanal)) {
     json_response(['status' => 'error', 'message' => 'Unbekannter Kanal'], 400);
 }
-if (!push_konfiguriert()) {
-    // Ein Abo ohne Schluessel waere ein Eintrag, an den nie etwas
-    // zugestellt werden kann -- und die App zeigte "eingeschaltet".
+// Welcher Schluessel zaehlt, haengt vom Kanal ab -- ein Geraet ohne
+// Gegenstueck (VAPID fuer Web Push, APNs-Schluessel fuer 'apns') waere
+// ein Abo, an das nie etwas zugestellt werden kann, und die App zeigte
+// trotzdem "eingeschaltet".
+if ($istApns ? !push_apns_konfiguriert() : !push_konfiguriert()) {
     json_response(['status' => 'error',
         'message' => 'Auf dem Server fehlt der Push-Schlüssel — bitte in der Einrichtung hinterlegen.'], 400);
 }
 
-// p256dh und auth kommen vom Browser mit dem Abo. Sie werden heute NICHT
-// gebraucht (es wird ohne Nutzlast verschickt, siehe push.php), aber
-// mitgespeichert: Sie stammen aus genau diesem Abo, und ohne sie muesste
-// spaeter jede Person ihr Abo neu erteilen, falls doch einmal ein Titel
-// mitgeschickt werden soll.
-$p256dh = trim((string)($in['p256dh'] ?? ''));
-$auth   = trim((string)($in['auth'] ?? ''));
+// p256dh und auth kommen vom Browser mit dem Web-Push-Abo. Sie werden
+// heute NICHT gebraucht (es wird ohne Nutzlast verschickt, siehe
+// push.php), aber mitgespeichert: Sie stammen aus genau diesem Abo, und
+// ohne sie muesste spaeter jede Person ihr Abo neu erteilen, falls doch
+// einmal ein Titel mitgeschickt werden soll. Bei 'apns' gibt es beides
+// nicht -- ein Geraete-Token ist kein Web-Push-Abo.
+$p256dh = $istApns ? null : trim((string)($in['p256dh'] ?? ''));
+$auth   = $istApns ? null : trim((string)($in['auth'] ?? ''));
 // Geraetebezeichnung: freiwillig und kurz, damit in der Verwaltung nicht
 // nur eine Nummer steht. KEIN vollstaendiger User-Agent -- der ist ein
 // Wiedererkennungsmerkmal und wird hier nicht gebraucht.
