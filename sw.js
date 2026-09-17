@@ -18,7 +18,14 @@ self.addEventListener('fetch', () => {});
 // was er nicht weiss: "Neue Mitteilung", nicht "Wichtige Mitteilung".
 // Ohne Nutzlast kann dieser Code die Stufe nicht kennen, und eine geratene
 // Dringlichkeit waere eine Falschauskunft.
-const PUSH_TITEL = 'CUPI 24';
+//
+// PUSH_TITEL und das Icon tragen die MARKE, nicht die Mandantin (ENT-603):
+// Diese Datei geht unveraendert in die geteilten Buendel (Rapport-Adresse,
+// Demo) -- dort waere "CUPI 24" der Name einer fremden Firma. Nur das
+// cupi24-Buendel bekommt beides im Deploy-Workflow auf CUPI 24 umgehaengt,
+// zusammen mit den Icon-Dateien (icons/guardops-* -> icons/cupi24-*,
+// dieselbe Ersetzung wie beim Favicon, ENT-589).
+const PUSH_TITEL = 'GuardOpS';
 const PUSH_TEXT  = 'Neue Mitteilung — zum Lesen öffnen';
 
 self.addEventListener('push', event => {
@@ -28,13 +35,13 @@ self.addEventListener('push', event => {
   event.waitUntil(
     self.registration.showNotification(PUSH_TITEL, {
       body: PUSH_TEXT,
-      icon: 'icons/icon-192.png',
-      badge: 'icons/icon-192.png',
+      icon: 'icons/guardops-192.png',
+      badge: 'icons/guardops-192.png',
       // Gleiches Kennzeichen fuer alle: Zwei Mitteilungen kurz
       // hintereinander ergeben EINE Benachrichtigung auf dem
       // Sperrbildschirm, nicht zwei gleichlautende. Was es im Einzelnen
       // ist, steht ohnehin erst in der App.
-      tag: 'cupi24-mitteilung',
+      tag: 'guardops-mitteilung',
       renotify: true,
     })
   );
