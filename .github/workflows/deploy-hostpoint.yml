@@ -1184,7 +1184,7 @@ jobs:
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_BETREIBER_FTP_HOST != '' }}
         run: |
           set -euo pipefail
-          mkdir -p dist-betreiber/api dist-betreiber/fonts
+          mkdir -p dist-betreiber/api dist-betreiber/fonts dist-betreiber/icons
 
           # Auf der eigenen Adresse gehoert der Betreiber-Bereich auf "/",
           # nicht auf "/betreiber.html".
@@ -1198,6 +1198,18 @@ jobs:
           # (SIL OFL 1.1).
           cp fonts/inter-latin.woff2   dist-betreiber/fonts/
           cp fonts/inter-LICENSE.txt   dist-betreiber/fonts/
+
+          # Favicon und Haus-Symbol (siehe <link rel="icon"> in
+          # betreiber.html). NUR die guardops-Dateien: Der Betreiber-Bereich
+          # gehoert der Betreiberin, nicht einer Mandantin (ENT-568) -- ein
+          # "cp icons/*.png" wuerde das CUPI-24-Siegel auf eine Adresse
+          # hochladen, die es nie zeigen darf. Fehlen die Dateien, zeigt der
+          # Browser einen Buchstaben-Platzhalter statt der Marke, und lokal
+          # faellt es NICHT auf -- derselbe Fallstrick wie bei der Schrift
+          # direkt darueber.
+          cp icons/guardops-16.png    dist-betreiber/icons/
+          cp icons/guardops-32.png    dist-betreiber/icons/
+          cp icons/guardops-180.png   dist-betreiber/icons/
 
           # Genau die Backend-Dateien, die betreiber.php und seine
           # API-Endpunkte tatsaechlich per require_once einbinden (siehe
@@ -1303,7 +1315,7 @@ jobs:
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_PORTAL_FTP_HOST != '' }}
         run: |
           set -euo pipefail
-          mkdir -p dist-portal/api dist-portal/img
+          mkdir -p dist-portal/api dist-portal/img dist-portal/icons
 
           # Auf der eigenen Adresse gehoert das Kundenportal auf "/", nicht
           # auf "/portal.html".
@@ -1319,6 +1331,18 @@ jobs:
           cp img/anmeldung-nacht.webp dist-portal/img/anmeldung-nacht.webp
           cp img/anmeldung-nacht.webm dist-portal/img/anmeldung-nacht.webm
           cp img/anmeldung-nacht.mp4  dist-portal/img/anmeldung-nacht.mp4
+
+          # Favicon UND das Logo im Kopf der Seite (<img src="icons/
+          # guardops-192.png"> in portal.html, zweimal). Die 192er fehlte
+          # diesem Buendel bisher ganz: Auf portal.guardops.ch blieb das
+          # Logo im Anmeldekopf leer, waehrend es auf der geteilten Adresse
+          # (dist/, wo icons/*.png mitkommt) richtig stand -- darum ist es
+          # lange nicht aufgefallen. NUR die guardops-Dateien, gleiche
+          # Begruendung wie beim Betreiber-Buendel (ENT-568).
+          cp icons/guardops-16.png    dist-portal/icons/
+          cp icons/guardops-32.png    dist-portal/icons/
+          cp icons/guardops-180.png   dist-portal/icons/
+          cp icons/guardops-192.png   dist-portal/icons/
 
           # Genau die Backend-Dateien, die kundenportal.php und seine
           # portal_*-API-Endpunkte tatsaechlich per require/require_once
@@ -1581,8 +1605,10 @@ jobs:
           sed -i "s|icons/guardops-|icons/cupi24-|g" \
             dist-cupi24/dashboard.html dist-cupi24/app.html dist-cupi24/index.html \
             dist-cupi24/manifest.json dist-cupi24/manifest-app.json
-          sed -i "s|icons/icon-32.png|icons/cupi24-32.png|; s|icons/icon-180.png|icons/cupi24-180.png|" \
-            dist-cupi24/dashboard.html
+          # KEINE eigene Zeile mehr fuer das Favicon des Cockpits: Seit
+          # dashboard.html im Grundzustand icons/guardops-32/16/180 traegt
+          # (vorher icons/icon-*.png, das CUPI-24-Siegel fuer ALLE Adressen),
+          # haengt es die "icons/guardops-"-Ersetzung direkt darueber mit um.
 
           # Die Anmeldemaske des Cockpits (gate-oben, ENT-579) zeigt das
           # CUPI-24-Siegel statt der GuardOpS-Wortmarke -- das ist die

@@ -19,7 +19,19 @@
 # loeschen. Die Seite laeuft danach sofort wieder, nur ohne diese
 # Schutzeinstellungen.
 
-# ── 1. Hilfsdateien nicht direkt abrufbar ────────────────────────────────
+# ── 1. Startseite ────────────────────────────────────────────────────────
+# "/" gehoert dem Betreiber/Planer-Cockpit, nicht dem Waechter-Gate: Ohne
+# diese Regel liefert Apache seinen Standard (index.html) aus, und wer
+# cupi24.guardops.ch ohne Pfad aufruft, landet in der Waechter-Anmeldung
+# statt im Cockpit -- genau die Verwechslung, die ein Planer/Admin nicht
+# erwartet.
+# /app.html bleibt unveraendert erreichbar -- dort melden sich Waechter
+# auch vom Desktop aus an, bewusst so gebaut. /index.html, /portal.html und
+# /betreiber.html bleiben ebenfalls unter ihrem Pfad abrufbar; nur die
+# Zuordnung von "/" aendert sich.
+DirectoryIndex dashboard.html
+
+# ── 2. Hilfsdateien nicht direkt abrufbar ────────────────────────────────
 # db.php traegt das Datenbankpasswort, ai.php den Schluessel zur KI, mailer.php
 # das SMTP-Passwort. Alle liegen im Web-Verzeichnis, weil der Deploy per FTP
 # nicht darueber hinaus schreiben kann. PHP wird zwar ausgefuehrt statt
@@ -49,7 +61,7 @@
   </IfModule>
 </FilesMatch>
 
-# ── 2. Schutzkopfzeilen ──────────────────────────────────────────────────
+# ── 3. Schutzkopfzeilen ──────────────────────────────────────────────────
 <IfModule mod_headers.c>
   # Die Seite darf nicht in einen fremden Rahmen gesetzt werden. Sonst legt
   # jemand eine unsichtbare Kopie ueber seine eigene Seite und faengt Klicks
@@ -79,11 +91,11 @@
   Header always set Strict-Transport-Security "max-age=15552000"
 </IfModule>
 
-# ── 3. Kein Verzeichnisinhalt ────────────────────────────────────────────
+# ── 4. Kein Verzeichnisinhalt ────────────────────────────────────────────
 # Ohne das listet Apache in einem Ordner ohne index-Datei alle Dateien auf.
 Options -Indexes
 
-# ── 4. HTTPS erzwingen -- BEWUSST AUSGESCHALTET (OP-67) ──────────────────
+# ── 5. HTTPS erzwingen -- BEWUSST AUSGESCHALTET (OP-67) ──────────────────
 # Der richtige Weg ist die Hostpoint-Verwaltung: Domain → automatische
 # Weiterleitung auf HTTPS einschalten. Nur falls das dort nicht geht, die
 # folgenden vier Zeilen entkommentieren. VORHER pruefen, dass
