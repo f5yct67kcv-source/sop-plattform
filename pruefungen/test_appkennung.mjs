@@ -17,6 +17,12 @@
 // kommt aus capacitor.config.json, nicht aus dieser Datei. Eine Suite, die
 // den Namen abschreibt, muesste bei jeder Umbenennung mitgeaendert werden --
 // und waere damit keine Pruefung, sondern eine zweite Quelle.
+//
+// Seit ENT-603 bewacht diese Suite zusaetzlich den ANZEIGENAMEN (nicht nur
+// die Kennung): Er stand bis dahin auf "CUPI 24" -- dem Namen der
+// Mandantin -- obwohl die Kennung schon mit ENT-568 auf GuardOpS umgestellt
+// war. Dieselbe Lehre wie oben: eine von drei Stellen zu vergessen faellt
+// lokal nicht auf, weil hier niemand die App baut.
 import { WURZEL } from './pfade.mjs';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 
@@ -76,6 +82,27 @@ for (const [datei, feld, muster] of stellen) {
     check('KRITISCH: kein verwaistes Paketverzeichnis aus einer frueheren Kennung',
       zweige.length === 1 && zweige[0] === paket.split('.')[1]);
     if (zweige.length !== 1) { bad.push('  daneben liegt noch: ' + zweige.join(', ')); }
+  }
+}
+
+// Der Anzeigename (ENT-603): dieselbe Kette wie bei der Kennung -- ein
+// Sollwert aus capacitor.config.json, jede weitere Stelle muss ihn tragen.
+{
+  const name = konfig.appName || '';
+  check('KRITISCH: capacitor.config.json nennt einen Anzeigenamen', name.length > 0);
+
+  const anzeigeStellen = [
+    [`${M}/ios/App/App/Info.plist`, 'CFBundleDisplayName',
+      /<key>CFBundleDisplayName<\/key>\s*\n\s*<string>([^<]*)<\/string>/],
+    [`${M}/android/app/src/main/res/values/strings.xml`, 'app_name',
+      /<string name="app_name">([^<]*)<\/string>/],
+    [`${M}/android/app/src/main/res/values/strings.xml`, 'title_activity_main',
+      /<string name="title_activity_main">([^<]*)<\/string>/],
+  ];
+  for (const [datei, feld, muster] of anzeigeStellen) {
+    const treffer = (lies(datei).match(muster) || [])[1] || '';
+    check(`KRITISCH: ${feld} in ${datei.replace(M + '/', '')} traegt denselben Anzeigenamen`, treffer === name);
+    if (treffer !== name) { bad.push(`  ${feld}: "${treffer}" statt "${name}"`); }
   }
 }
 

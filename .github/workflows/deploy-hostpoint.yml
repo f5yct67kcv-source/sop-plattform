@@ -1620,11 +1620,13 @@ jobs:
           # (oben per icons/*.png mitkopiert).
           sed -i "s|icons/guardops-|icons/cupi24-|g" \
             dist-cupi24/dashboard.html dist-cupi24/app.html dist-cupi24/index.html \
-            dist-cupi24/manifest.json dist-cupi24/manifest-app.json
+            dist-cupi24/manifest.json dist-cupi24/manifest-app.json dist-cupi24/sw.js
           # KEINE eigene Zeile mehr fuer das Favicon des Cockpits: Seit
           # dashboard.html im Grundzustand icons/guardops-32/16/180 traegt
           # (vorher icons/icon-*.png, das CUPI-24-Siegel fuer ALLE Adressen),
           # haengt es die "icons/guardops-"-Ersetzung direkt darueber mit um.
+          # sw.js haengt hier mit dran: Push-Icon/-Badge tragen seit ENT-603
+          # denselben "icons/guardops-"-Pfad wie das Cockpit-Favicon.
 
           # Die Anmeldemaske des Cockpits (gate-oben, ENT-579) zeigt das
           # CUPI-24-Siegel statt der GuardOpS-Wortmarke -- das ist die
@@ -1644,13 +1646,17 @@ jobs:
 
           # Name in den beiden Manifesten (ENT-568, offene Frage): Diese
           # Dateien sind mandantenseitig -- auf dem Telefon einer CUPI-24-
-          # Mitarbeiterin ist "GuardOpS" die falsche Auskunft. PUSH_TITEL in
-          # sw.js braucht KEINE Ersetzung: die Datei traegt schon "CUPI 24"
-          # (nie auf GuardOpS umgestellt, absichtlich, siehe ENT-568).
+          # Mitarbeiterin ist "GuardOpS" die falsche Auskunft.
           sed -i "s|GuardOpS – Mitarbeitende|CUPI 24 – Mitarbeitende|; s|\"short_name\": \"GuardOpS\"|\"short_name\": \"CUPI 24\"|" \
             dist-cupi24/manifest-app.json
           sed -i "s|Stundenrapport – GuardOpS|Stundenrapport – CUPI 24|" \
             dist-cupi24/manifest.json
+          # PUSH_TITEL und das Benachrichtigungs-Kennzeichen in sw.js
+          # (ENT-603): Die Quelldatei traegt seither GuardOpS (fuer die
+          # geteilten Buendel), das cupi24-Buendel haengt beides hier auf
+          # CUPI 24 um -- dieselbe Bauart wie bei den Manifesten oben.
+          sed -i "s|const PUSH_TITEL = 'GuardOpS';|const PUSH_TITEL = 'CUPI 24';|; s|tag: 'guardops-mitteilung',|tag: 'cupi24-mitteilung',|" \
+            dist-cupi24/sw.js
 
           # Kein uebersehener Platzhalter darf hochgeladen werden. Genau wie
           # im betreiber-Buendel und im Hauptschritt (dist/) oben werden die

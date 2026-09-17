@@ -1462,11 +1462,21 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     /CUPI 24 – Mitarbeitende/.test(bauen) && /dist-cupi24\/manifest-app\.json/.test(bauen)
     && /Stundenrapport – CUPI 24/.test(bauen) && /dist-cupi24\/manifest\.json/.test(bauen));
 
+  // sw.js traegt seit ENT-603 die MARKE im Quelltext (nicht mehr die
+  // Mandantin) -- das cupi24-Bündel haengt PUSH_TITEL, Icon/Badge und das
+  // Benachrichtigungs-Kennzeichen im Deploy-Workflow um, dieselbe Bauart
+  // wie bei den Web-App-Manifesten.
   {
     const swjs = readFileSync(`${WURZEL}/sw.js`, 'utf8');
-    check('KRITISCH: PUSH_TITEL in sw.js ist mandantenseitig und trägt bereits "CUPI 24" (ENT-568) -- keine Ersetzung im Deploy nötig',
-      /const PUSH_TITEL = 'CUPI 24'/.test(swjs));
+    check('KRITISCH: PUSH_TITEL in sw.js trägt im Quelltext die Marke (GuardOpS), nicht die Mandantin',
+      /const PUSH_TITEL = 'GuardOpS'/.test(swjs));
   }
+
+  check('KRITISCH: das cupi24-Bündel haengt PUSH_TITEL im sw.js auf CUPI 24 um',
+    /sed -i "s\|const PUSH_TITEL = 'GuardOpS';\|const PUSH_TITEL = 'CUPI 24';\|[\s\S]{0,120}dist-cupi24\/sw\.js/.test(bauen));
+
+  check('KRITISCH: sw.js ist Teil DERSELBEN icons/guardops- -> icons/cupi24--Umhaengung wie das Favicon (Push-Icon/-Badge)',
+    /sed -i "s\|icons\/guardops-\|icons\/cupi24-\|g" \\[\s\S]{0,250}dist-cupi24\/sw\.js/.test(bauen));
 
   for (const tok of ['icons/cupi24-', 'cupi24-badge.png']) {
     const zaehlung = (text) => (text.match(new RegExp(tok.replace(/[.]/g, '\\.'), 'g')) || []).length;
