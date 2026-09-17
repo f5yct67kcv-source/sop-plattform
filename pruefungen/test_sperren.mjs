@@ -166,8 +166,9 @@ check('Abmelden ist geblieben', await page.isVisible('#btn-header-logout'));
 const kopfKinder = await page.evaluate(() => document.querySelector('header').children.length);
 check(`Die Kopfzeile hat nur noch drei Bereiche (${kopfKinder})`, kopfKinder === 3);
 
-// Farben wie in der App
-const farben = await page.evaluate(() => {
+// Farben wie in der App -- die Kopfzeile (--shell) ist in beiden Themen
+// fest dunkel, darum vor beiden Theme-Wechseln pruefbar.
+const farbenLesen = () => page.evaluate(() => {
   const w = getComputedStyle(document.documentElement);
   return {
     kopf: getComputedStyle(document.querySelector('header')).backgroundColor,
@@ -175,9 +176,29 @@ const farben = await page.evaluate(() => {
     grund: w.getPropertyValue('--bg').trim(),
   };
 });
+let farben = await farbenLesen();
 check('Die Kopfzeile ist graphitfarben wie in der App', farben.kopf === 'rgb(22, 24, 29)');
-check('Der Akzent stimmt mit der App überein', farben.akzent.toUpperCase() === '#2F5BD7');
-check('Der Hintergrund stimmt mit der App überein', farben.grund.toUpperCase() === '#F4F6F8');
+
+// Hell/Dunkel wie in der App (ENT-398-Uebernahme, siehe app.html): ohne
+// gespeicherte Wahl ist Dunkel der Standard -- das ist der Zustand, den
+// die Checks oben schon geprueft haben. Beide Themen einzeln pruefen,
+// gegen dieselben Werte wie html[data-thema] in app.html.
+await page.evaluate(() => localStorage.setItem('rv3_app_thema', 'hell'));
+await page.reload(); await page.waitForTimeout(400);
+farben = await farbenLesen();
+check('Hell: Der Akzent stimmt mit der App überein', farben.akzent.toUpperCase() === '#2F5BD7');
+check('Hell: Der Hintergrund stimmt mit der App überein', farben.grund.toUpperCase() === '#F4F6F8');
+
+await page.evaluate(() => localStorage.setItem('rv3_app_thema', 'dunkel'));
+await page.reload(); await page.waitForTimeout(400);
+farben = await farbenLesen();
+check('Dunkel: Der Akzent stimmt mit der App überein', farben.akzent.toUpperCase() === '#7098F7');
+check('Dunkel: Der Hintergrund stimmt mit der App überein', farben.grund.toUpperCase() === '#0F1117');
+
+// Zurueck auf Hell fuer die restlichen Funktionschecks und den Screenshot --
+// die pruefen Inhalt, nicht Farbe, sollen aber wie gewohnt aussehen.
+await page.evaluate(() => localStorage.setItem('rv3_app_thema', 'hell'));
+await page.reload(); await page.waitForTimeout(400);
 
 // Das Formular selbst funktioniert weiterhin
 check('Das Erfassungsformular ist da', await page.isVisible('#tab-erfassen'));

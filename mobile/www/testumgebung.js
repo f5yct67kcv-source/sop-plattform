@@ -33,7 +33,7 @@
 // keine deploybare Demo-Instanz, an der sich das pruefen liesse. Vor der
 // ersten echten Vorfuehrung nachholen.
 (function () {
-  var APP_ENV = '__APP_ENV__';
+  var APP_ENV = 'production';
   if (APP_ENV === 'production') { return; }
 
   var istDemo = APP_ENV === 'demo';
