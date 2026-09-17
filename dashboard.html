@@ -10265,7 +10265,14 @@ function enter() {
     // Anmeldung gilt bereits, darum ohne zweites Anmelden weiterleiten.
     location.replace('app.html');
     $('gateLogin').style.display = 'none';
-    $('gateDenied').style.display = '';
+    // "Zugang verweigert" wird NICHT sofort gezeigt: location.replace()
+    // navigiert schon weg, und bis der Browser das tatsaechlich vollzieht,
+    // wuerde sonst bei jeder normalen Anmeldung kurz sichtbar "Dieser
+    // Bereich ist der Administration vorbehalten" aufblitzen, bevor die
+    // Seite wechselt (gemessen am Desktop, 2026-09-17). Die Meldung bleibt
+    // nur als Auffangnetz, falls die Weiterleitung aus irgendeinem Grund
+    // nicht greift -- darum verzoegert statt entfernt.
+    setTimeout(() => { $('gateDenied').style.display = ''; }, 800);
     return;
   }
   $('gate').style.display = 'none';
