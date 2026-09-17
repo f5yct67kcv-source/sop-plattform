@@ -21,8 +21,13 @@
 #     Lauf neu geschrieben. Es kann darum weder ins Repository noch in
 #     einen Store-Build geraten, der aus mobile/www/ entsteht.
 #
-# BENUTZUNG (im Ordner mobile/, nach "npx cap sync ios"):
-#     ./dev-anmelden.sh
+# BENUTZUNG (im Ordner mobile/):
+#     ./dev-anmelden.sh && npx cap run ios --no-sync
+#
+# Das Skript synchronisiert selbst und legt DANACH die Sitzung ins
+# gebaute Buendel. "--no-sync" beim Starten ist Pflicht: "cap run"
+# synchronisiert sonst noch einmal und wirft die Sitzung weg -- dann steht
+# wieder die Anmeldemaske da. Genau daran ist der erste Anlauf gescheitert.
 #
 # Der erste Lauf fragt nach Name und Passwort und merkt sich beides:
 # den Namen in ~/.guardops-dev-user, das Passwort im Schluesselbund des
@@ -50,6 +55,17 @@ if [ "${1:-}" = "vergessen" ]; then
   fi
   echo "Gemerkte Zugangsdaten geloescht."
   exit 0
+fi
+
+# Das Synchronisieren gehoert in dieses Skript, nicht davor: "npx cap sync"
+# schreibt ios/App/App/public/ komplett neu -- genau den Ordner, in den
+# unten die Sitzung gelegt wird. Lag der Aufruf davor, war jede
+# Reihenfolge-Verwechslung ein stiller Fehlschlag (die Anmeldemaske kam
+# einfach wieder). Jetzt kann es nur noch in der richtigen Reihenfolge
+# laufen. Ueberspringen mit "./dev-anmelden.sh ohne-sync".
+if [ "${1:-}" != "ohne-sync" ] && command -v npx >/dev/null 2>&1; then
+  echo "Synchronisiere das Buendel (npx cap sync ios) ..."
+  npx cap sync ios
 fi
 
 if [ ! -f "$ZIEL" ]; then
@@ -154,7 +170,10 @@ if not anzahl:
     sys.exit('Kein <head> in ' + ziel + ' gefunden -- nichts geaendert.')
 open(ziel, 'w', encoding='utf-8').write(neu)
 print('Sitzung fuer "%s" ins Buendel gelegt (%s).' % (nutzer['name'], ziel))
-print('Gilt bis zur naechsten "npx cap sync" -- die schreibt den Ordner neu.')
+print('')
+print('JETZT STARTEN MIT:  npx cap run ios --no-sync')
+print('Ohne --no-sync synchronisiert "cap run" von sich aus noch einmal und')
+print('wirft die Sitzung damit weg -- dann steht wieder die Anmeldemaske da.')
 PY
 
 # Erst JETZT merken -- vorher waere bei einem Tippfehler im Passwort ein
@@ -162,7 +181,7 @@ PY
 # ihn wortlos wiederverwendet.
 # Scheitert das Merken, ist das kein Grund zum Abbruch: Die Sitzung liegt
 # zu diesem Zeitpunkt bereits im Buendel, der Lauf war erfolgreich.
-printf '%s' "$NAME" > "$MERKDATEI" 2>/dev/null || true
+( printf '%s' "$NAME" > "$MERKDATEI" ) 2>/dev/null || true
 if [ "$NEU" = "1" ] && command -v security >/dev/null 2>&1; then
   if security add-generic-password -U -s "$DIENST" -a "$NAME" -w "$PW" 2>/dev/null; then
     echo "Passwort im Schluesselbund gemerkt -- der naechste Lauf fragt nicht mehr."
