@@ -745,6 +745,10 @@ jobs:
           # eingebunden, nie direkt aufgerufen -- steht darum auch in
           # der Sperrliste der .htaccess.
           cp backend/betreiber.php dist/betreiber.php
+          # Rechenkern der Demo-Zugaenge (ENT-600) -- betreiber.php bindet
+          # ihn per require_once ein. Fehlt er, stirbt jeder Aufruf, der
+          # betreiber.php laedt, nicht erst die Demo-Freigabe.
+          cp backend/demo_zugang.php dist/demo_zugang.php
           # Support-Freigabe (ENT-526). Wird von BEIDEN Seiten eingebunden --
           # von den support_*-Endpunkten des Betriebs und von
           # api/betreiber_support.php -- und nie direkt aufgerufen; steht
@@ -1224,6 +1228,11 @@ jobs:
           cp backend/support.php       dist-betreiber/support.php
           cp backend/supportvorgang.php dist-betreiber/supportvorgang.php
           cp backend/betreiber.php     dist-betreiber/betreiber.php
+          # Rechenkern der Demo-Zugaenge (ENT-600). betreiber.php bindet ihn
+          # per require_once ein -- fehlt er, stirbt der ganze
+          # Betreiber-Bereich beim ersten Aufruf, nicht erst bei der
+          # Demo-Freigabe.
+          cp backend/demo_zugang.php   dist-betreiber/demo_zugang.php
           cp backend/api/betreiber_*.php dist-betreiber/api/
           cp htaccess-betreiber        dist-betreiber/.htaccess
           cp robots-betreiber.txt      dist-betreiber/robots.txt
@@ -1503,6 +1512,8 @@ jobs:
           cp backend/db.php dist-cupi24/db.php
           cp backend/kundenportal.php dist-cupi24/kundenportal.php
           cp backend/betreiber.php dist-cupi24/betreiber.php
+          # Siehe dist/: betreiber.php braucht diesen Rechenkern (ENT-600).
+          cp backend/demo_zugang.php dist-cupi24/demo_zugang.php
           cp backend/support.php dist-cupi24/support.php
           cp backend/supportvorgang.php dist-cupi24/supportvorgang.php
           cp backend/demo_anfrage.php dist-cupi24/demo_anfrage.php

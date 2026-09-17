@@ -42,6 +42,9 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/db.php';
+// Rechenkern der Demo-Zugaenge (ENT-600) -- liefert die Tabellendefinition
+// fuer be_tabellen() und die Ablauflogik fuer die Endpunkte.
+require_once __DIR__ . '/demo_zugang.php';
 
 // ── Verbindung zur Betreiber-Datenbank ────────────────────────────────
 //
@@ -863,6 +866,18 @@ function be_tabellen(): array
 // Mitarbeiterkonto stehen in verschiedenen Tabellen verschiedener Ebenen,
 // eine gemeinsame Fremdschluesselspalte gaebe es dafuer nicht. Wer
 // geschrieben hat, steht als Name daneben.
+// Register der Demo-Zugaenge (ENT-600). Die Definition steht in
+// backend/demo_zugang.php beim uebrigen Rechenkern der Demo-Zugaenge und
+// wird hier nur eingehaengt -- zwei Kopien derselben Definition liefen
+// irgendwann auseinander, und man saehe es erst, wenn eine Anlage anders
+// aufgebaut waere als die andere (derselbe Grund wie im Kopf dieser
+// Funktion).
+//
+// SIE LIEGT IN DER BETREIBER-DATENBANK und nicht in der Demo-Instanz: Der
+// naechtliche Reset (ENT-523) leert generisch JEDE Tabelle der verbundenen
+// Datenbank. Ein Register in der Demo waere am naechsten Morgen weg.
+'demo_zugang' => demo_zugang_tabelle(),
+
 'support_nachricht' => "CREATE TABLE IF NOT EXISTS support_nachricht (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   vorgang_id INT UNSIGNED NOT NULL,
