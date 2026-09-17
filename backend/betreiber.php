@@ -244,7 +244,7 @@ function be_konten_zahl(PDO $pdo, int $ausser = 0): int
 // und dazu gehoeren hier Felder, die NIEMAND ueber die Oberflaeche setzen
 // soll (angelegt_am) oder die eine eigene Bestaetigung brauchen
 // (gav_bestaetigt_am/-von, siehe be_gav_bestaetigen()).
-const BE_MANDANT_FELDER = ['name', 'kanton', 'db_host', 'db_name', 'db_user', 'secret_name'];
+const BE_MANDANT_FELDER = ['name', 'subdomain', 'kanton', 'db_host', 'db_name', 'db_user', 'secret_name'];
 
 // Der Kanton steuert den Feiertagskalender. Zwei Buchstaben, gross --
 // mehr wird hier nicht geprueft: Eine Liste der 26 Kantone waere eine
@@ -806,12 +806,15 @@ function be_tabellen(): array
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(200) NOT NULL,
   -- Eigene Ausliefer-Adresse dieses Mandanten unter guardops.ch (ENT-589),
-  -- z. B. 'cupi24' fuer cupi24.guardops.ch. Rein informativ -- KEINE
-  -- Server-Logik liest diese Spalte zur Laufzeit, um zu entscheiden, welche
-  -- Datenbank oder Konfiguration gilt (ENT-501: die eigene Adresse kommt
-  -- ausschliesslich aus dem Deploy-Buendel des jeweiligen Mandanten, nie aus
-  -- einer Anfrage oder einer Tabellenzeile). Leer, solange ein Mandant noch
-  -- unter der geteilten Testadresse laeuft.
+  -- z. B. 'cupi24' fuer cupi24.guardops.ch. Fuer einen regulaeren Mandanten
+  -- bleibt sie informativ -- die eigene Adresse eines Deploy-Buendels kommt
+  -- weiterhin ausschliesslich aus dem Buendel selbst, nie aus einer Anfrage
+  -- oder einer Tabellenzeile (ENT-501, basis_url()). Seit ENT-600 hat sie
+  -- fuer Demo-Plaetze aber eine zweite, aktive Rolle: demo_instanz.php und
+  -- demo_anfordern.php lesen sie zur Laufzeit, um zu einem freien Platz
+  -- (z. B. 'demo1') die zugehoerige Mandantenzeile und damit deren
+  -- Datenbankangaben zu finden. Leer, solange ein Mandant noch unter der
+  -- geteilten Testadresse laeuft.
   subdomain VARCHAR(100) NOT NULL DEFAULT '',
   status ENUM('aktiv','gesperrt','gekuendigt') NOT NULL DEFAULT 'aktiv',
   kanton CHAR(2) NULL,

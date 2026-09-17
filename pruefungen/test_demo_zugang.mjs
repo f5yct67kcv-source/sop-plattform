@@ -154,7 +154,7 @@ await seite.addInitScript(() => {
 });
 await seite.goto(`file://${WURZEL}/betreiber.html`);
 await seite.waitForTimeout(600);
-await seite.click('#kopf-nav .nav-item[data-bereich="demo"]');
+await seite.click('#kopf-nav .nav-item[data-bereich="mandanten"]');
 await seite.waitForTimeout(350);
 
 const sicht = await seite.evaluate(() => {
@@ -173,7 +173,8 @@ const sicht = await seite.evaluate(() => {
   };
 });
 
-check('die Ansicht heisst "Demo"', sicht.titel === 'Demo');
+check('die Ansicht heisst "Mandanten" -- Demo ist ein Abschnitt darin, kein eigener Reiter',
+  sicht.titel === 'Mandanten');
 check('der Vorrat zeigt alle gemeldeten Plätze', sicht.plaetze === 3);
 check('die Liste zeigt alle Zugänge', sicht.zugaenge === 3);
 check('KRITISCH: es gibt keinen Freigabe-Knopf mehr -- die Zuteilung läuft automatisch (ENT-601)',

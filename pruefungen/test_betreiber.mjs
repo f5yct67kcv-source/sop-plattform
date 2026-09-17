@@ -141,6 +141,8 @@ check('KRITISCH: der Mandantenstamm hat kein Passwortfeld',
     mandantSql.replace(/secret_name/g, '')));
 check('der Mandantenstamm haelt Host, Name und Benutzer',
   ['db_host', 'db_name', 'db_user'].every(f => mandantSql.includes(f)));
+check('der Mandantenstamm haelt die Subdomain, ueber die Demo-Plaetze zugeteilt werden',
+  mandantSql.includes('subdomain'));
 
 // ── 5. Die Ebenen bleiben getrennt ────────────────────────────────────
 //
@@ -274,6 +276,14 @@ check('KRITISCH: ein mitgesendetes Datenbank-Passwort wird abgewiesen, nicht ver
   /db_pass|db_passwort/.test(save) && /400/.test(save));
 check('der Sammel-Schreibweg fasst weder Status noch GAV an',
   !/SET[\s\S]{0,200}\bstatus\s*=/.test(save) && !/gav_unterstellt\s*=/.test(save));
+// Die Subdomain ist seit dem Formular-Nachtrag Teil des Schreibwegs -- und
+// weil demo_instanz.php/demo_anfordern.php per LIMIT 1 darauf zugreifen,
+// muss der Speicherweg eine doppelt vergebene Subdomain selbst abweisen,
+// nicht erst der Zufall der Zuteilung.
+check('KRITISCH: der Schreibweg speichert die Subdomain mit',
+  /['"]subdomain['"]\s*=>/.test(save) && /INSERT INTO mandant[\s\S]{0,60}subdomain/.test(save));
+check('KRITISCH: eine doppelt vergebene Subdomain wird abgewiesen, nicht kommentarlos gespeichert',
+  /SELECT id FROM mandant WHERE subdomain/.test(save) && /400/.test(save));
 
 // Die GAV-Angabe wird bestaetigt, nicht gesetzt: ohne ausdrueckliche
 // Bestaetigung passiert nichts, und wer bestaetigt hat, kommt aus der

@@ -582,10 +582,6 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
         <svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-5h6v5"/><path d="M9 10h.01"/><path d="M15 10h.01"/></svg>
         <span class="lbl">Mandanten</span>
       </button>
-      <button type="button" class="nav-item" data-bereich="demo" aria-current="false">
-        <svg viewBox="0 0 24 24"><path d="M2 7.5A2.5 2.5 0 0 1 4.5 5h15A2.5 2.5 0 0 1 22 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 16.5z"/><path d="M10 9.5l4.5 2.5L10 14.5z"/></svg>
-        <span class="lbl">Demo</span>
-      </button>
       <button type="button" class="nav-item" data-bereich="offerten" aria-current="false">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
         <span class="lbl">Offerten</span>
@@ -727,6 +723,11 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
             <input id="m-name">
           </div>
           <div class="feld">
+            <label for="m-subdomain">Subdomain</label>
+            <input id="m-subdomain" placeholder="z. B. demo1" autocapitalize="none">
+            <div class="hinweis">Ohne „.guardops.ch" — nur das Wort davor. Darüber findet die Zuteilung den Platz.</div>
+          </div>
+          <div class="feld">
             <label for="m-kanton">Kanton</label>
             <input id="m-kanton" maxlength="2" autocapitalize="characters">
             <div class="hinweis">Zweistellig, steuert den Feiertagskalender.</div>
@@ -775,6 +776,34 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
         <div id="sup-freigabe"></div>
         <div id="sup-inhalt"></div>
       </div>
+    </div>
+
+    <!-- Demo-Zugaenge (ENT-600) -- eigener Abschnitt, aber innerhalb von
+         Mandanten statt eines eigenen obersten Reiters: Ein Demo-Zugang ist
+         ein vorlaeufiger Mandant, keine eigene Ebene des Betreiber-Bereichs.
+         Seit ENT-601 nur noch Uebersicht und Not-Aus: Ein Interessent
+         bekommt seinen Zugang ueber die Anmeldemaske selbst, automatisch
+         und sofort. Kein Betreiber schaltet mehr frei -- wer bei
+         Werbe-Anfragen auf einen freien Menschen wartet, ist zu spaet. -->
+    <div class="karte">
+      <div class="karte-kopf">
+        <div>
+          <h2>Demo — Plätze</h2>
+          <div class="sub">Zuteilung läuft automatisch über die Anmeldemaske</div>
+        </div>
+      </div>
+      <div id="demo-plaetze"></div>
+    </div>
+
+    <div class="karte">
+      <div class="karte-kopf">
+        <div>
+          <h2>Demo — Zugänge</h2>
+          <div class="sub">Laufende und beendete, neuste zuerst</div>
+        </div>
+        <button class="klein" id="knopf-demo-ablauf">Abgelaufene schliessen</button>
+      </div>
+      <div id="demo-inhalt"></div>
     </div>
     </section>
 
@@ -841,35 +870,6 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
     </section>
 
     <!-- ══ Offerten ═══════════════════════════════════════════════ -->
-    <!-- ══ Demo-Zugänge (ENT-600) ═══════════════════════════════════ -->
-    <section class="bereich versteckt" id="b-demo">
-
-      <!-- Seit ENT-601 nur noch Übersicht und Not-Aus: Ein Interessent
-           bekommt seinen Zugang über die Anmeldemaske selbst, automatisch
-           und sofort. Kein Betreiber schaltet mehr frei -- wer bei
-           Werbe-Anfragen auf einen freien Menschen wartet, ist zu spät. -->
-      <div class="karte">
-        <div class="karte-kopf">
-          <div>
-            <h2>Plätze</h2>
-            <div class="sub">Zuteilung läuft automatisch über die Anmeldemaske</div>
-          </div>
-        </div>
-        <div id="demo-plaetze"></div>
-      </div>
-
-      <div class="karte">
-        <div class="karte-kopf">
-          <div>
-            <h2>Zugänge</h2>
-            <div class="sub">Laufende und beendete, neuste zuerst</div>
-          </div>
-          <button class="klein" id="knopf-demo-ablauf">Abgelaufene schliessen</button>
-        </div>
-        <div id="demo-inhalt"></div>
-      </div>
-    </section>
-
     <section class="bereich versteckt" id="b-offerten">
       <div class="karte">
         <div class="karte-kopf">
@@ -932,8 +932,7 @@ function stumm(el) { zeig(el, false); }
    Anmeldung. */
 const BEREICHE = {
   uebersicht: ['Übersicht',  'Die Lage über allen Betrieben'],
-  mandanten:  ['Mandanten',  'Betriebe, die diese Plattform nutzen'],
-  demo:       ['Demo',       'Zugänge für Interessenten, je 14 Tage'],
+  mandanten:  ['Mandanten',  'Betriebe, die diese Plattform nutzen, samt Demo-Zugängen'],
   offerten:   ['Offerten',   'Angebote an künftige Mandanten'],
   rechnungen: ['Rechnungen', 'Was die Mandanten für die Nutzung zahlen'],
   support:    ['Support',    'Anfragen der Mandanten, die auf eine Antwort warten'],
@@ -1249,6 +1248,7 @@ async function ladeMandanten() {
     + '</tr></thead><tbody>'
     + liste.map(m => '<tr>'
         + '<td><strong>' + text(m.name) + '</strong>'
+          + '<div class="zweit">' + (m.subdomain ? text(m.subdomain) + '.guardops.ch' : 'Keine Subdomain gesetzt') + '</div>'
           + '<div class="zweit">' + (m.kanton ? 'Kanton ' + text(m.kanton) : 'Kanton nicht gesetzt') + '</div></td>'
         + '<td>' + groesseZelle(groesse[m.id]) + '</td>'
         + '<td>' + merker(STATUS_TEXT, m.status) + '</td>'
@@ -1305,6 +1305,7 @@ function formularOeffnen(m) {
   $('m-form-titel').textContent = m ? 'Mandant ändern' : 'Mandant anlegen';
   $('m-id').value     = m ? m.id : '';
   $('m-name').value   = m ? m.name : '';
+  $('m-subdomain').value = m && m.subdomain ? m.subdomain : '';
   $('m-kanton').value = m && m.kanton ? m.kanton : '';
   $('m-host').value   = m ? m.db_host : '';
   $('m-db').value     = m ? m.db_name : '';
@@ -1320,6 +1321,7 @@ async function mandantSpeichern() {
   const a = await ruf('betreiber_mandant_save.php', {
     id: id ? +id : 0,
     name: $('m-name').value,
+    subdomain: $('m-subdomain').value,
     kanton: $('m-kanton').value,
     db_host: $('m-host').value,
     db_name: $('m-db').value,

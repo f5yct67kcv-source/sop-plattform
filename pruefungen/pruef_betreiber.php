@@ -110,6 +110,9 @@ $pruef('KRITISCH: Status und GAV stehen nicht im Sammel-Schreibweg',
 $pruef('KRITISCH: kein Passwortfeld im Schreibweg',
     count(array_filter(BE_MANDANT_FELDER,
         static fn($f) => str_contains($f, 'pass') || $f === 'secret')) === 0);
+$pruef('KRITISCH: die Subdomain steht im Schreibweg -- sonst laesst sich ein Demo-Platz '
+     . 'im Betreiber-Bereich gar nicht zuteilen',
+    in_array('subdomain', BE_MANDANT_FELDER, true));
 
 // ── 7. Verbindungsaufloesung je Mandant ───────────────────────────────
 //
