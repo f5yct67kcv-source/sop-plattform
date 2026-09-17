@@ -37,6 +37,15 @@
   --luft: 14px;
   --shell: #16181D; --shell-hi: #1E2128; --shell-line: #272B33;
   --shell-txt: #9298A5; --shell-txt-hi: #F3F5F8;
+  /* Zweitnamen fuer unterschrift.js (ENT-292): Dieselbe Datei liegt in
+     app.html und hier, benutzt aber die Farbmarken von app.html. Fehlten
+     sie, fiel das Unterschriftsfeld auf die fest eingebauten HELLEN
+     Rueckfallwerte zurueck -- im Dunkelmodus ein weisser Kasten mitten in
+     der dunklen Karte (Befund vom 2026-09-17). Als Verweis und nicht als
+     eigener Farbwert: So ziehen sie beim Themenwechsel automatisch mit,
+     und es gibt weiterhin nur EINE Stelle je Farbe. */
+  --accent-soft: var(--accent-light); --line: var(--border); --ink: var(--text);
+  --ink-3: var(--sub); --pos: var(--green); --neg: var(--red);
 }
 /* Dieselben dunklen Werte wie html[data-thema="dunkel"] in app.html
    (ENT-398) -- eigene Variablennamen hier, aber dieselben Farben, damit
@@ -300,10 +309,6 @@ tr:hover td { background: var(--accent-light); }
           <input type="text" value="Verkehrsdienst" id="einsatzart" class="fest" readonly>
         </div>
       </div>
-      <div class="field">
-        <label id="lbl-auftragNr">Auftragsnummer</label>
-        <input type="text" id="auftragNr" placeholder="optional">
-      </div>
     </div>
 
     <div class="card">
@@ -311,12 +316,12 @@ tr:hover td { background: var(--accent-light); }
       <div class="row2">
         <div class="field" id="field-von">
           <label><span id="lbl-von">Arbeitsbeginn</span> <span class="req">*</span></label>
-          <input type="time" id="von" value="08:00" oninput="calcNet()">
+          <input type="time" id="von" value="08:00" step="900" oninput="calcNet()">
           <div class="err-msg" id="err-von">Pflichtfeld</div>
         </div>
         <div class="field" id="field-bis">
           <label><span id="lbl-bis">Arbeitsende</span> <span class="req">*</span></label>
-          <input type="time" id="bis" value="16:00" oninput="calcNet()">
+          <input type="time" id="bis" value="16:00" step="900" oninput="calcNet()">
           <div class="err-msg" id="err-bis">Pflichtfeld</div>
         </div>
       </div>
@@ -344,7 +349,6 @@ tr:hover td { background: var(--accent-light); }
         <span id="lbl-sec-sig">Kundenunterschrift</span>
         <span class="opt-badge" id="lbl-optional">Optional</span>
       </div>
-      <p style="font-size:13px;color:var(--sub);margin-bottom:12px" id="lbl-sig-hint">Der Kunde unterschreibt auf dem ganzen Bildschirm — Gerät dazu quer halten.</p>
       <div class="field" style="margin-bottom:12px">
         <label id="lbl-sig-name">Name Unterzeichner</label>
         <input type="text" id="sigName" placeholder="Vor- und Nachname">
@@ -366,7 +370,7 @@ tr:hover td { background: var(--accent-light); }
     <div class="confirm-box" id="confirmBox" onclick="toggleConfirm()">
       <input type="checkbox" id="confirmCheck" onclick="event.stopPropagation()">
       <label for="confirmCheck" id="lbl-confirm">
-        Ich bestätige, dass alle Angaben in diesem Rapport korrekt und vollständig sind.
+        Ich bestätige, dass die Angaben in diesem Rapport korrekt sind.
       </label>
     </div>
 
@@ -544,16 +548,19 @@ const T = {
     'lbl-strasse':'Strasse (Einsatzort)','err-strasse':'Pflichtfeld',
     'lbl-ort':'Ort / PLZ','err-ort':'Pflichtfeld',
     'lbl-datum':'Datum','err-datum':'Pflichtfeld',
-    'lbl-einsatzart':'Einsatzart','lbl-auftragNr':'Auftragsnummer',
+    'lbl-einsatzart':'Einsatzart',
     'lbl-sec-zeiten':'Arbeitszeit',
     'lbl-von':'Arbeitsbeginn','err-von':'Pflichtfeld',
     'lbl-bis':'Arbeitsende','err-bis':'Pflichtfeld',
     'lbl-pause':'Pause','netLbl':'Nettostunden',
     'lbl-sec-sig':'Kundenunterschrift','lbl-optional':'Optional',
-    'lbl-sig-hint':'Der Kunde unterschreibt auf dem ganzen Bildschirm — Gerät dazu quer halten.',
     'lbl-sig-name':'Name Unterzeichner',
     'lbl-sec-bem':'Bemerkungen',
-    'lbl-confirm':'Ich bestätige, dass alle Angaben in diesem Rapport korrekt und vollständig sind.',
+    // "und vollstaendig" ist raus (2026-09-17, Projektinhaber): Die
+    // Pflichtfelder erzwingen die Vollstaendigkeit bereits, der Rest ist
+    // ausdruecklich optional. Der Haken bestaetigt, was er bestaetigen kann
+    // -- die Richtigkeit.
+    'lbl-confirm':'Ich bestätige, dass die Angaben in diesem Rapport korrekt sind.',
     'btn-save':'✓ Rapport speichern',
     'success-title':'Rapport gespeichert!','success-sub':'Der Rapport wurde erfolgreich erfasst.',
     'btn-neuer':'Neuer Rapport',
@@ -572,7 +579,7 @@ const T = {
     'no-data':'Keine Rapporte vorhanden.','del':'Löschen','ph-filter':'Suche...','ph-new-ma':'Name hinzufügen...',
     'ph-signame':'Vor- und Nachname',
     'ph-kunde':'z.B. Stadt Bern','ph-strasse':'z.B. Bahnhofstrasse 12',
-    'ph-ort':'z.B. 3011 Bern','ph-auftragNr':'optional',
+    'ph-ort':'z.B. 3011 Bern',
     'ph-bem':'Besondere Vorkommnisse...',
     'stat-r':'Rapporte','stat-h':'Stunden','stat-ma':'Mitarbeiter',
     'min':'Min.','tDel':'Rapport gelöscht.',
@@ -586,9 +593,9 @@ function applyLang() {
   const ids = ['h-title','tab-erfassen','tab-uebersicht',
     'lbl-sec-ma','lbl-name','err-ma','lbl-sec-auftrag','lbl-kunde','err-kunde',
     'lbl-strasse','err-strasse','lbl-ort','err-ort','lbl-datum','err-datum',
-    'lbl-einsatzart','lbl-auftragNr','lbl-sec-zeiten','lbl-von','err-von',
+    'lbl-einsatzart','lbl-sec-zeiten','lbl-von','err-von',
     'lbl-bis','err-bis','lbl-pause','netLbl','lbl-sec-sig','lbl-optional',
-    'lbl-sig-hint','lbl-sig-name',
+    'lbl-sig-name',
     'lbl-sec-bem','lbl-confirm','btn-save','success-title','success-sub','btn-neuer',
     'btn-filter-clear','btn-csv','lbl-sec-mastats','lbl-pin-hint','lbl-pin-sub',
     'lbl-sec-adminma','btn-add-ma','lbl-sec-pin','lbl-new-pin','btn-change-pin',
@@ -603,7 +610,7 @@ function applyLang() {
   t('pa').forEach((tx,i) => { p.options[i].text = tx; p.options[i].value = pVals[i]; });
 
   const phs = {'filterQ':'ph-filter','newMaInput':'ph-new-ma','bemerkung':'ph-bem',
-    'kunde':'ph-kunde','strasse':'ph-strasse','ort':'ph-ort','auftragNr':'ph-auftragNr','sigName':'ph-signame'};
+    'kunde':'ph-kunde','strasse':'ph-strasse','ort':'ph-ort','sigName':'ph-signame'};
   Object.entries(phs).forEach(([id,k]) => { const el=document.getElementById(id); if(el) el.placeholder=t(k); });
   calcNet();
 }
@@ -682,7 +689,6 @@ function saveRapport() {
     kunde:document.getElementById('kunde').value.trim(),
     strasse:document.getElementById('strasse').value.trim(),
     ort:document.getElementById('ort').value.trim(),
-    auftragNr:document.getElementById('auftragNr').value.trim(),
     einsatzart:document.getElementById('einsatzart').value,
     von:document.getElementById('von').value,
     bis:document.getElementById('bis').value,
@@ -705,7 +711,7 @@ function saveRapport() {
 function resetForm() {
   document.getElementById('successScreen').classList.remove('show');
   document.getElementById('formArea').style.display='';
-  ['kunde','strasse','ort','auftragNr','bemerkung','sigName'].forEach(id=>document.getElementById(id).value='');
+  ['kunde','strasse','ort','bemerkung','sigName'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('datum').value=today();
   document.getElementById('von').value='08:00';
   document.getElementById('bis').value='16:00';
@@ -776,7 +782,11 @@ function showDetail(id) {
     ['Mitarbeiter', r.ma],
     ['Kunde', r.kunde],
     ['Adresse', `${r.strasse}, ${r.ort}`],
-    ['Auftrags-Nr.', r.auftragNr || '–'],
+    // Nur zeigen, wenn wirklich eine Nummer da ist: Erfasst wird sie in
+    // diesem Werkzeug nicht mehr (die Planung vergibt sie, 2026-09-17),
+    // aeltere Rapporte tragen sie aber weiterhin. Eine Zeile, die immer
+    // "–" sagt, ist keine Auskunft, sondern Fuellmaterial.
+    ...(r.auftragNr ? [['Auftrags-Nr.', r.auftragNr]] : []),
     ['Einsatzart', r.einsatzart],
     ['Zeit', `${r.von}–${r.bis} (${r.pause} ${t('min')} Pause)`],
     ['Nettostunden', r.netH.toFixed(2) + ' h'],
@@ -801,7 +811,7 @@ function printReport(id) {
     ['Mitarbeiter', r.ma],
     ['Kunde', r.kunde],
     ['Adresse', `${r.strasse}, ${r.ort}`],
-    ['Auftrags-Nr.', r.auftragNr || '–'],
+    ...(r.auftragNr ? [['Auftrags-Nr.', r.auftragNr]] : []),
     ['Einsatzart', r.einsatzart],
     ['Arbeitszeit', `${r.von} – ${r.bis}`],
     ['Pause', `${r.pause} Min.`],
