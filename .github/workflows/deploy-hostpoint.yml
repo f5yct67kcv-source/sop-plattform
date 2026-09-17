@@ -127,36 +127,22 @@ jobs:
           P_BETREIBER_FTP_HOST: ${{ secrets.BETREIBER_FTP_HOST }}
           P_BETREIBER_FTP_USER: ${{ secrets.BETREIBER_FTP_USER }}
           P_BETREIBER_FTP_PASSWORD: ${{ secrets.BETREIBER_FTP_PASSWORD }}
-          # Eigene Datenbank der Betreiber-Ebene (OP-518, sop-projekt/
-          # 00-projekt/offene-punkte.md): Mandantenstamm, Betreiber-Konten
-          # und Support-Vorgaenge sollen NICHT in derselben Datenbank liegen
-          # wie der erste Mandant. Eigene Secret-NAMEN aus demselben Grund
-          # wie bei BETREIBER_FTP_* oben: kein stiller Rueckfall. NICHT
-          # erforderlich -- fehlen sie, faellt betreiber_db() weiterhin
-          # bewusst auf db() zurueck (siehe Kopf von backend/betreiber.php).
-          # Das ist der heutige, unveraenderte Normalfall und ausdruecklich
-          # KEIN Fehlerzustand, solange OP-518 auf der Hostpoint-/Secret-
-          # Seite noch nicht abgeschlossen ist. Nur fuer Production -- die
-          # Betreiber-Ebene als eigene Datenbank ist wie BETREIBER_FTP_*
-          # ein Production-Konzept.
+          # Eigene Datenbank der Betreiber-Ebene (OP-518): Mandantenstamm,
+          # Betreiber-Konten, Support sollen nicht in der Datenbank des
+          # ersten Mandanten liegen. Eigener Secret-Name wie BETREIBER_FTP_*
+          # oben, kein stiller Rueckfall. NICHT erforderlich -- fehlen sie,
+          # faellt betreiber_db() bewusst auf db() zurueck (Kopf von
+          # backend/betreiber.php), solange OP-518 offen ist. Nur Production.
           P_BETREIBER_DB_HOST: ${{ secrets.BETREIBER_DB_HOST }}
           P_BETREIBER_DB_NAME: ${{ secrets.BETREIBER_DB_NAME }}
           P_BETREIBER_DB_USER: ${{ secrets.BETREIBER_DB_USER }}
           P_BETREIBER_DB_PASSWORD: ${{ secrets.BETREIBER_DB_PASSWORD }}
-          # OP-526: base64(JSON), NICHT rohes JSON -- {"secret_name":
-          # "passwort", ...}, ein Eintrag je Mandant mit eigener Datenbank,
-          # dann base64-kodiert (siehe mandant_secret() und die ausfuehrliche
-          # Begruendung bei mandant_secrets_tafel_pruefen() in
-          # backend/betreiber.php: sed, das den Wert weiter unten einsetzt,
-          # vertraegt kein "&" und keinen Trenner "|" in einem Passwort,
-          # base64 kennt beide Zeichen nicht -- genau wie
-          # VAPID_PRIVATE_PEM_B64 aus demselben Grund schon base64 traegt).
-          # Erzeugen z. B. mit: base64 -w0 mandant-secrets.json
-          # ("-w0": keine Zeilenumbrueche -- $GITHUB_ENV traegt eine
-          # KEY=value-Zeile je Eintrag und wuerde sonst zerreissen).
-          # Bleibt das Secret ungesetzt, ist der Wert leer -- derselbe,
-          # ausdruecklich kein Fehlerzustand wie bei P_BETREIBER_DB_* oben,
-          # solange kein Mandant eine eigene Datenbank hat.
+          # OP-526: base64(JSON) {"secret_name":"passwort",...}, NICHT roh --
+          # sed weiter unten vertraegt kein "&"/"|" in einem Passwort, base64
+          # kennt beide nicht (wie VAPID_PRIVATE_PEM_B64, siehe
+          # mandant_secrets_tafel_pruefen() in backend/betreiber.php).
+          # Erzeugen: base64 -w0 mandant-secrets.json ("-w0": $GITHUB_ENV ist
+          # eine KEY=value-Zeile). Leer bleibt kein Fehler, wie P_BETREIBER_DB_*.
           P_MANDANT_SECRETS: ${{ secrets.MANDANT_SECRETS }}
           # Eigener FTP-Zugang fuer portal.guardops.ch, beschraenkt auf
           # /home/itufeden/www/portal.guardops.ch (ENT-580, zweite Etappe
@@ -324,12 +310,8 @@ jobs:
             EFF_BETREIBER_DB_NAME="$P_BETREIBER_DB_NAME"
             EFF_BETREIBER_DB_USER="$P_BETREIBER_DB_USER"
             EFF_BETREIBER_DB_PASSWORD="$P_BETREIBER_DB_PASSWORD"
-            # OP-526: dasselbe Prinzip wie EFF_BETREIBER_DB_* zwei Zeilen
-            # darueber. Ist das Secret noch nicht gesetzt (kein Mandant hat
-            # bisher eine eigene Datenbank), ist $EFF_MANDANT_SECRETS leer --
-            # mandant_secret() behandelt das als "kein Secret", nicht als
-            # Fehler (siehe Kopf von backend/betreiber.php und
-            # pruef_betreiber.php). Kein Pflichtwert, aus demselben Grund.
+            # OP-526, wie EFF_BETREIBER_DB_* zwei Zeilen darueber: leer bleibt
+            # kein Fehler, mandant_secret() liest das als "kein Secret".
             EFF_MANDANT_SECRETS="$P_MANDANT_SECRETS"
             EFF_PORTAL_FTP_HOST="$P_PORTAL_FTP_HOST"
             EFF_PORTAL_FTP_USER="$P_PORTAL_FTP_USER"
@@ -420,10 +402,7 @@ jobs:
             EFF_BETREIBER_DB_NAME=""
             EFF_BETREIBER_DB_USER=""
             EFF_BETREIBER_DB_PASSWORD=""
-            # OP-526: betreiber.guardops.ch und cupi24.guardops.ch, die
-            # Einzigen, die __MANDANT_SECRETS__ ueberhaupt ersetzen, sind
-            # beide nur fuer Production gedacht -- dieselbe Begruendung wie
-            # bei EFF_BETREIBER_DB_* direkt darueber.
+            # OP-526, wie EFF_BETREIBER_DB_* direkt darueber: nur Production.
             EFF_MANDANT_SECRETS=""
             # portal.guardops.ch ist wie betreiber.guardops.ch nur fuer
             # Production gedacht (ENT-580) -- dieselbe Begruendung.
@@ -511,10 +490,7 @@ jobs:
             EFF_BETREIBER_DB_NAME=""
             EFF_BETREIBER_DB_USER=""
             EFF_BETREIBER_DB_PASSWORD=""
-            # OP-526: betreiber.guardops.ch und cupi24.guardops.ch, die
-            # Einzigen, die __MANDANT_SECRETS__ ueberhaupt ersetzen, sind
-            # beide nur fuer Production gedacht -- dieselbe Begruendung wie
-            # bei EFF_BETREIBER_DB_* direkt darueber.
+            # OP-526, wie EFF_BETREIBER_DB_* direkt darueber: nur Production.
             EFF_MANDANT_SECRETS=""
             # portal.guardops.ch ist wie betreiber.guardops.ch nur fuer
             # Production gedacht (ENT-580) -- dieselbe Begruendung.
@@ -526,16 +502,11 @@ jobs:
             EFF_CUPI24_FTP_HOST=""
             EFF_CUPI24_FTP_USER=""
             EFF_CUPI24_FTP_PASSWORD=""
-            # Eigene Adresse (ENT-501), siehe Begruendung im Production-Zweig.
-            # Fuer Staging steht die Domain bereits als Environment-Variable
-            # STAGING_DOMAIN bereit -- dieselbe, mit der die beiden
-            # Verifikationsschritte weiter unten die Seite abrufen. KEIN
-            # Rueckfall auf die produktive Adresse: Ein Staging-Link, der auf
-            # Produktion zeigt, waere genau der Fehler, den die urspruengliche
-            # HTTP_HOST-Loesung vermeiden wollte. Fehlt die Variable, bleibt
-            # der Platzhalter stehen, basis_url() liefert null und die
-            # betroffenen Endpunkte verschicken keinen Link, statt einen
-            # falschen.
+            # Eigene Adresse (ENT-501, Begruendung im Production-Zweig).
+            # STAGING_DOMAIN dient auch den Verifikationsschritten weiter
+            # unten. Kein Rueckfall auf die produktive Adresse -- fehlt die
+            # Variable, bleibt der Platzhalter stehen, basis_url() liefert
+            # null statt eines falschen Links.
             EFF_APP_BASIS_URL=""
             if [ -n "${{ vars.STAGING_DOMAIN }}" ]; then
               EFF_APP_BASIS_URL="https://${{ vars.STAGING_DOMAIN }}"
@@ -584,21 +555,13 @@ jobs:
           fi
 
           # Drift-Guard fuer die manuell bei Hostpoint gepflegten Staging-
-          # Dateien (ENT-384, erweitert ENT-387; Demo braucht ihn NICHT --
-          # ENT-523-N1: keinen Passwortschutz, nichts manuell zu pflegen,
-          # siehe htaccess-demo-zusatz weiter unten). Oberhalb der Markierung
-          # "#@__HCP_END__@#" in der dortigen .htaccess verwaltet sich der
-          # Passwortschutz selbst; darunter stehen von Hand die Inhalte von
-          # htaccess-hostpoint UND htaccess-staging-zusatz (X-Robots-Tag),
-          # robots.txt liegt daneben. Der Deploy laesst alle drei fuer
-          # Staging unangetastet (siehe FTP-Schritt unten), sonst wuerde
-          # jeder Deploy den Schutz stillschweigend entfernen -- aendert
-          # sich eine der drei Quelldateien im Repository, driftet die
-          # Staging-Kopie darum unbemerkt auseinander, wenn niemand manuell
-          # nachzieht. Deshalb muss jeder Hash exakt dem zuletzt manuell
-          # uebertragenen Stand entsprechen (staging-htaccess.synced-sha256,
-          # "datei:hash" je Zeile) -- sonst bricht der Staging-Deploy ab,
-          # statt mit veralteten Regeln weiterzulaufen.
+          # Dateien (ENT-384/387; Demo braucht ihn nicht, ENT-523-N1). Der
+          # Deploy laesst htaccess-hostpoint, htaccess-staging-zusatz und
+          # robots-staging.txt fuer Staging unangetastet, sonst wuerde er den
+          # dort manuell gepflegten Passwortschutz stillschweigend entfernen
+          # -- driftet eine der drei Quelldateien im Repository unbemerkt
+          # auseinander, muss jeder Hash exakt staging-htaccess.synced-sha256
+          # entsprechen, sonst bricht der Staging-Deploy ab.
           if [ "$UMGEBUNG" = "staging" ]; then
             for DRIFT_DATEI in htaccess-hostpoint htaccess-staging-zusatz robots-staging.txt; do
               AKTUELLER_HASH=$(sha256sum "$DRIFT_DATEI" | cut -d' ' -f1)
@@ -711,20 +674,14 @@ jobs:
           # Mitarbeiter-Code, also kann von dort auch nichts versehentlich
           # an einen Kunden geraten.
           cp portal.html dist/portal.html
-          # KEINE homepage.html MEHR AUF DIESER INSTANZ (ENT-563/OP-565).
-          # Die oeffentliche Seite lebt seit guardops.ch dort, und zwar als
-          # index.html auf der Wurzel. Zweimal dieselbe Seite unter zwei
-          # Adressen waere doppelter Inhalt, und die Testadresse soll gar
-          # nicht gefunden werden. Der Upload raeumt sein Zielverzeichnis
-          # auf -- die Datei verschwindet vom Server also von selbst, sobald
-          # diese Zeile fehlt. Das Buendel fuer guardops.ch baut sie weiter
-          # (siehe weiter unten); test_deploy.mjs achtet darauf, dass sie
-          # hier NICHT zurueckkehrt.
-          # Betreiber-Bereich (ENT-519 bis ENT-521). Eigene Seite neben
-          # dashboard.html und portal.html, mit eigener Anmeldung gegen die
-          # betreiber_*-Endpunkte. Sie traegt weder Cockpit- noch
-          # Mitarbeiter- noch Portalcode -- dieselbe Trennung wie bei den
-          # Anmeldewegen selbst.
+          # KEINE homepage.html MEHR AUF DIESER INSTANZ (ENT-563/OP-565): Die
+          # oeffentliche Seite lebt seit guardops.ch als index.html dort,
+          # doppelter Inhalt unter zwei Adressen soll nicht entstehen. Der
+          # Upload raeumt sein Ziel auf, die Datei fehlt hier also von
+          # selbst; guardops.ch baut sie weiter, test_deploy.mjs achtet
+          # darauf, dass sie hier nicht zurueckkehrt.
+          # Betreiber-Bereich (ENT-519/521): eigene Seite, eigene Anmeldung
+          # gegen betreiber_*-Endpunkte, kein Cockpit-/Mitarbeiter-/Portalcode.
           cp betreiber.html dist/betreiber.html
           # gav.js traegt die GAV-Regeln fuer BEIDE Oberflaechen (ENT-049).
           # Fehlt sie hier, laden dashboard.html und app.html ins Leere und
