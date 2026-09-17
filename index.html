@@ -64,7 +64,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
    dieselbe Loesung wie .kopf in app.html. Ohne echten Einschub (Browser)
    ist env(safe-area-inset-top) 0 und min-height haelt die bisherige
    Hoehe von 58px. */
-header { background: var(--shell); color: #fff; padding: calc(env(safe-area-inset-top) + 12px) 16px 12px; min-height: 58px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+/* Raster 1fr auto 1fr statt Flex mit space-between (CLAUDE.md): Der Titel
+   gehoert in die Mitte des BILDSCHIRMS, nicht in die Mitte des Rests
+   zwischen "App" und Abmelden. Die beiden sind verschieden breit -- mit
+   space-between sass "Stundenrapport" sichtbar links der Mitte. */
+header { background: var(--shell); color: #fff; padding: calc(env(safe-area-inset-top) + 12px) 16px 12px; min-height: 58px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+header > :last-child { justify-self: end; }
 header h1 { font-size: 15px; font-weight: 700; }
 /* Kopfzeile: nur noch Weg zurueck, Logo und Abmelden. Alles andere war
    Zierde und hat den Blick vom Formular abgezogen (ENT-028). */
@@ -107,6 +112,13 @@ header h1 { font-size: 15px; font-weight: 660; letter-spacing: -.2px; color: var
 /* Ein festes, nicht aenderbares Feld (Einsatzart) -- vorher als Inline-Stil
    am Element, damit ausserhalb des Systems und beim naechsten Mal vergessen. */
 .field input.fest { color: var(--sub); cursor: default; }
+/* Gesperrtes Feld (Kundenname bei Auswahl aus der Liste). Die Werte stehen
+   ausdruecklich hier: iOS faerbt und blasst ein disabled-Feld von sich aus
+   ein (-webkit-text-fill-color, opacity) -- im Dunkelmodus lag der Text
+   danach fast auf dem Hintergrund. "Ausgegraut" soll heissen "nicht
+   aenderbar", nicht "unlesbar". */
+.field input:disabled { color: var(--sub); -webkit-text-fill-color: var(--sub);
+  opacity: 1; background: var(--bg); cursor: default; }
 .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); background: var(--surface); }
 .field input.error, .field select.error { border-color: var(--red); background: var(--red-bg); }
 .field .err-msg { font-size: 11px; color: var(--red); margin-top: 4px; display: none; }
@@ -244,7 +256,7 @@ tr:hover td { background: var(--accent-light); }
     <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
     <span>App</span>
   </a>
-  <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+  <div style="min-width:0">
     <h1 id="h-title">Stundenrapport</h1>
   </div>
   <button class="kopf-btn" onclick="doLogout()" id="btn-header-logout" title="Abmelden" aria-label="Abmelden">
@@ -306,7 +318,10 @@ tr:hover td { background: var(--accent-light); }
         </div>
         <div class="field">
           <label id="lbl-einsatzart">Einsatzart</label>
-          <input type="text" value="Verkehrsdienst" id="einsatzart" class="fest" readonly>
+          <select id="einsatzart">
+            <option value="Verkehrsdienst">Verkehrsdienst</option>
+            <option value="Sicherheitsdienst">Sicherheitsdienst</option>
+          </select>
         </div>
       </div>
     </div>
@@ -316,12 +331,12 @@ tr:hover td { background: var(--accent-light); }
       <div class="row2">
         <div class="field" id="field-von">
           <label><span id="lbl-von">Arbeitsbeginn</span> <span class="req">*</span></label>
-          <input type="time" id="von" value="08:00" step="900" oninput="calcNet()">
+          <input type="time" id="von" value="08:00" oninput="calcNet()">
           <div class="err-msg" id="err-von">Pflichtfeld</div>
         </div>
         <div class="field" id="field-bis">
           <label><span id="lbl-bis">Arbeitsende</span> <span class="req">*</span></label>
-          <input type="time" id="bis" value="16:00" step="900" oninput="calcNet()">
+          <input type="time" id="bis" value="16:00" oninput="calcNet()">
           <div class="err-msg" id="err-bis">Pflichtfeld</div>
         </div>
       </div>
@@ -425,6 +440,11 @@ tr:hover td { background: var(--accent-light); }
 
 <div class="toast" id="toast"></div>
 
+<!-- Dieselbe Zeitwahl wie in App und Cockpit (ENT-110): zwei Auswahlfelder
+     statt eines freien Feldes, Minuten in Viertelstunden. Das ersetzt jedes
+     <input type="time"> von selbst. Der Weg ueber step="900" half nicht --
+     iOS zeigt im nativen Zeitrad trotzdem jede Minute. -->
+<script src="zeitwahl.js"></script>
 <script src="unterschrift.js"></script>
 <script src="testumgebung.js"></script>
 <script>
@@ -712,6 +732,11 @@ function resetForm() {
   document.getElementById('successScreen').classList.remove('show');
   document.getElementById('formArea').style.display='';
   ['kunde','strasse','ort','bemerkung','sigName'].forEach(id=>document.getElementById(id).value='');
+  // Kundenauswahl zurueck auf "manuell eingeben" -- sonst bliebe der Kunde
+  // des vorigen Rapports gewaehlt und sein Name gesperrt im Feld stehen.
+  document.getElementById('kundeSelect').value='';
+  applyKundeSelect();
+  document.getElementById('einsatzart').value='Verkehrsdienst';
   document.getElementById('datum').value=today();
   document.getElementById('von').value='08:00';
   document.getElementById('bis').value='16:00';
@@ -856,10 +881,23 @@ let maDetailTarget = null;
 // 2026-09-17, Projektinhaber).
 function applyKundeSelect(){
   const idx = document.getElementById('kundeSelect').value;
-  if (idx==='') return;
-  const k = kundenOptions[idx];
-  if (!k) return;
-  document.getElementById('kunde').value = k.name;
+  const feld = document.getElementById('kunde');
+  const manuell = idx === '';
+  if (manuell) {
+    // Zurueck auf manuell heisst: Das Feld gehoert wieder dem Mitarbeiter.
+    // Der zuvor gewaehlte Name bleibt sonst stehen und sieht aus wie eine
+    // Eingabe, die er selbst gemacht hat.
+    feld.value = '';
+  } else {
+    const k = kundenOptions[idx];
+    if (k) feld.value = k.name;
+  }
+  // Ausgegraut, solange der Kunde aus der Liste kommt: Dort ist der Name
+  // bereits gepflegt, und eine Abweichung von Hand waere nur eine zweite
+  // Schreibweise desselben Kunden. Strasse und Ort bleiben IMMER offen --
+  // das ist der Einsatzort, nicht der Sitz des Kunden.
+  feld.disabled = !manuell;
+  feld.classList.toggle('fest', !manuell);
 }
 
 // ── KUNDENAUSWAHL IM FORMULAR
