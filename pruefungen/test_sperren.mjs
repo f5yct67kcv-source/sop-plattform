@@ -159,8 +159,11 @@ check('Kein albanischer Text mehr in der Erfassung',
   await page.evaluate(() => !/Shqip|Punonjës|Raporti|Fjalëkalimi|Ruaj/.test(document.body.innerHTML)));
 check('Der Zurück-Knopf ist da', await page.isVisible('#btn-zurueck'));
 check('Er führt in die App', (await page.getAttribute('#btn-zurueck', 'href')) === 'app.html');
-check('Das Logo ist geblieben',
-  await page.evaluate(() => !!document.querySelector('header img')));
+// Revidiert 2026-09-17 (Projektinhaber): Das Logo ist ausdruecklich
+// wieder raus -- der Zurueck-Knopf und der Titel sagen bereits, wo man
+// ist, ein zusaetzliches Bild trug nichts bei.
+check('Kein Logo mehr im Kopf',
+  await page.evaluate(() => !document.querySelector('header img')));
 check('Der Titel ist geblieben', (await page.textContent('#h-title')) === 'Stundenrapport');
 check('Abmelden ist geblieben', await page.isVisible('#btn-header-logout'));
 const kopfKinder = await page.evaluate(() => document.querySelector('header').children.length);

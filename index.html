@@ -66,7 +66,6 @@ header h1 { font-size: 15px; font-weight: 700; }
 .kopf-btn:hover { background: #262A33; }
 .kopf-btn svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 header h1 { font-size: 15px; font-weight: 660; letter-spacing: -.2px; color: var(--shell-txt-hi); }
-header img { width: 30px; height: 30px; border-radius: 8px; }
 
 .tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .tab { flex: 1; min-width: 80px; min-height: 46px; padding: 14px 8px; font-size: 12px; font-weight: 600; color: var(--sub); cursor: pointer; border-bottom: 2px solid transparent; text-align: center; white-space: nowrap; transition: all .15s; user-select: none; }
@@ -104,9 +103,20 @@ header img { width: 30px; height: 30px; border-radius: 8px; }
 .field .err-msg { font-size: 11px; color: var(--red); margin-top: 4px; display: none; }
 .field.has-error .err-msg { display: block; }
 select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B7280' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
+/* .field select { background: var(--bg) } (oben) ist eine KURZFORM -- die
+   setzt background-image/-repeat/-position implizit mit zurueck und
+   gewinnt gegen die blosse "select"-Regel oben (hoehere Eigenspezifitaet:
+   Klasse+Element schlaegt Element allein). Ohne diese Zeile blieb der
+   Pfeil unsichtbar (background-image:none gewann); mit der Dunkel-Variante
+   (naechste Regel) gewann NUR das Bild, nicht das "no-repeat" daneben --
+   das Ergebnis war ein gekacheltes Zickzack statt eines einzelnen Pfeils
+   (Befund vom 2026-09-17, gemessen am gerenderten Zustand). Dieselbe
+   Spezifitaet wie die Kurzform und spaeter im Text behebt beides: das Bild
+   erscheint, UND "no-repeat" gilt wieder. */
+.field select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B7280' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
 /* Dieselbe Pfeilform, hellerer Strich -- #6B7280 verschwindet fast auf dem
    dunklen Feldhintergrund. */
-html[data-thema="dunkel"] select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239298A5' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); }
+html[data-thema="dunkel"] .field select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239298A5' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--luft); margin-bottom: var(--luft); }
 
 .net-display { background: var(--green-bg); border: 1.5px solid var(--green-line); border-radius: 10px; padding: 14px 18px; text-align: center; margin-bottom: 0; }
@@ -226,7 +236,6 @@ tr:hover td { background: var(--accent-light); }
     <span>App</span>
   </a>
   <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
-    <img src="icons/guardops-192.png" alt="">
     <h1 id="h-title">Stundenrapport</h1>
   </div>
   <button class="kopf-btn" onclick="doLogout()" id="btn-header-logout" title="Abmelden" aria-label="Abmelden">
@@ -262,7 +271,7 @@ tr:hover td { background: var(--accent-light); }
     <div class="card">
       <div class="card-title" id="lbl-sec-auftrag">Auftrag</div>
       <div class="field">
-        <label>Kunde wählen (optional)</label>
+        <label>Kunde wählen</label>
         <select id="kundeSelect" onchange="applyKundeSelect()"><option value="">— manuell eingeben —</option></select>
       </div>
       <div class="field" id="field-kunde">
@@ -271,7 +280,7 @@ tr:hover td { background: var(--accent-light); }
         <div class="err-msg" id="err-kunde">Pflichtfeld</div>
       </div>
       <div class="field" id="field-strasse">
-        <label><span id="lbl-strasse">Strasse</span> <span class="req">*</span></label>
+        <label><span id="lbl-strasse">Strasse (Einsatzort)</span> <span class="req">*</span></label>
         <input type="text" id="strasse" placeholder="z.B. Bahnhofstrasse 12">
         <div class="err-msg" id="err-strasse">Pflichtfeld</div>
       </div>
@@ -532,7 +541,7 @@ const T = {
     'h-title':'Stundenrapport','tab-erfassen':'Erfassen','tab-uebersicht':'Übersicht',
     'lbl-sec-ma':'Mitarbeiter','lbl-name':'Name','err-ma':'Bitte Mitarbeiter wählen.',
     'lbl-sec-auftrag':'Auftrag','lbl-kunde':'Kundenname','err-kunde':'Pflichtfeld',
-    'lbl-strasse':'Strasse','err-strasse':'Pflichtfeld',
+    'lbl-strasse':'Strasse (Einsatzort)','err-strasse':'Pflichtfeld',
     'lbl-ort':'Ort / PLZ','err-ort':'Pflichtfeld',
     'lbl-datum':'Datum','err-datum':'Pflichtfeld',
     'lbl-einsatzart':'Einsatzart','lbl-auftragNr':'Auftragsnummer',
@@ -830,14 +839,17 @@ function exportCSV() {
 let maListData = [];
 let maDetailTarget = null;
 
+// Nur der Name kommt aus der Kundenliste. Strasse/Ort sind der Einsatzort
+// dieses Rapports, nicht der Hauptsitz des Kunden -- beide sind oft nicht
+// dasselbe. Ein automatisch eingesetzter Hauptsitz sah aus wie eine
+// gepruefte Angabe und wurde als solche stehen gelassen (Befund vom
+// 2026-09-17, Projektinhaber).
 function applyKundeSelect(){
   const idx = document.getElementById('kundeSelect').value;
   if (idx==='') return;
   const k = kundenOptions[idx];
   if (!k) return;
   document.getElementById('kunde').value = k.name;
-  document.getElementById('strasse').value = k.strasse;
-  document.getElementById('ort').value = k.ort;
 }
 
 // ── KUNDENAUSWAHL IM FORMULAR
