@@ -35,22 +35,75 @@ declare(strict_types=1);
 //     nicht stimmt. Das sind zwei verschiedene Aussagen und brauchen zwei
 //     Texte (CLAUDE.md). Fuer den Betreiber ist der erste Fall ein Anruf
 //     wert, der zweite nicht.
+//
+// SEIT ENT-601/ENT-603 ZUSAETZLICH: Die Zuteilung eines Platzes laeuft
+// automatisch ueber api/demo_anfordern.php, nicht mehr ueber einen
+// Betreiber von Hand -- Interessenten, die ueber Werbung kommen, sollen
+// nicht auf einen freien Menschen warten. Der Vorrat selbst und die
+// Trennung ueber eigene Datenbanken (Punkte 1 und 2 oben) bleiben
+// unveraendert; nur WER zuteilt und WIE die Zugangsdaten zugestellt
+// werden, hat sich geaendert. Der Betreiber-Bereich behaelt eine
+// Uebersicht mit Not-Aus (einen laufenden Zugang vorzeitig beenden),
+// vergibt aber keinen mehr selbst.
+const DEMO_FREIGEGEBEN_AUTOMATISCH = 'automatisch (Selbstbedienung, ENT-601)';
+
+// Dieselbe Antwort fuer JEDEN erfolgreichen Fall von api/demo_anfordern.php
+// -- Honigtopf, neuer Zugang, bestehender Zugang mit neuem Passwort. Wer
+// bereits einen aktiven Zugang hat, soll das nicht am Antworttext ablesen
+// koennen (dieselbe Regel wie bei passwort_vergessen.php). "Kein Platz
+// frei" bleibt bewusst eine EIGENE, ehrliche Meldung (409) -- eine
+// Kapazitaetsgrenze ist keine sicherheitsrelevante Tatsache, die man
+// verschleiern muesste, und ein Interessent soll nicht auf eine Zusage
+// warten, die nicht kommt.
+const DEMO_ANFORDERN_DANKE = 'Vielen Dank. Sie erhalten in Kürze eine E-Mail mit Ihren Zugangsdaten.';
+
+// ── Kleine Formhelfer fuer api/demo_anfordern.php und
+// api/demo_erneut_senden.php ─────────────────────────────────────────
+//
+// EIGENE, KLEINE FASSUNG STATT demo_anfrage.php EINZUBINDEN: Jene Datei
+// traegt einen Platzhalter fuer den Empfaenger des Kontaktformulars der
+// Homepage (siehe dort) -- im Betreiber-Buendel gaebe es dafuer nie einen
+// Wert, und ein dauerhaft unersetzter Platzhalter in einer mitgelieferten
+// Datei ist genau der Zustand, den test_deploy.mjs abweist. Die paar
+// Zeilen hier zu verdoppeln ist kleiner als eine Ausnahme dafuer zu
+// pflegen. (Der Platzhaltername steht bewusst NICHT woertlich in diesem
+// Kommentar -- sonst faende ihn derselbe Scanner genau hier.)
+const DEMO_ZUGANG_MAX_FIRMA  = 120;
+const DEMO_ZUGANG_MAX_NAME   = 120;
+const DEMO_ZUGANG_MAX_EMAIL  = 200;
+const DEMO_ZUGANG_FALLE      = 'website';
+
+function demo_zugang_ist_falle(array $in): bool
+{
+    return trim((string)($in[DEMO_ZUGANG_FALLE] ?? '')) !== '';
+}
+
+function demo_zugang_einzeilig(mixed $wert, int $max): string
+{
+    $s = preg_replace('/[\r\n\t]+/', ' ', (string)$wert) ?? '';
+    return mb_substr(trim($s), 0, $max);
+}
 
 // Laufzeit eines Demo-Zugangs. Als Konstante und nicht als Einstellung:
 // Konfigurierbarkeit ist kein Qualitaetsmerkmal, solange niemand eine
 // andere Laufzeit braucht (Optimierungsziel, CLAUDE.md Teil B).
 const DEMO_ZUGANG_TAGE = 14;
 
-// Die Plaetze des Vorrats. Drei zum Start (ENT-600, Punkt 3). Die Namen
-// entsprechen der Subdomain unter guardops.ch und damit der `subdomain`-
-// Spalte der `mandant`-Zeile, ueber die der Betreiber-Bereich die
-// Datenbank des Platzes findet.
+// Die Plaetze des Vorrats. Zehn zum Start (ENT-603 -- ENT-600 nannte drei,
+// bevor sich zeigte, dass eine zehnfach groessere Datenbank-Kapazitaet bei
+// Hostpoint zwei Franken im Monat kostet). Die Namen entsprechen der
+// Subdomain unter guardops.ch und damit der `subdomain`-Spalte der
+// `mandant`-Zeile, ueber die der Betreiber-Bereich die Datenbank des
+// Platzes findet.
 //
-// FESTE LISTE UND KEINE ZAEHLSCHLEIFE ("demo" . $i): Ein vierter Platz
+// FESTE LISTE UND KEINE ZAEHLSCHLEIFE ("demo" . $i): Ein elfter Platz
 // entsteht nicht dadurch, dass jemand eine Zahl hochsetzt -- er braucht
 // eine Datenbank, ein Deploy-Buendel und ein Geheimnis. Eine Liste, die
 // man erweitern MUSS, zwingt zu dem Blick auf das, was sonst noch fehlt.
-const DEMO_PLAETZE = ['demo1', 'demo2', 'demo3'];
+const DEMO_PLAETZE = [
+    'demo1', 'demo2', 'demo3', 'demo4', 'demo5',
+    'demo6', 'demo7', 'demo8', 'demo9', 'demo10',
+];
 
 // Zustaende eines Zugangs. Geschlossene Liste, kein freier Text -- wie der
 // Mandantenstatus in betreiber.php.

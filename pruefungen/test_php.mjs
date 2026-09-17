@@ -872,6 +872,16 @@ const OHNE_ANMELDUNG = [
   // Konto. Bis ENT-501 standen diese beiden nirgends benannt.
   'beleg_oeffentlich.php',
   'beleg_entscheidung.php',
+  // Demo-Selbstbedienung (ENT-601): Ein Interessent hat noch kein Konto,
+  // kann also keine Sitzung mitbringen -- dieselbe Begruendung wie bei
+  // login.php. Eigene Bremsen (IP und E-Mail-Adresse), Honigtopf,
+  // hoechstens ein aktiver Zugang je Adresse. Eigene Pruefung:
+  // test_demo_zugang.mjs, und die enge Einhegung in test_betreiber.mjs
+  // ("Die Ausnahme fuer die Demo bleibt eng").
+  'demo_anfordern.php',
+  // Gegenstueck fuer "Zugangsdaten erneut senden" -- dieselbe Begruendung,
+  // dieselbe gleichlautende Antwort in jedem Fall (wie passwort_vergessen.php).
+  'demo_erneut_senden.php',
   // Naechtlicher Demo-Reset (ENT-523 Punkt 3), ausgeloest ueber einen
   // GitHub-Actions-Zeitgeber ohne jede Sitzung -- gleiches Prinzip wie
   // push_versand.php (dort STEHT require_session() aber im Quelltext, als

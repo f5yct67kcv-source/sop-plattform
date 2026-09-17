@@ -124,6 +124,13 @@ const BETREIBER_EBENE_ERLAUBT = [
   // solange der Bootstrap offen ist -- aelter als die Supportvorgaenge und
   // hier nur der Vollstaendigkeit halber genannt.
   'planung_einrichten.php',
+  // Die oeffentliche Demo-Selbstbedienung (ENT-601): Das Register der
+  // Demo-Zugaenge (demo_zugang) und der Mandantenstamm liegen in der
+  // Betreiber-Datenbank, nicht in einer Demo-Instanz (siehe demo_zugang.php,
+  // Kopfkommentar) -- ohne betreiber_db() faende dieser Weg sein eigenes
+  // Register nicht.
+  'demo_anfordern.php',
+  'demo_erneut_senden.php',
 ];
 const apiDateien = readdirSync(`${WURZEL}/backend/api`).filter(f => f.endsWith('.php'));
 const fremdeNutzer = apiDateien.filter(f => {

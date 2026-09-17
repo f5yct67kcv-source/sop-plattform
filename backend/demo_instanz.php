@@ -17,6 +17,7 @@ declare(strict_types=1);
 // läuft, also der Ablauf, also genau die, die niemand ansieht.
 require_once __DIR__ . '/betreiber.php';
 require_once __DIR__ . '/demo_reset.php';
+require_once __DIR__ . '/demo_zugang.php';
 
 // Leert die Instanz eines Platzes und sät die Systemrollen neu.
 //
@@ -60,4 +61,64 @@ function demo_instanz_leeren(PDO $betreiber, string $platz): ?string
     demo_reset_alle_tabellen_leeren($instanz);
     demo_reset_systemrollen_saeen($instanz);
     return null;
+}
+
+// Neues Passwort fuer ein BESTEHENDES Demo-Konto (ENT-601, Punkt 6/7).
+//
+// Zwei Aufrufer teilen sich diesen Weg und wollen absichtlich dasselbe
+// Ergebnis: demo_anfordern.php, wenn dieselbe E-Mail-Adresse ein zweites
+// Mal anfragt, und demo_erneut_senden.php, wenn jemand seinen Zugang
+// verloren hat. Beide duerfen NIE eine zweite Instanz anlegen -- nur ein
+// neues Passwort fuer die, die schon existiert.
+//
+// Gibt ['fehler' => string, 'mail' => null] oder ['fehler' => null,
+// 'mail' => [...]] zurueck -- die aufrufende Datei entscheidet, ob und wie
+// sie einen Fehler nach aussen zeigt (demo_erneut_senden.php zeigt NIE
+// etwas, demo_anfordern.php zeigt eine Betriebsstoerung).
+function demo_zugang_neues_passwort(PDO $betreiber, array $zugang): array
+{
+    $platz = (string)$zugang['platz'];
+    $stmt = $betreiber->prepare('SELECT * FROM mandant WHERE subdomain = ? LIMIT 1');
+    $stmt->execute([$platz]);
+    $m = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$m) {
+        return ['fehler' => "Der Platz „$platz“ ist im Mandantenstamm nicht eingetragen.", 'mail' => null];
+    }
+    if (mandant_verbindung_bereit($m) !== 'bereit') {
+        return ['fehler' => "Der Platz „$platz“ ist nicht verbunden.", 'mail' => null];
+    }
+    try {
+        $instanz = mandant_db($m);
+    } catch (Throwable $e) {
+        return ['fehler' => "Der Platz „$platz“ ist nicht erreichbar.", 'mail' => null];
+    }
+
+    $s = $instanz->prepare('SELECT id FROM mitarbeiter WHERE name = ? LIMIT 1');
+    $s->execute([(string)$zugang['login']]);
+    $konto = $s->fetch(PDO::FETCH_ASSOC);
+    if (!$konto) {
+        // Das Register sagt "aktiv", das Konto in der Instanz fehlt --
+        // ein Widerspruch, der nicht still uebergangen wird (Hausregel:
+        // "unbekannt" darf nie wie "keine" aussehen).
+        return ['fehler' => "Das Konto zum Zugang auf „$platz“ fehlt in der Instanz.", 'mail' => null];
+    }
+
+    $passwort = demo_passwort_erzeugen();
+    $instanz->prepare('UPDATE mitarbeiter SET password_hash = ? WHERE id = ?')
+        ->execute([password_hash($passwort, PASSWORD_DEFAULT), (int)$konto['id']]);
+    // Bestehende Sitzungen fallen weg -- ein neues Passwort ist ein
+    // Wiederherstellungsvorgang, kein normaler Wechsel aus einer
+    // angemeldeten Sitzung heraus (dieselbe Regel wie in
+    // passwort_zuruecksetzen.php).
+    $instanz->prepare('DELETE FROM sessions WHERE mitarbeiter_id = ?')->execute([(int)$konto['id']]);
+
+    $mail = demo_zugang_mail(
+        (string)$zugang['firma'],
+        (string)$zugang['person'],
+        (string)demo_platz_adresse($platz),
+        (string)$zugang['login'],
+        $passwort,
+        (string)$zugang['laeuft_ab_am']
+    );
+    return ['fehler' => null, 'mail' => $mail];
 }

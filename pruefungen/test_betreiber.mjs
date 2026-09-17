@@ -10,7 +10,7 @@
 // bestaetigt, sondern die, die jeden KUENFTIGEN betreiber_*-Endpunkt
 // zwingt, die Wache zu rufen.
 import { WURZEL, HIER } from './pfade.mjs';
-import { readFileSync, readdirSync } from 'fs';
+import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { execFileSync } from 'child_process';
 
@@ -147,15 +147,17 @@ check('der Mandantenstamm haelt Host, Name und Benutzer',
 // Ein Betreiber-Konto ist keine Zeile in mitarbeiter. Ausser beim
 // Bootstrap (Einrichtung, Erstkonto) darf kein Betreiber-Endpunkt die
 // Verwaltungstabellen anfassen.
-// Seit ENT-600 kommt eine dritte Ausnahme dazu: Die Demo-Freigabe legt
-// das persoenliche Konto des Interessenten an. Das ist eine Zeile in
-// `mitarbeiter` -- aber in der Datenbank EINER DEMO-INSTANZ, nicht in der
-// des Betriebs. Die Ausnahme ist eng: Sie gilt nur fuer den einen
-// Endpunkt, und weiter unten wird geprueft, dass er ueberhaupt nur auf
-// einen Platz des Demo-Vorrats zugreifen kann.
+// Seit ENT-601 legen die OEFFENTLICHEN Selbstbedienungs-Endpunkte
+// (demo_anfordern.php, demo_erneut_senden.php) ein persoenliches Konto des
+// Interessenten an bzw. setzen dessen Passwort neu -- aber in der
+// Datenbank EINER DEMO-INSTANZ, nicht in der des Betriebs, und sie tragen
+// kein betreiber_-Praefix (sie laufen ohne Anmeldung) und fallen darum gar
+// nicht erst in diese Liste. Diese Pruefung bleibt darum eng auf echte
+// betreiber_*-Endpunkte beschraenkt; weiter unten wird eigens geprueft,
+// dass die beiden oeffentlichen Endpunkte nur auf einen Platz des
+// Demo-Vorrats zugreifen koennen.
 const fremdzugriff = endpunkte.filter(f => {
-  if (f === 'betreiber_einrichten.php' || f === 'betreiber_konto_anlegen.php'
-      || f === 'betreiber_demo_freigeben.php') { return false; }
+  if (f === 'betreiber_einrichten.php' || f === 'betreiber_konto_anlegen.php') { return false; }
   const q = lies(`backend/api/${f}`);
   return /\bFROM mitarbeiter\b|\bFROM sessions\b|\bFROM kunden_sessions\b/.test(q);
 });
@@ -292,10 +294,7 @@ check('KRITISCH: der Hinweistext legt den GAV nicht selbst aus',
 // Kein Betreiber-Endpunkt liefert Betriebsdaten mit. Der Bereich sieht
 // Vertrag und Zustand eines Betriebs, nicht seinen Inhalt.
 const BETRIEBSTABELLEN = /\bFROM (?:mitarbeiter|einsaetze|rapporte|lohnlauf|lohn_person|objekte|kunden)\b/;
-// Dieselbe Ausnahme wie oben und aus demselben Grund (ENT-600): Die
-// Demo-Freigabe schreibt in eine Demo-Instanz, nicht in einen Betrieb.
-const zuViel = endpunkte.filter(f => f !== 'betreiber_demo_freigeben.php'
-  && BETRIEBSTABELLEN.test(nurCode(lies(`backend/api/${f}`))));
+const zuViel = endpunkte.filter(f => BETRIEBSTABELLEN.test(nurCode(lies(`backend/api/${f}`))));
 check('KRITISCH: kein Betreiber-Endpunkt liefert Betriebsdaten',
   zuViel.length === 0);
 if (zuViel.length) { bad.push('liest Betriebsdaten: ' + zuViel.join(', ')); }
@@ -384,25 +383,40 @@ check('KRITISCH: der Code wird vor der Sitzung geprueft, nicht danach',
 // Erlaubt ist darum genau eines: die Erreichbarkeit und den
 // Einrichtungsstand pruefen. Wer mandant_db() fuer etwas anderes benutzt,
 // faellt hier durch.
+// Seit ENT-601 kommen zwei OEFFENTLICHE Endpunkte dazu, die ebenfalls zu
+// einer Mandantendatenbank verbinden (die Selbstbedienung braucht das,
+// um eine Demo-Instanz zu befuellen bzw. ihr Konto zurueckzusetzen). Sie
+// tragen kein betreiber_-Praefix und stehen darum nicht in `endpunkte` --
+// diese Pruefung wuerde sie sonst gar nicht erst sehen. Eigene, konstante
+// Liste statt eines Verzeichnis-Scans: Diese beiden Dateinamen sind fest,
+// kein Muster.
+const OEFFENTLICHE_DEMO_ENDPUNKTE = ['demo_anfordern.php', 'demo_erneut_senden.php'];
+const endpunkteMitOeffentlicherDemo = [...endpunkte, ...OEFFENTLICHE_DEMO_ENDPUNKTE];
+
 const MANDANT_VERBINDER = /mandant_db\s*\(|mandant_stand\s*\(/;
-const nutztMandantDb = endpunkte.filter(f => MANDANT_VERBINDER.test(nurCode(lies(`backend/api/${f}`))));
+const nutztMandantDb = endpunkteMitOeffentlicherDemo.filter(f =>
+  MANDANT_VERBINDER.test(nurCode(lies(`backend/api/${f}`))));
 check('es gibt ueberhaupt einen Endpunkt, der die Mandantenlage prueft',
   nutztMandantDb.length > 0);
-// Erlaubt sind genau zwei Endpunkte, namentlich -- und der zweite muss
-// zusaetzlich die drei Bedingungen des Supportzugriffs erfuellen, die
-// weiter unten einzeln geprueft werden. Die Liste ist damit nicht
-// laenger geworden, sondern strenger: Wer verbinden darf, muss Freigabe
-// UND Protokoll nachweisen.
+// Erlaubt sind genau zwei betreiber_-Endpunkte, namentlich -- und der
+// zweite muss zusaetzlich die drei Bedingungen des Supportzugriffs
+// erfuellen, die weiter unten einzeln geprueft werden. Dazu die beiden
+// oeffentlichen Selbstbedienungs-Endpunkte (ENT-601). Die Liste ist damit
+// nicht laenger geworden, sondern strenger: Wer verbinden darf, muss
+// Freigabe UND Protokoll nachweisen, oder eben oeffentlich UND eng
+// eingehegt sein -- nachgewiesen gleich unten.
 const DARF_VERBINDEN = {
   'betreiber_mandant_stand.php':   'zaehlt Tabellen, liest nichts',
   'betreiber_support.php':         'nur auf Freigabe, befristet, protokolliert (ENT-526)',
-  // ENT-600. Eine Demo-Instanz ist kein Betrieb: Sie traegt Musterdaten und
-  // wird beim Freigeben und beim Ablaufen restlos geleert. Der Zugriff
-  // bleibt trotzdem eingehegt -- die drei Endpunkte kommen nur an einen
-  // Platz des Demo-Vorrats heran, nachgewiesen gleich unten.
-  'betreiber_demo_freigeben.php':  'leert und befuellt eine Demo-Instanz (ENT-600)',
+  // ENT-600/ENT-601. Eine Demo-Instanz ist kein Betrieb: Sie traegt
+  // Musterdaten und wird beim Anfordern, beim erneuten Senden und beim
+  // Ablaufen restlos geleert bzw. neu befuellt. Der Zugriff bleibt
+  // trotzdem eingehegt -- alle drei Endpunkte kommen nur an einen Platz
+  // des Demo-Vorrats heran, nachgewiesen gleich unten.
   'betreiber_demo_beenden.php':    'leert eine Demo-Instanz (ENT-600)',
   'betreiber_demo_ablauf.php':     'leert abgelaufene Demo-Instanzen (ENT-600)',
+  'demo_anfordern.php':            'befuellt eine Demo-Instanz fuer eine neue Anfrage, ohne Anmeldung (ENT-601)',
+  'demo_erneut_senden.php':        'setzt das Passwort einer bestehenden Demo-Instanz zurueck, ohne Anmeldung (ENT-601)',
 };
 const heimlich = nutztMandantDb.filter(f => !DARF_VERBINDEN[f]);
 check('KRITISCH: nur namentlich genannte Endpunkte verbinden zu einer Mandantendatenbank',
@@ -410,15 +424,16 @@ check('KRITISCH: nur namentlich genannte Endpunkte verbinden zu einer Mandantend
 if (heimlich.length) { bad.push('verbindet zum Mandanten: ' + heimlich.join(', ')); }
 // Kehrseite: Verschwindet einer, gehoert er aus der Liste -- sonst deckt
 // ein veralteter Eintrag den naechsten Endpunkt gleichen Namens zu.
-const toteErlaubnis = Object.keys(DARF_VERBINDEN).filter(f => !endpunkte.includes(f));
+const toteErlaubnis = Object.keys(DARF_VERBINDEN).filter(f => !endpunkteMitOeffentlicherDemo.includes(f));
 check('kein toter Eintrag in der Verbindungs-Erlaubnisliste', toteErlaubnis.length === 0);
 
-// ── Die Ausnahme fuer die Demo bleibt eng (ENT-600) ──────────────────
+// ── Die Ausnahme fuer die Demo bleibt eng (ENT-600/ENT-601) ──────────
 //
-// Die drei Demo-Endpunkte duerfen in eine Mandantendatenbank schreiben --
+// Die vier Demo-Endpunkte duerfen in eine Mandantendatenbank schreiben --
 // aber nur in die eines Demo-Platzes. Faellt diese Einhegung, ist aus der
-// Demo-Freigabe ein Werkzeug geworden, mit dem sich die Datenbank eines
-// echten Mandanten leeren laesst. Zwei Nachweise:
+// Demo-Selbstbedienung ein Werkzeug geworden, mit dem sich die Datenbank
+// eines echten Mandanten leeren laesst -- und seit ENT-601 braucht es dafuer
+// nicht einmal mehr eine Anmeldung. Zwei Nachweise:
 //
 //   a) Der Platz kommt NIE aus der Anfrage. Er stammt aus
 //      demo_platz_waehlen() -- das liefert ausschliesslich Werte aus
@@ -428,10 +443,10 @@ check('kein toter Eintrag in der Verbindungs-Erlaubnisliste', toteErlaubnis.leng
 //      abgewiesen. Das ist die Datenbank des laufenden Betriebs; ein
 //      Leeren darauf loeschte echte Einsaetze, echtes Personal, echte
 //      Loehne.
-const DEMO_ENDPUNKTE = ['betreiber_demo_freigeben.php', 'betreiber_demo_beenden.php',
-                        'betreiber_demo_ablauf.php'];
+const DEMO_ENDPUNKTE = ['betreiber_demo_beenden.php', 'betreiber_demo_ablauf.php',
+                        ...OEFFENTLICHE_DEMO_ENDPUNKTE];
 check('es gibt die Demo-Endpunkte ueberhaupt',
-  DEMO_ENDPUNKTE.every(f => endpunkte.includes(f)));
+  DEMO_ENDPUNKTE.every(f => existsSync(join(API, f))));
 
 const platzAusAnfrage = DEMO_ENDPUNKTE.filter(f => {
   const q = nurCode(lies(`backend/api/${f}`));

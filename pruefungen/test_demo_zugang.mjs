@@ -1,4 +1,5 @@
-// Demo-Zugaenge je Interessent (ENT-600).
+// Demo-Zugaenge je Interessent (ENT-600, seit ENT-601 automatische
+// Selbstbedienung statt Betreiber-Freigabe).
 //
 // Zwei Sorten Nachweis:
 //   1. Die reinen Funktionen wirklich ausfuehren (pruef_demo_zugang.php).
@@ -152,14 +153,18 @@ const sicht = await seite.evaluate(() => {
     zugaenge: document.querySelectorAll('#demo-inhalt tbody tr').length,
     merkerWorte,
     text: document.body.innerText,
-    // Höhe der Bedienelemente am gerenderten Zustand.
-    knopfHoehe: Math.round(document.getElementById('knopf-demo-neu').getBoundingClientRect().height),
+    // Seit ENT-601 gibt es keinen Freigabe-Knopf mehr -- die Zuteilung
+    // laeuft automatisch. Das Fehlen dieses Elements ist die Aussage, nicht
+    // eine seiner Masse.
+    freigebenKnopfWeg: document.getElementById('knopf-demo-neu') === null,
   };
 });
 
 check('die Ansicht heisst "Demo"', sicht.titel === 'Demo');
-check('der Vorrat zeigt alle drei Plätze', sicht.plaetze === 3);
+check('der Vorrat zeigt alle gemeldeten Plätze', sicht.plaetze === 3);
 check('die Liste zeigt alle Zugänge', sicht.zugaenge === 3);
+check('KRITISCH: es gibt keinen Freigabe-Knopf mehr -- die Zuteilung läuft automatisch (ENT-601)',
+  sicht.freigebenKnopfWeg);
 // DER Punkt: Wörter, keine Klassennamen.
 check('KRITISCH: die Statusspalte zeigt Wörter, keinen CSS-Klassennamen',
   sicht.merkerWorte.length === 3

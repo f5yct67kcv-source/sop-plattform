@@ -992,6 +992,27 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     && liegtImBuendel('dist-betreiber/betreiber.php'));
   if (fehlendeModule.length) { bad.push('Einbindung fehlt im betreiber-Bündel: ' + fehlendeModule.join(', ')); }
 
+  // Die zwei öffentlichen Selbstbedienungs-Endpunkte (ENT-601) tragen kein
+  // betreiber_-Präfix -- absichtlich, sie laufen ohne Anmeldung -- und
+  // fallen darum durch die Prüfung zwei Blöcke oben. Eigene, schmale
+  // Prüfung mit derselben Aussage: mitgeliefert, und jede ihrer
+  // Einbindungen liegt ebenfalls im Bündel.
+  const OEFFENTLICHE_DEMO_ENDPUNKTE = ['demo_anfordern.php', 'demo_erneut_senden.php'];
+  check('KRITISCH: die öffentlichen Demo-Endpunkte (ENT-601) werden ins betreiber-Bündel kopiert',
+    OEFFENTLICHE_DEMO_ENDPUNKTE.every(e => wirdKopiert(`backend/api/${e}`)));
+  const oeffentlicheQuellen = OEFFENTLICHE_DEMO_ENDPUNKTE
+    .map(e => readFileSync(`${WURZEL}/backend/api/${e}`, 'utf8'));
+  const oeffentlicheModule = [...new Set(
+    oeffentlicheQuellen.join('\n')
+      .matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g))]
+    .map(m => m[1]);
+  const fehlendeOeffentlicheModule = oeffentlicheModule.filter(m => !liegtImBuendel(`dist-betreiber/${m}`));
+  check('KRITISCH: jede Datei, die ein öffentlicher Demo-Endpunkt einbindet, liegt im betreiber-Bündel',
+    oeffentlicheModule.length >= 3 && fehlendeOeffentlicheModule.length === 0);
+  if (fehlendeOeffentlicheModule.length) {
+    bad.push('Einbindung fehlt im betreiber-Bündel (öffentliche Demo-Endpunkte): ' + fehlendeOeffentlicheModule.join(', '));
+  }
+
   check('KRITISCH: die eigene .htaccess und robots.txt der Adresse werden mitgeliefert',
     cpZeilen.some(z => z.von === 'htaccess-betreiber' && z.nach === 'dist-betreiber/.htaccess')
     && cpZeilen.some(z => z.von === 'robots-betreiber.txt' && z.nach === 'dist-betreiber/robots.txt')

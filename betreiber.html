@@ -844,71 +844,18 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
     <!-- ══ Demo-Zugänge (ENT-600) ═══════════════════════════════════ -->
     <section class="bereich versteckt" id="b-demo">
 
-      <!-- Der Vorrat. Er steht OBEN und nicht unter der Liste: Die erste
-           Frage vor jeder Freigabe ist, ob überhaupt ein Platz frei ist. -->
+      <!-- Seit ENT-601 nur noch Übersicht und Not-Aus: Ein Interessent
+           bekommt seinen Zugang über die Anmeldemaske selbst, automatisch
+           und sofort. Kein Betreiber schaltet mehr frei -- wer bei
+           Werbe-Anfragen auf einen freien Menschen wartet, ist zu spät. -->
       <div class="karte">
         <div class="karte-kopf">
           <div>
             <h2>Plätze</h2>
-            <div class="sub">Jeder Interessent bekommt eine eigene Instanz</div>
+            <div class="sub">Zuteilung läuft automatisch über die Anmeldemaske</div>
           </div>
-          <button class="klein" id="knopf-demo-neu">Interessent freigeben</button>
         </div>
         <div id="demo-plaetze"></div>
-      </div>
-
-      <!-- Freigabe. Drei Felder, mehr braucht es nicht: Alles Weitere
-           entsteht beim Freigeben selbst. -->
-      <div class="karte versteckt" id="demo-form-karte">
-        <div class="karte-kopf">
-          <div>
-            <h2>Interessent freigeben</h2>
-            <div class="sub">Eigene Instanz, eigene Zugangsdaten, 14 Tage</div>
-          </div>
-        </div>
-        <div class="karte-leib">
-          <div class="raster2">
-            <div class="feld">
-              <label for="demo-firma">Firma</label>
-              <input id="demo-firma" autocomplete="off">
-              <div class="hinweis">Daraus entsteht der Anmeldename.</div>
-            </div>
-            <div class="feld">
-              <label for="demo-person">Name der Ansprechperson</label>
-              <input id="demo-person" autocomplete="off">
-            </div>
-          </div>
-          <div class="feld">
-            <label for="demo-email">E-Mail-Adresse</label>
-            <input id="demo-email" type="email" autocomplete="off" autocapitalize="off" spellcheck="false">
-            <div class="hinweis">An diese Adresse gehen die Zugangsdaten — und nur an sie.
-              Sie ist später der einzige Weg, sie noch einmal zu verschicken.</div>
-          </div>
-          <div id="demo-form-meldung" class="meldung versteckt"></div>
-          <div class="knopfzeile">
-            <button id="knopf-demo-freigeben" class="haupt">Freigeben und senden</button>
-            <button id="knopf-demo-abbrechen" class="still">Abbrechen</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Die Zugangsdaten stehen GENAU EINMAL hier: direkt nach dem
-           Freigeben. Danach sind sie nur noch als Hash in der Instanz und
-           nirgends mehr abrufbar. Wer sie jetzt nicht weitergibt, muss
-           einen neuen Zugang freigeben. -->
-      <div class="karte versteckt" id="demo-fertig-karte">
-        <div class="karte-kopf">
-          <div>
-            <h2 id="demo-fertig-titel">Zugang steht bereit</h2>
-            <div class="sub" id="demo-fertig-sub"></div>
-          </div>
-        </div>
-        <div class="karte-leib">
-          <div id="demo-fertig-inhalt"></div>
-          <div class="knopfzeile">
-            <button id="knopf-demo-fertig-zu" class="still">Schliessen</button>
-          </div>
-        </div>
       </div>
 
       <div class="karte">
@@ -1017,13 +964,6 @@ function bereichZeigen(welcher) {
   // Derselbe Grund: Ein halb getippter Antworttext beim naechsten Besuch
   // waere ein Raetsel.
   if (welcher !== 'support') { zeig($('sv-karte'), false); }
-  // Dasselbe fuer die Demo: Ein halb ausgefuelltes Freigabeformular und
-  // erst recht die einmalig angezeigten Zugangsdaten gehoeren nicht in den
-  // naechsten Besuch dieses Bereichs.
-  if (welcher !== 'demo') {
-    zeig($('demo-form-karte'), false);
-    zeig($('demo-fertig-karte'), false);
-  }
   window.scrollTo({ top: 0 });
 }
 
@@ -1606,16 +1546,10 @@ async function ladeDemo() {
          + 'Laufzeit ' + a.laufzeit_tage + ' Tage · '
          + a.aktive + ' laufende Zugänge') + '</div>';
 
-  /* Der Knopf sagt selbst, wenn nichts geht -- ein Formular, das sich
-     öffnet und beim Absenden abweist, ist der längere Weg zum selben Nein. */
-  const neu = $('knopf-demo-neu');
-  neu.disabled = a.plaetze_frei === 0;
-  neu.textContent = a.plaetze_frei === 0 ? 'Alle Plätze belegt' : 'Interessent freigeben';
-
   const liste = a.zugaenge || [];
   if (!liste.length) {
-    inhalt.innerHTML = leerBlock('◇', 'Noch kein Zugang freigegeben',
-      'Sobald ein Interessent freigegeben ist, steht er hier.');
+    inhalt.innerHTML = leerBlock('◇', 'Noch kein Zugang vergeben',
+      'Sobald ein Interessent sich über die Anmeldemaske einen Demo-Zugang holt, steht er hier.');
     return;
   }
 
@@ -1631,7 +1565,7 @@ async function ladeDemo() {
         + '<td>' + demoRestZelle(z) + '</td>'
         + '<td style="text-align:right;white-space:nowrap">'
           + (z.status === 'aktiv'
-              ? '<button class="klein" data-demo-beenden="' + z.id + '">Beenden</button>'
+              ? '<button class="klein" data-demo-beenden="' + z.id + '" title="Not-Aus: leert die Instanz sofort und gibt den Platz frei">Beenden</button>'
               : '') + '</td>'
       + '</tr>').join('')
     + '</tbody></table></div>';
@@ -1655,56 +1589,6 @@ async function demoBeenden(z) {
     return;
   }
   melde($('haus-meldung'), 'gut', 'Zugang beendet, Platz ' + z.platz + ' ist wieder frei.');
-  ladeDemo();
-}
-
-async function demoFreigeben() {
-  const firma  = $('demo-firma').value.trim();
-  const person = $('demo-person').value.trim();
-  const email  = $('demo-email').value.trim();
-  const m = $('demo-form-meldung');
-  if (!firma || !person || !email) {
-    melde(m, 'fehler', 'Firma, Name und E-Mail-Adresse werden gebraucht.');
-    return;
-  }
-  const knopf = $('knopf-demo-freigeben');
-  knopf.disabled = true;
-  knopf.textContent = 'Instanz wird vorbereitet …';
-  const a = await ruf('betreiber_demo_freigeben.php', { firma, person, email }, 'POST');
-  knopf.disabled = false;
-  knopf.textContent = 'Freigeben und senden';
-
-  if (a.status !== 'ok') {
-    melde(m, 'fehler', a.message || 'Die Freigabe ist nicht durchgelaufen.');
-    return;
-  }
-
-  zeig($('demo-form-karte'), false);
-  $('demo-firma').value = ''; $('demo-person').value = ''; $('demo-email').value = '';
-  zeig(m, false);
-
-  /* Zwei verschiedene Lagen, zwei verschiedene Texte: "gesendet" und
-     "nicht gesendet" dürfen nicht gleich aussehen. Im zweiten Fall
-     funktioniert der Zugang trotzdem -- nur die Post kam nicht an, und
-     dann müssen die Daten von Hand weitergegeben werden. */
-  const gesendet = a.versand === 'gesendet';
-  $('demo-fertig-titel').textContent = gesendet
-    ? 'Zugang steht bereit und ist unterwegs'
-    : 'Zugang steht bereit — die E-Mail ging nicht raus';
-  $('demo-fertig-sub').textContent = gesendet
-    ? 'Die Zugangsdaten stehen hier ein einziges Mal. Danach sind sie nicht mehr abrufbar.'
-    : 'Bitte von Hand weitergeben. Sie stehen hier ein einziges Mal.';
-
-  $('demo-fertig-inhalt').innerHTML =
-      (gesendet ? '' : '<div class="meldung warn">'
-        + text('Grund: ' + (a.versand_grund || 'unbekannt')) + '</div>')
-    + '<div class="tab-huelle"><table><tbody>'
-    + '<tr><th style="text-align:left">Adresse</th><td>' + text(a.adresse) + '</td></tr>'
-    + '<tr><th style="text-align:left">Anmeldename</th><td><strong>' + text(a.login) + '</strong></td></tr>'
-    + '<tr><th style="text-align:left">Passwort</th><td><strong>' + text(a.passwort) + '</strong></td></tr>'
-    + '<tr><th style="text-align:left">Läuft ab</th><td>' + text(String(a.laeuft_ab_am).slice(0, 10)) + '</td></tr>'
-    + '</tbody></table></div>';
-  zeig($('demo-fertig-karte'), true);
   ladeDemo();
 }
 
@@ -2031,15 +1915,6 @@ $('knopf-zf-weiter').onclick = async () => {
   bereichZeigen('uebersicht'); await ladeAlles();
 };
 $('knopf-neu').onclick        = () => formularOeffnen(null);
-$('knopf-demo-neu').onclick   = () => {
-  zeig($('demo-fertig-karte'), false);
-  zeig($('demo-form-meldung'), false);
-  zeig($('demo-form-karte'), true);
-  $('demo-firma').focus();
-};
-$('knopf-demo-abbrechen').onclick = () => zeig($('demo-form-karte'), false);
-$('knopf-demo-freigeben').onclick = demoFreigeben;
-$('knopf-demo-fertig-zu').onclick = () => zeig($('demo-fertig-karte'), false);
 $('knopf-demo-ablauf').onclick    = demoAblauf;
 $('knopf-speichern').onclick  = mandantSpeichern;
 $('knopf-abbrechen').onclick  = () => zeig($('m-form-karte'), false);

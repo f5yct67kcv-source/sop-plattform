@@ -38,11 +38,11 @@ $pruef('Luecken werden gefuellt, nicht uebersprungen',
 // zurueck, stuende dieser Punkt rot -- und im Betrieb sassen zwei
 // Interessenten auf derselben Datenbank.
 $pruef('KRITISCH: ist alles belegt, kommt null und nicht der erste Platz',
-    demo_platz_waehlen(['demo1', 'demo2', 'demo3']) === null);
+    demo_platz_waehlen(DEMO_PLAETZE) === null);
 $pruef('ein unbekannter Platz in der Belegung verschiebt nichts',
-    demo_platz_waehlen(['demo9']) === 'demo1');
-$pruef('der Vorrat hat drei Plaetze (ENT-600)',
-    count(DEMO_PLAETZE) === 3);
+    demo_platz_waehlen(['nichtimvorrat']) === 'demo1');
+$pruef('der Vorrat hat zehn Plaetze (ENT-603 -- ENT-600 nannte noch drei)',
+    count(DEMO_PLAETZE) === 10);
 
 // ── 2. Ablauf ────────────────────────────────────────────────────────
 $pruef('die Laufzeit betraegt 14 Tage (ENT-600)', DEMO_ZUGANG_TAGE === 14);
@@ -131,7 +131,7 @@ $pruef('ein Platz ergibt seine eigene Adresse',
 // Gegenprobe: Ein Platz, den es nicht gibt, ergibt KEINE Adresse. Sonst
 // stuende in einer Mail ein Link auf etwas, das nirgends steht.
 $pruef('KRITISCH: ein unbekannter Platz ergibt keine Adresse',
-    demo_platz_adresse('demo9') === null && demo_platz_adresse('') === null);
+    demo_platz_adresse('demo99') === null && demo_platz_adresse('') === null);
 $pruef('die Adresse ist verschluesselt (https)',
     str_starts_with((string)demo_platz_adresse('demo1'), 'https://'));
 
@@ -176,7 +176,14 @@ $boes = demo_zugang_mail('<b>Muster</b>', 'X', 'https://demo1.guardops.ch',
 $pruef('KRITISCH: ein Firmenname wird im HTML-Teil maskiert, nicht eingebaut',
     !str_contains($boes['html'], '<b>Muster</b>') && str_contains($boes['html'], '&lt;b&gt;'));
 
-// ── Ergebnis ─────────────────────────────────────────────────────────
+// ── Formhelfer der Selbstbedienung (ENT-601) ─────────────────────────
+$pruef('das Fallenfeld erkennt eine gefuellte Falle',
+    demo_zugang_ist_falle(['website' => 'irgendwas']));
+$pruef('ein leeres Fallenfeld ist keine Falle',
+    !demo_zugang_ist_falle(['website' => '']) && !demo_zugang_ist_falle([]));
+$pruef('demo_zugang_einzeilig ersetzt Umbrueche und kuerzt',
+    demo_zugang_einzeilig("Zeile 1\r\nZeile 2\t\tEnde", 100) === 'Zeile 1 Zeile 2 Ende'
+    && demo_zugang_einzeilig('123456789', 5) === '12345');
 echo "\n$ok bestanden, " . count($bad) . " nicht bestanden\n";
 foreach ($bad as $n) { echo "  x $n\n"; }
 exit(count($bad) ? 1 : 0);
