@@ -6,24 +6,28 @@
 //
 // FUENF FESTLEGUNGEN, die den Aufbau erklaeren:
 //
-//  1. WEB PUSH JETZT, NATIVER PUSH SPAETER. Die offiziellen Apps warten auf
-//     die Store-Freigabe; bis dahin ist Web Push der einzige Weg, der ohne
-//     Apple-/Google-Freigabe funktioniert. Der Projektinhaber hat "jetzt
-//     bauen, Aufruf an die Belegschaft spaeter" entschieden. Darum traegt
-//     jedes Abo eine Spalte `kanal`: heute ausschliesslich 'webpush',
-//     spaeter kommen 'apns'/'fcm' daneben. Nur der Transportweg unten
-//     (push_zustellen) wechselt dann -- Tabelle, Empfaengerwahl, Protokoll
-//     und Oberflaeche bleiben.
+//  1. EIN ABO, MEHRERE KANAELE. Web Push kam zuerst, weil er ohne Apple-/
+//     Google-Freigabe funktioniert (ENT-424: "jetzt bauen, Aufruf an die
+//     Belegschaft spaeter"). Seit ENT-604 kommt natives Push dazu (APNs
+//     fuer iOS, FCM fuer Android folgt), weil die Store-App-Huelle Web
+//     Push technisch nicht empfangen kann (kein Service Worker in der
+//     Capacitor-WKWebView). Genau dafuer war die Spalte `kanal` von Anfang
+//     an vorgesehen: 'webpush' traegt eine URL in `endpunkt`, 'apns'/'fcm'
+//     tragen dort das Geraete-Token. EINE Tabelle, EIN Empfaenger-Weg
+//     (push_abos_fuer_mitteilung) -- nur der Transportweg (push_zustellen)
+//     verzweigt nach Kanal.
 //
-//  2. KEINE NUTZLAST. Auf dem Sperrbildschirm steht "Neue Mitteilung",
-//     nicht der Titel. Vom Projektinhaber so entschieden: So laeuft KEIN
-//     Mitteilungsinhalt ueber die Server von Apple und Google. Technisch
-//     ist das ausserdem der schlankere Weg -- ohne Nutzlast entfaellt die
-//     Verschluesselung nach RFC 8291 vollstaendig, es bleibt die Signatur
-//     nach RFC 8292 (VAPID). PREIS DAVON, und er ist bewusst bezahlt: Auf
-//     dem Sperrbildschirm laesst sich "wichtig" nicht von "normal"
-//     unterscheiden. Wer das aendern will, braucht die Nutzlast und damit
-//     die Verschluesselung.
+//  2. KEIN MITTEILUNGSINHALT. Auf dem Sperrbildschirm steht "Neue
+//     Mitteilung", nicht der Titel. Vom Projektinhaber so entschieden: So
+//     laeuft KEIN Text der konkreten Mitteilung ueber die Server von Apple
+//     und Google. Bei Web Push heisst das: ganz ohne Nutzlast (RFC 8291
+//     entfaellt, es bleibt die VAPID-Signatur nach RFC 8292). Bei APNs
+//     lässt sich ein Alarm ohne jede Nutzlast technisch nicht zustellen,
+//     solange die App nicht laeuft -- dort traegt die Nutzlast darum einen
+//     FESTEN, immer gleichen Text (siehe push_apns_senden), nie den Titel
+//     oder Inhalt der Mitteilung. PREIS DAVON, und er ist bewusst bezahlt:
+//     Auf dem Sperrbildschirm laesst sich "wichtig" nicht von "normal"
+//     unterscheiden.
 //
 //  3. EIN GEHEIMNIS, NICHT ZWEI. Der oeffentliche VAPID-Schluessel wird aus
 //     dem privaten ABGELEITET (push_oeffentlicher_schluessel), nicht
@@ -68,11 +72,29 @@ const VAPID_PRIVAT_B64 = '__VAPID_PRIVATE_PEM_B64__';
 // erreicht, wenn etwas schiefgeht.
 const VAPID_KONTAKT = '__VAPID_KONTAKT__';
 
+// ── Das zweite Geheimnis: APNs (ENT-604) ─────────────────────────────
+// Derselbe Mechanismus wie oben, ein zweiter, unabhaengiger Schluessel --
+// ein APNs-Authentifizierungsschluessel ist keine Nutzererlaubnis auf VAPID,
+// er wird im Apple-Developer-Portal eigens dafuer erzeugt (Certificates,
+// Identifiers & Profiles -> Keys -> "+", "Apple Push Notifications
+// service (APNs)" ankreuzen). Erzeugt EINMALIG herunterladbar, danach nur
+// noch als Wert hier ersetzbar.
+//
+// Wert: base64 der .p8-Datei, EINZEILIG (derselbe Grund wie bei VAPID_PRIVAT_B64).
+const APNS_KEY_P8_B64 = '__APNS_KEY_P8_B64__';
+// Steht auf der Bestaetigungsseite nach dem Erzeugen des Schluessels.
+const APNS_KEY_ID = '__APNS_KEY_ID__';
+// Apple-Developer-Team-ID (Mitgliedschaft -> Team-ID), nicht die App-ID.
+const APNS_TEAM_ID = '__APNS_TEAM_ID__';
+// Die App-Kennung (ENT-568/ENT-141) -- kein Geheimnis, aber APNs verlangt
+// sie im "apns-topic"-Kopf jeder Zustellung.
+const APNS_BUNDLE_ID = 'ch.guardops.mitarbeiter';
+
 // Die Kanaele. EINE Liste -- Speichern und Versand befragen sie.
-// 'apns' und 'fcm' stehen noch nicht drin: Ein Kanal, den niemand
-// zustellen kann, waere ein Versprechen ohne Deckung. Sie kommen dazu,
-// wenn der native Weg gebaut wird.
-const PUSH_KANAELE = ['webpush'];
+// 'fcm' (Android) steht noch nicht drin: Ein Kanal, den niemand zustellen
+// kann, waere ein Versprechen ohne Deckung. Kommt dazu, wenn der
+// FCM-Versand gebaut wird (ENT-604, zweiter Bauabschnitt).
+const PUSH_KANAELE = ['webpush', 'apns'];
 
 function push_kanal_gueltig(string $wert): bool
 {
@@ -266,6 +288,153 @@ function push_jwt(string $aud, ?int $jetzt = null): ?string
     return $kopf . '.' . $rumpf . '.' . push_b64url($roh);
 }
 
+// ── APNs (ENT-604) ────────────────────────────────────────────────────
+// Dieselbe Kryptografie wie VAPID (ES256, P-256), ein anderer Schluessel
+// und ein anderes JWT -- darum eigene Funktionen und nicht dieselben mit
+// einem Kanal-Parameter verbogen. push_der_zu_roh() bleibt gemeinsam: die
+// DER-zu-roh-Umrechnung ist reine Mathematik, keine VAPID-Eigenheit.
+
+/**
+ * Der private APNs-Schluessel, oder null wenn nicht eingerichtet.
+ * Statisch gemerkt wie push_privatschluessel() -- derselbe Grund.
+ */
+function push_apns_privatschluessel()
+{
+    static $schluessel = false;
+    if ($schluessel !== false) { return $schluessel; }
+    $schluessel = null;
+    if (APNS_KEY_P8_B64 === '' || str_starts_with(APNS_KEY_P8_B64, '__APNS')) { return null; }
+    $pem = base64_decode(APNS_KEY_P8_B64, true);
+    if ($pem === false || $pem === '') { return null; }
+    $k = openssl_pkey_get_private($pem);
+    if ($k === false) { return null; }
+    $d = openssl_pkey_get_details($k);
+    if (!isset($d['ec']['curve_name']) || $d['ec']['curve_name'] !== 'prime256v1') { return null; }
+    $schluessel = $k;
+    return $schluessel;
+}
+
+/**
+ * WARUM ist APNs nicht eingerichtet? Dieselbe Idee wie push_grund(): vier
+ * Handgriffe, vier verschiedene Antworten, nie den Schluessel selbst.
+ */
+function push_apns_grund(): string
+{
+    if (APNS_KEY_P8_B64 === '' || str_starts_with(APNS_KEY_P8_B64, '__APNS')) { return 'kein_schluessel'; }
+    $pem = base64_decode(APNS_KEY_P8_B64, true);
+    if ($pem === false || $pem === '') { return 'schluessel_unlesbar'; }
+    $k = openssl_pkey_get_private($pem);
+    if ($k === false) { return 'schluessel_ungueltig'; }
+    $d = openssl_pkey_get_details($k);
+    if (!isset($d['ec']['curve_name']) || $d['ec']['curve_name'] !== 'prime256v1') { return 'falsche_kurve'; }
+    if (APNS_KEY_ID === '' || str_starts_with(APNS_KEY_ID, '__APNS')) { return 'keine_key_id'; }
+    if (APNS_TEAM_ID === '' || str_starts_with(APNS_TEAM_ID, '__APNS')) { return 'keine_team_id'; }
+    return 'ok';
+}
+
+function push_apns_konfiguriert(): bool
+{
+    return push_apns_grund() === 'ok';
+}
+
+/**
+ * Ein APNs-Token ist ein reiner Hex-String (typischerweise 64 Zeichen).
+ * Er landet direkt in der URL des Zustellwegs -- die Pruefung ist darum
+ * kein Komfort, sondern die einzige Absicherung gegen eine manipulierte
+ * Adresse (ENT-501, dieselbe Haltung wie push_ursprung() bei Web Push).
+ */
+function push_apns_token_gueltig(string $t): bool
+{
+    return (bool)preg_match('/^[0-9a-fA-F]{32,255}$/', $t);
+}
+
+/**
+ * Das APNs-Authentifizierungs-JWT nach Apples "Token-based provider
+ * connection". Anders als bei VAPID kein "aud", sondern "iss" (Team-ID)
+ * und "kid" im Kopf statt im Rumpf. Gueltigkeit hier ebenfalls 12 Stunden
+ * (Apple akzeptiert selbst erstellte, gueltige Tokens bis zu einer
+ * Stunde alt fuer den Versand, ein neues JWT je Versand ist unkritisch
+ * und einfacher als eines vorzuhalten).
+ */
+function push_apns_jwt(?int $jetzt = null): ?string
+{
+    $k = push_apns_privatschluessel();
+    if ($k === null || APNS_KEY_ID === '' || APNS_TEAM_ID === '') { return null; }
+    $jetzt = $jetzt ?? time();
+    $kopf  = push_b64url((string)json_encode(['alg' => 'ES256', 'kid' => APNS_KEY_ID]));
+    $rumpf = push_b64url((string)json_encode(['iss' => APNS_TEAM_ID, 'iat' => $jetzt]));
+    $sig = '';
+    if (!openssl_sign($kopf . '.' . $rumpf, $sig, $k, OPENSSL_ALGO_SHA256)) { return null; }
+    $roh = push_der_zu_roh($sig);
+    if ($roh === null) { return null; }
+    return $kopf . '.' . $rumpf . '.' . push_b64url($roh);
+}
+
+/**
+ * Eine Benachrichtigung an ein APNs-Geraet zustellen.
+ *
+ * FESTER TEXT, nie der Inhalt der Mitteilung (Festlegung 2 oben) --
+ * derselbe Satz wie in sw.js fuer Web Push, damit beide Wege dieselbe
+ * Auskunft geben. "apns-push-type: alert" UND ein "aps.alert" sind
+ * Pflicht: Ohne Alarm-Inhalt zeigt iOS nichts an, solange die App nicht
+ * laeuft -- ein content-available-Push (still, ohne Anzeige) braucht eine
+ * eigene Hintergrundausfuehrung, die diese App nicht hat.
+ *
+ * "apns-priority: 10" nur fuer wichtige Mitteilungen, sonst 5 -- dieselbe
+ * Idee wie "Urgency" bei Web Push.
+ */
+function push_apns_senden(array $abo, bool $wichtig): array
+{
+    $token = (string)($abo['endpunkt'] ?? '');
+    if (!push_apns_token_gueltig($token)) {
+        return ['code' => 0, 'ausgang' => 'entfernen', 'meldung' => 'Kein gueltiges Geraete-Token'];
+    }
+    $jwt = push_apns_jwt();
+    if ($jwt === null) {
+        return ['code' => 0, 'ausgang' => 'fehler', 'meldung' => 'APNs ist nicht eingerichtet'];
+    }
+    // Immer die Produktivumgebung: Diese App wird ueber TestFlight/App
+    // Store verteilt, nicht ueber ein Entwicklungsprofil. Ein im Simulator
+    // erzeugtes Token gehoert ohnehin nicht hierher -- der Simulator kann
+    // grundsaetzlich kein echtes Push empfangen (ENT-604, Risiken).
+    $ch = curl_init('https://api.push.apple.com/3/device/' . $token);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => (string)json_encode(['aps' => [
+            'alert' => ['title' => 'GuardOpS', 'body' => 'Neue Mitteilung — zum Lesen öffnen'],
+            'sound' => 'default',
+        ]]),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 10,
+        CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_2_0,
+        CURLOPT_HTTPHEADER     => [
+            'authorization: bearer ' . $jwt,
+            'apns-topic: ' . APNS_BUNDLE_ID,
+            'apns-push-type: alert',
+            'apns-priority: ' . ($wichtig ? '10' : '5'),
+            'content-type: application/json',
+        ],
+    ]);
+    $antwort = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    $netzfehler = curl_error($ch);
+    curl_close($ch);
+
+    if ($antwort === false && $code === 0) {
+        return ['code' => 0, 'ausgang' => 'fehler', 'meldung' => $netzfehler ?: 'keine Verbindung'];
+    }
+    if ($code >= 200 && $code < 300) { return ['code' => $code, 'ausgang' => 'ok', 'meldung' => ''];  }
+    // Apple meldet ungueltige/entfernte Geraete ueber den Grund im
+    // Antwortrumpf, nicht ueber 404/410 wie Web Push.
+    $grund = '';
+    $antwortDaten = json_decode((string)$antwort, true);
+    if (is_array($antwortDaten)) { $grund = (string)($antwortDaten['reason'] ?? ''); }
+    if (in_array($grund, ['BadDeviceToken', 'Unregistered', 'DeviceTokenNotForTopic'], true)) {
+        return ['code' => $code, 'ausgang' => 'entfernen', 'meldung' => $grund];
+    }
+    return ['code' => $code, 'ausgang' => 'fehler', 'meldung' => $grund ?: ('HTTP ' . $code)];
+}
+
 /**
  * Der Ursprung eines Endpunkts -- "https://web.push.apple.com/xyz…" wird
  * zu "https://web.push.apple.com".
@@ -361,7 +530,21 @@ function push_antwort_deuten(int $code): string
 }
 
 /**
- * Eine Benachrichtigung an ein Abo zustellen.
+ * Eine Benachrichtigung an ein Abo zustellen -- der EINE Einstieg, den
+ * push_fuer_mitteilung() kennt (Festlegung 1). Verzweigt nach Kanal;
+ * jeder Kanal bringt seinen eigenen Transportweg und seine eigene
+ * Kryptografie mit.
+ */
+function push_zustellen(array $abo, bool $wichtig): array
+{
+    if ((string)($abo['kanal'] ?? 'webpush') === 'apns') {
+        return push_apns_senden($abo, $wichtig);
+    }
+    return push_webpush_senden($abo, $wichtig);
+}
+
+/**
+ * Eine Benachrichtigung an ein Web-Push-Abo zustellen.
  *
  * Ohne Nutzlast (Festlegung 2): leerer Rumpf, kein Content-Encoding.
  * "Urgency: high" nur fuer wichtige Mitteilungen -- niedrige Dringlichkeit
@@ -370,7 +553,7 @@ function push_antwort_deuten(int $code): string
  * Der Netzzugriff steckt in einer eigenen, ersetzbaren Funktion, damit
  * die Pruefung alles davor und danach ohne Netz durchspielen kann.
  */
-function push_zustellen(array $abo, bool $wichtig): array
+function push_webpush_senden(array $abo, bool $wichtig): array
 {
     // Zwei verschiedene Fehler, und sie brauchen zwei verschiedene Folgen
     // (ENT-501). Bis hierher gab es nur "keine https-Adresse" -> entfernen.

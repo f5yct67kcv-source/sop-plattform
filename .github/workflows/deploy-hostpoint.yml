@@ -230,6 +230,16 @@ jobs:
           D_VAPID_PRIVATE_PEM_B64: ${{ secrets.DEMO_VAPID_PRIVATE_PEM_B64 }}
           D_VAPID_KONTAKT: ${{ secrets.DEMO_VAPID_KONTAKT }}
           D_PUSH_CRON_SCHLUESSEL: ${{ secrets.DEMO_PUSH_CRON_SCHLUESSEL }}
+          # APNs (ENT-604). NUR Production: Die native Store-App ist EIN
+          # Programm mit EINER Bundle-ID, das immer gegen die echte API
+          # spricht -- anders als die Web-Bereiche gibt es fuer sie kein
+          # Staging/Demo-Gegenstueck, das eine eigene Apple-Freigabe
+          # brauchte. Staging/Demo bekommen darum keinen APNs-Schluessel
+          # und bleiben bei push_apns_grund() == "kein_schluessel" stehen --
+          # das ist dort richtig, nicht luecke.
+          P_APNS_KEY_P8_B64: ${{ secrets.APNS_KEY_P8_B64 }}
+          P_APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+          P_APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
         run: |
           set -euo pipefail
 
@@ -262,6 +272,9 @@ jobs:
             EFF_VAPID_PRIVATE_PEM_B64="$P_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$P_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$P_PUSH_CRON_SCHLUESSEL"
+            EFF_APNS_KEY_P8_B64="$P_APNS_KEY_P8_B64"
+            EFF_APNS_KEY_ID="$P_APNS_KEY_ID"
+            EFF_APNS_TEAM_ID="$P_APNS_TEAM_ID"
             EFF_DEMO_EMPFAENGER="$P_DEMO_EMPFAENGER"
             EFF_GUARDOPS_FTP_HOST="$P_GUARDOPS_FTP_HOST"
             EFF_GUARDOPS_FTP_USER="$P_GUARDOPS_FTP_USER"
@@ -339,6 +352,11 @@ jobs:
             EFF_VAPID_PRIVATE_PEM_B64="$D_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$D_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$D_PUSH_CRON_SCHLUESSEL"
+            # Kein APNs-Schluessel ausserhalb der Produktion (siehe
+            # Begruendung bei den Secrets oben) -- bleibt "kein_schluessel".
+            EFF_APNS_KEY_P8_B64=""
+            EFF_APNS_KEY_ID=""
+            EFF_APNS_TEAM_ID=""
             # Der Empfaenger der Demo-ANFRAGEN von der guardops.ch-Homepage
             # (ENT-563) -- eine andere Sache als diese Demo-UMGEBUNG (ENT-523),
             # nur der Name ist sich zufaellig aehnlich. Die Demo-Umgebung
@@ -429,6 +447,9 @@ jobs:
             EFF_VAPID_PRIVATE_PEM_B64="$S_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$S_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$S_PUSH_CRON_SCHLUESSEL"
+            EFF_APNS_KEY_P8_B64=""
+            EFF_APNS_KEY_ID=""
+            EFF_APNS_TEAM_ID=""
             EFF_DEMO_EMPFAENGER="$S_DEMO_EMPFAENGER"
             # guardops.ch ist die ECHTE Verkaufsdomain. Ein Staging-Lauf hat
             # dort nichts verloren -- darum hier leer und KEIN Rueckfall auf
@@ -601,6 +622,9 @@ jobs:
             echo "EFF_VAPID_PRIVATE_PEM_B64=$EFF_VAPID_PRIVATE_PEM_B64"
             echo "EFF_VAPID_KONTAKT=$EFF_VAPID_KONTAKT"
             echo "EFF_PUSH_CRON_SCHLUESSEL=$EFF_PUSH_CRON_SCHLUESSEL"
+            echo "EFF_APNS_KEY_P8_B64=$EFF_APNS_KEY_P8_B64"
+            echo "EFF_APNS_KEY_ID=$EFF_APNS_KEY_ID"
+            echo "EFF_APNS_TEAM_ID=$EFF_APNS_TEAM_ID"
             echo "EFF_APP_BASIS_URL=$EFF_APP_BASIS_URL"
             echo "EFF_DEMO_EMPFAENGER=$EFF_DEMO_EMPFAENGER"
             echo "EFF_GUARDOPS_FTP_HOST=$EFF_GUARDOPS_FTP_HOST"
@@ -937,6 +961,9 @@ jobs:
           # keine Zeilenumbrueche im Ersatzwert.
           sed -i "s|__VAPID_PRIVATE_PEM_B64__|$EFF_VAPID_PRIVATE_PEM_B64|g" dist/push.php
           sed -i "s|__VAPID_KONTAKT__|$EFF_VAPID_KONTAKT|g" dist/push.php
+          sed -i "s|__APNS_KEY_P8_B64__|$EFF_APNS_KEY_P8_B64|g" dist/push.php
+          sed -i "s|__APNS_KEY_ID__|$EFF_APNS_KEY_ID|g" dist/push.php
+          sed -i "s|__APNS_TEAM_ID__|$EFF_APNS_TEAM_ID|g" dist/push.php
           # Der Schluessel fuer den Zeitgeber-Aufruf (Hostpoint-Cronjob).
           # Ohne ihn bleibt dieser Weg zu; der Versand laeuft dann nur beim
           # Veroeffentlichen und beilaeufig beim Oeffnen der
@@ -1609,6 +1636,9 @@ jobs:
           sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist-cupi24/app.html
           sed -i "s|__VAPID_PRIVATE_PEM_B64__|$EFF_VAPID_PRIVATE_PEM_B64|g" dist-cupi24/push.php
           sed -i "s|__VAPID_KONTAKT__|$EFF_VAPID_KONTAKT|g" dist-cupi24/push.php
+          sed -i "s|__APNS_KEY_P8_B64__|$EFF_APNS_KEY_P8_B64|g" dist-cupi24/push.php
+          sed -i "s|__APNS_KEY_ID__|$EFF_APNS_KEY_ID|g" dist-cupi24/push.php
+          sed -i "s|__APNS_TEAM_ID__|$EFF_APNS_TEAM_ID|g" dist-cupi24/push.php
           sed -i "s|__PUSH_CRON_SCHLUESSEL__|$EFF_PUSH_CRON_SCHLUESSEL|g" dist-cupi24/api/push_versand.php
 
           # CUPI-24-eigenes Branding (ENT-589, mandantenseitig -- schliesst

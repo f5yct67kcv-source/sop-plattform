@@ -43,14 +43,26 @@ function json_response($data, int $status = 200): void { throw new RuntimeExcept
 $pk = openssl_pkey_new(['curve_name' => 'prime256v1', 'private_key_type' => OPENSSL_KEYTYPE_EC]);
 openssl_pkey_export($pk, $pem);
 
+// Ein ZWEITER, eigener Schluessel fuer APNs (ENT-604) -- dieselbe
+// Kurve, aber ein anderes Geheimnis als VAPID. Zwei getrennte Schluessel,
+// die sich hier zufaellig auf demselben Verfahren treffen, teilen sich in
+// echt weder Wert noch Zweck.
+$apk = openssl_pkey_new(['curve_name' => 'prime256v1', 'private_key_type' => OPENSSL_KEYTYPE_EC]);
+openssl_pkey_export($apk, $apem);
+
 $quelle = (string)file_get_contents(__DIR__ . '/../backend/push.php');
 pruef('KRITISCH: im Quelltext steht ein Platzhalter und kein echter Schluessel',
     str_contains($quelle, "'__VAPID_PRIVATE_PEM_B64__'"));
 pruef('Dasselbe fuer die Kontaktadresse', str_contains($quelle, "'__VAPID_KONTAKT__'"));
+pruef('Dasselbe fuer den APNs-Schluessel', str_contains($quelle, "'__APNS_KEY_P8_B64__'"));
+pruef('Dasselbe fuer die APNs-Key-ID', str_contains($quelle, "'__APNS_KEY_ID__'"));
+pruef('Dasselbe fuer die APNs-Team-ID', str_contains($quelle, "'__APNS_TEAM_ID__'"));
 
 $ersetzt = str_replace(
-    ['__VAPID_PRIVATE_PEM_B64__', '__VAPID_KONTAKT__'],
-    [base64_encode($pem), 'mailto:pruefung@example.invalid'],
+    ['__VAPID_PRIVATE_PEM_B64__', '__VAPID_KONTAKT__',
+     '__APNS_KEY_P8_B64__', '__APNS_KEY_ID__', '__APNS_TEAM_ID__'],
+    [base64_encode($pem), 'mailto:pruefung@example.invalid',
+     base64_encode($apem), 'PRUEFKEYID01', 'PRUEFTEAMID9'],
     $quelle
 );
 $tmp = tempnam(sys_get_temp_dir(), 'push') . '.php';
@@ -239,8 +251,103 @@ pruef('KRITISCH: 401 ist eine Stoerung und entfernt kein Abo -- '
 pruef('Auch 403 entfernt nichts', push_antwort_deuten(403) === 'fehler');
 
 // ── KANAELE
-pruef('Heute gibt es genau einen Kanal', PUSH_KANAELE === ['webpush']);
+pruef('KRITISCH: Web Push und APNs sind gueltige Kanaele, FCM noch nicht '
+    . '(ENT-604, zweiter Bauabschnitt)',
+    PUSH_KANAELE === ['webpush', 'apns']);
 pruef('Ein erfundener Kanal gilt nicht', !push_kanal_gueltig('brieftaube'));
+pruef('KRITISCH: "fcm" gilt noch nicht -- ein Kanal, den niemand zustellen kann, '
+    . 'waere ein Versprechen ohne Deckung', !push_kanal_gueltig('fcm'));
+
+// ── APNs: EINRICHTUNG
+pruef('Mit Schluessel, Key-ID und Team-ID gilt APNs als eingerichtet', push_apns_konfiguriert());
+pruef('Der private APNs-Schluessel wird geladen', push_apns_privatschluessel() !== null);
+pruef('Und der Grund lautet "ok"', push_apns_grund() === 'ok');
+
+// ── APNs: WARUM NICHT EINGERICHTET -- sechs Ursachen, sechs Antworten.
+// Dieselbe Bauart wie pruef_grund_mit() oben, nur fuer push_apns_grund().
+function pruef_apns_grund_mit(string $schluessel, string $keyId, string $teamId): string
+{
+    static $nr = 0;
+    $nr++;
+    $quelle = (string)file_get_contents(__DIR__ . '/../backend/push.php');
+    $anfang = strpos($quelle, 'function push_apns_grund(): string');
+    $ende = strpos($quelle, "\n}", $anfang) + 2;
+    $rumpf = substr($quelle, $anfang, $ende - $anfang);
+    $rumpf = str_replace('function push_apns_grund(): string', "function pruef_apns_grund_$nr(): string", $rumpf);
+    $rumpf = str_replace('APNS_KEY_P8_B64', "PRUEF_APNS_SCHLUESSEL_$nr", $rumpf);
+    $rumpf = str_replace('APNS_KEY_ID', "PRUEF_APNS_KEYID_$nr", $rumpf);
+    $rumpf = str_replace('APNS_TEAM_ID', "PRUEF_APNS_TEAMID_$nr", $rumpf);
+    define("PRUEF_APNS_SCHLUESSEL_$nr", $schluessel);
+    define("PRUEF_APNS_KEYID_$nr", $keyId);
+    define("PRUEF_APNS_TEAMID_$nr", $teamId);
+    eval($rumpf);
+    return ('pruef_apns_grund_' . $nr)();
+}
+
+$apnsGueltig = base64_encode($apem);
+$apnsGruende = [
+    'kein Deploy gelaufen' => pruef_apns_grund_mit('__APNS_KEY_P8_B64__', 'PRUEFKEYID01', 'PRUEFTEAMID9'),
+    'Secret leer'          => pruef_apns_grund_mit('', 'PRUEFKEYID01', 'PRUEFTEAMID9'),
+    'unlesbar'             => pruef_apns_grund_mit($apnsGueltig . '%', 'PRUEFKEYID01', 'PRUEFTEAMID9'),
+    'kein Schluessel drin' => pruef_apns_grund_mit(base64_encode('nur irgendein Text'), 'PRUEFKEYID01', 'PRUEFTEAMID9'),
+    'Key-ID fehlt'         => pruef_apns_grund_mit($apnsGueltig, '', 'PRUEFTEAMID9'),
+    'Team-ID fehlt'        => pruef_apns_grund_mit($apnsGueltig, 'PRUEFKEYID01', ''),
+    'alles gut'            => pruef_apns_grund_mit($apnsGueltig, 'PRUEFKEYID01', 'PRUEFTEAMID9'),
+];
+pruef('KRITISCH: ein unersetzter Platzhalter heisst "kein Schluessel"',
+    $apnsGruende['kein Deploy gelaufen'] === 'kein_schluessel');
+pruef('KRITISCH: ein leeres Secret heisst ebenfalls "kein Schluessel"',
+    $apnsGruende['Secret leer'] === 'kein_schluessel');
+pruef('KRITISCH: unlesbar ist etwas anderes als "kein Schluessel"',
+    $apnsGruende['unlesbar'] === 'schluessel_unlesbar');
+pruef('KRITISCH: lesbar, aber kein Schluessel, heisst "ungueltig"',
+    $apnsGruende['kein Schluessel drin'] === 'schluessel_ungueltig');
+pruef('KRITISCH: eine fehlende Key-ID wird als solche benannt',
+    $apnsGruende['Key-ID fehlt'] === 'keine_key_id');
+pruef('KRITISCH: eine fehlende Team-ID ebenso, nicht dasselbe wie eine fehlende Key-ID',
+    $apnsGruende['Team-ID fehlt'] === 'keine_team_id');
+pruef('Mit allem gilt es als eingerichtet', $apnsGruende['alles gut'] === 'ok');
+// "kein Deploy gelaufen" und "Secret leer" ergeben beide "kein_schluessel"
+// (dieselbe Ursache, derselbe Satz) -- sechs UNTERSCHIEDLICHE Bilder aus
+// sieben Eintraegen, nicht sieben.
+pruef('KRITISCH: alle sechs Fehlerbilder sind unterscheidbar (CLAUDE.md)',
+    count(array_unique($apnsGruende)) === 6);
+
+// ── APNs: DAS JWT
+$apnsJetzt = 1893495600;
+$apnsJwt = push_apns_jwt($apnsJetzt);
+pruef('Es entsteht ein JWT', is_string($apnsJwt) && $apnsJwt !== '');
+$apnsTeile = explode('.', (string)$apnsJwt);
+pruef('KRITISCH: es hat drei Teile', count($apnsTeile) === 3);
+$apnsKopf = json_decode(push_b64url_zurueck($apnsTeile[0] ?? ''), true);
+$apnsRumpf = json_decode(push_b64url_zurueck($apnsTeile[1] ?? ''), true);
+pruef('KRITISCH: der Kopf nennt ES256', ($apnsKopf['alg'] ?? '') === 'ES256');
+pruef('KRITISCH: der Kopf nennt die Key-ID -- APNs verlangt sie dort, nicht im Rumpf',
+    ($apnsKopf['kid'] ?? '') === 'PRUEFKEYID01');
+pruef('KRITISCH: der Rumpf nennt die Team-ID als Aussteller',
+    ($apnsRumpf['iss'] ?? '') === 'PRUEFTEAMID9');
+pruef('KRITISCH: er nennt den Erstellzeitpunkt', ($apnsRumpf['iat'] ?? null) === $apnsJetzt);
+
+// Dieselbe Signaturpruefung wie bei VAPID, mit dem APNs-Schluessel.
+$apnsPubPem = openssl_pkey_get_details($apk)['key'];
+$apnsSigOk = openssl_verify(
+    $apnsTeile[0] . '.' . $apnsTeile[1],
+    pruef_roh_zu_der(push_b64url_zurueck($apnsTeile[2] ?? '')),
+    $apnsPubPem, OPENSSL_ALGO_SHA256
+);
+pruef('KRITISCH: die APNs-Signatur haelt der Pruefung mit dem oeffentlichen Schluessel stand',
+    $apnsSigOk === 1);
+
+// ── APNs: DAS GERAETE-TOKEN
+pruef('KRITISCH: ein plausibles Hex-Token gilt', push_apns_token_gueltig(str_repeat('a1', 32)));
+pruef('KRITISCH: eine URL gilt NICHT als Token -- Verwechslung mit Web Push waere ein Leck',
+    !push_apns_token_gueltig('https://web.push.apple.com/abc'));
+pruef('KRITISCH: ein zu kurzer Wert gilt nicht', !push_apns_token_gueltig('ab12'));
+pruef('KRITISCH: ein Schraegstrich (Pfad-Manipulation) faellt durch -- '
+    . 'das Token landet direkt in der URL des Zustellwegs (ENT-501)',
+    !push_apns_token_gueltig(str_repeat('a1', 16) . '/../x'));
+pruef('KRITISCH: ein Leerzeichen (Kopfzeilen-Manipulation) faellt durch',
+    !push_apns_token_gueltig(str_repeat('a1', 16) . ' x'));
 
 // ── WER BEKOMMT ETWAS
 $pdo = new PDO('sqlite::memory:');
