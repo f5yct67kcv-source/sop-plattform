@@ -14,8 +14,17 @@
      im Skript ein zweites Mal hingeschrieben. -->
 <meta name="viewport" id="metaViewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Cockpit</title>
-<link rel="icon" href="icons/icon-32.png" type="image/png">
-<link rel="apple-touch-icon" href="icons/icon-180.png">
+<!-- FAVICON IST DIE MARKE DER PLATTFORM, NICHT DIE DER MANDANTIN
+     (ENT-568/ENT-589): Bis hierher zeigte der Reiter des Cockpits auf JEDER
+     Adresse das CUPI-24-Siegel (icons/icon-*.png) -- auch auf der Demo und
+     auf der geteilten Rapport-Adresse, wo kein Mandant gemeint ist. Die
+     GuardOpS-Dateien stehen hier als Grundzustand; cupi24.guardops.ch
+     ersetzt sie im Deploy wieder durch icons/cupi24-* (dieselbe
+     "icons/guardops-"-Ersetzung, die schon App-Icons und Vorschaubilder
+     umhaengt). test_marke_favicon.mjs haelt beides nach. -->
+<link rel="icon" href="icons/guardops-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icons/guardops-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="icons/guardops-180.png">
 <meta name="theme-color" content="#16181D">
 <style>
 /* ══════════════════════════════════════════════════════════════════
@@ -32854,7 +32863,14 @@ document.querySelectorAll('.dlg-scrim').forEach(s => {
 $('gPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 $('gName').addEventListener('keydown', e => { if (e.key === 'Enter') $('gPass').focus(); });
 
-document.title = APP_NAME;
+// REITERNAME: In der Demo sagt "Cockpit" nicht, WO man ist -- wer mehrere
+// GuardOpS-Adressen offen hat, sieht in der Reiterliste mehrfach dasselbe
+// Wort und trifft die Demo statt der Produktion. Nur der Reiter (und damit
+// das Lesezeichen) wechselt; die Wasserzeichen im Tor und in der Seitenspalte
+// benennen weiterhin die ANWENDUNG, nicht die Umgebung.
+// window.APP_UMGEBUNG_DEMO kommt aus testumgebung.js (weiter oben
+// eingebunden) und stammt aus dem Deploy, nicht aus dem Hostnamen.
+document.title = window.APP_UMGEBUNG_DEMO ? 'Demobereich – GuardOpS' : APP_NAME;
 $('gateWm').textContent = APP_NAME;
 $('sideWm').textContent = APP_NAME;
 
