@@ -119,7 +119,8 @@ for (const seite of [...seiten, ...phpDateien]) {
    ein Schluessel, der nie ankommt; eine Ersetzung ohne Platzhalter waere
    eine Zeile, die nichts tut. */
 for (const [datei, platzhalter] of [
-  ['backend/push.php', ['__VAPID_PRIVATE_PEM_B64__', '__VAPID_KONTAKT__']],
+  ['backend/push.php', ['__VAPID_PRIVATE_PEM_B64__', '__VAPID_KONTAKT__',
+    '__APNS_KEY_P8_B64__', '__APNS_KEY_ID__', '__APNS_TEAM_ID__']],
   ['backend/api/push_versand.php', ['__PUSH_CRON_SCHLUESSEL__']],
 ]) {
   const inhalt = readFileSync(`${WURZEL}/${datei}`, 'utf8');
@@ -127,6 +128,20 @@ for (const [datei, platzhalter] of [
     check(`${datei} traegt den Platzhalter ${ph}`, inhalt.includes(ph));
     check(`KRITISCH: ${ph} wird beim Deploy auch ersetzt`,
       new RegExp(`sed -i "s\\|${ph}\\|`).test(workflow));
+  }
+}
+
+/* push.php geht in ZWEI Buendel (dist/ und dist-cupi24/, ENT-604) -- die
+   generische Pruefung oben schlaegt schon an, wenn IRGENDEINE der beiden
+   Zeilen existiert. Hier zusaetzlich JEDES Ziel einzeln, dieselbe Strenge
+   wie bei __MAPS_JS_KEY__ weiter oben. Gegenprobe gemacht: eine der sechs
+   Zeilen entfernt, genau diese Aussage wurde rot -- die generische blieb
+   gruen. */
+for (const ziel of ['dist/push.php', 'dist-cupi24/push.php']) {
+  for (const ph of ['__APNS_KEY_P8_B64__', '__APNS_KEY_ID__', '__APNS_TEAM_ID__']) {
+    check(`KRITISCH: ${ph} wird auch in ${ziel} ersetzt (nicht nur im jeweils anderen Buendel)`,
+      new RegExp(`sed -i "s\\|${ph}\\|\\$EFF_${ph.slice(2, -2)}\\|g" ${ziel.replace('.', '\\.')}`)
+        .test(workflow));
   }
 }
 

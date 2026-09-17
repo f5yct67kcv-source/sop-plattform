@@ -106,6 +106,25 @@ for (const [datei, feld, muster] of stellen) {
   }
 }
 
+// Push-Berechtigung fuer iOS (ENT-604). Ohne die Datei UND ohne den
+// Verweis in BEIDEN Konfigurationen lehnt Apple die App beim Registrieren
+// fuer Push kommentarlos ab -- ein Fehler, der sich nur am echten Geraet
+// zeigt, nie lokal.
+{
+  const pfad = `${M}/ios/App/App/App.entitlements`;
+  check('KRITISCH: die Push-Berechtigungsdatei existiert', existsSync(`${WURZEL}/${pfad}`));
+  if (existsSync(`${WURZEL}/${pfad}`)) {
+    const inhalt = lies(pfad);
+    check('KRITISCH: sie nennt aps-environment',
+      /<key>aps-environment<\/key>\s*<string>\w+<\/string>/.test(inhalt));
+  }
+  const pbxproj = lies(`${M}/ios/App/App.xcodeproj/project.pbxproj`);
+  const treffer = [...pbxproj.matchAll(/CODE_SIGN_ENTITLEMENTS\s*=\s*([^;]+);/g)].map(m => m[1].trim());
+  check('KRITISCH: beide Xcode-Konfigurationen verweisen auf dieselbe Berechtigungsdatei (Debug UND Release)',
+    treffer.length === 2 && treffer.every(t => t === 'App/App.entitlements'));
+  if (treffer.some(t => t !== 'App/App.entitlements')) { bad.push('  CODE_SIGN_ENTITLEMENTS: ' + treffer.join(', ')); }
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

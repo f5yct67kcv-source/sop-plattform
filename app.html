@@ -2964,6 +2964,7 @@ function starten() {
   // der keine Leiste passt, sieht aus wie ein Fehler.
   if (amSchreibtisch()) zeigeTisch('plan'); else tischMarkeSetzen();
   allesLaden();
+  pushNativEinrichten();
   // Ueberlebt einen Geraeteneustart oder App-Neuinstallation zwischen den
   // Sitzungen: liegen aus einer frueheren, offline gebliebenen Rundgang-
   // Meldung noch Eintraege in localStorage, wird jetzt ein Sendeversuch
@@ -4305,6 +4306,70 @@ function pushGeraeteName() {
             : /Macintosh/.test(ua) ? 'Mac'
             : /Windows/.test(ua) ? 'Windows' : 'Gerät';
   return art + (appInstalliert() ? ' (App)' : ' (Browser)');
+}
+
+/* ── Natives Push in der Store-App-Huelle (ENT-604) ─────────────────────
+
+   Eigener, von pushMoeglichHier()/pushStand GETRENNTER Weg: Jenes Sechs-
+   Zustaende-Modell ist auf den Browser zugeschnitten (Notification.
+   permission, Service-Worker-Registrierung) -- in der nativen Huelle gibt
+   es beides nicht, dafuer das Capacitor-Plugin. Statt das Modell zu
+   verbiegen, fragt die native Huelle die Erlaubnis wie jede gewoehnliche
+   App: einmal, automatisch, über den System-Dialog. Kein eigener Schalter
+   im Menü dafür -- lehnt jemand ab, steht die Rücknahme wie ueberall auf
+   dem iPhone/Android in den System-Einstellungen, nicht in dieser App.
+
+   Der Knopf "Benachrichtigungen" im Menü bleibt darum in der nativen
+   Huelle weiterhin ausgeblendet (pushMoeglichHier() bleibt unveraendert
+   false dort) -- er gehoert zum Web-Push-Weg, nicht zu diesem. */
+function pushMoeglichNativ() {
+  return nativeAppHuelle() && !!(window.Capacitor && window.Capacitor.Plugins
+    && window.Capacitor.Plugins.PushNotifications);
+}
+
+// 'apns' auf iOS, 'fcm' auf Android -- dieselben Kanalnamen wie in
+// backend/push.php (PUSH_KANAELE). FCM ist dort noch nicht zustellfaehig
+// (ENT-604, zweiter Bauabschnitt); die Registrierung darf trotzdem schon
+// laufen, sie wird serverseitig nur noch nicht angeschrieben.
+function nativePlattform() {
+  const p = (window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || '';
+  return p === 'ios' ? 'apns' : (p === 'android' ? 'fcm' : '');
+}
+
+function pushNativEinrichten() {
+  if (!pushMoeglichNativ()) { return; }
+  const PN = window.Capacitor.Plugins.PushNotifications;
+
+  PN.addListener('registration', token => {
+    const kanal = nativePlattform();
+    if (!kanal || !token || !token.value) { return; }
+    // Eigene Daten, dieselbe Sitzung wie ueberall -- kein besonderes Recht
+    // noetig (siehe push_einrichtung.php).
+    api('push_einrichtung.php', { method: 'POST',
+      body: { kanal, endpunkt: token.value, geraet: pushGeraeteName() } }).catch(() => {});
+  });
+  // Kein Alarm bei einem einzelnen Geraet, das sich nicht registrieren
+  // laesst -- das ist kein Systemfehler, hoechstens ein einzelnes
+  // fehlendes Geraet in der Empfaengerliste.
+  PN.addListener('registrationError', () => {});
+  // Tipp auf die Benachrichtigung: Die App laedt beim Sichtbarwerden
+  // ohnehin neu (allesLaden()) -- hier ist nichts weiter zu tun, genau wie
+  // beim Web-Push-Gegenstueck in sw.js.
+  PN.addListener('pushNotificationActionPerformed', () => {});
+
+  PN.checkPermissions().then(stand => {
+    const erlaubnis = stand && stand.receive;
+    if (erlaubnis === 'granted') { return PN.register(); }
+    // NUR bei "prompt" fragen -- ein bereits "denied" nicht ein zweites
+    // Mal versuchen: iOS zeigt den Systemdialog dafuer ohnehin kein
+    // zweites Mal, und ein eigener Hinweis waere eine Aufforderung zu
+    // etwas, das die Person schon einmal abgelehnt hat.
+    if (erlaubnis === 'prompt' || erlaubnis === 'prompt-with-rationale') {
+      return PN.requestPermissions().then(ergebnis => {
+        if (ergebnis && ergebnis.receive === 'granted') { return PN.register(); }
+      });
+    }
+  }).catch(() => {});
 }
 
 // Der erklaerende Satz zum aktuellen Zustand. Getrennt vom Zeichnen,
