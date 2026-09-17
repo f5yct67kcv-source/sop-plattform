@@ -3971,7 +3971,12 @@ function zeichneRapport() {
   // Keine Stundensumme mehr aus den Rapporten (ENT-049) -- massgeblich ist
   // die abgeglichene Zeit unter Profil > Meine Stunden. Eine zweite Zahl
   // zwei Fingertipps daneben haette ihr nur widersprochen.
-  let html = `<a class="btn btn-primary btn-wide" href="index.html" style="margin-bottom:8px">
+  // Das Rapport Tool liegt im Buendel unter "rapport-tool.html" neben der
+  // kopierten app.html (siehe mobile-buendel-erstellen.py) -- bleibt damit
+  // in der App statt extern in Safari zu oeffnen (anders als der
+  // Cockpit-Link: dashboard.html gehoert nicht zum Werkzeug der Waechter
+  // und wird bewusst nicht mitgebuendelt).
+  let html = `<a class="btn btn-primary btn-wide" href="${nativeAppHuelle() ? 'rapport-tool.html' : 'index.html'}" style="margin-bottom:8px">
       <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       ${esc(w('neuerRapport'))}
     </a>
@@ -5218,7 +5223,7 @@ function rundgangUebersichtLaden() {
         // nicht vorbei; dort waere der Knopf eine leere Zusage.
         + (gesperrt ? '' : `<button class="btn btn-plain btn-wide" style="margin-top:10px"
              onclick="rundgangUebersichtOeffnen()">${esc(w('nochmal'))}</button>`);
-      $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="zeige('waechter')">${esc(w('zurueck'))}</button>`;
+      $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="blattZu()">${esc(w('zurueck'))}</button>`;
       blattZeigen();
       return;
     }
@@ -5231,7 +5236,7 @@ function rundgangUebersichtLaden() {
           </button>`).join('')}</div>`
       : LEER(w('waechterUebersichtLeer'), w('waechterUebersichtLeerText'),
           '<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/>');
-    $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="zeige('waechter')">${esc(w('zurueck'))}</button>`;
+    $('blFuss').innerHTML = `<button class="btn btn-plain" onclick="blattZu()">${esc(w('zurueck'))}</button>`;
     blattZeigen();
   });
 }

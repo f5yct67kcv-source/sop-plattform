@@ -471,14 +471,69 @@ if (zfBeanstandet.length) { zfBeanstandet.forEach(z => bad.push('PHP-Zweifaktor:
 // Dieselbe Ueberlegung gilt fuer die native App-Huelle (ENT-588): app.html
 // ist die Quelle, mobile/www/index.html ist eine reine Kopie davon fuer das
 // Capacitor-Buendel (Variante A). Laufen sie auseinander, testet man die
-// eine Fassung und ausgeliefert wird im Store die andere.
+// eine Fassung und ausgeliefert wird im Store die andere. Dasselbe gilt
+// fuer index.html (Rapport Tool, im Buendel "rapport-tool.html") und die
+// vier Begleitskripte, die app.html per <script src> laedt -- ohne sie
+// als eigene Kopien liefe z.B. die GAV-Rechnung oder die Unterschrift in
+// der App ins Leere (Befund vom 2026-09-17).
+// testumgebung.js ist die eine Ausnahme: mobile-buendel-erstellen.py setzt
+// dort __APP_ENV__ direkt auf "production" (Begruendung in der Datei
+// selbst), die Kopie ist also bewusst NICHT byte-gleich mit dem Original.
+for (const [quelle, ziel] of [
+  ['app.html', 'mobile/www/index.html'],
+  ['index.html', 'mobile/www/rapport-tool.html'],
+  ['dashboard.html', 'mobile/www/dashboard.html'],
+  ['gav.js', 'mobile/www/gav.js'],
+  ['zeitwahl.js', 'mobile/www/zeitwahl.js'],
+  ['unterschrift.js', 'mobile/www/unterschrift.js'],
+]) {
+  const original = readFileSync(`${WURZEL}/${quelle}`, 'utf8');
+  const kopie = readFileSync(`${WURZEL}/${ziel}`, 'utf8');
+  check(`KRITISCH: ${quelle} und ${ziel} sind gleich `
+      + '(sonst "python3 mobile-buendel-erstellen.py" ausfuehren)', original === kopie);
+  if (original !== kopie) {
+    bad.push(`${quelle} ${original.length} Zeichen gegen ${ziel} ${kopie.length} Zeichen`);
+  }
+}
 {
-  const appHtml = readFileSync(`${WURZEL}/app.html`, 'utf8');
-  const mobilHtml = readFileSync(`${WURZEL}/mobile/www/index.html`, 'utf8');
-  check('KRITISCH: app.html und mobile/www/index.html sind gleich '
-      + '(sonst "python3 mobile-buendel-erstellen.py" ausfuehren)', appHtml === mobilHtml);
-  if (appHtml !== mobilHtml) {
-    bad.push(`app.html ${appHtml.length} Zeichen gegen mobile/www/index.html ${mobilHtml.length} Zeichen`);
+  const original = readFileSync(`${WURZEL}/testumgebung.js`, 'utf8');
+  const kopie = readFileSync(`${WURZEL}/mobile/www/testumgebung.js`, 'utf8');
+  const erwartet = original.replace("'__APP_ENV__'", "'production'");
+  check('KRITISCH: mobile/www/testumgebung.js ist testumgebung.js mit '
+      + '__APP_ENV__ auf "production" gesetzt '
+      + '(sonst "python3 mobile-buendel-erstellen.py" ausfuehren)', erwartet === kopie);
+  if (erwartet !== kopie) {
+    bad.push(`testumgebung.js (erwartet, production) ${erwartet.length} Zeichen `
+      + `gegen mobile/www/testumgebung.js ${kopie.length} Zeichen`);
+  }
+}
+
+// mobile/dev-anmelden.sh legt zum Entwickeln eine echte Sitzung ins GEBAUTE
+// Buendel (mobile/ios/App/App/public, steht in .gitignore). Geriete derselbe
+// Block je nach mobile/www/, laege ein gueltiger Sitzungs-Token im
+// Repository und im Store-Build. Diese Pruefung ist der Riegel dagegen.
+for (const datei of ['mobile/www/index.html', 'mobile/www/rapport-tool.html',
+                     'mobile/www/dashboard.html']) {
+  const inhalt = readFileSync(`${WURZEL}/${datei}`, 'utf8');
+  const sauber = !inhalt.includes('dev-anmeldung') && !inhalt.includes('rv3_token","');
+  check(`KRITISCH: ${datei} traegt keine eingesetzte Entwicklungs-Sitzung `
+      + '(dev-anmelden.sh schreibt nur nach mobile/ios/App/App/public)', sauber);
+  if (!sauber) { bad.push(`${datei} enthaelt einen eingesetzten Sitzungs-Token`); }
+}
+
+// icons/ und img/ (Logos, Anmelde-Animation) muessen vollstaendig und
+// unveraendert im Buendel liegen -- ohne sie zeigt die App an deren Stelle
+// ein kaputtes Bildsymbol (Befund vom 2026-09-17).
+for (const ordner of ['icons', 'img']) {
+  const dateien = readdirSync(`${WURZEL}/${ordner}`);
+  for (const datei of dateien) {
+    const original = readFileSync(`${WURZEL}/${ordner}/${datei}`);
+    let kopie;
+    try { kopie = readFileSync(`${WURZEL}/mobile/www/${ordner}/${datei}`); } catch (e) { kopie = null; }
+    const gleich = !!kopie && Buffer.compare(original, kopie) === 0;
+    check(`KRITISCH: mobile/www/${ordner}/${datei} ist gleich `
+        + '(sonst "python3 mobile-buendel-erstellen.py" ausfuehren)', gleich);
+    if (!gleich) { bad.push(`${ordner}/${datei} fehlt im Buendel oder weicht ab`); }
   }
 }
 
