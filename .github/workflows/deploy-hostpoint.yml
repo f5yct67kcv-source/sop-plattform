@@ -303,21 +303,14 @@ jobs:
             EFF_CUPI24_FTP_HOST="$P_CUPI24_FTP_HOST"
             EFF_CUPI24_FTP_USER="$P_CUPI24_FTP_USER"
             EFF_CUPI24_FTP_PASSWORD="$P_CUPI24_FTP_PASSWORD"
-            # Eigene Adresse der Anlage (ENT-501). Sie steckt in jedem Link,
-            # den der Server per E-Mail verschickt -- Passwort zuruecksetzen,
-            # Portalzugang, Beleg. Bis ENT-501 kam sie aus dem Host-Kopf DER
-            # ANFRAGE; wer die unangemeldeten Endpunkte mit einem fremden
-            # Host-Kopf aufrief, liess den Server einen Link auf die eigene
-            # Adresse verschicken. Jetzt weiss der Deploy-Lauf, wohin er
-            # deployt, und traegt es ein -- dieselbe Ueberlegung wie bei
-            # APP_ENV.
-            #
-            # Kein Secret: Die Adresse ist oeffentlich und steht in README.md.
-            # Ueber die Environment-Variable APP_BASIS_URL ueberschreibbar,
-            # falls die Anlage einmal unter einer anderen Adresse laeuft --
-            # ohne sie gilt die heutige, damit ein Deploy nicht an einer
-            # nicht gesetzten Variablen scheitert und die Links dabei
-            # wortlos verschwinden.
+            # Eigene Adresse der Anlage (ENT-501, siehe auch APP_ENV oben):
+            # steckt in jedem Link, den der Server per E-Mail verschickt.
+            # Bis ENT-501 kam sie aus dem Host-Kopf DER ANFRAGE -- ein Angriff
+            # ueber die unangemeldeten Endpunkte liess den Server so einen
+            # Link auf eine fremde Adresse verschicken. Jetzt traegt der
+            # Deploy-Lauf sein eigenes Ziel ein.
+            # Kein Secret (oeffentlich, siehe README.md); ueber APP_BASIS_URL
+            # ueberschreibbar, sonst gilt die heutige Adresse.
             EFF_APP_BASIS_URL="${{ vars.APP_BASIS_URL }}"
             if [ -z "$EFF_APP_BASIS_URL" ]; then
               EFF_APP_BASIS_URL="https://rapport.itufeden.myhostpoint.ch"
@@ -352,8 +345,6 @@ jobs:
             EFF_VAPID_PRIVATE_PEM_B64="$D_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$D_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$D_PUSH_CRON_SCHLUESSEL"
-            # Kein APNs-Schluessel ausserhalb der Produktion (siehe
-            # Begruendung bei den Secrets oben) -- bleibt "kein_schluessel".
             EFF_APNS_KEY_P8_B64=""
             EFF_APNS_KEY_ID=""
             EFF_APNS_TEAM_ID=""
@@ -546,25 +537,22 @@ jobs:
             esac
           fi
 
-          # Drift-Guard fuer die manuell bei Hostpoint gepflegten Staging-Dateien
-          # (ENT-384, erweitert ENT-387; Demo braucht diesen Guard bewusst
-          # NICHT -- ENT-523-N1: Demo traegt keinen Passwortschutz, darum
-          # gibt es nichts manuell bei Hostpoint zu pflegen. Die Demo-.htaccess
-          # inklusive X-Robots-Tag entsteht vollstaendig aus dem Repository,
-          # siehe htaccess-demo-zusatz weiter unten). Der Passwortschutz verwaltet sich
-          # selbst oberhalb der Markierung "#@__HCP_END__@#" in der dortigen
-          # .htaccess; unterhalb davon stehen von Hand die Inhalte von
+          # Drift-Guard fuer die manuell bei Hostpoint gepflegten Staging-
+          # Dateien (ENT-384, erweitert ENT-387; Demo braucht ihn NICHT --
+          # ENT-523-N1: keinen Passwortschutz, nichts manuell zu pflegen,
+          # siehe htaccess-demo-zusatz weiter unten). Oberhalb der Markierung
+          # "#@__HCP_END__@#" in der dortigen .htaccess verwaltet sich der
+          # Passwortschutz selbst; darunter stehen von Hand die Inhalte von
           # htaccess-hostpoint UND htaccess-staging-zusatz (X-Robots-Tag),
-          # und robots.txt liegt als eigene Datei daneben. Der Deploy laesst
-          # alle drei fuer Staging unangetastet (siehe FTP-Schritt unten) --
-          # sonst wuerde jeder Deploy den Schutz stillschweigend entfernen.
-          # Das bedeutet aber auch: aendert sich eine der drei Quelldateien
-          # hier im Repository, driftet die Staging-Kopie unbemerkt
-          # auseinander, wenn niemand manuell nachzieht. Deshalb muss jeder
-          # Hash exakt dem Stand entsprechen, der zuletzt manuell uebertragen
-          # wurde (staging-htaccess.synced-sha256, Format "datei:hash" je
-          # Zeile) -- sonst bricht der Staging-Deploy ab, statt mit
-          # veralteten Regeln weiterzulaufen.
+          # robots.txt liegt daneben. Der Deploy laesst alle drei fuer
+          # Staging unangetastet (siehe FTP-Schritt unten), sonst wuerde
+          # jeder Deploy den Schutz stillschweigend entfernen -- aendert
+          # sich eine der drei Quelldateien im Repository, driftet die
+          # Staging-Kopie darum unbemerkt auseinander, wenn niemand manuell
+          # nachzieht. Deshalb muss jeder Hash exakt dem zuletzt manuell
+          # uebertragenen Stand entsprechen (staging-htaccess.synced-sha256,
+          # "datei:hash" je Zeile) -- sonst bricht der Staging-Deploy ab,
+          # statt mit veralteten Regeln weiterzulaufen.
           if [ "$UMGEBUNG" = "staging" ]; then
             for DRIFT_DATEI in htaccess-hostpoint htaccess-staging-zusatz robots-staging.txt; do
               AKTUELLER_HASH=$(sha256sum "$DRIFT_DATEI" | cut -d' ' -f1)

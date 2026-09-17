@@ -1500,6 +1500,41 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   }
 }
 
+/* GitHub selbst weist einen einzelnen "run:"-Block ab, sobald sein
+   Rohtext eine bestimmte Laenge ueberschreitet -- ohne dass irgendeine
+   YAML-Regel das anzeigt: die Datei bleibt gueltiges YAML, ein Duplikat-
+   Schluessel-Pruefer findet nichts, und lokal laeuft alles. Es faellt
+   erst beim echten Deploy auf, und dann sofort komplett: GitHub kann die
+   Datei dann ueberhaupt nicht mehr einlesen (0 Jobs, der Lauf traegt statt
+   des Namens den Dateipfad).
+   Genau das ist beim Bauen von ENT-604 passiert: der grosse "Umgebung
+   waehlen"-Schritt lag mit 24909 Zeichen schon nahe an der Grenze; neun weitere
+   Zeilen fuer APNs (ENT-604) haben sie auf 25561 gerissen. Empirisch
+   eingegrenzt (ueber echte, manuell ausgeloeste Laeufe -- nicht geraten):
+   24765 Zeichen laufen durch, 25561 nicht. Die genaue Grenze dazwischen
+   ist nicht bekannt; die Zahl 21000 aus GitHubs eigener Fehlermeldung
+   ("Exceeded max expression length 21000") ist jedenfalls nicht direkt
+   die Rohlaenge. GRENZE liegt darum nahe dem bestaetigt LAUFENDEN Wert,
+   mit etwas Luft nach oben -- wer sie anhebt, um diese Pruefung stumm zu
+   schalten, hebt sie ueber Boden auf, den niemand vermessen hat. */
+{
+  const GRENZE = 25000;
+  // Jeden "run: |"-Block bis zum naechsten Geschwister-Schritt (naechstes
+  // "- name:") oder Dateiende vermessen.
+  const namen = [...workflow.matchAll(/\n( +)- name: ([^\n]*)\n/g)];
+  for (let i = 0; i < namen.length; i++) {
+    const [, einrueckung, name] = namen[i];
+    const start = namen[i].index + namen[i][0].length;
+    const ende = i + 1 < namen.length ? namen[i + 1].index : workflow.length;
+    const abschnitt = workflow.slice(start, ende);
+    const runStart = abschnitt.indexOf(`${einrueckung}  run: |\n`);
+    if (runStart === -1) { continue; }
+    const laenge = abschnitt.length - runStart;
+    check(`KRITISCH: run-Block "${name}" bleibt unter ${GRENZE} Zeichen (GitHub weist zu grosse Bloecke komplett ab) -- ${laenge}`,
+      laenge < GRENZE);
+  }
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');
