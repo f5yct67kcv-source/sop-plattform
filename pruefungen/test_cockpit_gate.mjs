@@ -199,6 +199,15 @@ check('KRITISCH: die Wortmarke "Cockpit" steht ueber dem Formular',
 // "G"-Zeichen auf die volle Wortmarke (2026-09-16) entfallen: Die Marke
 // selbst traegt den Firmennamen jetzt, eine zweite Zeile wuerde ihn
 // verdoppeln. Nachweis dafuer steht bei der Bildbeschriftung der Marke.
+// Ausserhalb des Demobereichs steht die Fassung OHNE Claim: Wer hier
+// ankommt, hat ein Konto und weiss, was das ist. 4.23:1 statt 3.07:1.
+const ohneClaim = await ev(page, () => {
+  const svg = document.querySelector('.gate-oben svg.marke');
+  const k = svg.getBoundingClientRect();
+  return k.width / k.height;
+});
+check('KRITISCH: ausserhalb des Demobereichs steht die Marke OHNE Claim',
+  ohneClaim > 4.0 && ohneClaim < 4.5);
 check('KRITISCH: die Wortmarke traegt den Firmennamen als Bildbeschriftung, keine doppelte Textzeile mehr',
   (await page.getAttribute('.gate-oben .marke', 'aria-label').catch(() => '') || '').toLowerCase().includes('guard')
   && (await ev(page, () => !document.querySelector('.gate-oben .sub'))));
@@ -514,6 +523,38 @@ check('KRITISCH: im Demobereich sagt der Gruss, wo man ist', kopf !== null && ko
 check('KRITISCH: und der Bereichsname steht nicht zusaetzlich daneben -- nicht zwei Ortsangaben untereinander',
   kopf !== null && !kopf.wm);
 check('Der Gruss nennt den Demobereich', kopf !== null && /demo/i.test(kopf.grussText));
+
+// Volles Logo mit Claim -- nur hier. Geprueft wird nicht, dass ein
+// bestimmter href dasteht, sondern dass die Zeichnung tatsaechlich hoeher
+// ist als die Fassung ohne Claim UND dass die Tinte den Kasten fuellt:
+// Genau das bricht, wenn die aeussere viewBox nicht mitgezogen wird -- die
+// Zeichnung sitzt dann zu klein oder abgeschnitten im richtig grossen
+// Kasten, und der Quelltext sieht dabei in Ordnung aus.
+const claim = await ev(demo, () => {
+  const svg = document.querySelector('.gate-oben svg.marke');
+  if (!svg) { return null; }
+  const k = svg.getBoundingClientRect();
+  const bb = svg.getBBox(), m = svg.getScreenCTM();
+  const pt = (x, y) => { const q = svg.createSVGPoint(); q.x = x; q.y = y; return q.matrixTransform(m); };
+  const a2 = pt(bb.x, bb.y), b2 = pt(bb.x + bb.width, bb.y + bb.height);
+  return {
+    verhaeltnis: k.width / k.height,
+    breite: k.width,
+    imKasten: a2.x >= k.left - 1 && a2.y >= k.top - 1 && b2.x <= k.right + 1 && b2.y <= k.bottom + 1,
+    deckungB: (b2.x - a2.x) / k.width, deckungH: (b2.y - a2.y) / k.height,
+    name: svg.getAttribute('aria-label') || '',
+  };
+});
+// Ohne Claim ist die Marke 649.83:153.56 = 4.23:1, mit Claim
+// 649.83:211.46 = 3.07:1. Gemessen wird am gerenderten Kasten.
+check('KRITISCH: im Demobereich steht das volle Logo MIT Claim (niedrigeres Seitenverhaeltnis)',
+  claim !== null && claim.verhaeltnis > 2.9 && claim.verhaeltnis < 3.25);
+check('KRITISCH: der Schriftzug bleibt dabei gleich gross -- die Breite aendert sich nicht mit',
+  claim !== null && Math.abs(claim.breite - 255) <= 2);
+check('KRITISCH: die Claim-Zeichnung liegt in ihrem Kasten und fuellt ihn -- die aeussere viewBox wurde mitgezogen',
+  claim !== null && claim.imKasten && claim.deckungB >= 0.90 && claim.deckungH >= 0.85);
+check('Auch die Claim-Fassung traegt den Namen fuer Screenreader',
+  claim !== null && /guard\s*ops/i.test(claim.name));
 // Die Hilfe sagt im Demobereich etwas anderes als im Betrieb: Wer hier
 // keinen Zugang hat, ist ein Interessent, kein Mitarbeitender.
 await demo.click('#gateHilfeKnopf');
