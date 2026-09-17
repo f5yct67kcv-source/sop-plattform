@@ -157,6 +157,107 @@ function demo_zugang_meldung(string $lage): string
     };
 }
 
+// Die Lage des Zeitgeber-Schluessels fuer den Ablauf (ENT-600).
+//
+// EIGENE FUNKTION UND EIGENER PLATZHALTERNAME, obwohl demo_reset.php eine
+// fast gleiche hat: Jene prueft "__DEMO_RESET"-Platzhalter und gilt nur in
+// der Demo-Umgebung. Der Ablauf laeuft dagegen auf Produktion, wo der
+// Betreiber-Bereich mit dem Register steht. Ein gemeinsamer Schluessel
+// oeffnete je nach Umgebung etwas anderes.
+//
+// KEIN FREMDER PLATZHALTERNAME IM KLARTEXT in dieser Datei: Sie geht in
+// drei Buendel mit, und der Bau weist jeden Platzhalter ab, der dort nicht
+// ersetzt wird (derselbe Fall wie bei demo_reset.php und mailer.php).
+// Darum wird der erwartete Wert hereingereicht, nicht hier gebildet.
+//
+// hash_equals und kein "===": Ein Vergleich, der beim ersten falschen
+// Zeichen abbricht, verraet ueber die Zeit, wie weit man richtig lag.
+function demo_ablauf_zeitgeber_lage(string $erwartet, string $mitgegeben): string
+{
+    if ($erwartet === '' || str_starts_with($erwartet, '__DEMO_ABLAUF')) {
+        return 'nicht_eingerichtet';
+    }
+    if ($mitgegeben === '') { return 'kein_schluessel_in_der_adresse'; }
+    return hash_equals($erwartet, $mitgegeben) ? 'ok' : 'falscher_schluessel';
+}
+
+// Adresse eines Platzes. Aus der festen Basis und dem Platznamen gebaut,
+// nie aus $_SERVER['HTTP_HOST'] (ENT-501): Der Betreiber-Bereich verschickt
+// hier einen Link auf eine FREMDE Instanz, und der Kopf der eingehenden
+// Anfrage gehoert dem Aufrufer, nicht uns. Ein untergeschobener Host
+// stuende sonst in der Mail an den Interessenten.
+const DEMO_ADRESSE_BASIS = 'guardops.ch';
+
+function demo_platz_adresse(string $platz): ?string
+{
+    if (!in_array($platz, DEMO_PLAETZE, true)) { return null; }
+    return 'https://' . $platz . '.' . DEMO_ADRESSE_BASIS;
+}
+
+// Ein Passwort, das jemand aus einer E-Mail abtippt.
+//
+// OHNE VERWECHSELBARE ZEICHEN: 0 und O, 1 und l und I sehen in vielen
+// Schriften gleich aus. Wer sie drin laesst, baut sich Support-Anrufe --
+// und der Anrufer haelt dann sich selbst fuer den Fehler.
+// Der Vorrat ist damit 54 Zeichen gross; bei 12 Stellen sind das rund
+// 69 Bit, deutlich mehr als jedes Passwort, das sich ein Mensch ausdenkt.
+//
+// random_int und nicht rand(): Das hier ist ein Zugangsschluessel, kein
+// Wuerfelwurf. random_int zieht aus der Zufallsquelle des Systems.
+const DEMO_PASSWORT_ZEICHEN = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function demo_passwort_erzeugen(int $laenge = 12): string
+{
+    $vorrat = DEMO_PASSWORT_ZEICHEN;
+    $max = strlen($vorrat) - 1;
+    $aus = '';
+    for ($i = 0; $i < $laenge; $i++) { $aus .= $vorrat[random_int(0, $max)]; }
+    return $aus;
+}
+
+// Die Mail an den Interessenten. Als reine Funktion, damit ihr Inhalt
+// pruefbar ist, ohne etwas zu verschicken.
+//
+// DREI SACHEN MUESSEN DRINSTEHEN, und jede aus einem eigenen Grund:
+//   - Adresse, Anmeldename und Passwort: ohne sie ist die Mail nutzlos.
+//   - Das Ablaufdatum: Wer nicht weiss, dass die Zeit laeuft, meldet sich
+//     am 15. Tag und haelt den Zugang fuer kaputt.
+//   - Der Hinweis auf echte Personendaten: Die Instanz wird beim Ablauf
+//     restlos geleert, und bis dahin liegt hier fremdes Personal in einer
+//     fremden Datenbank (ENT-600).
+function demo_zugang_mail(string $firma, string $person, string $adresse,
+                          string $login, string $passwort, string $laeuftAbAm): array
+{
+    $ab = date('d.m.Y', strtotime($laeuftAbAm));
+    $betreff = 'Ihr Demo-Zugang zu GuardOpS';
+
+    $text = "Guten Tag $person\n\n"
+          . "Ihr Demo-Zugang für $firma steht bereit.\n\n"
+          . "Adresse:      $adresse\n"
+          . "Anmeldename:  $login\n"
+          . "Passwort:     $passwort\n\n"
+          . "Der Zugang läuft am $ab ab. Danach wird er gesperrt und alles, "
+          . "was Sie erfasst haben, vollständig gelöscht.\n\n"
+          . "Bitte erfassen Sie keine echten Personendaten — die Demo ist zum "
+          . "Ausprobieren da, nicht für den Betrieb.\n\n"
+          . "Freundliche Grüsse\npzu consulting gmbh";
+
+    $e = static fn (string $w): string => htmlspecialchars($w, ENT_QUOTES, 'UTF-8');
+    $html = '<p>Guten Tag ' . $e($person) . '</p>'
+          . '<p>Ihr Demo-Zugang für <b>' . $e($firma) . '</b> steht bereit.</p>'
+          . '<table cellpadding="4"><tr><td>Adresse</td><td><a href="' . $e($adresse) . '">'
+          . $e($adresse) . '</a></td></tr>'
+          . '<tr><td>Anmeldename</td><td><b>' . $e($login) . '</b></td></tr>'
+          . '<tr><td>Passwort</td><td><b>' . $e($passwort) . '</b></td></tr></table>'
+          . '<p>Der Zugang läuft am <b>' . $e($ab) . '</b> ab. Danach wird er gesperrt und '
+          . 'alles, was Sie erfasst haben, vollständig gelöscht.</p>'
+          . '<p>Bitte erfassen Sie keine echten Personendaten — die Demo ist zum '
+          . 'Ausprobieren da, nicht für den Betrieb.</p>'
+          . '<p>Freundliche Grüsse<br>pzu consulting gmbh</p>';
+
+    return ['betreff' => $betreff, 'text' => $text, 'html' => $html];
+}
+
 // Die Tabelle des Registers. Sie liegt in der BETREIBER-Datenbank, nicht in
 // der Demo-Instanz: Der naechtliche Reset (ENT-523) leert generisch JEDE
 // Tabelle der verbundenen Datenbank -- ein Register in der Demo waere am

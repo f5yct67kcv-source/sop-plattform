@@ -215,6 +215,15 @@ jobs:
           # api/demo_reset.php) -- gleiches Prinzip wie D_PUSH_CRON_SCHLUESSEL
           # weiter unten, nur umgebungsgebunden statt produktionsweit.
           D_RESET_TOKEN: ${{ secrets.DEMO_RESET_TOKEN }}
+          # Zeitgeber fuer den Ablauf der Demo-Zugaenge (ENT-600,
+          # api/betreiber_demo_ablauf.php). EIGENES Secret und NICHT
+          # DEMO_RESET_TOKEN: Jener gilt nur in der Demo-Umgebung, dieser
+          # laeuft auf Produktion -- der Betreiber-Bereich steht dort. Wer
+          # beide zusammenlegte, haette einen Zeitgeber-Schluessel, der je
+          # nach Umgebung etwas anderes oeffnet.
+          # Ohne dieses Secret laeuft der Ablauf nicht von selbst; der
+          # Endpunkt verlangt dann eine Betreiber-Sitzung und sagt das auch.
+          P_DEMO_ABLAUF_TOKEN: ${{ secrets.DEMO_ABLAUF_TOKEN }}
           # Push-Benachrichtigungen (ENT-424). Eigene, von den
           # Production-Namen VERSCHIEDENE Secret-Namen fuer Staging -- kein
           # struktureller Rueckfall moeglich (ENT-343 Punkt 1). Und
@@ -259,6 +268,9 @@ jobs:
             # Nur die Demo-Umgebung kennt einen Reset -- kein Zeitgeber-Zugang
             # ausserhalb von ihr, aus demselben Grund wie EFF_DEMO_TESTMAIL.
             EFF_DEMO_RESET_TOKEN=""
+            # Der Ablauf der Demo-Zugaenge laeuft dagegen AUF Produktion --
+            # dort steht der Betreiber-Bereich mit dem Register (ENT-600).
+            EFF_DEMO_ABLAUF_TOKEN="$P_DEMO_ABLAUF_TOKEN"
             EFF_VAPID_PRIVATE_PEM_B64="$P_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$P_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$P_PUSH_CRON_SCHLUESSEL"
@@ -336,6 +348,7 @@ jobs:
             EFF_STAGING_TESTMAIL=""
             EFF_DEMO_TESTMAIL="$D_TESTMAIL"
             EFF_DEMO_RESET_TOKEN="$D_RESET_TOKEN"
+            EFF_DEMO_ABLAUF_TOKEN=""
             EFF_VAPID_PRIVATE_PEM_B64="$D_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$D_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$D_PUSH_CRON_SCHLUESSEL"
@@ -426,6 +439,7 @@ jobs:
             # teilen sich keine Mailziele (ENT-523-N1).
             EFF_DEMO_TESTMAIL=""
             EFF_DEMO_RESET_TOKEN=""
+            EFF_DEMO_ABLAUF_TOKEN=""
             EFF_VAPID_PRIVATE_PEM_B64="$S_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$S_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$S_PUSH_CRON_SCHLUESSEL"
@@ -598,6 +612,7 @@ jobs:
             echo "EFF_STAGING_TESTMAIL=$EFF_STAGING_TESTMAIL"
             echo "EFF_DEMO_TESTMAIL=$EFF_DEMO_TESTMAIL"
             echo "EFF_DEMO_RESET_TOKEN=$EFF_DEMO_RESET_TOKEN"
+            echo "EFF_DEMO_ABLAUF_TOKEN=$EFF_DEMO_ABLAUF_TOKEN"
             echo "EFF_VAPID_PRIVATE_PEM_B64=$EFF_VAPID_PRIVATE_PEM_B64"
             echo "EFF_VAPID_KONTAKT=$EFF_VAPID_KONTAKT"
             echo "EFF_PUSH_CRON_SCHLUESSEL=$EFF_PUSH_CRON_SCHLUESSEL"
@@ -1233,6 +1248,17 @@ jobs:
           # Betreiber-Bereich beim ersten Aufruf, nicht erst bei der
           # Demo-Freigabe.
           cp backend/demo_zugang.php   dist-betreiber/demo_zugang.php
+          # Der Griff in eine Demo-Instanz (ENT-600) und was er braucht.
+          # demo_instanz.php bindet demo_reset.php ein, demo_reset.php
+          # erwartet system_rollen() aus rechte.php (oben schon dabei), und
+          # demo_daten.php befuellt die frisch geleerte Instanz.
+          cp backend/demo_instanz.php  dist-betreiber/demo_instanz.php
+          cp backend/demo_reset.php    dist-betreiber/demo_reset.php
+          cp backend/demo_daten.php    dist-betreiber/demo_daten.php
+          # Der Versand der Zugangsdaten an den Interessenten (ENT-600).
+          # mailer.php traegt das SMTP-Passwort -- die Platzhalter werden
+          # weiter unten ersetzt, wie in den anderen Buendeln.
+          cp backend/mailer.php        dist-betreiber/mailer.php
           cp backend/api/betreiber_*.php dist-betreiber/api/
           cp htaccess-betreiber        dist-betreiber/.htaccess
           cp robots-betreiber.txt      dist-betreiber/robots.txt
@@ -1262,6 +1288,27 @@ jobs:
           # Zugangsdaten (gleiche Einordnung wie bei EFF_APP_BASIS_URL des
           # Rapport-Tools und bei den GuardOpS-Literalen im guardops-Buendel).
           sed -i "s|__APP_BASIS_URL__|https://betreiber.guardops.ch|g" dist-betreiber/db.php
+
+          # SMTP fuer die Zugangsdaten-Mail an Demo-Interessenten (ENT-600).
+          # Dasselbe Postfach wie das Kundenportal, aus demselben Grund wie
+          # dort: Es ist Kundenkommunikation der Plattform, keine eigene
+          # Anfrage-Mailbox wie beim guardops-Buendel (ENT-371).
+          # Die beiden Testmail-Platzhalter werden geleert -- der
+          # Betreiber-Bereich laeuft nur auf Produktion, eine Umleitung auf
+          # eine Testadresse gaebe es dort nie.
+          sed -i "s|__SMTP_HOST__|$EFF_SMTP_HOST|g" dist-betreiber/mailer.php
+          sed -i "s|__SMTP_PORT__|$EFF_SMTP_PORT|g" dist-betreiber/mailer.php
+          sed -i "s|__SMTP_VERSCHLUESSELUNG__|$EFF_SMTP_VERSCHLUESSELUNG|g" dist-betreiber/mailer.php
+          sed -i "s|__SMTP_USER__|$EFF_SMTP_USER|g" dist-betreiber/mailer.php
+          sed -i "s|__SMTP_PASSWORD__|$EFF_SMTP_PASSWORD|g" dist-betreiber/mailer.php
+          sed -i "s|__SMTP_ABSENDER__|$EFF_SMTP_ABSENDER|g" dist-betreiber/mailer.php
+          sed -i "s|__SMTP_ABSENDER_NAME__|$EFF_SMTP_ABSENDER_NAME|g" dist-betreiber/mailer.php
+          sed -i "s|__STAGING_TESTMAIL__||g" dist-betreiber/mailer.php
+          sed -i "s|__DEMO_TESTMAIL__||g" dist-betreiber/mailer.php
+          # Der Zeitgeber-Schluessel fuer den Ablauf der Demo-Zugaenge
+          # (api/betreiber_demo_ablauf.php). Derselbe Wert wie beim
+          # naechtlichen Demo-Reset -- es ist derselbe Cron-Dienst.
+          sed -i "s|__DEMO_ABLAUF_TOKEN__|$EFF_DEMO_ABLAUF_TOKEN|g" dist-betreiber/api/betreiber_demo_ablauf.php
 
           # Kein uebersehener Platzhalter darf hochgeladen werden. Anders als
           # beim guardops-Buendel braucht dieses hier eine echte

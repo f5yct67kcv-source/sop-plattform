@@ -125,6 +125,57 @@ $pruef('das Register traegt Platz, Adresse, Anmeldename und Ablauf',
     str_contains($tabelle, 'platz') && str_contains($tabelle, 'email')
     && str_contains($tabelle, 'login') && str_contains($tabelle, 'laeuft_ab_am'));
 
+// ── 9. Adresse eines Platzes ─────────────────────────────────────────
+$pruef('ein Platz ergibt seine eigene Adresse',
+    demo_platz_adresse('demo2') === 'https://demo2.guardops.ch');
+// Gegenprobe: Ein Platz, den es nicht gibt, ergibt KEINE Adresse. Sonst
+// stuende in einer Mail ein Link auf etwas, das nirgends steht.
+$pruef('KRITISCH: ein unbekannter Platz ergibt keine Adresse',
+    demo_platz_adresse('demo9') === null && demo_platz_adresse('') === null);
+$pruef('die Adresse ist verschluesselt (https)',
+    str_starts_with((string)demo_platz_adresse('demo1'), 'https://'));
+
+// ── 10. Passwort ─────────────────────────────────────────────────────
+$pw = demo_passwort_erzeugen();
+$pruef('das Passwort hat die vorgegebene Laenge', strlen($pw) === 12);
+// Der Grund fuer den eigenen Zeichenvorrat: Wer 0 und O nicht unterscheiden
+// kann, tippt falsch und haelt sich selbst fuer den Fehler.
+$pruef('KRITISCH: keine verwechselbaren Zeichen im Vorrat (0 O 1 l I)',
+    preg_match('/[0O1lI]/', DEMO_PASSWORT_ZEICHEN) === 0);
+$pruef('und auch nicht im erzeugten Passwort',
+    preg_match('/[0O1lI]/', $pw) === 0);
+// Zwei Laeufe duerfen nicht dasselbe ergeben. Bei 54^12 Moeglichkeiten
+// waere eine Wiederholung ein Zeichen dafuer, dass gar nicht gezogen wird.
+$pruef('KRITISCH: zwei Passwoerter sind nicht dasselbe',
+    demo_passwort_erzeugen() !== demo_passwort_erzeugen());
+$pruef('der Vorrat ist gross genug, um 12 Stellen zu tragen',
+    strlen(DEMO_PASSWORT_ZEICHEN) >= 50);
+
+// ── 11. Die Mail an den Interessenten ────────────────────────────────
+$mail = demo_zugang_mail('Muster AG', 'R. Beispiel', 'https://demo1.guardops.ch',
+    'musterag', 'AbcDefGhiJkm', '2026-03-16 09:00:00');
+foreach (['text', 'html'] as $teil) {
+    $pruef("die Mail ($teil) traegt die Adresse",
+        str_contains($mail[$teil], 'demo1.guardops.ch'));
+    $pruef("die Mail ($teil) traegt den Anmeldenamen",
+        str_contains($mail[$teil], 'musterag'));
+    $pruef("die Mail ($teil) traegt das Passwort",
+        str_contains($mail[$teil], 'AbcDefGhiJkm'));
+    // Ohne Datum meldet sich jemand am 15. Tag und haelt den Zugang fuer
+    // kaputt.
+    $pruef("KRITISCH: die Mail ($teil) nennt das Ablaufdatum",
+        str_contains($mail[$teil], '16.03.2026'));
+    $pruef("KRITISCH: die Mail ($teil) warnt vor echten Personendaten",
+        str_contains($mail[$teil], 'echten Personendaten'));
+}
+$pruef('der Betreff sagt, worum es geht',
+    str_contains($mail['betreff'], 'Demo-Zugang'));
+// Ein Firmenname mit spitzen Klammern darf im HTML-Teil kein Markup werden.
+$boes = demo_zugang_mail('<b>Muster</b>', 'X', 'https://demo1.guardops.ch',
+    'x', 'y', '2026-03-16 09:00:00');
+$pruef('KRITISCH: ein Firmenname wird im HTML-Teil maskiert, nicht eingebaut',
+    !str_contains($boes['html'], '<b>Muster</b>') && str_contains($boes['html'], '&lt;b&gt;'));
+
 // ── Ergebnis ─────────────────────────────────────────────────────────
 echo "\n$ok bestanden, " . count($bad) . " nicht bestanden\n";
 foreach ($bad as $n) { echo "  x $n\n"; }

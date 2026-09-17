@@ -11,7 +11,8 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { execFileSync } from 'child_process';
-import { WURZEL } from './pfade.mjs';
+import { WURZEL, browserPfad } from './pfade.mjs';
+import { chromium } from 'playwright';
 
 const HIER = new URL('.', import.meta.url).pathname;
 const ok = [], bad = [];
@@ -79,6 +80,105 @@ const fehlend = zieleBetreiber.filter(z => !zieleKern.includes(z));
 check('KRITISCH: jedes Buendel mit betreiber.php bekommt auch demo_zugang.php'
     + (fehlend.length ? ` -- fehlt in: ${fehlend.join(', ')}` : ''),
   zieleBetreiber.length > 0 && fehlend.length === 0);
+
+// ── 5. Die Ansicht am gerenderten Zustand ─────────────────────────────
+// Nicht im Quelltext nachgelesen, sondern gemessen (CLAUDE.md). Der Grund
+// steht im Kommentar bei DEMO_STATUS_TEXT in betreiber.html: Beim ersten
+// Bau war die Reihenfolge [Wort, Klasse] statt [Klasse, Wort] vertauscht.
+// Die Tabelle zeigte daraufhin "m-ok" statt "läuft" -- im Quelltext sah
+// nichts falsch aus, der Kasten hatte die richtige Grösse, die Farbe war
+// da. Gesehen hat es erst ein Bildschirmfoto.
+// Die Zeitpunkte werden vom heutigen Tag aus gerechnet und nicht
+// festgenagelt: Ein festes Datum nahe beim heutigen Tag kippt beim
+// Datumswechsel, und die Suite wäre über Nacht rot (CLAUDE.md,
+// test_datumsfest.mjs achtet darauf).
+const tagVersatz = n => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10) + ' 09:14:00';
+};
+
+const ANTWORTEN = {
+  'betreiber_zf_status.php': { status: 'ok', eingerichtet: true },
+  'betreiber_mandant_list.php': { status: 'ok', mandanten: [], anzahl: 0 },
+  'betreiber_demo_list.php': {
+    status: 'ok', laufzeit_tage: 14, plaetze_frei: 1, plaetze_total: 3, aktive: 2,
+    plaetze: [
+      { platz: 'demo1', adresse: 'https://demo1.guardops.ch', frei: false,
+        firma: 'Muster Sicherheit GmbH', laeuft_ab_am: tagVersatz(11) },
+      { platz: 'demo2', adresse: 'https://demo2.guardops.ch', frei: false,
+        firma: 'Beispiel Wachdienst AG', laeuft_ab_am: tagVersatz(2) },
+      { platz: 'demo3', adresse: 'https://demo3.guardops.ch', frei: true,
+        firma: null, laeuft_ab_am: null },
+    ],
+    zugaenge: [
+      { id: 3, platz: 'demo1', firma: 'Muster Sicherheit GmbH', person: 'R. Muster',
+        email: 'r.muster@beispiel.ch', login: 'mustersicherh', status: 'aktiv',
+        laeuft_ab_am: tagVersatz(11), abgelaufen: false, resttage: 11, beendet_am: null },
+      { id: 2, platz: 'demo2', firma: 'Beispiel Wachdienst AG', person: 'S. Beispiel',
+        email: 's.beispiel@beispiel.ch', login: 'beispielwachd', status: 'aktiv',
+        laeuft_ab_am: tagVersatz(0), abgelaufen: true, resttage: 0, beendet_am: null },
+      { id: 1, platz: 'demo3', firma: 'Probe Security GmbH', person: 'T. Probe',
+        email: 't.probe@beispiel.ch', login: 'probesecurity', status: 'abgelaufen',
+        laeuft_ab_am: tagVersatz(-7), abgelaufen: false, resttage: null,
+        beendet_am: tagVersatz(-7) },
+    ],
+  },
+};
+
+const browser = await chromium.launch({ executablePath: browserPfad() });
+const seite = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+seite.on('pageerror', e => bad.push('JS-Fehler in der Ansicht: ' + e.message));
+await seite.route('**/api/*.php', r => {
+  const datei = r.request().url().split('/').pop().split('?')[0];
+  r.fulfill({ status: 200, contentType: 'application/json',
+    body: JSON.stringify(ANTWORTEN[datei] || { status: 'ok' }) });
+});
+await seite.addInitScript(() => {
+  sessionStorage.setItem('betreiber-token', 'pruefung');
+  localStorage.setItem('rv3_thema', 'dunkel');
+});
+await seite.goto(`file://${WURZEL}/betreiber.html`);
+await seite.waitForTimeout(600);
+await seite.click('#kopf-nav .nav-item[data-bereich="demo"]');
+await seite.waitForTimeout(350);
+
+const sicht = await seite.evaluate(() => {
+  const zellen = sel => [...document.querySelectorAll(sel)].map(e => e.textContent.trim());
+  const merkerWorte = zellen('#demo-inhalt tbody tr td:nth-child(4)');
+  return {
+    titel: document.getElementById('leiste-titel').textContent.trim(),
+    plaetze: document.querySelectorAll('#demo-plaetze tbody tr').length,
+    zugaenge: document.querySelectorAll('#demo-inhalt tbody tr').length,
+    merkerWorte,
+    text: document.body.innerText,
+    // Höhe der Bedienelemente am gerenderten Zustand.
+    knopfHoehe: Math.round(document.getElementById('knopf-demo-neu').getBoundingClientRect().height),
+  };
+});
+
+check('die Ansicht heisst "Demo"', sicht.titel === 'Demo');
+check('der Vorrat zeigt alle drei Plätze', sicht.plaetze === 3);
+check('die Liste zeigt alle Zugänge', sicht.zugaenge === 3);
+// DER Punkt: Wörter, keine Klassennamen.
+check('KRITISCH: die Statusspalte zeigt Wörter, keinen CSS-Klassennamen',
+  sicht.merkerWorte.length === 3
+  && sicht.merkerWorte.every(w => w.length > 0 && !/^m-/.test(w)));
+check('und zwar die richtigen',
+  sicht.merkerWorte.join('|') === 'läuft|läuft|abgelaufen');
+// "Frist um" ist etwas anderes als "0 Tage": Der Zugang ist abgelaufen,
+// aber noch nicht geschlossen -- der Fall, der eine Handlung braucht.
+check('KRITISCH: ein abgelaufener, noch offener Zugang sagt das auch',
+  sicht.text.includes('Frist um') && sicht.text.includes('noch nicht geschlossen'));
+// Eine gefilterte Zahl ohne Bezug sieht aus wie die Gesamtzahl (Hausregel).
+check('KRITISCH: die freien Plätze stehen mit Bezug da, nicht als nackte Zahl',
+  /\d+ von \d+ Plätzen frei/.test(sicht.text));
+// Einheiten nicht vermischen: Plätze zählen Instanzen, Zugänge zählen
+// Interessenten -- beide Zahlen stehen mit ihrem eigenen Wort da.
+check('Plätze und Zugänge stehen als zwei verschiedene Zahlen da',
+  /Plätzen frei/.test(sicht.text) && /laufende Zugänge/.test(sicht.text));
+
+await browser.close();
 
 // ── Ergebnis ──────────────────────────────────────────────────────────
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden`);

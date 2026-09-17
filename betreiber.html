@@ -582,6 +582,10 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
         <svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-5h6v5"/><path d="M9 10h.01"/><path d="M15 10h.01"/></svg>
         <span class="lbl">Mandanten</span>
       </button>
+      <button type="button" class="nav-item" data-bereich="demo" aria-current="false">
+        <svg viewBox="0 0 24 24"><path d="M2 7.5A2.5 2.5 0 0 1 4.5 5h15A2.5 2.5 0 0 1 22 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 16.5z"/><path d="M10 9.5l4.5 2.5L10 14.5z"/></svg>
+        <span class="lbl">Demo</span>
+      </button>
       <button type="button" class="nav-item" data-bereich="offerten" aria-current="false">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
         <span class="lbl">Offerten</span>
@@ -837,6 +841,88 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
     </section>
 
     <!-- ══ Offerten ═══════════════════════════════════════════════ -->
+    <!-- ══ Demo-Zugänge (ENT-600) ═══════════════════════════════════ -->
+    <section class="bereich versteckt" id="b-demo">
+
+      <!-- Der Vorrat. Er steht OBEN und nicht unter der Liste: Die erste
+           Frage vor jeder Freigabe ist, ob überhaupt ein Platz frei ist. -->
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Plätze</h2>
+            <div class="sub">Jeder Interessent bekommt eine eigene Instanz</div>
+          </div>
+          <button class="klein" id="knopf-demo-neu">Interessent freigeben</button>
+        </div>
+        <div id="demo-plaetze"></div>
+      </div>
+
+      <!-- Freigabe. Drei Felder, mehr braucht es nicht: Alles Weitere
+           entsteht beim Freigeben selbst. -->
+      <div class="karte versteckt" id="demo-form-karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Interessent freigeben</h2>
+            <div class="sub">Eigene Instanz, eigene Zugangsdaten, 14 Tage</div>
+          </div>
+        </div>
+        <div class="karte-leib">
+          <div class="raster2">
+            <div class="feld">
+              <label for="demo-firma">Firma</label>
+              <input id="demo-firma" autocomplete="off">
+              <div class="hinweis">Daraus entsteht der Anmeldename.</div>
+            </div>
+            <div class="feld">
+              <label for="demo-person">Name der Ansprechperson</label>
+              <input id="demo-person" autocomplete="off">
+            </div>
+          </div>
+          <div class="feld">
+            <label for="demo-email">E-Mail-Adresse</label>
+            <input id="demo-email" type="email" autocomplete="off" autocapitalize="off" spellcheck="false">
+            <div class="hinweis">An diese Adresse gehen die Zugangsdaten — und nur an sie.
+              Sie ist später der einzige Weg, sie noch einmal zu verschicken.</div>
+          </div>
+          <div id="demo-form-meldung" class="meldung versteckt"></div>
+          <div class="knopfzeile">
+            <button id="knopf-demo-freigeben" class="haupt">Freigeben und senden</button>
+            <button id="knopf-demo-abbrechen" class="still">Abbrechen</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Die Zugangsdaten stehen GENAU EINMAL hier: direkt nach dem
+           Freigeben. Danach sind sie nur noch als Hash in der Instanz und
+           nirgends mehr abrufbar. Wer sie jetzt nicht weitergibt, muss
+           einen neuen Zugang freigeben. -->
+      <div class="karte versteckt" id="demo-fertig-karte">
+        <div class="karte-kopf">
+          <div>
+            <h2 id="demo-fertig-titel">Zugang steht bereit</h2>
+            <div class="sub" id="demo-fertig-sub"></div>
+          </div>
+        </div>
+        <div class="karte-leib">
+          <div id="demo-fertig-inhalt"></div>
+          <div class="knopfzeile">
+            <button id="knopf-demo-fertig-zu" class="still">Schliessen</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Zugänge</h2>
+            <div class="sub">Laufende und beendete, neuste zuerst</div>
+          </div>
+          <button class="klein" id="knopf-demo-ablauf">Abgelaufene schliessen</button>
+        </div>
+        <div id="demo-inhalt"></div>
+      </div>
+    </section>
+
     <section class="bereich versteckt" id="b-offerten">
       <div class="karte">
         <div class="karte-kopf">
@@ -900,6 +986,7 @@ function stumm(el) { zeig(el, false); }
 const BEREICHE = {
   uebersicht: ['Übersicht',  'Die Lage über allen Betrieben'],
   mandanten:  ['Mandanten',  'Betriebe, die diese Plattform nutzen'],
+  demo:       ['Demo',       'Zugänge für Interessenten, je 14 Tage'],
   offerten:   ['Offerten',   'Angebote an künftige Mandanten'],
   rechnungen: ['Rechnungen', 'Was die Mandanten für die Nutzung zahlen'],
   support:    ['Support',    'Anfragen der Mandanten, die auf eine Antwort warten'],
@@ -930,6 +1017,13 @@ function bereichZeigen(welcher) {
   // Derselbe Grund: Ein halb getippter Antworttext beim naechsten Besuch
   // waere ein Raetsel.
   if (welcher !== 'support') { zeig($('sv-karte'), false); }
+  // Dasselbe fuer die Demo: Ein halb ausgefuelltes Freigabeformular und
+  // erst recht die einmalig angezeigten Zugangsdaten gehoeren nicht in den
+  // naechsten Besuch dieses Bereichs.
+  if (welcher !== 'demo') {
+    zeig($('demo-form-karte'), false);
+    zeig($('demo-fertig-karte'), false);
+  }
   window.scrollTo({ top: 0 });
 }
 
@@ -1434,6 +1528,212 @@ async function kontoSchalten(id, aktiv) {
    ladeMandanten() gereicht. Zwei Stellen, die dieselbe Menge zaehlen,
    laufen irgendwann auseinander -- und es faellt erst auf, wenn zwei
    verschiedene Zahlen nebeneinander stehen. */
+/* ══ Demo-Zugänge (ENT-600) ═══════════════════════════════════════════
+
+   Was diese Ansicht NICHT tut: Sie zeigt nichts aus den Demo-Instanzen
+   selbst. Der Betreiber sieht, wer einen Zugang hat und wie lange -- nicht,
+   was dieser jemand darin erfasst hat. Dieselbe Grenze wie bei den
+   Mandanten.
+
+   Und sie rechnet den Ablauf nicht selbst: Ob ein Zugang abgelaufen ist,
+   sagt der Server (Feld `abgelaufen`). Sonst stünde hier eine zweite
+   Wahrheit neben der des Zeitgebers. */
+/* Reihenfolge wie bei STATUS_TEXT weiter unten: [Klasse, Wort]. Beim
+   ersten Bau stand sie hier vertauscht, und die Tabelle zeigte "m-ok"
+   statt "läuft" -- im Quelltext sah nichts falsch aus, gesehen hat es erst
+   ein Bildschirmfoto (CLAUDE.md: gemessen, nicht nachgelesen). */
+const DEMO_STATUS_TEXT = {
+  aktiv:      ['m-pos',  'läuft'],
+  abgelaufen: ['m-ruhe', 'abgelaufen'],
+  beendet:    ['m-ruhe', 'beendet'],
+};
+
+function demoRestZelle(z) {
+  if (z.status !== 'aktiv') {
+    return '<span class="zweit">' + text((z.beendet_am || '').slice(0, 10)) + '</span>';
+  }
+  /* Vier Aussagen, vier Texte: "Frist um, noch nicht geschlossen" ist
+     etwas anderes als "läuft heute ab" und beides etwas anderes als eine
+     Zahl. Wer daraus eine 0 macht, verschweigt den Fall, der eine
+     Handlung braucht. */
+  if (z.abgelaufen) {
+    return '<span class="merker m-warn">Frist um</span>'
+         + '<div class="zweit">noch nicht geschlossen</div>';
+  }
+  if (z.resttage === 0) { return '<strong>läuft heute ab</strong>'; }
+  return '<strong>' + z.resttage + '</strong> '
+       + '<span style="color:var(--ink-3)">' + (z.resttage === 1 ? 'Tag' : 'Tage') + '</span>'
+       + '<div class="zweit">bis ' + text(String(z.laeuft_ab_am).slice(0, 10)) + '</div>';
+}
+
+async function ladeDemo() {
+  const a = await ruf('betreiber_demo_list.php');
+  const inhalt = $('demo-inhalt');
+  const plaetze = $('demo-plaetze');
+
+  if (a.code === 503) {
+    /* Nicht eingerichtet ist etwas anderes als "keine Zugänge". */
+    plaetze.innerHTML = '';
+    inhalt.innerHTML = leerBlock('⚙', 'Noch nicht eingerichtet',
+      'Das Register der Demo-Zugänge ist auf diesem Server noch nicht angelegt.');
+    return;
+  }
+  if (a.status !== 'ok') {
+    plaetze.innerHTML = '';
+    inhalt.innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
+    return;
+  }
+
+  /* Einheiten nicht vermischen: "Plätze" zählt Instanzen, "Zugänge" zählt
+     Interessenten. Auf einem Platz liegt höchstens ein Zugang, aber die
+     beiden Zahlen sind trotzdem nicht dasselbe -- beendete Zugänge zählen
+     bei den Zugängen mit und bei den Plätzen nicht. */
+  plaetze.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
+    + '<th>Platz</th><th>Belegt durch</th><th>Bis</th>'
+    + '</tr></thead><tbody>'
+    + (a.plaetze || []).map(p => '<tr>'
+        + '<td><strong>' + text(p.platz) + '</strong>'
+          + '<div class="zweit">' + text(p.adresse || 'keine Adresse') + '</div></td>'
+        + '<td>' + (p.frei
+            ? '<span class="merker m-pos">frei</span>'
+            : '<strong>' + text(p.firma || '') + '</strong>') + '</td>'
+        + '<td>' + (p.frei ? '<span class="zweit">—</span>'
+            : text(String(p.laeuft_ab_am || '').slice(0, 10))) + '</td>'
+      + '</tr>').join('')
+    + '</tbody></table></div>'
+    + '<div class="hinweis" style="margin-top:10px">'
+    + text(a.plaetze_frei + ' von ' + a.plaetze_total + ' Plätzen frei · '
+         + 'Laufzeit ' + a.laufzeit_tage + ' Tage · '
+         + a.aktive + ' laufende Zugänge') + '</div>';
+
+  /* Der Knopf sagt selbst, wenn nichts geht -- ein Formular, das sich
+     öffnet und beim Absenden abweist, ist der längere Weg zum selben Nein. */
+  const neu = $('knopf-demo-neu');
+  neu.disabled = a.plaetze_frei === 0;
+  neu.textContent = a.plaetze_frei === 0 ? 'Alle Plätze belegt' : 'Interessent freigeben';
+
+  const liste = a.zugaenge || [];
+  if (!liste.length) {
+    inhalt.innerHTML = leerBlock('◇', 'Noch kein Zugang freigegeben',
+      'Sobald ein Interessent freigegeben ist, steht er hier.');
+    return;
+  }
+
+  inhalt.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
+    + '<th>Interessent</th><th>Platz</th><th>Anmeldename</th><th>Status</th><th>Rest</th><th></th>'
+    + '</tr></thead><tbody>'
+    + liste.map(z => '<tr>'
+        + '<td><strong>' + text(z.firma) + '</strong>'
+          + '<div class="zweit">' + text(z.person) + ' · ' + text(z.email) + '</div></td>'
+        + '<td>' + text(z.platz) + '</td>'
+        + '<td>' + text(z.login) + '</td>'
+        + '<td>' + merker(DEMO_STATUS_TEXT, z.status) + '</td>'
+        + '<td>' + demoRestZelle(z) + '</td>'
+        + '<td style="text-align:right;white-space:nowrap">'
+          + (z.status === 'aktiv'
+              ? '<button class="klein" data-demo-beenden="' + z.id + '">Beenden</button>'
+              : '') + '</td>'
+      + '</tr>').join('')
+    + '</tbody></table></div>';
+
+  inhalt.querySelectorAll('[data-demo-beenden]').forEach(b =>
+    b.onclick = () => demoBeenden(liste.find(z => z.id === +b.dataset.demoBeenden)));
+}
+
+/* Beenden heisst hier dasselbe wie Ablaufen: Konto weg, Instanz geleert.
+   Darum die Rückfrage -- und sie sagt, was wirklich geschieht, nicht nur
+   "sind Sie sicher". */
+async function demoBeenden(z) {
+  if (!z) { return; }
+  const ja = confirm('Zugang von ' + z.firma + ' beenden?\n\n'
+    + 'Der Platz ' + z.platz + ' wird dabei vollständig geleert. Alles, was '
+    + 'dort erfasst wurde, ist danach weg, und der Platz ist wieder frei.');
+  if (!ja) { return; }
+  const a = await ruf('betreiber_demo_beenden.php', { id: z.id }, 'POST');
+  if (a.status !== 'ok') {
+    melde($('haus-meldung'), 'fehler', a.message || 'Der Zugang liess sich nicht beenden.');
+    return;
+  }
+  melde($('haus-meldung'), 'gut', 'Zugang beendet, Platz ' + z.platz + ' ist wieder frei.');
+  ladeDemo();
+}
+
+async function demoFreigeben() {
+  const firma  = $('demo-firma').value.trim();
+  const person = $('demo-person').value.trim();
+  const email  = $('demo-email').value.trim();
+  const m = $('demo-form-meldung');
+  if (!firma || !person || !email) {
+    melde(m, 'fehler', 'Firma, Name und E-Mail-Adresse werden gebraucht.');
+    return;
+  }
+  const knopf = $('knopf-demo-freigeben');
+  knopf.disabled = true;
+  knopf.textContent = 'Instanz wird vorbereitet …';
+  const a = await ruf('betreiber_demo_freigeben.php', { firma, person, email }, 'POST');
+  knopf.disabled = false;
+  knopf.textContent = 'Freigeben und senden';
+
+  if (a.status !== 'ok') {
+    melde(m, 'fehler', a.message || 'Die Freigabe ist nicht durchgelaufen.');
+    return;
+  }
+
+  zeig($('demo-form-karte'), false);
+  $('demo-firma').value = ''; $('demo-person').value = ''; $('demo-email').value = '';
+  zeig(m, false);
+
+  /* Zwei verschiedene Lagen, zwei verschiedene Texte: "gesendet" und
+     "nicht gesendet" dürfen nicht gleich aussehen. Im zweiten Fall
+     funktioniert der Zugang trotzdem -- nur die Post kam nicht an, und
+     dann müssen die Daten von Hand weitergegeben werden. */
+  const gesendet = a.versand === 'gesendet';
+  $('demo-fertig-titel').textContent = gesendet
+    ? 'Zugang steht bereit und ist unterwegs'
+    : 'Zugang steht bereit — die E-Mail ging nicht raus';
+  $('demo-fertig-sub').textContent = gesendet
+    ? 'Die Zugangsdaten stehen hier ein einziges Mal. Danach sind sie nicht mehr abrufbar.'
+    : 'Bitte von Hand weitergeben. Sie stehen hier ein einziges Mal.';
+
+  $('demo-fertig-inhalt').innerHTML =
+      (gesendet ? '' : '<div class="meldung warn">'
+        + text('Grund: ' + (a.versand_grund || 'unbekannt')) + '</div>')
+    + '<div class="tab-huelle"><table><tbody>'
+    + '<tr><th style="text-align:left">Adresse</th><td>' + text(a.adresse) + '</td></tr>'
+    + '<tr><th style="text-align:left">Anmeldename</th><td><strong>' + text(a.login) + '</strong></td></tr>'
+    + '<tr><th style="text-align:left">Passwort</th><td><strong>' + text(a.passwort) + '</strong></td></tr>'
+    + '<tr><th style="text-align:left">Läuft ab</th><td>' + text(String(a.laeuft_ab_am).slice(0, 10)) + '</td></tr>'
+    + '</tbody></table></div>';
+  zeig($('demo-fertig-karte'), true);
+  ladeDemo();
+}
+
+/* Von Hand anstossen, was sonst der Zeitgeber tut. Der Knopf ist kein
+   Ersatz für ihn, sondern die Antwort auf "ist der Ablauf gelaufen?" --
+   solange man es nicht sieht, weiss man es nicht. */
+async function demoAblauf() {
+  const a = await ruf('betreiber_demo_ablauf.php', {}, 'POST');
+  if (a.status !== 'ok') {
+    melde($('haus-meldung'), 'fehler', a.message || 'Der Lauf ist nicht durchgekommen.');
+    return;
+  }
+  const gescheitert = (a.gescheitert || []).length;
+  if (gescheitert) {
+    /* Ein Platz, der nicht erreichbar war, bleibt aktiv -- und das muss
+       dastehen. Stillschweigend "erledigt" zu melden, wäre die Aussage,
+       dass die Daten weg sind, obwohl sie liegen. */
+    melde($('haus-meldung'), 'warn',
+      a.geschlossen + ' geschlossen, ' + gescheitert + ' nicht: '
+      + (a.gescheitert || []).map(g => g.platz + ' (' + g.grund + ')').join(', '));
+  } else if (a.geschlossen === 0) {
+    melde($('haus-meldung'), 'gut', 'Kein Zugang war fällig.');
+  } else {
+    melde($('haus-meldung'), 'gut', a.geschlossen + ' Zugang' + (a.geschlossen === 1 ? '' : 'e')
+      + ' geschlossen und die Plätze geleert.');
+  }
+  ladeDemo();
+}
+
 function uebersichtSetzen(zahlenHtml) {
   const el = $('u-zahlen');
   if (el) { el.innerHTML = zahlenHtml; }
@@ -1705,6 +2005,7 @@ async function ladeAlles() {
     + 'Mitarbeitenden oder Einsätze. Davon hängt ab, wie die Daten liegen.');
 
   await ladeMandanten();
+  await ladeDemo();
   await ladeKonten();
   /* Zuletzt, aber auf jeder Seite sichtbar: Das Abzeichen am Reiter steht
      auch dann im Blick, wenn gerade ein anderer Bereich offen ist. */
@@ -1730,6 +2031,16 @@ $('knopf-zf-weiter').onclick = async () => {
   bereichZeigen('uebersicht'); await ladeAlles();
 };
 $('knopf-neu').onclick        = () => formularOeffnen(null);
+$('knopf-demo-neu').onclick   = () => {
+  zeig($('demo-fertig-karte'), false);
+  zeig($('demo-form-meldung'), false);
+  zeig($('demo-form-karte'), true);
+  $('demo-firma').focus();
+};
+$('knopf-demo-abbrechen').onclick = () => zeig($('demo-form-karte'), false);
+$('knopf-demo-freigeben').onclick = demoFreigeben;
+$('knopf-demo-fertig-zu').onclick = () => zeig($('demo-fertig-karte'), false);
+$('knopf-demo-ablauf').onclick    = demoAblauf;
 $('knopf-speichern').onclick  = mandantSpeichern;
 $('knopf-abbrechen').onclick  = () => zeig($('m-form-karte'), false);
 $('knopf-sup-zu').onclick      = () => zeig($('sup-karte'), false);

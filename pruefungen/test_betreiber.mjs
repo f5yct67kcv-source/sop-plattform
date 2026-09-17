@@ -147,8 +147,15 @@ check('der Mandantenstamm haelt Host, Name und Benutzer',
 // Ein Betreiber-Konto ist keine Zeile in mitarbeiter. Ausser beim
 // Bootstrap (Einrichtung, Erstkonto) darf kein Betreiber-Endpunkt die
 // Verwaltungstabellen anfassen.
+// Seit ENT-600 kommt eine dritte Ausnahme dazu: Die Demo-Freigabe legt
+// das persoenliche Konto des Interessenten an. Das ist eine Zeile in
+// `mitarbeiter` -- aber in der Datenbank EINER DEMO-INSTANZ, nicht in der
+// des Betriebs. Die Ausnahme ist eng: Sie gilt nur fuer den einen
+// Endpunkt, und weiter unten wird geprueft, dass er ueberhaupt nur auf
+// einen Platz des Demo-Vorrats zugreifen kann.
 const fremdzugriff = endpunkte.filter(f => {
-  if (f === 'betreiber_einrichten.php' || f === 'betreiber_konto_anlegen.php') { return false; }
+  if (f === 'betreiber_einrichten.php' || f === 'betreiber_konto_anlegen.php'
+      || f === 'betreiber_demo_freigeben.php') { return false; }
   const q = lies(`backend/api/${f}`);
   return /\bFROM mitarbeiter\b|\bFROM sessions\b|\bFROM kunden_sessions\b/.test(q);
 });
@@ -285,7 +292,10 @@ check('KRITISCH: der Hinweistext legt den GAV nicht selbst aus',
 // Kein Betreiber-Endpunkt liefert Betriebsdaten mit. Der Bereich sieht
 // Vertrag und Zustand eines Betriebs, nicht seinen Inhalt.
 const BETRIEBSTABELLEN = /\bFROM (?:mitarbeiter|einsaetze|rapporte|lohnlauf|lohn_person|objekte|kunden)\b/;
-const zuViel = endpunkte.filter(f => BETRIEBSTABELLEN.test(nurCode(lies(`backend/api/${f}`))));
+// Dieselbe Ausnahme wie oben und aus demselben Grund (ENT-600): Die
+// Demo-Freigabe schreibt in eine Demo-Instanz, nicht in einen Betrieb.
+const zuViel = endpunkte.filter(f => f !== 'betreiber_demo_freigeben.php'
+  && BETRIEBSTABELLEN.test(nurCode(lies(`backend/api/${f}`))));
 check('KRITISCH: kein Betreiber-Endpunkt liefert Betriebsdaten',
   zuViel.length === 0);
 if (zuViel.length) { bad.push('liest Betriebsdaten: ' + zuViel.join(', ')); }
@@ -384,8 +394,15 @@ check('es gibt ueberhaupt einen Endpunkt, der die Mandantenlage prueft',
 // laenger geworden, sondern strenger: Wer verbinden darf, muss Freigabe
 // UND Protokoll nachweisen.
 const DARF_VERBINDEN = {
-  'betreiber_mandant_stand.php': 'zaehlt Tabellen, liest nichts',
-  'betreiber_support.php':       'nur auf Freigabe, befristet, protokolliert (ENT-526)',
+  'betreiber_mandant_stand.php':   'zaehlt Tabellen, liest nichts',
+  'betreiber_support.php':         'nur auf Freigabe, befristet, protokolliert (ENT-526)',
+  // ENT-600. Eine Demo-Instanz ist kein Betrieb: Sie traegt Musterdaten und
+  // wird beim Freigeben und beim Ablaufen restlos geleert. Der Zugriff
+  // bleibt trotzdem eingehegt -- die drei Endpunkte kommen nur an einen
+  // Platz des Demo-Vorrats heran, nachgewiesen gleich unten.
+  'betreiber_demo_freigeben.php':  'leert und befuellt eine Demo-Instanz (ENT-600)',
+  'betreiber_demo_beenden.php':    'leert eine Demo-Instanz (ENT-600)',
+  'betreiber_demo_ablauf.php':     'leert abgelaufene Demo-Instanzen (ENT-600)',
 };
 const heimlich = nutztMandantDb.filter(f => !DARF_VERBINDEN[f]);
 check('KRITISCH: nur namentlich genannte Endpunkte verbinden zu einer Mandantendatenbank',
@@ -395,6 +412,52 @@ if (heimlich.length) { bad.push('verbindet zum Mandanten: ' + heimlich.join(', '
 // ein veralteter Eintrag den naechsten Endpunkt gleichen Namens zu.
 const toteErlaubnis = Object.keys(DARF_VERBINDEN).filter(f => !endpunkte.includes(f));
 check('kein toter Eintrag in der Verbindungs-Erlaubnisliste', toteErlaubnis.length === 0);
+
+// ── Die Ausnahme fuer die Demo bleibt eng (ENT-600) ──────────────────
+//
+// Die drei Demo-Endpunkte duerfen in eine Mandantendatenbank schreiben --
+// aber nur in die eines Demo-Platzes. Faellt diese Einhegung, ist aus der
+// Demo-Freigabe ein Werkzeug geworden, mit dem sich die Datenbank eines
+// echten Mandanten leeren laesst. Zwei Nachweise:
+//
+//   a) Der Platz kommt NIE aus der Anfrage. Er stammt aus
+//      demo_platz_waehlen() -- das liefert ausschliesslich Werte aus
+//      DEMO_PLAETZE -- oder aus einer Zeile des Registers, die selbst so
+//      entstanden ist.
+//   b) Ein Platz, der auf die Standardverbindung zurueckfaellt, wird
+//      abgewiesen. Das ist die Datenbank des laufenden Betriebs; ein
+//      Leeren darauf loeschte echte Einsaetze, echtes Personal, echte
+//      Loehne.
+const DEMO_ENDPUNKTE = ['betreiber_demo_freigeben.php', 'betreiber_demo_beenden.php',
+                        'betreiber_demo_ablauf.php'];
+check('es gibt die Demo-Endpunkte ueberhaupt',
+  DEMO_ENDPUNKTE.every(f => endpunkte.includes(f)));
+
+const platzAusAnfrage = DEMO_ENDPUNKTE.filter(f => {
+  const q = nurCode(lies(`backend/api/${f}`));
+  // Ein Platz, der aus $daten oder $_GET zugewiesen wird -- in jeder
+  // Schreibweise, auch ueber einen Umweg wie $x = $daten['platz'].
+  return /\$platz\s*=\s*[^;]*\$(daten|_GET|_POST|_REQUEST)\b/.test(q)
+      || /subdomain\s*=\s*\?['"]?\s*\)[\s\S]{0,120}\$(daten|_GET)\b/.test(q);
+});
+check('KRITISCH: kein Demo-Endpunkt nimmt den Platz aus der Anfrage entgegen',
+  platzAusAnfrage.length === 0);
+if (platzAusAnfrage.length) { bad.push('Platz aus der Anfrage: ' + platzAusAnfrage.join(', ')); }
+
+const griff = nurCode(lies('backend/demo_instanz.php'));
+check('KRITISCH: der Griff in eine Instanz weist die Standardverbindung ab, statt sie zu leeren',
+  /standardverbindung/.test(griff)
+  && /return\s+["'`]/.test(griff.split('standardverbindung')[1] || ''));
+check('KRITISCH: er leert erst, nachdem die Verbindung als bereit erkannt ist',
+  griff.indexOf('mandant_verbindung_bereit') < griff.indexOf('demo_reset_alle_tabellen_leeren'));
+// Eine Stelle, nicht drei: Waere das Leeren in jedem Endpunkt eigens
+// geschrieben, wuerde beim naechsten Umbau eine vergessen -- die, die am
+// seltensten laeuft, also der Ablauf.
+const leertSelbst = DEMO_ENDPUNKTE.filter(f =>
+  /demo_reset_alle_tabellen_leeren/.test(nurCode(lies(`backend/api/${f}`))));
+check('KRITISCH: kein Demo-Endpunkt leert eine Instanz an der Wache vorbei',
+  leertSelbst.length === 0);
+if (leertSelbst.length) { bad.push('leert selbst: ' + leertSelbst.join(', ')); }
 
 // ── Die drei Bedingungen des Supportzugriffs (ENT-526) ───────────────
 //
