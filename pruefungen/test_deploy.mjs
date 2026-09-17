@@ -1090,15 +1090,16 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     const endpunktPfade = endpunkte.map(e => `backend/api/${e}`);
     for (const p of endpunktPfade) { quellen.push(p); }
     const ersetzt = new Set([...bauen.matchAll(/sed -i "s\|(__[A-Z_]+__)\|/g)].map(m => m[1]));
-    // __BETREIBER_DB_*__ (backend/betreiber.php) wird seit OP-518 auch hier
-    // oben per sed ersetzt -- notfalls mit einer leeren Zeichenkette, wenn
-    // die vier Secrets noch nicht gesetzt sind; betreiber_db() faellt dann
-    // bewusst auf db() zurueck (siehe Kommentar dort). Es steht darum NICHT
-    // mehr in dieser Ausnahmeliste, sondern muss ueber "ersetzt" oben
-    // gefunden werden wie jeder andere Platzhalter. __MANDANT_SECRETS__
-    // bleibt eigene, noch unersetzte Ausnahme -- eigenes, noch offenes
-    // Thema (OP-526). __DIR__ ist PHPs eigene Konstante, kein Platzhalter.
-    const absichtlich = /^(__MANDANT_SECRETS__|__DIR__)$/;
+    // __BETREIBER_DB_*__ (backend/betreiber.php, OP-518) und seit OP-526
+    // auch __MANDANT_SECRETS__ (dieselbe Datei) werden hier oben per sed
+    // ersetzt -- notfalls mit einer leeren Zeichenkette, wenn die
+    // zugehoerigen Secrets noch nicht gesetzt sind; betreiber_db() und
+    // mandant_secret() fallen dann bewusst auf ihren jeweiligen Normalfall
+    // zurueck (siehe Kommentare dort). Beide stehen darum NICHT mehr in
+    // dieser Ausnahmeliste, sondern muessen ueber "ersetzt" oben gefunden
+    // werden wie jeder andere Platzhalter. __DIR__ ist PHPs eigene
+    // Konstante, kein Platzhalter.
+    const absichtlich = /^__DIR__$/;
     const offen = [];
     for (const q of quellen) {
       if (!existsSync(`${WURZEL}/${q}`)) { offen.push(`${q}: Datei fehlt`); continue; }
@@ -1423,7 +1424,9 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
       if (!ersetztJeZiel.has(ziel)) { ersetztJeZiel.set(ziel, new Set()); }
       ersetztJeZiel.get(ziel).add(platzhalter);
     }
-    const absichtlichCupi = /^(__MANDANT_SECRETS__|__DIR__)$/;
+    // __MANDANT_SECRETS__ wird seit OP-526 auch hier per sed ersetzt (siehe
+    // Kommentar beim betreiber-Bündel oben) -- nur noch __DIR__ bleibt aus.
+    const absichtlichCupi = /^__DIR__$/;
 
     const offenCupi = [];
     for (const { quelle, ziel } of textDateienCupi) {

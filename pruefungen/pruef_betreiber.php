@@ -121,6 +121,28 @@ $pruef('KRITISCH: unersetzter Platzhalter liefert kein Secret',
     mandant_secret('DB_PASS_MANDANT_2') === null);
 $pruef('leerer Name liefert kein Secret', mandant_secret('') === null);
 
+// mandant_secrets_tafel_pruefen() ist die testbare Zerlegung (OP-526):
+// mandant_secret() selbst reicht ihr nur den hartcodierten Platzhalter
+// hinein, hier wird mit frei gewaehlten Werten geprueft.
+$pruef('leere Eingabe ergibt keine Eintraege', mandant_secrets_tafel_pruefen('') === []);
+$pruef('der unersetzte Platzhalter selbst ergibt keine Eintraege',
+    mandant_secrets_tafel_pruefen('__MANDANT' . '_SECRETS__') === []);
+// DER wichtige Fall: base64(JSON) wird tatsaechlich entschluesselt und
+// gelesen -- nicht nur behauptet.
+$echtesGeheimnis = base64_encode(json_encode(['demo1' => 'Ab1$cd&ef|gh']));
+// Absichtlich mit "&" und "|" im Passwort -- genau den Zeichen, an denen
+// ein rohes sed (ohne base64) zerbricht (siehe deploy-hostpoint.yml).
+$pruef('KRITISCH: base64(JSON) wird entschluesselt, ein Passwort mit "&" und "|" bleibt unversehrt',
+    mandant_secrets_tafel_pruefen($echtesGeheimnis) === ['demo1' => 'Ab1$cd&ef|gh']);
+// Gegenprobe zur Base64-Entscheidung: Rohes JSON (kein base64) wird nicht
+// als Zufallstreffer fehlinterpretiert, sondern ergibt sauber nichts.
+$pruef('rohes JSON statt base64 ergibt keine Eintraege, keinen Absturz',
+    mandant_secrets_tafel_pruefen('{"demo1":"pw"}') === []);
+// Gueltiges base64, aber kein JSON dahinter -- auch das ergibt nichts,
+// nicht einen Fehler.
+$pruef('gueltiges base64 ohne JSON dahinter ergibt keine Eintraege',
+    mandant_secrets_tafel_pruefen(base64_encode('einfach nur Text')) === []);
+
 // Vier Lagen, vier Handlungen. Die dritte ist die wichtige: Angaben
 // vollstaendig, aber das Deploy-Secret fehlt -- das ist etwas anderes als
 // "unvollstaendig ausgefuellt" und etwas anderes als "bereit".
