@@ -128,19 +128,25 @@ body {
 .gate.g-desktop .g-oben { margin-bottom: 44px; }
 
 /* Logoplatz. Zwei Fassungen, EIN Platz:
-   .marke-wort  -- die Guard-OpS-Wortmarke (Rechteck, Breite gesetzt)
-   .marke-bild  -- das Logo des Mandanten (Quadrat, Hoehe gesetzt)
+   .marke-wort  -- die Guard-OpS-Wortmarke (Rechteck, 240/340 breit)
+   .marke-bild  -- das Logo des Mandanten (Rund, 130/170 breit)
+   Beide mit BREITE gesetzt und height:auto -- eine gesetzte Hoehe
+   verzerrt jedes Logo, dessen Seitenverhaeltnis nicht dem erwarteten
+   entspricht, und das naechste Mandantenlogo ist vielleicht ein
+   liegendes Rechteck statt eines Kreises.
    Beide enden auf derselben Grundlinie und haben denselben Abstand nach
-   unten, damit der Wechsel den Rest der Maske nicht verschiebt. */
-.g-logo { display: flex; align-items: flex-end; justify-content: center; height: 96px; }
-.gate.g-desktop .g-logo { height: 132px; }
+   unten, damit der Wechsel den Rest der Maske nicht verschiebt.
+   130/170 px sind die Masse, die der Deploy heute schon setzt (siehe
+   .github/workflows/deploy-hostpoint.yml, Ersetzung im cupi24-Buendel). */
+.g-logo { display: flex; align-items: flex-end; justify-content: center; height: 130px; }
+.gate.g-desktop .g-logo { height: 170px; }
 .marke-wort { width: 240px; height: auto; color: var(--ink);
   filter: drop-shadow(0 16px 32px rgba(0,0,0,.75)); }
 .gate.g-desktop .marke-wort { width: 340px;
   filter: drop-shadow(0 22px 44px rgba(0,0,0,.8)); }
-.marke-bild { height: 96px; width: auto; display: block;
+.marke-bild { width: 130px; height: auto; display: block;
   filter: drop-shadow(0 16px 32px rgba(0,0,0,.7)); }
-.gate.g-desktop .marke-bild { height: 132px;
+.gate.g-desktop .marke-bild { width: 170px; height: auto;
   filter: drop-shadow(0 22px 44px rgba(0,0,0,.75)); }
 
 .g-bereich { margin-top: 18px; color: var(--ink); font-size: 20px;
@@ -278,9 +284,18 @@ body {
       <p>Heute: drei verschiedene Feldhöhen, Betreiber-Bereich ohne Auge.</p>
     </div>
     <div class="e-karte">
-      <div class="k">Grund</div>
-      <p>Dieselbe Nachtszene und derselbe Schleier auf allen vier Adressen, am Desktop als Video, am Handy als Verlauf.</p>
-      <p>Heute: Betreiber-Bereich als einzige Maske auf grauem Grund und abhängig vom Farbthema des Geräts.</p>
+      <div class="k">Grund — Desktop</div>
+      <p>Das Nachtvideo auf <b>allen sechs</b> Masken, sobald die Fläche breit genug ist
+        (ab 900 px). Darüber derselbe Schleier, damit der Text trägt.</p>
+      <p>Heute: Betreiber-Bereich als einzige Maske ohne Video, auf grauem Grund und
+        abhängig vom Farbthema des Geräts.</p>
+    </div>
+    <div class="e-karte">
+      <div class="k">Grund — Handy</div>
+      <p>Kein Video. Eigenes Layout auf dunklem Verlauf: kleineres Logo, mehr Luft um
+        die Felder, Fuss am unteren Rand.</p>
+      <p>Ein Video, das niemand sieht, weil der Text davorliegt, kostet nur Daten —
+        auf einer Schicht unterwegs das falsche Geschenk.</p>
     </div>
     <div class="e-karte">
       <div class="k">Farben und Schrift</div>
@@ -317,15 +332,18 @@ body {
     <p><b>Empfehlung:</b> trotzdem dasselbe Bild, aber den Bereichsnamen dort deutlich
       grösser als auf den anderen Masken. Gleiche Familie, unterscheidbarer Kopf.</p>
   </div>
-  <div class="e-frage">
-    <div class="k">Frage 3 — Mandantenlogo, woher</div>
-    <p>Auf cupi24.guardops.ch steht heute das CUPI-Logo schon vor der Anmeldung. Im
-      Quelltext finde ich keinen Weg, der es dorthin bringt — ein Logo aus der Datenbank
-      des Mandanten gäbe es erst nach der Anmeldung.</p>
-    <p><b>Empfehlung:</b> das Logo je Mandant beim Deploy mitliefern (eine Datei pro
-      Bündel, wie die Symbole heute schon). Dann braucht die Anmeldemaske keinen
-      Serverzugriff, bevor jemand angemeldet ist. Sag mir bitte, wie es heute
-      tatsächlich dorthin kommt — dann ziehe ich das nach.</p>
+  <div class="e-frage" style="background:#EDF2FE;border-color:#CBD9F9">
+    <div class="k" style="color:#2549B0">Geklärt — Mandantenlogo</div>
+    <p>Das Logo kommt beim Deploy in die Maske, nicht aus der Datenbank:
+      <code>.github/workflows/deploy-hostpoint.yml</code> ersetzt im cupi24-Bündel die
+      Guard-OpS-Wortmarke durch <code>icons/cupi24-badge.png</code> und setzt sie auf
+      130 px am Handy, 170 px am Desktop. Die Datei liegt im Repository unter
+      <code>icons/</code>. Dieser Entwurf zeigt jetzt genau diese Datei in genau diesen
+      Massen.</p>
+    <p>Für den Bau heisst das: Der Logoplatz braucht nur eine Regel, die eine
+      Bilddatei statt der Wortmarke aufnimmt — die Zuordnung je Mandant macht
+      weiterhin der Deploy. Beide Fassungen werden über die <b>Breite</b> gesetzt, nicht
+      über die Höhe: Das nächste Mandantenlogo ist womöglich kein Kreis.</p>
   </div>
   <div class="e-frage">
     <div class="k">Frage 4 — heller Modus</div>
@@ -438,7 +456,7 @@ function esc(s) {
 
 function logoHtml(b) {
   if (b.logo === 'cupi') {
-    return '<img class="marke-bild" src="../logo-quellen/cupi24-original.png" alt="CUPI 24 GmbH">';
+    return '<img class="marke-bild" src="../icons/cupi24-badge.png" alt="CUPI 24 GmbH">';
   }
   return '<svg class="marke-wort" viewBox="0.00 0.00 649.83 153.56" role="img" '
        + 'aria-label="Guard OpS"><use href="#go-wort"/></svg>';

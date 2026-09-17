@@ -18,7 +18,7 @@ ziel = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else wurzel / 'entwuerfe' 
 ERSATZ = {
     '../fonts/inter-latin.woff2': 'font/woff2',
     '../img/anmeldung-nacht.webp': 'image/webp',
-    '../logo-quellen/cupi24-original.png': 'image/png',
+    '../icons/cupi24-badge.png': 'image/png',
 }
 
 text = quelle.read_text(encoding='utf-8')

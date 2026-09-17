@@ -43,3 +43,6 @@ mobile/node_modules/
 # angehen. Die Datei entsteht bei Bedarf neu und gehoert nie ins
 # Repository.
 staging-htaccess-fertig.txt
+
+# Erzeugte Fassung des Deckblatt-Entwurfs (entwuerfe/deckblatt-buendeln.py)
+entwuerfe/*.eigenstaendig.html
