@@ -4382,7 +4382,36 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      dann dort. 16 px ist keine Geschmacksfrage, sondern die Schwelle. */
   .inp, .search input, input, select, textarea { font-size: 16px; }
   .content { padding: 18px 16px; }
-  .topbar { padding: 0 16px; }
+  /* NICHT "padding: 0 16px" -- das war hier die Regel bis 2026-09-17 und
+     hat "padding: env(safe-area-inset-top) 26px 0" von weiter oben mit
+     gleicher Eigenspezifitaet (.topbar gegen .topbar) ueberschrieben, weil
+     diese Regel spaeter im Blatt steht. Die Kopfzeile behielt ihre Zusatz-
+     hoehe fuer die Kerbe (height waechst weiter um env(safe-area-inset-top)),
+     verlor aber den Abstand, der den Inhalt darunter schiebt -- der Titel
+     lief in die Statusleiste hinein. Gemessen am Geraet, nicht im
+     Quelltext nachgelesen. Nur die Seiten aendern sich hier, der obere
+     Wert bleibt derselbe wie am Desktop. */
+  /* NICHT "padding: 0 16px" -- das war hier die Regel bis 2026-09-17 und
+     hat "padding: env(safe-area-inset-top) 26px 0" von weiter oben mit
+     gleicher Eigenspezifitaet (.topbar gegen .topbar) ueberschrieben, weil
+     diese Regel spaeter im Blatt steht. Die Kopfzeile behielt ihre Zusatz-
+     hoehe fuer die Kerbe (height waechst weiter um env(safe-area-inset-top)),
+     verlor aber den Abstand, der den Inhalt darunter schiebt -- der Titel
+     lief in die Statusleiste hinein. Nachgestellt mit einer eingeschleusten
+     Kerbe von 59 px: vorher Titel bei 34 px (in der Kerbe), nachher bei
+     64 px (darunter) -- env(safe-area-inset-top) ist im Testbrowser sonst
+     immer 0 und die Pruefung waere sonst gruen ohne etwas auszusagen.
+     Nur die Seiten aendern sich hier, der obere Wert bleibt wie am Desktop. */
+  /* NICHT "padding: 0 16px" -- das war hier die Regel bis 2026-09-17 und
+     hat "padding: env(safe-area-inset-top) 26px 0" von weiter oben mit
+     gleicher Eigenspezifitaet (.topbar gegen .topbar) ueberschrieben, weil
+     diese Regel spaeter im Blatt steht. Die Kopfzeile behielt ihre Zusatz-
+     hoehe fuer die Kerbe (height waechst weiter um env(safe-area-inset-top)),
+     verlor aber den Abstand, der den Inhalt darunter schiebt -- der Titel
+     lief in die Statusleiste hinein. Gegenprobe in test_kopf_kerbe.mjs:
+     env() wird dort textuell gegen eine feste Kerbe getauscht (im
+     Testbrowser sonst immer 0), sonst waere die Pruefung immer gruen. */
+  .topbar { padding: env(safe-area-inset-top) 16px 0; }
 }
 @media (max-width: 620px) {
   /* Kopfzeile: nur noch Symbole, damit nichts aus dem Bild laeuft */
@@ -5704,7 +5733,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                 </div>
                 <div class="diktat-router">
                   <div class="diktat-eingabe" id="rtDropzone" ondragover="rtDragUeber(event,'rt')" ondragleave="rtDragWeg('rt')" ondrop="rtDrop(event,'rt')">
-                    <textarea class="inp" id="rtText" rows="2" placeholder="Diktieren oder tippen — z. B. „Neuer Einsatz für die Beispiel AG morgen 7 bis 16 Uhr“" onpaste="rtEinfuegen(event,'rt')"></textarea>
+                    <textarea class="inp" id="rtText" rows="2" placeholder="Diktieren oder tippen — z. B. „Neuer Einsatz für die Beispiel AG morgen 7 bis 16 Uhr“" onpaste="rtEinfuegen(event,'rt')" oninput="rtFeldWaechst(this)"></textarea>
                     <div id="rtBildVorschau" class="rt-bild" style="display:none">
                       <img id="rtBildImg" alt="">
                       <button type="button" onclick="rtBildEntfernen('rt')" title="Bild entfernen" aria-label="Bild entfernen">
@@ -11528,6 +11557,29 @@ function gsErkennen() {
 function rtZuruecksetzen(prefix) {
   $(prefix + 'Text').value = '';
   rtBildEntfernen(prefix);
+  if (prefix === 'rt') { rtFeldWaechst($('rtText')); }
+}
+
+// Das Diktierfeld waechst mit dem Text -- NUR am Handy. Am Desktop bleibt
+// die feste Zweizeilen-Hoehe aus ENT-432 unberuehrt: dort steht der
+// Ziehgriff (resize: vertical) fuer mehr Platz, und ein Griff auf einer
+// Flaeche, die sich beim Tippen von selbst schon veraendert, waere zwei
+// widerspruechliche Wege zum selben Ziel. Am Handy gibt es keinen
+// brauchbaren Ziehgriff (kein Zeiger, keine Maus) -- dort wurde eingegebener
+// Text bisher abgeschnitten, sichtbar nur ueber den inneren Rollbalken des
+// Feldes (Bildschirmfoto vom 2026-09-17, auf Wunsch des Projektinhabers
+// korrigiert). RT_MAX_HOEHE begrenzt das Wachstum: darueber hinaus rollt
+// das Feld in sich selbst, damit die Karte nicht unbegrenzt mitwaechst.
+const RT_MAX_HOEHE = 200;
+function rtFeldWaechst(el) {
+  if (!window.matchMedia('(max-width: 900px)').matches) return;
+  // Gezogene Karte (.dh): dort gilt die Flex-Regel weiter oben, die die
+  // Karte selbst ueberlaesst der Bedienperson. Ein inline gesetztes
+  // style.height wuerde die staerker gewichten und den Griff wirkungslos
+  // machen.
+  if (el.closest('.dash-item.dh')) { el.style.height = ''; return; }
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, RT_MAX_HOEHE) + 'px';
 }
 
 // ── Router: Bild
