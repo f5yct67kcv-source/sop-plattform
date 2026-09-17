@@ -287,14 +287,21 @@ svg.i-sm { width: 15px; height: 15px; }
   --sh-1: none;
   --sh-2: 0 8px 28px -8px rgba(0,0,0,.6);
   color-scheme: dark;
-  /* KEIN --gate-schleier mehr. Er ist auf Ansage des Projektinhabers
-     entfallen (Skizze 2026-09-17, Punkt 9): Die Nachtszene soll offen
-     daliegen, nicht gedaempft. app.html zeigt dieselbe Szene weiterhin MIT
-     Schleier -- das ist kein Versehen, sondern eine eigene Maske.
-     Was der Schleier bisher mitgetragen hat, traegt jetzt der Verlauf oben
-     (radial-gradient) allein. Ob der Text davor lesbar bleibt, ist keine
-     Geschmacksfrage: test_cockpit_gate.mjs misst den Kontrast an fuenf
-     Zeitpunkten des laufenden Videos und noch einmal am Standbild. */
+  /* Der Schleier ist zurueck, und zwar mit genau demselben Wert wie in
+     app.html (Ansage des Projektinhabers, 2026-09-17, zweite Runde:
+     "der schleier identisch, wie auf [der] Testseite war und ist").
+     Am Vormittag desselben Tages war er auf Ansage entfallen (Skizze,
+     Punkt 9) -- die spaetere Ansage geht vor. Beide Masken zeigen dieselbe
+     Szene, also soll sie auch gleich gedaempft sein.
+     Einmal definiert, zweimal gebraucht (wie app.html): als Schicht im
+     CSS-background von #gate (die Ausweichebene ohne Video) UND als eigene
+     Flaeche .gate-schleier UEBER dem <video> -- ein Video deckt das
+     darunterliegende background vollstaendig ab, der Schleier braucht also
+     eine eigene Ebene, aber denselben Wert.
+     Ob der Text darauf lesbar bleibt, ist keine Geschmacksfrage:
+     test_cockpit_gate.mjs misst den Kontrast an fuenf Zeitpunkten des
+     laufenden Videos und noch einmal am Standbild. */
+  --gate-schleier: linear-gradient(rgba(10,11,15,.66), rgba(10,11,15,.82));
 }
 /* margin:auto statt align-items/justify-content:center (wie app.html):
    reicht die Hoehe nicht (kleines Geraet, offene Tastatur, 2FA-Feld
@@ -353,8 +360,8 @@ svg.i-sm { width: 15px; height: 15px; }
    Schleier. Gemessen war sie dabei vorhanden, sichtbar, richtig gross und
    richtig gefaerbt -- nur eben uebermalt. Gesehen hat es erst ein
    Bildschirmfoto, gehalten wird es jetzt von der Deckungspruefung in
-   test_gate_signatur.mjs. Der Schleier ist inzwischen weg, das Video
-   liegt weiterhin dort -- die Regel bleibt also noetig. */
+   test_gate_signatur.mjs. Video und Schleier liegen beide dort -- die
+   Regel bleibt also noetig, und zwar mehr als zuvor. */
 .gate-fuss { flex: none; margin-top: 34px; position: relative; z-index: 2;
              display: flex; flex-direction: column; align-items: center; gap: 12px; }
 /* Die Herstellersignatur steht nur da, wo oben ein FREMDES Logo haengt --
@@ -374,10 +381,11 @@ svg.i-sm { width: 15px; height: 15px; }
                       color: var(--ink-3); opacity: .8; }
 .gate-sig .go-sig { height: 27px; width: auto; display: block; color: var(--ink-3); }
 /* Rechtszeile und Hilfe. --ink-2 und nicht die zurueckgenommenere Stufe
-   --ink-3 der Signatur: Gemessen reicht #868D9A auf der Nachtszene OHNE
-   Schleier an der Fussleiste nicht mehr auf 4.5:1 -- dort liegt der helle
-   Boden mit den Spiegelungen. Vor dem 2026-09-17 trug das der Schleier;
-   seit er weg ist, muss es die Schriftfarbe tragen. Nachgewiesen in
+   --ink-3 der Signatur: Gemessen reicht #868D9A an der Fussleiste nicht
+   auf 4.5:1 -- dort liegt der helle Boden mit den Spiegelungen. Seit der
+   Schleier zurueck ist, traegt er einen Teil davon wieder mit; die
+   hellere Schriftfarbe bleibt trotzdem, weil sie nichts kostet und der
+   Fuss die hellste Stelle der Szene ueberdeckt. Nachgewiesen in
    test_cockpit_gate.mjs an fuenf Zeitpunkten des Videos und am Standbild. */
 .gate-recht { display: flex; flex-wrap: wrap; align-items: center;
               justify-content: center; gap: 2px; font-size: 12px; color: var(--ink-2); }
@@ -434,10 +442,18 @@ svg.i-sm { width: 15px; height: 15px; }
    Medienabfrage unten stehen -- genau der Fehler, der beim ersten Bau
    dieser Datei (ENT-395) tatsaechlich passiert ist und nur am
    gerenderten Zustand auffiel, nicht im Quelltext. */
-.gate-video { display: none; }
+.gate-video, .gate-schleier { display: none; }
 @media (min-width: 900px) {
+  /* Drei Ebenen, jede vor der naechsten gezeichnet: der Lichtschein oben,
+     darunter der Schleier, darunter das Foto (an 62% der Breite verankert,
+     weil die Figur rechts im Bild steht und "cover" sie bei schmalerem
+     Fenster sonst zuerst wegschneidet). Das Ganze ist die Ausweichebene
+     fuer alles, was das <video> darueber nicht zeigt -- vor dem ersten
+     decodierten Bild, bei reduzierter Bewegung, oder wenn ein Browser
+     keine der beiden Videoquellen abspielen kann. */
   #gate { background:
     radial-gradient(80% 68% at 50% 14%, #1C2639 0%, rgba(28,38,57,0) 66%),
+    var(--gate-schleier),
     url('img/anmeldung-nacht.webp') 62% center / cover no-repeat,
     #0F1117; }
   .gate-mitte { max-width: 400px; }
@@ -451,23 +467,39 @@ svg.i-sm { width: 15px; height: 15px; }
   .gate-oben .marke { width: 255px; height: auto;
     filter: drop-shadow(0 22px 44px rgba(0,0,0,.8)); }
   .gate-oben .gate-demo-gruss { margin-top: 20px; font-size: 17px; }
-  .gate-oben { margin-bottom: 44px; }
-  /* Luft zwischen Passwortfeld und Anmeldeknopf (Skizze 2026-09-17,
-     Punkt 6). Nur am Desktop: Am Handy waere derselbe Abstand verlorene
-     Hoehe, und der mobile Zuschnitt wurde nicht beanstandet.
-     118 statt der 58 px aus der Skizze: Die Skizze nennt den Zug des
-     Knopfes, ihr Zielwert ist die Endlage (y=648 bei 1728x971). Weil
-     .gate-mitte mittig haengt, verteilt sich jeder zusaetzliche Abstand
-     zur Haelfte nach oben -- 58 px Abstand ergaeben 44 px Weg. Gemessen
-     landet der Knopf mit 118 px bei y=644, die Marke bei y=216.
-     Die Deckelung ueber vh: Auf einem flachen Schirm (1280x720) frisst
-     ein fester Abstand die Hoehe, die das Formular braucht, und alles
-     wandert in den Bildlauf. min() nimmt dort den kleineren Wert. */
-  #gate #gBtn { margin-top: min(118px, 12vh); }
+  .gate-oben { margin-bottom: 40px; }
+  /* 18 statt der dashboardweiten 14 px zwischen den beiden Feldern.
+     Befund des Projektinhabers (2026-09-17): der Block wirkte
+     "aufeinander geklatscht", waehrend der Anmeldeknopf weit darunter
+     schwebte. Beides hat dieselbe Ursache -- die Luft sass an einer
+     einzigen Stelle statt im ganzen Block. Nur im Gate und nur am
+     Desktop: .f ist eine dashboardweite Klasse, und der Handy-Zuschnitt
+     ist eine eigene Entscheidung (CLAUDE.md). */
+  #gate .f { margin-bottom: 18px; }
+  /* Luft zwischen Passwortfeld und Anmeldeknopf. Die 118 px der ersten
+     Fassung (Skizze 2026-09-17, Punkt 6) sassen zu tief -- Befund des
+     Projektinhabers am selben Tag: der Knopf schwebte vom Formular
+     abgeloest in der Flaeche.
+     34 px sind eine Stufe, kein Sprung: deutlich mehr als die 18 px
+     zwischen den Feldern, also liest der Knopf als eigener Schritt und
+     nicht als drittes Feld -- aber nahe genug, dass er noch zum Formular
+     gehoert. Die Deckelung ueber vh bleibt: Auf einem flachen Schirm
+     frisst ein fester Abstand die Hoehe, die das Formular braucht, und
+     alles wandert in den Bildlauf. */
+  #gate #gBtn { margin-top: min(34px, 5vh); }
   .gate-video { display: block; position: absolute; inset: 0; width: 100%; height: 100%;
     object-fit: cover; object-position: 62% center; z-index: 0; }
+  /* Der Schleier liegt UEBER dem Video und UNTER dem Anmeldeblock
+     (.gate-mitte und .gate-fuss stehen beide auf z-index 2). Ohne diese
+     Ebene bliebe der Schleier im background von #gate unsichtbar, sobald
+     das Video darueber laeuft -- der Fehler, der 2026-09-16 die
+     Herstellersignatur unter dem damaligen Schleier verschwinden liess. */
+  .gate-schleier { display: block; position: absolute; inset: 0; z-index: 1;
+    background: var(--gate-schleier); }
+  /* Ohne Video bleibt das ruhige Foto -- der Schleier steckt dort schon im
+     background von #gate, die eigene Ebene waere doppelt. */
   @media (prefers-reduced-motion: reduce) {
-    .gate-video { display: none; }
+    .gate-video, .gate-schleier { display: none; }
   }
 }
 
@@ -5108,6 +5140,10 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     <source src="img/anmeldung-nacht.webm" type="video/webm">
     <source src="img/anmeldung-nacht.mp4" type="video/mp4">
   </video>
+  <!-- Der Schleier ueber dem Video, gleicher Wert wie in app.html. Als
+       eigenes Element, weil ein Video den CSS-Hintergrund darunter
+       vollstaendig abdeckt. -->
+  <div class="gate-schleier" aria-hidden="true"></div>
   <div class="gate-mitte">
     <div class="gate-oben">
       <svg class="marke" viewBox="0.00 0.00 649.83 153.56" role="img" aria-label="Guard OpS"><use href="#go-wort"/></svg>

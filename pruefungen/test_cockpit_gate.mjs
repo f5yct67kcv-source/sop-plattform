@@ -233,6 +233,25 @@ const cta = await mass(page, '#gBtn');
 check('KRITISCH: die Schrift auf dem Anmeldeknopf erreicht mindestens 4.5:1 Kontrast',
   cta !== null && kontrast(cta.farbe, cta.grund) >= 4.5);
 
+// ══════════ DER ANMELDEKNOPF GEHOERT ZUM FORMULAR ═════════════════════
+// Befund des Projektinhabers (2026-09-17, zweite Runde): Der Knopf sass
+// zu tief und wirkte vom Formular abgeloest, waehrend die Felder darueber
+// zusammengedraengt standen. Gemessen wird das Verhaeltnis der beiden
+// Abstaende, nicht der eingetragene Wert -- eine Pruefung auf "28px" waere
+// der abgeschriebene Quelltext und bliebe grün, wenn eine spaetere Regel
+// den Abstand wieder aufreisst.
+// Gegenprobe gemacht: mit dem vorherigen min(118px, 12vh) schlaegt der
+// obere Punkt an.
+const abstaende = await ev(page, () => {
+  const r = s => document.querySelector(s).getBoundingClientRect();
+  return { feldZuFeld: r('#gPass').top - r('#gName').bottom,
+           feldZuKnopf: r('#gBtn').top - r('#gPass').bottom };
+});
+check('KRITISCH: der Anmeldeknopf steht am Formular, statt darunter zu schweben',
+  abstaende !== null && abstaende.feldZuKnopf <= abstaende.feldZuFeld * 1.6);
+check('KRITISCH: er steht trotzdem abgesetzt und liest sich nicht als drittes Feld',
+  abstaende !== null && abstaende.feldZuKnopf > abstaende.feldZuFeld);
+
 // ══════════ DESKTOP: KEINE ANMELDUNG UEBER DIE VOLLE BREITE ═══════════
 check('KRITISCH: auf dem Desktop bleibt die Spalte schmal, statt sich ueber die ganze Breite zu ziehen',
   mitte !== null && mitte.w <= 420);
@@ -255,6 +274,22 @@ const attribute = await ev(page, () => {
 });
 check('KRITISCH: autoplay, muted, loop und playsinline sind gesetzt',
   attribute !== null && attribute.autoplay && attribute.muted && attribute.loop && attribute.playsinline);
+// Der Schleier liegt ZWISCHEN Video und Anmeldeblock. Gemessen wird die
+// Stapelfolge, nicht der Quelltext: Ein Schleier unter dem Video waere
+// wirkungslos, einer ueber dem Block wuerde ihn uebermalen. Beide Fehler
+// sind hier schon vorgekommen.
+const stapel = await ev(page, () => {
+  const z = s => { const e = document.querySelector(s); return e ? Number(getComputedStyle(e).zIndex) : null; };
+  const sch = document.querySelector('.gate-schleier');
+  const b = sch?.getBoundingClientRect();
+  return { video: z('.gate-video'), schleier: z('.gate-schleier'), mitte: z('.gate-mitte'), fuss: z('.gate-fuss'),
+           deckend: !!b && b.width >= innerWidth - 1 && b.height >= innerHeight - 1 };
+});
+check('KRITISCH: der Schleier liegt ueber dem Video und unter dem Anmeldeblock',
+  stapel !== null && stapel.schleier > stapel.video
+  && stapel.schleier < stapel.mitte && stapel.schleier < stapel.fuss);
+check('KRITISCH: der Schleier deckt die ganze Flaeche, nicht nur einen Ausschnitt',
+  stapel !== null && stapel.deckend);
 const zeitVorher = await ev(page, () => document.querySelector('.gate-video')?.currentTime ?? null);
 await page.waitForTimeout(600);
 const zeitNachher = await ev(page, () => document.querySelector('.gate-video')?.currentTime ?? null);
@@ -273,8 +308,8 @@ const TEXTE_HAUPT = [
   // entfernt (auf Ansage des Projektinhabers: die Maske erklaert sich
   // selbst). An seiner Stelle liegt jetzt der Fuss auf dem Video -- ueber
   // dem unteren Bildbereich, wo die Strassenlaternen stehen. Er braucht
-  // denselben Nachweis, und zwar mehr denn je: Seit dem 2026-09-17 liegt
-  // kein Schleier mehr zwischen Text und Szene.
+  // denselben Nachweis: Der Schleier daempft die Szene, er deckt sie
+  // nicht zu.
   // Die Herstellersignatur steht hier NICHT mehr in der Liste -- sie ist
   // ohne Mandantenlogo unsichtbar, und an einem unsichtbaren Element misst
   // man keinen Kontrast. Ihren Nachweis fuehrt test_gate_signatur.mjs im
@@ -296,23 +331,26 @@ await page.emulateMedia({ reducedMotion: 'reduce' });
 await page.waitForTimeout(150);
 check('KRITISCH: bei reduzierter Bewegung ist das Video unsichtbar',
   await ev(page, () => getComputedStyle(document.querySelector('.gate-video')).display === 'none'));
-// Der Schleier ist am 2026-09-17 ganz entfallen (Skizze des
-// Projektinhabers, Punkt 9). Geprueft wird deshalb nicht mehr, ob er im
-// richtigen Moment verschwindet, sondern dass er nirgends wieder
-// auftaucht: weder als Ebene im Dokument noch als Farbschicht im
-// Hintergrund von #gate. Beides waere ein stiller Rueckbau -- die Szene
-// saehe wieder gedaempft aus, ohne dass eine Pruefung anschluege.
-// Die Gegenprobe dazu ist gemacht: mit wieder eingesetztem
-// linear-gradient in der #gate-Regel schlaegt dieser Punkt an.
-check('KRITISCH: es gibt keine Schleier-Ebene mehr im Anmeldebildschirm',
-  await ev(page, () => !document.querySelector('.gate-schleier')));
-check('KRITISCH: und auch keine Schleier-Schicht im Hintergrund von #gate',
+// Der Schleier ist am Abend des 2026-09-17 zurueckgeholt worden, nachdem
+// er am Vormittag desselben Tages auf Ansage entfallen war (Skizze, Punkt
+// 9). Ansage des Projektinhabers: identisch mit app.html. Geprueft wird
+// darum wieder beides -- die eigene Ebene ueber dem Video UND die Schicht
+// im Hintergrund von #gate, die ohne Video traegt. Faellt eine der beiden
+// weg, liegt der Text wieder ungedaempft auf der Szene, ohne dass die
+// Kontrastmessung das zwangslaeufig zeigt: sie misst an fuenf
+// Zeitpunkten, und die dunklen Stellen des Videos bestehen auch ohne
+// Schleier.
+// Gegenprobe gemacht: Mit entferntem .gate-schleier bzw. entferntem
+// var(--gate-schleier) in der #gate-Regel schlaegt der jeweilige Punkt an.
+check('KRITISCH: bei reduzierter Bewegung ist auch die eigene Schleier-Ebene aus -- '
+    + 'sonst laege sie doppelt auf dem Standbild, das den Schleier schon im Hintergrund traegt',
+  await ev(page, () => getComputedStyle(document.querySelector('.gate-schleier')).display === 'none'));
+check('KRITISCH: die Schleier-Schicht steckt im Hintergrund von #gate',
   await ev(page, () => {
     const b = getComputedStyle(document.getElementById('gate')).backgroundImage;
-    // Der radial-gradient oben bleibt -- er ist Tiefenwirkung am Kopf, kein
-    // flaechiger Schleier. Ein linear-gradient ueber die ganze Flaeche war
-    // der Schleier.
-    return !b.includes('linear-gradient');
+    // Der radial-gradient oben ist Tiefenwirkung am Kopf, kein flaechiger
+    // Schleier. Der linear-gradient ueber die ganze Flaeche ist er.
+    return b.includes('linear-gradient');
   }));
 check('KRITISCH: das Hintergrundfoto ist als CSS-Ausweiche eingebunden',
   await ev(page, () => getComputedStyle(document.getElementById('gate')).backgroundImage.includes('anmeldung-nacht.webp')));
@@ -472,13 +510,12 @@ check('KRITISCH: der Hilfe-Knopf steht im Anmeldeblock, unter dem Anmeldeknopf',
 await fussHandy.close();
 
 // ══════════════════════════════════════════════════════════════════════
-// MANDANTENFALL: DIE SIGNATUR LIEGT JETZT UNGESCHUETZT AUF DER SZENE
-// Solange der Schleier da war, hat er die Fusszeile mitgetragen. Er ist
-// weg (2026-09-17), die Signatur erscheint aber weiterhin -- naemlich beim
-// Mandanten, dessen Buendel die Wortmarke durch sein eigenes Bild ersetzt.
-// Genau dieser Fall wird hier nachgebaut und gemessen. Ohne ihn stuende
-// die einzige Textzeile, die den Schleier wirklich brauchte, ungeprueft
-// auf dem hellsten Teil des Bildes.
+// MANDANTENFALL: DIE SIGNATUR LIEGT AUF DEM HELLSTEN TEIL DER SZENE
+// Die Signatur erscheint nur beim Mandanten, dessen Buendel die Wortmarke
+// durch sein eigenes Bild ersetzt. Genau dieser Fall wird hier nachgebaut
+// und gemessen. Ohne ihn stuende die unterste Textzeile ungeprueft ueber
+// dem Boden mit den Spiegelungen -- der Schleier daempft ihn, aber er
+// bleibt die hellste Stelle des Bildes.
 // ══════════════════════════════════════════════════════════════════════
 const mandant = await seiteOeffnen('dunkel', 1400, 950);
 const umgebaut = await ev(mandant, () => {
