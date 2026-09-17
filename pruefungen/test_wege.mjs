@@ -162,6 +162,84 @@ check('Der Knopf sieht nicht wie ein blauer Rohlink aus',
 }
 await p6.close();
 
+// ══════════ DIE ERFASSUNG IN DER NATIVEN HUELLE ══════════
+// In der Huelle heisst app.html "index.html" und diese Datei
+// "rapport-tool.html" (mobile-buendel-erstellen.py). Eine "app.html" gibt es
+// dort NICHT -- der Zurueck-Knopf zeigte trotzdem darauf, solange die
+// Umstellung am Ende von DOMContentLoaded stand und irgendetwas davor warf.
+// Geprueft wird das Ergebnis am gerenderten Zustand, nicht die Stelle im
+// Quelltext: Wohin zeigt der Knopf, und ist der Abmelden-Knopf weg.
+const huelle = async (admin) => {
+  const p = await b.newPage({ viewport: { width: 390, height: 844 } });
+  await mock(p, admin);
+  // So meldet sich Capacitor: window.Capacitor mit isNativePlatform().
+  await p.addInitScript(() => { window.Capacitor = { isNativePlatform: () => true }; });
+  await p.goto(`file://${WURZEL}/index.html`);
+  await p.waitForTimeout(500);
+  return p;
+};
+const p7 = await huelle(false);
+check('In der Huelle zeigt der Zurueck-Knopf auf index.html, nicht auf die dort fehlende app.html',
+  (await p7.getAttribute('#btn-zurueck', 'href')) === 'index.html');
+check('In der Huelle ist der Abmelden-Knopf weg -- abgemeldet wird ueber den Menue-Reiter der App',
+  await p7.evaluate(() => {
+    const el = document.getElementById('btn-header-logout');
+    return !el || !el.getClientRects().length;
+  }));
+// Der Titel sitzt in einem festen Raster 1fr auto 1fr. Ohne den Knopf
+// duerfte er nicht aus der Mitte wandern -- gemessen, nicht angenommen.
+check('Ohne den Abmelden-Knopf bleibt der Titel mittig',
+  await p7.evaluate(() => {
+    const t = document.getElementById('h-title').getBoundingClientRect();
+    return Math.abs((t.left + t.right) / 2 - innerWidth / 2) <= 2;
+  }));
+await p7.close();
+
+// ══════════ EIN SERVERFEHLER DARF NIEMANDEN ABMELDEN ══════════
+// Vorher meldete JEDER fehlgeschlagene Status ab, inklusive Neuladen der
+// Seite: "kurz das Rapport Tool, dann sofort wieder die Anmeldemaske".
+// Abgemeldet wird nur noch bei 401/403.
+const mitListenFehler = async (status) => {
+  const p = await b.newPage({ viewport: { width: 390, height: 844 } });
+  await p.route('**/api/**', r => {
+    const u = r.request().url();
+    const send = x => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(x) });
+    if (u.includes('login')) return send({ status: 'ok', token: 't', name: 'dario.beispiel', ist_admin: false });
+    if (u.includes('rapport_list')) return r.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ status: 'fehler', message: 'kaputt' }) });
+    if (u.includes('kunden_list')) return send({ status: 'ok', kunden: [] });
+    return send({ status: 'ok' });
+  });
+  await p.goto(`file://${WURZEL}/index.html`);
+  await p.fill('#loginName', 'dario.beispiel'); await p.fill('#loginPassword', 'x');
+  await p.click('#btn-login'); await p.waitForTimeout(600);
+  return p;
+};
+const p8 = await mitListenFehler(500);
+check('Ein 500er meldet den Nutzer NICHT ab',
+  await p8.evaluate(() => !!localStorage.getItem('rv3_token')));
+check('Ein 500er zeigt nicht die Anmeldemaske',
+  await p8.evaluate(() => getComputedStyle(document.getElementById('loginScreen')).display === 'none'));
+// "Abruf gescheitert" und "nichts erfasst" sind zwei verschiedene Aussagen
+// (CLAUDE.md). Vorher sahen beide gleich aus.
+check('Ein gescheiterter Abruf sagt das, statt "noch keine Rapporte" zu behaupten',
+  await p8.evaluate(() => {
+    const w = document.getElementById('tableWrap');
+    return !!w && !/keine|noch nicht/i.test(w.textContent) && /nicht geladen|nicht abrufbar|Verbindung/i.test(w.textContent);
+  }));
+await p8.close();
+
+// ══════════ EINE ABGELAUFENE SITZUNG SAGT, DASS SIE ABGELAUFEN IST ══════════
+const p9 = await mitListenFehler(401);
+check('Ein 401 meldet ab', await p9.evaluate(() => !localStorage.getItem('rv3_token')));
+check('Ein 401 zeigt die Anmeldemaske',
+  await p9.evaluate(() => getComputedStyle(document.getElementById('loginScreen')).display !== 'none'));
+check('Ein 401 nennt den Grund, statt den Nutzer stumm hinauszuwerfen',
+  await p9.evaluate(() => {
+    const e = document.getElementById('loginError');
+    return !!e && e.style.display !== 'none' && /abgelaufen/i.test(e.textContent);
+  }));
+await p9.close();
+
 await b.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(x => console.log('  ✗ ' + x)); process.exit(1); }
