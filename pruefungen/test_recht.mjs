@@ -20,6 +20,7 @@ const lies = d => readFileSync(`${WURZEL}/${d}`, 'utf8');
 
 const impressum = lies('impressum.html');
 const datenschutz = lies('datenschutz.html');
+const dsDemo = lies('datenschutz-demo.html');
 const homepage = lies('homepage.html');
 const workflow = lies('.github/workflows/deploy-hostpoint.yml');
 
@@ -119,6 +120,76 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
   if (ungenannt.length) { bad.push('Feld fehlt in der Datenschutzerklaerung: ' + ungenannt.join(', ')); }
 }
 
+// ══════════ DIE DEMO-ERKLAERUNG GEGEN DEN CODE ═══════════════════════
+// Eigene Seite fuer den Demobereich (2026-09-17). Die Erklaerung von
+// guardops.ch beschreibt eine Seite ohne Anmeldung, ohne Sitzung und ohne
+// Datenbank -- der Demobereich ist die Software selbst. Dieselbe Kopplung
+// wie oben: Jede pruefbare Aussage haengt am Code, nicht an sich selbst.
+{
+  const dash = lies('dashboard.html');
+  const anmeldung = lies('backend/anmeldung.php');
+  const resetLauf = lies('.github/workflows/demo-reset.yml');
+  const resetKern = lies('backend/demo_reset.php');
+  const flach = dsDemo.replace(/<!--[\s\S]*?-->/g, '').replace(/\s+/g, ' ');
+
+  // Die Kopplung "Verweis nur auf eine Seite, die es auf dem Server gibt".
+  // Der Demobereich verweist ABSOLUT auf guardops.ch -- ein 404 faende
+  // niemand von uns, sondern der Interessent auf der Anmeldemaske.
+  const imBuendel = /^\s*cp\s+datenschutz-demo\.html\s+dist-guardops\/\S+$/m.test(workflow);
+  check('KRITISCH: die Anmeldemaske verweist nur dann auf die Demo-Erklaerung, wenn sie ausgeliefert wird',
+    /datenschutz-demo\.html/.test(dash) === imBuendel);
+
+  // "Er setzt keine Cookies": dashboard.html haelt die Sitzung im lokalen
+  // Speicher. Ein setcookie/document.cookie waere die Falschaussage.
+  check('KRITISCH: die Behauptung "keine Cookies" stimmt mit dem Cockpit ueberein',
+    !/document\.cookie/.test(dash) && /setzt keine Cookies/i.test(flach));
+
+  // "Heute wird nichts gemessen": kein Analysewerkzeug, kein fremdes
+  // Skript. Gemeint ist wieder, was der Browser VON SELBST holt.
+  const dashOhneKommentare = dash.replace(/<!--[\s\S]*?-->/g, '');
+  const holtFremd = /\ssrc="https?:\/\//.test(dashOhneKommentare)
+    || /<link\b(?![^>]*rel="canonical")[^>]*href="https?:\/\//.test(dashOhneKommentare);
+  check('KRITISCH: die Behauptung "heute wird nichts gemessen" stimmt mit dem Cockpit ueberein',
+    !holtFremd && /Heute wird nichts davon gemessen/i.test(flach));
+
+  // Der Abschnitt zur geplanten Auswertung beschreibt ein VORHABEN. Wird
+  // die Messung eines Tages gebaut, muss er vorher in die Gegenwart
+  // gesetzt werden -- diese Pruefung haelt beides zusammen.
+  check('KRITISCH: die geplante Auswertung steht als Vorhaben da, nicht als Zustand',
+    /geplant, heute nicht in Betrieb/i.test(flach));
+
+  // Die Fristen der Anmeldebremse: genannt wird, was im Code steht.
+  const sperre = (anmeldung.match(/ANMELD_SPERRE_MIN\s*=\s*(\d+)/) || [])[1];
+  check('KRITISCH: die genannte Sperrfrist ist die im Code eingestellte',
+    !!sperre && new RegExp(`f(ue|\u00fc)r ${sperre} Minuten gesperrt`, 'i').test(flach));
+  check('KRITISCH: die Aufbewahrung der Fehlversuche ("nach einem Tag") steht so im Code',
+    /INTERVAL 1 DAY/.test(anmeldung) && /nach einem Tag gel(oe|\u00f6)scht/i.test(flach));
+
+  // Und die Gegenrichtung, derselbe Gedanke wie beim Pruefwert oben: Die
+  // Seite darf nicht weniger zugeben, als der Code tut. Die Adresse steht
+  // bei Fehlversuchen im KLARTEXT -- das muss dastehen.
+  check('KRITISCH: die Seite gibt zu, dass die Adresse bei Fehlversuchen im Klartext steht',
+    /INSERT INTO anmeldeversuche \(login_name, adresse\)/.test(anmeldung)
+    && /im Klartext/i.test(flach));
+
+  // Das naechtliche Leeren: Uhrzeit und Umfang aus dem Zeitplan und dem
+  // Rechenkern, nicht aus der Erinnerung.
+  const cron = (resetLauf.match(/cron:\s*'(\d+)\s+(\d+)\s/) || []);
+  check('KRITISCH: die genannte Uhrzeit des naechtlichen Leerens ist die eingestellte',
+    cron.length === 3 && new RegExp(`${cron[2].padStart(2, '0')}:${cron[1].padStart(2, '0')} UTC`).test(flach));
+  check('KRITISCH: die Behauptung "jede Tabelle" stimmt mit dem Rechenkern ueberein',
+    /DATABASE\(\)/.test(resetKern) && /jede Tabelle/i.test(flach));
+
+  // Die Sitzung: in der Datenbank nur der Abdruck (ENT-501).
+  check('KRITISCH: die Behauptung "nur ein Pruefwert der Sitzung" stimmt mit dem Code ueberein',
+    /sitzung_abdruck/.test(lies('backend/db.php')) && /nur ein Pr(ue|\u00fc)fwert/i.test(flach));
+
+  // Der Hinweis, der den Besucher schuetzt, muss stehen bleiben: Der
+  // Zugang ist gemeinsam, also sieht jeder alles.
+  check('KRITISCH: die Seite warnt davor, echte Personendaten einzutragen',
+    /keine echten Personen-, Kunden- oder Objektdaten/i.test(flach));
+}
+
 // ══════════ GERENDERT ════════════════════════════════════════════════
 const browser = await chromium.launch({ executablePath: browserPfad() });
 
@@ -131,7 +202,8 @@ const rgb = h => `rgb(${parseInt(h.slice(1,3),16)}, ${parseInt(h.slice(3,5),16)}
 const hell = block(':root {');
 const dunkel = block('html[data-thema="dunkel"] {');
 
-for (const [datei, titel] of [['impressum.html', 'Impressum'], ['datenschutz.html', 'Datenschutz']]) {
+for (const [datei, titel] of [['impressum.html', 'Impressum'], ['datenschutz.html', 'Datenschutz'],
+                              ['datenschutz-demo.html', 'Datenschutz Demobereich']]) {
   for (const [breite, hoehe, wo] of [[1440, 900, 'Desktop'], [390, 844, 'Handy']]) {
     const seite = await browser.newPage({ viewport: { width: breite, height: hoehe } });
     const fremde = [];
@@ -215,7 +287,7 @@ for (const [datei, titel] of [['impressum.html', 'Impressum'], ['datenschutz.htm
 // Jeder Verweis zwischen den Seiten muss eine Datei treffen, die es gibt.
 {
   const ziele = new Set();
-  for (const inhalt of [impressum, datenschutz]) {
+  for (const inhalt of [impressum, datenschutz, dsDemo]) {
     for (const m of inhalt.matchAll(/href="([a-z0-9_.-]+\.(?:html|css))"/g)) { ziele.add(m[1]); }
   }
   const fehlend = [...ziele].filter(z => !existsSync(`${WURZEL}/${z}`));

@@ -1073,6 +1073,11 @@ jobs:
           # Seiten ab, welche Stilblaetter und Schriften mitmuessen.
           cp impressum.html              dist-guardops/impressum.html
           cp datenschutz.html            dist-guardops/datenschutz.html
+          # Eigene Erklaerung fuer den Demobereich (demo.guardops.ch). Sie
+          # liegt hier und nicht im Demo-Buendel: Alle Rechtsseiten sollen
+          # an EINER Adresse stehen, mit einem Stil und einem Deploy-Weg.
+          # Der Demobereich verweist absolut darauf (dashboard.html).
+          cp datenschutz-demo.html       dist-guardops/datenschutz-demo.html
           cp recht.css                   dist-guardops/recht.css
           cp htaccess-guardops           dist-guardops/.htaccess
           cp robots-guardops.txt         dist-guardops/robots.txt

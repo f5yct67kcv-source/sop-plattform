@@ -5229,7 +5229,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <div class="gate-recht">
         <a href="https://guardops.ch/impressum.html">Impressum</a>
         <span class="trenn" aria-hidden="true">·</span>
-        <a href="https://guardops.ch/datenschutz.html">Datenschutz</a>
+        <a href="https://guardops.ch/datenschutz.html" id="gateDatenschutz">Datenschutz</a>
       </div>
     </div>
 </div>
@@ -32982,6 +32982,16 @@ if (window.APP_UMGEBUNG_DEMO) {
     marke.setAttribute('viewBox', '0.00 0.00 649.83 211.46');
     marke.querySelector('use')?.setAttribute('href', '#go-wort-claim');
   }
+
+  // Der Demobereich hat eine EIGENE Datenschutzerklaerung. Die von
+  // guardops.ch beschreibt die Verkaufsseite -- eine Seite ohne Anmeldung,
+  // ohne Sitzung und ohne Datenbank. Wer sich hier anmeldet und unten auf
+  // "Datenschutz" klickt, laese sonst einen Text, der seinen Fall nicht
+  // beschreibt ("Diese Seite setzt keine Cookies, misst kein Verhalten...").
+  // Umgehaengt statt zweiter Zeile im Markup: Ein zweiter Verweis stuende
+  // in jedem anderen Buendel mit daneben, wo es keinen Demobereich gibt.
+  const ds = $('gateDatenschutz');
+  if (ds) { ds.href = 'https://guardops.ch/datenschutz-demo.html'; }
 }
 
 // Wer automatisch abgemeldet wurde, steht sonst vor einer leeren
