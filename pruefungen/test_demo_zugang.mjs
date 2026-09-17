@@ -64,6 +64,19 @@ check('die Tabellendefinition laesst sich erzeugen', sql.includes('create table'
 check('KRITISCH: im Register steht kein Passwort und kein Hash',
   sql.includes('create table') && !sql.includes('passwort') && !sql.includes('hash'));
 
+// ── 3b. Telefon ist Pflicht, die Adresse wird geprueft (ENT-601/ENT-603) ─
+// Strukturell geprueft, weil ein echter Aufruf eine Datenbank braucht --
+// die reine Logik dahinter laeuft in pruef_demo_zugang.php.
+const anfordern = nurCode(lies('backend/api/demo_anfordern.php'));
+check('KRITISCH: demo_anfordern.php prueft die Telefonnummer, bevor ein Platz verbraucht wird',
+  /demo_zugang_telefon_ziffern\(\$telefon\)\s*<\s*DEMO_ZUGANG_TELEFON_MIN_ZIFFERN/.test(anfordern)
+  && anfordern.indexOf('demo_zugang_telefon_ziffern') < anfordern.indexOf('demo_platz_waehlen'));
+check('KRITISCH: demo_anfordern.php prueft die Zustellbarkeit, bevor ein Platz verbraucht wird',
+  /demo_zugang_adresse_zustellbar\(\$email\)\s*===\s*false/.test(anfordern)
+  && anfordern.indexOf('demo_zugang_adresse_zustellbar') < anfordern.indexOf('demo_platz_waehlen'));
+check('das Telefon wird im Register gespeichert, nicht verworfen',
+  /INSERT INTO demo_zugang[\s\S]{0,120}telefon/.test(anfordern) && /\$telefon\b/.test(anfordern));
+
 // ── 4. Der Rechenkern geht in JEDES Buendel mit, das betreiber.php hat ─
 // Das ist der Fall, der beim ersten Bau tatsaechlich danebengegangen
 // waere: betreiber.php in drei Buendeln, der neue require nur in einem.

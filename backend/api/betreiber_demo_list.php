@@ -21,7 +21,7 @@ if (!hat_tabelle($pdo, 'demo_zugang')) {
 $jetzt = date('Y-m-d H:i:s');
 
 $zeilen = $pdo->query(
-    'SELECT id, platz, firma, person, email, login, status,
+    'SELECT id, platz, firma, person, email, telefon, login, status,
             freigegeben_am, freigegeben_von, laeuft_ab_am, beendet_am
        FROM demo_zugang ORDER BY id DESC'
 )->fetchAll(PDO::FETCH_ASSOC);

@@ -68,10 +68,17 @@ const DEMO_ANFORDERN_DANKE = 'Vielen Dank. Sie erhalten in Kürze eine E-Mail mi
 // Zeilen hier zu verdoppeln ist kleiner als eine Ausnahme dafuer zu
 // pflegen. (Der Platzhaltername steht bewusst NICHT woertlich in diesem
 // Kommentar -- sonst faende ihn derselbe Scanner genau hier.)
-const DEMO_ZUGANG_MAX_FIRMA  = 120;
-const DEMO_ZUGANG_MAX_NAME   = 120;
-const DEMO_ZUGANG_MAX_EMAIL  = 200;
-const DEMO_ZUGANG_FALLE      = 'website';
+const DEMO_ZUGANG_MAX_FIRMA    = 120;
+const DEMO_ZUGANG_MAX_NAME     = 120;
+const DEMO_ZUGANG_MAX_EMAIL    = 200;
+const DEMO_ZUGANG_MAX_TELEFON  = 40;
+const DEMO_ZUGANG_FALLE        = 'website';
+// Telefon ist der Preis fuer den Sofort-Zugang (Entscheidung des
+// Projektinhabers): Wer in einer Minute eine eigene Instanz bekommt, gibt
+// dafuer eine erreichbare Nummer an. Dieselbe Grenze wie beim
+// Kontaktformular (demo_anfrage.php) -- neun Ziffern sind die Untergrenze,
+// unter der keine erreichbare Schweizer Nummer mehr liegt.
+const DEMO_ZUGANG_TELEFON_MIN_ZIFFERN = 9;
 
 function demo_zugang_ist_falle(array $in): bool
 {
@@ -82,6 +89,50 @@ function demo_zugang_einzeilig(mixed $wert, int $max): string
 {
     $s = preg_replace('/[\r\n\t]+/', ' ', (string)$wert) ?? '';
     return mb_substr(trim($s), 0, $max);
+}
+
+function demo_zugang_telefon_ziffern(string $wert): int
+{
+    return strlen((string)preg_replace('/\D+/', '', $wert));
+}
+
+// ── Ist die angegebene Adresse ueberhaupt zustellbar? ─────────────────
+//
+// DIESELBE ABSICHERUNG WIE BEIM KONTAKTFORMULAR (demo_anfrage.php,
+// Anlass: der Projektinhaber hat am 2026-09-14 absichtlich "info@test.cha"
+// eingegeben und die Anfrage ging durch) -- hier sogar wichtiger, weil eine
+// Anfrage nicht nur eine E-Mail auslöst, sondern SOFORT einen von zehn
+// knappen Demo-Plätzen verbraucht. Eine Adresse, die es nicht gibt, wuerde
+// einen Platz binden, den niemand je abholt.
+//
+// true = zustellbar, false = diese Domain gibt es nicht,
+// null = nicht pruefbar (Namensdienst gestoert oder abgeschaltet) -- und
+// NULL WIRD DURCHGELASSEN, nicht abgewiesen: "unbekannt" ist etwas anderes
+// als "keine" (Hausregel), und im Zweifel soll ein echter Interessent nicht
+// an einer gestoerten DNS-Abfrage scheitern.
+function demo_zugang_domain(string $email): string
+{
+    $pos = strrpos($email, '@');
+    return $pos === false ? '' : substr($email, $pos + 1);
+}
+
+function demo_zugang_hat_mailserver(string $domain): bool
+{
+    return checkdnsrr($domain, 'MX') || checkdnsrr($domain, 'A') || checkdnsrr($domain, 'AAAA');
+}
+
+const DEMO_ZUGANG_KONTROLL_DOMAIN = 'guardops.ch';
+
+function demo_zugang_adresse_zustellbar(string $email, ?callable $nachschlag = null): ?bool
+{
+    if ($nachschlag === null) {
+        if (!function_exists('checkdnsrr')) { return null; }
+        $nachschlag = 'demo_zugang_hat_mailserver';
+    }
+    $domain = demo_zugang_domain($email);
+    if ($domain === '') { return false; }
+    if ($nachschlag($domain)) { return true; }
+    return $nachschlag(DEMO_ZUGANG_KONTROLL_DOMAIN) ? false : null;
 }
 
 // Laufzeit eines Demo-Zugangs. Als Konstante und nicht als Einstellung:
@@ -325,6 +376,11 @@ function demo_zugang_tabelle(): string
   firma VARCHAR(200) NOT NULL,
   person VARCHAR(200) NOT NULL,
   email VARCHAR(200) NOT NULL,
+  -- Der Preis fuer den Sofort-Zugang (ENT-601/ENT-603, Entscheidung des
+  -- Projektinhabers): Wer die Instanz in einer Minute bekommt, hinterlaesst
+  -- eine erreichbare Nummer. Fuer den Vertrieb, nicht fuer den Zugang
+  -- selbst -- eine leere Zeichenkette bei aelteren Zeilen ist kein Fehler.
+  telefon VARCHAR(40) NOT NULL DEFAULT '',
   login VARCHAR(100) NOT NULL,
   status ENUM('aktiv','abgelaufen','beendet') NOT NULL DEFAULT 'aktiv',
   freigegeben_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

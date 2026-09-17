@@ -63,13 +63,27 @@ if (demo_zugang_ist_falle($in)) {
     json_response(['status' => 'ok', 'message' => DEMO_ANFORDERN_DANKE]);
 }
 
-$firma  = demo_zugang_einzeilig($in['firma'] ?? '', DEMO_ZUGANG_MAX_FIRMA);
-$person = demo_zugang_einzeilig($in['person'] ?? $in['name'] ?? '', DEMO_ZUGANG_MAX_NAME);
-$email  = demo_zugang_einzeilig($in['email'] ?? '', DEMO_ZUGANG_MAX_EMAIL);
+$firma   = demo_zugang_einzeilig($in['firma'] ?? '', DEMO_ZUGANG_MAX_FIRMA);
+$person  = demo_zugang_einzeilig($in['person'] ?? $in['name'] ?? '', DEMO_ZUGANG_MAX_NAME);
+$email   = demo_zugang_einzeilig($in['email'] ?? '', DEMO_ZUGANG_MAX_EMAIL);
+$telefon = demo_zugang_einzeilig($in['telefon'] ?? '', DEMO_ZUGANG_MAX_TELEFON);
 
 if ($firma === '' || $person === '' || $email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
     json_response(['status' => 'error',
         'message' => 'Bitte Firma, Name und eine gültige E-Mail-Adresse angeben.'], 400);
+}
+// Telefon ist der Preis fuer den Sofort-Zugang (Entscheidung des
+// Projektinhabers, siehe demo_zugang.php) -- Pflichtfeld, nicht optional.
+if (demo_zugang_telefon_ziffern($telefon) < DEMO_ZUGANG_TELEFON_MIN_ZIFFERN) {
+    json_response(['status' => 'error',
+        'message' => 'Bitte eine Telefonnummer angeben, unter der wir Sie erreichen.'], 400);
+}
+// Existiert die Domain ueberhaupt? Eine Anfrage verbraucht sofort einen von
+// zehn knappen Plaetzen -- eine Adresse, die es nicht gibt, waere ein
+// Platz, den niemand je abholt. "Nicht pruefbar" (null) wird durchgelassen.
+if (demo_zugang_adresse_zustellbar($email) === false) {
+    json_response(['status' => 'error',
+        'message' => 'Diese E-Mail-Adresse scheint es nicht zu geben. Bitte prüfen und erneut versuchen.'], 400);
 }
 
 // ── 2. Zwei Bremsen: IP UND E-Mail-Adresse ────────────────────────────
@@ -180,11 +194,11 @@ $instanz->prepare(
 $start    = date('Y-m-d H:i:s');
 $laeuftAb = demo_zugang_ablauf($start);
 $ein = $pdo->prepare(
-    'INSERT INTO demo_zugang (platz, firma, person, email, login, status,
+    'INSERT INTO demo_zugang (platz, firma, person, email, telefon, login, status,
                               freigegeben_am, freigegeben_von, laeuft_ab_am)
-     VALUES (?, ?, ?, ?, ?, \'aktiv\', ?, ?, ?)'
+     VALUES (?, ?, ?, ?, ?, ?, \'aktiv\', ?, ?, ?)'
 );
-$ein->execute([$platz, $firma, $person, $email, $login, $start, DEMO_FREIGEGEBEN_AUTOMATISCH, $laeuftAb]);
+$ein->execute([$platz, $firma, $person, $email, $telefon, $login, $start, DEMO_FREIGEGEBEN_AUTOMATISCH, $laeuftAb]);
 
 // ── 7. Mail ────────────────────────────────────────────────────────────
 // Ein Versandfehler aendert die Antwort nicht (siehe Dateikopf) -- er wird

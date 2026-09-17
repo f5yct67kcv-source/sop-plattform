@@ -1558,7 +1558,8 @@ async function ladeDemo() {
     + '</tr></thead><tbody>'
     + liste.map(z => '<tr>'
         + '<td><strong>' + text(z.firma) + '</strong>'
-          + '<div class="zweit">' + text(z.person) + ' · ' + text(z.email) + '</div></td>'
+          + '<div class="zweit">' + text(z.person) + ' · ' + text(z.email)
+            + (z.telefon ? ' · ' + text(z.telefon) : '') + '</div></td>'
         + '<td>' + text(z.platz) + '</td>'
         + '<td>' + text(z.login) + '</td>'
         + '<td>' + merker(DEMO_STATUS_TEXT, z.status) + '</td>'

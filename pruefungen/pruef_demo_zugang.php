@@ -184,6 +184,27 @@ $pruef('ein leeres Fallenfeld ist keine Falle',
 $pruef('demo_zugang_einzeilig ersetzt Umbrueche und kuerzt',
     demo_zugang_einzeilig("Zeile 1\r\nZeile 2\t\tEnde", 100) === 'Zeile 1 Zeile 2 Ende'
     && demo_zugang_einzeilig('123456789', 5) === '12345');
+
+// Telefon ist der Preis fuer den Sofort-Zugang (ENT-601/ENT-603).
+$pruef('KRITISCH: eine Nummer mit weniger als neun Ziffern zaehlt nicht',
+    demo_zugang_telefon_ziffern('079 12') < DEMO_ZUGANG_TELEFON_MIN_ZIFFERN);
+$pruef('eine gueltige Schweizer Nummer in jeder Schreibweise zaehlt',
+    demo_zugang_telefon_ziffern('+41 79 123 45 67') >= DEMO_ZUGANG_TELEFON_MIN_ZIFFERN
+    && demo_zugang_telefon_ziffern('079/123 45 67') >= DEMO_ZUGANG_TELEFON_MIN_ZIFFERN);
+
+// Zustellbarkeit: dieselbe Absicherung wie beim Kontaktformular, mit
+// einspeisbarem Nachschlag statt echtem DNS (ENT-469-Bauart).
+$immerJa      = fn(string $d): bool => true;
+$nieJa        = fn(string $d): bool => false;
+$nurKontrolle = fn(string $d): bool => $d === DEMO_ZUGANG_KONTROLL_DOMAIN;
+$pruef('eine Domain mit Mailserver gilt als zustellbar',
+    demo_zugang_adresse_zustellbar('a@echt.ch', $immerJa) === true);
+$pruef('KRITISCH: gestoerter Namensdienst (auch die Kontrolldomain faellt durch) heisst UNBEKANNT, nicht "keine"',
+    demo_zugang_adresse_zustellbar('a@irgendwas.ch', $nieJa) === null);
+$pruef('KRITISCH: erreichbarer Namensdienst, aber die Domain gibt es wirklich nicht, heisst "keine"',
+    demo_zugang_adresse_zustellbar('a@nirgends.test', $nurKontrolle) === false);
+$pruef('eine Adresse ohne @ gilt als nicht zustellbar, ohne Absturz',
+    demo_zugang_adresse_zustellbar('keine-email', $immerJa) === false);
 echo "\n$ok bestanden, " . count($bad) . " nicht bestanden\n";
 foreach ($bad as $n) { echo "  x $n\n"; }
 exit(count($bad) ? 1 : 0);
