@@ -471,14 +471,26 @@ if (zfBeanstandet.length) { zfBeanstandet.forEach(z => bad.push('PHP-Zweifaktor:
 // Dieselbe Ueberlegung gilt fuer die native App-Huelle (ENT-588): app.html
 // ist die Quelle, mobile/www/index.html ist eine reine Kopie davon fuer das
 // Capacitor-Buendel (Variante A). Laufen sie auseinander, testet man die
-// eine Fassung und ausgeliefert wird im Store die andere.
-{
-  const appHtml = readFileSync(`${WURZEL}/app.html`, 'utf8');
-  const mobilHtml = readFileSync(`${WURZEL}/mobile/www/index.html`, 'utf8');
-  check('KRITISCH: app.html und mobile/www/index.html sind gleich '
-      + '(sonst "python3 mobile-buendel-erstellen.py" ausfuehren)', appHtml === mobilHtml);
-  if (appHtml !== mobilHtml) {
-    bad.push(`app.html ${appHtml.length} Zeichen gegen mobile/www/index.html ${mobilHtml.length} Zeichen`);
+// eine Fassung und ausgeliefert wird im Store die andere. Dasselbe gilt
+// fuer index.html (Rapport Tool, im Buendel "rapport-tool.html") und die
+// vier Begleitskripte, die app.html per <script src> laedt -- ohne sie
+// als eigene Kopien liefe z.B. die GAV-Rechnung oder die Unterschrift in
+// der App ins Leere (Befund vom 2026-09-17).
+for (const [quelle, ziel] of [
+  ['app.html', 'mobile/www/index.html'],
+  ['index.html', 'mobile/www/rapport-tool.html'],
+  ['dashboard.html', 'mobile/www/dashboard.html'],
+  ['gav.js', 'mobile/www/gav.js'],
+  ['zeitwahl.js', 'mobile/www/zeitwahl.js'],
+  ['unterschrift.js', 'mobile/www/unterschrift.js'],
+  ['testumgebung.js', 'mobile/www/testumgebung.js'],
+]) {
+  const original = readFileSync(`${WURZEL}/${quelle}`, 'utf8');
+  const kopie = readFileSync(`${WURZEL}/${ziel}`, 'utf8');
+  check(`KRITISCH: ${quelle} und ${ziel} sind gleich `
+      + '(sonst "python3 mobile-buendel-erstellen.py" ausfuehren)', original === kopie);
+  if (original !== kopie) {
+    bad.push(`${quelle} ${original.length} Zeichen gegen ${ziel} ${kopie.length} Zeichen`);
   }
 }
 
