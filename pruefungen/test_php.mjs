@@ -508,6 +508,19 @@ for (const [quelle, ziel] of [
   }
 }
 
+// mobile/dev-anmelden.sh legt zum Entwickeln eine echte Sitzung ins GEBAUTE
+// Buendel (mobile/ios/App/App/public, steht in .gitignore). Geriete derselbe
+// Block je nach mobile/www/, laege ein gueltiger Sitzungs-Token im
+// Repository und im Store-Build. Diese Pruefung ist der Riegel dagegen.
+for (const datei of ['mobile/www/index.html', 'mobile/www/rapport-tool.html',
+                     'mobile/www/dashboard.html']) {
+  const inhalt = readFileSync(`${WURZEL}/${datei}`, 'utf8');
+  const sauber = !inhalt.includes('dev-anmeldung') && !inhalt.includes('rv3_token","');
+  check(`KRITISCH: ${datei} traegt keine eingesetzte Entwicklungs-Sitzung `
+      + '(dev-anmelden.sh schreibt nur nach mobile/ios/App/App/public)', sauber);
+  if (!sauber) { bad.push(`${datei} enthaelt einen eingesetzten Sitzungs-Token`); }
+}
+
 // icons/ und img/ (Logos, Anmelde-Animation) muessen vollstaendig und
 // unveraendert im Buendel liegen -- ohne sie zeigt die App an deren Stelle
 // ein kaputtes Bildsymbol (Befund vom 2026-09-17).
