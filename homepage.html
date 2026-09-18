@@ -1128,7 +1128,12 @@ p{margin:0 0 1em}
           <li><svg><use href="#i-haken"/></svg><span><b>Unverbindlich.</b> Läuft automatisch ab, keine Einrichtungsgebühr, keine Laufzeit.</span></li>
         </ul>
       </div>
-      <form class="formular" id="demoFormular" novalidate action="api/demo_anfordern.php" method="post">
+      <!-- Absolute Adresse, nicht relativ (ENT-601-Nachtrag, 2026-09-18):
+           guardops.ch traegt keine Datenbank-Zugangsdaten, der Endpunkt
+           liegt darum auf betreiber.guardops.ch -- mit einer eng
+           begrenzten CORS-Freigabe genau fuer dieses eine Formular
+           (cors_erlaubte_herkunft() in backend/db.php). -->
+      <form class="formular" id="demoFormular" novalidate action="https://betreiber.guardops.ch/api/demo_anfordern.php" method="post">
         <div class="felder">
         <div class="falle" aria-hidden="true"><label>Webseite (bitte leer lassen)<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
         <div class="reihe">
