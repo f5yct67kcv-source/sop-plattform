@@ -2893,6 +2893,45 @@ function merker(karte, schluessel) {
      - eine Zahl       : der Normalfall
    "Nicht feststellbar" als "0" auszugeben waere die schlimmste Variante:
    Sie sieht aus wie eine Auskunft und ist eine Erfindung. */
+/* ── Wird die Anlage benutzt (ENT-619) ──────────────────────────────
+   Vier Antworten, vier Texte. "Nicht erhoben", "nicht feststellbar", "noch
+   nie benutzt" und "seit X Tagen still" sind verschiedene Aussagen, und
+   keine darf wie eine andere aussehen (Hausregel). Die Tage rechnet der
+   Server; hier wird nur benannt. */
+const STILL_AB_TAGEN = 30;
+
+function nutzungZelle(eintrag) {
+  if (eintrag === undefined) { return '<span class="merker m-ruhe">nicht erhoben</span>'; }
+  const st = eintrag.stille;
+  if (st === null || st === undefined) {
+    return '<span class="merker m-warn">nicht feststellbar</span>';
+  }
+  if (st === 'nie') {
+    return '<span class="merker m-ruhe">noch nie benutzt</span>'
+         + '<div class="zweit">eingerichtet, aber nichts erfasst</div>';
+  }
+  const tage = Number(st);
+  const klasse = tage >= STILL_AB_TAGEN ? 'm-warn' : 'm-pos';
+  const wort = tage === 0 ? 'heute' : tage === 1 ? 'gestern' : 'vor ' + tage + ' Tagen';
+
+  /* Die zweite Zeile nennt BEIDE Signale, wenn sie auseinanderliegen --
+     genau die Differenz ist die Aussage: Wer sich noch anmeldet, aber
+     nichts mehr erfasst, ist auf dem Absprung. */
+  const z = eintrag.zahlen || {};
+  const kurz = w => (w ? String(w).slice(0, 10) : null);
+  const zug = kurz(z.letzter_zugriff), rap = kurz(z.letzter_rapport);
+  let zweit = '';
+  if (zug && rap && zug !== rap) {
+    zweit = 'Zugriff ' + zug + ' · Rapport ' + rap;
+  } else if (zug && !rap) {
+    zweit = 'angemeldet, aber kein Rapport erfasst';
+  } else if (rap && !zug) {
+    zweit = 'letzter Rapport ' + rap;
+  }
+  return '<span class="merker ' + klasse + '">' + text(wort) + '</span>'
+       + (zweit ? '<div class="zweit">' + text(zweit) + '</div>' : '');
+}
+
 function groesseZelle(g) {
   if (g === undefined) { return '<span class="merker m-ruhe">nicht erhoben</span>'; }
   if (g === null)      { return '<span class="merker m-warn">nicht feststellbar</span>'; }
@@ -2950,7 +2989,10 @@ async function ladeMandanten() {
   let groesse = {};
   try {
     const gr = await ruf('betreiber_zaehlstand.php', null, 'POST');
-    if (gr.status === 'ok') { (gr.heute || []).forEach(m => { groesse[m.id] = m.zahlen; }); }
+    /* Der ganze Eintrag, nicht nur die Zahlen: Seit ENT-619 haengt die
+       Nutzungsauskunft daran, und zwei Sammlungen mit verschiedenen
+       Ausschnitten derselben Antwort laufen irgendwann auseinander. */
+    if (gr.status === 'ok') { (gr.heute || []).forEach(m => { groesse[m.id] = m; }); }
   } catch (e) { /* Groesse bleibt unbekannt */ }
 
   const aktiv = liste.filter(m => m.status === 'aktiv').length;
@@ -2968,6 +3010,14 @@ async function ladeMandanten() {
      Vertragsende. Wer aufs Ende schaut, merkt die Frist, wenn sie vorbei
      ist. Die 90 Tage stehen fest: eine Zahl, die niemand je ändert, ist
      keine Einstellung. */
+  /* Stille Mandanten (ENT-619). Gezaehlt wird nur, was WIRKLICH still ist:
+     Eine Anlage, die gerade nicht erreichbar war, ist unbekannt und darf die
+     Zahl nicht aufblaehen -- sonst sieht ein Netzausfall aus wie ein Kunde
+     auf dem Absprung. Sie steht stattdessen im Bezug. */
+  const stilleWerte = liste.map(m => (groesse[m.id] || {}).stille);
+  const still = stilleWerte.filter(w => w === 'nie' || (typeof w === 'number' && w >= STILL_AB_TAGEN)).length;
+  const stillUnbekannt = stilleWerte.filter(w => w === null || w === undefined).length;
+
   const faellig = liste.filter(m => m.vertrag && m.vertrag.faellig_90).length;
   /* Ein Vertrag, zu dem nichts erfasst ist, zählt weder als fällig noch als
      in Ordnung — er ist unbekannt, und das steht als eigener Bezug da. */
@@ -2980,6 +3030,9 @@ async function ladeMandanten() {
     + zahlBlock('Verträge', faellig,
         faellig ? 'in den nächsten 90 Tagen'
                 : (ohneVertrag ? ohneVertrag + ' ohne Angaben' : 'nichts steht an'))
+    + zahlBlock('Still', still,
+        still ? 'seit ' + STILL_AB_TAGEN + ' Tagen ohne Nutzung'
+              : (stillUnbekannt ? stillUnbekannt + ' nicht feststellbar' : 'alle in Betrieb'))
     + zahlBlock('GAV offen', offen, offen ? 'Bestätigung fehlt' : 'alle bestätigt')
     + zahlBlock('Nicht erreichbar', kaputt, kaputt ? 'Einrichtung prüfen' : 'alle erreichbar'));
 
@@ -2990,13 +3043,14 @@ async function ladeMandanten() {
   }
 
   inhalt.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
-    + '<th>Mandant</th><th>Grösse</th><th>Status</th><th>Vertrag</th><th>GAV</th><th>Einrichtung</th><th></th>'
+    + '<th>Mandant</th><th>Grösse</th><th>Nutzung</th><th>Status</th><th>Vertrag</th><th>GAV</th><th>Einrichtung</th><th></th>'
     + '</tr></thead><tbody>'
     + liste.map(m => '<tr>'
         + '<td><strong>' + text(m.name) + '</strong>'
           + '<div class="zweit">' + (m.subdomain ? text(m.subdomain) + '.guardops.ch' : 'Keine Subdomain gesetzt') + '</div>'
           + '<div class="zweit">' + (m.kanton ? 'Kanton ' + text(m.kanton) : 'Kanton nicht gesetzt') + '</div></td>'
-        + '<td>' + groesseZelle(groesse[m.id]) + '</td>'
+        + '<td>' + groesseZelle(groesse[m.id] === undefined ? undefined : groesse[m.id].zahlen) + '</td>'
+        + '<td>' + nutzungZelle(groesse[m.id]) + '</td>'
         + '<td>' + merker(STATUS_TEXT, m.status) + '</td>'
         + '<td>' + vertragZelle(m) + '</td>'
         + '<td>' + merker(GAV_TEXT, m.gav_lage)
