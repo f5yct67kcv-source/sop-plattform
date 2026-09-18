@@ -11,7 +11,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../belege.php';
 
-require_betreiber_voll();
+$ich = require_betreiber_voll();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
@@ -35,5 +35,7 @@ if ($alt === false) {
 }
 
 $pdo->prepare('UPDATE be_belege SET status = ? WHERE id = ?')->execute([$neu, $id]);
+
+be_log($pdo, $ich, 'beleg', $id, 'status', (string)$alt, $neu);
 
 json_response(['status' => 'ok', 'alter_status' => $alt, 'neuer_status' => $neu]);

@@ -47,5 +47,9 @@ $pdo->prepare('DELETE FROM betreiber_zwei_faktor WHERE betreiber_id = ?')->execu
 // den neuen einrichten.
 $pdo->prepare('DELETE FROM betreiber_sessions WHERE betreiber_id = ?')->execute([$ziel]);
 
+// OHNE WERTE: Dass der Faktor eines fremden Kontos zurueckgesetzt wurde, ist
+// die Aussage -- ein Geheimnis gehoert nie in einen Verlauf.
+be_log($pdo, $ich, 'konto', $ziel, 'zwei_faktor_zurueckgesetzt', null, null, true);
+
 json_response(['status' => 'ok', 'id' => $ziel,
     'hinweis' => 'Das Konto muss den zweiten Faktor bei der nächsten Anmeldung neu einrichten.']);
