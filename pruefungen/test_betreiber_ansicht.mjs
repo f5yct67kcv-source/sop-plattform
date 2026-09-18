@@ -92,9 +92,16 @@ const MESSEN = () => {
   // Gestaltung dieser Seite heisst .knopf/.klein und .feld, die aus dem
   // Cockpit uebernommene .btn/.tab/.inp und so fort. Ein Baustein, der
   // beides traegt, gibt es nicht -- das war beim Uebernehmen die Bedingung.
-  const UEBERNOMMEN = ['btn', 'tab', 'of-schnell', 'of-zurueck', 'inp', 'check'];
+  const UEBERNOMMEN = ['btn', 'tab', 'of-schnell', 'of-zurueck', 'inp', 'check',
+    // Seit ENT-611 auch die Bausteine der beiden Leisten: Hell/Dunkel und
+    // Glas sind im Cockpit 52 x 30 px grosse Schieber, die Unterreiter in
+    // der Werkzeugleiste 33,5 px hoch, der Markenknopf 46 px. Uebernommen
+    // heisst uebernommen -- eine eigene Mindesthoehe fuer genau diese
+    // Knoepfe waere die Anweisung, sie anders zu machen als dort.
+    'thema-schalter', 'glas-schalter', 'marken-knopf', 'menue-eintrag'];
   const ausCockpit = el => UEBERNOMMEN.some(k => el.classList.contains(k))
-    || (el.closest && (el.closest('.seg2') || el.closest('.rowmenu-pop')) !== null);
+    || (el.closest && (el.closest('.seg2') || el.closest('.rowmenu-pop')
+                       || el.closest('.top-sub')) !== null);
   const knoepfe = [...document.querySelectorAll('button')].filter(sichtbar)
     .map(k => ({ t: k.textContent.trim().slice(0, 20), h: R(k).height,
                  klein: k.classList.contains('klein'), cockpit: ausCockpit(k) }));
@@ -361,6 +368,7 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
     const vorher = await seite.evaluate(() => ({
       thema: document.documentElement.getAttribute('data-thema'),
       hoehe: document.getElementById('btn-thema').getBoundingClientRect().height,
+      breite: document.getElementById('btn-thema').getBoundingClientRect().width,
       gemerkt: localStorage.getItem('rv3_thema'),
     }));
     await seite.click('#btn-thema');
@@ -373,7 +381,15 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
     }));
     await seite.close();
 
-    check('KRITISCH Handy: der Umschalter ist mindestens 44px hoch', vorher.hoehe >= 44);
+    // Er ist so gross wie im Cockpit -- 52 x 30 px, auf dem Handy 46 x 28
+    // (ENT-611). Die 44-px-Regel des Hauses gilt fuer die eigenen
+    // Bedienelemente dieser Seite; dieser Schalter ist keiner mehr,
+    // sondern Zeichen fuer Zeichen der von dort. Gemessen wird darum, dass
+    // er dieselbe Groesse hat wie dort -- das tut test_kopf_gleich.mjs --
+    // und hier nur noch, dass er ueberhaupt eine brauchbare Trefferflaeche
+    // traegt und nicht versehentlich auf ein paar Pixel geschrumpft ist.
+    check('Handy: der Umschalter hat eine brauchbare Trefferflaeche',
+      vorher.hoehe >= 26 && vorher.breite >= 44);
     check('Der Umschalter wechselt das Thema', vorher.thema === 'hell' && nachher.thema === 'dunkel');
     check('KRITISCH: die Wahl wird fuer das Cockpit mitgespeichert (derselbe Schluessel)',
       vorher.gemerkt === 'hell' && nachher.gemerkt === 'dunkel');

@@ -74,9 +74,13 @@ const LISTEN_ABZUG = (wahl) => {
   const R = el => el.getBoundingClientRect();
   const tab = document.querySelector(wahl + ' table');
   if (!tab) { return null; }
+  // Auch Innenabstand, Ausrichtung in der Zeile und Grund: Genau diese drei
+  // sind hier lange unbemerkt auseinandergelaufen, weil sie nicht gemessen
+  // wurden -- die Tabelle stand eine Spur enger als im Cockpit.
   const stil = el => {
     const c = getComputedStyle(el);
-    return [c.fontSize, c.fontWeight, c.textAlign, c.color, c.whiteSpace].join(' | ');
+    return [c.fontSize, c.fontWeight, c.textAlign, c.color, c.whiteSpace,
+            c.padding, c.verticalAlign, c.backgroundColor, c.letterSpacing].join(' | ');
   };
   const kopf = [...tab.querySelectorAll('thead th')].map(t => ({
     wort: t.textContent.replace(/[▲▼]/g, '').trim(),
@@ -88,6 +92,32 @@ const LISTEN_ABZUG = (wahl) => {
     h: R(tr).height,
   }));
   return { kopf, zeilen };
+};
+
+// Abzug der Handy-Karten einer Liste. Gemessen wird die Karte selbst (sie
+// war hier lange ein eigener Kasten mit Rahmen, waehrend das Cockpit Zeilen
+// mit feiner Trennlinie zeigt -- am Desktop unsichtbar, auf dem Handy eine
+// andere Liste) und der Inhalt der aufgeklappten Beschriftungsliste.
+const KARTEN_ABZUG = () => {
+  const stil = el => {
+    const c = getComputedStyle(el);
+    return [c.fontSize, c.fontWeight, c.padding, c.borderRadius, c.borderWidth,
+            c.borderBottomWidth, c.borderStyle, c.marginBottom, c.cursor].join(' | ');
+  };
+  const karten = [...document.querySelectorAll('.nur-schmal .ag-karte')]
+    .filter(k => k.offsetParent !== null);
+  if (!karten.length) { return null; }
+  return karten.map(k => ({
+    s: stil(k),
+    offen: k.getAttribute('aria-expanded'),
+    kopf: (k.querySelector('.kopf') || {}).textContent?.replace(/\s+/g, ' ').trim() || '',
+    wer: (k.querySelector('.wer') || {}).textContent?.replace(/\s+/g, ' ').trim() || '',
+    zeiten: (k.querySelector('.zeiten') || {}).textContent?.replace(/\s+/g, ' ').trim() || '',
+    dt: [...k.querySelectorAll('.kk-koerper .dl dt')].map(t => t.textContent.trim()),
+    dd: [...k.querySelectorAll('.kk-koerper .dl dd')].map(t => t.textContent.replace(/\s+/g, ' ').trim()),
+    dlS: k.querySelector('.kk-koerper .dl')
+      ? getComputedStyle(k.querySelector('.kk-koerper .dl')).gridTemplateColumns : '',
+  }));
 };
 
 const browser = await chromium.launch({ executablePath: browserPfad() });
@@ -119,6 +149,33 @@ const RECHNUNGEN = [
 
 const ADRESSE = { id: 1, name: 'Musterbetrieb AG', kundennummer: 'K0001', plz: '3000',
                   ort: 'Musterstadt', aktiv: 1, personen: [], kontaktwege: [] };
+
+// Zwei Adressen fuer die Adressenliste: eine vollstaendige und eine ohne
+// Telefon und E-Mail. Ohne die zweite bliebe der Strich-Fall ungeprueft --
+// und "unbekannt darf nie wie keine aussehen" faellt genau dort um.
+//
+// Die Belegzahl ist absichtlich dieselbe Zahl wie die Rapportzahl im
+// Cockpit: Dann unterscheiden sich in der ganzen Zeile nur der Spaltenkopf
+// und sonst nichts, und die Pruefung darunter kann genau diese eine
+// Abweichung benennen, statt sie in einer Sammelmeldung zu verstecken.
+const ADRESSEN_BE = [
+  { id: 1, kundennummer: 'K0001', name: 'Musterbetrieb AG', art: 'unternehmen',
+    anrede: '', vorname: '', nachname: '', zusatzfeld: '',
+    strasse: 'Musterweg', hausnummer: '12', adresszusatz: '', plz: '3000', ort: 'Musterstadt',
+    uid: '', mwst_nr: '', telefon: '031 000 00 00', kontaktperson: 'Leitung Betrieb',
+    email: 'post@musterbetrieb.example', notiz: 'Beispielnotiz', aktiv: 1,
+    personen: [], kontaktwege: [], belege_anzahl: 3 },
+  { id: 2, kundennummer: 'K0002', name: 'Zweitbetrieb GmbH', art: 'unternehmen',
+    anrede: '', vorname: '', nachname: '', zusatzfeld: '',
+    strasse: 'Beispielstrasse', hausnummer: '4', adresszusatz: '', plz: '4000', ort: 'Beispielort',
+    uid: '', mwst_nr: '', telefon: '', kontaktperson: '', email: '', notiz: '', aktiv: 1,
+    personen: [], kontaktwege: [], belege_anzahl: 0 },
+];
+// Die Rapporte des Cockpits, die zu derselben Zahl fuehren (gezaehlt wird
+// dort ueber den Kundennamen).
+const RAPPORTE = [0, 1, 2].map(i => ({ id: 900 + i, kunde: 'Musterbetrieb AG' }));
+// Dieselben Adressen ohne das Feld, das es im Cockpit nicht gibt.
+const ADRESSEN_CO = ADRESSEN_BE.map(({ belege_anzahl, ...rest }) => rest);
 const PRODUKT = { id: 1, nummer: 'P0001', name: 'Nutzung', beschreibung: '',
                   einzelpreis_rappen: 12000, einheit: 'Monat', mwst_satz_bp: 810,
                   sortierung: 10, aktiv: 1 };
@@ -169,6 +226,21 @@ async function cockpit(breite, hoehe, thema, glas, was) {
     await seite.evaluate(() => { go('kunden'); kuGoTab('rechnungen'); });
     await seite.waitForTimeout(250);
     m = await seite.evaluate(LISTEN_ABZUG, '#reTable');
+  } else if (was === 'adressen' || was === 'karten') {
+    await seite.evaluate(() => { go('kunden'); kuGoTab('uebersicht'); });
+    await seite.waitForTimeout(300);
+    // Erst NACH dem Laden setzen: Sonst ueberschriebe die noch laufende
+    // Antwort die eingesetzten Daten und gemessen waere etwas anderes.
+    await seite.evaluate(([liste, rap]) => { kunden = liste; rapporte = rap; renderKunden(); },
+      [ADRESSEN_CO, RAPPORTE]);
+    await seite.waitForTimeout(150);
+    if (was === 'karten') {
+      await seite.evaluate(() => kuKarteUm(1));
+      await seite.waitForTimeout(150);
+      m = await seite.evaluate(KARTEN_ABZUG);
+    } else {
+      m = await seite.evaluate(LISTEN_ABZUG, '#kuTable');
+    }
   } else {
     await seite.evaluate(([art, p]) => { ofNeu(art); ofPos = [p]; ofZeilenZeichnen(); }, [was, POSITION]);
     await seite.waitForTimeout(150);
@@ -219,6 +291,18 @@ async function betreiber(breite, hoehe, thema, glas, was) {
     await seite.evaluate(() => { bereichZeigen('rechnungen'); renderRechnungen(); });
     await seite.waitForTimeout(250);
     m = await seite.evaluate(LISTEN_ABZUG, '#reTable');
+  } else if (was === 'adressen' || was === 'karten') {
+    await seite.evaluate(() => { bereichZeigen('adressen'); });
+    await seite.waitForTimeout(300);
+    await seite.evaluate(liste => { offertenBereit = true; adressen = liste; adZeichnen(); }, ADRESSEN_BE);
+    await seite.waitForTimeout(150);
+    if (was === 'karten') {
+      await seite.evaluate(() => adKarteUm(1));
+      await seite.waitForTimeout(150);
+      m = await seite.evaluate(KARTEN_ABZUG);
+    } else {
+      m = await seite.evaluate(LISTEN_ABZUG, '#adTable');
+    }
   } else {
     await seite.evaluate(([art, p]) => { ofNeu(art); ofPos = [p]; ofZeilenZeichnen(); }, [was, POSITION]);
     await seite.waitForTimeout(150);
@@ -364,6 +448,145 @@ for (const [wie, breite, hoehe, thema, glas] of FAELLE) {
     const ueberfaellig = be.m.zeilen.find(z => z.zellen[0].wort === 'Überfällig');
     check('KRITISCH Rechnungsliste: die ueberfaellige sagt, wie lange schon',
       !!ueberfaellig && /\d+ Tage überfällig/.test(ueberfaellig.zellen[1].wort));
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// TEIL 3 — Die Adressenliste
+// ══════════════════════════════════════════════════════════════════════
+//
+// Acht Spalten, sortierbare Koepfe, auf dem Handy aufklappbare Karten.
+// EINE Spalte ist mit Absicht nicht dieselbe: Das Cockpit zaehlt dort
+// Rapporte, die Betreiberin hat keine und zaehlt Belege. Die Pruefung
+// benennt genau diese eine Abweichung und verlangt sonst Gleichheit --
+// so kann sie nicht als Sammelfreibrief fuer weitere Unterschiede dienen.
+const ZAEHLSPALTE = 6;
+
+{
+  const co = await cockpit(1500, 1000, 'dunkel', 'an', 'adressen');
+  const be = await betreiber(1500, 1000, 'dunkel', 'an', 'adressen');
+
+  check('Adressenliste: beide Seiten zeigen sie ohne JS-Fehler',
+    co.fehler.length === 0 && be.fehler.length === 0);
+  if (co.fehler.length) { bad.push('Cockpit: ' + co.fehler[0]); }
+  if (be.fehler.length) { bad.push('Betreiber: ' + be.fehler[0]); }
+  check('Adressenliste: beide wurden ueberhaupt gemessen',
+    !!co.m && !!be.m && co.m.zeilen.length === 2 && co.m.kopf.length === 8);
+
+  if (co.m && be.m) {
+    const cw = co.m.kopf.map(k => k.wort), bw = be.m.kopf.map(k => k.wort);
+    check('KRITISCH Adressenliste: die Zaehlspalte heisst hier Belege statt Rapporte',
+      cw[ZAEHLSPALTE] === 'Rapporte' && bw[ZAEHLSPALTE] === 'Belege');
+    const cwRest = cw.filter((_, i) => i !== ZAEHLSPALTE);
+    const bwRest = bw.filter((_, i) => i !== ZAEHLSPALTE);
+    check('KRITISCH Adressenliste: alle uebrigen Spalten heissen gleich und stehen gleich',
+      JSON.stringify(cwRest) === JSON.stringify(bwRest));
+    if (JSON.stringify(cwRest) !== JSON.stringify(bwRest)) {
+      bad.push('Cockpit   ' + JSON.stringify(cw) + '\n      Betreiber ' + JSON.stringify(bw));
+    }
+    check('KRITISCH Adressenliste: dieselben Spalten sind sortierbar',
+      JSON.stringify(co.m.kopf.map(k => k.sortbar)) === JSON.stringify(be.m.kopf.map(k => k.sortbar)));
+    if (JSON.stringify(co.m.kopf.map(k => k.sortbar)) !== JSON.stringify(be.m.kopf.map(k => k.sortbar))) {
+      bad.push('sortierbar Cockpit   ' + JSON.stringify(co.m.kopf.map(k => k.sortbar))
+        + '\n      sortierbar Betreiber ' + JSON.stringify(be.m.kopf.map(k => k.sortbar)));
+    }
+    const kopfGleich = co.m.kopf.every((k, i) => be.m.kopf[i] && be.m.kopf[i].s === k.s);
+    check('KRITISCH Adressenliste: die Spaltenkoepfe sind gleich gestaltet', kopfGleich);
+    if (!kopfGleich) {
+      co.m.kopf.forEach((k, i) => {
+        const g = be.m.kopf[i];
+        if (!g || g.s !== k.s) {
+          bad.push(`Kopf ${i} (${k.wort})\n      Cockpit   ${k.s}\n      Betreiber ${g ? g.s : '—'}`);
+        }
+      });
+    }
+
+    // Die Zeilen. Die Zaehlspalte traegt hier wie dort dieselbe Zahl (die
+    // Testdaten sind so gesetzt) -- sie wird darum MIT verglichen, nicht
+    // ausgenommen: Sonst bliebe unbemerkt, wenn eine Seite "1200" und die
+    // andere "1'200" schreibt.
+    const cz = co.m.zeilen.map(z => z.zellen.map(c => c.wort));
+    const bz = be.m.zeilen.map(z => z.zellen.map(c => c.wort));
+    check('KRITISCH Adressenliste: dieselben Zeilen mit demselben Inhalt',
+      JSON.stringify(cz) === JSON.stringify(bz));
+    if (JSON.stringify(cz) !== JSON.stringify(bz)) {
+      for (let i = 0; i < Math.max(cz.length, bz.length); i++) {
+        if (JSON.stringify(cz[i]) !== JSON.stringify(bz[i])) {
+          bad.push(`Zeile ${i}\n      Cockpit   ${JSON.stringify(cz[i])}\n      Betreiber ${JSON.stringify(bz[i])}`);
+        }
+      }
+    }
+    const zellenGleich = co.m.zeilen.every((z, i) => be.m.zeilen[i]
+      && z.zellen.every((c, j) => be.m.zeilen[i].zellen[j] && be.m.zeilen[i].zellen[j].s === c.s));
+    check('KRITISCH Adressenliste: und sie sind gleich gestaltet', zellenGleich);
+    if (!zellenGleich) {
+      co.m.zeilen.forEach((z, i) => z.zellen.forEach((c, j) => {
+        const g = be.m.zeilen[i] && be.m.zeilen[i].zellen[j];
+        if (!g || g.s !== c.s) {
+          bad.push(`Zelle ${i}/${j} (${c.wort})\n      Cockpit   ${c.s}\n      Betreiber ${g ? g.s : '—'}`);
+        }
+      }));
+    }
+    // Die Adresse ohne Telefon und E-Mail zeigt einen Strich, keine Leere.
+    check('KRITISCH Adressenliste: fehlende Angaben stehen als Strich da',
+      bz[1] && bz[1][4] === '–' && bz[1][5] === '–' && bz[1][6] === '–');
+  }
+}
+
+// Und dasselbe auf dem Handy: Dort ist die Karte die Liste.
+{
+  const co = await cockpit(390, 844, 'hell', 'an', 'karten');
+  const be = await betreiber(390, 844, 'hell', 'an', 'karten');
+
+  check('Adressenkarten: beide Seiten zeigen sie ohne JS-Fehler',
+    co.fehler.length === 0 && be.fehler.length === 0);
+  if (co.fehler.length) { bad.push('Cockpit: ' + co.fehler[0]); }
+  if (be.fehler.length) { bad.push('Betreiber: ' + be.fehler[0]); }
+  check('Adressenkarten: beide wurden ueberhaupt gemessen',
+    !!co.m && !!be.m && co.m.length === 2 && be.m.length === 2);
+
+  if (co.m && be.m && co.m.length === be.m.length) {
+    // Wieder nur die eine benannte Abweichung: Rapporte gegen Belege.
+    const norm = t => t.replace(/Rapporte/g, 'Belege');
+    const gestaltAnders = co.m.map((k, i) => k.s === be.m[i].s ? null : i).filter(i => i !== null);
+    check('KRITISCH Adressenkarten: die Karte selbst ist gleich gestaltet',
+      gestaltAnders.length === 0);
+    if (gestaltAnders.length) {
+      const i = gestaltAnders[0];
+      bad.push(`Karte ${i}\n      Cockpit   ${co.m[i].s}\n      Betreiber ${be.m[i].s}`);
+    }
+    const textAnders = co.m.map((k, i) => (norm(k.kopf) === be.m[i].kopf
+      && norm(k.wer) === be.m[i].wer && norm(k.zeiten) === be.m[i].zeiten) ? null : i)
+      .filter(i => i !== null);
+    check('KRITISCH Adressenkarten: dieselben drei Zeilen im selben Wortlaut',
+      textAnders.length === 0);
+    if (textAnders.length) {
+      const i = textAnders[0];
+      bad.push(`Karte ${i}\n      Cockpit   ${JSON.stringify([co.m[i].kopf, co.m[i].wer, co.m[i].zeiten])}`
+        + `\n      Betreiber ${JSON.stringify([be.m[i].kopf, be.m[i].wer, be.m[i].zeiten])}`);
+    }
+    // Die aufgeklappte Karte: dieselben Beschriftungen, dieselben Werte,
+    // dieselbe Spaltenbreite der Beschriftungsliste.
+    const offenCo = co.m.find(k => k.offen === 'true');
+    const offenBe = be.m.find(k => k.offen === 'true');
+    check('Adressenkarten: auf beiden Seiten laesst sich eine Karte aufklappen',
+      !!offenCo && !!offenBe && offenCo.dt.length >= 8);
+    if (offenCo && offenBe) {
+      check('KRITISCH Adressenkarten: dieselben Beschriftungen im aufgeklappten Teil',
+        JSON.stringify(offenCo.dt.map(norm)) === JSON.stringify(offenBe.dt));
+      if (JSON.stringify(offenCo.dt.map(norm)) !== JSON.stringify(offenBe.dt)) {
+        bad.push('Cockpit   ' + JSON.stringify(offenCo.dt)
+          + '\n      Betreiber ' + JSON.stringify(offenBe.dt));
+      }
+      check('KRITISCH Adressenkarten: und dieselben Werte darin',
+        JSON.stringify(offenCo.dd.map(norm)) === JSON.stringify(offenBe.dd));
+      if (JSON.stringify(offenCo.dd.map(norm)) !== JSON.stringify(offenBe.dd)) {
+        bad.push('Cockpit   ' + JSON.stringify(offenCo.dd)
+          + '\n      Betreiber ' + JSON.stringify(offenBe.dd));
+      }
+      check('KRITISCH Adressenkarten: die Beschriftungsspalte ist gleich breit',
+        offenCo.dlS === offenBe.dlS && offenCo.dlS !== '');
+    }
   }
 }
 
