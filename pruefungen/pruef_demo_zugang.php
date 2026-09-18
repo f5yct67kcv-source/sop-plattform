@@ -207,9 +207,19 @@ $pruef('KRITISCH: nach der Vorwahl kommt kein 0 und kein 1',
     !demo_zugang_telefon_gueltig('+41 09 123 45 67')
     && !demo_zugang_telefon_gueltig('+41 19 123 45 67')
     && !demo_zugang_telefon_gueltig('009 123 45 67'));
-$pruef('eine auslaendische Nummer gilt hier nicht',
-    !demo_zugang_telefon_gueltig('+49 151 12345678')
-    && !demo_zugang_telefon_gueltig('+33 6 12 34 56 78'));
+// Drei Laender sind zugelassen (Entscheidung 2026-09-18), der Rest nicht.
+$pruef('deutsche und oesterreichische Nummern mit Landesvorwahl gelten',
+    demo_zugang_telefon_gueltig('+49 151 12345678')
+    && demo_zugang_telefon_gueltig('0049 30 1234567')
+    && demo_zugang_telefon_gueltig('+43 664 1234567')
+    && demo_zugang_telefon_gueltig('+43 1 1234567'));
+$pruef('KRITISCH: ein viertes Land gilt nicht',
+    !demo_zugang_telefon_gueltig('+33 6 12 34 56 78')
+    && !demo_zugang_telefon_gueltig('+1 415 555 0123')
+    && !demo_zugang_telefon_gueltig('+39 06 1234567'));
+$pruef('KRITISCH: auch bei DE und AT faellt die fuehrende Null der Vorwahl weg',
+    !demo_zugang_telefon_gueltig('+49 0151 12345678')
+    && !demo_zugang_telefon_gueltig('+43 0664 1234567'));
 
 // Zustellbarkeit: dieselbe Absicherung wie beim Kontaktformular, mit
 // einspeisbarem Nachschlag statt echtem DNS (ENT-469-Bauart).

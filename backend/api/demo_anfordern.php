@@ -76,7 +76,7 @@ if ($firma === '' || $person === '' || $email === '' || filter_var($email, FILTE
 // Projektinhabers, siehe demo_zugang.php) -- Pflichtfeld, nicht optional.
 if (!demo_zugang_telefon_gueltig($telefon)) {
     json_response(['status' => 'error', 'felder' => ['telefon' => true],
-        'message' => 'Bitte eine Schweizer Telefonnummer angeben, z. B. +41 79 123 45 67 oder 079 123 45 67.'], 400);
+        'message' => 'Bitte eine Telefonnummer aus der Schweiz, Deutschland oder Österreich angeben — mit Landesvorwahl, z. B. +41 79 123 45 67.'], 400);
 }
 // Existiert die Domain ueberhaupt? Eine Anfrage verbraucht sofort einen von
 // zehn knappen Plaetzen -- eine Adresse, die es nicht gibt, waere ein

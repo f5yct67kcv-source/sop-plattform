@@ -1224,15 +1224,18 @@ p{margin:0 0 1em}
       email: feld('email').value.trim(), telefon: feld('telefon').value.trim(),
       website: feld('website').value
     };
-    // Dieselben Regeln wie im Rechenkern (backend/demo_zugang.php): eine
-    // Schweizer Nummer hat nach der Landesvorwahl neun Ziffern, die erste
-    // davon 2-9; geschrieben national (079 123 45 67) oder international
-    // (+41 79 123 45 67, auch 0041). Ob es die E-Mail-Adresse wirklich
+    // Dieselben Regeln wie im Rechenkern (demo_zugang_telefon_gueltig() in
+    // backend/demo_zugang.php, Begruendung der Laengen steht dort):
+    // zugelassen sind die Schweiz, Deutschland und Oesterreich; ohne
+    // Landesvorwahl gilt die Schweiz. Ob es die E-Mail-Adresse wirklich
     // gibt, kann nur der Server sagen -- der Browser kann keinen
     // Mailserver nachschlagen.
     function telefonGueltig(wert){
       var roh = wert.replace(/[\s\/\-\.\(\)]+/g, '');
-      return /^(?:\+41|0041)[2-9]\d{8}$/.test(roh) || /^0[2-9]\d{8}$/.test(roh);
+      return /^(?:\+41|0041)[2-9]\d{8}$/.test(roh)   // Schweiz, international
+        || /^(?:\+49|0049)[1-9]\d{5,12}$/.test(roh)  // Deutschland
+        || /^(?:\+43|0043)[1-9]\d{3,12}$/.test(roh)  // Oesterreich
+        || /^0[2-9]\d{8}$/.test(roh);                // Schweiz, national
     }
     var fehlend = [], leer = false;
     ['firma','name','email','telefon'].forEach(function(n){
@@ -1247,7 +1250,7 @@ p{margin:0 0 1em}
       // Ein leeres Feld und eine falsch geschriebene Nummer sind zwei
       // verschiedene Aussagen und bekommen zwei verschiedene Texte.
       melde(!leer && fehlend.length === 1 && fehlend[0] === 'telefon'
-        ? 'Bitte eine Schweizer Telefonnummer angeben, z. B. +41 79 123 45 67 oder 079 123 45 67.'
+        ? 'Bitte eine Telefonnummer aus der Schweiz, Deutschland oder Österreich angeben \u2014 mit Landesvorwahl, z. B. +41 79 123 45 67.'
         : 'Bitte Firma, Name, Telefon und eine gültige E-Mail-Adresse angeben.', true);
       feld(fehlend[0]).focus();
       return;
