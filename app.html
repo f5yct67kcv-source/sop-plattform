@@ -1102,6 +1102,13 @@ button.rd-kopf:active { background: var(--line-soft); }
 .rgs-bd.voll > :not(.rgs-karte-huelle) { margin: 0 16px; }
 .rgs-bd.voll > :last-child:not(.rgs-karte-huelle) { margin-bottom: calc(12px + env(safe-area-inset-bottom)); }
 .rgs-karte { position: absolute; inset: 0; }
+/* Die wachsende Fuellung waehrend der Verweilzeit (ENT-579), auf der
+   nativen Karte als Element ueber der Karte statt als Kartenkreis --
+   Begruendung bei rgKarteNativAufSchirm. Gruen wie ein erfasster Punkt:
+   Was hier waechst, wird gleich gruen. Nicht anklickbar, damit es die
+   Karte darunter nicht blockiert. */
+.rgs-fuellung { position: absolute; border-radius: 50%; pointer-events: none;
+  background: rgba(79, 206, 150, 0.35); z-index: 2; }
 /* Durchsicht auf die native Karte -- und was darunter NICHT
    durchscheinen darf (ENT-609).
 
@@ -8325,6 +8332,8 @@ async function rgKarteNativAbbauen() {
   // zu keiner Karte mehr gehoeren -- dieselbe Falle wie bei der
   // Standortmarke in ENT-331.
   rgsNativKreise = [];
+  rgsNativGrenzen = null;
+  rgFuellungNativAus();
   try { await weg.destroy(); } catch (e) {}
 }
 
@@ -8690,6 +8699,20 @@ async function rgKarteNativBauen(d, bauLauf) {
   if (bauLauf !== rgsKarteBauLauf) { return; }
   const el = $('rgsKarte');
   if (!el) { return; }
+  // ERST warten, bis das Element seine Groesse hat.
+  //
+  // Die native Ansicht wird an die Stelle des Elements gelegt, und ihre
+  // Masse werden beim Erzeugen EINMAL abgelesen. Wer sie ablas, bevor die
+  // Seite fertig umgebrochen hat, bekam eine Ansicht der Groesse Null --
+  // sichtbar als schwarze Flaeche. Vom Projektinhaber gemeldet: Beim Start
+  // der Runde blieb der Bildschirm schwarz, und erst das Umschalten der
+  // Nachtsicht brachte die Karte, weil die Karte dabei neu gebaut wird --
+  // zu einem Zeitpunkt, an dem die Seite laengst steht.
+  if (!(await rgsElementBereit(el))) {
+    if (bauLauf === rgsKarteBauLauf) { zeigen('rgsKarteFehler'); }
+    return;
+  }
+  if (bauLauf !== rgsKarteBauLauf || $('rgsKarte') !== el) { return; }
   try {
     rgsNativKarte = await window.KarteNativ.GoogleMap.create({
       id: 'rgs-karte',
@@ -8730,10 +8753,121 @@ async function rgKarteNativBauen(d, bauLauf) {
   // gewollt.
   try { await rgsNativKarte.enableCurrentLocation(true); } catch (e) {}
   await rgKarteNativKreiseZeichnen(d.zeigbar);
+  // Die Kartengrenzen brauchen wir, um den Kontrollpunkt auf den
+  // Bildschirm zu rechnen (Fuellung waehrend der Verweilzeit). Sie aendern
+  // sich beim Verschieben und Zoomen -- darum einmal jetzt und danach bei
+  // jedem Stillstand der Kamera.
+  await rgKarteNativGrenzenLesen();
+  try { await rgsNativKarte.setOnCameraIdleListener(() => rgKarteNativGrenzenLesen()); } catch (e) {}
   // Den Hinweis erst entfernen, wenn die Karte wirklich steht -- dieselbe
   // Reihenfolge wie in der Browser-Fassung.
   const stand = $('rgsKarteStand');
   if (stand) { stand.remove(); }
+}
+
+/* Wartet, bis ein Element im Dokument steht UND eine Groesse hat.
+
+   Rahmenweise statt mit festem Zeitabstand: Der Umbruch ist meist nach
+   einem einzigen Bild fertig, und ein festes Warten waere entweder zu
+   kurz (dann hilft es nicht) oder zu lang (dann sieht man die Karte
+   spaeter als noetig). Nach einer Sekunde wird aufgegeben -- dann stimmt
+   etwas anderes nicht, und eine Meldung ist besser als ewiges Warten. */
+function rgsElementBereit(el, fristMs) {
+  const frist = fristMs || 1000;
+  return new Promise(fertig => {
+    const start = Date.now();
+    const sehen = () => {
+      if (!el.isConnected) { fertig(false); return; }
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) { fertig(true); return; }
+      if (Date.now() - start > frist) { fertig(false); return; }
+      requestAnimationFrame(sehen);
+    };
+    requestAnimationFrame(sehen);
+  });
+}
+
+/* Die wachsende gruene Fuellung auf der nativen Karte (ENT-609).
+
+   Warum anders als im Browser: Dort waechst ein echter Kartenkreis, Bild
+   fuer Bild (setRadius). Das native SDK kennt kein Aendern eines
+   bestehenden Kreises -- man muesste ihn sechzigmal je Sekunde loeschen
+   und neu anlegen, jedes Mal ueber die Bruecke zwischen Seite und
+   Betriebssystem. Das waere weder fluessig noch sparsam.
+
+   Darum wird die Fuellung UEBER die Karte gelegt, als gewoehnliches
+   Element im Dokument. Dafuer muss der Kontrollpunkt auf den Bildschirm
+   gerechnet werden: aus den Kartengrenzen (getMapBounds) und der Groesse
+   der Flaeche. Ueber wenige hundert Meter ist eine geradlinige Umrechnung
+   genau genug -- die Kruemmung der Mercator-Projektion faellt auf dieser
+   Strecke nicht ins Gewicht.
+
+   Reine Funktionen, damit sich das ohne Karte und ohne Geraet pruefen
+   laesst. */
+function rgKarteNativAufSchirm(grenzen, masse, lat, lng) {
+  if (!grenzen || !grenzen.southwest || !grenzen.northeast || !masse) { return null; }
+  const sw = grenzen.southwest, ne = grenzen.northeast;
+  const spanneLat = Number(ne.lat) - Number(sw.lat);
+  const spanneLng = Number(ne.lng) - Number(sw.lng);
+  if (!(spanneLat > 0) || !(spanneLng > 0)) { return null; }
+  if (!(masse.width > 0) || !(masse.height > 0)) { return null; }
+  return {
+    x: (Number(lng) - Number(sw.lng)) / spanneLng * masse.width,
+    // Nach Norden wachsen die Breitengrade, nach unten die Bildschirm-
+    // Koordinaten -- darum von oben gerechnet.
+    y: (Number(ne.lat) - Number(lat)) / spanneLat * masse.height,
+  };
+}
+
+/* Wie viele Bildpunkte sind so viele Meter? Ueber die Breite gerechnet:
+   Ein Breitengrad ist ueberall rund 111 320 m lang, ein Laengengrad nicht
+   -- er schrumpft zum Pol hin. */
+function rgKarteNativMeterInPixel(grenzen, masse, meter) {
+  if (!grenzen || !grenzen.southwest || !grenzen.northeast || !masse) { return 0; }
+  const spanneLat = Number(grenzen.northeast.lat) - Number(grenzen.southwest.lat);
+  if (!(spanneLat > 0) || !(masse.height > 0)) { return 0; }
+  return (Number(meter) / 111320) / spanneLat * masse.height;
+}
+
+let rgsNativGrenzen = null;    // zuletzt gelesene Kartengrenzen
+let rgsFuellEl = null;         // das Element der Fuellung im Dokument
+
+async function rgKarteNativGrenzenLesen() {
+  if (!rgsNativKarte) { rgsNativGrenzen = null; return; }
+  try { rgsNativGrenzen = await rgsNativKarte.getMapBounds(); }
+  catch (e) { rgsNativGrenzen = null; }
+}
+
+function rgFuellungNativAus() {
+  if (rgsFuellEl) {
+    try { rgsFuellEl.remove(); } catch (e) {}
+    rgsFuellEl = null;
+  }
+}
+
+/* Setzt die Fuellung auf den Stand, der zu diesem Augenblick gehoert.
+   Gibt zurueck, ob sie ueberhaupt gezeichnet werden konnte -- ohne
+   Kartengrenzen geht es nicht, und dann soll die Karte lieber nichts
+   zeigen als etwas an der falschen Stelle. */
+function rgFuellungNativZeichnen(p, anteil) {
+  const huelle = $('rgsBody') ? $('rgsBody').querySelector('.rgs-karte-huelle') : null;
+  const karte = $('rgsKarte');
+  if (!huelle || !karte || !rgsNativGrenzen) { rgFuellungNativAus(); return false; }
+  const masse = karte.getBoundingClientRect();
+  const ort = rgKarteNativAufSchirm(rgsNativGrenzen, masse, Number(p.lat), Number(p.lng));
+  if (!ort) { rgFuellungNativAus(); return false; }
+  const r = rgKarteNativMeterInPixel(rgsNativGrenzen, masse, rdRadiusVon(p)) * anteil;
+  if (!rgsFuellEl) {
+    rgsFuellEl = document.createElement('div');
+    rgsFuellEl.className = 'rgs-fuellung';
+    rgsFuellEl.setAttribute('aria-hidden', 'true');
+    huelle.appendChild(rgsFuellEl);
+  }
+  rgsFuellEl.style.left = (ort.x - r) + 'px';
+  rgsFuellEl.style.top = (ort.y - r) + 'px';
+  rgsFuellEl.style.width = (2 * r) + 'px';
+  rgsFuellEl.style.height = (2 * r) + 'px';
+  return true;
 }
 
 /* Die Geofence-Radien auf der nativen Karte (ENT-609).
@@ -8871,6 +9005,7 @@ function rgKartenSignatur(punkte) {
    rgBereichPruefen(). Faellt die Karte aus, faellt nur das Bild aus --
    darum steht alles hier in try/catch und niemand fragt sie etwas. */
 function rgFuellungAus() {
+  rgFuellungNativAus();
   if (rgsFuellBild !== null) {
     try { cancelAnimationFrame(rgsFuellBild); } catch (e) {}
     rgsFuellBild = null;
@@ -8901,11 +9036,31 @@ function rgFuellAnteil(drinSeit, jetzt) {
 }
 
 function rgFuellungNachfuehren() {
-  if (rgsModus !== 'lauf' || !rundgangAktiv || !rgsKarte || rgsReiter !== 'karte') {
+  const karteDa = rgsKarte || rgsNativKarte;
+  if (rgsModus !== 'lauf' || !rundgangAktiv || !karteDa || rgsReiter !== 'karte') {
     rgFuellungAus(); return;
   }
   const k = rgFuellKandidat(rundgangAktiv.kontrollpunkte);
   if (!k) { rgFuellungAus(); return; }
+  // Auf der nativen Karte laeuft dasselbe, nur mit einem Element ueber der
+  // Karte statt einem Kartenkreis -- Begruendung bei
+  // rgKarteNativAufSchirm. Derselbe Takt, dieselbe Frist, dieselbe Farbe.
+  if (rgsNativKarte) {
+    if (rgsFuellPunktId !== Number(k.id)) {
+      rgFuellungNativAus();
+      rgsFuellPunktId = Number(k.id);
+    }
+    const rahmenNativ = () => {
+      rgsFuellBild = null;
+      if (!rgsNativKarte || !rundgangAktiv) { return; }
+      const p = rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === rgsFuellPunktId);
+      if (!p || p.erledigt || !(p._autoRest > 0)) { rgFuellungAus(); return; }
+      rgFuellungNativZeichnen(p, rgFuellAnteil(p._drinSeit, Date.now()));
+      rgsFuellBild = requestAnimationFrame(rahmenNativ);
+    };
+    if (rgsFuellBild === null) { rgsFuellBild = requestAnimationFrame(rahmenNativ); }
+    return;
+  }
   if (rgsFuellPunktId !== Number(k.id)) {
     // Anderer Punkt als zuletzt -- der alte Kreis gehoert weg.
     rgFuellungAus();
