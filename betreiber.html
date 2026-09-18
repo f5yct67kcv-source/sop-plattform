@@ -76,6 +76,7 @@
   --pos:#0E7C55; --pos-soft:#E6F6EF;
   --neg:#C2382A; --neg-soft:#FCEDEB;
   --warn:#9A6B08; --warn-soft:#FBF3E0; --warn-line:#EFDCAE;
+  --glas:rgba(255,255,255,.86);   /* Milchglas der Werkzeugleiste */
   --shell:#16181D; --shell-hi:#1E2128; --shell-line:#272B33;
   --shell-txt:#9298A5; --shell-txt-hi:#F3F5F8;
   --nix:#D8DCE2;
@@ -111,6 +112,7 @@ html[data-thema="dunkel"] {
   --pos:#4FCE96; --pos-soft:#10281E;
   --neg:#F27F70; --neg-soft:#2E1A18;
   --warn:#E2B156; --warn-soft:#2B2314; --warn-line:#4A3C1C;
+  --glas:rgba(22,27,39,.86);
   --shell:#0B0D11; --shell-hi:#14171C; --shell-line:#23272F;
   --shell-txt:#8A919E; --shell-txt-hi:#F2F4F8;
   --nix:#3B4560;
@@ -145,32 +147,90 @@ body {
    Drei Spalten als Raster 1fr auto 1fr, nicht als Flex mit Abstandhalter:
    Mittiges gehoert in die Mitte des Containers, nicht zwischen zwei
    ungleich lange Texte (Hausregel). */
+/* ── Kopfleiste ───────────────────────────────────────────────────
+   Dieselbe Bauart wie die Kopfleiste des Cockpits, wenn dort die
+   Seitenleiste zur Kopfzeile geworden ist (.shell.aus .side, ENT-086/410/
+   411): 70 px hoch, links der Schriftzug, in der Mitte die Navigation, ganz
+   rechts der Markenknopf mit dem Kontomenue darunter.
+
+   Bis ENT-611 stand links ein dreizeiliger Block -- Schriftzug, Bereichsname,
+   Kontozeile untereinander -- und rechts vier Bedienelemente nebeneinander.
+   Das trug, war aber sichtbar eine andere Leiste als im Cockpit: hoeher,
+   anders gegliedert, mit dem Konto als Text statt als Griff. Vorgabe des
+   Projektinhabers ist die Cockpit-Fassung.
+
+   Raster 1fr auto 1fr und nicht ein Abstandhalter: Die Navigation soll in
+   der Mitte des FENSTERS stehen, nicht in der Mitte des Rests zwischen
+   Schriftzug und Markenknopf. Die beiden Aussenspalten sind verschieden
+   breit. */
 .kopf {
+  /* Sie klebt ueber der Werkzeugleiste -- sonst schoebe sie sich beim
+     Scrollen darueber und verdeckte die Navigation. */
+  position: sticky; top: 0; z-index: 40;
   background: var(--shell); color: var(--shell-txt-hi);
-  padding: 18px 24px;
-  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px;
+  height: 70px; padding: 0 14px;
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 4px;
+  border-bottom: 1px solid var(--shell-line);
 }
-/* Marke, Bereichsname, Konto -- in dieser Reihenfolge untereinander.
-   --shell-txt-hi wie der Bereichsname darunter: Dieser Bereich gehoert dem
-   Betreiber der Plattform selbst, die Marke tritt hier nicht zurueck.
-   22 px: ueber dem Mindestmass der Fassung ohne Claim (20 px) und knapp
-   ueber dem 16-px-Bereichsnamen -- die Marke fuehrt, ohne den Kopf
-   aufzublaehen. */
-/* min-width: 0 -- ohne das ist die Mindestbreite einer Rasterspalte der
-   laengste unzerlegbare Inhalt darin, hier die Kontozeile ("name ·
-   lange@adresse"). Bei 390 px schob sie den Kopf um 15 px ueber den
-   Bildschirm hinaus, samt Navigationsband darunter; die Seite scrollte
-   quer, und quer scrollen darf nur das Band (Hausregel). Gemessen
-   aufgefallen ist es erst, als rechts ein zweiter Schalter dazukam --
-   vorher blieb gerade noch Platz. Die Zeile kuerzt jetzt mit Auslassung,
-   statt die Seite zu verbreitern. */
-.kopf-links { display: flex; flex-direction: column; align-items: flex-start; gap: 7px;
-  min-width: 0; }
-.kopf-links .unter { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.kopf-marke { height: 22px; width: auto; display: block; color: var(--shell-txt-hi); }
-.kopf .titel { font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
-.kopf .unter { font-size: 12.5px; color: var(--shell-txt); margin-top: 2px; }
-.kopf .rechts { justify-self: end; display: flex; gap: 10px; align-items: center; }
+/* 26 px wie im Cockpit: Die Marke steht neben 24-px-Sinnbildern mit
+   Beschriftung darunter, nicht neben 13,5-px-Text. */
+/* --shell-txt und nicht --shell-txt-hi: Im Cockpit steht die
+   Herstellersignatur zurueckhaltend da, nicht als hellstes Element der
+   Leiste. Bis ENT-611 war sie hier heller, mit der Begruendung, dieser
+   Bereich gehoere der Betreiberin selbst. Die Vorgabe lautet jetzt 1:1 --
+   und gemessen war es der auffaelligste Unterschied der beiden Leisten. */
+.kopf-marke { height: 26px; width: auto; display: block; color: var(--shell-txt);
+  justify-self: start; }
+.kopf .rechts { justify-self: end; display: flex; gap: 10px; align-items: center;
+  position: relative; }
+
+/* ── Markenknopf und Kontomenue ───────────────────────────────────
+   Der Griff ist kreisrund, weil das Zeichen darin kreisrund ist -- ein
+   abgerundetes Quadrat um einen Kreis erzeugt vier sichtbare Ecken.
+   Dahinter steht, was vorher offen in der Leiste lag: wer angemeldet ist,
+   die Einrichtung und das Abmelden. */
+.marken-knopf {
+  display: inline-flex; flex: none; padding: 3px; border: none;
+  background: none; cursor: pointer; border-radius: 50%;
+  transition: background .13s, box-shadow .13s;
+}
+.marken-knopf img { display: block; width: 40px; height: 40px; border-radius: 50%;
+  object-fit: contain; background: #fff; padding: 2px; }
+.marken-knopf:hover { background: var(--shell-hi); }
+.marken-knopf:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.kopf.menue-offen .marken-knopf { background: var(--shell-hi); box-shadow: 0 0 0 2px var(--accent); }
+.konto-menue {
+  position: absolute; top: calc(70px / 2 + 21px + 4px); right: 0;
+  z-index: 60; width: 252px; max-width: calc(100vw - 28px);
+  display: none; flex-direction: column; gap: 1px;
+  padding: 7px;
+  background: var(--shell); border: 1px solid var(--shell-line);
+  border-radius: 14px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .42), 0 2px 10px rgba(0, 0, 0, .26);
+}
+.kopf.menue-offen .konto-menue { display: flex; animation: markenBlatt .14s ease-out; }
+@keyframes markenBlatt { from { opacity: 0; transform: translateY(-6px); } }
+/* Wer ist angemeldet -- die Frage zuerst, danach erst, was man tun kann. */
+.konto-menue .wer {
+  padding: 9px 10px 12px; margin-bottom: 5px;
+  border-bottom: 1px solid var(--shell-line);
+}
+.konto-menue .wer .titel { font-size: 13.5px; font-weight: 650; color: var(--shell-txt-hi); }
+.konto-menue .wer .unter { font-size: 12px; color: var(--shell-txt); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.konto-menue .menue-eintrag {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  justify-content: flex-start; min-height: 40px; margin: 0; padding: 9px 10px;
+  border: none; background: transparent; border-radius: 9px;
+  color: var(--shell-txt); font: inherit; font-size: 13.5px; font-weight: 550;
+  text-align: left; cursor: pointer; transition: background .13s, color .13s;
+}
+.konto-menue .menue-eintrag:hover { background: var(--shell-hi); color: var(--shell-txt-hi); }
+.konto-menue .menue-eintrag svg.i { flex: none; width: 19px; height: 19px; }
+/* Abmelden ist der einzige Eintrag, den man nicht versehentlich treffen
+   soll -- abgesetzt und in der Warnfarbe, wie im Cockpit. */
+.konto-menue #knopf-abmelden { margin-top: 6px; color: var(--neg); }
+.konto-menue #knopf-abmelden:hover { background: var(--neg-soft); color: var(--neg); }
 
 /* ── Navigationsband ──────────────────────────────────────────────
    Dieselbe Bauart wie die Kopfleiste des Cockpits, wenn dort die
@@ -182,33 +242,80 @@ body {
    des FENSTERS, nicht in der Mitte des Rests zwischen Titel und
    Abmelden-Knopf. Die beiden Aussenspalten sind verschieden breit; mit
    einem Abstandhalter saesse die Navigation sichtbar daneben. */
-.kopf-nav { display: flex; align-items: center; gap: 2px; }
+.kopf-nav { justify-self: center; display: flex; flex-direction: row; align-items: center;
+  gap: 2px; flex: none; padding: 0; overflow: visible; }
 .kopf-nav .nav-item {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 4px; min-width: 84px; min-height: 44px; padding: 5px 10px;
-  border: 0; background: transparent; border-radius: 8px;
-  color: var(--shell-txt); font: inherit; cursor: pointer;
+  gap: 4px; min-width: 84px; min-height: 38px; padding: 7px 10px;
+  border: 0; background: transparent; border-radius: var(--r-sm);
+  color: var(--shell-txt); font: inherit; font-size: 13.5px; font-weight: 550;
+  text-align: left; cursor: pointer;
   transition: background .13s, color .13s;
 }
 .kopf-nav .nav-item .lbl {
-  font-size: 12px; font-weight: 650; letter-spacing: .2px;
+  display: block; font-size: 12px; font-weight: 650; letter-spacing: .2px;
   line-height: 1.1; white-space: nowrap;
 }
-.kopf-nav .nav-item svg { width: 19px; height: 19px; fill: none; stroke: currentColor;
-  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+/* 1.7 wie svg.i im Cockpit -- 1.8 stand hier seit dem ersten Entwurf und
+   zeichnete die Sinnbilder eine Spur fetter. Gemessen gefunden. */
+.kopf-nav .nav-item svg { width: 24px; height: 24px; fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .kopf-nav .nav-item:hover { background: var(--shell-hi); color: var(--shell-txt-hi); border-color: transparent; }
 .kopf-nav .nav-item.on { background: var(--shell-hi); color: var(--shell-txt-hi); }
 .kopf-nav .nav-item.on svg { stroke: var(--accent); }
 
-/* ── Titelleiste ──────────────────────────────────────────────────
-   Auf dem Handy ist sie der einzige Ort, der sagt, wo man ist
-   (Hausregel): Titel deutlich, Unterzeile lesbar. */
+/* ── Werkzeugleiste ───────────────────────────────────────────────
+   Die Fassung des Cockpits (.topbar, ENT-086): 60 px hoch, Milchglas mit
+   Unschaerfe, klebend unter der Kopfleiste. Links Titel und Unterzeile --
+   auf dem Handy der einzige Ort, der sagt, wo man ist (Hausregel). In der
+   Mitte die Unterreiter des offenen Bereichs, rechts die beiden Schalter.
+
+   Raster statt Flex mit Abstandhalter: Die Unterreiter sollen in der Mitte
+   des FENSTERS stehen, nicht in der Mitte des Rests zwischen Titel und
+   Knopfgruppe -- und der Titel wechselt mit jedem Bereich seine Laenge, die
+   Mitte wuerde also bei jedem Klick springen. Ist kein Unterreiter da,
+   faellt die mittlere Spalte auf 0 zusammen.
+
+   Die Spalten werden AUSDRUECKLICH zugewiesen: Ein Element mit display:none
+   ist kein Rasterfeld: Ohne die Angabe rutschte die rechte Gruppe in die
+   mittlere Spalte, sobald die Reiterleiste verborgen ist. */
 .leiste {
-  background: var(--surface); border-bottom: 1px solid var(--line);
-  padding: 16px 24px;
+  position: sticky; top: 70px; z-index: 30;
+  height: calc(60px + env(safe-area-inset-top)); flex: none;
+  background: var(--glas); backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--line);
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; gap: 16px; padding: env(safe-area-inset-top) 26px 0;
 }
-.leiste h1 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
-.leiste .crumb { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
+.leiste-links  { grid-column: 1; display: flex; align-items: center; gap: 16px; min-width: 0; }
+.leiste-rechts { grid-column: 3; display: flex; align-items: center; gap: 16px; justify-self: end; }
+.top-sub       { grid-column: 2; justify-self: center; }
+.leiste h1 { margin: 0; font-size: 16px; font-weight: 680; letter-spacing: -.2px; }
+.leiste .crumb { font-size: 12px; color: var(--ink-3); margin-top: 1px; }
+
+/* Unterreiter des offenen Bereichs, neben dem Titel in der Werkzeugleiste
+   (ENT-086). Die Knoepfe werden AUS den Originalen erzeugt und geben den
+   Klick an sie weiter -- keine zweite Liste, die irgendwann von der ersten
+   abweicht. Kein eigener Aussenabstand: Im Raster uebernimmt die Luecke der
+   Spalten den Abstand; ein margin-left schoebe die Leiste um seine halbe
+   Groesse aus der Mitte. */
+/* Die Haupt-Reiterleiste eines Bereichs steht in der Werkzeugleiste, nicht
+   im Inhalt. Das Original bleibt im DOM -- die Knoepfe oben geben ihren
+   Klick daran weiter, und was ein Zustand ausblendet, taucht oben gar
+   nicht erst auf. Ausgeblendet wird es von unterreiterZeichnen(), nicht
+   hier: Unter 1210 px steht es wieder im Inhalt, weil die Werkzeugleiste
+   dort keinen Platz mehr hat. */
+.top-sub { display: none; align-items: center; gap: 2px; }
+.top-sub button {
+  border: none; background: transparent; color: var(--ink-2); font: inherit;
+  font-size: 13px; font-weight: 560; padding: 7px 11px; border-radius: var(--r-sm);
+  cursor: pointer; white-space: nowrap; transition: background .13s, color .13s;
+  min-height: 0;
+}
+.top-sub button:hover { background: var(--hover); color: var(--ink); }
+.top-sub button.on { color: var(--accent); background: var(--accent-soft); }
+
 
 /* Dieselbe Inhaltsbreite und dasselbe Polster wie .content im Cockpit.
    Vorher 1120 px: Das Offertformular stand damit schmaler als dasselbe
@@ -328,21 +435,19 @@ button.klein { min-height: 36px; padding: 0 12px; font-size: 13px; }
 /* Zahnrad "Einrichtung" -- selbe Kopfzeile, dieselben --shell-Farben wie
    die Bereichsreiter oben, kein eigener Farbraum wie beim Thema-Schalter,
    der bewusst in beiden Themen dunkel bleibt. */
-.icon-knopf {
-  min-height: 44px; min-width: 32px; padding: 0; border: 0; background: none;
-  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
-  border-radius: 8px; color: var(--shell-txt); transition: background .13s, color .13s;
-}
-.icon-knopf:hover { background: var(--shell-hi); color: var(--shell-txt-hi); }
-.icon-knopf .i { width: 19px; height: 19px; fill: none; stroke: currentColor;
-  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.icon-knopf .ico-wrap { position: relative; display: inline-flex; }
-.icon-knopf .update-punkt {
-  display: none; position: absolute; top: -2px; right: -2px; width: 9px; height: 9px;
+/* Der Punkt am Zahnrad, sobald etwas nachzutragen ist -- Zeichen fuer
+   Zeichen die Fassung des Cockpits (.nav-item .update-punkt). Er sass bis
+   ENT-611 an einem eigenen Knopf in der Kopfleiste; seit der Umstellung
+   steht die Einrichtung als Eintrag im Kontomenue, also dort, wo das
+   Cockpit sie auch hat. */
+.nav-item .ico-wrap { position: relative; display: inline-flex; flex: none; }
+.nav-item .update-punkt {
+  display: none; position: absolute; top: -3px; right: -3px; width: 9px; height: 9px;
   border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 2px var(--shell);
 }
-.icon-knopf.hat-update { color: var(--warn); }
-.icon-knopf.hat-update .update-punkt { display: block; }
+.nav-item.hat-update { color: var(--warn); }
+.nav-item.hat-update svg.i { stroke: var(--warn); }
+.nav-item.hat-update .update-punkt { display: block; }
 
 /* Dialog "Einrichtung" -- eigenes, schlankes Overlay statt einer Karte im
    Seitenfluss (dasselbe Prinzip wie dlgEinrichtung im Cockpit, hier ohne
@@ -366,35 +471,43 @@ button.klein { min-height: 36px; padding: 0 12px; font-size: 13px; }
   padding: 14px 22px; border-top: 1px solid var(--line-soft);
   display: flex; gap: 9px; justify-content: flex-end; flex: none;
 }
-.thema-schalter {
-  min-height: 44px; width: 52px; padding: 0; border: 0; background: none;
-  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
-}
-.thema-schalter:hover { border-color: transparent; }
-.ts-bahn {
-  width: 52px; height: 30px; border-radius: 999px; position: relative;
-  border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08);
-  transition: background .18s, border-color .18s;
-}
-.thema-schalter:hover .ts-bahn { border-color: rgba(255,255,255,.34); }
-.ts-schieber {
-  position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%;
-  background: #F3F5F8; display: flex; align-items: center; justify-content: center;
-  transition: transform .2s;
-}
-.ts-schieber svg {
-  width: 14px; height: 14px; fill: none; stroke-width: 2.1;
-  stroke-linecap: round; stroke-linejoin: round; position: absolute; transition: opacity .16s;
-}
-.ts-schieber .i-sonne { stroke: #9A6B08; opacity: 1; }
-.ts-schieber .i-mond  { stroke: #2F5BD7; opacity: 0; }
-html[data-thema="dunkel"] .ts-bahn { background: var(--accent-soft); border-color: var(--accent-line); }
-html[data-thema="dunkel"] .ts-schieber { transform: translateX(22px); }
-html[data-thema="dunkel"] .ts-schieber .i-sonne { opacity: 0; }
-html[data-thema="dunkel"] .ts-schieber .i-mond  { opacity: 1; }
+/* Hell/Dunkel -- Zeichen fuer Zeichen die Fassung des Cockpits. Bis
+   ENT-611 stand der Schalter in der dunklen Kopfleiste und trug dafuer
+   eigene Weiss-Alpha-Farben; jetzt steht er wie dort in der Werkzeugleiste
+   auf hellem Grund und kann dieselben Variablen benutzen. */
+.thema-schalter { flex: none; width: 52px; height: 30px; border-radius: 999px; padding: 0;
+  /* min-height: 0 gegen die 44-px-Regel, die diese Seite JEDEM Knopf
+     gibt: Sie steht spaeter im Blatt und gewinnt sonst. Gemessen war
+     der Schalter dadurch 44 statt 30 px hoch -- im Quelltext las sich
+     die Zeile darueber vollkommen richtig. */
+  min-height: 0; display: block;
+  border: 1px solid var(--line); background: var(--bg); cursor: pointer; position: relative;
+  transition: background .18s, border-color .18s; }
+.thema-schalter:hover { border-color: var(--line-hi); }
+/* padding und min-height ausdruecklich zurueckgesetzt: ".knopf" ist auf
+   dieser Seite auch der Name der Sammelklasse fuer Bedienelemente
+   (button, .knopf -- 44 px hoch, 0 18px Polster). Der Schieber im
+   Schalter heisst im Cockpit genauso, erbt hier aber deren Masse und
+   war gemessen 44 px hoch und 18 px breit gepolstert. Ein
+   Namenskonflikt derselben Sorte wie ENT-536. */
+.thema-schalter .knopf { position: absolute; top: 2px; left: 2px; width: 24px; height: 24px;
+  min-height: 0; padding: 0; border: none;
+  border-radius: 50%; background: var(--surface); box-shadow: var(--sh-1);
+  display: flex; align-items: center; justify-content: center; transition: transform .2s; }
+.thema-schalter svg { width: 14px; height: 14px; fill: none; stroke-width: 2.1;
+  stroke-linecap: round; stroke-linejoin: round; position: absolute; transition: opacity .16s; }
+.thema-schalter .i-sonne { stroke: var(--warn); opacity: 1; }
+.thema-schalter .i-mond  { stroke: var(--accent); opacity: 0; }
+html[data-thema="dunkel"] .thema-schalter { background: var(--accent-soft); border-color: var(--accent-line); }
+html[data-thema="dunkel"] .thema-schalter .knopf { transform: translateX(22px); }
+html[data-thema="dunkel"] .thema-schalter .i-sonne { opacity: 0; }
+html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
-  .ts-bahn, .ts-schieber, .ts-schieber svg { transition: none; }
+  .thema-schalter, .thema-schalter .knopf, .thema-schalter svg { transition: none; }
 }
+@media (max-width: 620px) { .thema-schalter { width: 46px; height: 28px; }
+  .thema-schalter .knopf { width: 22px; height: 22px; }
+  html[data-thema="dunkel"] .thema-schalter .knopf { transform: translateX(18px); } }
 
 label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
 /* Ankreuz- und Auswahlknoepfe ausgenommen: Volle Breite, 44 px Hoehe und
@@ -522,19 +635,29 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
    dazustellt --, misst diese Grenze neu. test_marke_portale.mjs schlaegt
    an, wenn sie nicht mehr stimmt. */
 @media (max-width: 1210px) {
-  .kopf { grid-template-columns: 1fr auto; row-gap: 10px; }
+  /* Die Navigation faellt in eine zweite Zeile, und damit kann die
+     Kopfleiste ihre 70 px nicht halten. Sie waechst mit statt den Inhalt
+     abzuschneiden -- und die Werkzeugleiste klebt dann nicht mehr, weil
+     ihr Abstand von oben an einer Hoehe haengt, die es nicht mehr gibt. */
+  .kopf { height: auto; grid-template-columns: 1fr auto; row-gap: 10px; padding: 12px 14px; }
+  /* justify-self zurueck auf "stretch" und min-width: 0 -- sonst ist die
+     Breite des Bandes seine max-content-Breite, und overflow-x hat nichts
+     zu beschneiden. Gemessen: 587 px Band in einem 390 px breiten Fenster,
+     die Seite scrollte quer. */
   .kopf-nav {
-    grid-row: 2; grid-column: 1 / -1; justify-content: flex-start;
+    grid-row: 2; grid-column: 1 / -1; justify-self: stretch; min-width: 0;
+    justify-content: flex-start;
     overflow-x: auto; scrollbar-width: none; margin: 0 -4px; padding: 0 4px;
   }
   .kopf-nav::-webkit-scrollbar { display: none; }
   .kopf-nav .nav-item { min-width: 76px; flex: none; }
+  .leiste { position: static; }
+  .konto-menue { top: auto; }
 }
 @media (max-width: 700px) {
   .huelle { padding: 20px 16px 48px; }
-  .kopf { padding: 14px 16px; }
-  .leiste { padding: 14px 16px; }
-  .leiste h1 { font-size: 17px; }
+  .kopf { padding: 12px 16px; }
+  .leiste { padding: env(safe-area-inset-top) 16px 0; }
   .karte-leib { padding: 16px; }
 }
 
@@ -910,6 +1033,9 @@ html[data-glas="an"] {
   --glas-grund-1: rgba(47,91,215,.22);
   --glas-grund-2: rgba(107,79,168,.17);
   --glas-grund-3: rgba(15,122,107,.13);
+
+  /* Die Werkzeugleiste hat ihr Milchglas schon; hier wird es nur duenner. */
+  --glas: rgba(255,255,255,.60);
 }
 
 html[data-glas="an"][data-thema="dunkel"] {
@@ -928,6 +1054,20 @@ html[data-glas="an"][data-thema="dunkel"] {
      Kontrast, im Dunkeln hellt er sie auf und der Text verliert. Darum
      deckt sie im Dunkeln mehr -- gemessen, nicht geschaetzt. */
   --glas-kachel:  .62;
+
+  --glas: rgba(22,27,39,.62);
+
+  /* Die Kopfleiste. Nur im Dunkeln, aus demselben Grund wie die
+     Seitenleiste im Cockpit: Im Hellen ist sie der einzige dunkle Block
+     auf heller Seite, und jedes Prozent Durchsicht hellt ihren Grund in
+     Richtung Verlauf auf -- am dunklen Ende verlaeuft relative Helligkeit
+     steil, die Beschriftungen verlieren dabei messbar Kontrast. Im
+     Dunkeln liegt sie auf dunklem Grund und vertraegt deutlich mehr. */
+  --glas-schiene: .74;
+}
+
+html[data-glas="an"][data-thema="dunkel"] .kopf {
+  background: rgba(var(--shell-rgb), var(--glas-schiene));
 }
 
 /* ── Der Grund, auf den das Glas schaut ─────────────────────────────────
@@ -936,6 +1076,16 @@ html[data-glas="an"][data-thema="dunkel"] {
    background-attachment:fixed am Koerper -- sonst zeichnet der Browser den
    Verlauf bei jedem Bildaufbau neu. z-index:-1 heisst hier: hinter dem
    Inhalt, aber VOR der Hintergrundfarbe des Koerpers. */
+/* Die Werkzeugleiste traegt ihr Milchglas schon; im Glaszustand wird es
+   duenner und die Kante uebernimmt. Dieselbe Regel wie fuer .topbar im
+   Cockpit. */
+html[data-glas="an"] .leiste {
+  backdrop-filter: saturate(var(--glas-saettigung)) blur(var(--glas-unschaerfe));
+  -webkit-backdrop-filter: saturate(var(--glas-saettigung)) blur(var(--glas-unschaerfe));
+  border-bottom-color: var(--glas-linie);
+  box-shadow: inset 0 -1px 0 0 var(--glas-kante-tief);
+}
+
 html[data-glas="an"] body::before {
   content: '';
   position: fixed;
@@ -1028,53 +1178,42 @@ html[data-glas="an"] .dlg {
   html[data-glas="an"] { --glas-unschaerfe: 14px; }
 }
 
-/* ── Der Schalter ──────────────────────────────────────────────────────
-   Gleiche Bauart wie der Hell/Dunkel-Schalter daneben: zwei Schalter
-   nebeneinander, die verschieden aussehen, wirken wie zwei verschiedene
-   Dinge. Eigene Klassen statt derselben, weil die dunkle Fassung von
-   .ts-bahn deren Schieber verschiebt -- ein Glas-Schalter, der im Dunkeln
-   von selbst umspringt, behauptete einen Zustand, den er nicht hat.
-   Die Bahn traegt dieselben --shell-tauglichen Farben wie der Nachbar:
-   Diese Kopfzeile ist in beiden Themen dunkel. */
-.glas-schalter {
-  min-height: 44px; width: 52px; padding: 0; border: 0; background: none;
-  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
-}
-.glas-schalter:hover { border-color: transparent; }
-.gs-bahn {
-  width: 52px; height: 30px; border-radius: 999px; position: relative;
-  border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08);
-  transition: background .18s, border-color .18s;
-}
-.glas-schalter:hover .gs-bahn { border-color: rgba(255,255,255,.34); }
-.gs-schieber {
-  position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%;
-  background: #F3F5F8; display: flex; align-items: center; justify-content: center;
-  transition: transform .2s;
-}
-.gs-schieber svg {
-  width: 14px; height: 14px; fill: none; stroke-width: 2.1;
-  stroke-linecap: round; stroke-linejoin: round; stroke: #8B919D; transition: stroke .16s;
-}
-html[data-glas="an"] .gs-bahn { background: var(--accent-soft); border-color: var(--accent-line); }
-html[data-glas="an"] .gs-schieber { transform: translateX(22px); }
-html[data-glas="an"] .gs-schieber svg { stroke: #2F5BD7; }
+/* ── Der Glas-Schalter ────────────────────────────────────────────────
+   Ebenfalls die Cockpit-Fassung. Eigene Klasse statt derselben wie beim
+   Nachbarn, weil die dunkle Fassung von .thema-schalter deren Knopf
+   verschiebt -- ein Glas-Schalter, der im Dunkeln von selbst umspringt,
+   behauptete einen Zustand, den er nicht hat. */
+.glas-schalter { flex: none; width: 52px; height: 30px; border-radius: 999px; padding: 0;
+  /* min-height: 0 gegen die 44-px-Regel, die diese Seite JEDEM Knopf
+     gibt: Sie steht spaeter im Blatt und gewinnt sonst. Gemessen war
+     der Schalter dadurch 44 statt 30 px hoch -- im Quelltext las sich
+     die Zeile darueber vollkommen richtig. */
+  min-height: 0; display: block;
+  border: 1px solid var(--line); background: var(--bg); cursor: pointer; position: relative;
+  transition: background .18s, border-color .18s; }
+.glas-schalter:hover { border-color: var(--line-hi); }
+/* padding und min-height ausdruecklich zurueckgesetzt: ".knopf" ist auf
+   dieser Seite auch der Name der Sammelklasse fuer Bedienelemente
+   (button, .knopf -- 44 px hoch, 0 18px Polster). Der Schieber im
+   Schalter heisst im Cockpit genauso, erbt hier aber deren Masse und
+   war gemessen 44 px hoch und 18 px breit gepolstert. Ein
+   Namenskonflikt derselben Sorte wie ENT-536. */
+.glas-schalter .knopf { position: absolute; top: 2px; left: 2px; width: 24px; height: 24px;
+  min-height: 0; padding: 0; border: none;
+  border-radius: 50%; background: var(--surface); box-shadow: var(--sh-1);
+  display: flex; align-items: center; justify-content: center; transition: transform .2s; }
+.glas-schalter svg { width: 14px; height: 14px; fill: none; stroke-width: 2.1;
+  stroke-linecap: round; stroke-linejoin: round; }
+.glas-schalter .i-glas { stroke: var(--ink-3); transition: stroke .16s; }
+html[data-glas="an"] .glas-schalter { background: var(--accent-soft); border-color: var(--accent-line); }
+html[data-glas="an"] .glas-schalter .knopf { transform: translateX(22px); }
+html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
-  .gs-bahn, .gs-schieber, .gs-schieber svg { transition: none; }
+  .glas-schalter, .glas-schalter .knopf, .glas-schalter svg { transition: none; }
 }
-/* Auf dem Telefon werden beide Bahnen schmaler -- dieselbe Stufe wie im
-   Cockpit. Nicht aus Geschmack: Mit zwei Schaltern, Zahnrad und
-   Abmelden-Knopf lief die Kopfzeile bei 390 px um sieben Pixel ueber ihre
-   Spalte hinaus, und das Navigationsband darunter sass dadurch 3,4 px
-   neben der Mitte. Der KNOPF bleibt 44 px hoch; schmaler wird nur das
-   Bild darauf. */
-@media (max-width: 620px) {
-  .thema-schalter, .glas-schalter { width: 46px; }
-  .ts-bahn, .gs-bahn { width: 46px; height: 28px; }
-  .ts-schieber, .gs-schieber { width: 22px; height: 22px; }
-  html[data-thema="dunkel"] .ts-schieber { transform: translateX(18px); }
-  html[data-glas="an"] .gs-schieber { transform: translateX(18px); }
-}
+@media (max-width: 620px) { .glas-schalter { width: 46px; height: 28px; }
+  .glas-schalter .knopf { width: 22px; height: 22px; }
+  html[data-glas="an"] .glas-schalter .knopf { transform: translateX(18px); } }
 
 /* ── Druck ──
    Beim Drucken bleibt genau das Blatt stehen, nichts von der Oberflaeche
@@ -1225,19 +1364,10 @@ html[data-glas="an"] .gs-schieber svg { stroke: #2F5BD7; }
 <!-- ── Hauptansicht ──────────────────────────────────────────────── -->
 <div id="haus" class="versteckt">
   <div class="kopf">
-    <!-- Die Marke steht UEBER dem Bereichsnamen, nicht daneben. Gemessen:
-         Der Schriftzug ist 110 px breit, der Textblock rund 130 px; neben-
-         einander braucht die erste Rasterspalte gut 250 px, bei 1100 px
-         Fensterbreite stehen ihr aber nur 245 px zu. Das Raster waere
-         uebergelaufen und haette dabei die Navigation aus der Fenstermitte
-         geschoben -- 1fr auto 1fr haelt die Mitte nur, solange beide
-         Aussenspalten ihren Inhalt fassen. Uebereinander braucht die Spalte
-         nur die Breite des breiteren von beiden. -->
-    <div class="kopf-links">
-      <svg class="kopf-marke" viewBox="0.00 0.00 649.83 153.56" role="img" aria-label="Guard OpS"><use href="#go-wort"/></svg>
-      <div class="titel">Betreiber-Bereich</div>
-      <div class="unter" id="kopf-wer"></div>
-    </div>
+    <!-- Links nur der Schriftzug, wie im Cockpit. Bereichsname und Konto
+         stehen seit ENT-611 rechts im Kontomenue: In einer 70-px-Leiste ist
+         fuer drei Textzeilen kein Platz, und das Cockpit loest es genauso. -->
+    <svg class="kopf-marke" viewBox="0.00 0.00 649.83 153.56" role="img" aria-label="Guard OpS"><use href="#go-wort"/></svg>
     <nav class="kopf-nav" id="kopf-nav" aria-label="Bereiche">
       <button type="button" class="nav-item on" data-bereich="uebersicht" aria-current="page">
         <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
@@ -1270,35 +1400,37 @@ html[data-glas="an"] .gs-schieber svg { stroke: #2F5BD7; }
       </button>
     </nav>
     <div class="rechts">
-      <!-- Zahnrad, das sich faerbt, sobald etwas nachzutragen ist -- dasselbe
-           Muster wie "Einrichtung" im Cockpit (dashboard.html, nav-einrichtung/
-           update-punkt), hier eigens fuer den Betreiber-Bereich (ENT-524):
-           api/betreiber_schema_pruefen.php statt eines Mandanten-Cockpits. -->
-      <button class="icon-knopf" id="knopf-einrichtung" title="Einrichtung"
-              aria-label="Einrichtung">
-        <span class="ico-wrap">
-          <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.5.66.86 1.19.91H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <span class="update-punkt" id="einrichtung-punkt"></span>
-        </span>
+      <!-- Der Griff zum Kontomenue. Dasselbe Muster wie der Markenknopf im
+           Cockpit (btnMarke): Das Zeichen der Marke ist zugleich der Weg zu
+           Konto, Einrichtung und Abmelden. Das Zeichen ist das der
+           Betreiberin -- ein Mandantenlogo gibt es hier nicht und darf es
+           nicht geben (ENT-568). -->
+      <button type="button" class="marken-knopf" id="btnMarke"
+              aria-haspopup="true" aria-expanded="false" aria-controls="kontoMenue"
+              title="Konto, Einrichtung und Abmelden" aria-label="Konto, Einrichtung und Abmelden">
+        <img src="icons/guardops-180.png" alt="">
       </button>
-      <button class="thema-schalter" id="btn-thema" role="switch" aria-checked="false"
-              title="Hell oder dunkel"
-              aria-label="Zwischen heller und dunkler Darstellung wechseln">
-        <span class="ts-bahn"><span class="ts-schieber">
-          <svg class="i-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></svg>
-          <svg class="i-mond" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
-        </span></span>
-      </button>
-      <!-- Durchscheinende Oberflaeche an/aus (ENT-418/ENT-419), derselbe
-           Schalter und derselbe Speicherschluessel wie im Cockpit. -->
-      <button class="glas-schalter" id="btn-glas" role="switch" aria-checked="true"
-              title="Durchscheinende Oberfläche ausschalten"
-              aria-label="Durchscheinende Oberfläche ein- oder ausschalten">
-        <span class="gs-bahn"><span class="gs-schieber">
-          <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="12" height="12" rx="3"/><rect x="8.5" y="9" width="12" height="10" rx="3"/></svg>
-        </span></span>
-      </button>
-      <button class="klein" id="knopf-abmelden">Abmelden</button>
+      <div class="konto-menue" id="kontoMenue">
+        <div class="wer">
+          <div class="titel">Betreiber-Bereich</div>
+          <div class="unter" id="kopf-wer"></div>
+        </div>
+        <!-- Zahnrad, das sich faerbt, sobald etwas nachzutragen ist -- dasselbe
+             Muster wie "Einrichtung" im Cockpit (dashboard.html, nav-einrichtung/
+             update-punkt), hier eigens fuer den Betreiber-Bereich (ENT-524):
+             api/betreiber_schema_pruefen.php statt eines Mandanten-Cockpits. -->
+        <button type="button" class="menue-eintrag nav-item" id="knopf-einrichtung">
+          <span class="ico-wrap">
+            <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.5.66.86 1.19.91H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span class="update-punkt" id="einrichtung-punkt"></span>
+          </span>
+          <span class="lbl">Einrichtung</span>
+        </button>
+        <button type="button" class="menue-eintrag" id="knopf-abmelden">
+          <svg class="i" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+          <span class="lbl">Abmelden</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -1325,8 +1457,36 @@ html[data-glas="an"] .gs-schieber svg { stroke: #2F5BD7; }
   </div>
 
   <div class="leiste">
-    <h1 id="leiste-titel">Übersicht</h1>
-    <div class="crumb" id="leiste-unter">Die Lage über allen Betrieben</div>
+    <div class="leiste-links">
+      <div>
+        <h1 id="leiste-titel">Übersicht</h1>
+        <div class="crumb" id="leiste-unter">Die Lage über allen Betrieben</div>
+      </div>
+    </div>
+    <!-- Unterreiter des offenen Bereichs. Wird aus den Originalen im Inhalt
+         gefuellt (siehe unterreiterZeichnen) und bleibt leer, wo es keine
+         gibt -- dann faellt die mittlere Rasterspalte auf 0 zusammen. -->
+    <nav class="top-sub" id="topSub" aria-label="Unterbereiche"></nav>
+    <div class="leiste-rechts">
+      <!-- Durchscheinende Oberflaeche an/aus (ENT-418/ENT-419), derselbe
+           Schalter und derselbe Speicherschluessel wie im Cockpit. Links von
+           hell/dunkel, genau wie dort. -->
+      <button type="button" class="glas-schalter" id="btn-glas" role="switch" aria-checked="true"
+              title="Durchscheinende Oberfläche ausschalten"
+              aria-label="Durchscheinende Oberfläche ein- oder ausschalten">
+        <span class="knopf">
+          <svg class="i-glas" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="12" height="12" rx="3.4"/><path d="M8.5 20.5h8a4 4 0 0 0 4-4v-8"/></svg>
+        </span>
+      </button>
+      <button type="button" class="thema-schalter" id="btn-thema" role="switch" aria-checked="false"
+              title="Hell oder dunkel"
+              aria-label="Zwischen heller und dunkler Darstellung wechseln">
+        <span class="knopf">
+          <svg class="i-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></svg>
+          <svg class="i-mond" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
+        </span>
+      </button>
+    </div>
   </div>
 
   <div class="huelle">
@@ -1628,7 +1788,7 @@ html[data-glas="an"] .gs-schieber svg { stroke: #2F5BD7; }
            neben den Bereichen, nicht in diesem hier, und der ganze Bereich
            wird als Ganzes ein- und ausgeblendet. -->
       <div id="of-rahmen">
-        <div class="tabs" id="ofHauptTabs">
+        <div class="tabs haupt" id="ofHauptTabs">
           <button type="button" class="tab on" id="oftab-liste" onclick="ofHauptTab('liste')">Offerten</button>
           <button type="button" class="tab" id="oftab-leistungen" onclick="ofHauptTab('leistungen')">Leistungen</button>
           <button type="button" class="tab" id="oftab-briefkopf" onclick="ofHauptTab('briefkopf')">Briefkopf</button>
@@ -2199,6 +2359,7 @@ function bereichZeigen(welcher) {
   /* Die Bereiche lesen aus denselben Tabellen und koennen sich gegenseitig
      veraendern (eine neue Adresse, eine neue Offerte). Beim Betreten frisch
      holen ist billiger als ein Stand, der nicht mehr stimmt. */
+  unterreiterZeichnen();
   if (welcher === 'adressen') { ladeAdressen(); }
   if (welcher === 'offerten') { ladeBelege(); ladeProdukte(); }
   if (welcher === 'rechnungen') { ladeRechnungen(); ladeProdukte(); }
@@ -2211,6 +2372,77 @@ function bereichZeigen(welcher) {
   if (welcher !== 'support') { zeig($('sv-karte'), false); }
   window.scrollTo({ top: 0 });
 }
+
+/* ── Unterreiter in der Werkzeugleiste (ENT-611) ─────────────────
+   Dieselbe Mechanik wie topSubZeichnen() im Cockpit: Die Knoepfe oben
+   werden AUS den Originalen im Inhalt erzeugt und geben ihren Klick daran
+   weiter. Keine zweite Liste -- eine Kopie laeuft irgendwann auseinander,
+   und dann steht oben ein Reiter, den es unten nicht mehr gibt.
+
+   Unter 1210 px faellt die Navigation in eine zweite Zeile; die
+   Werkzeugleiste hat dort keinen Platz mehr fuer Titel, Reiter UND
+   Schalter. Dann bleiben die Reiter, wo sie im Inhalt stehen. */
+const reiterOben = () => window.matchMedia('(min-width: 1211px)').matches;
+
+function unterreiterZeichnen() {
+  const leiste = $('topSub');
+  if (!leiste) { return; }
+  leiste.innerHTML = '';
+  const alle = [...document.querySelectorAll('.tabs.haupt')];
+  /* Die Reiterleiste des OFFENEN Bereichs -- es gibt hoechstens eine.
+     Ueber den Bereich gefragt und nicht ueber offsetParent: Die Leiste ist
+     genau dann unsichtbar, wenn ihre Knoepfe oben stehen, und dann faende
+     offsetParent sie nie wieder. */
+  const quelle = alle.find(el => {
+    const b = el.closest('.bereich');
+    return b && !b.classList.contains('versteckt');
+  });
+  const oben = reiterOben() && !!quelle;
+  alle.forEach(el => zeig(el, !oben));
+  if (!oben) { leiste.style.display = 'none'; return; }
+  const reiter = [...quelle.querySelectorAll('.tab')];
+  if (reiter.length < 2) { leiste.style.display = 'none'; return; }
+  reiter.forEach(orig => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = orig.textContent;
+    b.className = orig.classList.contains('on') ? 'on' : '';
+    b.onclick = () => orig.click();
+    leiste.appendChild(b);
+  });
+  leiste.style.display = 'flex';
+}
+window.addEventListener('resize', unterreiterZeichnen);
+
+/* ── Kontomenue am Markenknopf (ENT-611) ─────────────────────────
+   Dieselbe Bauart wie im Cockpit (markenMenuUm): Das Zeichen der Marke ist
+   der Griff, und was dahinter steht -- wer angemeldet ist, Einrichtung,
+   Abmelden -- lag vorher offen in der Kopfleiste. Ein Klick daneben oder
+   im Menue schliesst: Jeder Eintrag fuehrt irgendwohin, und ein Menue, das
+   danach offen bleibt, verdeckt genau das Ergebnis. Der Markenknopf ist
+   ausgenommen, sonst schloesse sein eigener Klick sofort wieder. */
+function kontoMenuUm(ev) {
+  if (ev) { ev.stopPropagation(); }
+  const kopf = document.querySelector('.kopf');
+  if (!kopf) { return; }
+  const offen = kopf.classList.toggle('menue-offen');
+  const b = $('btnMarke');
+  if (b) { b.setAttribute('aria-expanded', String(offen)); }
+}
+function kontoMenuSchliessen() {
+  const kopf = document.querySelector('.kopf');
+  if (!kopf || !kopf.classList.contains('menue-offen')) { return; }
+  kopf.classList.remove('menue-offen');
+  const b = $('btnMarke');
+  if (b) { b.setAttribute('aria-expanded', 'false'); }
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('#btnMarke')) { return; }
+  kontoMenuSchliessen();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { kontoMenuSchliessen(); }
+});
 
 /* ── Hell oder dunkel ────────────────────────────────────────────
    Der Wert steht schon im Kopf der Seite am Dokument; hier wird nur noch
@@ -4241,6 +4473,7 @@ function ofHauptTab(t) {
     zeig($('ofv-' + k), k === t);
     $('oftab-' + k).classList.toggle('on', k === t);
   });
+  unterreiterZeichnen();
 }
 
 function ofArchivGo(t) {
@@ -4834,7 +5067,7 @@ function ofFormLabelZeichnen() {
    Bereich daneben, und die Titelleiste sagt, welcher Beleg gemeint ist --
    dieselbe Aussage wie die Kopfzeile im Cockpit. */
 function ofFormularZeigen(an) {
-  if (!an) { zeig($('of-formular'), false); return; }
+  if (!an) { zeig($('of-formular'), false); unterreiterZeichnen(); return; }
   const t = OF_ART_TEXT[ofArt];
   Object.keys(BEREICHE).forEach(k => { const el = $('b-' + k); if (el) { zeig(el, false); } });
   zeig($('of-formular'), true);
@@ -4849,6 +5082,7 @@ function ofFormularZeigen(an) {
     b.classList.toggle('on', dazu);
     b.setAttribute('aria-current', dazu ? 'page' : 'false');
   });
+  unterreiterZeichnen();
 }
 
 function ofZurueck() {
@@ -5766,6 +6000,7 @@ $('knopf-sv-erledigt').onclick = () => svStatus('erledigt');
 $('knopf-sv-neu').onclick      = () => { svNurOffen = true;  ladeSupport(); };
 $('knopf-sv-alle').onclick     = () => { svNurOffen = false; ladeSupport(); };
 $('knopf-abmelden').onclick   = abmelden;
+$('btnMarke').onclick         = kontoMenuUm;
 $('btn-thema').onclick        = themaUm;
 $('btn-glas').onclick         = glasUm;
 document.querySelectorAll('#kopf-nav .nav-item').forEach(b => {

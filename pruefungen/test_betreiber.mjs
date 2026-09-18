@@ -740,7 +740,10 @@ check('KRITISCH: der Dialog-Lauf ruft betreiber_schema_pruefen.php tatsaechlich 
   /function einrichtungLauf\(\)[\s\S]{0,600}betreiber_schema_pruefen\.php[\s\S]{0,40}'POST'/.test(betreiberHtml));
 check('KRITISCH: das Zahnrad faerbt sich, sobald etwas nachzutragen ist -- stiller GET-Check, kein Toast',
   /function pruefeEinrichtungUpdate\(\)[\s\S]{0,300}betreiber_schema_pruefen\.php[\s\S]{0,200}hat-update/.test(betreiberHtml)
-  && /\.icon-knopf\.hat-update\s*\{[^}]*color:\s*var\(--warn\)/.test(betreiberHtml));
+  // Ohne Klassennamen davor: Das Zahnrad sitzt seit ENT-611 im Kontomenue
+  // und traegt die Klasse der Menueeintraege. Geprueft ist die Aussage --
+  // "hat-update" faerbt warn --, nicht wo der Knopf gerade haengt.
+  && /\.hat-update\s*\{[^}]*color:\s*var\(--warn\)/.test(betreiberHtml));
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

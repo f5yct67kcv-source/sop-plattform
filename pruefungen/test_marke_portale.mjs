@@ -202,7 +202,9 @@ for (const schema of ['light', 'dark']) {
   });
   await p.waitForTimeout(250);
   const kopf = await p.evaluate(({ fn, a, b }) => (new Function('return ' + fn))()(a, b),
-    { fn: MESSUNG.toString(), a: '.kopf-marke', b: '.kopf-links' });
+    // Traeger ist die Kopfleiste selbst: Der dreizeilige Block .kopf-links
+    // ist mit ENT-611 entfallen, die Marke steht direkt im Raster.
+    { fn: MESSUNG.toString(), a: '.kopf-marke', b: '.kopf' });
   check(`Betreiber (${schema}): in der Kopfzeile steht die Marke`, !!kopf && kopf.gezeichnet);
   if (kopf) {
     check(`Betreiber (${schema}): KRITISCH -- die Zeichnung liegt im Kasten (Kopf)`, kopf.imKasten);
