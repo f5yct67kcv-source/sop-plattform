@@ -17,14 +17,20 @@ declare(strict_types=1);
 // Ueberlegung wie in der Oberflaeche gilt trotzdem: Beschriftung oben,
 // Wert darunter (CLAUDE.md, Gestaltung).
 //
-// KEIN BILD, auch kein Logo: Ein eingebettetes Bild waere entweder ein
-// Anhang, den manche Programme als Briefklammer anzeigen, oder eine
-// externe Adresse, die die meisten Programme ungefragt blockieren. Dann
-// stuende an der wichtigsten Stelle der Mail ein leerer Rahmen. Die
-// Wortmarke steht darum als Schrift da.
+// DAS LOGO STEHT IN DER SIGNATUR, EINGEBETTET (ENT-619). Nicht ueber eine
+// externe Adresse: Outlook und die meisten Programme laden solche Bilder
+// erst auf Erlaubnis, bis dahin stuende unter der Unterschrift ein leerer
+// Rahmen. Eingebettet per Content-ID (multipart/related, siehe
+// smtp_senden()) kommt es an -- derselbe Weg, den Outlook fuer seine
+// eigenen Signaturen nimmt.
+//
+// KEIN BRIEFKOPF-BALKEN mehr darueber: Mit dem Logo unten stuende die
+// Marke zweimal in derselben Mail, oben als getippter Schriftzug in einer
+// Systemschrift, unten als echtes Logo. Eine Geschaeftsmail aus Outlook
+// hat aus genau diesem Grund keinen Briefkopf, sondern Text und darunter
+// die Signatur.
 
 // Markenfarben, wie auf der oeffentlichen Seite (homepage.html).
-const MAIL_FARBE_DUNKEL = '#14161A';
 const MAIL_FARBE_TEXT   = '#14161A';
 const MAIL_FARBE_LEISE  = '#545B67';
 const MAIL_FARBE_FLAECHE = '#F2F4F8';
@@ -34,6 +40,11 @@ const MAIL_FARBE_BLAU   = '#2F5BD7';
 // Schriftfamilie ohne Webfont: Ein per @font-face nachgeladener Schnitt
 // kommt in Mailprogrammen praktisch nie an. Die Wortmarke traegt darum
 // dieselbe Systemschrift wie der Fliesstext.
+const MAIL_LOGO_DATEI   = 'guardops-signatur.png';
+const MAIL_LOGO_KENNUNG = 'guardops-logo';
+// Angezeigt 200 px; die Datei ist 400 px breit (doppelte Aufloesung).
+const MAIL_LOGO_BREITE  = 200;
+
 const MAIL_SCHRIFT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
 
 function mail_e(string $w): string
@@ -84,7 +95,7 @@ function mail_absatz(string $html): string
 //
 // Ist dort nichts hinterlegt, zeichnet die Firma. Kein leerer Gruss und
 // kein Platzhaltername, der bei einem Interessenten ankommt.
-function mail_signatur(array $zeilen): string
+function mail_signatur(array $zeilen, string $bildKennung = ''): string
 {
     $sichtbar = array_values(array_filter(array_map('trim', $zeilen), fn($z) => $z !== ''));
     if ($sichtbar === []) { $sichtbar = ['pzu consulting gmbh']; }
@@ -96,7 +107,32 @@ function mail_signatur(array $zeilen): string
     foreach ($sichtbar as $z) {
         $html .= '<br><span style="color:' . MAIL_FARBE_LEISE . ';">' . mail_e($z) . '</span>';
     }
-    return $html . '</p>';
+    $html .= '</p>';
+    if ($bildKennung !== '') {
+        // Breite fest in Pixeln UND als Attribut: Outlook rechnet ueber
+        // Word und ignoriert eine Breite, die nur im style steht -- das
+        // Bild kaeme dort in seiner vollen Dateibreite an. Die Datei
+        // traegt die doppelte Aufloesung, damit sie auf feinen
+        // Bildschirmen nicht ausfranst.
+        $html .= '<img src="cid:' . mail_e($bildKennung) . '" width="' . MAIL_LOGO_BREITE . '"'
+            . ' alt="GuardOpS" style="display:block;border:0;width:' . MAIL_LOGO_BREITE . 'px;'
+            . 'max-width:' . MAIL_LOGO_BREITE . 'px;height:auto;margin-top:14px;">';
+    }
+    return $html;
+}
+
+// Das Logo fuer die Signatur, als Rohbytes fuer smtp_senden(). Liegt neben
+// dieser Datei, weil der Deploy flach in den Buendelordner kopiert.
+//
+// Fehlt die Datei, gibt es kein Bild und die Signatur bleibt rein
+// textlich -- eine fehlende Bilddatei darf keine Mail verhindern.
+function mail_logo(): ?array
+{
+    $pfad = __DIR__ . '/' . MAIL_LOGO_DATEI;
+    if (!is_file($pfad)) { return null; }
+    $inhalt = @file_get_contents($pfad);
+    if ($inhalt === false || $inhalt === '') { return null; }
+    return ['cid' => MAIL_LOGO_KENNUNG, 'mime' => 'image/png', 'inhalt' => $inhalt];
 }
 
 // Der Rahmen um alles: Kopf mit der Wortmarke, Inhalt, Fuss mit den
@@ -104,10 +140,6 @@ function mail_signatur(array $zeilen): string
 // oeffentlich und stehen wortgleich im Impressum (ENT-563).
 function mail_rahmen(string $inhalt): string
 {
-    $kopf = '<tr><td style="background:' . MAIL_FARBE_DUNKEL . ';padding:20px 28px;">'
-        . '<span style="font-size:19px;font-weight:700;letter-spacing:0.01em;color:#FFFFFF;">'
-        . 'GuardOpS</span></td></tr>';
-
     $fuss = '<tr><td style="padding:0 28px 28px 28px;">'
         . '<div style="border-top:1px solid ' . MAIL_FARBE_RAND . ';padding-top:16px;'
         . 'font-size:12px;line-height:1.6;color:' . MAIL_FARBE_LEISE . ';">'
@@ -125,7 +157,6 @@ function mail_rahmen(string $inhalt): string
         . '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600"'
         . ' style="max-width:600px;width:100%;border:1px solid ' . MAIL_FARBE_RAND . ';'
         . 'border-radius:8px;overflow:hidden;font-family:' . MAIL_SCHRIFT . ';">'
-        . $kopf
         . '<tr><td style="padding:28px 28px 8px 28px;">' . $inhalt . '</td></tr>'
         . $fuss
         . '</table></td></tr></table>';

@@ -199,11 +199,34 @@ $quelle = (string)file_get_contents(dirname(__DIR__) . '/backend/demo_zugang.php
 $pruef('KRITISCH: die Mail holt die Signatur aus dem Deploy, statt sie im Quelltext zu fuehren',
     str_contains($quelle, 'mail_signatur_zeilen()'));
 
+// ── Das Logo in der Signatur (ENT-619) ───────────────────────────────
+//
+// Eingebettet, nicht verlinkt: Outlook und die meisten Programme laden ein
+// extern verlinktes Bild erst auf Erlaubnis -- bis dahin stuende unter der
+// Unterschrift ein leerer Rahmen.
+$pruef('KRITISCH: das Logo wird als Bild MITGEGEBEN, nicht von aussen nachgeladen',
+    count($mail['bilder']) === 1
+    && ($mail['bilder'][0]['inhalt'] ?? '') !== ''
+    && !preg_match('/<img[^>]+src="https?:/', $mail['html']));
+$pruef('KRITISCH: das HTML spricht genau die mitgegebene Kennung an',
+    str_contains($mail['html'], 'cid:' . $mail['bilder'][0]['cid']));
+// Ein cid-Verweis ohne Bild dahinter zeigt ein zerbrochenes Bild.
+$pruef('KRITISCH: ohne Bilddatei steht auch kein Verweis darauf in der Mail',
+    (mail_logo() === null) === (!str_contains($mail['html'], 'cid:')));
+// Die Klartextfassung hat kein Bild und darf es auch nicht vortaeuschen.
+$pruef('die Klartextfassung traegt keinen Bildverweis',
+    !str_contains($mail['text'], 'cid:') && !str_contains($mail['text'], '<img'));
+
 // ── Die gemeinsame Gestaltung ────────────────────────────────────────
 $pruef('KRITISCH: die Mail traegt Marke und Angaben der Betreiberin, nicht die der Mandantin',
     str_contains($mail['html'], 'GuardOpS')
     && str_contains($mail['html'], 'pzu consulting gmbh')
     && str_contains($mail['html'], 'info@guardops.ch'));
+// Die Marke steht EINMAL da. Mit dem Logo in der Signatur waere ein
+// getippter Schriftzug im Kopf eine zweite, schlechtere Fassung derselben
+// Marke -- eine Geschaeftsmail aus Outlook hat darum keinen Briefkopf.
+$pruef('KRITISCH: kein Briefkopf-Balken neben dem Logo -- die Marke steht nicht zweimal da',
+    !str_contains($mail['html'], 'background:#14161A'));
 // Hausregel: Ueberschrift oben, Wert darunter -- auch hier, nicht nur in
 // der Oberflaeche. Geprueft ueber die Reihenfolge im Quelltext, weil genau
 // das die Aussage ist.

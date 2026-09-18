@@ -73,7 +73,8 @@ if (hat_tabelle($pdo, 'demo_zugang')) {
         } else {
             try {
                 smtp_senden($email, (string)$zugang['person'], $ergebnis['mail']['betreff'],
-                    $ergebnis['mail']['html'], $ergebnis['mail']['text']);
+                    $ergebnis['mail']['html'], $ergebnis['mail']['text'],
+                    [], $ergebnis['mail']['bilder'] ?? []);
             } catch (Throwable $e) {
                 error_log('demo_erneut_senden: Versand fehlgeschlagen -- ' . $e->getMessage());
             }
