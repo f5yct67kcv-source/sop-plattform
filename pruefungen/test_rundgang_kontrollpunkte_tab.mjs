@@ -1,6 +1,9 @@
-// Kontrollrunden-Seite: Reiter "Kontrollpunkte" (Filterliste ALLER
-// Kontrollpunkte des Objekts) und "Kartenansicht" (Uebersichtskarte aller
-// GPS-Punkte, ENT-259).
+// Kontrollrunden-Seite: Reiter "Kontrollpunkte" (Filterliste NUR der dieser
+// Runde zugeordneten Kontrollpunkte, ENT-554 -- bis dahin, unter dem im Code
+// zitierten, aber nie im Entscheidungsprotokoll erfassten "ENT-259", zeigte
+// dieser Reiter faelschlich ALLE Punkte des Objekts) und "Kartenansicht"
+// (Uebersichtskarte aller GPS-Punkte des Objekts -- die bleibt bewusst
+// objektweit, das war nicht Teil der Beanstandung).
 //
 // Anlass: Referenz-Screenshots eines Fremdsystems (Filterliste mit Typ/
 // Name/Tag-Identifikator-Spalten samt "+ Kontrollpunkt anlegen",
@@ -44,17 +47,27 @@ const OBJEKTE = { status: 'ok', objekte: [
 const KONTROLLPUNKTE = { status: 'ok', kontrollpunkte: [
   { id: 1, objekt_id: 1, bezeichnung: 'Hintereingang', beschreibung: null, reihenfolge: 1, typ: 'nfc', chip_id: 'AB12',
     lat: null, lng: null, geofence_radius_m: 20, aktiv: 1, bereichszeit_beginn: 0, bereichszeit_ende: 0 },
+  // Bewusst nicht aktiv (ENT-554-Anpassung): "Tor Süd" (id 3) traegt das
+  // nicht mehr, weil es jetzt ausserhalb der Runde liegt -- die Aussage
+  // "ein nicht aktiver Punkt wird im Reiter gekennzeichnet" braucht darum
+  // einen inaktiven Punkt INNERHALB der Runde.
   { id: 2, objekt_id: 1, bezeichnung: 'Parkplatz', beschreibung: null, reihenfolge: 2, typ: 'geofence', chip_id: null,
-    lat: 47.37690, lng: 8.54170, geofence_radius_m: 35, aktiv: 1, bereichszeit_beginn: 0, bereichszeit_ende: 0 },
+    lat: 47.37690, lng: 8.54170, geofence_radius_m: 35, aktiv: 0, bereichszeit_beginn: 0, bereichszeit_ende: 0 },
   // "Tor Süd" traegt den Bereichszeit-Beginn -- damit prueft die Suite, dass
   // der gespeicherte Stand der Schalter wirklich uebernommen wird (ENT-265).
   { id: 3, objekt_id: 1, bezeichnung: 'Tor Süd', beschreibung: null, reihenfolge: 3, typ: 'geofence', chip_id: null,
     lat: 47.37820, lng: 8.54350, geofence_radius_m: 15, aktiv: 0, bereichszeit_beginn: 1, bereichszeit_ende: 0 },
 ]};
 
+// "Tor Süd" (id 3) bewusst NICHT in den Punkten der "Öffnungsrunde" --
+// beweist, dass der Reiter "Kontrollpunkte" seit ENT-554 nur die
+// zugeordneten Punkte zeigt, nicht den ganzen Objektkatalog. Es bleibt am
+// Objekt bestehen und wird ausschliesslich ueber die (objektweite)
+// Kartenansicht angesprochen, siehe unten.
 const VORLAGEN_ALLE = { status: 'ok', vorlagen: [
   { id: 10, objekt_id: 1, kunde_name: 'Muster Liegenschaften AG', objekt_name: 'Testliegenschaft Nord',
-    name: 'Öffnungsrunde', beschreibung: '', aktiv: 1, erstellt_am: '2026-01-01 00:00:00', punkte: [] },
+    name: 'Öffnungsrunde', beschreibung: '', aktiv: 1, erstellt_am: '2026-01-01 00:00:00',
+    punkte: [{ id: 1, bezeichnung: 'Hintereingang', reihenfolge: 0 }, { id: 2, bezeichnung: 'Parkplatz', reihenfolge: 1 }] },
 ]};
 
 let calls = [];
@@ -117,7 +130,31 @@ function setup(page) {
       gesetzt = body;
       return send({ status: 'ok', gesetzt: body.aufgabe_ids, abgewiesen: [] });
     }
-    if (path.includes('rundgang_vorlage_liste')) return send({ status: 'ok', vorlagen: [] });
+    // Zustandsbehaftet (ENT-554, gleiches Muster wie
+    // test_rundgaenge_verwaltung.mjs): liest die tatsaechliche Zuordnung aus
+    // VORLAGEN_ALLE statt einer festen leeren Liste -- sonst faende
+    // rdKrZeigen() nie die wirklich zugeordneten Punkte, und der jetzt
+    // rundenbezogen gefilterte Reiter "Kontrollpunkte" pruefte nur sich
+    // selbst.
+    if (path.includes('rundgang_vorlage_liste')) {
+      const objektId = Number(u.searchParams.get('objekt_id'));
+      return send({ status: 'ok', vorlagen: VORLAGEN_ALLE.vorlagen.filter(v => v.objekt_id === objektId) });
+    }
+    // Zustandsbehaftet (ENT-554): schreibt tatsaechlich in VORLAGEN_ALLE
+    // zurueck -- rdKdSpeichern() ordnet einen neu angelegten Punkt darueber
+    // sofort dieser Runde zu, rpEntfernen() nimmt darueber wieder heraus;
+    // beides muss hier wirklich wirken, sonst pruefte der Test nur sich
+    // selbst.
+    if (path.includes('rundgang_vorlage_punkte_setzen')) {
+      const v = VORLAGEN_ALLE.vorlagen.find(x => x.id === Number(body.vorlage_id));
+      if (v) {
+        v.punkte = (body.kontrollpunkt_ids || []).map((id, i) => {
+          const k = KONTROLLPUNKTE.kontrollpunkte.find(x => x.id === Number(id));
+          return { id: Number(id), bezeichnung: k ? k.bezeichnung : '?', reihenfolge: i };
+        });
+      }
+      return send({ status: 'ok' });
+    }
     return send({ status: 'ok' });
   });
   // Reihenfolge wichtig (ENT-269): Playwright ruft bei mehreren passenden
@@ -148,14 +185,16 @@ await page.click('#rdAb-liste tr:has-text("Öffnungsrunde") button:has-text("Bea
 await page.waitForFunction(() => document.getElementById('rdAb-kr').style.display !== 'none');
 await page.waitForTimeout(200);
 
-// ══════════ KONTROLLPUNKTE-KACHEL: TABELLE MIT ALLEN PUNKTEN DES OBJEKTS
+// ══════════ KONTROLLPUNKTE-KACHEL: TABELLE NUR MIT DEN PUNKTEN DIESER RUNDE (ENT-554)
 await page.click('#rdKrReiter .rdkr-tab:has-text("Kontrollpunkte")');
 await page.waitForTimeout(200);
 check('KRITISCH: das Formular (Reiter "Allgemeines") wird ausgeblendet', !(await page.isVisible('#rdKrAb-allgemeines')));
 check('KRITISCH (ENT-260): die Reiterleiste bleibt dabei stehen', await page.isVisible('#rdKrReiter'));
-check('KRITISCH: alle drei Kontrollpunkte des Objekts stehen da, nicht nur die dieser Runde',
-  (await page.$$('#rdKpTabelle tbody tr')).length === 3);
+check('KRITISCH (ENT-554): nur die ZWEI dieser Runde zugeordneten Kontrollpunkte stehen da',
+  (await page.$$('#rdKpTabelle tbody tr')).length === 2);
 const tabelleText = await page.textContent('#rdKpTabelle');
+check('KRITISCH (ENT-554): "Tor Süd" gehört noch keiner Runde und erscheint darum NICHT in diesem Reiter',
+  !tabelleText.includes('Tor Süd'));
 check('NFC-Punkt mit Tag-Identifikator (Chip-ID) erscheint', tabelleText.includes('Hintereingang') && tabelleText.includes('AB12'));
 check('Geofence-Punkt ohne Tag-Identifikator zeigt einen Strich, keine leere Zelle', /Parkplatz[\s\S]*?–/.test(tabelleText));
 check('Nicht aktiver Punkt ist gekennzeichnet', tabelleText.includes('nicht aktiv'));
@@ -169,7 +208,7 @@ await page.fill('#rdKpFilterName', '');
 // ══════════ FILTER: TYP
 await page.selectOption('#rdKpFilterTyp', 'geofence');
 await page.waitForTimeout(100);
-check('KRITISCH: Typfilter "Geofence" zeigt nur die zwei Geofence-Punkte', (await page.$$('#rdKpTabelle tbody tr')).length === 2);
+check('KRITISCH: Typfilter "Geofence" zeigt nur den einen Geofence-Punkt dieser Runde (Parkplatz -- "Tor Süd" gehört ihr nicht)', (await page.$$('#rdKpTabelle tbody tr')).length === 1);
 await page.selectOption('#rdKpFilterTyp', 'nfc');
 await page.waitForTimeout(100);
 check('KRITISCH: Typfilter "NFC" zeigt nur den einen NFC-Punkt', (await page.$$('#rdKpTabelle tbody tr')).length === 1);
@@ -557,9 +596,78 @@ check('KRITISCH: die Karte zeigt den neuen Punkt sofort, ohne den Reiter neu zu 
   (await page.$$('#rdKarteUebersicht .gm-mock-marker')).length === 3);
 await page.click('#rdKrReiter .rdkr-tab:has-text("Kontrollpunkte")');
 await page.waitForTimeout(150);
-check('KRITISCH: auch die Tabelle zeigt den neuen Punkt sofort', (await page.$$('#rdKpTabelle tbody tr')).length === 4);
-check('KRITISCH: der Anzahl-Chip am Reiter zieht ebenfalls nach (4)',
-  (await page.textContent('#rdKrKpBadge')).trim() === '4');
+// ENT-554: Ueber die KARTENANSICHT angelegt (ort 'karte') bleibt "Nordtor"
+// objektweit ohne automatische Zuordnung -- anders als ueber den eigenen
+// "+ Kontrollpunkt anlegen"-Knopf des Reiters selbst (naechster Abschnitt).
+// Das ist die Gegenprobe zur eigentlichen Beanstandung: ein objektweit
+// erfasster, dieser Runde nicht zugeordneter Punkt darf hier NICHT
+// auftauchen.
+check('KRITISCH (ENT-554): "Nordtor" gehört NICHT automatisch zu dieser Runde und bleibt darum aus dem Reiter aussen vor',
+  (await page.$$('#rdKpTabelle tbody tr')).length === 2);
+check('KRITISCH: der Anzahl-Chip am Reiter bleibt darum bei 2, nicht 4',
+  (await page.textContent('#rdKrKpBadge')).trim() === '2');
+KONTROLLPUNKTE.kontrollpunkte.pop();
+
+// ══════════ ENT-554: "+ KONTROLLPUNKT ANLEGEN" (REITER SELBST) ORDNET SOFORT ZU
+// Anders als ueber die Kartenansicht: ein hier NEU angelegter Punkt gehoert
+// ohne weiteren Schritt zu DIESER Runde -- sonst waere er im jetzt
+// rundenbezogen gefilterten Reiter sofort wieder unsichtbar (ENT-554).
+await page.click('#rdKpAnlegenBtn');
+await page.waitForTimeout(300);
+check('Öffnet mit Typ NFC vorbelegt (Standard dieses Knopfes, unveraendert)', (await page.inputValue('#rdKdTyp')) === 'nfc');
+await page.fill('#rdKdName', 'Hof');
+await page.fill('#rdKdChipId', 'HF01');
+KONTROLLPUNKTE.kontrollpunkte.push(
+  { id: 5, objekt_id: 1, bezeichnung: 'Hof', beschreibung: null, reihenfolge: 5, typ: 'nfc', chip_id: 'HF01',
+    lat: null, lng: null, geofence_radius_m: 20, aktiv: 1, bereichszeit_beginn: 0, bereichszeit_ende: 0 });
+calls.length = 0;
+await page.click('#rdKdSpeichern');
+await page.waitForTimeout(400);
+const zuordnungsAufruf = calls.find(c => c.path.includes('rundgang_vorlage_punkte_setzen'));
+check('KRITISCH (ENT-554): das Anlegen ruft die Rundenzuordnung mit auf und schliesst „Hof" (5) mit ein',
+  zuordnungsAufruf && zuordnungsAufruf.body.kontrollpunkt_ids.includes(5));
+check('KRITISCH: der neue Punkt erscheint sofort im (rundenbezogen gefilterten) Reiter',
+  (await page.textContent('#rdKpTabelle')).includes('Hof'));
+check('Der Anzahl-Chip zieht auf 3 nach', (await page.textContent('#rdKrKpBadge')).trim() === '3');
+check('Die Meldung sagt ausdrücklich, dass der Punkt dieser Runde zugeordnet wurde',
+  (await page.textContent('#toast')).includes('zugeordnet'));
+
+// ENT-554: Die Beschriftung des Seitenfenster-Knopfes muss sagen, was er
+// hier tatsächlich tut (nur Zuordnung, keine Löschung) -- und darf dabei
+// die Werkzeugleiste nicht sprengen (gemessen, nicht angenommen, CLAUDE.md).
+check('KRITISCH: der Löschen-Knopf im Fenster heisst hier "Aus dieser Runde entfernen", nicht "Löschen"',
+  (await page.textContent('#rdKdLoeschen')).trim() === 'Aus dieser Runde entfernen');
+check('Die längere Beschriftung sprengt die Werkzeugleiste des Fensters nicht (1440px)',
+  await page.evaluate(() => {
+    const leiste = document.getElementById('rdKdLoeschen').closest('.bar-tools');
+    return leiste.scrollWidth <= leiste.clientWidth + 1;
+  }));
+await page.setViewportSize({ width: 390, height: 844 });
+await page.waitForTimeout(150);
+check('Und ebenso wenig auf dem Handy (390px)',
+  await page.evaluate(() => {
+    const leiste = document.getElementById('rdKdLoeschen').closest('.bar-tools');
+    return leiste.scrollWidth <= leiste.clientWidth + 1;
+  }));
+await page.setViewportSize({ width: 1440, height: 1000 });
+await page.waitForTimeout(150);
+
+// ══════════ ENT-554: "ENTFERNEN" NIMMT NUR AUS DER RUNDE, LÖSCHT NICHT OBJEKTWEIT
+calls.length = 0;
+await page.click('#rdKpTabelle tbody tr:has-text("Hof") button:has-text("Entfernen")');
+await page.waitForSelector('#dlgConfirm.on');
+check('Die Rückfrage macht den Unterschied klar: nur die Zuordnung verschwindet, nicht der Kontrollpunkt',
+  (await page.textContent('#cfText')).includes('bleibt bestehen'));
+await page.click('#cfBtn');
+await page.waitForTimeout(300);
+const entfernenAufruf = calls.find(c => c.path.includes('rundgang_vorlage_punkte_setzen'));
+check('KRITISCH: "Entfernen" ruft die Rundenzuordnung (ohne "Hof") auf',
+  entfernenAufruf && !entfernenAufruf.body.kontrollpunkt_ids.includes(5));
+check('KRITISCH: kontrollpunkt_loeschen.php wird dabei NICHT aufgerufen — "Hof" bleibt am Objekt bestehen',
+  !calls.some(c => c.path.includes('kontrollpunkt_loeschen')));
+check('„Hof" verschwindet aus dem Reiter, sobald es aus der Runde entfernt ist',
+  !(await page.textContent('#rdKpTabelle')).includes('Hof'));
+check('Der Anzahl-Chip fällt auf 2 zurück', (await page.textContent('#rdKrKpBadge')).trim() === '2');
 KONTROLLPUNKTE.kontrollpunkte.pop();
 
 // ══════════ HANDY: BEIDE REITER ZUSAETZLICH GEPRUEFT (CLAUDE.md)
@@ -608,13 +716,15 @@ await page.waitForTimeout(200);
 const mitteNachSuche = await page.evaluate(() => { const c = rdKarteMapa.getCenter(); return { lat: c.lat(), lng: c.lng() }; });
 check('KRITISCH: die Karte schwenkt zum gewählten Treffer (Olten, nicht Zürich)',
   Math.abs(mitteNachSuche.lat - 47.3782) < 0.01 && Math.abs(mitteNachSuche.lng - 7.9127) < 0.01);
-// Drei statt zwei Marker: der zuvor angelegte "Nordtor"-Punkt (voriger
-// Abschnitt) bleibt im geladenen Bestand, auch nachdem ihn die Fixture oben
-// wieder aus der API-Antwort entfernt hat -- ohne erneuten Ladevorgang
-// aendert sich der bereits im Browser gehaltene Stand nicht, das ist hier
-// kein Fehler. Entscheidend ist nur: die Suche selbst legt nichts NEU an.
+// Wieder zwei Marker, nicht drei: Das Anlegen/Entfernen von "Hof" im
+// zwischenzeitlichen ENT-554-Abschnitt hat kontrollpunkte() neu geladen und
+// damit das zuvor aus der Fixture entfernte "Nordtor" laengst aus dem im
+// Browser gehaltenen Bestand gezogen -- kein Fehler, nur ein spaeterer
+// Ladevorgang als frueher in dieser Suite. "Hof" selbst ist NFC ohne
+// Koordinaten und zaehlt hier ohnehin nicht mit. Entscheidend bleibt nur:
+// die Suche selbst legt nichts NEU an.
 check('KRITISCH: die Adresssuche legt KEINEN GPS-Punkt an — nur der Kartenklick tut das',
-  (await page.$$('#rdKarteUebersicht .gm-mock-marker')).length === 3);
+  (await page.$$('#rdKarteUebersicht .gm-mock-marker')).length === 2);
 
 // "Kein Treffer" ist erkennbar, keine leere, wortlose Liste
 await page.route('**/nominatim.openstreetmap.org/**', route =>
