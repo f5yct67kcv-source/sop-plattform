@@ -38,14 +38,33 @@ function json_response($data, int $status = 200): void {
 // ein blind erlaubter fremder Ursprung koennte ihn sonst mitlesen.
 const APP_NATIVE_HERKUENFTE = ['capacitor://localhost', 'http://localhost'];
 
-// Reine Funktion -- pruefbar mit einem frei gewaehlten Wert, ohne echten
-// Request (gleiche Ueberlegung wie bei basis_url_pruefen()).
-function cors_erlaubte_herkunft(string $herkunft): ?string {
-    return in_array($herkunft, APP_NATIVE_HERKUENFTE, true) ? $herkunft : null;
+// Die eigene Marketingseite (ENT-601-Nachtrag, 2026-09-18): guardops.ch
+// traegt bewusst keine Datenbank-Zugangsdaten (siehe deploy-hostpoint.yml,
+// Schritt "Homepage-Buendel fuer guardops.ch bauen") und ruft darum die
+// zwei oeffentlichen Selbstbedienungs-Endpunkte -- die Zugriff auf die
+// Mandanten-Datenbank brauchen -- auf betreiber.guardops.ch statt bei sich
+// selbst auf. Nur DIESE eine Herkunft und nur fuer DIESE zwei Skripte:
+// jeder andere Endpunkt bleibt same-origin-only, genau wie zuvor.
+const WEB_HERKUNFT_OEFFENTLICHE_DEMO = 'https://guardops.ch';
+const OEFFENTLICHE_DEMO_SKRIPTE = ['demo_anfordern.php', 'demo_erneut_senden.php'];
+
+// Reine Funktion -- pruefbar mit frei gewaehlten Werten, ohne echten
+// Request (gleiche Ueberlegung wie bei basis_url_pruefen()). $skript ist
+// der Dateiname ohne Pfad, wie basename($_SERVER['SCRIPT_NAME']) ihn
+// liefert -- nicht die Herkunft entscheidet allein, sondern Herkunft UND
+// Ziel zusammen.
+function cors_erlaubte_herkunft(string $herkunft, string $skript = ''): ?string {
+    if (in_array($herkunft, APP_NATIVE_HERKUENFTE, true)) { return $herkunft; }
+    if ($herkunft === WEB_HERKUNFT_OEFFENTLICHE_DEMO
+        && in_array($skript, OEFFENTLICHE_DEMO_SKRIPTE, true)) {
+        return $herkunft;
+    }
+    return null;
 }
 
 function cors_kopfzeilen_setzen(): void {
-    $erlaubt = cors_erlaubte_herkunft($_SERVER['HTTP_ORIGIN'] ?? '');
+    $skript = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $erlaubt = cors_erlaubte_herkunft($_SERVER['HTTP_ORIGIN'] ?? '', $skript);
     if ($erlaubt !== null) {
         header('Access-Control-Allow-Origin: ' . $erlaubt);
         header('Vary: Origin');

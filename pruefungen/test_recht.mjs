@@ -84,8 +84,12 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
   // so sagen, nicht mehr das Gegenteil behaupten. Waere je kein INSERT mehr
   // da, waere die neue Behauptung ihrerseits falsch.
   const endpunkt = lies('backend/api/demo_anfordern.php');
+  // Absolute Adresse seit dem 2026-09-18-Nachtrag: guardops.ch traegt keine
+  // Datenbank-Zugangsdaten, der Endpunkt liegt darum auf
+  // betreiber.guardops.ch (mit eng begrenzter CORS-Freigabe genau fuer
+  // dieses Formular, siehe cors_erlaubte_herkunft() in backend/db.php).
   check('KRITISCH: das Formular fuehrt tatsaechlich zu diesem Endpunkt',
-    /action="api\/demo_anfordern\.php"/.test(homepage));
+    /action="https:\/\/betreiber\.guardops\.ch\/api\/demo_anfordern\.php"/.test(homepage));
   check('KRITISCH: die Behauptung "wird in einer Datenbank gespeichert" stimmt mit dem Code ueberein',
     /INSERT INTO demo_zugang/i.test(endpunkt)
     && /werden dafür in\s*\n?\s*einer Datenbank gespeichert/i.test(datenschutz.replace(/\s+/g, ' ')));
