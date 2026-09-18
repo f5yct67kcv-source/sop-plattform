@@ -33,6 +33,35 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
     }
 
+    // MARK: - Push (ENT-604)
+    //
+    // Diese beiden Methoden sind KEIN Beiwerk: iOS liefert den Geraetetoken
+    // ausschliesslich hier ab. Ohne die Weitergabe holt das System den Token
+    // zwar, das Capacitor-Plugin erfaehrt ihn aber nie, das Ereignis
+    // "registration" bleibt aus, und es wird nie ein Token beim Server
+    // hinterlegt. Das Plugin sagt das im Fehlerfall sogar selbst:
+    // "event capacitorDidRegisterForRemoteNotifications not called".
+    //
+    // Capacitor legt diese Methoden beim Anlegen des Geruests NICHT an -- sie
+    // sind ein ausdruecklicher Handgriff aus seiner Anleitung, und genau
+    // darum fehlten sie hier. Die Namen sind nicht frei gewaehlt, sondern die
+    // des Plugins (CAPNotifications.swift in @capacitor/ios).
+    //
+    // "object" traegt den Token als Data -- das Plugin macht daraus selbst
+    // die Hex-Schreibweise. Etwas anderes als Data oder String meldet es als
+    // registrationError.
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications,
+                                        object: deviceToken)
+    }
+
+    func application(_ application: UIApplication,
+                     didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications,
+                                        object: error)
+    }
+
     func application(_ application: UIApplication,
                      configurationForConnecting connectingSceneSession: UISceneSession,
                      options: UIScene.ConnectionOptions) -> UISceneConfiguration {

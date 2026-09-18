@@ -383,6 +383,23 @@ function push_apns_jwt(?int $jetzt = null): ?string
  * "apns-priority: 10" nur fuer wichtige Mitteilungen, sonst 5 -- dieselbe
  * Idee wie "Urgency" bei Web Push.
  */
+/**
+ * Die Adresse eines Geraets bei Apple. Zwei Umgebungen, streng getrennt:
+ * Ein Geraet, auf dem die App ueber Xcode installiert wurde, meldet sich
+ * im SANDKASTEN an und bekommt ein Token, das nur dort gilt. Dieselbe App
+ * aus TestFlight oder dem Store meldet sich in der Produktivumgebung an.
+ * Ein Token der einen Seite ist auf der anderen ungueltig.
+ *
+ * Die Umgebung steht NICHT im Token -- man sieht ihm nicht an, woher er
+ * stammt. Darum probiert push_apns_senden() die zweite Umgebung, wenn die
+ * erste das Token ablehnt.
+ */
+function push_apns_adresse(string $token, bool $sandkasten): string
+{
+    $wirt = $sandkasten ? 'api.sandbox.push.apple.com' : 'api.push.apple.com';
+    return 'https://' . $wirt . '/3/device/' . $token;
+}
+
 function push_apns_senden(array $abo, bool $wichtig): array
 {
     $token = (string)($abo['endpunkt'] ?? '');
@@ -393,11 +410,58 @@ function push_apns_senden(array $abo, bool $wichtig): array
     if ($jwt === null) {
         return ['code' => 0, 'ausgang' => 'fehler', 'meldung' => 'APNs ist nicht eingerichtet'];
     }
-    // Immer die Produktivumgebung: Diese App wird ueber TestFlight/App
-    // Store verteilt, nicht ueber ein Entwicklungsprofil. Ein im Simulator
-    // erzeugtes Token gehoert ohnehin nicht hierher -- der Simulator kann
-    // grundsaetzlich kein echtes Push empfangen (ENT-604, Risiken).
-    $ch = curl_init('https://api.push.apple.com/3/device/' . $token);
+    // Zuerst die Produktivumgebung, das ist der Regelfall fuer eine App aus
+    // dem Store. Lehnt Apple das Token ab, war es eines aus dem Sandkasten
+    // -- dann derselbe Versand noch einmal dorthin.
+    //
+    // WARUM UEBERHAUPT: Bis hierher ging alles nur an die Produktivadresse,
+    // mit der Begruendung, die App werde ja ueber den Store verteilt. Beim
+    // Testen am eigenen Geraet stimmt das nicht: Die App kommt dort direkt
+    // aus Xcode, das Token gilt nur im Sandkasten, und Apple antwortet
+    // BadDeviceToken. Dieser Grund gilt unten als "Geraet gibt es nicht
+    // mehr" -- das Abo wurde also bei JEDEM Versuch geloescht, und es kam
+    // nie etwas an.
+    $ergebnis = push_apns_versuch($token, $jwt, $wichtig, false);
+    if (push_apns_sandkasten_probieren($ergebnis)) {
+        $ergebnis = push_apns_ergebnis_waehlen($ergebnis, push_apns_versuch($token, $jwt, $wichtig, true));
+    }
+    return $ergebnis;
+}
+
+/**
+ * Lohnt ein zweiter Versuch im Sandkasten?
+ *
+ * NUR bei BadDeviceToken -- das ist Apples Art zu sagen "dieses Token
+ * gehoert nicht hierher", und genau das sagt es einem Sandkasten-Token an
+ * der Produktivadresse. Jeder andere Fehlschlag (abgelaufener Schluessel,
+ * Stoerung bei Apple, falsches Thema) wuerde durch einen zweiten Versuch
+ * nicht besser, sondern nur jede Zustellung verdoppeln.
+ *
+ * Eigene Funktion und nicht nur eine Bedingung im Ablauf, damit die Regel
+ * ohne Netzverbindung pruefbar bleibt.
+ */
+function push_apns_sandkasten_probieren(array $ergebnis): bool
+{
+    return ($ergebnis['ausgang'] ?? '') === 'entfernen'
+        && ($ergebnis['meldung'] ?? '') === 'BadDeviceToken';
+}
+
+/**
+ * Welches der beiden Ergebnisse zaehlt.
+ *
+ * Der Sandkasten zaehlt nur, wenn er es besser weiss. Lehnt auch er das
+ * Token ab, bleibt es beim ersten Ergebnis: Dann ist das Token wirklich
+ * tot und das Abo gehoert entfernt. Ohne diese Regel wuerde ein wirklich
+ * abgemeldetes Geraet nie aus der Empfaengerliste verschwinden.
+ */
+function push_apns_ergebnis_waehlen(array $erster, array $zweiter): array
+{
+    return ($zweiter['ausgang'] ?? '') === 'entfernen' ? $erster : $zweiter;
+}
+
+function push_apns_versuch(string $token, string $jwt, bool $wichtig, bool $sandkasten): array
+{
+    $ch = curl_init(push_apns_adresse($token, $sandkasten));
     curl_setopt_array($ch, [
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => (string)json_encode(['aps' => [

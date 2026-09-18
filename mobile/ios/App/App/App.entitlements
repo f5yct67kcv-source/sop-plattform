@@ -5,9 +5,15 @@
      den Store: Bei automatisch verwalteter Signierung (CODE_SIGN_STYLE =
      Automatic, siehe project.pbxproj) schreibt Xcode diesen Wert beim
      Archivieren fuer TestFlight/App Store selbst auf "production" um --
-     das gehoert zum Vorgang, nicht von Hand geaendert werden. Der
-     Server (backend/push.php) spricht ohnehin immer nur
-     api.push.apple.com an, nie den Sandkasten (siehe push_apns_senden). -->
+     das gehoert zum Vorgang, nicht von Hand geaendert werden.
+
+     Was hier "development" steht, heisst aber: Eine ueber Xcode
+     installierte App meldet sich bei Apple im SANDKASTEN an und bekommt
+     ein Token, das nur dort gilt. Der Server probiert darum beide
+     Umgebungen (push_apns_senden in backend/push.php). Ein frueherer
+     Vermerk an dieser Stelle behauptete, es genuege die Produktivadresse
+     -- das stimmte fuer die Store-Fassung, nicht fuer den Test am eigenen
+     Geraet, und dort kam darum nie eine Mitteilung an. -->
 <dict>
 	<key>aps-environment</key>
 	<string>development</string>
