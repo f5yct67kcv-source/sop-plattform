@@ -130,7 +130,11 @@ npx cap sync ios
 
 if [ "$SAUBER" = "sauber" ]; then
   echo "── 3b/5 Zwischenspeicher leeren"
-  rm -rf ~/Library/Developer/Xcode/DerivedData/App-*
+  # Der projekteigene Ordner, denselben setzt Schritt 5 per
+  # -derivedDataPath. Xcodes globaler Ordner unter ~/Library kommt hier
+  # nicht mehr vor: Dort liegen die Bauteile ALLER Projekte, und dieses
+  # baut gar nicht mehr dorthin.
+  rm -rf ios/DerivedData
 fi
 
 echo "── 4/5  iPhone suchen"
@@ -154,8 +158,60 @@ if [ -z "$GERAET" ]; then
 fi
 echo "        $GERAET"
 
+# Vor dem Bauen nachsehen, ob Apples eigenes Werkzeug das Geraet auch
+# kennt -- sonst laeuft ein mehrminuetiger Bau durch und scheitert erst
+# beim Installieren.
+if ! xcrun devicectl list devices 2>/dev/null | grep -q "$GERAET"; then
+  echo ""
+  echo "  Das iPhone taucht in der Liste, aber nicht bei devicectl auf."
+  echo "  Meist fehlt die Freigabe auf dem Geraet selbst:"
+  echo "    - iPhone entsperren und 'Diesem Computer vertrauen' bestaetigen"
+  echo "    - Einstellungen > Datenschutz & Sicherheit > Entwicklermodus: ein"
+  echo "      (danach startet das iPhone neu)"
+  echo ""
+  echo "  devicectl sieht derzeit:"
+  xcrun devicectl list devices 2>&1 | sed 's/^/    /'
+  exit 1
+fi
+
 echo "── 5/5  Bauen, installieren, starten"
-npx cap run ios --target "$GERAET"
+# Bewusst NICHT "npx cap run ios": Dessen Hilfsprogramm native-run kennt
+# angeschlossene iPhones nicht mehr, seit Apple den Weg zum Geraet auf
+# CoreDevice umgestellt hat. Es listet dann nur noch Simulatoren und
+# lehnt die echte Geraetekennung ab ("Invalid target ID"). Genau dort ist
+# der erste Lauf gescheitert.
+#
+# Darum dieselben drei Schritte, die Xcode auch macht, direkt mit Apples
+# eigenen Werkzeugen: bauen, installieren, starten.
+DD="$PWD/ios/DerivedData"
+
+# -allowProvisioningUpdates laesst Xcode ein fehlendes Bereitstellungs-
+# profil selbst anlegen, statt den Bau abzubrechen.
+xcodebuild \
+  -workspace ios/App/App.xcworkspace \
+  -scheme App \
+  -configuration Debug \
+  -destination "id=$GERAET" \
+  -derivedDataPath "$DD" \
+  -allowProvisioningUpdates \
+  build
+
+APP="$DD/Build/Products/Debug-iphoneos/App.app"
+if [ ! -d "$APP" ]; then
+  echo "  Der Bau hat keine App hinterlassen, erwartet unter:"
+  echo "    $APP"
+  exit 1
+fi
+
+# Die Kennung kommt aus capacitor.config.json und wird nicht hier
+# abgeschrieben -- sonst gaebe es eine zweite Quelle, die beim naechsten
+# Umbenennen stillschweigend falsch waere (siehe test_appkennung.mjs).
+APPID="$(python3 -c "import json;print(json.load(open('capacitor.config.json'))['appId'])")"
+
+echo "        installieren"
+xcrun devicectl device install app --device "$GERAET" "$APP"
+echo "        starten"
+xcrun devicectl device process launch --device "$GERAET" "$APPID"
 
 echo ""
 echo "Fertig. Die App laeuft auf dem iPhone."
