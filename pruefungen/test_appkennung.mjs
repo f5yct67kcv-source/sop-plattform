@@ -125,6 +125,70 @@ for (const [datei, feld, muster] of stellen) {
   if (treffer.some(t => t !== 'App/App.entitlements')) { bad.push('  CODE_SIGN_ENTITLEMENTS: ' + treffer.join(', ')); }
 }
 
+// Der AppDelegate muss den Geraetetoken an Capacitor weiterreichen (ENT-604).
+//
+// iOS liefert den Token ausschliesslich an diese eine Methode. Gibt sie ihn
+// nicht weiter, holt das System ihn zwar, das Plugin erfaehrt ihn aber nie:
+// kein "registration"-Ereignis, kein Token beim Server, kein Push. Capacitor
+// legt die Methoden beim Anlegen des Geruests nicht an, sie sind ein
+// Handgriff aus seiner Anleitung -- und fehlten hier genau deshalb.
+//
+// Geprueft wird die Weitergabe, nicht die Formulierung: Kommt die Methode
+// vor UND schickt sie die Nachricht los, auf die das Plugin hoert.
+{
+  const d = lies(`${M}/ios/App/App/AppDelegate.swift`);
+  const weiterleitung = (methode, nachricht) => {
+    const i = d.indexOf(methode);
+    if (i < 0) { return false; }
+    // Nur den Rumpf bis zur naechsten Methode ansehen -- sonst wuerde eine
+    // Nachricht irgendwo sonst in der Datei als Weitergabe durchgehen.
+    const rumpf = d.slice(i, d.indexOf('\n    func ', i + 1) + 1 || undefined);
+    return rumpf.includes(nachricht);
+  };
+  check('KRITISCH: der AppDelegate reicht den Geraetetoken an Capacitor weiter',
+    weiterleitung('didRegisterForRemoteNotificationsWithDeviceToken',
+      'capacitorDidRegisterForRemoteNotifications'));
+  check('KRITISCH: und meldet auch den Fehlschlag weiter, statt ihn zu verschlucken',
+    weiterleitung('didFailToRegisterForRemoteNotificationsWithError',
+      'capacitorDidFailToRegisterForRemoteNotifications'));
+}
+
+// Jedes Plugin aus package.json muss auch im nativen Bau stehen (ENT-604).
+//
+// WARUM: "npx cap sync" schreibt ios/App/CapApp-SPM/Package.swift bei jedem
+// Lauf neu -- und zwar anhand dessen, was in node_modules liegt, NICHT
+// anhand von package.json. Wer ein Plugin eintraegt und "npm install"
+// vergisst, bekommt eine Package.swift ohne dieses Plugin. Der Bau gelingt
+// danach anstandslos, die Funktion fehlt aber auf dem Geraet.
+//
+// Genau so fehlte das Push-Plugin beim ersten Geraetetest: keine Frage nach
+// der Erlaubnis, und die App tauchte nicht einmal in den Mitteilungs-
+// einstellungen des iPhones auf. Am Rechner faellt das nicht auf, weil hier
+// niemand die App baut -- dieselbe Lehre wie oben bei der Kennung.
+//
+// Committet jemand eine so entstandene Package.swift, verschwindet das
+// Plugin fuer alle. Diese Pruefung faengt das.
+{
+  const pkg = JSON.parse(lies(`${M}/package.json`));
+  const swift = lies(`${M}/ios/App/CapApp-SPM/Package.swift`);
+  // core, cli, ios und android sind das Geruest von Capacitor selbst, keine
+  // Plugins -- sie stehen nie als eigene Abhaengigkeit in Package.swift.
+  const GERUEST = ['core', 'cli', 'ios', 'android'];
+  const plugins = Object.keys(pkg.dependencies || {})
+    .filter(n => n.startsWith('@capacitor/'))
+    .map(n => n.slice('@capacitor/'.length))
+    .filter(n => !GERUEST.includes(n));
+
+  check('KRITISCH: package.json nennt ueberhaupt ein natives Plugin', plugins.length > 0);
+  for (const p of plugins) {
+    check(`KRITISCH: das Plugin ${p} steht auch im nativen Bau (Package.swift)`,
+      swift.includes(`@capacitor/${p}`));
+    if (!swift.includes(`@capacitor/${p}`)) {
+      bad.push(`  ${p} fehlt -- in mobile/ "npm install" und dann "npx cap sync ios" laufen lassen`);
+    }
+  }
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

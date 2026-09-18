@@ -287,6 +287,47 @@ button.klein { min-height: 36px; padding: 0 12px; font-size: 13px; }
    Eigene Farben statt --bg/--surface: Diese Kopfzeile ist in BEIDEN
    Themen dunkel (--shell). Ein Schalter auf --bg waere im hellen Thema
    eine grelle Kachel auf grauem Grund. */
+/* Zahnrad "Einrichtung" -- selbe Kopfzeile, dieselben --shell-Farben wie
+   die Bereichsreiter oben, kein eigener Farbraum wie beim Thema-Schalter,
+   der bewusst in beiden Themen dunkel bleibt. */
+.icon-knopf {
+  min-height: 44px; min-width: 32px; padding: 0; border: 0; background: none;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  border-radius: 8px; color: var(--shell-txt); transition: background .13s, color .13s;
+}
+.icon-knopf:hover { background: var(--shell-hi); color: var(--shell-txt-hi); }
+.icon-knopf .i { width: 19px; height: 19px; fill: none; stroke: currentColor;
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.icon-knopf .ico-wrap { position: relative; display: inline-flex; }
+.icon-knopf .update-punkt {
+  display: none; position: absolute; top: -2px; right: -2px; width: 9px; height: 9px;
+  border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 2px var(--shell);
+}
+.icon-knopf.hat-update { color: var(--warn); }
+.icon-knopf.hat-update .update-punkt { display: block; }
+
+/* Dialog "Einrichtung" -- eigenes, schlankes Overlay statt einer Karte im
+   Seitenfluss (dasselbe Prinzip wie dlgEinrichtung im Cockpit, hier ohne
+   dessen Zusatzfunktionen wie Verschieben/Glas, die dieser eine Dialog
+   nicht braucht). */
+.dlg-schleier {
+  position: fixed; inset: 0; z-index: 70; background: rgba(16,18,22,.42);
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+.dlg-schleier.on { display: flex; }
+.dlg {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.28); width: 100%; max-width: 460px;
+  max-height: 88vh; display: flex; flex-direction: column;
+}
+.dlg-kopf { padding: 20px 22px 0; flex: none; }
+.dlg-kopf h2 { font-size: 16px; font-weight: 660; letter-spacing: -.2px; }
+.dlg-kopf p { font-size: 12.5px; color: var(--ink-3); margin-top: 8px; line-height: 1.55; }
+.dlg-leib { padding: 16px 22px; overflow-y: auto; flex: 1; }
+.dlg-fuss {
+  padding: 14px 22px; border-top: 1px solid var(--line-soft);
+  display: flex; gap: 9px; justify-content: flex-end; flex: none;
+}
 .thema-schalter {
   min-height: 44px; width: 52px; padding: 0; border: 0; background: none;
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
@@ -852,6 +893,17 @@ tbody tr.aus td { opacity: .55; }
       </button>
     </nav>
     <div class="rechts">
+      <!-- Zahnrad, das sich faerbt, sobald etwas nachzutragen ist -- dasselbe
+           Muster wie "Einrichtung" im Cockpit (dashboard.html, nav-einrichtung/
+           update-punkt), hier eigens fuer den Betreiber-Bereich (ENT-524):
+           api/betreiber_schema_pruefen.php statt eines Mandanten-Cockpits. -->
+      <button class="icon-knopf" id="knopf-einrichtung" title="Einrichtung"
+              aria-label="Einrichtung">
+        <span class="ico-wrap">
+          <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.5.66.86 1.19.91H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span class="update-punkt" id="einrichtung-punkt"></span>
+        </span>
+      </button>
       <button class="thema-schalter" id="btn-thema" role="switch" aria-checked="false"
               title="Hell oder dunkel"
               aria-label="Zwischen heller und dunkler Darstellung wechseln">
@@ -861,6 +913,28 @@ tbody tr.aus td { opacity: .55; }
         </span></span>
       </button>
       <button class="klein" id="knopf-abmelden">Abmelden</button>
+    </div>
+  </div>
+
+  <!-- Dialog "Einrichtung" -- dasselbe Muster wie dlgEinrichtung im Cockpit
+       (dashboard.html): eigenes Overlay statt einer Karte im Fluss der
+       Seite, weil es ein einmaliger Vorgang ist, kein taeglicher Anblick. -->
+  <div class="dlg-schleier" id="dlgEinrichtung">
+    <div class="dlg">
+      <div class="dlg-kopf">
+        <h2>Einrichtung</h2>
+        <p>Legt fehlende Tabellen und Spalten dieser Ebene nach — ohne Umweg
+           über das Cockpit eines Mandanten. Ergänzt nur Fehlendes, löscht
+           nichts, leert nichts. Gefahrlos mehrfach ausführbar.</p>
+      </div>
+      <div class="dlg-leib">
+        <div id="einrichtung-meldung" class="meldung versteckt"></div>
+        <div id="einrichtung-inhalt"></div>
+      </div>
+      <div class="dlg-fuss">
+        <button id="knopf-einrichtung-zu">Schliessen</button>
+        <button class="haupt" id="knopf-einrichtung-lauf">Prüfen und einrichten</button>
+      </div>
     </div>
   </div>
 
@@ -4340,6 +4414,65 @@ window.addEventListener('resize', () => {
 });
 
 /* ── Rahmen ─────────────────────────────────────────────────────── */
+/* Fehlende Tabellen/Spalten dieser Ebene selbst nachtragen (ENT-524),
+   api/betreiber_schema_pruefen.php. Zwei getrennte Wege, dasselbe Muster
+   wie "Einrichtung" im Cockpit (dashboard.html, pruefeUpdate()/eiOeffnen()):
+   ein stiller GET-Check faerbt das Zahnrad, wenn etwas ansteht, und ERST
+   der Klick darauf oeffnet den Dialog und traegt tatsaechlich nach (POST). */
+async function pruefeEinrichtungUpdate() {
+  let a;
+  try { a = await ruf('betreiber_schema_pruefen.php', undefined, 'GET'); }
+  catch (e) { return; }
+  const hat = !!(a && (((a.offen || []).length) || ((a.fehler || []).length)));
+  const knopf = $('knopf-einrichtung');
+  knopf.classList.toggle('hat-update', hat);
+  knopf.title = hat ? 'Update verfügbar: Einrichtung steht aus' : 'Einrichtung';
+}
+
+function einrichtungOeffnen() {
+  $('dlgEinrichtung').classList.add('on');
+  einrichtungLauf();
+}
+function einrichtungSchliessen() {
+  $('dlgEinrichtung').classList.remove('on');
+}
+
+async function einrichtungLauf() {
+  const b = $('knopf-einrichtung-lauf'); if (b) { b.disabled = true; }
+  stumm($('einrichtung-meldung'));
+  $('einrichtung-inhalt').innerHTML = '<p class="zone-note">Prüfe …</p>';
+  let a;
+  try {
+    a = await ruf('betreiber_schema_pruefen.php', {}, 'POST');
+  } catch (e) {
+    if (b) { b.disabled = false; }
+    melde($('einrichtung-meldung'), 'fehler', 'Netzwerkfehler.');
+    return;
+  }
+  if (b) { b.disabled = false; }
+  if (!a || (a.getan === undefined && a.offen === undefined)) {
+    melde($('einrichtung-meldung'), 'fehler', (a && a.message) || 'Einrichtung nicht abrufbar.');
+    return;
+  }
+  const liste = (titel, arr, farbe) => !arr || !arr.length ? '' :
+    '<div class="zweit" style="margin-top:10px' + (farbe ? ';color:' + farbe : '') + '"><b>' + text(titel) + '</b></div>'
+    + '<ul style="margin:4px 0 0;padding-left:18px;font-size:13px;color:var(--ink-2);line-height:1.6">'
+    + arr.map(x => '<li>' + text(x) + '</li>').join('') + '</ul>';
+  $('einrichtung-inhalt').innerHTML =
+      liste('Ergänzt', a.getan)
+    + liste('Noch offen', a.offen, 'var(--warn)')
+    + liste('Fehlgeschlagen', a.fehler, 'var(--neg)');
+  melde($('einrichtung-meldung'), a.fehler.length ? 'fehler' : (a.getan.length ? 'gut' : 'warn'),
+    a.message || (a.fehler.length ? 'Einrichtung teilweise fehlgeschlagen.' : 'Alles vollständig eingerichtet.'));
+  // Das Zahnrad selbst muss den neuen Stand mitbekommen -- sonst bliebe es
+  // gefaerbt, obwohl der Lauf gerade alles nachgetragen hat.
+  pruefeEinrichtungUpdate();
+  // Und die Mandantenliste: Gerade wurde vielleicht genau die Spalte
+  // ergaenzt, an der sie bisher scheiterte -- ohne Neuladen bliebe "Nicht
+  // abrufbar" stehen, obwohl der Grund dafuer soeben behoben wurde.
+  if (a.getan.length) { ladeMandanten(); }
+}
+
 async function ladeAlles() {
   /* Name und Adresse nur dann beide, wenn sie sich unterscheiden. Wer beim
      Anlegen seine E-Mail auch als Namen eingetragen hat, sah sie hier sonst
@@ -4377,6 +4510,7 @@ async function ladeAlles() {
   /* Zuletzt, aber auf jeder Seite sichtbar: Das Abzeichen am Reiter steht
      auch dann im Blick, wenn gerade ein anderer Bereich offen ist. */
   await ladeSupport();
+  await pruefeEinrichtungUpdate();
 }
 
 async function abmelden() {
@@ -4397,6 +4531,9 @@ $('knopf-zf-weiter').onclick = async () => {
   zeig($('zf-tor'), false); zeig($('haus'), true);
   bereichZeigen('uebersicht'); await ladeAlles();
 };
+$('knopf-einrichtung').onclick     = einrichtungOeffnen;
+$('knopf-einrichtung-zu').onclick  = einrichtungSchliessen;
+$('knopf-einrichtung-lauf').onclick = einrichtungLauf;
 $('knopf-neu').onclick        = () => formularOeffnen(null);
 $('knopf-demo-ablauf').onclick    = demoAblauf;
 $('knopf-speichern').onclick  = mandantSpeichern;

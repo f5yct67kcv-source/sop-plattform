@@ -688,6 +688,60 @@ check('die Demo-Wache liest tatsaechlich ist_demo() aus backend/db.php, keine ei
 check('KRITISCH (ENT-587): der Betreiber-Abschnitt bleibt in der Demo ausgeblendet',
   /function eiBetreiberPruefen\(\)[\s\S]{0,450}?APP_UMGEBUNG_DEMO[\s\S]{0,40}return/.test(cockpit));
 
+// ── 11. Schema-Nachtrag direkt im Betreiber-Bereich ───────────────────
+//
+// betreiber_einrichten.php verlangt bewusst eine Mandanten-Verwaltungs-
+// sitzung (require_session) fuer die Erstanlage, bevor ueberhaupt ein
+// Betreiber-Token existieren kann. Wer aber schon im Betreiber-Bereich
+// angemeldet ist, soll fehlende Tabellen/Spalten NICHT ueber ein fremdes
+// Mandanten-Cockpit nachtragen muessen -- api/betreiber_schema_pruefen.php
+// ist dafuer der eigene, mit der Vollwache abgesicherte Weg.
+check('KRITISCH: es gibt eine geteilte Spalten-Nachtragsfunktion, keine zweite Kopie neben be_tabellen_anlegen()',
+  /function be_spalten\(\)/.test(modulCode) && /function be_spalten_anlegen\(/.test(modulCode));
+check('KRITISCH: be_spalten() traegt den Nachtrag fuer mandant.subdomain -- sonst bleibt eine Anlage von vor ENT-589 ohne die Spalte, die betreiber_mandant_list.php inzwischen abfragt',
+  /'mandant',\s*'subdomain',/.test(modulCode));
+
+check('KRITISCH: der neue Endpunkt existiert und verlangt die Vollwache, nicht die Mandanten-Anmeldung',
+  endpunkte.includes('betreiber_schema_pruefen.php'));
+const schemaPruefen = nurCode(lies('backend/api/betreiber_schema_pruefen.php'));
+check('KRITISCH: betreiber_schema_pruefen.php ergaenzt sowohl Tabellen als auch Spalten',
+  /be_tabellen_anlegen\(/.test(schemaPruefen) && /be_spalten_anlegen\(/.test(schemaPruefen));
+check('KRITISCH: er verlangt keine Mandanten-Verwaltungssitzung -- sonst waere er vom Betreiber-Bereich aus so wenig aufrufbar wie betreiber_einrichten.php',
+  !/require_session\s*\(/.test(schemaPruefen));
+
+// betreiber_einrichten.php (Erstanlage) ergaenzt seit diesem Nachtrag
+// ebenfalls Spalten, nicht nur Tabellen -- sonst bliebe eine ganz frische
+// Anlage, deren Bootstrap noch offen ist, ohne diesen Weg.
+const betreiberEinrichten = nurCode(lies('backend/api/betreiber_einrichten.php'));
+check('betreiber_einrichten.php ergaenzt ebenfalls Spalten, nicht nur Tabellen',
+  /be_spalten_anlegen\(/.test(betreiberEinrichten));
+
+// Der alte Nachtrag fuer mandant.subdomain stand bis eben doppelt: einmal
+// als eigener Array-Eintrag in planung_einrichten.php, einmal (seit diesem
+// Umbau) in be_spalten(). Eine Textsuche nach dem Wortlaut wuerde nur die
+// Umformulierung pruefen -- geprueft wird stattdessen, dass die geteilte
+// Funktion tatsaechlich BENUTZT wird und kein zweiter Array-Eintrag mit
+// derselben ALTER-Anweisung danebensteht.
+const planungEinrichten = nurCode(lies('backend/api/planung_einrichten.php'));
+check('KRITISCH: planung_einrichten.php nutzt die geteilte Funktion statt einer eigenen Kopie der ALTER-Anweisung',
+  /be_spalten_anlegen\(/.test(planungEinrichten)
+  && !/ALTER TABLE mandant ADD COLUMN subdomain/.test(planungEinrichten));
+
+// Die Oberflaeche: ein Zahnrad in der Kopfzeile, dasselbe Muster wie
+// "Einrichtung" im Cockpit (dashboard.html) -- kein eigener Container im
+// Seitenfluss, sondern ein Icon, das sich faerbt, sobald etwas ansteht, und
+// ein Dialog, der den Endpunkt tatsaechlich aufruft (ENT-524, 2026-09-18:
+// ausdruecklicher Gestaltungsauftrag, siehe CLAUDE.md "Gestaltung").
+const betreiberHtml = lies('betreiber.html');
+check('KRITISCH: das Zahnrad oeffnet den Einrichtungs-Dialog, statt eine Karte im Seitenfluss zu sein',
+  /knopf-einrichtung['"]\)\.onclick\s*=\s*einrichtungOeffnen/.test(betreiberHtml)
+  && /function einrichtungOeffnen\(\)[\s\S]{0,120}dlgEinrichtung[\s\S]{0,40}einrichtungLauf/.test(betreiberHtml));
+check('KRITISCH: der Dialog-Lauf ruft betreiber_schema_pruefen.php tatsaechlich per POST auf',
+  /function einrichtungLauf\(\)[\s\S]{0,600}betreiber_schema_pruefen\.php[\s\S]{0,40}'POST'/.test(betreiberHtml));
+check('KRITISCH: das Zahnrad faerbt sich, sobald etwas nachzutragen ist -- stiller GET-Check, kein Toast',
+  /function pruefeEinrichtungUpdate\(\)[\s\S]{0,300}betreiber_schema_pruefen\.php[\s\S]{0,200}hat-update/.test(betreiberHtml)
+  && /\.icon-knopf\.hat-update\s*\{[^}]*color:\s*var\(--warn\)/.test(betreiberHtml));
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

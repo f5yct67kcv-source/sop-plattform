@@ -5165,10 +5165,21 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   <!-- Video-Hintergrund auf dem Desktop, dieselbe Szene wie app.html
        (ENT-392/394/396) -- die Karte ist seit ENT-396 weg, Text liegt
        jetzt direkt auf Foto/Video, wie in app.html seit ENT-385. -->
-  <video class="gate-video" autoplay muted loop playsinline>
-    <source src="img/anmeldung-nacht.webm" type="video/webm">
-    <source src="img/anmeldung-nacht.mp4" type="video/mp4">
-  </video>
+  <video class="gate-video" autoplay muted loop playsinline id="gate-video"></video>
+  <script>
+  // Gleicher Grund wie in app.html: in der nativen Huelle darf dieses
+  // Video nie laden, und "display:none" allein reicht dafuer nicht, weil
+  // WKWebView den Abruf unabhaengig von der Sichtbarkeit beginnt.
+  // nativeAppHuelle() ist an dieser fruehen Stelle noch nicht definiert,
+  // darum hier dieselbe Pruefung wie dort (ENT-588).
+  if (!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())) {
+    var gv = document.getElementById('gate-video');
+    gv.insertAdjacentHTML('beforeend',
+      '<source src="img/anmeldung-nacht.webm" type="video/webm">' +
+      '<source src="img/anmeldung-nacht.mp4" type="video/mp4">');
+    gv.load();
+  }
+  </script>
   <!-- Der Schleier ueber dem Video, gleicher Wert wie in app.html. Als
        eigenes Element, weil ein Video den CSS-Hintergrund darunter
        vollstaendig abdeckt. -->

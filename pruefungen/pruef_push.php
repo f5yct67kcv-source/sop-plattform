@@ -498,5 +498,62 @@ $danach = array_map('intval', array_column(push_faellige_mitteilungen($pdo, $jet
 pruef('KRITISCH: nach dem Vermerk ist sie nicht mehr faellig -- keine zweite Runde',
     !in_array(1, $danach, true));
 
+// ── Die zwei Umgebungen von Apple (ENT-604) ──────────────────────────────
+//
+// Ein Geraet, auf dem die App ueber Xcode installiert wurde, meldet sich im
+// Sandkasten an; dieselbe App aus dem Store in der Produktivumgebung. Dem
+// Token sieht man nicht an, woher es stammt.
+//
+// Bis hierher ging jeder Versand nur an die Produktivadresse. Beim Test am
+// eigenen Geraet antwortete Apple darum BadDeviceToken -- und weil dieser
+// Grund als "Geraet gibt es nicht mehr" gilt, wurde das Abo bei JEDEM
+// Versuch geloescht. Es kam nie etwas an, und die Ursache sah aus wie ein
+// unbekanntes Geraet.
+$tok = str_repeat('a1b2', 16);
+$adrProd = push_apns_adresse($tok, false);
+$adrSand = push_apns_adresse($tok, true);
+pruef('KRITISCH: die Produktivadresse ist Apples Produktivumgebung',
+    $adrProd === 'https://api.push.apple.com/3/device/' . $tok);
+pruef('KRITISCH: die Sandkasten-Adresse ist eine ANDERE Adresse, nicht dieselbe',
+    $adrSand !== $adrProd && str_contains($adrSand, 'sandbox'));
+pruef('KRITISCH: beide tragen dasselbe Token am Ende',
+    str_ends_with($adrProd, '/' . $tok) && str_ends_with($adrSand, '/' . $tok));
+// Das Token wandert in eine URL -- es darf dort nichts anderes anstossen
+// koennen (ENT-501, kein selbstgewaehltes Ziel).
+pruef('KRITISCH: ein Token mit Pfadwechsel kommt gar nicht erst bis zur Adresse',
+    !push_apns_token_gueltig('../../' . $tok) && !push_apns_token_gueltig($tok . '/..'));
+
+// Der zweite Versuch darf NUR bei BadDeviceToken kommen, nicht bei jedem
+// Fehlschlag: Ein abgelaufener Schluessel oder eine Stoerung bei Apple
+// wuerde sonst jede Zustellung verdoppeln.
+//
+// Geprueft wird die Entscheidung selbst, nicht ihr Wortlaut im Quelltext.
+// Ein erster Entwurf sah im Quelltext nach "BadDeviceToken" nach -- und
+// blieb gruen, nachdem die Regel entfernt war, weil das Wort noch im
+// Kommentar darueber stand. Genau die Falle, vor der CLAUDE.md warnt.
+$badToken  = ['code' => 400, 'ausgang' => 'entfernen', 'meldung' => 'BadDeviceToken'];
+$abgemeldet = ['code' => 410, 'ausgang' => 'entfernen', 'meldung' => 'Unregistered'];
+$gestoert  = ['code' => 500, 'ausgang' => 'fehler',    'meldung' => 'InternalServerError'];
+$zugestellt = ['code' => 200, 'ausgang' => 'ok',       'meldung' => ''];
+
+pruef('KRITISCH: bei BadDeviceToken wird der Sandkasten probiert',
+    push_apns_sandkasten_probieren($badToken));
+pruef('KRITISCH: bei einem abgemeldeten Geraet NICHT -- das Token ist wirklich tot',
+    !push_apns_sandkasten_probieren($abgemeldet));
+pruef('KRITISCH: bei einer Stoerung NICHT -- ein zweiter Versuch verdoppelt nur',
+    !push_apns_sandkasten_probieren($gestoert));
+pruef('KRITISCH: nach erfolgreicher Zustellung erst recht nicht',
+    !push_apns_sandkasten_probieren($zugestellt));
+
+pruef('KRITISCH: gelingt es im Sandkasten, zaehlt dieses Ergebnis',
+    push_apns_ergebnis_waehlen($badToken, $zugestellt) === $zugestellt);
+// Zwei UNTERSCHEIDBARE Ergebnisse, beide mit Ausgang "entfernen": Mit
+// zweimal demselben Array waere der Test wertlos -- beide Zweige lieferten
+// dasselbe, und ein "nimm immer den zweiten" bliebe unbemerkt.
+pruef('KRITISCH: lehnt auch der Sandkasten ab, bleibt es beim ERSTEN Ergebnis',
+    push_apns_ergebnis_waehlen($badToken, $abgemeldet) === $badToken);
+pruef('KRITISCH: eine Stoerung im Sandkasten ueberschreibt das Entfernen nicht stillschweigend mit Erfolg',
+    push_apns_ergebnis_waehlen($badToken, $gestoert)['ausgang'] === 'fehler');
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

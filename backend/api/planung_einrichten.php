@@ -2624,12 +2624,6 @@ $spalten = [
     // waffentragberechtigt: eine bewusst gesetzte Berechtigung statt einer
     // Vermutung aus vergangenen Einsaetzen.
     ['mitarbeiter', 'revierdienst_berechtigt', 'ALTER TABLE mitarbeiter ADD COLUMN revierdienst_berechtigt TINYINT(1) NOT NULL DEFAULT 0'],
-    // Eigene Ausliefer-Adresse je Mandant (ENT-589) -- siehe Kommentar an der
-    // Spalte in backend/betreiber.php. `mandant` entsteht sonst ueber
-    // be_tabellen_anlegen() (CREATE TABLE IF NOT EXISTS) und bekommt die
-    // Spalte dort bereits neu; dieser Eintrag traegt sie fuer eine Anlage
-    // nach, deren `mandant`-Tabelle schon vor ENT-589 entstanden ist.
-    ['mandant', 'subdomain', "ALTER TABLE mandant ADD COLUMN subdomain VARCHAR(100) NOT NULL DEFAULT '' AFTER name"],
 ];
 // Vor dem Loop merken, ob die neue Berechtigungs-Spalte schon da war -- nur
 // wenn sie JETZT, in diesem Lauf, neu entsteht, darf der Nachtrag weiter
@@ -2646,6 +2640,18 @@ foreach ($spalten as [$tabelle, $spalte, $sql]) {
     if ($nurPruefen) { $getan[] = "Spalte $tabelle.$spalte fehlt noch"; continue; }
     schritt($pdo, $sql, "Spalte $tabelle.$spalte", $getan, $fehler);
 }
+
+// Betreiber-eigene Spalten-Nachtraege (be_spalten() in backend/betreiber.php,
+// z. B. mandant.subdomain) -- bewusst NICHT an be_bootstrap_offen() geknuepft
+// wie der Tabellenblock weiter unten: Eine bestehende Tabelle um eine
+// fehlende Spalte zu ergaenzen legt keinen neuen Bootstrap-Zustand an, sie
+// patcht nur eine Anlage, die es schon laenger gibt. Laeuft ueber $pdo, nicht
+// betreiber_db(): dieselbe Datenbank, solange die Betreiber-DB-Secrets leer
+// sind (heutiger Normalfall), und derselbe Verbindungsweg wie der Block darueber.
+$beSpErgebnis = be_spalten_anlegen($pdo, $nurPruefen);
+foreach ($beSpErgebnis['getan'] as $g)  { $getan[]  = $g; }
+foreach ($beSpErgebnis['offen'] as $o)  { $getan[]  = $o . ' fehlt noch'; }
+foreach ($beSpErgebnis['fehler'] as $f) { $fehler[] = $f; }
 
 // ── 2a0. Aufkleber-Schluessel nachtragen (ENT-340). Jedes Fahrzeug braucht
 // einen, sonst laesst es sich nicht scannen -- und Fahrzeuge aus der Zeit
