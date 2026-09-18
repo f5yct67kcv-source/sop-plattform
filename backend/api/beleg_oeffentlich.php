@@ -192,6 +192,8 @@ try {
     }
 
     $titel = BELEG_ARTEN[$b['art']]['titel'] ?? 'Beleg';
+    $datumLabel  = BELEG_ARTEN[$b['art']]['datum_label'] ?? 'Datum';
+    $nummerLabel = BELEG_ARTEN[$b['art']]['nummer_label'] ?? 'Nummer';
 
     $empfaenger = array_values(array_filter([
         $kunde['name'] ?? '',
@@ -313,7 +315,7 @@ try {
         . '<div style="line-height:1.5;font-size:13px">' . portal_esc($firma !== '' ? $firma : 'Absender') . '</div>'
         . '<div class="zf-label">Details</div>'
         . '<div style="line-height:1.7;font-size:13px">'
-        . portal_esc($titel) . 'datum<br><span style="color:#6B7280">' . portal_dmy($b['datum']) . '</span>'
+        . portal_esc($datumLabel) . '<br><span style="color:#6B7280">' . portal_dmy($b['datum']) . '</span>'
         . (!portal_leeres_datum($b['gueltig_bis']) ? '<br><br>Gültig bis<br><span style="color:#6B7280">' . portal_dmy($b['gueltig_bis']) . '</span>' : '')
         . (!portal_leeres_datum($b['faellig_bis'] ?? null) ? '<br><br>Fällig bis<br><span style="color:#6B7280">' . portal_dmy($b['faellig_bis']) . '</span>' : '')
         . '</div>'

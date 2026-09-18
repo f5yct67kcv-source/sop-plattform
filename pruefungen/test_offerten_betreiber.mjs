@@ -112,7 +112,7 @@ if (fremdeAufrufe.length) { bad.push('fremder Aufruf: ' + fremdeAufrufe.join(', 
 // Cockpit duerfen nirgends stehengeblieben sein.
 const COCKPIT_NAMEN = ['beleg_list.php', 'beleg_lesen.php', 'beleg_speichern.php',
   'beleg_versenden.php', 'beleg_status.php', 'beleg_archivieren.php',
-  'beleg_duplizieren.php', 'kunden_list.php', 'kunden_create.php',
+  'beleg_duplizieren.php', 'beleg_bezahlt.php', 'kunden_list.php', 'kunden_create.php',
   'kunden_update.php', 'produkt_list.php', 'produkt_speichern.php'];
 const stehengeblieben = COCKPIT_NAMEN.filter(n =>
   new RegExp(`(?<!betreiber_)${n.replace('.', '\\.')}`).test(nurCode(seite)));
@@ -187,16 +187,51 @@ if (fehlend.length) { bad.push('fehlt im Buendel: ' + fehlend.join(', ')); }
   if (doppelt.length) { bad.push('doppelt definiert: ' + doppelt.join(', ')); }
 }
 
-// ── 6. Rechnungen bleiben ein Geruest, und zwar sichtbar ──────────────
+// ── 6. Rechnungen (ENT-608) ──────────────────────────────────────────
 //
-// Die Freigabe traegt den definierten Umfang. Offerten sind gebaut, die
-// wiederkehrende Rechnung nicht -- sie braucht die Antwort auf "wonach wird
-// abgerechnet" (OP-536). Steht das nicht mehr da, behauptet die Oberflaeche
-// eine Funktion, die es nicht gibt.
-check('KRITISCH: der Rechnungsbereich sagt weiterhin, dass er nicht gebaut ist',
-  /geruestZeigen\('re-inhalt', 'Noch nicht gebaut'/.test(seite));
-check('und nennt den Grund, nicht nur den Zustand',
-  /wonach abgerechnet wird/.test(seite));
+// Bis ENT-608 stand hier das Gegenteil: Der Rechnungsbereich MUSSTE sagen,
+// dass er nicht gebaut ist. Er ist es jetzt -- und die Wache wird darum
+// umgehaengt, nicht gestrichen. Geprueft wird ab hier, dass die Rechnung
+// wirklich eine Rechnung ist und nicht eine Offerte mit anderer
+// Beschriftung.
+const seiteCode = nurCode(seite);
+
+check('KRITISCH: die Rechnungsliste holt ausdruecklich art=rechnung',
+  /betreiber_beleg_list\.php\?art=rechnung/.test(seiteCode));
+check('KRITISCH: das Formular schickt die Belegart mit, statt sie festzuschreiben',
+  /art:\s*ofArt/.test(seiteCode) && !/art:\s*'offerte'/.test(seiteCode));
+// Das zweite Datumsfeld ist der eigentliche Unterschied der beiden Arten.
+// Traegt eine Rechnung "gueltig_bis", steht ihre Frist in der falschen
+// Spalte -- und die Liste zeigt danach ueberall einen Strich.
+check('KRITISCH: das zweite Datum geht in die Spalte der jeweiligen Art',
+  /\[t\.zweitFeld\]:/.test(seiteCode)
+  && /zweitFeld:\s*'faellig_bis'/.test(seiteCode)
+  && /zweitFeld:\s*'gueltig_bis'/.test(seiteCode));
+// Vier Spalten, die es nur bei Rechnungen gibt.
+check('die Rechnungsliste rechnet Faelligkeit und offenen Betrag',
+  /function reFaelligTage/.test(seiteCode) && /function reOffenRappen/.test(seiteCode));
+// "Unbekannt darf nie wie laengst vorbei aussehen": '0000-00-00' ist
+// truthy UND kleiner als jeder echte Tag.
+check('KRITISCH: eine Rechnung ohne Frist gilt nicht als ueberfaellig',
+  /leeresDatum\(b\.faellig_bis\)/.test(seiteCode));
+check('KRITISCH: bestaetigt und abgelehnt gibt es bei einer Rechnung nicht',
+  /function belegStatusOptionen/.test(seiteCode)
+  && /art !== 'rechnung'/.test(seiteCode));
+
+// Der neue Endpunkt: Er steht auf derselben Ebene wie die uebrigen und
+// markiert ausschliesslich Rechnungen.
+{
+  const bez = nurCode(lies('backend/api/betreiber_beleg_bezahlt.php'));
+  check('KRITISCH: der Bezahlt-Endpunkt verlangt die Betreiber-Anmeldung',
+    /require_betreiber_voll\(\)/.test(bez));
+  check('KRITISCH: er arbeitet auf be_belege und betreiber_db()',
+    bez.includes('be_belege') && bez.includes('betreiber_db()') && !/FROM\s+belege\b/.test(bez));
+  check('KRITISCH: nur eine Rechnung kann bezahlt sein -- eine Offerte nicht',
+    /\$art\s*!==\s*'rechnung'/.test(bez));
+  check('das Bezahldatum setzt der Server, nicht die Eingabe',
+    /date\('Y-m-d'\)/.test(bez) && !/\$in\['bezahlt_am'\]/.test(bez));
+  check('nur POST', /REQUEST_METHOD.*!==.*POST/.test(bez));
+}
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden`);
 if (bad.length) {

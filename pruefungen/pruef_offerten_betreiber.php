@@ -66,9 +66,9 @@ foreach (['', 'be_'] as $p) {
         id INTEGER PRIMARY KEY AUTOINCREMENT, nummer TEXT, name TEXT, aktiv INTEGER DEFAULT 1)");
 }
 
-$anlegen = function (string $praefix, string $nummer, array $positionen) use ($pdo): int {
+$anlegen = function (string $praefix, string $nummer, array $positionen, string $art = 'offerte') use ($pdo): int {
     $pdo->prepare('INSERT INTO ' . $praefix . 'belege (art, nummer, datum, status) VALUES (?, ?, ?, ?)')
-        ->execute(['offerte', $nummer, '2026-03-01', 'entwurf']);
+        ->execute([$art, $nummer, '2026-03-01', 'entwurf']);
     $id = (int)$pdo->lastInsertId();
     beleg_positionen_schreiben($pdo, $id, array_map('beleg_position_lesen', $positionen), $praefix);
     beleg_summen_schreiben($pdo, $id, 0, $praefix);
@@ -118,6 +118,36 @@ check('KRITISCH: die Betreiberin zaehlt ihre Offerten selbst',
     beleg_naechste_nummer($pdo, 'offerte', 'be_') === 'OF-0002');
 check('die Mandantin zaehlt weiter ihre eigenen',
     beleg_naechste_nummer($pdo, 'offerte') === 'OF-0100');
+
+// ── 3b. Rechnungen zaehlen noch einmal fuer sich (ENT-608) ───────────
+//
+// Zwei Reihen je Tabellensatz, nicht eine: RE und OF duerfen einander
+// nicht weiterzaehlen. Und die Reihe der Betreiberin faengt auch dann bei
+// RE-0001 an, wenn die Mandantin schon bei RE-0207 steht -- solange
+// betreiber_db() auf dieselbe Datenbank zeigt (OP-518), haengt genau
+// daran, dass die erste eigene Rechnung nicht RE-0208 heisst.
+check('KRITISCH: die erste Rechnung der Betreiberin heisst RE-0001',
+    beleg_naechste_nummer($pdo, 'rechnung', 'be_') === 'RE-0001');
+$pdo->prepare("INSERT INTO belege (art, nummer, datum, status) VALUES ('rechnung', ?, '2026-03-02', 'entwurf')")
+    ->execute(['RE-0207']);
+check('KRITISCH: die Rechnungen der Mandantin zaehlen die der Betreiberin nicht hoch',
+    beleg_naechste_nummer($pdo, 'rechnung', 'be_') === 'RE-0001'
+    && beleg_naechste_nummer($pdo, 'rechnung') === 'RE-0208');
+$beRechnung = $anlegen('be_', 'RE-0001', [
+    ['menge' => 3, 'einzelpreis_rappen' => 20000, 'mwst_satz_bp' => 810],
+], 'rechnung');
+// Zwei im eigenen Satz (OF-0001 und RE-0001), drei im fremden (OF-0001,
+// OF-0099 und die RE-0207 von eben) -- gezaehlt statt geschaetzt.
+check('KRITISCH: die Rechnung der Betreiberin steht in be_belege, nicht daneben',
+    $zaehle('be_belege') === 2 && $zaehle('belege') === 3);
+check('sie rechnet mit demselben Kern wie die Offerte',
+    (int)beleg_lesen($pdo, $beRechnung, 'be_')['total_rappen'] === 64860);  // 600.00 + 8.1 %
+check('und die naechste ist danach RE-0002',
+    beleg_naechste_nummer($pdo, 'rechnung', 'be_') === 'RE-0002');
+// Die Offertenreihe bleibt davon unberuehrt -- sonst zaehlte eine Rechnung
+// die Offerten weiter.
+check('KRITISCH: die Offertenreihe zaehlt davon nicht mit',
+    beleg_naechste_nummer($pdo, 'offerte', 'be_') === 'OF-0002');
 
 // ── 4. Adressen und Leistungen ebenso ────────────────────────────────
 $pdo->prepare('INSERT INTO be_kunden (kundennummer, name) VALUES (?, ?)')->execute(['K0001', 'Betrieb A']);
