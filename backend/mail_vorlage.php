@@ -42,8 +42,9 @@ const MAIL_FARBE_BLAU   = '#2F5BD7';
 // dieselbe Systemschrift wie der Fliesstext.
 const MAIL_LOGO_DATEI   = 'guardops-signatur.png';
 const MAIL_LOGO_KENNUNG = 'guardops-logo';
-// Angezeigt 200 px; die Datei ist 400 px breit (doppelte Aufloesung).
-const MAIL_LOGO_BREITE  = 200;
+// Angezeigt 160 px; die Datei ist 400 px breit -- mehr als das Doppelte,
+// damit sie auch auf feinen Bildschirmen nicht ausfranst.
+const MAIL_LOGO_BREITE  = 160;
 
 const MAIL_SCHRIFT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
 
