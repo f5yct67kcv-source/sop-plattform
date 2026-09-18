@@ -1102,6 +1102,35 @@ button.rd-kopf:active { background: var(--line-soft); }
 .rgs-bd.voll > :not(.rgs-karte-huelle) { margin: 0 16px; }
 .rgs-bd.voll > :last-child:not(.rgs-karte-huelle) { margin-bottom: calc(12px + env(safe-area-inset-bottom)); }
 .rgs-karte { position: absolute; inset: 0; }
+/* Durchsicht auf die native Karte -- und was darunter NICHT
+   durchscheinen darf (ENT-609).
+
+   Zwei Fehlversuche, beide am Geraet gemessen, darum steht die Begruendung
+   hier ausfuehrlich:
+
+   1. Zuerst wurde die Kette vom Seitenkoerper bis zur Karte durchsichtig
+      gestellt. Die Karte erschien -- aber die Seite DARUNTER schien mit
+      durch: Auf dem Karten-Reiter klebten die Revierdienst-Kacheln im
+      Bild. Die Rundgang-Ebene liegt naemlich UEBER der App und verdeckt
+      sie nur mit ihrem Hintergrund; nimmt man den weg, sieht man sie.
+
+   2. Daraufhin wurde die Durchsicht ganz entfernt, in der Annahme, das
+      Plugin zeichne auf iOS in die Webansicht hinein und brauche sie gar
+      nicht. Ergebnis: gar keine Karte mehr, nur noch die Hintergrundfarbe
+      der Huelle. Die Annahme war falsch -- die native Ansicht liegt
+      wirklich unter der Webansicht.
+
+   Also beides: durchsichtig bis nach unten, UND die App-Ebene wird
+   ausgeblendet, statt sich auf ihren Hintergrund zu verlassen. Dann ist
+   unter der Rundgang-Ebene nichts mehr, was durchscheinen koennte --
+   ausser der Karte, um die es geht.
+
+   Ausgeblendet wird mit visibility, nicht mit display: Ein display:none
+   wirft die Masse der Seite weg, und die Rueckkehr kostet dann einen
+   ganzen Neuaufbau samt Sprung im Bildlauf. */
+body.karte-nativ, body.karte-nativ .rgs, body.karte-nativ .rgs-bd,
+body.karte-nativ .rgs-karte-huelle, body.karte-nativ .rgs-karte { background: transparent; }
+body.karte-nativ .app { visibility: hidden; }
 /* Ladehinweis und Fehlermeldung an derselben Stelle: Beides beantwortet
    dieselbe Frage ("warum sehe ich nichts"), darum derselbe Ort. */
 .rgs-karte-stand { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; font-size: 14px; line-height: 1.5; color: var(--ink-3); }
@@ -2527,6 +2556,17 @@ const W = {
     rgsKarteFehler: 'Die Karte liess sich nicht laden — ohne Netz geht das nicht. Die Kontrollpunkte stehen im Reiter daneben.',
     rgsKarteGesperrt: 'Die Karte ist für diese Seite nicht freigegeben. Das ist eine Einstellung beim Kartenanbieter, kein Fehler an deinem Gerät — bitte der Verwaltung melden. Die Kontrollpunkte stehen im Reiter daneben, die Runde läuft normal weiter.',
     rgsKarteGesperrtKurz: 'Der Kartenanbieter meldet, dass diese Seite nicht freigegeben ist — bitte der Verwaltung melden.',
+    // Vierter Fall, und ein anderer als die drei darueber (ENT-309/312):
+    // Der Schluessel wurde beim Bauen dieser Fassung gar nicht erst
+    // eingesetzt. Das ist kein Netzproblem, keine Sperre beim Anbieter und
+    // nichts, was der Waechter vor Ort beheben koennte -- es fehlt ein
+    // Schritt beim Ausliefern. Genau so gemeldet aus der ersten App-Fassung
+    // auf dem Geraet: Der Platzhalter stand noch im Buendel, Google lehnte
+    // ihn ab, und die App behauptete daraufhin eine Freigabe-Einstellung,
+    // die es gar nicht gibt. Ein falscher Rat kostet den Waechter einen
+    // Anruf.
+    rgsKarteOhneSchluessel: 'Die Karte ist in dieser Fassung der App nicht eingerichtet — bitte der Verwaltung melden. Die Kontrollpunkte stehen im Reiter daneben, die Runde läuft normal weiter.',
+    rgsKarteOhneSchluesselKurz: 'Die Karte ist in dieser Fassung der App nicht eingerichtet — bitte der Verwaltung melden.',
     rgsKarteLeer: 'Für diese Runde ist kein Kontrollpunkt auf der Karte darstellbar.',
     rgsKarteOhneOrt: 'ohne Koordinaten — nur in der Liste',
     rgsZentrieren: 'Zentrieren',
@@ -2536,6 +2576,17 @@ const W = {
     rgOrtAusTitel: 'Kein Standort — die Runde lässt sich so nicht bestätigen',
     rgOrtVerweigert: 'Der Standortzugriff ist gesperrt. Ohne ihn kannst du keinen Kontrollpunkt bestätigen, und es kommt kein Signal, wenn du einen erreichst.',
     rgOrtWegIos: 'iPhone: Einstellungen › Datenschutz & Sicherheit › Ortungsdienste › Safari › „Beim Verwenden der App". Danach in Safari auf „aA" in der Adressleiste › Website-Einstellungen › Standort › Erlauben.',
+    // In der App fuehrt ein GANZ anderer Weg zum Ziel (ENT-609). Der Text
+    // darueber lotst durch Safari -- in der App gibt es weder den Eintrag
+    // "Safari" noch das "aA" in der Adressleiste, und wer danach sucht,
+    // sucht sich zu Tode. Ein Weg, den es nicht gibt, ist schlimmer als
+    // gar keiner: Er sieht aus wie eine Auskunft.
+    //
+    // Und iOS fragt NICHT noch einmal. Die Systemabfrage kommt genau
+    // einmal; wer sie wegtippt, kommt nur ueber die Einstellungen zurueck.
+    // Darum steht der Weg dorthin hier, und der Warnblock bleibt stehen,
+    // solange die Sperre gilt.
+    rgOrtWegApp: 'iPhone: Einstellungen › GuardOpS › Standort › „Beim Verwenden der App". Danach hierher zurück und auf „Erneut versuchen" tippen.',
     rgOrtWegAndroid: 'Android: Einstellungen › Apps › Browser › Berechtigungen › Standort › Zulassen.',
     rgOrtKeinSignal: 'Der Standort ist nicht verfügbar — draussen oder am Fenster geht es meist besser.',
     rgOrtWartet: 'Standort wird gesucht …',
@@ -5431,6 +5482,11 @@ function rgSeiteZu() {
   rgTimerStoppen();   // sonst tickt er unsichtbar weiter
   rgOrtungStoppen();  // sonst ortet das Geraet weiter, ohne dass es jemand sieht
   rgsMeinOrt = null;  // die Position ueberdauert die Runde nicht
+  // Dieselbe Ueberlegung fuer die native Karte (ENT-609): Sie liegt als
+  // eigene Ansicht unter der Seite und verschwindet nicht mit ihr. Wer sie
+  // hier stehen laesst, hat sie danach ueber der Uebersicht liegen -- samt
+  // der Durchsicht, die die ganze App durchscheinen laesst.
+  rgKarteNativAbbauen();
   $('rgsReiter').hidden = true;
   rgZahlenAn(false);
   $('rgsFuss').hidden = false;
@@ -7727,6 +7783,14 @@ function rgLaufZeichnen() {
   // Anders herum bliebe sie stehen, wenn die Karte nichts zu zeigen hat und
   // stattdessen ein Warnblock erscheint -- der klebte dann am Bildschirmrand.
   rgVollflaeche(false);
+  // Die native Karte gehoert NUR auf den Karten-Reiter (ENT-609). Sie liegt
+  // nicht im Dokument, sondern als eigene Ansicht darunter -- und die
+  // Durchsicht, die sie sichtbar macht, gilt fuer die ganze Seite. Bleibt
+  // beides beim Reiterwechsel stehen, sieht man durch die App hindurch auf
+  // die Ebenen darunter, und die Masken schieben sich uebereinander. Genau
+  // so vom Projektinhaber gemeldet. Abgebaut wird darum HIER, an der einen
+  // Stelle, durch die jeder Reiterwechsel laeuft.
+  if (rgsReiter !== 'karte') { rgKarteNativAbbauen(); }
   if (rgsReiter === 'karte') { rgKarteZeichnen(); }
   else if (rgsReiter === 'funktionen') { rgLaufFunktionen(); }
   else {
@@ -7802,7 +7866,7 @@ function rgLaufKopfZeichnen() {
   const lage = rgOrtLage().art;
   if (lage !== rgsOrtLageGezeichnet) {
     rgsOrtLageGezeichnet = lage;
-    if (rgsReiter === 'punkte' && abPunktId === null) { rundgangListeZeichnen(); }
+    if (rgsReiter === 'punkte' && abPunktId === null) { rundgangListeZeichnen('ortung'); }
   }
   // Dasselbe gilt fuer den Richtungspfeil (ENT-542): Er altert ebenfalls.
   try { rgRichtungMarkeNachfuehren(); } catch (e) {}
@@ -8008,6 +8072,15 @@ function rgLaufFunktionen() {
 // unvermeidbar (Client-Schluessel), der Schutz laeuft weiterhin ueber die
 // Referrer-Einschraenkung, nicht ueber Geheimhaltung.
 const RGS_MAPS_SCHLUESSEL = '__MAPS_JS_KEY__';
+/* Der Schluessel fuer die NATIVE Karte (ENT-609). Ein anderer als der
+   darueber, und das ist keine Doppelung: Dieser ist auf die Bundle-ID
+   ch.guardops.mitarbeiter und auf das Maps-SDK eingeschraenkt, jener auf
+   die Web-Adresse und die JavaScript-API. Eine Website-Einschraenkung kann
+   in der App nach Googles eigener Dokumentation gar nicht greifen -- die
+   WebView laedt ihre Seiten aus dem Buendel und schickt dabei keinen
+   Referrer mit. In der Web-Fassung bleibt hier der Platzhalter stehen; sie
+   braucht ihn nicht und kaeme auch nicht daran vorbei. */
+const RGS_MAPS_IOS_SCHLUESSEL = '__MAPS_IOS_KEY__';
 let rgsMapsVersprechen = null;
 let rgsKarte = null, rgsKartenMarken = [], rgsKartenKreise = [], rgsStandortMarke = null;
 /* Der mitwachsende Kreis waehrend der Verweilzeit (ENT-579). Bewusst NICHT
@@ -8084,7 +8157,8 @@ function rgKarteGesperrtZeigen() {
       const streifen = document.createElement('div');
       streifen.className = 'rgs-karte-hinweis fehler';
       streifen.id = 'rgsKarteWarnung';
-      streifen.textContent = w('rgsKarteGesperrtKurz');
+      streifen.textContent = w(rgsMapsSchluesselDa
+        ? 'rgsKarteGesperrtKurz' : 'rgsKarteOhneSchluesselKurz');
       huelle.parentNode.insertBefore(streifen, huelle.nextSibling);
     }
     return;
@@ -8108,11 +8182,150 @@ function rgKarteGesperrtZeigen() {
     stand.id = 'rgsKarteStand';
     karte.parentNode.appendChild(stand);
   }
-  stand.textContent = w('rgsKarteGesperrt');
+  // Zwei verschiedene Sachverhalte, zwei Texte: Der Anbieter lehnt einen
+  // fehlenden Schluessel genauso ab wie eine nicht freigegebene Adresse und
+  // nennt dabei keinen Grund. Wer den falschen Text liest, meldet der
+  // Verwaltung etwas, das gar nicht der Fall ist.
+  stand.textContent = w(rgsMapsSchluesselDa
+    ? 'rgsKarteGesperrt' : 'rgsKarteOhneSchluessel');
   stand.classList.add('fehler');
   // Der Zentrieren-Knopf zentriert nichts mehr -- ein Knopf, der nichts tut,
   // ist schlimmer als keiner.
   const btn = $('rgsZentrieren'); if (btn) { btn.remove(); }
+}
+
+/* Taugt der eingebaute Schluessel ueberhaupt etwas?
+
+   Reine Funktion, damit sie sich ohne Netz und ohne Karte pruefen laesst.
+   Beim Ausliefern wird der Platzhalter __MAPS_JS_KEY__ durch den echten
+   Schluessel ersetzt (deploy-hostpoint.yml fuers Web, aufs-handy.sh fuers
+   Handy). Bleibt er stehen, faehrt die Anfrage trotzdem zu Google und wird
+   abgelehnt -- auf demselben Weg wie eine nicht freigegebene Adresse,
+   naemlich ueber gm_authFailure. Der Anbieter nennt dabei keinen Grund;
+   diese Funktion ist die einzige Stelle, an der sich die beiden Faelle
+   noch auseinanderhalten lassen. Und sie sind zweierlei: hier fehlt ein
+   Schritt beim Ausliefern, dort eine Einstellung beim Anbieter.
+
+   Geladen wird trotzdem. Ein Schluessel, den wir fuer untauglich halten,
+   koennte einer sein, den Google annimmt -- die Karte gar nicht erst zu
+   versuchen, waere eine Vermutung zulasten des Waechters. */
+function mapsSchluesselTauglich(wert) {
+  const k = String(wert || '').trim();
+  if (k === '') { return false; }
+  // Geprueft wird die FORM, nicht der Wortlaut eines bestimmten
+  // Platzhalters. Ein Schluessel von Google beginnt mit "AIza" und ist
+  // deutlich laenger als 30 Zeichen.
+  //
+  // Zuerst stand hier nur, dass es nicht wie ein Platzhalter mit
+  // Unterstrichen am Rand aussehen darf. Das reichte
+  // nicht: Beim Einrichten landete der Beispieltext aus einer Anleitung im
+  // Buendel ("DER_NEUE_SCHLUESSEL"). Fuer diese Funktion war das ein
+  // Schluessel, die App baute die Karte auf, Google lieferte keine Kacheln
+  // -- und der Waechter las "nicht freigegeben", obwohl schlicht kein
+  // Schluessel da war. Zwei verschiedene Sachverhalte, ein Text: genau das,
+  // was hier nie passieren darf (CLAUDE.md).
+  //
+  // Das ist KEINE Echtheitspruefung. Ein falscher Schluessel dieser Form
+  // kommt durch und wird dann von Google abgelehnt -- dafuer gibt es die
+  // andere Meldung. Abgefangen wird nur, was offensichtlich gar keiner ist.
+  return /^AIza[0-9A-Za-z_-]{26,}$/.test(k);
+}
+
+/* Einmal beim Start beantwortet und in einer Variablen gehalten, nicht bei
+   jeder Meldung neu gerechnet. Der Wert aendert sich waehrend einer Sitzung
+   nicht -- und so laesst sich in den Pruefungen BEIDES herstellen, obwohl
+   in der Datei auf der Platte immer der Platzhalter steht (ersetzt wird er
+   erst beim Ausliefern). */
+let rgsMapsSchluesselDa = mapsSchluesselTauglich(RGS_MAPS_SCHLUESSEL);
+
+/* ══ Die native Karte (ENT-609) ══════════════════════════════════════
+   In der App zeichnet nicht mehr die JavaScript-Karte, sondern das native
+   Maps-SDK. Der Grund steht bei RGS_MAPS_IOS_SCHLUESSEL: Die
+   JavaScript-Karte laesst sich in der App gar nicht ordentlich absichern.
+
+   Die Browser-Fassung bleibt unveraendert daneben bestehen, solange es die
+   Runde im Browser gibt. */
+/* Nachtsicht auf der nativen Karte (ENT-609).
+
+   Die Browser-Fassung faerbt seit ENT-543 ueber das eingebaute Farbschema
+   der Vektorkarte; das native SDK kennt das nicht, es nimmt eine
+   Stilvorschrift entgegen -- also genau die Form, die vor ENT-543 auch im
+   Browser lief. Die Farbwerte stehen im Entscheidungsprotokoll bei
+   ENT-543 und sind von dort geholt, nicht neu erfunden.
+
+   Der Grund fuer die Nachtsicht steht bei RG_NACHT_SCHLUESSEL: Die Runde
+   laeuft abends und nachts, und eine helle Karte mitten in einer dunklen
+   Seite blendet und zerstoert die Nachtsicht. */
+const RG_NACHT_STIL_NATIV = [
+  { elementType: 'geometry', stylers: [{ color: '#1B2230' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#9AA3B2' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#0F1117' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2A3147' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#151B27' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3A4360' }] },
+  { featureType: 'road.local', elementType: 'labels.text.fill', stylers: [{ color: '#7E8798' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#101725' }] },
+  { featureType: 'landscape.man_made', elementType: 'geometry', stylers: [{ color: '#202838' }] },
+  // Geschaefte und Verkehrsmittel aus: Auf einer Runde zaehlt der Weg,
+  // nicht wo es Kaffee gibt -- und jede Beschriftung weniger ist eine
+  // Beschriftung, die den Kontrollpunkt nicht verdeckt.
+  { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+];
+
+let rgsNativKarte = null;       // die native Karte, solange sie steht
+let rgsNativVersprechen = null; // das einmal geladene Kartenplugin
+
+function rgKarteNativMoeglich() {
+  return nativeAppHuelle() && mapsSchluesselTauglich(RGS_MAPS_IOS_SCHLUESSEL);
+}
+
+/* Die zusammengefasste Kartenschicht nachladen (karte-nativ.js, erzeugt in
+   aufs-handy.sh). Eigener Weg statt eines festen <script>-Eintrags: Die
+   Datei liegt NUR im App-Buendel. Im Browser gaebe es sie nicht, und ein
+   fester Eintrag brummte dort bei jedem Seitenaufruf gegen einen 404. */
+function rgsNativLaden() {
+  if (window.KarteNativ && window.KarteNativ.GoogleMap) { return Promise.resolve(); }
+  if (rgsNativVersprechen) { return rgsNativVersprechen; }
+  rgsNativVersprechen = new Promise((resolve, reject) => {
+    const skript = document.createElement('script');
+    skript.src = 'karte-nativ.js';
+    // Dieselbe Vorsicht wie beim Kartenskript weiter unten: Ein leer
+    // beantwortetes Skript loest ebenfalls onload aus, ohne etwas zu
+    // definieren. Ohne diese Weiche bliebe eine graue Flaeche ohne jede
+    // Erklaerung zurueck.
+    skript.onload = () => {
+      if (window.KarteNativ && window.KarteNativ.GoogleMap) { resolve(); return; }
+      rgsNativVersprechen = null;
+      reject(new Error('karte-nativ-leer'));
+    };
+    skript.onerror = () => {
+      rgsNativVersprechen = null;
+      reject(new Error('karte-nativ'));
+    };
+    document.head.appendChild(skript);
+  });
+  return rgsNativVersprechen;
+}
+
+/* Die native Karte liegt NICHT im Dokument -- sie ist eine eigene Ansicht,
+   die das Betriebssystem an die Stelle des Elements haelt. Wer nur das
+   Element wegwirft, laesst sie stehen: Sie bliebe ueber der Seite liegen,
+   auch auf dem Reiter mit der Liste. Darum wird sie ausdruecklich
+   abgebaut, und zwar vor jedem Ersetzen des Rumpfs. */
+async function rgKarteNativAbbauen() {
+  // Die Durchsicht gilt nur, solange die Karte steht -- sonst bliebe die
+  // App auf den anderen Reitern unsichtbar.
+  document.body.classList.remove('karte-nativ');
+  if (!rgsNativKarte) { return; }
+  const weg = rgsNativKarte;
+  rgsNativKarte = null;
+  // Die Kreise haengen an der Karte, die gleich verschwindet. Sie muessen
+  // auch VERGESSEN werden, sonst haelt die App Kennungen fuer gueltig, die
+  // zu keiner Karte mehr gehoeren -- dieselbe Falle wie bei der
+  // Standortmarke in ENT-331.
+  rgsNativKreise = [];
+  try { await weg.destroy(); } catch (e) {}
 }
 
 function rgsMapsLaden() {
@@ -8207,7 +8420,16 @@ function rgNachtUm() {
      Das ist der eine Neubau, der bleibt: Er geschieht auf ausdrueckliches
      Tippen, nicht im Sekundentakt. Und er nimmt Zoom, Ausschnitt und
      Drehung mit, damit der Schalter nicht nebenbei die Ansicht wegwirft. */
-  if (rgsKarte) {
+  if (rgsNativKarte) {
+    // Dieselbe Ueberlegung fuer die native Karte (ENT-609): Auch dort
+    // gilt der Stil nur beim Erzeugen. Ohne diesen Zweig blieb der
+    // Schalter in der App wirkungslos -- er faerbte sich um und sonst
+    // geschah nichts. Genau so vom Projektinhaber gemeldet, und ein
+    // Knopf, der nichts tut, ist schlimmer als keiner.
+    rgKarteNativAbbauen();
+    rgsKarteEl = null;
+    try { rgKarteZeichnen(); } catch (e) {}
+  } else if (rgsKarte) {
     rgsKarteAnsicht = rgKarteAnsichtLesen();
     rgsKarte = null; rgsKarteEl = null; rgsKartenSignatur = null;
     rgsStandortMarke = null; rgsRichtungsMarke = null;
@@ -8287,6 +8509,10 @@ function rgKarteZeichnen() {
     ? `<div class="rgs-karte-hinweis" id="rgsKarteOhneOrt">${d.ohneOrt.length} ${esc(d.ohneOrt.length === 1 ? w('rgsReiterPunkte').slice(0, -1) : w('rgsReiterPunkte'))} ${esc(w('rgsKarteOhneOrt'))}</div>`
     : '';
   if (!d.zeigbar.length) {
+    // Auch hier: keine Karte, also auch keine native Ansicht und keine
+    // Durchsicht -- sonst bliebe der Warnblock auf einer durchsichtigen
+    // Seite stehen.
+    rgKarteNativAbbauen();
     $('rgsBody').innerHTML = `<div class="rgs-warn" id="rgsKarteLeer">
       <svg class="i i-sm" style="flex:none" viewBox="0 0 24 24"><polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21"/><line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/></svg>
       <span>${esc(w('rgsKarteLeer'))}</span></div>${hinweis}`;
@@ -8318,9 +8544,23 @@ function rgKarteZeichnen() {
     rgKarteAktualisieren(d, ortungHinweis, hinweis);
     return;
   }
+  // Dasselbe fuer die native Karte (ENT-609): Steht sie, wird sie nicht
+  // weggeworfen. Der Grund ist derselbe wie bei ENT-543 darueber, und er
+  // wiegt hier schwerer -- eine native Ansicht neu aufzubauen kostet
+  // sichtbar Zeit, und der selbst gewaehlte Ausschnitt waere jedes Mal weg.
+  if (rgsNativKarte && rgsKarteEl && rgsKarteEl === $('rgsKarte')) {
+    rgKarteNativAktualisieren(d, ortungHinweis, hinweis);
+    return;
+  }
+  // Der Rumpf wird gleich ersetzt. Eine noch stehende native Karte muss
+  // VORHER weg -- sie haengt nicht am Element und bliebe sonst ueber der
+  // Seite liegen.
+  rgKarteNativAbbauen();
   $('rgsBody').innerHTML = `
     <div class="rgs-karte-huelle">
-      <div class="rgs-karte" id="rgsKarte"></div>
+      ${rgKarteNativMoeglich()
+        ? '<capacitor-google-map class="rgs-karte" id="rgsKarte"></capacitor-google-map>'
+        : '<div class="rgs-karte" id="rgsKarte"></div>'}
       <div class="rgs-karte-stand" id="rgsKarteStand">${esc(w('rgsKarteLaedt'))}</div>
       ${rgZahlenChipsHtml(true)}${rgOrtChipHtml()}
       <button type="button" class="rgs-karte-btn" id="rgsZentrieren" onclick="rgKarteZentrieren()">
@@ -8342,6 +8582,7 @@ function rgKarteZeichnen() {
   // erneut, meldet sich der Anbieter von selbst wieder.
 
   const bauLauf = ++rgsKarteBauLauf;
+  if (rgKarteNativMoeglich()) { rgKarteNativBauen(d, bauLauf); return; }
   rgsMapsLaden().then(() => {
     // Ein neuerer Aufbau hat inzwischen uebernommen -- dieser hier ist
     // ueberholt und darf nichts mehr in die Karte schreiben.
@@ -8420,6 +8661,155 @@ function rgKarteZeichnen() {
     const stand = $('rgsKarteStand');
     if (stand) { stand.textContent = w('rgsKarteFehler'); stand.classList.add('fehler'); }
   });
+}
+
+/* Die native Karte aufbauen (ENT-609).
+
+   Erster Schritt: die Karte selbst. Marken, Kreise und der eigene Standort
+   kommen darauf, sobald feststeht, dass die Karte auf dem Geraet
+   ueberhaupt erscheint -- fuer das Plugin liegt ein offener Bericht vor,
+   dass sie unter Capacitor 8 leer bleiben kann. Lieber eine Probe als ein
+   Tag Arbeit gegen eine schwarze Flaeche. */
+async function rgKarteNativBauen(d, bauLauf) {
+  const zeigen = (wort) => {
+    const stand = $('rgsKarteStand');
+    if (stand) { stand.textContent = w(wort); stand.classList.add('fehler'); }
+  };
+  try {
+    await rgsNativLaden();
+  } catch (e) {
+    // Die zusammengefasste Kartenschicht fehlt im Buendel. Das ist ein
+    // uebersprungener Schritt beim Bauen, keine Sperre beim Anbieter und
+    // kein Netzproblem -- also derselbe Text wie beim fehlenden
+    // Schluessel, nicht der Freigabe-Text.
+    if (bauLauf === rgsKarteBauLauf) { zeigen('rgsKarteOhneSchluessel'); }
+    return;
+  }
+  // Waehrend des Ladens kann ein neuerer Aufbau uebernommen oder der
+  // Reiter gewechselt haben.
+  if (bauLauf !== rgsKarteBauLauf) { return; }
+  const el = $('rgsKarte');
+  if (!el) { return; }
+  try {
+    rgsNativKarte = await window.KarteNativ.GoogleMap.create({
+      id: 'rgs-karte',
+      element: el,
+      apiKey: RGS_MAPS_IOS_SCHLUESSEL,
+      config: {
+        center: { lat: d.zeigbar[0].lat, lng: d.zeigbar[0].lng },
+        zoom: 17,
+        // Der Stil laesst sich nur beim Erzeugen setzen -- der Schalter
+        // baut die Karte darum neu (rgNachtUm), genau wie in der
+        // Browser-Fassung.
+        styles: rgNachtAn() ? RG_NACHT_STIL_NATIV : undefined,
+      },
+    });
+  } catch (e) {
+    rgsNativKarte = null;
+    if (bauLauf === rgsKarteBauLauf) { zeigen('rgsKarteFehler'); }
+    return;
+  }
+  // Ein noch neuerer Aufbau hat waehrenddessen uebernommen: Diese Karte
+  // gehoert nicht mehr dorthin und muss wieder weg, sonst liegen zwei
+  // native Ansichten uebereinander.
+  if (bauLauf !== rgsKarteBauLauf) { rgKarteNativAbbauen(); return; }
+  rgsKarteEl = el;
+  document.body.classList.add('karte-nativ');
+  // Ausschnitt AUSDRUECKLICH setzen, obwohl er schon in der Erzeugung
+  // stand. Gemessen am Geraet: Die Karte kam ueber halb Mitteleuropa
+  // heraus statt ueber dem Kontrollpunkt -- die Angaben aus der Erzeugung
+  // sind offenbar noch nicht wirksam, wenn die Ansicht ihre endgueltige
+  // Groesse erst danach bekommt. Ein zweiter, ausdruecklicher Schritt
+  // kostet nichts und steht nicht im Zweifel.
+  await rgKarteNativAusschnitt(d, false);
+  // Der eigene Standort als NATIVE Anzeige (ENT-609, Entscheidung des
+  // Projektinhabers): der eingebaute Punkt samt Richtungskegel und
+  // Ungenauigkeit. Er dreht stufenlos mit und muss nicht nachgebaut
+  // werden -- eine Marke im SDK kann sich gar nicht drehen. Sieht anders
+  // aus als das weisse Schild der Browser-Fassung, und das ist so
+  // gewollt.
+  try { await rgsNativKarte.enableCurrentLocation(true); } catch (e) {}
+  await rgKarteNativKreiseZeichnen(d.zeigbar);
+  // Den Hinweis erst entfernen, wenn die Karte wirklich steht -- dieselbe
+  // Reihenfolge wie in der Browser-Fassung.
+  const stand = $('rgsKarteStand');
+  if (stand) { stand.remove(); }
+}
+
+/* Die Geofence-Radien auf der nativen Karte (ENT-609).
+
+   Die Marken mit Nummer, Haken und Ausrufezeichen fehlen hier noch: Das
+   native SDK zeichnet keine Vektorsymbole, dafuer braucht es Bilddateien,
+   die beim Bauen erzeugt werden. Die Kreise gehen ohne das -- und sie
+   sind es, die zeigen, wo der Punkt gilt und wie weit er reicht.
+
+   Farbe und Zustand kommen aus rgPunktZustand, derselben Quelle wie in
+   der Browser-Fassung. */
+let rgsNativKreise = [];
+async function rgKarteNativKreiseZeichnen(punkte) {
+  if (!rgsNativKarte) { return; }
+  try {
+    if (rgsNativKreise.length) {
+      await rgsNativKarte.removeCircles(rgsNativKreise);
+      rgsNativKreise = [];
+    }
+    if (!punkte || !punkte.length) { return; }
+    rgsNativKreise = await rgsNativKarte.addCircles(punkte.map(p => {
+      const { farbe } = rgPunktZustand(p);
+      return {
+        center: { lat: p.lat, lng: p.lng }, radius: p.radius,
+        strokeColor: farbe, strokeOpacity: 0.7, strokeWeight: 1,
+        fillColor: farbe, fillOpacity: 0.12,
+      };
+    })) || [];
+  } catch (e) { rgsNativKreise = []; }
+}
+
+/* Ausschnitt der nativen Karte: ein Punkt wird angefahren, mehrere werden
+   eingepasst. Dieselbe Regel wie in der Browser-Fassung -- bei einem
+   einzelnen Punkt sagt "einpassen" nichts, weil es nichts einzupassen
+   gibt, und die Karte landete auf einer Zoomstufe, die vom Zufall
+   abhaengt. */
+async function rgKarteNativAusschnitt(d, weich) {
+  if (!rgsNativKarte || !d || !d.zeigbar.length) { return; }
+  try {
+    if (d.zeigbar.length === 1) {
+      await rgsNativKarte.setCamera({
+        coordinate: { lat: d.zeigbar[0].lat, lng: d.zeigbar[0].lng },
+        zoom: 17, animate: !!weich,
+      });
+      return;
+    }
+    let sN = -90, sS = 90, sO = -180, sW = 180;
+    d.zeigbar.forEach(p => {
+      if (p.lat > sN) { sN = p.lat; }
+      if (p.lat < sS) { sS = p.lat; }
+      if (p.lng > sO) { sO = p.lng; }
+      if (p.lng < sW) { sW = p.lng; }
+    });
+    await rgsNativKarte.fitBounds({
+      southwest: { lat: sS, lng: sW },
+      center: { lat: (sN + sS) / 2, lng: (sO + sW) / 2 },
+      northeast: { lat: sN, lng: sO },
+    }, 48);
+  } catch (e) {}
+}
+
+/* Was sich an der nativen Karte ohne Neubau aendert. Vorerst nur das, was
+   NEBEN der Karte steht -- die Marken kommen mit dem naechsten Schritt. */
+function rgKarteNativAktualisieren(d, ortungHinweis, hinweis) {
+  const huelle = $('rgsBody') ? $('rgsBody').querySelector('.rgs-karte-huelle') : null;
+  if (huelle) {
+    while (huelle.nextSibling) { huelle.nextSibling.remove(); }
+    huelle.insertAdjacentHTML('afterend', ortungHinweis + hinweis);
+  }
+  const chipAlt = $('rgsOrtChip');
+  const chipNeu = rgOrtChipHtml();
+  if (chipAlt && !chipNeu) { chipAlt.remove(); }
+  else if (!chipAlt && chipNeu && $('rgsZentrieren')) {
+    $('rgsZentrieren').insertAdjacentHTML('beforebegin', chipNeu);
+  }
+  rgOrtChipZeichnen();
 }
 
 /* Was sich ohne Neubau aendern kann (ENT-543).
@@ -8548,15 +8938,25 @@ function rgFuellungNachfuehren() {
 
 // Nummer, "nicht verfuegbar"/Ersatzscan tragen ein Ausrufezeichen. Wer die
 // Farben nicht unterscheidet, liest die Zeichen.
+/* Farbe und Zeichen eines Kontrollpunkts -- EINE Quelle fuer beide
+   Kartenfassungen (ENT-609). Stuenden sie zweimal da, faerbte die App in
+   der Huelle irgendwann anders als im Browser, ohne dass etwas
+   kaputtginge. */
+function rgPunktZustand(p) {
+  const fertig = p.erledigt === 'bestaetigt';
+  const abweichend = p.erledigt && p.erledigt !== 'bestaetigt';
+  return {
+    farbe: fertig ? '#4FCE96' : abweichend ? '#E2B156' : '#7098F7',
+    zeichen: fertig ? '✓' : abweichend ? '!' : String(p.nr),
+  };
+}
+
 function rgKartePunkteZeichnen(punkte) {
   rgsKartenMarken.forEach(m => m.setMap(null));
   rgsKartenKreise.forEach(k => k.setMap(null));
   rgsKartenMarken = []; rgsKartenKreise = [];
   punkte.forEach(p => {
-    const fertig = p.erledigt === 'bestaetigt';
-    const abweichend = p.erledigt && p.erledigt !== 'bestaetigt';
-    const farbe = fertig ? '#4FCE96' : abweichend ? '#E2B156' : '#7098F7';
-    const zeichen = fertig ? '✓' : abweichend ? '!' : String(p.nr);
+    const { farbe, zeichen } = rgPunktZustand(p);
     rgsKartenKreise.push(new google.maps.Circle({
       map: rgsKarte, center: { lat: p.lat, lng: p.lng }, radius: p.radius,
       strokeColor: farbe, strokeOpacity: 0.7, strokeWeight: 1,
@@ -8787,7 +9187,7 @@ function rgOrtungStarten() {
     // Die Liste zeigt Entfernungen -- sie muss mitwandern. Nur wenn sie
     // gerade sichtbar ist: sonst wuerde ein offenes Formular (Ersatzscan,
     // "nicht verfuegbar") beim naechsten Positionswechsel weggeworfen.
-    if (rgsReiter === 'punkte' && abPunktId === null) { rundgangListeZeichnen(); }
+    if (rgsReiter === 'punkte' && abPunktId === null) { rundgangListeZeichnen('ortung'); }
   }, fehler => {
     // Ausgewertet statt verschluckt (ENT-320).
     // 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT.
@@ -9152,10 +9552,13 @@ function rgOrtungHinweisHtml(aufKarte) {
   if (rgsOrtWache === null) { return ''; }
   if (rgsOrtFehler === 'verweigert') {
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    // Drei Wege, nicht zwei: In der App fuehrt der Weg ueber die
+    // Einstellungen der App selbst, nicht ueber die des Browsers.
+    const weg = nativeAppHuelle() ? 'rgOrtWegApp' : (iOS ? 'rgOrtWegIos' : 'rgOrtWegAndroid');
     return `<div class="rgs-ortwarn" id="rgsOrtWarn">
       <div class="rgs-ortwarn-tt">${esc(w('rgOrtAusTitel'))}</div>
       <div>${esc(w('rgOrtVerweigert'))}</div>
-      <div class="rgs-ortwarn-weg">${esc(w(iOS ? 'rgOrtWegIos' : 'rgOrtWegAndroid'))}</div>
+      <div class="rgs-ortwarn-weg">${esc(w(weg))}</div>
       <button type="button" class="btn btn-plain btn-wide" style="margin-top:12px"
         onclick="rgOrtungErneut()">${esc(w('rgOrtErneut'))}</button>
     </div>`;
@@ -9605,9 +10008,49 @@ function rgRichtungMarkeNachfuehren() {
 
 /* Zentrieren: alle Punkte ins Bild, danach einmalig die eigene Position
    dazuholen. Einmalig, nicht laufend -- ENT-131. */
+/* "Zentrieren" fuehrt auf den EIGENEN Standort, nicht auf die
+   Kontrollpunkte.
+
+   Bis hierher passte es den Ausschnitt an die Kontrollpunkte an. Vom
+   Projektinhaber am Geraet gemeldet: "Wenn ich zentriere, springt sie auf
+   den Kontrollpunkt." Der Pfeil auf dem Knopf verspricht etwas anderes --
+   in jeder Karten-App heisst dieses Zeichen "zeig mir, wo ich bin". Und
+   auf einer Runde ist genau das die Frage: Wo stehe ich, und wie weit ist
+   es noch?
+
+   Ist der Standort nicht bekannt -- Keller, Tiefgarage, gerade erst
+   geoeffnet --, bleibt es beim alten Verhalten: Dann zeigt der Knopf die
+   Kontrollpunkte, statt gar nichts zu tun. */
 function rgKarteZentrieren() {
+  const dn = rgKarteDaten(rundgangAktiv ? rundgangAktiv.kontrollpunkte : []);
+  // Die native Karte zuerst: Sie hat ihren eigenen Weg, und den eigenen
+  // Standort zeichnet bei ihr das Betriebssystem.
+  if (rgsNativKarte) {
+    if (rgsMeinOrt) {
+      try {
+        rgsNativKarte.setCamera({
+          coordinate: { lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng },
+          zoom: 17, animate: true,
+        });
+      } catch (e) {}
+      return;
+    }
+    rgKarteNativAusschnitt(dn, true);
+    return;
+  }
   if (!rgsKarte || !window.google) { return; }
-  const d = rgKarteDaten(rundgangAktiv ? rundgangAktiv.kontrollpunkte : []);
+  const d = dn;
+  if (!d.zeigbar.length && !rgsMeinOrt) { return; }
+  if (rgsMeinOrt) {
+    rgsKarte.setCenter({ lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng });
+    rgsKarte.setZoom(17);
+    // Die Marke trotzdem frisch setzen -- der Standort kann sich seit dem
+    // letzten Zeichnen bewegt haben, und der Knopf soll zeigen, wo man
+    // JETZT ist.
+    rgStandortMarkeSetzen({ lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng });
+    rgRichtungMarkeSetzen({ lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng }, rgRichtungJetzt());
+    return;
+  }
   if (!d.zeigbar.length) { return; }
   const grenzen = new google.maps.LatLngBounds();
   d.zeigbar.forEach(p => grenzen.extend({ lat: p.lat, lng: p.lng }));
@@ -9711,8 +10154,50 @@ function rundgangFussZeichnen() {
   $('blFuss').innerHTML = zurueck + aktion;
 }
 
-function rundgangListeZeichnen() {
+/* Steht der Cursor in einem Feld der Liste, wird NICHT neu gezeichnet.
+
+   Vom Projektinhaber gemeldet: "Bei Grund erforderlich kann man nicht
+   reinschreiben." Der Text ging nicht verloren -- er wird vor jedem
+   Zeichnen gesichert (ENT-324) --, aber das Feld selbst wurde ersetzt,
+   und damit war der Cursor weg. Bei laufender Ortung passiert das im
+   Sekundentakt; tippen laesst sich so nicht.
+
+   Aufgeschoben ist nicht aufgehoben: Sobald das Feld verlassen wird,
+   zeichnet die Liste nach. Entfernungen und Zustaende sind damit
+   hoechstens so lange alt, wie jemand tippt -- und wer tippt, sieht
+   ohnehin auf die Tastatur, nicht auf die Meterzahl. */
+let rdZeichnenNachholen = false;
+function rdCursorInListe() {
+  const a = document.activeElement;
+  if (!a) { return false; }
+  const tag = a.tagName;
+  if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') { return false; }
+  const liste = $('rdListe');
+  return !!liste && liste.contains(a);
+}
+
+document.addEventListener('focusout', () => {
+  if (!rdZeichnenNachholen) { return; }
+  // Erst im naechsten Durchlauf: Beim Wechsel von einem Feld ins naechste
+  // ist der Cursor fuer einen Augenblick nirgends, und ein Zeichnen genau
+  // dann raeumte das Ziel des Wechsels weg.
+  setTimeout(() => {
+    if (rdZeichnenNachholen && !rdCursorInListe()) {
+      rdZeichnenNachholen = false;
+      try { rundgangListeZeichnen('ortung'); } catch (e) {}
+    }
+  }, 0);
+});
+
+function rundgangListeZeichnen(anlass) {
   if (!rundgangAktiv) return;
+  // Aufgeschoben wird NUR, was die Ortung anstoesst. Eine Handlung des
+  // Benutzers muss immer sofort wirken -- sonst oeffnet sich ein Formular
+  // nicht, weil der Cursor noch im vorigen steht. Genau das hat die
+  // Regression gefunden, nachdem hier zuerst jedes Zeichnen aufgeschoben
+  // wurde.
+  if (anlass === 'ortung' && rdCursorInListe()) { rdZeichnenNachholen = true; return; }
+  rdZeichnenNachholen = false;
   rundgangFussZeichnen();
   const kps = rundgangAktiv.kontrollpunkte;
   // #rdFortschritt ist mit ENT-541 entfallen: Den Zustand der Runde nennt
@@ -9918,7 +10403,7 @@ function rdZeile(k, gesperrt, naechsterId) {
       <button class="btn btn-plain" onclick="rdNvUm(${k.id})">${esc(w('kpNichtVerfuegbar'))}</button>
     </div>
     <div class="rd-nv" id="rdEs${k.id}"${k.offen === 'es' ? '' : ' style="display:none"'}>
-      <input type="file" accept="image/*" capture="environment" id="rdEsInput${k.id}" onchange="rdEsFotoGewaehlt(${k.id})" style="display:none">
+      <input type="file" accept="image/*" capture="environment" id="rdEsInput${k.id}" onchange="rdEsFotoGewaehlt(${k.id}, this)" style="display:none">
       <button class="btn btn-plain" onclick="document.getElementById('rdEsInput${k.id}').click()">${esc(w('kpEsFotoAufnehmen'))}</button>
       <!-- Auch hier geht das Bild an den Kunden (seit ENT-455 ins Portal,
            mit ENT-544 in Lesegroesse ins Rapport-PDF) -- und auch hier stand
@@ -10246,8 +10731,21 @@ function rdEsKomprimieren(datei) {
   });
 }
 
-function rdEsFotoGewaehlt(kontrollpunktId) {
-  const input = $('rdEsInput' + kontrollpunktId);
+/* Das Feld kommt MIT (zweiter Parameter), statt hier nachgeschlagen zu
+   werden.
+
+   Vom Projektinhaber gemeldet: Foto aufgenommen, "Verwenden" getippt --
+   und nichts geschah; beim Melden hiess es weiterhin "Foto erforderlich".
+   Der Grund: Waehrend die Kamera offen ist, laeuft die Ortung weiter, und
+   jede neue Position zeichnet die Liste neu (ENT-317). Das Dateifeld im
+   Dokument ist danach ein ANDERES. Das Foto kam beim alten an -- und
+   $('rdEsInput...') lieferte das neue, leere.
+
+   Mit dem Feld aus dem Ereignis ist das gleichgueltig: Es ist immer das,
+   bei dem das Foto tatsaechlich angekommen ist, auch wenn es inzwischen
+   aus dem Dokument geloest wurde. */
+function rdEsFotoGewaehlt(kontrollpunktId, feld) {
+  const input = feld || $('rdEsInput' + kontrollpunktId);
   const datei = input && input.files && input.files[0];
   if (!datei) return;
   rdEsKomprimieren(datei).then(dataUrl => {

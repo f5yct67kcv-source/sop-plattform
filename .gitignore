@@ -45,6 +45,20 @@ mobile/node_modules/
 # darum nie ins Repository.
 mobile/.maps-key
 
+# Maps-Schluessel fuer die NATIVE Karte (ENT-609). Ein anderer Schluessel
+# als der darueber und bewusst getrennt: Dieser ist auf die Bundle-ID
+# ch.guardops.mitarbeiter und auf das Maps-SDK eingeschraenkt, der andere
+# auf die Web-Adresse und die JavaScript-API. Wer einen davon durch den
+# anderen ersetzt, legt entweder die Karte in der App oder die im Cockpit
+# lahm. Ebenfalls ein echter Schluessel, ebenfalls nie ins Repository.
+mobile/.maps-ios-key
+
+# Aus dem Plugin zusammengefasste Kartenschicht (ENT-609), erzeugt von
+# esbuild in aufs-handy.sh aus node_modules. Erzeugtes Erzeugnis, keine
+# Quelle -- und es haengt an der Fassung in node_modules, die hier nicht
+# mitliegt.
+mobile/www/karte-nativ.js
+
 # Persoenliche Signier-Einstellungen fuer Xcode, vor allem
 # DEVELOPMENT_TEAM. Die Kennung gehoert zum Apple-Entwicklerkonto einer
 # Person, nicht zum Projekt -- dieselbe Ueberlegung wie bei APNS_TEAM_ID,

@@ -12,6 +12,10 @@
     "@capacitor/cli": "^8.5.0",
     "@capacitor/core": "^8.5.0",
     "@capacitor/ios": "^8.5.0",
-    "@capacitor/push-notifications": "^8.1.2"
+    "@capacitor/push-notifications": "^8.1.2",
+    "@capacitor/google-maps": "^8.0.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
   }
 }

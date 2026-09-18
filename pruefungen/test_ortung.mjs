@@ -51,8 +51,20 @@ check('KRITISCH: eine einzige Stelle entscheidet über die Ortung',
   && /status !== 'abgeschlossen'/.test(APP)
   && /status !== 'abgebrochen'/.test(APP)
   && /status !== 'pausiert'/.test(APP));
-check('Beim Verlassen der Seite wird die Ortung beendet und die Position verworfen',
-  /rgOrtungStoppen\(\);\s*\/\/[^\n]*\n\s*rgsMeinOrt = null;/.test(APP));
+// Hier stand eine Pruefung auf zwei unmittelbar aufeinanderfolgende
+// Zeilen. Sie ist rot geworden, als eine dritte Zeile dazwischenkam --
+// ohne dass sich an der Aussage etwas geaendert haette. Eine Pruefung, die
+// den Zeilenabstand bewacht statt die Sache, meldet Fehlalarm und
+// erzieht dazu, sie beim naechsten Mal wegzuschieben. Geprueft wird jetzt,
+// dass rgSeiteZu BEIDES tut, in welcher Reihenfolge auch immer.
+{
+  const zu = APP.slice(APP.indexOf('function rgSeiteZu()'));
+  const rumpf = zu.slice(0, zu.indexOf('\n}'));
+  check('Beim Verlassen der Seite wird die Ortung beendet',
+    /rgOrtungStoppen\(\);/.test(rumpf));
+  check('Beim Verlassen der Seite wird die Position verworfen',
+    /rgsMeinOrt = null;/.test(rumpf));
+}
 // Diese Suite deckt die Ortung IM GERAET ab (ENT-317). Die Uebermittlung
 // der Spur kam mit ENT-318 dazu und hat eine eigene Suite (test_spur).
 // Hier stand zunaechst die Pruefung, dass die Position das Geraet NICHT
@@ -423,6 +435,37 @@ check('KRITISCH: "Zentrieren" verändert das Zeichen nicht und legt keine zweite
     const alle = [...document.querySelectorAll('#rgsKarte .gm-mock-marker')];
     return alle.filter(e => e.dataset.symbolart === 'pfad').length === 1
       && alle.filter(e => e.dataset.symbolart === 'kreis').length === 2;
+  }));
+// Und er fuehrt auf den EIGENEN Standort, nicht auf die Kontrollpunkte.
+// Vom Projektinhaber gemeldet: "Wenn ich zentriere, springt sie auf den
+// Kontrollpunkt." Der Pfeil auf dem Knopf verspricht etwas anderes.
+// Gemessen an der Karte, nicht im Quelltext: Die Mitte muss danach beim
+// eigenen Standort liegen -- Punkt 1 liegt hier zufaellig genau dort,
+// darum wird gegen Punkt 2 geprueft, der 900 m entfernt ist.
+check('KRITISCH: "Zentrieren" führt auf den eigenen Standort',
+  await page.evaluate(() => {
+    // Erst bewusst woanders hin, sonst pruefte man gegen den Zustand,
+    // der ohnehin schon da ist.
+    rgsKarte.setCenter({ lat: 47.3580, lng: 7.9000 });
+    rgKarteZentrieren();
+    const m = rgsKarte.getCenter();
+    const lat = typeof m.lat === 'function' ? m.lat() : m.lat;
+    const lng = typeof m.lng === 'function' ? m.lng() : m.lng;
+    return Math.abs(lat - rgsMeinOrt.lat) < 0.0005
+      && Math.abs(lng - rgsMeinOrt.lng) < 0.0005;
+  }));
+// Ohne bekannten Standort -- Keller, Tiefgarage -- darf der Knopf nicht
+// einfach nichts tun. Dann zeigt er die Kontrollpunkte.
+check('Ohne bekannten Standort zeigt er die Kontrollpunkte, statt nichts zu tun',
+  await page.evaluate(() => {
+    const merk = rgsMeinOrt;
+    rgsMeinOrt = null;
+    rgsKarte.setCenter({ lat: 40, lng: 0 });
+    rgKarteZentrieren();
+    const m = rgsKarte.getCenter();
+    const lat = typeof m.lat === 'function' ? m.lat() : m.lat;
+    rgsMeinOrt = merk;
+    return Math.abs(lat - 40) > 1;
   }));
 await page.screenshot({ path: `${OUT}/ortung-02-karte.png` });
 

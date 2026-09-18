@@ -87,15 +87,30 @@ team_finden() {
   echo ""
 }
 
-echo "── 1/5  Stand holen ($ZWEIG)"
-# Angefangene Arbeit wird beiseitegelegt, nicht weggeworfen: Ohne das
-# bricht "git pull" ab, sobald irgendetwas geaendert ist -- auch der
-# Maps-Schluessel weiter unten zaehlt dazu. Zurueck kommt sie mit
-# "git stash pop".
-if [ -n "$(git status --porcelain)" ]; then
-  git stash push -u -m "aufs-handy $(date '+%d.%m. %H:%M')" >/dev/null
+# Angefangene Arbeit beiseitelegen, damit "git pull" durchkommt -- aber
+# NUR, was Git schon kennt.
+#
+# Hier stand einmal "git stash push -u", also samt unversionierter Dateien.
+# Das hat zweimal echten Schaden angerichtet: Es hat die Xcode-Team-
+# Einstellung des Projektinhabers eingesammelt und spaeter seine frisch
+# angelegte Datei mit dem Maps-Schluessel. Beide Male war die Datei in
+# .gitignore eingetragen -- aber der Eintrag kam mit dem Stand, der gerade
+# erst geholt werden sollte. VOR dem Pull war sie fuer Git schlicht eine
+# unversionierte Datei.
+#
+# Daraus die Regel: Was Git nicht verwaltet, fasst dieses Skript nicht an.
+# Wer eine Datei von Hand ins Arbeitsverzeichnis legt, darf sich darauf
+# verlassen, dass sie dort bleibt. Bricht der Pull deshalb an einer neu
+# hinzukommenden Datei ab, sagt das die Meldung von git deutlich genug --
+# das ist ein Fall zum Hinsehen, kein Fall zum Wegraeumen.
+lokale_aenderungen_sichern() {
+  [ -n "$(git status --porcelain --untracked-files=no)" ] || return 0
+  git stash push -m "aufs-handy $(date '+%d.%m. %H:%M')" >/dev/null
   echo "        Lokale Aenderungen liegen im Stash (zurueck mit: git stash pop)"
-fi
+}
+
+echo "── 1/5  Stand holen ($ZWEIG)"
+lokale_aenderungen_sichern
 git fetch origin "$ZWEIG"
 git checkout "$ZWEIG"
 git pull origin "$ZWEIG"
@@ -142,13 +157,94 @@ python3 mobile-buendel-erstellen.py
 # Der Maps-Schluessel gehoert nicht ins Repository (siehe Kopf von
 # mobile-buendel-erstellen.py). Wer die Karte auf dem Geraet braucht, legt
 # ihn einmal in mobile/.maps-key -- Git nimmt die Datei nie mit.
-if [ -f mobile/.maps-key ]; then
-  KEY="$(tr -d '[:space:]' < mobile/.maps-key)"
+# Was am Ende noch einmal gesagt werden muss.
+#
+# Eine Warnung mitten im Bau liest niemand: Danach laufen Hunderte Zeilen
+# von xcodebuild durch, und oben steht dann etwas Wichtiges, das niemand
+# mehr sucht. Genau so ist der fehlende Maps-Schluessel untergegangen --
+# der Projektinhaber hat eine App ohne Karte auf dem Telefon gehabt und
+# nicht gewusst, warum. Darum wird jede solche Meldung hier gesammelt und
+# ganz zum Schluss wiederholt, wo der Blick ohnehin hinfaellt.
+WARNUNGEN=""
+warnen() {
+  echo "        $1"
+  WARNUNGEN="${WARNUNGEN}${WARNUNGEN:+
+}$1"
+}
+
+maps_schluessel_einsetzen() {
+  ZIEL="$1"
+  QUELLE="${2:-mobile/.maps-key}"
+  PLATZ="${3:-__MAPS_JS_KEY__}"
+  if [ ! -f "$QUELLE" ]; then
+    # Frueher schwieg dieser Zweig. Die App landete dann mit dem Platzhalter
+    # statt eines Schluessels auf dem Geraet, Google lehnte ihn ab, und in
+    # der laufenden Runde stand statt der Karte eine graue Tafel --
+    # gemeldet vom Projektinhaber. Ein uebersprungener Schritt darf nicht
+    # wie ein gelungener aussehen (CLAUDE.md).
+    warnen "KEINE Karte: $QUELLE fehlt ($PLATZ steht noch im Buendel)."
+    echo "        Die Rundgang-Karte bleibt auf dem Geraet leer, alles andere laeuft."
+    echo "        Abhilfe: den Google-Maps-JS-Schluessel einmal ablegen --"
+    echo "            printf '%s' 'DEIN_SCHLUESSEL' > $QUELLE"
+    echo "        Git nimmt die Datei nie mit. Danach dieses Skript erneut laufen lassen."
+    echo "        Der Schluessel muss ausserdem fuer die App freigegeben sein:"
+    echo "        Capacitor laedt die Seite unter capacitor://localhost, nicht unter"
+    echo "        der Web-Adresse -- eine reine Web-Freigabe reicht dafuer nicht."
+    return 0
+  fi
+  KEY="$(tr -d '[:space:]' < "$QUELLE")"
+  if [ -z "$KEY" ]; then
+    warnen "KEINE Karte: $QUELLE ist leer ($PLATZ steht noch im Buendel)."
+    echo "        Die Rundgang-Karte bleibt auf dem Geraet leer, alles andere laeuft."
+    return 0
+  fi
+  # Sieht das ueberhaupt nach einem Schluessel aus?
+  #
+  # Der Grund ist ein echter Vorfall: In der Anleitung stand eine fertige
+  # Befehlszeile mit einem erfundenen Wert darin, und genau der landete
+  # danach im Buendel ("DER_NEUE_SCHLUESSEL"). Google lehnte ihn ab, die
+  # Karte blieb grau, und weder Skript noch App sagten warum -- fuer beide
+  # war ja "ein Schluessel da". Dasselbe war vorher schon einmal mit der
+  # Xcode-Team-Kennung passiert.
+  #
+  # Ein Schluessel von Google beginnt mit AIza und ist deutlich laenger als
+  # 30 Zeichen. Das ist keine Echtheitspruefung -- ein falscher Schluessel
+  # dieser Form kommt hier durch. Es faengt nur den Fall ab, in dem
+  # offensichtlich gar kein Schluessel eingetragen wurde.
+  case "$KEY" in
+    AIza*) ;;
+    *)
+      warnen "KEINE Karte: $QUELLE enthaelt keinen Schluessel ($PLATZ steht noch im Buendel)."
+      echo "        Gefunden: ${KEY%"${KEY#??????????}"}... -- ein Schluessel von Google"
+      echo "        beginnt mit AIza. Sieht nach einem Platzhalter aus dem Text aus."
+      echo "        Den echten Wert gibt es in der Google-Cloud-Konsole beim"
+      echo "        Schluessel unter \"Schluessel anzeigen\"."
+      return 0 ;;
+  esac
+  if [ "${#KEY}" -lt 30 ]; then
+    warnen "KEINE Karte: der Schluessel in $QUELLE ist zu kurz ($PLATZ steht noch im Buendel)."
+    return 0
+  fi
   # LC_ALL=C, weil sed auf macOS sonst bei nicht-ASCII im Dateiinhalt
-  # aussteigt ("illegal byte sequence").
-  LC_ALL=C sed -i '' "s|__MAPS_JS_KEY__|$KEY|g" mobile/www/index.html
-  echo "        Maps-Schluessel eingesetzt"
-fi
+  # aussteigt ("illegal byte sequence"). Das leere Argument nach -i ist
+  # die BSD-Schreibweise fuer "keine Sicherungskopie".
+  if sed --version >/dev/null 2>&1; then
+    LC_ALL=C sed -i "s|$PLATZ|$KEY|g" "$ZIEL"
+  else
+    LC_ALL=C sed -i '' "s|$PLATZ|$KEY|g" "$ZIEL"
+  fi
+  echo "        Maps-Schluessel eingesetzt ($PLATZ)"
+}
+
+maps_schluessel_einsetzen mobile/www/index.html
+
+# Der zweite Schluessel, fuer die NATIVE Karte (ENT-609). Bewusst ein
+# anderer: Dieser ist auf die Bundle-ID und das Maps-SDK eingeschraenkt,
+# der obige auf die Web-Adresse und die JavaScript-API. In der App wird
+# der native gebraucht -- eine Website-Einschraenkung kann dort nach
+# Googles eigener Dokumentation gar nicht greifen, weil die WebView beim
+# Laden aus dem Buendel keinen Referrer mitschickt.
+maps_schluessel_einsetzen mobile/www/index.html mobile/.maps-ios-key __MAPS_IOS_KEY__
 
 echo "── 3/5  Nach iOS uebertragen"
 cd mobile
@@ -162,6 +258,25 @@ cd mobile
 # geschriebene Package.swift bei jedem Lauf als lokale Aenderung im Stash
 # landete.
 npm install --silent
+
+# Die Kartenschicht des Plugins zu EINER Datei zusammenfassen (ENT-609).
+#
+# Muss nach npm install laufen (die Quelle liegt in node_modules) und vor
+# cap sync (das Ergebnis gehoert ins Buendel, das dort kopiert wird).
+#
+# Warum ueberhaupt: app.html ist eine einzelne Datei ohne Buendler und
+# spricht Plugins sonst ueber window.Capacitor.Plugins an. Fuer die Karte
+# genuegt das nicht -- siehe Kopf von karte-nativ-eingang.js.
+echo "        Kartenschicht zusammenfassen"
+if ! npx --no-install esbuild karte-nativ-eingang.js \
+     --bundle --format=iife --global-name=KarteNativ \
+     --outfile=www/karte-nativ.js --log-level=warning; then
+  echo ""
+  echo "  Die Kartenschicht liess sich nicht zusammenfassen."
+  echo "  Ohne sie bleibt die Karte in der Runde leer, alles andere laeuft."
+  echo "  Meist hilft: cd mobile && rm -rf node_modules && npm install"
+  exit 1
+fi
 
 npx cap sync ios
 
@@ -211,26 +326,79 @@ UDID="$(xcrun xctrace list devices 2>/dev/null \
   | grep -i "iPhone" | head -1 \
   | sed -E 's/.*\(([0-9A-Fa-f-]{25,})\).*/\1/' || true)"
 
-# Fuer devicectl. Die Kopfzeile der Tabelle traegt das Wort "Identifier"
-# und wird darum ausgelassen; der Hostname enthaelt ebenfalls "iPhone",
-# stoert aber nicht, weil nur das UUID-Muster gelesen wird.
-DEVCTL="$(xcrun devicectl list devices 2>/dev/null \
-  | grep -i "iPhone" | grep -v "Identifier" | head -1 \
-  | grep -oE '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}' \
-  | head -1 || true)"
+# Fuer devicectl.
+#
+# Die Tabelle fuehrt eine Spalte "State", und die ist nicht nebensaechlich:
+# "connected" heisst erreichbar, "available (paired)" heisst nur bekannt --
+# das Telefon war schon einmal da. Wer den Unterschied uebergeht, bekommt
+# eine Kennung, die spaeter beim Installieren an
+# "CoreDeviceService was unable to locate a device" scheitert. Genau so
+# gemeldet vom Projektinhaber: Der Bau lief durch, und erst das
+# Installieren fiel um.
+#
+# Darum wird das verbundene Geraet bevorzugt und der Zustand mitgefuehrt,
+# statt ihn wegzuwerfen. Als Funktion, damit sich das ohne angeschlossenes
+# iPhone pruefen laesst.
+geraet_waehlen() {
+  awk '
+    /Identifier/ { next }
+    {
+      pos = 0
+      for (i = 1; i <= NF; i++) {
+        if ($i ~ /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/) { pos = i }
+      }
+      if (pos == 0) { next }
+      # Zwischen Kennung und Modell (letzte Spalte) steht der Zustand.
+      zustand = ""
+      for (i = pos + 1; i < NF; i++) { zustand = zustand (zustand == "" ? "" : " ") $i }
+      if (zustand == "") { zustand = "unbekannt" }
+      if (zustand ~ /connected/ && verbunden == "") { verbunden = $pos; vz = zustand }
+      if (ersatz == "") { ersatz = $pos; ez = zustand }
+    }
+    END {
+      if (verbunden != "") { print verbunden "\t" vz }
+      else if (ersatz != "") { print ersatz "\t" ez }
+    }'
+}
 
-if [ -z "$UDID" ] || [ -z "$DEVCTL" ]; then
+GERAET="$(xcrun devicectl list devices 2>/dev/null | grep -i "iPhone" | geraet_waehlen || true)"
+DEVCTL="${GERAET%%	*}"
+ZUSTAND="${GERAET#*	}"
+[ "$ZUSTAND" = "$DEVCTL" ] && ZUSTAND=""
+
+# Ohne devicectl-Kennung geht gar nichts -- ueber sie laeuft das
+# Installieren und das Starten. Die UDID ist dagegen KEINE Vorbedingung
+# mehr: Sie dient nur dazu, gezielt fuer dieses eine Geraet zu bauen, und
+# xcodebuild fuehrt seine Geraeteliste getrennt von devicectl. Genau das
+# ist hier passiert -- devicectl sah das iPhone, xcodebuild nicht, und der
+# Lauf brach mit "Unable to find a destination" ab, obwohl das Telefon
+# angeschlossen war. Fehlt sie, wird allgemein fuer iOS gebaut; das
+# Ergebnis landet ueber devicectl genauso auf dem Geraet.
+if [ -z "$DEVCTL" ]; then
   echo ""
   echo "  Kein einsatzbereites iPhone gefunden."
-  [ -z "$UDID" ]   && echo "    - xcodebuild sieht keines (Kabel, Sperre, Vertrauensfrage?)"
-  [ -z "$DEVCTL" ] && echo "    - devicectl sieht keines (Entwicklermodus eingeschaltet?)"
+  echo "    - devicectl sieht keines (Kabel, Sperre, Vertrauensfrage,"
+  echo "      Entwicklermodus eingeschaltet?)"
   echo ""
   echo "  Was die beiden Werkzeuge melden:"
   xcrun xctrace list devices 2>/dev/null | sed -n '1,/== Simulators ==/p' | sed 's/^/    /'
   xcrun devicectl list devices 2>&1 | sed 's/^/    /'
   exit 1
 fi
-echo "        gefunden (Bau: ${UDID}, Installation: ${DEVCTL})"
+if [ -n "$UDID" ]; then
+  echo "        gefunden (Bau: ${UDID}, Installation: ${DEVCTL})"
+else
+  echo "        gefunden (Installation: ${DEVCTL})"
+fi
+case "$ZUSTAND" in
+  *connected*) echo "        Zustand: ${ZUSTAND}" ;;
+  "")          echo "        Zustand: unbekannt -- das Installieren kann scheitern" ;;
+  *)           echo "        Zustand: ${ZUSTAND} -- NICHT verbunden."
+               echo "        Das iPhone ist bekannt, aber gerade nicht erreichbar."
+               echo "        Der Bau laeuft trotzdem; scheitert das Installieren,"
+               echo "        liegt es daran: Kabel einstecken, Bildschirm entsperren"
+               echo "        und die Frage \"Diesem Computer vertrauen?\" bestaetigen." ;;
+esac
 
 echo "── 5/5  Bauen, installieren, starten"
 # Bewusst NICHT "npx cap run ios": Dessen Hilfsprogramm native-run kennt
@@ -268,13 +436,58 @@ else
   WIE=(-target App)
 fi
 
+# Fuer WELCHES Ziel gebaut wird.
+#
+# Am liebsten fuer genau dieses iPhone (-destination id=...): Dann baut
+# Xcode nur die noetige Architektur und traegt das Geraet bei Bedarf gleich
+# ins Bereitstellungsprofil ein.
+#
+# Nur sieht xcodebuild das Geraet nicht immer, auch wenn es dasteht --
+# waehrend Xcode es nach einem iOS-Update noch vorbereitet, bei gesperrtem
+# Bildschirm, ueber WLAN statt Kabel. devicectl sieht es in diesen Faellen
+# laengst. Frueher brach der Lauf dann mit "Unable to find a destination
+# matching ..." ab und listete hilflos alle Simulatoren auf.
+#
+# Darum wird gefragt statt angenommen: Bietet xcodebuild dieses Geraet an,
+# wird es genommen; sonst wird allgemein fuer iOS gebaut. Installiert wird
+# so oder so ueber devicectl, und dem ist die Herkunft des Bauwerks egal.
+bau_ziel_waehlen() {
+  GESUCHT="$1"; shift
+  # ACHTUNG: -showdestinations gibt ZWEI Listen aus. Unter "Available
+  # destinations" steht, womit gebaut werden kann; darunter folgt
+  # "Ineligible destinations" -- Geraete, die xcodebuild zwar KENNT, aber
+  # gerade nicht bedienen kann (wird vorbereitet, gesperrt, nicht
+  # unterstuetzte iOS-Fassung). Wer beide Listen zusammen durchsucht,
+  # findet das Geraet und baut trotzdem ins Leere. Genau so ist der
+  # Ausweichweg beim ersten Versuch nicht angesprungen: gefunden in der
+  # falschen Liste, danach derselbe Abbruch wie zuvor.
+  # Darum alles ab "Ineligible" abschneiden -- dieselbe Vorsicht wie beim
+  # Abschneiden der Simulatoren weiter oben.
+  if [ -n "$GESUCHT" ] \
+     && xcodebuild "$@" -showdestinations 2>/dev/null \
+        | awk '/[Ii]neligible destinations/ { exit } { print }' \
+        | grep -q "$GESUCHT"; then
+    echo "id=$GESUCHT"
+  else
+    echo "generic/platform=iOS"
+  fi
+}
+
+BAUZIEL="$(bau_ziel_waehlen "$UDID" "${ZIEL[@]}" "${WIE[@]}")"
+if [ "$BAUZIEL" = "generic/platform=iOS" ]; then
+  echo "        xcodebuild sieht dieses iPhone gerade nicht --"
+  echo "        es wird allgemein fuer iOS gebaut und danach ueber devicectl"
+  echo "        installiert. Haeufigster Grund: Xcode bereitet das Geraet nach"
+  echo "        einem iOS-Update noch vor (Fenster \"Devices and Simulators\")."
+fi
+
 # -allowProvisioningUpdates laesst Xcode ein fehlendes Bereitstellungs-
 # profil selbst anlegen, statt den Bau abzubrechen.
 xcodebuild \
   "${ZIEL[@]}" \
   "${WIE[@]}" \
   -configuration Debug \
-  -destination "id=$UDID" \
+  -destination "$BAUZIEL" \
   -derivedDataPath "$DD" \
   -allowProvisioningUpdates \
   build
@@ -292,9 +505,54 @@ fi
 APPID="$(python3 -c "import json;print(json.load(open('capacitor.config.json'))['appId'])")"
 
 echo "        installieren"
-xcrun devicectl device install app --device "$DEVCTL" "$APP"
+if ! xcrun devicectl device install app --device "$DEVCTL" "$APP"; then
+  echo ""
+  echo "  Die App ist gebaut, aber nicht auf dem Telefon gelandet."
+  echo "  devicectl kommt an dieses Geraet gerade nicht heran"
+  [ -n "$ZUSTAND" ] && echo "  (zuletzt gemeldeter Zustand: ${ZUSTAND})"
+  echo ""
+  echo "  Der Reihe nach durchgehen:"
+  echo "    1. Kabel direkt am Mac, nicht ueber einen Hub"
+  echo "    2. Bildschirm entsperren -- ein gesperrtes iPhone nimmt nichts an"
+  echo "    3. \"Diesem Computer vertrauen?\" bestaetigen, falls die Frage kommt"
+  echo "    4. Einstellungen > Datenschutz & Sicherheit > Entwicklermodus: ein"
+  echo "    5. Xcode: Window > Devices and Simulators -- steht dort"
+  echo "       \"Preparing iPhone for development\", erst abwarten"
+  echo ""
+  echo "  Was devicectl gerade sieht:"
+  xcrun devicectl list devices 2>&1 | sed 's/^/    /'
+  echo ""
+  echo "  Der Bau bleibt erhalten. Danach genuegt ein erneuter Lauf."
+  exit 1
+fi
 echo "        starten"
-xcrun devicectl device process launch --device "$DEVCTL" "$APPID"
+if ! xcrun devicectl device process launch --device "$DEVCTL" "$APPID"; then
+  echo ""
+  echo "  Die App ist installiert, laesst sich aber nicht starten."
+  echo "  Fast immer ist es dasselbe: Ein selbst signiertes Programm muss auf"
+  echo "  dem Geraet einmal ausdruecklich freigegeben werden. iOS meldet das"
+  echo "  als \"invalid code signature, inadequate entitlements or its profile"
+  echo "  has not been explicitly trusted\" -- gemeint ist meist das Letzte."
+  echo ""
+  echo "  Am iPhone:"
+  echo "    Einstellungen > Allgemein > VPN & Geraeteverwaltung"
+  echo "    > unter \"Entwickler-App\" den eigenen Eintrag > Vertrauen"
+  echo ""
+  echo "  Danach die App vom Homescreen starten. Dieses Skript muss dafuer"
+  echo "  NICHT noch einmal laufen -- sie liegt schon auf dem Geraet."
+  echo ""
+  echo "  Die Frage kommt auch dann wieder, wenn sich die Berechtigungen der"
+  echo "  App geaendert haben: Fuer iOS ist sie dann nicht mehr dieselbe."
+  exit 1
+fi
 
 echo ""
 echo "Fertig. Die App laeuft auf dem iPhone."
+if [ -n "$WARNUNGEN" ]; then
+  echo ""
+  echo "  ABER -- das fehlt in dieser Fassung:"
+  printf '%s\n' "$WARNUNGEN" | sed 's/^/    /'
+  echo ""
+  echo "  Alles andere laeuft. Wer das behebt, laesst dieses Skript einfach"
+  echo "  noch einmal laufen."
+fi
