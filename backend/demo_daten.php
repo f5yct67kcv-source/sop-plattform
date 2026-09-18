@@ -120,15 +120,37 @@ function demo_musterbetrieb_bereits_da(PDO $pdo): bool
     return $kunden > 0 || $objekte > 0;
 }
 
-function demo_daten_erzeugen_ausfuehren(PDO $pdo): void
+// Traegt den HTTP-Status mit, den die beiden selbst-antwortenden Aufrufer
+// (api/demo_daten_erzeugen.php, api/demo_reset_ausfuehren.php) schon immer
+// verwendet haben -- die Aufteilung unten aendert an IHREM Verhalten nichts.
+class DemoDatenFehler extends RuntimeException
+{
+    public function __construct(string $message, public readonly int $status)
+    {
+        parent::__construct($message);
+    }
+}
+
+// Reine Fassung (seit ENT-612-Nachtrag, 2026-09-18): gibt das Ergebnis
+// zurueck oder wirft, antwortet nie selbst. NOETIG geworden, weil
+// demo_anfordern.php diese Erzeugung nur als EINEN Schritt unter mehreren
+// braucht (danach folgen noch das Anlegen des angeforderten Kontos, der
+// Registereintrag und der Mailversand) -- die alte, selbst-antwortende
+// Fassung (demo_daten_erzeugen_ausfuehren() unten) haette den Rest der
+// Anfrage beim ersten erfolgreichen Demo-Zugang STILLSCHWEIGEND
+// abgeschnitten (json_response() beendet den Prozess). BESTANDSFEHLER:
+// Erst sichtbar geworden, als am 2026-09-18 die Einrichtung eines Demo-
+// Platzes zum ersten Mal ueberhaupt erfolgreich durchlief -- bis dahin
+// schlug jede Anfrage schon vorher fehl (siehe ENT-612).
+function demo_daten_erzeugen(PDO $pdo): array
 {
     // Ohne vorherige Einrichtung kontrolliert abbrechen, statt mit halben
     // Tabellen weiterzuarbeiten. hat_tabelle() steht in db.php.
     foreach (['ma_funktion', 'ma_abteilung', 'objekte', 'rollen', 'einsaetze', 'rundgang', 'kontrollpunkt',
               'lohn_ansatz', 'lohn_abzug', 'lohnlauf'] as $t) {
         if (!hat_tabelle($pdo, $t)) {
-            json_response(['status' => 'error',
-                'message' => "Einrichtung fehlt noch (Tabelle $t) -- zuerst im Cockpit auf „Einrichten“ klicken."], 503);
+            throw new DemoDatenFehler(
+                "Einrichtung fehlt noch (Tabelle $t) -- zuerst im Cockpit auf „Einrichten“ klicken.", 503);
         }
     }
     // Nie auf einen bereits gefuellten Betrieb schreiben (kein Leeren von
@@ -136,8 +158,8 @@ function demo_daten_erzeugen_ausfuehren(PDO $pdo): void
     // Reset waere sonst eine stille Verdoppelung aller Mitarbeitenden und
     // Objekte.
     if (demo_musterbetrieb_bereits_da($pdo)) {
-        json_response(['status' => 'error',
-            'message' => 'Es sind bereits Kunden oder Objekte vorhanden -- dieser Lauf ist nur fuer einen noch nicht erzeugten Musterbetrieb gedacht.'], 409);
+        throw new DemoDatenFehler(
+            'Es sind bereits Kunden oder Objekte vorhanden -- dieser Lauf ist nur fuer einen noch nicht erzeugten Musterbetrieb gedacht.', 409);
     }
 
     $pdo->beginTransaction();
@@ -180,12 +202,26 @@ function demo_daten_erzeugen_ausfuehren(PDO $pdo): void
         $pdo->commit();
     } catch (Throwable $e) {
         $pdo->rollBack();
-        json_response(['status' => 'error', 'message' => 'Musterbetrieb-Erzeugung abgebrochen: ' . $e->getMessage()], 500);
+        throw new DemoDatenFehler('Musterbetrieb-Erzeugung abgebrochen: ' . $e->getMessage(), 500);
     }
 
-    json_response(['status' => 'ok', 'mitarbeitende' => count($mitarbeitende),
-        'kunden' => count($kunden), 'objekte' => count($objekte), 'einsaetze' => $einsaetze,
-        'lohnlauf_id' => $lohnlaufId]);
+    return ['mitarbeitende' => count($mitarbeitende), 'kunden' => count($kunden),
+        'objekte' => count($objekte), 'einsaetze' => $einsaetze, 'lohnlauf_id' => $lohnlaufId];
+}
+
+// Selbst-antwortende Huelle fuer die beiden Aufrufer, die diesen Aufruf
+// bewusst als LETZTEN Schritt einer Anfrage einsetzen (siehe deren eigene
+// Kopfkommentare: "Ruft json_response() selbst auf und beendet damit
+// diesen Aufruf"). demo_anfordern.php gehoert NICHT dazu -- es ruft
+// stattdessen demo_daten_erzeugen() oben direkt auf.
+function demo_daten_erzeugen_ausfuehren(PDO $pdo): void
+{
+    try {
+        $ergebnis = demo_daten_erzeugen($pdo);
+    } catch (DemoDatenFehler $e) {
+        json_response(['status' => 'error', 'message' => $e->getMessage()], $e->status);
+    }
+    json_response(['status' => 'ok', ...$ergebnis]);
 }
 
 // ── Betrieb ──────────────────────────────────────────────────────────

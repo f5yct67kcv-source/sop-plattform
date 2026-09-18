@@ -176,7 +176,18 @@ if ($fehler !== null) {
         'message' => 'Der Demo-Zugang konnte gerade nicht eingerichtet werden. Bitte in Kürze erneut versuchen.'], 503);
 }
 $instanz = mandant_db($m);
-demo_daten_erzeugen_ausfuehren($instanz);
+// demo_daten_erzeugen() (nicht die selbst-antwortende
+// demo_daten_erzeugen_ausfuehren()!): Diese Anfrage macht danach noch
+// weiter -- Konto, Register, Mail. Die selbst-antwortende Fassung wuerde
+// den Rest hier STILLSCHWEIGEND abschneiden (json_response() beendet den
+// Prozess), siehe Kopfkommentar in demo_daten.php.
+try {
+    demo_daten_erzeugen($instanz);
+} catch (Throwable $e) {
+    error_log('demo_anfordern: ' . $e->getMessage());
+    json_response(['status' => 'error',
+        'message' => 'Der Demo-Zugang konnte gerade nicht eingerichtet werden. Bitte in Kürze erneut versuchen.'], 503);
+}
 
 $vergeben = $instanz->query('SELECT name FROM mitarbeiter')->fetchAll(PDO::FETCH_COLUMN);
 $login    = demo_login_bilden($firma, array_map('strval', $vergeben));

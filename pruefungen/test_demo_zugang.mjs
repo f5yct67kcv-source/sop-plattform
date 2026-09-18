@@ -77,6 +77,24 @@ check('KRITISCH: demo_anfordern.php prueft die Zustellbarkeit, bevor ein Platz v
 check('das Telefon wird im Register gespeichert, nicht verworfen',
   /INSERT INTO demo_zugang[\s\S]{0,120}telefon/.test(anfordern) && /\$telefon\b/.test(anfordern));
 
+// KRITISCH (gefunden live am 2026-09-18, ENT-612-Nachtrag): Bis hierher
+// rief demo_anfordern.php demo_daten_erzeugen_ausfuehren() -- die Fassung,
+// die json_response() SELBST aufruft und den Prozess damit beendet. Diese
+// Anfrage macht danach aber noch weiter: das angeforderte Konto anlegen,
+// den Registereintrag schreiben, die Mail verschicken. Der erste
+// erfolgreiche Demo-Zugang ueberhaupt (erst moeglich, seit ENT-612 die
+// Einrichtung selbst reparierte) haette diesen Rest stillschweigend
+// abgeschnitten -- keine Zugangsdaten, keine Mail, obwohl der Musterbetrieb
+// erfolgreich entstand.
+check('KRITISCH: demo_anfordern.php ruft die reine demo_daten_erzeugen() auf, nicht die selbst-antwortende Fassung',
+  /\bdemo_daten_erzeugen\(\$instanz\)/.test(anfordern)
+  && !/\bdemo_daten_erzeugen_ausfuehren\(/.test(anfordern));
+// Kehrseite: Nach diesem Aufruf muss die Anfrage tatsaechlich weitergehen
+// -- sonst waere die Aufteilung selbst zwecklos gewesen.
+check('KRITISCH: nach der Musterbetrieb-Erzeugung legt die Anfrage noch das angeforderte Konto an',
+  anfordern.indexOf('demo_daten_erzeugen($instanz)') <
+  anfordern.indexOf("INSERT INTO mitarbeiter"));
+
 // ── 4. Der Rechenkern geht in JEDES Buendel mit, das betreiber.php hat ─
 // Das ist der Fall, der beim ersten Bau tatsaechlich danebengegangen
 // waere: betreiber.php in drei Buendeln, der neue require nur in einem.
