@@ -1841,9 +1841,17 @@ jobs:
           # mit einer leeren Zeichenkette, solange die Secrets noch nicht
           # gesetzt sind; betreiber_db() und mandant_secret() fallen dann
           # bewusst auf ihren jeweiligen Normalfall zurueck. Die Liste unten
-          # traegt darum nur noch PHPs eigene Konstante __DIR__.
+          # traegt darum PHPs eigene Konstante __DIR__ und den Schluessel der
+          # NATIVEN Karte: __MAPS_IOS_KEY__ gehoert ins App-Buendel und wird
+          # dort von aufs-handy.sh eingesetzt (ENT-609). Die Web-Fassung
+          # nimmt ihn nie in die Hand und zeichnet weiterhin mit der
+          # JavaScript-Karte; ihn hier einzusetzen hiesse, einen Schluessel
+          # zu veroeffentlichen, den die Seite gar nicht braucht. Dass der
+          # Platzhalter stehen bleibt, ist im Code abgefangen --
+          # mapsSchluesselTauglich() erkennt ihn und meldet "nicht
+          # eingerichtet" statt "nicht freigegeben".
           UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' dist-cupi24/ \
-                   | grep -v -e '^__DIR__$' \
+                   | grep -v -e '^__DIR__$' -e '^__MAPS_IOS_KEY__$' \
                    | sort -u || true)
           if [ -n "$UEBRIG" ]; then
             echo "::error::Nicht ersetzte Platzhalter im cupi24-Buendel: $UEBRIG"
