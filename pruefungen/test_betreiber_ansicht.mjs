@@ -29,8 +29,6 @@ const AUFBAU = () => {
   document.getElementById('kopf-wer').textContent = 'Testkonto · test@example.invalid';
   // Gemessen wird der Bereich, in dem am meisten steht: Mandantenliste und
   // Formular zusammen. Die Kennzahlen liegen seit ENT-536 in der Uebersicht.
-  document.getElementById('b-uebersicht').classList.remove('versteckt');
-  document.getElementById('b-mandanten').classList.remove('versteckt');
   // Gebaut wird ueber zahlBlock() statt von Hand: Eine nachgebaute
   // Kennzahl prueft den Nachbau, nicht die Seite. Die Null gehoert dazu --
   // genau sie trug einmal die falschen Regeln.
@@ -64,11 +62,14 @@ const AUFBAU = () => {
   belege = [{ id: 1, nummer: 'OF-0001', titel: 'Nutzung', status: 'entwurf',
               datum: '2026-03-01', gueltig_bis: '2026-03-31', total_rappen: 129700,
               aktiv: 1, kunde_name: 'Musterbetrieb AG', referenz: '', kundennummer: 'K0001' }];
+  rechnungen = [{ id: 2, art: 'rechnung', nummer: 'RE-0001', titel: 'Nutzung',
+                  status: 'versendet', datum: '2026-03-01', faellig_bis: '2026-03-31',
+                  total_rappen: 129700, bezahlt: 0, aktiv: 1,
+                  kunde_name: 'Musterbetrieb AG', referenz: '', kundennummer: 'K0001' }];
   adZeichnen();
   renderOfferten();
+  renderRechnungen();
   pdZeichnen();
-  document.getElementById('b-adressen').classList.remove('versteckt');
-  document.getElementById('b-offerten').classList.remove('versteckt');
   // Das Formular mit einer gefuellten Positionszeile -- dort stehen die
   // meisten Bedienelemente auf engstem Raum.
   ofNeu();
@@ -76,6 +77,12 @@ const AUFBAU = () => {
              menge: 12, einheit: 'Monat', einzelpreis_rappen: 12000,
              rabatt_bp: 0, mwst_satz_bp: 810 }];
   ofZeilenZeichnen();
+  /* ZULETZT, und mit Absicht: Seit ENT-608 ist das Belegformular eine eigene
+     Ansicht NEBEN den Bereichen -- ofNeu() blendet sie darum aus. Fuer diese
+     Suite sollen sie alle gleichzeitig dastehen, damit in einem Durchgang
+     gemessen werden kann, was sonst auf fuenf Bildschirmen liegt. */
+  ['b-uebersicht', 'b-mandanten', 'b-adressen', 'b-offerten', 'b-rechnungen']
+    .forEach(id => document.getElementById(id).classList.remove('versteckt'));
 };
 
 const MESSEN = () => {
@@ -488,13 +495,16 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
 // "keine Offerten vorhanden" sagt, behauptet, es gaebe die Funktion --
 // nur eben ohne Inhalt. Das ist falsch und faellt niemandem auf.
 //
-// SEIT ENT-605 GILT SIE FUER EINE ANDERE MENGE: Offerten SIND gebaut, das
-// Geruest dort ist weg. Die Pruefung ist darum umgehaengt und nicht
-// gestrichen worden -- eine Wache, die ihr Pruefobjekt verliert, muss rot
-// werden oder umgehaengt, nicht schweigen (so schon bei der Kopfmitte in
-// ENT-536). Geprueft wird jetzt: Das Geruest der Rechnungen sagt weiter,
-// dass es noch nicht gebaut ist, UND die Offertenliste haelt ihre vier
-// Lagen auseinander.
+// SEIT ENT-605 UND ENT-608 GIBT ES HIER KEIN GERUEST MEHR: Offerten und
+// Rechnungen sind beide gebaut. Die Pruefung ist darum ZWEIMAL umgehaengt
+// und nicht gestrichen worden -- eine Wache, die ihr Pruefobjekt verliert,
+// muss rot werden oder umgehaengt, nicht schweigen (so schon bei der
+// Kopfmitte in ENT-536). Geprueft wird jetzt, dass beide Geruestflaechen
+// wirklich weg sind UND dass BEIDE Listen ihre vier Lagen auseinander-
+// halten: "nicht eingerichtet", "nichts erfasst", "kein Treffer" und "hier
+// ist die Liste" sind vier Aussagen und brauchen vier Texte. Das ist
+// dieselbe Hausregel eine Ebene tiefer, und sie greift jetzt doppelt so
+// weit wie vorher.
 {
   const seite = await browser.newPage({ viewport: { width: 1500, height: 900 } });
   await seite.goto(ADRESSE);
@@ -533,25 +543,48 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
     renderOfferten();
     const bestand = ablesen();
 
+    // Dieselben vier Lagen noch einmal fuer die Rechnungsliste.
+    const rechnung = {
+      id: 2, art: 'rechnung', nummer: 'RE-0001', titel: 'Nutzung', status: 'versendet',
+      datum: '2026-01-15', faellig_bis: '2026-02-14', total_rappen: 120000, bezahlt: 0,
+      aktiv: 1, kunde_name: 'Musterbetrieb AG', referenz: '', kundennummer: 'K0001',
+    };
+    const reAblesen = () => document.getElementById('reTable').textContent.trim();
+
+    offertenBereit = false;
+    nichtEingerichtet('reTable', 'Die Rechnungen');
+    const reNichtGebaut = reAblesen();
+
+    offertenBereit = true;
+    document.getElementById('reQ').value = '';
+    document.getElementById('reStatus').innerHTML = '<option value="">Alle Status</option>';
+    rechnungen = [];
+    renderRechnungen();
+    const reNichtsDa = reAblesen();
+
+    rechnungen = [rechnung];
+    document.getElementById('reQ').value = 'gibtesnicht';
+    renderRechnungen();
+    const reKeinTreffer = reAblesen();
+
+    document.getElementById('reQ').value = '';
+    renderRechnungen();
+    const reBestand = reAblesen();
+
     return {
-      rechnungen: document.getElementById('re-inhalt').textContent,
       offertenGeruestWeg: document.getElementById('of-inhalt') === null,
+      rechnungsGeruestWeg: document.getElementById('re-inhalt') === null,
       nichtGebaut, nichtsDa, keinTreffer, bestand,
+      reNichtGebaut, reNichtsDa, reKeinTreffer, reBestand,
     };
   });
   await seite.close();
 
   check('KRITISCH: Offerten sind gebaut -- das Gerüst dort ist weg',
     lage.offertenGeruestWeg);
-  check('rechnungen: das Gerüst sagt, dass es noch nicht gebaut ist',
-    /noch nicht gebaut/i.test(lage.rechnungen));
-  check('KRITISCH rechnungen: es behauptet NICHT, es sei bloss nichts vorhanden',
-    !/(keine|nichts|noch nichts)\s+(rechnungen|vorhanden|erfasst|angelegt)/i.test(lage.rechnungen));
-  check('rechnungen: es steht da, worauf es wartet', lage.rechnungen.length > 80);
+  check('KRITISCH: Rechnungen sind gebaut -- das Gerüst dort ist auch weg',
+    lage.rechnungsGeruestWeg);
 
-  // Die vier Lagen der Liste. Das ist dieselbe Hausregel eine Ebene
-  // tiefer: "nicht eingerichtet", "nichts erfasst", "kein Treffer" und
-  // "hier ist die Liste" sind vier Aussagen und brauchen vier Texte.
   check('KRITISCH: die Offertenliste sagt "nicht eingerichtet" eigens',
     /noch nicht eingerichtet/i.test(lage.nichtGebaut));
   check('KRITISCH: "nicht eingerichtet" sieht nicht aus wie "keine Offerten"',
@@ -564,6 +597,19 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
     new Set([lage.nichtGebaut, lage.nichtsDa, lage.keinTreffer, lage.bestand]).size === 4);
   check('Mit Bestand steht die Offerte wirklich da',
     lage.bestand.includes('OF-0001') && lage.bestand.includes('Musterbetrieb AG'));
+
+  check('KRITISCH: die Rechnungsliste sagt "nicht eingerichtet" eigens',
+    /noch nicht eingerichtet/i.test(lage.reNichtGebaut));
+  check('KRITISCH: "nicht eingerichtet" sieht nicht aus wie "keine Rechnungen"',
+    !/keine rechnungen/i.test(lage.reNichtGebaut));
+  check('KRITISCH: auch bei den Rechnungen sagen leerer Bestand und leerer Filter Verschiedenes',
+    lage.reNichtsDa !== lage.reKeinTreffer
+    && /noch keine rechnungen/i.test(lage.reNichtsDa)
+    && /keine treffer/i.test(lage.reKeinTreffer));
+  check('KRITISCH: auch dort sagen die vier Lagen vier verschiedene Dinge',
+    new Set([lage.reNichtGebaut, lage.reNichtsDa, lage.reKeinTreffer, lage.reBestand]).size === 4);
+  check('Mit Bestand steht die Rechnung wirklich da',
+    lage.reBestand.includes('RE-0001') && lage.reBestand.includes('Musterbetrieb AG'));
 }
 
 // ── Eine abgelaufene Sitzung ist kein Ladefehler ─────────────────────

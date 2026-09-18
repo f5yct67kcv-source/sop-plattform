@@ -658,7 +658,11 @@ svg.i-sm { width: 15px; height: 15px; }
 .tw tr.click { cursor: pointer; }
 .tw tr.click:hover td { background: var(--surface-3); }
 .tw td.num, .tw th.num { text-align: right; }
-.tw td.strong { font-weight: 650; }
+/* 620 wie im Cockpit, wo die Regel .strong heisst und nicht nur in einer
+   Tabellenzelle gilt. Der Unterschied war mit blossem Auge nicht zu sehen
+   und trotzdem einer: Dieselbe Belegnummer stand hier eine Spur fetter als
+   dort. Gemessen gefunden, nicht gelesen. */
+.tw td.strong { font-weight: 620; }
 .tw td.nowrap, .tw th.nowrap { white-space: nowrap; }
 .tw th.sortbar { cursor: pointer; user-select: none; }
 .tw th.sortbar .pf { opacity: 0; margin-left: 4px; font-size: 9px; }
@@ -1570,7 +1574,10 @@ html[data-glas="an"] .gs-schieber svg { stroke: #2F5BD7; }
          mehrzeiligen Beschreibungen hat. -->
     <section class="bereich versteckt" id="b-offerten">
 
-      <!-- Liste, Leistungen und Briefkopf -->
+      <!-- Liste, Leistungen und Briefkopf. Der Kasten hat seit ENT-608
+           keine eigene Sichtbarkeit mehr: Das Belegformular liegt jetzt
+           neben den Bereichen, nicht in diesem hier, und der ganze Bereich
+           wird als Ganzes ein- und ausgeblendet. -->
       <div id="of-rahmen">
         <div class="tabs" id="ofHauptTabs">
           <button type="button" class="tab on" id="oftab-liste" onclick="ofHauptTab('liste')">Offerten</button>
@@ -1682,160 +1689,182 @@ html[data-glas="an"] .gs-schieber svg { stroke: #2F5BD7; }
         </div>
       </div>
 
-      <!-- ══ Offerte erfassen ══
-           Eigene Ansicht statt eines Dialogs: Eine Offerte hat beliebig
-           viele Positionszeilen mit mehrzeiligen Beschreibungen -- das ist
-           kein Formular, das in ein Fenster passt, ohne dass man darin
-           scrollt und dabei den Summenblock verliert. -->
-      <div id="of-formular" class="versteckt">
-        <div class="of-detail-hd">
-          <button type="button" class="of-zurueck" id="ofBtnZurueck" onclick="ofZurueck()" aria-label="Zurück zur Offertenliste">
-            <svg class="i" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <div style="flex:1;min-width:140px">
-            <h2 id="ofFormNummer">–</h2>
-            <div class="sub" id="ofFormSub">–</div>
-          </div>
-          <button type="button" class="btn btn-quiet btn-sm rowmenu-btn" id="ofFormMenuBtn" onclick="ofFormMenuOeffnen(event)"
-                  aria-label="Aktionen" style="display:none">
-            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
-          </button>
-          <!-- Vorschau nur als Symbol, Drucken mit Wort, Speichern wieder
-               nur als Symbol -- dieselbe Kopfzeile wie im Cockpit. Das
-               Herunterladen steht hier nicht: Im Cockpit traegt die
-               Kopfzeile diesen Knopf nicht, und ein vierter Knopf waere
-               genau der Unterschied, um den es geht. Er steht im
-               Dreipunkt-Menue daneben. -->
-          <button type="button" class="btn btn-plain btn-sm" id="ofFormVorschauBtn" onclick="ofVorschau(ofFormId)"
-                  aria-label="Vorschau" title="Vorschau" style="display:none">
-            <svg class="i i-sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          </button>
-          <button type="button" class="btn btn-plain btn-sm" id="ofFormDruckBtn" onclick="ofDrucken(ofFormId)" style="display:none">
-            <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            Drucken
-          </button>
-          <button type="button" class="btn btn-primary btn-sm" id="ofFormSaveBtn" onclick="ofSpeichern()"
-                  aria-label="Speichern" title="Speichern">
-            <svg class="i i-sm" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          </button>
-        </div>
-
-        <div class="msg-err versteckt" id="ofFormErr"></div>
-
-        <div class="of-kopf-zwei">
-          <div class="card"><div class="card-bd">
-            <div class="f"><label for="of_kunde">Empfänger *</label>
-              <input class="inp" id="of_kunde" list="dlAdressen" autocomplete="off"
-                     placeholder="Betrieb suchen …" oninput="ofKundeGewaehlt()"></div>
-            <div class="f" style="margin-bottom:10px"><label for="of_person">Ansprechperson</label>
-              <select class="inp" id="of_person"></select></div>
-            <button class="btn btn-plain btn-sm" type="button" onclick="ofNeueAdresse()">
-              <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Neue Adresse erstellen
-            </button>
-          </div></div>
-
-          <div class="card"><div class="card-bd">
-            <div class="f"><label for="of_datum" id="ofLblDatum">Offertendatum *</label>
-              <input class="inp" type="date" id="of_datum" onchange="ofGueltigNachziehen()"></div>
-            <div class="f"><label for="of_nummer" id="ofLblNummer">Offertennummer</label>
-              <input class="inp" id="of_nummer" readonly tabindex="-1"></div>
-            <div class="f">
-              <div class="of-lbl-zeile">
-                <label for="of_gueltig" id="ofLblGueltig">Gültig bis</label>
-                <span>
-                  <button type="button" class="of-schnell" id="ofBtnPlus10" onclick="ofGueltigSetzen(10)"
-                          title="10 Tage ab Offertendatum">+10</button>
-                  <button type="button" class="of-schnell" id="ofBtnPlus30" onclick="ofGueltigSetzen(30)"
-                          title="30 Tage ab Offertendatum">+30</button>
-                </span>
-              </div>
-              <input class="inp" type="date" id="of_gueltig">
-            </div>
-            <div class="f" style="margin-bottom:0"><label for="of_referenz">Referenz</label>
-              <input class="inp" id="of_referenz" placeholder="Ihre Bestellnummer o. Ä."></div>
-          </div></div>
-        </div>
-
-        <div class="card" style="margin-bottom:14px"><div class="card-bd">
-          <div class="f" style="margin-bottom:0"><label for="of_titel">Titel</label>
-            <input class="inp" id="of_titel" placeholder="z. B. Nutzung GuardOpS"></div>
-        </div></div>
-
-        <div class="card" style="margin-bottom:14px">
-          <div class="card-hd"><h2>Positionen</h2></div>
-          <div class="card-bd flush"><div class="tw"><div id="ofPositionen"></div></div></div>
-          <div class="card-bd" style="display:flex;gap:8px;border-top:1px solid var(--line-soft)">
-            <button type="button" class="btn btn-plain btn-sm" onclick="ofZeileHinzu()">
-              <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Position hinzufügen
-            </button>
-            <button type="button" class="btn btn-plain btn-sm" onclick="ofNeuesProduktAnlegen()">
-              <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Neue Leistung
-            </button>
-          </div>
-        </div>
-
-        <div class="of-abschluss">
-          <div class="card"><div class="card-bd">
-            <div class="f"><label for="of_bemerkung">Interne Bemerkung</label>
-              <textarea class="inp" id="of_bemerkung" rows="3" style="min-height:60px"
-                placeholder="Steht nicht auf dem Dokument — nur für den eigenen Gebrauch."></textarea></div>
-            <div class="f"><label for="of_notizen">Öffentliche Notizen</label>
-              <textarea class="inp" id="of_notizen" rows="3" style="min-height:60px"
-                placeholder="Erscheint auf dem Dokument, unterhalb der Positionen."></textarea></div>
-            <div class="f"><label for="of_bedingungen">Bedingungen</label>
-              <textarea class="inp" id="of_bedingungen" rows="3" style="min-height:60px"
-                placeholder="Zahlungs- oder Lieferbedingungen — erscheinen auf dem Dokument."></textarea></div>
-            <div class="f" style="margin-bottom:0"><label for="of_fusszeile">Fusszeile</label>
-              <textarea class="inp" id="of_fusszeile" rows="2"
-                placeholder="Abschliessender Text auf dem Dokument."></textarea></div>
-          </div></div>
-          <div style="display:flex;flex-direction:column;gap:14px">
-            <div class="card"><div class="card-bd">
-              <div class="f" style="margin-bottom:10px">
-                <label for="of_rabatt">Gesamtrabatt auf alle Positionen</label>
-                <div style="display:flex;gap:8px">
-                  <input class="inp" id="of_rabatt" inputmode="decimal" value="0" oninput="ofSummenZeichnen()" style="flex:1">
-                  <div class="seg2">
-                    <button type="button" id="of_rabatt_pct" class="on" onclick="ofRabattEinheitSetzen('pct')">%</button>
-                    <button type="button" id="of_rabatt_chf" onclick="ofRabattEinheitSetzen('chf')">CHF</button>
-                  </div>
-                </div>
-              </div>
-              <div id="ofSummen"></div>
-            </div></div>
-            <div class="card"><div class="card-bd">
-              <div style="font-size:11px;font-weight:650;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-2);margin-bottom:12px">
-                Unterschriften
-              </div>
-              <label class="check">
-                <input type="checkbox" id="of_unterschriftsseite">
-                Unterschriftsfelder hinzufügen
-              </label>
-              <div class="sec" style="margin-top:8px">
-                Setzt Felder für Ort, Datum und Unterschrift ans Ende des Belegs — auf
-                dieselbe Seite, nicht auf ein eigenes Blatt (ENT-425).
-              </div>
-            </div></div>
-          </div>
-        </div>
-      </div>
     </section>
 
     <!-- ══ Rechnungen ═════════════════════════════════════════════ -->
+    <!-- ══ Rechnungen (ENT-608) ═══════════════════════════════════
+         Aufbau wie die Rechnungsliste im Cockpit: drei Reiter statt zwei --
+         "Erledigt" zeigt bezahlte, noch nicht archivierte Rechnungen. Eine
+         bezahlte Rechnung ist erledigt, aber deswegen nicht automatisch
+         archiviert; das bleibt eine eigene, bewusste Handlung.
+
+         Keine Unterreiter fuer Leistungen und Briefkopf: Beide gelten fuer
+         Offerten UND Rechnungen und stehen darum weiterhin genau einmal,
+         drueben unter "Offerten". Zweimal dasselbe Formular waere zweimal
+         derselbe Briefkopf, und einer davon irgendwann veraltet. -->
     <section class="bereich versteckt" id="b-rechnungen">
-      <div class="karte">
-        <div class="karte-kopf">
-          <div>
-            <h2>Rechnungen</h2>
-            <div class="sub">Was die Mandanten für die Nutzung dieser Plattform zahlen</div>
-          </div>
-        </div>
-        <div id="re-inhalt"></div>
+      <div class="tabs" id="reArchivTabs">
+        <button type="button" class="tab on" id="reatab-alle" onclick="reArchivGo('alle')">Alle</button>
+        <button type="button" class="tab" id="reatab-erledigt" onclick="reArchivGo('erledigt')">Erledigt</button>
+        <button type="button" class="tab" id="reatab-archiv" onclick="reArchivGo('archiv')">Archiviert</button>
       </div>
+      <div class="bar-tools">
+        <div class="search">
+          <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="inp" type="search" id="reQ" placeholder="Nummer, Titel, Empfänger oder Referenz …" oninput="renderRechnungen()">
+        </div>
+        <select class="inp" id="reStatus" style="width:auto" onchange="renderRechnungen()">
+          <option value="">Alle Status</option>
+        </select>
+        <div class="sp"></div>
+        <button type="button" class="btn btn-primary" onclick="ofNeuStarten('rechnung')">
+          <svg class="i" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Rechnung erstellen
+        </button>
+      </div>
+      <div class="card"><div class="card-bd flush"><div class="tw" id="reTable"></div></div></div>
     </section>
+
+    <!-- ══ Offerte erfassen ══
+         Eigene Ansicht statt eines Dialogs: Eine Offerte hat beliebig
+         viele Positionszeilen mit mehrzeiligen Beschreibungen -- das ist
+         kein Formular, das in ein Fenster passt, ohne dass man darin
+         scrollt und dabei den Summenblock verliert. -->
+    <div id="of-formular" class="versteckt">
+      <div class="of-detail-hd">
+        <button type="button" class="of-zurueck" id="ofBtnZurueck" onclick="ofZurueck()" aria-label="Zurück zur Offertenliste">
+          <svg class="i" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div style="flex:1;min-width:140px">
+          <h2 id="ofFormNummer">–</h2>
+          <div class="sub" id="ofFormSub">–</div>
+        </div>
+        <button type="button" class="btn btn-quiet btn-sm rowmenu-btn" id="ofFormMenuBtn" onclick="ofFormMenuOeffnen(event)"
+                aria-label="Aktionen" style="display:none">
+          <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+        </button>
+        <!-- Vorschau nur als Symbol, Drucken mit Wort, Speichern wieder
+             nur als Symbol -- dieselbe Kopfzeile wie im Cockpit. Das
+             Herunterladen steht hier nicht: Im Cockpit traegt die
+             Kopfzeile diesen Knopf nicht, und ein vierter Knopf waere
+             genau der Unterschied, um den es geht. Er steht im
+             Dreipunkt-Menue daneben. -->
+        <button type="button" class="btn btn-plain btn-sm" id="ofFormVorschauBtn" onclick="ofVorschau(ofFormId)"
+                aria-label="Vorschau" title="Vorschau" style="display:none">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <button type="button" class="btn btn-plain btn-sm" id="ofFormDruckBtn" onclick="ofDrucken(ofFormId)" style="display:none">
+          <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Drucken
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" id="ofFormSaveBtn" onclick="ofSpeichern()"
+                aria-label="Speichern" title="Speichern">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        </button>
+      </div>
+
+      <div class="msg-err versteckt" id="ofFormErr"></div>
+
+      <div class="of-kopf-zwei">
+        <div class="card"><div class="card-bd">
+          <div class="f"><label for="of_kunde">Empfänger *</label>
+            <input class="inp" id="of_kunde" list="dlAdressen" autocomplete="off"
+                   placeholder="Betrieb suchen …" oninput="ofKundeGewaehlt()"></div>
+          <div class="f" style="margin-bottom:10px"><label for="of_person">Ansprechperson</label>
+            <select class="inp" id="of_person"></select></div>
+          <button class="btn btn-plain btn-sm" type="button" onclick="ofNeueAdresse()">
+            <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Neue Adresse erstellen
+          </button>
+        </div></div>
+
+        <div class="card"><div class="card-bd">
+          <div class="f"><label for="of_datum" id="ofLblDatum">Offertendatum *</label>
+            <input class="inp" type="date" id="of_datum" onchange="ofGueltigNachziehen()"></div>
+          <div class="f"><label for="of_nummer" id="ofLblNummer">Offertennummer</label>
+            <input class="inp" id="of_nummer" readonly tabindex="-1"></div>
+          <div class="f">
+            <div class="of-lbl-zeile">
+              <label for="of_gueltig" id="ofLblGueltig">Gültig bis</label>
+              <span>
+                <button type="button" class="of-schnell" id="ofBtnPlus10" onclick="ofGueltigSetzen(10)"
+                        title="10 Tage ab Offertendatum">+10</button>
+                <button type="button" class="of-schnell" id="ofBtnPlus30" onclick="ofGueltigSetzen(30)"
+                        title="30 Tage ab Offertendatum">+30</button>
+              </span>
+            </div>
+            <input class="inp" type="date" id="of_gueltig">
+          </div>
+          <div class="f" style="margin-bottom:0"><label for="of_referenz">Referenz</label>
+            <input class="inp" id="of_referenz" placeholder="Ihre Bestellnummer o. Ä."></div>
+        </div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:14px"><div class="card-bd">
+        <div class="f" style="margin-bottom:0"><label for="of_titel">Titel</label>
+          <input class="inp" id="of_titel" placeholder="z. B. Nutzung GuardOpS"></div>
+      </div></div>
+
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-hd"><h2>Positionen</h2></div>
+        <div class="card-bd flush"><div class="tw"><div id="ofPositionen"></div></div></div>
+        <div class="card-bd" style="display:flex;gap:8px;border-top:1px solid var(--line-soft)">
+          <button type="button" class="btn btn-plain btn-sm" onclick="ofZeileHinzu()">
+            <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Position hinzufügen
+          </button>
+          <button type="button" class="btn btn-plain btn-sm" onclick="ofNeuesProduktAnlegen()">
+            <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Neue Leistung
+          </button>
+        </div>
+      </div>
+
+      <div class="of-abschluss">
+        <div class="card"><div class="card-bd">
+          <div class="f"><label for="of_bemerkung">Interne Bemerkung</label>
+            <textarea class="inp" id="of_bemerkung" rows="3" style="min-height:60px"
+              placeholder="Steht nicht auf dem Dokument — nur für den eigenen Gebrauch."></textarea></div>
+          <div class="f"><label for="of_notizen">Öffentliche Notizen</label>
+            <textarea class="inp" id="of_notizen" rows="3" style="min-height:60px"
+              placeholder="Erscheint auf dem Dokument, unterhalb der Positionen."></textarea></div>
+          <div class="f"><label for="of_bedingungen">Bedingungen</label>
+            <textarea class="inp" id="of_bedingungen" rows="3" style="min-height:60px"
+              placeholder="Zahlungs- oder Lieferbedingungen — erscheinen auf dem Dokument."></textarea></div>
+          <div class="f" style="margin-bottom:0"><label for="of_fusszeile">Fusszeile</label>
+            <textarea class="inp" id="of_fusszeile" rows="2"
+              placeholder="Abschliessender Text auf dem Dokument."></textarea></div>
+        </div></div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="card"><div class="card-bd">
+            <div class="f" style="margin-bottom:10px">
+              <label for="of_rabatt">Gesamtrabatt auf alle Positionen</label>
+              <div style="display:flex;gap:8px">
+                <input class="inp" id="of_rabatt" inputmode="decimal" value="0" oninput="ofSummenZeichnen()" style="flex:1">
+                <div class="seg2">
+                  <button type="button" id="of_rabatt_pct" class="on" onclick="ofRabattEinheitSetzen('pct')">%</button>
+                  <button type="button" id="of_rabatt_chf" onclick="ofRabattEinheitSetzen('chf')">CHF</button>
+                </div>
+              </div>
+            </div>
+            <div id="ofSummen"></div>
+          </div></div>
+          <div class="card"><div class="card-bd">
+            <div style="font-size:11px;font-weight:650;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-2);margin-bottom:12px">
+              Unterschriften
+            </div>
+            <label class="check">
+              <input type="checkbox" id="of_unterschriftsseite">
+              Unterschriftsfelder hinzufügen
+            </label>
+            <div class="sec" style="margin-top:8px">
+              Setzt Felder für Ort, Datum und Unterschrift ans Ende des Belegs — auf
+              dieselbe Seite, nicht auf ein eigenes Blatt (ENT-425).
+            </div>
+          </div></div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2056,16 +2085,18 @@ function bereichZeigen(welcher) {
   $('leiste-unter').textContent = BEREICHE[welcher][1];
   // Ein Formular, das beim Bereichswechsel offen bliebe, stuende beim
   // naechsten Besuch halb ausgefuellt da, ohne dass jemand weiss warum.
-  /* Das Offertformular ist eine eigene Ansicht INNERHALB des Bereichs.
-     Wer den Bereich verlaesst, soll beim naechsten Besuch die Liste sehen
+  /* Das Belegformular ist eine eigene Ansicht NEBEN den Bereichen und dient
+     beiden Belegarten. Wer einen Bereich aufruft, soll dessen Liste sehen
      und nicht ein halb ausgefuelltes Formular, dessen Herkunft nirgends
-     mehr steht. */
-  if (welcher !== 'offerten') { ofFormularZeigen(false); }
-  /* Beide Bereiche lesen aus denselben Tabellen und koennen sich gegenseitig
+     mehr steht. Hier nur verbergen und NICHT ofFormularZeigen(false) rufen:
+     Das riefe seinerseits bereichZeigen() und liefe im Kreis. */
+  zeig($('of-formular'), false);
+  /* Die Bereiche lesen aus denselben Tabellen und koennen sich gegenseitig
      veraendern (eine neue Adresse, eine neue Offerte). Beim Betreten frisch
      holen ist billiger als ein Stand, der nicht mehr stimmt. */
   if (welcher === 'adressen') { ladeAdressen(); }
   if (welcher === 'offerten') { ladeBelege(); ladeProdukte(); }
+  if (welcher === 'rechnungen') { ladeRechnungen(); ladeProdukte(); }
   if (welcher !== 'mandanten') {
     zeig($('m-form-karte'), false);
     zeig($('sup-karte'), false);
@@ -2754,15 +2785,6 @@ function uebersichtSetzen(zahlenHtml) {
   if (el) { el.innerHTML = zahlenHtml; }
 }
 
-/* Ein Bereich, der noch nicht gebaut ist, ist etwas anderes als einer ohne
-   Inhalt. "Noch nichts vorhanden" waere eine Falschaussage: Es ist nicht
-   leer, es gibt es noch nicht. Vier Aussagen, vier Texte -- die Hausregel,
-   die hier schon am haeufigsten verletzt wurde. */
-function geruestZeigen(id, was, warum) {
-  const el = $(id);
-  if (el) { el.innerHTML = leerBlock('◷', was, warum); }
-}
-
 
 /* ── Supportvorgaenge (ENT-538) ─────────────────────────────────────
    Der Arbeitsvorrat. Die Zahlen kommen vom Server, nicht aus der Liste --
@@ -3184,6 +3206,17 @@ let ofArchivTab = 'alle';
 let ofSortFeld = 'datum';
 let ofSortRichtung = 'ab';
 let ofOffen = new Set();       // aufgeklappte Karten am Handy
+/* Rechnungen stehen in eigenen Variablen neben den Offerten, nicht in
+   derselben Liste mit einem Feld "art": Beide Listen haben eigene Reiter,
+   eigene Sortierung und eigene Suchfelder, und ein gemeinsamer Bestand
+   hiesse, dass jeder Filter zuerst die andere Art wegwerfen muss. So
+   macht es das Cockpit auch. */
+let rechnungen = [];
+let reNaechsteNummer = '';
+let reArchivTab = 'alle';
+let reSortFeld = 'datum';
+let reSortRichtung = 'ab';
+let reOffen = new Set();       // aufgeklappte Karten am Handy
 let briefkopf = { firma: '', absender: '', logo: null };
 /* null heisst "noch nicht nachgesehen" und ist etwas anderes als false.
    Solange es null ist, behauptet die Oberflaeche nichts. */
@@ -3208,6 +3241,7 @@ async function offertenteilNachladen() {
   await ladeAdressen();
   await ladeProdukte();
   await ladeBelege();
+  await ladeRechnungen();
   await ladeBriefkopf();
 }
 
@@ -3236,6 +3270,9 @@ async function ladeProdukte() {
 }
 async function ladeBelege() {
   return sicher(ladeBelegeRoh, 'ofTable', 'Die Offerten');
+}
+async function ladeRechnungen() {
+  return sicher(ladeRechnungenRoh, 'reTable', 'Die Rechnungen');
 }
 async function ladeBriefkopf() {
   return sicher(ladeBriefkopfRoh, null, 'Der Briefkopf');
@@ -3282,6 +3319,18 @@ async function ladeBelegeRoh() {
   belege = a.belege || [];
   ofNaechsteNummer = a.naechste_nummer || '';
   renderOfferten();
+}
+
+async function ladeRechnungenRoh() {
+  const a = await ruf('betreiber_beleg_list.php?art=rechnung');
+  if (a.status !== 'ok') {
+    $('reTable').innerHTML = LEER('Nicht abrufbar', a.message || 'Unbekannter Fehler.');
+    return;
+  }
+  if (a.eingerichtet === false) { nichtEingerichtet('reTable', 'Die Rechnungen'); return; }
+  rechnungen = a.belege || [];
+  reNaechsteNummer = a.naechste_nummer || '';
+  renderRechnungen();
 }
 
 async function ladeBriefkopfRoh() {
@@ -3356,12 +3405,13 @@ function adMenuOeffnen(ev, id) {
   if (pop.classList.contains('on') && pop.dataset.wer === 'ad' + id) { menuSchliessen(); return; }
   pop.innerHTML = `
     <button type="button" onclick="menuSchliessen(); adDlgOeffnen(${id})">Bearbeiten</button>
-    <button type="button" onclick="menuSchliessen(); ofNeuFuerAdresse(${id})">Offerte erstellen</button>
+    <button type="button" onclick="menuSchliessen(); ofNeuFuerAdresse(${id}, 'offerte')">Offerte erstellen</button>
+    <button type="button" onclick="menuSchliessen(); ofNeuFuerAdresse(${id}, 'rechnung')">Rechnung erstellen</button>
     <hr>
     <button type="button" onclick="menuSchliessen(); adArchivKlick(${id}, ${Number(k.aktiv) ? 0 : 1})">${Number(k.aktiv) ? 'Archivieren' : 'Zurückholen'}</button>`;
   pop.dataset.wer = 'ad' + id;
   pop.classList.add('on');
-  menuPositionieren(ev, 150);
+  menuPositionieren(ev, 190);
 }
 
 async function adArchivKlick(id, aktiv) {
@@ -3903,6 +3953,167 @@ function renderOfferten() {
 /* ── Zeilenmenue ───────────────────────────────────────────────────── */
 /* EINE Positionierung fuer Liste und Formular, damit beide dieselbe
    Kante-oben/Kante-unten-Logik haben und nicht zwei Kopien davon. */
+/* ══ Rechnungen (ENT-608) ══════════════════════════════════════════
+   Bewusst eigene Funktionen statt renderOfferten() mit einem Art-Parameter:
+   Die Rechnungsliste hat zwei Spalten, die auf eine Offerte nicht zutreffen
+   (Faellig, Offener Betrag), und einen dritten Reiter. Eine gemeinsame
+   Funktion mit Verzweigungen fuer beides waere von Anfang an auf Trennung
+   angelegt gewesen, nur unsichtbar in einer Datei. Genau so steht es im
+   Cockpit, und von dort ist das hier uebernommen. */
+function reArchivGo(t) {
+  reArchivTab = t;
+  document.querySelectorAll('#reArchivTabs .tab').forEach(b => b.classList.remove('on'));
+  $('reatab-' + t).classList.add('on');
+  renderRechnungen();
+}
+
+function reTh(feld, label, num) {
+  const aktiv = reSortFeld === feld;
+  const pfeil = aktiv && reSortRichtung === 'ab' ? '▼' : '▲';
+  return `<th class="sortbar${aktiv ? ' aktiv' : ''}${num ? ' num' : ''}" onclick="reSort('${feld}')">${esc(label)}<span class="pf">${pfeil}</span></th>`;
+}
+function reSort(feld) {
+  reSortRichtung = (reSortFeld === feld && reSortRichtung === 'auf') ? 'ab' : 'auf';
+  reSortFeld = feld;
+  renderRechnungen();
+}
+
+function reEmpfaenger(b) {
+  if (b.kunde_name) { return String(b.kunde_name); }
+  return b.kunde_id ? '(Adresse entfernt)' : '';
+}
+
+/* Status in der Liste: bezahlt und ueberfaellig ueberschreiben den rohen
+   Statuswert, weil sie das Wichtigere sagen -- eine "versendete" Rechnung,
+   die laengst faellig ist, soll das zeigen und nicht weiterhin "Versendet".
+
+   leeresDatum() statt einer blossen Wahrheitspruefung: '0000-00-00' ist
+   truthy UND kleiner als jeder echte Tag -- eine Rechnung ohne Frist
+   stuende damit als "Überfällig" da. Unbekannt darf nie wie laengst vorbei
+   aussehen. */
+function reStatusInfo(b) {
+  if (Number(b.bezahlt)) { return { text: 'Bezahlt', chip: 'chip-p' }; }
+  if (!leeresDatum(b.faellig_bis) && String(b.faellig_bis) < isoTag()) {
+    return { text: 'Überfällig', chip: 'chip-x' };
+  }
+  return ofStatusInfo(b.status);
+}
+
+/* "Fällig": Tage bis zur Frist bzw. darueber hinaus. Bezahlte Rechnungen
+   und solche ohne Faelligkeitsdatum zeigen einen Strich statt einer
+   erfundenen Zahl. null heisst "nicht bestimmbar" -- aus '0000-00-00'
+   wuerde sonst ein Invalid Date und daraus "NaN Tage". */
+function reFaelligTage(b) {
+  if (Number(b.bezahlt) || leeresDatum(b.faellig_bis)) { return null; }
+  const heute = new Date(); heute.setHours(0, 0, 0, 0);
+  const faellig = new Date(String(b.faellig_bis).slice(0, 10) + 'T00:00:00');
+  if (Number.isNaN(faellig.getTime())) { return null; }
+  return Math.round((faellig - heute) / 864e5);
+}
+function reFaelligHtml(b) {
+  const tage = reFaelligTage(b);
+  if (tage === null) { return '<span style="color:var(--ink-3)">–</span>'; }
+  if (tage < 0) { return `<span style="color:var(--neg)">${Math.abs(tage)} Tage überfällig</span>`; }
+  if (tage === 0) { return 'heute fällig'; }
+  return `${tage} Tage`;
+}
+/* Einfache bezahlt/nicht-bezahlt-Markierung, keine Teilzahlungen -- "Offener
+   Betrag" ist damit entweder 0 oder der volle Betrag, nie etwas dazwischen. */
+function reOffenRappen(b) { return Number(b.bezahlt) ? 0 : (Number(b.total_rappen) || 0); }
+
+function renderRechnungen() {
+  if (offertenBereit === false) { return; }
+  const q = ($('reQ').value || '').toLowerCase().trim();
+  const statusFilter = $('reStatus').value || '';
+  const d = rechnungen.filter(b => {
+    if (reArchivTab === 'archiv') { if (Number(b.aktiv ?? 1) !== 0) { return false; } }
+    else {
+      if (Number(b.aktiv ?? 1) !== 1) { return false; }
+      if (reArchivTab === 'erledigt' && !Number(b.bezahlt)) { return false; }
+    }
+    if (statusFilter && reStatusInfo(b).text !== statusFilter) { return false; }
+    if (q && ![b.nummer, b.titel, b.referenz, reEmpfaenger(b), b.kundennummer]
+        .some(f => String(f || '').toLowerCase().includes(q))) { return false; }
+    return true;
+  });
+
+  /* Betraege numerisch vergleichen, nicht als Text: "1'048.55" gegen
+     "952.00" als Zeichenkette sortiert falsch, und zwar unauffaellig
+     falsch. */
+  d.sort((a, b) => {
+    let c;
+    if (reSortFeld === 'total_rappen') {
+      c = (Number(a.total_rappen) || 0) - (Number(b.total_rappen) || 0);
+    } else if (reSortFeld === 'offen_rappen') {
+      c = reOffenRappen(a) - reOffenRappen(b);
+    } else if (reSortFeld === 'empfaenger') {
+      c = reEmpfaenger(a).localeCompare(reEmpfaenger(b), 'de', { sensitivity: 'base' });
+    } else if (reSortFeld === 'faellig_bis') {
+      /* Ohne Faelligkeitsdatum ans Ende, in BEIDEN Richtungen -- ein
+         Leerwert ist kein "kleinster" oder "groesster" Tag. */
+      const av = reFaelligTage(a), bv = reFaelligTage(b);
+      if (av === null && bv === null) { c = 0; }
+      else if (av === null) { c = 1; }
+      else if (bv === null) { c = -1; }
+      else { c = av - bv; }
+      return c;
+    } else if (reSortFeld === 'status') {
+      c = reStatusInfo(a).text.localeCompare(reStatusInfo(b).text, 'de', { sensitivity: 'base' });
+    } else {
+      c = String(a[reSortFeld] ?? '').localeCompare(String(b[reSortFeld] ?? ''), 'de', { numeric: true, sensitivity: 'base' });
+    }
+    return reSortRichtung === 'auf' ? c : -c;
+  });
+
+  /* Statusfilter aus den tatsaechlich vorkommenden ANGEZEIGTEN Werten
+     (inkl. Bezahlt und Ueberfaellig) -- kein Filter, der auf nichts zeigt. */
+  const vorhanden = new Set(rechnungen.map(b => reStatusInfo(b).text));
+  const gewaehlt = $('reStatus').value;
+  $('reStatus').innerHTML = '<option value="">Alle Status</option>'
+    + [...vorhanden].sort((a, b) => a.localeCompare(b, 'de')).map(text =>
+        `<option value="${esc(text)}"${text === gewaehlt ? ' selected' : ''}>${esc(text)}</option>`).join('');
+
+  if (!d.length) {
+    const gefiltert = q || statusFilter;
+    $('reTable').innerHTML = rechnungen.length
+      ? LEER('Keine Treffer', gefiltert
+          ? 'Für diese Suche gibt es keine Rechnung. Suchbegriff oder Status zurücksetzen.'
+          : reArchivTab === 'erledigt'
+            ? 'Hier stehen keine bezahlten Rechnungen.'
+            : 'Hier stehen keine archivierten Rechnungen.')
+      : LEER('Noch keine Rechnungen', 'Über „Rechnung erstellen“ oben rechts die erste anlegen.');
+    return;
+  }
+
+  $('reTable').innerHTML = `<table><thead><tr>
+      ${reTh('status', 'Status')}${reTh('faellig_bis', 'Fällig')}${reTh('nummer', 'Nr.')}${reTh('referenz', 'Referenz')}
+      ${reTh('titel', 'Titel')}${reTh('empfaenger', 'Empfänger')}
+      ${reTh('datum', 'Rechnungsdatum')}${reTh('total_rappen', 'Betrag', true)}
+      ${reTh('offen_rappen', 'Offener Betrag', true)}<th class="num">Aktion</th>
+    </tr></thead><tbody>` + d.map(b => {
+      const si = reStatusInfo(b);
+      const offen = reOffenRappen(b);
+      return `
+      <tr class="click" onclick="ofOeffnen(${Number(b.id)})">
+        <td><span class="chip ${si.chip}">${esc(si.text)}</span></td>
+        <td class="nowrap">${reFaelligHtml(b)}</td>
+        <td class="strong nowrap">${esc(b.nummer)}</td>
+        <td class="nowrap">${strich(b.referenz)}</td>
+        <td>${b.titel ? esc(b.titel) : '<span style="color:var(--ink-3)">ohne Titel</span>'}</td>
+        <td>${reEmpfaenger(b) ? esc(reEmpfaenger(b)) : '<span style="color:var(--ink-3)">–</span>'}
+            ${b.kundennummer ? `<div class="sec">${esc(b.kundennummer)}</div>` : ''}</td>
+        <td class="nowrap">${dmy(b.datum)}</td>
+        <td class="num nowrap strong">CHF ${chf(b.total_rappen)}</td>
+        <td class="num nowrap"${offen ? '' : ' style="color:var(--ink-3)"'}>CHF ${chf(offen)}</td>
+        <td class="num" onclick="event.stopPropagation()">
+          <button type="button" class="btn btn-quiet btn-sm rowmenu-btn" onclick="reMenuOeffnen(event, ${Number(b.id)})" aria-label="Aktionen">
+            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+          </button>
+        </td>
+      </tr>`;
+    }).join('') + '</tbody></table>';
+}
+
 function menuPositionieren(ev, hoeheGeschaetzt) {
   const pop = $('rowmenuPop');
   const r = ev.currentTarget.getBoundingClientRect();
@@ -3919,6 +4130,15 @@ function menuSchliessen() {
   delete pop.dataset.wer;
 }
 
+/* Welche Statuswechsel eine Belegart kennt: 'bestaetigt' und 'abgelehnt'
+   sind die Entscheidung des Empfaengers zu einer OFFERTE und ergeben bei
+   einer Rechnung keinen Sinn -- dort steht stattdessen die
+   bezahlt/unbezahlt-Markierung. */
+function belegStatusOptionen(art, aktuellerStatus) {
+  return OF_STATUS.filter(s => s.wert !== aktuellerStatus
+    && (art !== 'rechnung' || (s.wert !== 'bestaetigt' && s.wert !== 'abgelehnt')));
+}
+
 function ofMenuOeffnen(ev, id) {
   ev.stopPropagation();
   const b = belege.find(x => Number(x.id) === Number(id));
@@ -3927,21 +4147,48 @@ function ofMenuOeffnen(ev, id) {
   if (pop.classList.contains('on') && pop.dataset.wer === 'of' + id) { menuSchliessen(); return; }
   /* Der aktuelle Status steht nicht als Knopf da -- ihn auf sich selbst zu
      setzen ist keine Handlung. */
-  const statusKnoepfe = OF_STATUS.filter(s => s.wert !== b.status).map(s =>
-    `<button type="button" onclick="menuSchliessen(); ofStatusSetzen(${id}, '${s.wert}')">Als „${esc(s.text)}" markieren</button>`).join('');
+  const statusKnoepfe = belegStatusOptionen('offerte', b.status).map(s =>
+    `<button type="button" onclick="menuSchliessen(); ofStatusSetzen(${id}, '${s.wert}', 'offerte')">Als „${esc(s.text)}" markieren</button>`).join('');
   pop.innerHTML = `
     <button type="button" onclick="menuSchliessen(); ofOeffnen(${id})">Bearbeiten</button>
     <button type="button" onclick="menuSchliessen(); ofDrucken(${id})">Drucken</button>
     <hr>
     ${statusKnoepfe}
     <hr>
-    <button type="button" onclick="menuSchliessen(); ofDuplizieren(${id}, 0)">Duplizieren</button>
-    <button type="button" onclick="menuSchliessen(); ofDuplizieren(${id}, 1)">In Vorlage umwandeln</button>
+    <button type="button" onclick="menuSchliessen(); ofDuplizieren(${id}, 0, 'offerte')">Duplizieren</button>
+    <button type="button" onclick="menuSchliessen(); ofDuplizieren(${id}, 1, 'offerte')">In Vorlage umwandeln</button>
     <hr>
-    <button type="button" onclick="menuSchliessen(); ofArchivKlick(${id}, ${Number(b.aktiv) ? 0 : 1})">${Number(b.aktiv) ? 'Archivieren' : 'Zurückholen'}</button>`;
+    <button type="button" onclick="menuSchliessen(); ofArchivKlick(${id}, ${Number(b.aktiv) ? 0 : 1}, 'offerte')">${Number(b.aktiv) ? 'Archivieren' : 'Zurückholen'}</button>`;
   pop.dataset.wer = 'of' + id;
   pop.classList.add('on');
   menuPositionieren(ev, 300);
+}
+
+/* Dasselbe Zeilenmenue fuer die Rechnungsliste: statt der Statuswechsel zu
+   "bestaetigt"/"abgelehnt" steht hier die bezahlt/unbezahlt-Markierung.
+   "Per E-Mail versenden" gibt es -- wie beim Offerten-Zeilenmenue auch --
+   hier bewusst nicht: Der Versand haengt am gerade offenen Formular. */
+function reMenuOeffnen(ev, id) {
+  ev.stopPropagation();
+  const b = rechnungen.find(x => Number(x.id) === Number(id));
+  if (!b) { return; }
+  const pop = $('rowmenuPop');
+  if (pop.classList.contains('on') && pop.dataset.wer === 're' + id) { menuSchliessen(); return; }
+  const statusKnoepfe = belegStatusOptionen('rechnung', b.status).map(s =>
+    `<button type="button" onclick="menuSchliessen(); ofStatusSetzen(${id}, '${s.wert}', 'rechnung')">Als „${esc(s.text)}" markieren</button>`).join('');
+  pop.innerHTML = `
+    <button type="button" onclick="menuSchliessen(); ofOeffnen(${id})">Bearbeiten</button>
+    <button type="button" onclick="menuSchliessen(); ofDrucken(${id})">Drucken</button>
+    <hr>
+    ${statusKnoepfe}
+    <button type="button" onclick="menuSchliessen(); reBezahltKlick(${id}, ${Number(b.bezahlt) ? 0 : 1})">${Number(b.bezahlt) ? 'Als unbezahlt markieren' : 'Als bezahlt markieren'}</button>
+    <hr>
+    <button type="button" onclick="menuSchliessen(); ofDuplizieren(${id}, 0, 'rechnung')">Duplizieren</button>
+    <hr>
+    <button type="button" onclick="menuSchliessen(); ofArchivKlick(${id}, ${Number(b.aktiv) ? 0 : 1}, 'rechnung')">${Number(b.aktiv) ? 'Archivieren' : 'Zurückholen'}</button>`;
+  pop.dataset.wer = 're' + id;
+  pop.classList.add('on');
+  menuPositionieren(ev, 320);
 }
 
 /* Dasselbe Menue, aber IM Formular -- spart den Umweg ueber "zurueck zur
@@ -3951,25 +4198,38 @@ function ofFormMenuOeffnen(ev) {
   const pop = $('rowmenuPop');
   if (pop.classList.contains('on') && pop.dataset.wer === 'form') { menuSchliessen(); return; }
   const id = ofFormId;
-  const statusKnoepfe = OF_STATUS.filter(s => s.wert !== ofFormStatus).map(s =>
-    `<button type="button" onclick="menuSchliessen(); ofStatusSetzen(${id}, '${s.wert}')">Als „${esc(s.text)}" markieren</button>`).join('');
+  const statusKnoepfe = belegStatusOptionen(ofArt, ofFormStatus).map(s =>
+    `<button type="button" onclick="menuSchliessen(); ofStatusSetzen(${id}, '${s.wert}', '${ofArt}')">Als „${esc(s.text)}" markieren</button>`).join('');
+  /* Die bezahlt-Markierung gibt es nur bei Rechnungen, die Vorlage nur bei
+     Offerten -- eine Offerte wird nicht bezahlt, und eine Rechnungsvorlage
+     ohne Empfaenger und Datum waere keine Rechnung. */
+  const bezahltKnopf = ofArt === 'rechnung'
+    ? `<button type="button" onclick="menuSchliessen(); reBezahltKlick(${id}, ${ofFormBezahlt ? 0 : 1})">${ofFormBezahlt ? 'Als unbezahlt markieren' : 'Als bezahlt markieren'}</button>`
+    : '';
   pop.innerHTML = `
     <button type="button" onclick="menuSchliessen(); ofVersenden(${id})">Per E-Mail versenden</button>
+    ${bezahltKnopf}
     <button type="button" onclick="menuSchliessen(); ofHerunterladen(${id}, null)">Herunterladen</button>
     <button type="button" onclick="menuSchliessen(); ofTeilen(${id}, null)">Teilen</button>
     <hr>
     ${statusKnoepfe}
     <hr>
-    <button type="button" onclick="menuSchliessen(); ofDuplizieren(${id}, 0)">Duplizieren</button>
-    <button type="button" onclick="menuSchliessen(); ofDuplizieren(${id}, 1)">In Vorlage umwandeln</button>
+    <button type="button" onclick="menuSchliessen(); ofDuplizieren(${id}, 0, '${ofArt}')">Duplizieren</button>
+    ${ofArt === 'offerte' ? `<button type="button" onclick="menuSchliessen(); ofDuplizieren(${id}, 1, 'offerte')">In Vorlage umwandeln</button>` : ''}
     <hr>
-    <button type="button" onclick="menuSchliessen(); ofArchivKlick(${id}, ${ofFormAktiv ? 0 : 1})">${ofFormAktiv ? 'Archivieren' : 'Zurückholen'}</button>`;
+    <button type="button" onclick="menuSchliessen(); ofArchivKlick(${id}, ${ofFormAktiv ? 0 : 1}, '${ofArt}')">${ofFormAktiv ? 'Archivieren' : 'Zurückholen'}</button>`;
   pop.dataset.wer = 'form';
   pop.classList.add('on');
   menuPositionieren(ev, 320);
 }
 
-async function ofStatusSetzen(id, neu) {
+/* Welche Liste nach einer Aenderung nachzuladen ist. EINE Stelle statt
+   einer Verzweigung an jedem Aufrufort. */
+async function belegListeAktualisieren(art) {
+  if (art === 'rechnung') { await ladeRechnungen(); } else { await ladeBelege(); }
+}
+
+async function ofStatusSetzen(id, neu, art) {
   const a = await ruf('betreiber_beleg_status.php', { id, neuer_status: neu });
   if (a.status !== 'ok') { kurzmeldung(a.message || 'Fehlgeschlagen.'); return; }
   kurzmeldung('Status: ' + ofStatusInfo(neu).text);
@@ -3977,22 +4237,38 @@ async function ofStatusSetzen(id, neu) {
      nachziehen -- sonst zeigt das Formular nach einer Aenderung ueber sein
      eigenes Menue kurzzeitig den alten Status. */
   if (ofFormId === Number(id)) { ofFormStatus = neu; ofFormSubZeichnen(); }
-  await ladeBelege();
+  await belegListeAktualisieren(art);
 }
 
-async function ofArchivKlick(id, aktiv) {
+async function ofArchivKlick(id, aktiv, art) {
+  const dokument = OF_ART_TEXT[art || 'offerte'].dokument;
   const a = await ruf('betreiber_beleg_archivieren.php', { id, aktiv });
   if (a.status !== 'ok') { kurzmeldung(a.message || 'Fehlgeschlagen.'); return; }
-  kurzmeldung(aktiv ? 'Offerte zurückgeholt.' : 'Offerte archiviert.');
+  kurzmeldung(aktiv ? dokument + ' zurückgeholt.' : dokument + ' archiviert.');
   if (ofFormId === Number(id)) { ofFormAktiv = Number(aktiv); ofFormSubZeichnen(); }
-  await ladeBelege();
+  await belegListeAktualisieren(art);
 }
 
-async function ofDuplizieren(id, alsVorlage) {
+async function ofDuplizieren(id, alsVorlage, art) {
   const a = await ruf('betreiber_beleg_duplizieren.php', { id, als_vorlage: alsVorlage });
   if (a.status !== 'ok') { kurzmeldung(a.message || 'Fehlgeschlagen.'); return; }
   kurzmeldung(alsVorlage ? 'Als Vorlage gespeichert.' : 'Kopie angelegt: ' + (a.nummer || ''));
-  await ladeBelege();
+  await belegListeAktualisieren(art);
+}
+
+/* Bezahlt oder nicht -- eigener Endpunkt statt eines Feldes im Formular,
+   dasselbe Muster wie Status und Archiv: eine bewusste, einzelne Handlung,
+   kein Feld, das beim routinemaessigen Speichern versehentlich mitwandert. */
+async function reBezahltKlick(id, bezahlt) {
+  const a = await ruf('betreiber_beleg_bezahlt.php', { id, bezahlt });
+  if (a.status !== 'ok') { kurzmeldung(a.message || 'Fehlgeschlagen.'); return; }
+  kurzmeldung(bezahlt ? 'Als bezahlt markiert.' : 'Als unbezahlt markiert.');
+  if (ofFormId === Number(id)) {
+    ofFormBezahlt = Number(bezahlt);
+    ofFormBezahltAm = a.bezahlt_am || null;
+    ofFormSubZeichnen();
+  }
+  await ladeRechnungen();
 }
 
 /* ── Offertformular ────────────────────────────────────────────────── */
@@ -4009,19 +4285,88 @@ let ofFormKundeId = null;
    Offerte still auf "Entwurf" zuruecksetzen. */
 let ofFormStatus = 'entwurf';
 let ofFormAktiv = 1;
+/* Nur bei Rechnungen belegt. Die Markierung steht nicht im Formular,
+   sondern im Dreipunkt-Menue -- wie Status und Archiv: eine bewusste
+   Handlung, kein Feld, das beim Speichern mitwandert. */
+let ofFormBezahlt = 0;
+let ofFormBezahltAm = null;
 /* Nur die EINGABE-Einheit des Gesamtrabatts. Gespeichert wird immer in
    Basispunkten -- siehe ofRabattBp(). */
 let ofRabattEinheit = 'pct';
 const OF_GUELTIG_TAGE = 30;
 
+/* EIN Formular fuer beide Belegarten, genau wie im Cockpit (ENT-608):
+   Positionen, Rabatt, Summen, Druck und Versand sind identisch, nur der
+   Wortlaut und das zweite Datumsfeld unterscheiden sich (Gueltig bis vs.
+   Faellig am). Zwei komplette Formulare zu pflegen hiesse, jede kuenftige
+   Aenderung an Positionen oder Summen zweimal zu machen -- und irgendwann
+   nur noch an einem. */
+let ofArt = 'offerte';
+const OF_ART_TEXT = {
+  offerte: {
+    dokument: 'Offerte', neu: 'Neue Offerte', liste: 'Offertenliste',
+    bereich: 'offerten',
+    datumLabel: 'Offertendatum', nummerLabel: 'Offertennummer', zweitLabel: 'Gültig bis',
+    zweitFeld: 'gueltig_bis',
+    fehlerDatum: 'Ein Offertendatum ist erforderlich.',
+    fehlerZweit: '„Gültig bis" liegt vor dem Offertendatum.',
+    angelegt: 'Offerte angelegt.', gespeichert: 'Offerte gespeichert.',
+    versandFrage: 'Offerte per E-Mail versenden?',
+    versandText: 'Der Empfänger erhält eine E-Mail mit einem Link zur Offerte. Dort kann er sie direkt annehmen oder ablehnen.',
+    versandErfolg: 'Offerte per E-Mail verschickt.',
+  },
+  rechnung: {
+    dokument: 'Rechnung', neu: 'Neue Rechnung', liste: 'Rechnungsliste',
+    bereich: 'rechnungen',
+    datumLabel: 'Rechnungsdatum', nummerLabel: 'Rechnungsnummer', zweitLabel: 'Fällig am',
+    zweitFeld: 'faellig_bis',
+    fehlerDatum: 'Ein Rechnungsdatum ist erforderlich.',
+    fehlerZweit: '„Fällig am" liegt vor dem Rechnungsdatum.',
+    angelegt: 'Rechnung angelegt.', gespeichert: 'Rechnung gespeichert.',
+    versandFrage: 'Rechnung per E-Mail versenden?',
+    versandText: 'Der Empfänger erhält eine E-Mail mit einem Link zur Rechnung.',
+    versandErfolg: 'Rechnung per E-Mail verschickt.',
+  },
+};
+
+/* Beschriftungen und Zurueck-Ziel auf die aktuelle Belegart umstellen.
+   Eigene Funktion, weil sowohl ofNeu() als auch ofOeffnen() sie brauchen. */
+function ofFormLabelZeichnen() {
+  const t = OF_ART_TEXT[ofArt];
+  $('ofLblDatum').textContent = t.datumLabel + ' *';
+  $('ofLblNummer').textContent = t.nummerLabel;
+  $('ofLblGueltig').textContent = t.zweitLabel;
+  $('ofBtnPlus10').title = '10 Tage ab ' + t.datumLabel;
+  $('ofBtnPlus30').title = '30 Tage ab ' + t.datumLabel;
+  $('ofBtnZurueck').setAttribute('aria-label', 'Zurück zur ' + t.liste);
+}
+
+/* Das Formular ist eine eigene Ansicht NEBEN den Bereichen, nicht in einem
+   von ihnen: Es dient beiden Belegarten. Waehrend es offen ist, steht kein
+   Bereich daneben, und die Titelleiste sagt, welcher Beleg gemeint ist --
+   dieselbe Aussage wie die Kopfzeile im Cockpit. */
 function ofFormularZeigen(an) {
-  zeig($('of-formular'), an);
-  zeig($('of-rahmen'), !an);
+  if (!an) { zeig($('of-formular'), false); return; }
+  const t = OF_ART_TEXT[ofArt];
+  Object.keys(BEREICHE).forEach(k => { const el = $('b-' + k); if (el) { zeig(el, false); } });
+  zeig($('of-formular'), true);
+  $('leiste-titel').textContent = t.dokument;
+  $('leiste-unter').textContent = 'Positionen, Preise und Summen';
+  /* Der Reiter des zugehoerigen Bereichs bleibt markiert. Auf dem Handy ist
+     die Kopfzeile der einzige Ort, der sagt, wo man ist (Hausregel) -- ein
+     Formular, ueber dem "Übersicht" leuchtet, waehrend "Rechnung" dasteht,
+     sagt zwei verschiedene Dinge. */
+  document.querySelectorAll('#kopf-nav .nav-item').forEach(b => {
+    const dazu = b.dataset.bereich === t.bereich;
+    b.classList.toggle('on', dazu);
+    b.setAttribute('aria-current', dazu ? 'page' : 'false');
+  });
 }
 
 function ofZurueck() {
   ofFormularZeigen(false);
-  ofHauptTab('liste');
+  bereichZeigen(OF_ART_TEXT[ofArt].bereich);
+  if (ofArt === 'offerte') { ofHauptTab('liste'); }
 }
 
 function ofLeereZeile() {
@@ -4069,8 +4414,12 @@ function ofFehler(txt) {
   zeig(el, true);
 }
 
+/* Bezahlt schlaegt den Status: Eine laengst bezahlte Rechnung weiterhin als
+   "Versendet" auszuweisen waere zwar nicht falsch, aber es sagt das
+   Unwichtigere. Dieselbe Regel wie in der Liste (reStatusInfo). */
 function ofFormSubZeichnen() {
-  $('ofFormSub').textContent = ofStatusInfo(ofFormStatus).text + (ofFormAktiv ? '' : ' · archiviert');
+  $('ofFormSub').textContent = (ofFormBezahlt ? 'Bezahlt' : ofStatusInfo(ofFormStatus).text)
+    + (ofFormAktiv ? '' : ' · archiviert');
 }
 
 /* Die Ansprechpersonen des gewaehlten Betriebs. Wechselt der Empfaenger,
@@ -4109,20 +4458,25 @@ function ofNeueAdresse() {
   adDlgOeffnen(null);
 }
 
-function ofNeu() {
+function ofNeu(art) {
+  ofArt = art || 'offerte';
+  ofFormLabelZeichnen();
   ofFormId = null;
   ofPos = [ofLeereZeile()];
   ofFormKundeId = null;
   ofFormStatus = 'entwurf';
   ofFormAktiv = 1;
+  ofFormBezahlt = 0;
+  ofFormBezahltAm = null;
   const heute = isoTag();
-  $('ofFormNummer').textContent = ofNaechsteNummer || 'Neue Offerte';
+  const naechsteNummer = ofArt === 'rechnung' ? reNaechsteNummer : ofNaechsteNummer;
+  $('ofFormNummer').textContent = naechsteNummer || OF_ART_TEXT[ofArt].neu;
   $('ofFormSub').textContent = 'Entwurf · noch nicht gespeichert';
   zeig($('ofFormErr'), false);
   ['of_kunde', 'of_titel', 'of_referenz', 'of_bemerkung', 'of_notizen',
    'of_bedingungen', 'of_fusszeile'].forEach(f => { $(f).value = ''; });
   $('of_unterschriftsseite').checked = false;
-  $('of_nummer').value = ofNaechsteNummer || 'wird beim Speichern vergeben';
+  $('of_nummer').value = naechsteNummer || 'wird beim Speichern vergeben';
   ofRabattEinheit = 'pct';
   $('of_rabatt_pct').classList.add('on');
   $('of_rabatt_chf').classList.remove('on');
@@ -4144,19 +4498,24 @@ function ofNeu() {
 /* Aus der Liste heraus. Leistungen und Adressen muessen da sein, bevor das
    Formular erscheint -- sonst steht die Vervollstaendigung der ersten
    Positionszeile leer da, und man haelt sie fuer ein Freitextfeld. */
-async function ofNeuStarten() {
+async function ofNeuStarten(art) {
   if (!produkte.length) { await ladeProdukte(); }
   if (!adressen.length) { await ladeAdressen(); }
-  ofNeu();
+  ofNeu(art);
 }
 
-/* Eine neue Offerte mit bereits gesetztem Empfaenger -- aus dem Zeilenmenue
+/* Ein neuer Beleg mit bereits gesetztem Empfaenger -- aus dem Zeilenmenue
    des Adressbuchs. Spart den Schritt, den Betrieb noch einmal zu suchen,
-   den man gerade angeklickt hat. */
-async function ofNeuFuerAdresse(kundeId) {
+   den man gerade angeklickt hat. Fuer beide Belegarten, wie im Cockpit:
+   Wer eine Adresse vor sich hat, will von dort aus beides schreiben
+   koennen. Die Nummernreihe der jeweiligen Art muss dafuer geladen sein --
+   sonst stuende im Kopf "Neue Rechnung" statt RE-0004. */
+async function ofNeuFuerAdresse(kundeId, art) {
   if (!produkte.length) { await ladeProdukte(); }
-  bereichZeigen('offerten');
-  ofNeu();
+  if (art === 'rechnung') {
+    if (!reNaechsteNummer) { await ladeRechnungen(); }
+  } else if (!ofNaechsteNummer) { await ladeBelege(); }
+  ofNeu(art);
   const k = adressen.find(x => Number(x.id) === Number(kundeId));
   if (k) {
     $('of_kunde').value = k.name;
@@ -4338,8 +4697,13 @@ async function ofOeffnen(id) {
   if (!produkte.length) { await ladeProdukte(); }
   if (!adressen.length) { await ladeAdressen(); }
   const a = await ruf('betreiber_beleg_lesen.php?id=' + Number(id));
-  if (a.status !== 'ok') { kurzmeldung(a.message || 'Offerte konnte nicht geladen werden.'); return; }
+  if (a.status !== 'ok') { kurzmeldung(a.message || 'Der Beleg konnte nicht geladen werden.'); return; }
   const b = a.beleg;
+  /* Die Art kommt vom Beleg, nicht davon, aus welcher Liste geklickt wurde:
+     Beide Listen fuehren in dasselbe Formular, und ein Beleg, der sich fuer
+     die falsche Art haelt, schriebe beim Speichern in die falsche Spalte. */
+  ofArt = b.art || 'offerte';
+  ofFormLabelZeichnen();
   ofFormId = Number(b.id);
   ofFormKundeId = b.kunde_id ? Number(b.kunde_id) : null;
   ofPos = (b.positionen || []).map(p => ({
@@ -4354,6 +4718,8 @@ async function ofOeffnen(id) {
   }));
   ofFormStatus = b.status;
   ofFormAktiv = Number(b.aktiv);
+  ofFormBezahlt = Number(b.bezahlt) || 0;
+  ofFormBezahltAm = b.bezahlt_am || null;
   $('ofFormNummer').textContent = b.nummer || '–';
   ofFormSubZeichnen();
   zeig($('ofFormErr'), false);
@@ -4374,7 +4740,8 @@ async function ofOeffnen(id) {
   $('of_rabatt').value = bpText(b.rabatt_bp);
   $('of_datum').value = leeresDatum(b.datum) ? '' : String(b.datum).slice(0, 10);
   $('of_datum').dataset.vorher = $('of_datum').value;
-  $('of_gueltig').value = leeresDatum(b.gueltig_bis) ? '' : String(b.gueltig_bis).slice(0, 10);
+  const zweitWert = b[OF_ART_TEXT[ofArt].zweitFeld];
+  $('of_gueltig').value = leeresDatum(zweitWert) ? '' : String(zweitWert).slice(0, 10);
   ofPersonenFuellen(b.person_id);
   ['ofFormVorschauBtn', 'ofFormDruckBtn', 'ofFormMenuBtn']
     .forEach(x => { $(x).style.display = ''; });
@@ -4383,25 +4750,26 @@ async function ofOeffnen(id) {
 }
 
 async function ofSpeichern() {
+  const t = OF_ART_TEXT[ofArt];
   const datum = $('of_datum').value;
   const zeigeFehler = txt => {
     ofFehler(txt);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  if (!datum) { zeigeFehler('Ein Offertendatum ist erforderlich.'); return; }
+  if (!datum) { zeigeFehler(t.fehlerDatum); return; }
   if (!ofFormKundeId) { zeigeFehler('Bitte einen Empfänger aus dem Adressbuch wählen.'); return; }
   const bis = $('of_gueltig').value;
-  if (bis && bis < datum) { zeigeFehler('„Gültig bis" liegt vor dem Offertendatum.'); return; }
+  if (bis && bis < datum) { zeigeFehler(t.fehlerZweit); return; }
 
   const koerper = {
     id: ofFormId || 0,
-    art: 'offerte',
+    art: ofArt,
     kunde_id: ofFormKundeId,
     person_id: Number($('of_person').value) || null,
     titel: ($('of_titel').value || '').trim(),
     referenz: ($('of_referenz').value || '').trim(),
     datum,
-    gueltig_bis: bis || null,
+    [t.zweitFeld]: bis || null,
     /* Unveraendert mitgeschickt, damit ein Speichern den Status nicht auf
        "Entwurf" zurueckwirft. */
     status: ofFormStatus,
@@ -4427,8 +4795,8 @@ async function ofSpeichern() {
   /* Die Summen aus der SERVERANTWORT uebernehmen, nicht die eigene Vorschau
      stehenlassen: Weichen beide ab, soll das sofort auffallen. */
   if (a.summen) { ofSummenAusServer(a.summen); }
-  kurzmeldung(warNeu ? 'Offerte angelegt.' : 'Offerte gespeichert.');
-  await ladeBelege();
+  kurzmeldung(warNeu ? t.angelegt : t.gespeichert);
+  await belegListeAktualisieren(ofArt);
 }
 
 function ofSummenAusServer(s) {
@@ -4535,9 +4903,11 @@ function ofBlatt(b, kunde, person) {
 
       <div style="display:flex;justify-content:space-between;gap:40px;margin-bottom:52px">
         <table style="border-collapse:collapse;line-height:1.5">
-          ${kopfZeile('Offertennummer', esc(b.nummer))}
-          ${kopfZeile('Offertendatum', dmy(b.datum))}
-          ${b.gueltig_bis && !leeresDatum(b.gueltig_bis) ? kopfZeile('Gültig bis', dmy(b.gueltig_bis)) : ''}
+          ${kopfZeile(BELEG_TITEL_FELD[b.art] || 'Offertennummer', esc(b.nummer))}
+          ${kopfZeile((OF_ART_TEXT[b.art] || OF_ART_TEXT.offerte).datumLabel, dmy(b.datum))}
+          ${b.art === 'rechnung'
+            ? (b.faellig_bis && !leeresDatum(b.faellig_bis) ? kopfZeile('Fällig am', dmy(b.faellig_bis)) : '')
+            : (b.gueltig_bis && !leeresDatum(b.gueltig_bis) ? kopfZeile('Gültig bis', dmy(b.gueltig_bis)) : '')}
           ${b.referenz ? kopfZeile('Referenz', esc(b.referenz)) : ''}
         </table>
         <div style="line-height:1.5;min-width:230px">${empfaenger.map(z => esc(z)).join('<br>')}</div>
@@ -4565,6 +4935,10 @@ function ofBlatt(b, kunde, person) {
       ${bkFusszeile()}
     </div>`;
 }
+
+/* Wie die Nummer auf dem Blatt heisst. Je Belegart eigener Wortlaut --
+   "Offertennummer" auf einer Rechnung waere schlicht falsch. */
+const BELEG_TITEL_FELD = { offerte: 'Offertennummer', rechnung: 'Rechnungsnummer' };
 
 /* Die Zahlen kommen vom SERVER (betreiber_beleg_lesen.php rechnet sie
    frisch), nicht aus dem Formular -- was gedruckt wird, soll das sein, was
@@ -4651,8 +5025,9 @@ function blattPdfBlob(el) {
 }
 
 function ofDateiname(b) {
-  const teil = String(b.nummer || 'Offerte').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return (teil || 'Offerte') + '.pdf';
+  const ersatz = (OF_ART_TEXT[b.art] || OF_ART_TEXT.offerte).dokument;
+  const teil = String(b.nummer || ersatz).replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return (teil || ersatz) + '.pdf';
 }
 
 async function ofPdfBauen(id) {
@@ -4756,17 +5131,15 @@ async function ofVorschau(id) {
    Sicherheitsabfrage davor, weil eine einmal verschickte Mail sich nicht
    zurueckholen laesst. */
 function ofVersenden(id) {
-  if (!id) { kurzmeldung('Die Offerte muss zuerst gespeichert werden.'); return; }
-  frageStellen('Offerte per E-Mail versenden?',
-    'Der Betrieb erhält eine E-Mail mit einem Link zur Offerte. Dort kann er sie direkt '
-    + 'annehmen oder ablehnen.',
-    'Versenden', async () => {
-      const a = await ruf('betreiber_beleg_versenden.php', { id: Number(id) });
-      if (a.status !== 'ok') { kurzmeldung(a.message || 'Versand fehlgeschlagen.'); return; }
-      kurzmeldung('Offerte per E-Mail verschickt.');
-      if (ofFormId === Number(id)) { ofFormStatus = 'versendet'; ofFormSubZeichnen(); }
-      await ladeBelege();
-    });
+  const t = OF_ART_TEXT[ofArt];
+  if (!id) { kurzmeldung('Der Beleg muss zuerst gespeichert werden.'); return; }
+  frageStellen(t.versandFrage, t.versandText, 'Versenden', async () => {
+    const a = await ruf('betreiber_beleg_versenden.php', { id: Number(id) });
+    if (a.status !== 'ok') { kurzmeldung(a.message || 'Versand fehlgeschlagen.'); return; }
+    kurzmeldung(t.versandErfolg);
+    if (ofFormId === Number(id)) { ofFormStatus = 'versendet'; ofFormSubZeichnen(); }
+    await belegListeAktualisieren(ofArt);
+  });
 }
 
 /* Ein Klick irgendwo sonst schliesst das Zeilenmenue. Ohne das bliebe es
@@ -4855,18 +5228,6 @@ async function ladeAlles() {
   const hinweis = $('u-sitzung');
   if (hinweis) { hinweis.textContent = 'Die Sitzung endet nach 30 Minuten ohne Nutzung.'; }
 
-  /* Offerten sind seit ENT-605 gebaut. Rechnungen bleiben ein Geruest --
-     und das aus einem anderen Grund als bisher: Eine Offerte laesst sich
-     schreiben, ohne dass ein Preismodell feststeht (ihre Positionen tragen
-     Text, Menge und Preis selbst). Eine wiederkehrende Rechnung nicht: Sie
-     braucht die Antwort auf "wonach wird abgerechnet" (OP-536), und davon
-     haengt der Datenaufbau ab. */
-  geruestZeigen('re-inhalt', 'Noch nicht gebaut',
-    'Das Gerüst steht. Rechnungen an die Mandanten entstehen hier, sobald '
-    + 'entschieden ist, wonach abgerechnet wird — Grundgebühr, Zahl der '
-    + 'Mitarbeitenden oder Einsätze. Davon hängt ab, wie die Daten liegen. '
-    + 'Offerten hängen nicht daran und stehen seit ENT-605 unter „Offerten“.');
-
   await ladeMandanten();
   await ladeDemo();
   await ladeKonten();
@@ -4876,6 +5237,7 @@ async function ladeAlles() {
   await ladeAdressen();
   await ladeProdukte();
   await ladeBelege();
+  await ladeRechnungen();
   await ladeBriefkopf();
   /* Zuletzt, aber auf jeder Seite sichtbar: Das Abzeichen am Reiter steht
      auch dann im Blick, wenn gerade ein anderer Bereich offen ist. */
