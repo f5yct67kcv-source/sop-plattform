@@ -200,6 +200,53 @@ check('Und der Hinweis, dass geortet wird, steht dann wieder da',
     return !!el && el.textContent.includes('verfolgt');
   }));
 
+// ══════════ DER WEG ZURÜCK STIMMT JE NACH FASSUNG ═════════════════════
+// Vom Projektinhaber angestossen: Die Coredinate-App weist immer wieder
+// hin, wenn die Einstellungen nicht passen -- einmal fragen genügt nicht,
+// weil der Mitarbeitende sonst nicht erkennt, woran es liegt.
+//
+// Im Grundsatz ist das hier schon so: Der Warnblock bleibt stehen, solange
+// die Sperre gilt. Falsch war der WEG darin. Er lotste durch Safari
+// ("Ortungsdienste › Safari", "aA in der Adressleiste") -- in der App gibt
+// es beides nicht. Ein Weg, den es nicht gibt, ist schlimmer als gar
+// keiner: Er sieht aus wie eine Auskunft.
+//
+// Geprüft wird die AUSSAGE, nicht der Wortlaut: In der App darf der Text
+// nicht durch den Browser führen, und er muss den Ort nennen, an dem es
+// wirklich steht.
+{
+  const wegIn = async (nativ) => await page.evaluate((n) => {
+    const merk = window.Capacitor;
+    if (n) { window.Capacitor = { isNativePlatform: () => true }; }
+    try {
+      rgsOrtFehler = 'verweigert';
+      const html = rgOrtungHinweisHtml(false);
+      const h = document.createElement('div');
+      h.innerHTML = html;
+      const el = h.querySelector('.rgs-ortwarn-weg');
+      return el ? el.textContent : null;
+    } finally { window.Capacitor = merk; rgsOrtFehler = null; }
+  }, nativ);
+
+  const inApp = await wegIn(true);
+  const imBrowser = await wegIn(false);
+
+  check('KRITISCH: in der App steht überhaupt ein Weg da', !!inApp && inApp.length > 20);
+  check('KRITISCH: der Weg in der App führt NICHT durch den Browser',
+    !!inApp && !/Safari|Adressleiste|Website-Einstellungen|Browser/i.test(inApp));
+  check('KRITISCH: er nennt die App-Einstellungen als Ort',
+    !!inApp && /Einstellungen/.test(inApp) && /GuardOpS/.test(inApp));
+  check('Und er sagt, was danach zu tun ist -- der Warnblock geht nicht von selbst weg',
+    !!inApp && /Erneut versuchen/.test(inApp));
+  // Welcher der beiden Browser-Wege hier greift, haengt am User-Agent der
+  // Pruefumgebung -- geprueft wird darum, dass er ueberhaupt durch den
+  // Browser fuehrt, nicht welcher es ist.
+  check('KRITISCH: im Browser bleibt der Browser-Weg stehen, er ist dort richtig',
+    !!imBrowser && /Safari|Browser/.test(imBrowser));
+  check('KRITISCH: die beiden Wege sind nicht derselbe Text',
+    !!inApp && !!imBrowser && inApp !== imBrowser);
+}
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

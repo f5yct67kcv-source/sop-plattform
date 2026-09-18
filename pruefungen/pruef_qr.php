@@ -91,6 +91,58 @@ $mitDebitor = qr_spc_zeilen($betrieb, 48.65, 'RE0962',
 check('KRITISCH: mit bekanntem Debitor steht "S" als Adresstyp', $mitDebitor[20] === 'S');
 check('Und der Name des Debitors an der richtigen Stelle', $mitDebitor[21] === 'abc consulting gmbh');
 
+// ── ZWEITE REFERENZART: normale IBAN (ENT-616) ────────────────────────────
+//
+// Eine QR-IBAN verlangt QRR, eine normale IBAN VERBIETET sie. Wer beides
+// gleich behandelt, erzeugt einen Code, den die Bank zurueckweist -- und das
+// merkt man erst, wenn eine Zahlung nicht ankommt. Darum gerechnet, nicht
+// nachgelesen.
+//
+// Die IBAN unten ist das ueberall veroeffentlichte ISO-Beispiel, keine
+// echte Bankverbindung.
+$normal = ['firma' => 'Muster GmbH', 'qr_iban' => 'CH93 0076 2011 6238 5295 7',
+    'qr_strasse' => 'Musterweg', 'qr_hausnummer' => '1', 'qr_plz' => '9999', 'qr_ort' => 'Musterhausen'];
+$zn = qr_spc_zeilen($normal, 48.65, 'RE0962', null);
+
+check('KRITISCH: auch mit normaler IBAN sind es genau 31 Zeilen', count($zn) === 31);
+check('KRITISCH: normale IBAN traegt NON, nicht QRR', $zn[27] === 'NON');
+check('KRITISCH: und dann KEINE Referenz -- eine QR-Referenz waere hier unzulaessig',
+    $zn[28] === '');
+check('KRITISCH: die Rechnungsnummer steht stattdessen in der Mitteilung',
+    strpos($zn[29], 'RE0962') !== false);
+check('Der Trailer bleibt EPD', end($zn) === 'EPD');
+check('KRITISCH: die QR-IBAN bleibt unberuehrt bei QRR',
+    qr_spc_zeilen($betrieb, 1.0, 'RE0001', null)[27] === 'QRR');
+
+check('KRITISCH: eine QR-IBAN wird als solche erkannt, eine normale nicht',
+    iban_ist_qr('CH44 3199 9123 0008 8901 2') && !iban_ist_qr('CH93 0076 2011 6238 5295 7'));
+
+// qr_referenzteil() liefert immer drei Felder -- sonst verschoebe sich der
+// Rest des Codes um eine Zeile, und der Trailer stuende an falscher Stelle.
+check('Der Referenzteil hat beide Male drei Felder',
+    count(qr_referenzteil('CH44 3199 9123 0008 8901 2', 'RE1')) === 3
+    && count(qr_referenzteil('CH93 0076 2011 6238 5295 7', 'RE1')) === 3);
+check('Die Mitteilung bleibt innerhalb der 140 Zeichen des Standards',
+    mb_strlen(qr_referenzteil('CH93 0076 2011 6238 5295 7', str_repeat('X', 400))[2]) <= 140);
+
+// ── Wann ist ein Zahlteil ueberhaupt moeglich ─────────────────────────────
+//
+// EINE Stelle beantwortet das, sonst geben Cockpit und Betreiber-Bereich
+// zwei verschiedene Antworten auf dieselbe Frage.
+check('KRITISCH: mit gueltiger IBAN und vollstaendiger Adresse ist er moeglich',
+    qr_zahlteil_moeglich($betrieb) && qr_zahlteil_moeglich($normal));
+check('KRITISCH: ohne IBAN nicht',
+    !qr_zahlteil_moeglich(['qr_iban' => ''] + $normal));
+check('KRITISCH: mit unbrauchbarer IBAN nicht -- ein Code, den die Bank abweist, ist schlimmer als keiner',
+    !qr_zahlteil_moeglich(['qr_iban' => 'CH93 0076 2011 6238 5295 8'] + $normal));
+check('KRITISCH: ohne Strasse nicht', !qr_zahlteil_moeglich(['qr_strasse' => ''] + $normal));
+check('KRITISCH: ohne PLZ nicht',     !qr_zahlteil_moeglich(['qr_plz' => ''] + $normal));
+check('KRITISCH: ohne Ort nicht',     !qr_zahlteil_moeglich(['qr_ort' => ''] + $normal));
+check('Eine Hausnummer ist nicht Pflicht -- es gibt Adressen ohne',
+    qr_zahlteil_moeglich(['qr_hausnummer' => ''] + $normal));
+check('Eine auslaendische IBAN taugt nicht fuer einen Schweizer Zahlteil',
+    !qr_zahlteil_moeglich(['qr_iban' => 'DE89 3704 0044 0532 0130 00'] + $normal));
+
 echo count($bad) === 0 ? "$ok Pruefungen bestanden\n" : '';
 foreach ($bad as $b) { echo "X $b\n"; }
 exit(count($bad) === 0 ? 0 : 1);

@@ -122,10 +122,33 @@ function qrr_referenz(string $rechnungsnummer): string
 
 // ── SPC-Zahlungsteil (Swiss Payments Code) ─────────────────────────────
 
+// ZWEI REFERENZARTEN, EINE FUNKTION (ENT-616).
+//
+// Eine QR-IBAN verlangt eine QR-Referenz (QRR): 27 Stellen, aus der
+// Rechnungsnummer abgeleitet, und die Bank meldet den Zahlungseingang mit
+// genau dieser Referenz zurueck -- die Zuordnung laeuft von selbst.
+//
+// Eine NORMALE Schweizer IBAN darf gar keine QR-Referenz tragen. Dort ist
+// 'NON' die richtige Angabe, und die Rechnungsnummer gehoert in die
+// unstrukturierte Mitteilung. Der Einzahlungsschein ist genauso gueltig und
+// genauso scannbar; was fehlt, ist die maschinelle Zuordnung des Eingangs.
+//
+// Beides ist ein gueltiger Swiss Payments Code. Die Alternative waere
+// gewesen, ohne QR-IBAN gar keinen Zahlteil zu drucken -- dann haengt die
+// Rechnungsstellung daran, ob und wann eine Bank eine QR-IBAN zuteilt.
+function qr_referenzteil(string $iban, string $rechnungsnummer): array
+{
+    return iban_ist_qr($iban)
+        ? ['QRR', qrr_referenz($rechnungsnummer), '']
+        // Die Nummer steht als Klartext in der Mitteilung. Ohne sie koennte
+        // der Empfaenger zwar zahlen, aber niemand wuesste, wofuer.
+        : ['NON', '', mb_substr('Rechnung ' . $rechnungsnummer, 0, 140)];
+}
+
 // Baut die 31 Zeilen des QR-Code-Inhalts, in der von SIX vorgegebenen,
-// fixen Reihenfolge. Wird nur aufgerufen, wenn iban_ist_qr() bereits
-// bestaetigt hat, dass eine QR-Referenz ueberhaupt zulaessig ist --
-// diese Funktion selbst prueft das nicht nochmals.
+// fixen Reihenfolge. Welche Referenzart daraus wird, entscheidet die IBAN
+// selbst (qr_referenzteil()) -- ein Aufrufer, der die falsche waehlt,
+// erzeugt einen Code, den die Bank zurueckweist.
 //
 // $betrieb: Zeile aus der Tabelle betrieb (firma, qr_iban, qr_strasse,
 //   qr_hausnummer, qr_plz, qr_ort).
@@ -159,12 +182,20 @@ function qr_spc_zeilen(array $betrieb, float $betragChf, string $rechnungsnummer
     ], $leer7, [
         number_format($betragChf, 2, '.', ''),
         'CHF',
-    ], $debitor, [
-        'QRR',
-        qrr_referenz($rechnungsnummer),
-        '',
-        'EPD',
-    ]);
+    ], $debitor, qr_referenzteil($iban, $rechnungsnummer), ['EPD']);
+}
+
+// Traegt dieser Briefkopf genug fuer einen Zahlteil? Eine Stelle, damit
+// Cockpit und Betreiber-Bereich nicht zwei verschiedene Antworten geben.
+// Ohne gueltige Adresse des Zahlungsempfaengers weist die Bank den Code
+// zurueck -- die vier Felder sind Pflicht, nicht Zierde.
+function qr_zahlteil_moeglich(array $betrieb): bool
+{
+    $iban = (string)($betrieb['qr_iban'] ?? '');
+    return $iban !== '' && iban_ch_li_gueltig($iban)
+        && trim((string)($betrieb['qr_strasse'] ?? '')) !== ''
+        && trim((string)($betrieb['qr_plz'] ?? '')) !== ''
+        && trim((string)($betrieb['qr_ort'] ?? '')) !== '';
 }
 
 function qr_spc_payload(array $betrieb, float $betragChf, string $rechnungsnummer, ?array $empfaenger): string

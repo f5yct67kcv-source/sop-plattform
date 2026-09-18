@@ -196,6 +196,102 @@ check('KRITISCH: ein Ersatzscan startet NICHT die Rohzeit (Projektinhaber-Entsch
 const zeileText = await page.textContent('#rdListe .rd-zeile:nth-child(2)');
 check('Die Checkliste zeigt "Ersatzscan", nicht "Bestätigt"', zeileText.includes('Ersatzscan') && !zeileText.includes('Bestätigt'));
 
+// ══════════ DIE LAUFENDE ORTUNG DARF DAS FORMULAR NICHT WEGZIEHEN ═════
+// Zwei Befunde des Projektinhabers, beide mit derselben Ursache: Bei jeder
+// neuen Position wird die Liste neu gezeichnet (ENT-317). Dabei werden die
+// Felder durch neue ersetzt.
+//
+//  1. "Bei Grund erforderlich kann man nicht reinschreiben." Der Text ging
+//     nicht verloren -- er wird gesichert (ENT-324) --, aber der Cursor war
+//     weg. Im Sekundentakt lässt sich so nicht tippen.
+//  2. Foto aufgenommen, "Verwenden" getippt, und nichts geschah. Während
+//     die Kamera offen ist, wird auch das Dateifeld ersetzt: Das Foto kommt
+//     beim alten an, nachgeschlagen wurde das neue, leere.
+{
+  // Ein Punkt mit offenem Ersatzscan-Formular.
+  await page.evaluate(() => {
+    const k = rundgangAktiv.kontrollpunkte[0];
+    k.offen = 'es';
+    rundgangListeZeichnen();
+  });
+  await page.waitForTimeout(150);
+  const feld = '#rdEsText' + (await page.evaluate(() => rundgangAktiv.kontrollpunkte[0].id));
+
+  check('KRITISCH: das Grundfeld steht da und lässt sich beschreiben',
+    await page.evaluate(async (sel) => {
+      const f = document.querySelector(sel);
+      if (!f) { return false; }
+      f.focus();
+      f.value = 'Schild abgerissen';
+      // Genau das, was draussen dauernd passiert: eine neue Position.
+      // Der Anlass zaehlt -- aufgeschoben wird nur, was die Ortung
+      // anstoesst; eine Handlung des Benutzers muss sofort wirken.
+      rundgangListeZeichnen('ortung');
+      await new Promise(r => setTimeout(r, 30));
+      const jetzt = document.querySelector(sel);
+      return !!jetzt && jetzt === document.activeElement && jetzt.value === 'Schild abgerissen';
+    }, feld));
+
+  // Aufgeschoben ist nicht aufgehoben: Sobald das Feld verlassen wird, holt
+  // die Liste nach. Sonst blieben Entfernungen und Zustände stehen.
+  check('KRITISCH: nach dem Verlassen des Feldes zeichnet die Liste nach',
+    await page.evaluate(async (sel) => {
+      const f = document.querySelector(sel);
+      f.focus();
+      rundgangListeZeichnen('ortung');
+      const vorher = rdZeichnenNachholen;
+      f.blur();
+      await new Promise(r => setTimeout(r, 60));
+      return vorher === true && rdZeichnenNachholen === false;
+    }, feld));
+
+  // Und umgekehrt: Eine Handlung des Benutzers darf NIE aufgeschoben
+  // werden. Sonst oeffnet sich ein Formular nicht, weil der Cursor noch im
+  // vorigen steht -- so geschehen, als hier zuerst jedes Zeichnen
+  // aufgeschoben wurde; die Regression hat es gefunden.
+  check('KRITISCH: eine Handlung des Benutzers zeichnet sofort, auch bei gesetztem Cursor',
+    await page.evaluate(async (sel) => {
+      const f = document.querySelector(sel);
+      f.focus();
+      // Ohne Anlass: das ist der Weg, den jede Handlung nimmt. Nichts darf
+      // dabei liegen bleiben.
+      rundgangListeZeichnen();
+      return rdZeichnenNachholen === false;
+    }, feld));
+
+  // Das Foto kommt beim Feld an, bei dem es aufgenommen wurde -- auch wenn
+  // dieses inzwischen aus dem Dokument gelöst ist.
+  check('KRITISCH: ein Foto geht nicht verloren, wenn die Liste zwischendurch neu gezeichnet wurde',
+    await page.evaluate(async () => {
+      const k = rundgangAktiv.kontrollpunkte[0];
+      const alt = document.getElementById('rdEsInput' + k.id);
+      if (!alt) { return false; }
+      // Ein winziges, gueltiges Bild -- echtes Kamerafoto gibt es hier nicht.
+      const bytes = Uint8Array.from(atob(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+      ), c => c.charCodeAt(0));
+      const dt = new DataTransfer();
+      dt.items.add(new File([bytes], 'beleg.png', { type: 'image/png' }));
+      alt.files = dt.files;
+      // Jetzt die Liste neu zeichnen -- das alte Feld ist danach geloest.
+      k.offen = 'es';
+      rundgangListeZeichnen('ortung');
+      await new Promise(r => setTimeout(r, 30));
+      // Und das Ereignis kommt beim ALTEN Feld an, so wie draussen auch.
+      rdEsFotoGewaehlt(k.id, alt);
+      await new Promise(r => setTimeout(r, 300));
+      return typeof rdEsFotos[k.id] === 'string' && rdEsFotos[k.id].length > 100;
+    }));
+
+  // Und es wird sichtbar: Der Waechter muss sehen, dass das Foto sitzt.
+  check('KRITISCH: das Foto erscheint als Vorschau, statt unsichtbar zu bleiben',
+    await page.evaluate(() => {
+      const k = rundgangAktiv.kontrollpunkte[0];
+      const v = document.getElementById('rdEsVorschau' + k.id);
+      return !!v && v.style.display !== 'none' && (v.src || '').length > 100;
+    }));
+}
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

@@ -22,6 +22,25 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Nutzungsbeschreibungen (ENT-609).
+
+	     OHNE diese Eintraege fragt iOS gar nicht erst nach der Erlaubnis,
+	     es lehnt still ab. Die App wartet dann ewig ("Standort wird
+	     gesucht ..."), und niemand sieht, woran es liegt. Genau so gemeldet
+	     vom Projektinhaber, und es ist dieselbe Falle wie beim Push
+	     (ENT-604): In der Browser-Fassung bringt Safari die eigenen
+	     Beschreibungen mit, in der eigenen Huelle muss die App sie selbst
+	     stellen.
+
+	     Der Text ist der, den die betroffene Person im Fenster liest. Er
+	     sagt darum, WOFUER, statt blosser Worte wie "Zugriff auf den
+	     Standort". Wer nicht weiss, warum gefragt wird, lehnt ab. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Auf der Runde wird geprüft, ob du wirklich beim Kontrollpunkt stehst — ohne Standort lässt sich kein Punkt bestätigen.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Für den Fotobeleg bei einem Ereignis und beim Ersatzscan eines Kontrollpunkts.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Damit du einen bestehenden Fotobeleg aus deinen Bildern auswählen kannst.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

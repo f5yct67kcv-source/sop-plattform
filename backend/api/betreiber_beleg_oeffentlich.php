@@ -21,6 +21,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../belege.php';
+require_once __DIR__ . '/../qrrechnung.php';
 
 function portal_esc(?string $s): string
 {
@@ -236,6 +237,59 @@ try {
     }
     $summenHtml .= $sz('Total', portal_chf($summen['total_rappen']) . ' CHF', true);
 
+    // ── QR-Zahlteil (ENT-616) ─────────────────────────────────────────
+    //
+    // Nur bei einer offenen, unbezahlten Rechnung mit hinterlegter, gueltiger
+    // IBAN und vollstaendiger Adresse. Fehlt etwas davon, bleibt der Block
+    // schlicht weg -- ein nicht scannbarer Code waere schlimmer als keiner,
+    // weil er aussieht, als koenne man ihn benutzen (so schon ENT-205).
+    //
+    // NICHT "keindruck": Genau dieser Teil soll auf dem Papier landen.
+    //
+    // ZWEI REFERENZARTEN (Unterschied zur Mandantenseite): Eine QR-IBAN
+    // traegt eine Referenznummer, eine normale IBAN die Rechnungsnummer als
+    // Mitteilung. Beides ist ein gueltiger Einzahlungsschein; welcher es
+    // wird, entscheidet qr_referenzteil().
+    $qrZahlteil = '';
+    $bezahlt = (int)($b['bezahlt'] ?? 0) === 1;
+    if ($b['art'] === 'rechnung' && !$bezahlt && $summen['total_rappen'] > 0
+        && qr_zahlteil_moeglich($bk)
+    ) {
+        $debitor = $kunde ? [
+            'name' => (string)($kunde['name'] ?? ''), 'strasse' => (string)($kunde['strasse'] ?? ''),
+            'hausnummer' => (string)($kunde['hausnummer'] ?? ''), 'plz' => (string)($kunde['plz'] ?? ''),
+            'ort' => (string)($kunde['ort'] ?? ''),
+        ] : null;
+        $spc  = qr_spc_payload($bk, $summen['total_rappen'] / 100, (string)$b['nummer'], $debitor);
+        $teil = qr_referenzteil((string)$bk['qr_iban'], (string)$b['nummer']);
+
+        // Die Zeile unter der IBAN heisst, was sie ist: eine Referenz oder
+        // eine Mitteilung. Beides "Referenz" zu nennen waere bequem und
+        // falsch -- der Empfaenger tippt sie in verschiedene Felder.
+        $zusatz = $teil[0] === 'QRR'
+            ? '<tr><td style="padding:2px 24px 2px 0;color:#6B7280">Referenz</td><td>'
+              . portal_esc(trim((string)preg_replace('/(.{5})/', '$1 ', $teil[1]))) . '</td></tr>'
+            : '<tr><td style="padding:2px 24px 2px 0;color:#6B7280">Mitteilung</td><td>'
+              . portal_esc($teil[2]) . '</td></tr>';
+
+        $qrZahlteil = '<div style="margin-top:32px;padding-top:20px;border-top:1px solid #E5E8EC">'
+            . '<div style="font-size:15px;font-weight:700;margin-bottom:14px">Zahlung per QR-Rechnung</div>'
+            . '<div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">'
+            . '<div id="qrRechnungCode" data-spc="' . portal_esc($spc) . '" style="flex:0 0 auto"></div>'
+            . '<table style="line-height:1.7;width:auto;font-size:12px">'
+            . '<tr><td style="padding:2px 24px 2px 0;color:#6B7280">IBAN</td><td>'
+            . portal_esc(iban_gruppiert((string)$bk['qr_iban'])) . '</td></tr>'
+            . $zusatz
+            . '<tr><td style="padding:2px 24px 2px 0;color:#6B7280">Betrag</td><td>'
+            . portal_chf($summen['total_rappen']) . ' CHF</td></tr>'
+            . '</table></div></div>'
+            . '<script src="/qrcode.js"></script>'
+            . '<script>(function(){var el=document.getElementById("qrRechnungCode");'
+            . 'if(!el||typeof qrcode==="undefined"){return;}'
+            . 'var q=qrcode(0,"M");q.addData(el.getAttribute("data-spc"));q.make();'
+            . 'el.innerHTML=q.createSvgTag({cellSize:4,margin:8});})();</script>';
+    }
+
     $abschnitt = function (string $label, ?string $text): string {
         if (!$text) { return ''; }
         return '<div style="margin-top:22px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;'
@@ -336,6 +390,7 @@ try {
         . '<th style="padding:7px 8px;text-align:right;font-size:11px;font-weight:700;background:#EDEFF2">Summe</th>'
         . '</tr></thead><tbody>' . $zeilen . '</tbody></table>'
         . '<table style="margin-left:auto;margin-top:14px;width:auto">' . $summenHtml . '</table>'
+        . $qrZahlteil
         . $abschnitt('Notizen', $b['oeffentliche_notizen'])
         . $abschnitt('Bedingungen', $b['bedingungen'])
         . $unterschriftsseite
