@@ -327,8 +327,20 @@ fi
 # so oder so ueber devicectl, und dem ist die Herkunft des Bauwerks egal.
 bau_ziel_waehlen() {
   GESUCHT="$1"; shift
+  # ACHTUNG: -showdestinations gibt ZWEI Listen aus. Unter "Available
+  # destinations" steht, womit gebaut werden kann; darunter folgt
+  # "Ineligible destinations" -- Geraete, die xcodebuild zwar KENNT, aber
+  # gerade nicht bedienen kann (wird vorbereitet, gesperrt, nicht
+  # unterstuetzte iOS-Fassung). Wer beide Listen zusammen durchsucht,
+  # findet das Geraet und baut trotzdem ins Leere. Genau so ist der
+  # Ausweichweg beim ersten Versuch nicht angesprungen: gefunden in der
+  # falschen Liste, danach derselbe Abbruch wie zuvor.
+  # Darum alles ab "Ineligible" abschneiden -- dieselbe Vorsicht wie beim
+  # Abschneiden der Simulatoren weiter oben.
   if [ -n "$GESUCHT" ] \
-     && xcodebuild "$@" -showdestinations 2>/dev/null | grep -q "$GESUCHT"; then
+     && xcodebuild "$@" -showdestinations 2>/dev/null \
+        | awk '/[Ii]neligible destinations/ { exit } { print }' \
+        | grep -q "$GESUCHT"; then
     echo "id=$GESUCHT"
   else
     echo "generic/platform=iOS"

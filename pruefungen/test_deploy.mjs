@@ -1662,6 +1662,13 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
       '{ platform:iOS Simulator, arch:arm64, id:D30B9AE4-0000-0000-0000-000000000000, OS:26.5, name:iPhone 17 }',
     ].join('\n');
     const MIT = OHNE + `\n{ platform:iOS, arch:arm64, id:${KENNUNG}, name:Diensthandy }`;
+    // Der Fall, an dem der Ausweichweg beim ersten Versuch vorbeilief:
+    // xcodebuild KENNT das Gerät, kann es aber nicht bedienen und führt es
+    // darum in einer zweiten Liste unter "Ineligible destinations". Wer
+    // beide zusammen durchsucht, findet es -- und baut trotzdem ins Leere.
+    const UNBRAUCHBAR = OHNE
+      + '\n\nIneligible destinations for the "App" scheme:'
+      + `\n{ platform:iOS, id:${KENNUNG}, name:Diensthandy, error:Diensthandy is busy }`;
 
     const lauf = (liste, kennung) => {
       const ordner = mkdtempSync(join(tmpdir(), 'bauziel-'));
@@ -1685,12 +1692,15 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
       lauf(MIT, '') === 'generic/platform=iOS');
     // Ein Simulator darf die Wahl nie gewinnen -- sonst landet die App
     // nicht auf dem Telefon, und das fiele erst beim Installieren auf.
+    check('KRITISCH: ein Gerät unter "Ineligible destinations" gilt NICHT als brauchbar',
+      lauf(UNBRAUCHBAR, KENNUNG) === 'generic/platform=iOS');
     check('KRITISCH: das Ergebnis ist nie ein Simulator',
       !lauf(OHNE, KENNUNG).includes('Simulator') && !lauf(MIT, KENNUNG).includes('Simulator'));
   } else {
     ['KRITISCH: sieht xcodebuild das Gerät, wird für genau dieses gebaut',
      'KRITISCH: sieht es xcodebuild NICHT, wird allgemein für iOS gebaut statt abgebrochen',
      'KRITISCH: ohne bekannte Gerätekennung ebenfalls allgemein für iOS',
+     'KRITISCH: ein Gerät unter "Ineligible destinations" gilt NICHT als brauchbar',
      'KRITISCH: das Ergebnis ist nie ein Simulator',
     ].forEach(n => check(n + ' (nicht prüfbar: Funktion nicht gefunden)', false));
   }
