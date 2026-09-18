@@ -113,7 +113,7 @@ if (fremdeAufrufe.length) { bad.push('fremder Aufruf: ' + fremdeAufrufe.join(', 
 const COCKPIT_NAMEN = ['beleg_list.php', 'beleg_lesen.php', 'beleg_speichern.php',
   'beleg_versenden.php', 'beleg_status.php', 'beleg_archivieren.php',
   'beleg_duplizieren.php', 'beleg_bezahlt.php', 'kunden_list.php', 'kunden_create.php',
-  'kunden_update.php', 'produkt_list.php', 'produkt_speichern.php'];
+  'kunden_update.php', 'kunden_import.php', 'produkt_list.php', 'produkt_speichern.php'];
 const stehengeblieben = COCKPIT_NAMEN.filter(n =>
   new RegExp(`(?<!betreiber_)${n.replace('.', '\\.')}`).test(nurCode(seite)));
 check('KRITISCH: kein Endpunktname aus dem Cockpit ist stehengeblieben',
@@ -231,6 +231,58 @@ check('KRITISCH: bestaetigt und abgelehnt gibt es bei einer Rechnung nicht',
   check('das Bezahldatum setzt der Server, nicht die Eingabe',
     /date\('Y-m-d'\)/.test(bez) && !/\$in\['bezahlt_am'\]/.test(bez));
   check('nur POST', /REQUEST_METHOD.*!==.*POST/.test(bez));
+}
+
+// Der Import (ENT-610). Er ist der zweite Schreibweg in be_kunden und damit
+// genau die Stelle, an der ein zweites Regelwerk entstehen koennte.
+{
+  const imp = nurCode(lies('backend/api/betreiber_kunden_import.php'));
+  check('KRITISCH: der Import verlangt die Betreiber-Anmeldung',
+    /require_betreiber_voll\(\)/.test(imp));
+  check('KRITISCH: er arbeitet auf be_kunden und betreiber_db()',
+    imp.includes('be_kunden') && imp.includes('betreiber_db()')
+    && !/\bFROM\s+kunden\b/.test(imp) && !/INSERT INTO kunden\b/.test(imp));
+  check('KRITISCH: jede Zeile laeuft durch dieselbe Lesefunktion wie das Anlegen von Hand',
+    /kunden_eingabe_lesen\(/.test(imp));
+  check('KRITISCH: die Kundennummer vergibt der Server, mit dem be_-Praefix',
+    /naechste_kundennummer\(\$pdo, 'be_'\)/.test(imp));
+  check('KRITISCH: der Trockenlauf schreibt nichts',
+    /\$modus === 'pruefen'[\s\S]{0,120}json_response/.test(imp)
+    && imp.indexOf("'pruefen'") < imp.indexOf('beginTransaction'));
+  check('KRITISCH: geschrieben wird alles oder nichts',
+    /beginTransaction\(\)/.test(imp) && /rollBack\(\)/.test(imp));
+  check('eine Obergrenze je Durchgang, damit eine grosse Datei nicht den Server bindet',
+    /BE_IMPORT_MAX_ZEILEN/.test(imp));
+  check('nur POST', /REQUEST_METHOD.*!==.*POST/.test(imp));
+  check('ohne eingerichtete Tabelle sagt er das, statt zu schreiben',
+    /hat_tabelle\(\$pdo, 'be_kunden'\)/.test(imp));
+
+  // Und die Oberflaeche: Die Datei wird im Browser gelesen, nicht
+  // hochgeladen -- sonst laegen Adressdaten unbeaufsichtigt auf dem Server.
+  check('KRITISCH: die CSV-Datei wird im Browser gelesen, nicht hochgeladen',
+    /FileReader\(\)/.test(seiteCode) && !/FormData\(/.test(seiteCode));
+  check('erst pruefen, dann anlegen -- der Knopf erscheint erst nach dem Trockenlauf',
+    /impSenden\('pruefen'\)/.test(seiteCode) && /impSenden\('anwenden'\)/.test(seiteCode));
+  check('nach dem Anlegen wird die Liste neu geladen',
+    /impAnwenden[\s\S]{0,140}ladeAdressen\(\)/.test(seiteCode));
+}
+
+// ── Die Adressenliste selbst ──────────────────────────────────────────
+//
+// Das WIE prueft test_offerten_gleich.mjs am gerenderten Bild. Hier steht
+// nur, dass die Liste die Wege hat, die eine sortierbare Liste braucht --
+// und dass die eine bewusste Abweichung benannt ist.
+check('die Adressenliste ist sortierbar und hat Handy-Karten',
+  /function adTh\(/.test(seiteCode) && /function adSort\(/.test(seiteCode)
+  && /function adKarte\(/.test(seiteCode) && /function adSortNameUm\(/.test(seiteCode));
+check('KRITISCH: die Zaehlspalte zaehlt Belege -- Rapporte gibt es beim Betreiber nicht',
+  /belege_anzahl/.test(seiteCode) && !/rapporte/i.test(seiteCode));
+{
+  const list = nurCode(lies('backend/api/betreiber_kunden_list.php'));
+  check('KRITISCH: die Belegzahl kommt aus EINER Abfrage, nicht einer je Adresse',
+    /GROUP BY kunde_id/.test(list) && (list.match(/be_belege/g) || []).length <= 2);
+  check('fehlt die Belegtabelle, bleibt die Zahl 0 statt eines Fehlers',
+    /hat_tabelle\(\$pdo, 'be_belege'\)/.test(list));
 }
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden`);

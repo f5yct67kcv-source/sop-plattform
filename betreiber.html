@@ -75,7 +75,7 @@
   --accent:#2F5BD7; --accent-hi:#2549B0; --accent-soft:#EDF2FE; --accent-line:#CBD9F9;
   --pos:#0E7C55; --pos-soft:#E6F6EF;
   --neg:#C2382A; --neg-soft:#FCEDEB;
-  --warn:#9A6B08; --warn-soft:#FBF3E0;
+  --warn:#9A6B08; --warn-soft:#FBF3E0; --warn-line:#EFDCAE;
   --shell:#16181D; --shell-hi:#1E2128; --shell-line:#272B33;
   --shell-txt:#9298A5; --shell-txt-hi:#F3F5F8;
   --nix:#D8DCE2;
@@ -110,7 +110,7 @@ html[data-thema="dunkel"] {
   --accent:#7098F7; --accent-hi:#8DAEFA; --accent-soft:#1A2440; --accent-line:#2D3D63;
   --pos:#4FCE96; --pos-soft:#10281E;
   --neg:#F27F70; --neg-soft:#2E1A18;
-  --warn:#E2B156; --warn-soft:#2B2314;
+  --warn:#E2B156; --warn-soft:#2B2314; --warn-line:#4A3C1C;
   --shell:#0B0D11; --shell-hi:#14171C; --shell-line:#23272F;
   --shell-txt:#8A919E; --shell-txt-hi:#F2F4F8;
   --nix:#3B4560;
@@ -617,6 +617,14 @@ textarea.inp { resize: vertical; min-height: 92px; font-family: inherit; line-he
 td .sec { font-size: 11.5px; color: var(--ink-3); }
 .of-hinweis { font-size: 11.5px; color: var(--ink-3); line-height: 1.45; }
 
+/* Hinweiskasten im Import-Dialog -- dieselbe Fassung wie im Cockpit
+   (.ki-hint). Die Variante "web" ist die warnfarbene; sie traegt hier die
+   Saetze, die vor dem Klick gelesen werden muessen. */
+.ki-hint { display: none; align-items: flex-start; gap: 9px; background: var(--accent-soft); border: 1px solid var(--accent-line); border-radius: var(--r-sm); padding: 10px 12px; font-size: 12.5px; color: var(--accent); line-height: 1.5; margin-bottom: 16px; }
+.ki-hint.on { display: flex; }
+.ki-hint.web { background: var(--warn-soft); border-color: var(--warn-line); color: var(--warn); }
+.ki-hint a { color: inherit; }
+
 /* ── Knoepfe ── */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   border: 1px solid transparent; border-radius: var(--r-sm); padding: 9px 15px; min-height: 0;
@@ -650,10 +658,17 @@ svg.i-sm { width: 15px; height: 15px; }
 
 /* ── Tabellen ── */
 .tw table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.tw th { text-align: left; font-size: 10.5px; font-weight: 650; letter-spacing: .5px;
-  text-transform: uppercase; color: var(--ink-3); padding: 10px 14px;
+/* Kopf und Zelle Zeichen fuer Zeichen wie im Cockpit (thead th / tbody td
+   dort). Vorher stand hier eine eigene Fassung: 650 statt 700 Schnittfett,
+   .5 statt .6 px Laufweite, 14 statt 18 px Innenabstand, kein Grund im
+   Kopf, und die Zellen oben statt mittig ausgerichtet. Jede Abweichung
+   fuer sich unauffaellig -- zusammen stand dieselbe Tabelle hier enger und
+   blasser als dort. Gemessen gefunden (test_offerten_gleich.mjs). */
+.tw th { text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .6px;
+  text-transform: uppercase; color: var(--ink-3); padding: 10px 18px;
+  background: var(--surface-2);
   border-bottom: 1px solid var(--line); white-space: nowrap; }
-.tw td { padding: 11px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+.tw td { padding: 11px 18px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
 .tw tbody tr:last-child td { border-bottom: none; }
 .tw tr.click { cursor: pointer; }
 .tw tr.click:hover td { background: var(--surface-3); }
@@ -664,11 +679,14 @@ svg.i-sm { width: 15px; height: 15px; }
    dort. Gemessen gefunden, nicht gelesen. */
 .tw td.strong { font-weight: 620; }
 .tw td.nowrap, .tw th.nowrap { white-space: nowrap; }
+/* Ebenfalls die Cockpit-Fassung: Der Pfeil steht an JEDEM sortierbaren
+   Kopf halb sichtbar (nicht erst beim Zeigen), und die sortierte Spalte
+   erkennt man am vollen, akzentfarbenen Pfeil -- nicht daran, dass ihr
+   Kopftext heller wird. */
 .tw th.sortbar { cursor: pointer; user-select: none; }
-.tw th.sortbar .pf { opacity: 0; margin-left: 4px; font-size: 9px; }
-.tw th.sortbar:hover .pf { opacity: .45; }
-.tw th.sortbar.aktiv { color: var(--ink); }
-.tw th.sortbar.aktiv .pf { opacity: 1; }
+.tw th.sortbar:hover { color: var(--ink-2); }
+.tw th.sortbar .pf { margin-left: 4px; opacity: .5; }
+.tw th.sortbar.aktiv .pf { opacity: 1; color: var(--accent); }
 tbody tr.aus td { opacity: .55; }
 
 /* ── Marken (Status) ── */
@@ -788,17 +806,38 @@ tbody tr.aus td { opacity: .55; }
    Tabelle mit neun Spalten (dieselbe Entscheidung wie im Cockpit,
    ENT-400), und jedes Bedienelement wird 44 px hoch. */
 .nur-schmal { display: none; }
-.of-karte { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface);
-  padding: 14px; margin-bottom: 10px; cursor: pointer; }
-.of-karte .kopf { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.of-karte .kopf .sp { flex: 1; }
-.of-karte .wer { font-weight: 650; font-size: 14px; }
-.of-karte .zeiten { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
-.of-karte .kk-pfeil { width: 18px; height: 18px; color: var(--ink-3); }
-.of-karte dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 12px 0 0; font-size: 12.5px; }
-.of-karte dt { color: var(--ink-3); }
-.of-karte dd { margin: 0; }
-.of-karte .kk-tasten { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+
+/* Die Karte ist Zeichen fuer Zeichen die des Cockpits (.ag-karte, ENT-323/
+   ENT-400/ENT-401). Vorher stand hier eine eigene Fassung mit Rahmen,
+   Eckenradius und eigenem Aussenabstand -- am Desktop fiel das nicht auf,
+   auf dem Handy war es sichtbar eine andere Liste: dort getrennte Kaesten,
+   im Cockpit Zeilen mit feiner Trennlinie. Uebernommen wird darum die
+   Cockpit-Fassung, nicht eine daran angenaeherte. */
+.ag-karte { padding: 13px 14px; border-bottom: 1px solid var(--line-soft); }
+.ag-karte:last-child { border-bottom: none; }
+.ag-karte .kopf { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.ag-karte .kopf b { font-size: 14.5px; font-weight: 660; }
+.ag-karte .wer { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
+.ag-karte .zeiten { font-size: 13px; color: var(--ink-3); margin-top: 5px; }
+.ag-karte .zeiten b { color: var(--ink-1); font-weight: 620; }
+.ag-karte .marken { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+.ag-karte.klickbar { cursor: pointer; }
+.ag-karte.klickbar:hover { background: var(--surface-2); border-color: var(--accent-line); }
+.ag-karte.klickbar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.kk-pfeil { flex: none; width: 18px; height: 18px; color: var(--ink-3);
+  transition: transform .15s; }
+.ag-karte[aria-expanded="true"] .kk-pfeil { transform: rotate(180deg); }
+.kk-koerper { margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--line-soft); }
+.kk-koerper .dl dt { overflow-wrap: anywhere; }
+.kk-tasten { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+/* Beschriftungsliste des Hauses -- dieselbe wie im Cockpit, damit die
+   aufgeklappte Karte dort und hier gleich breit gesetzt ist. */
+.dl { display: grid; grid-template-columns: 118px 1fr; gap: 1px 14px; }
+.dl dt { font-size: 11px; font-weight: 650; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-3); padding: 8px 0; }
+.dl dd { font-size: 13.5px; font-weight: 550; padding: 8px 0; word-break: break-word; }
+.dl dt + dd { border-bottom: 1px solid var(--line-soft); }
+.dl dt { border-bottom: 1px solid var(--line-soft); }
+.dl dt:last-of-type, .dl dd:last-of-type { border-bottom: none; }
 
 @media (max-width: 900px) {
   .of-abschluss { grid-template-columns: 1fr; }
@@ -1549,19 +1588,29 @@ html[data-glas="an"] .gs-schieber svg { stroke: #2F5BD7; }
          wo sie ist, weil die Rechnung spaeter dieselbe Rechnungsadresse
          braucht. -->
     <section class="bereich versteckt" id="b-adressen">
-      <div class="tabs" id="adArchivTabs">
+      <div class="tabs" id="adArchivTabs" style="margin-bottom:10px">
         <button type="button" class="tab on" id="adatab-alle" onclick="adArchivGo('alle')">Alle</button>
         <button type="button" class="tab" id="adatab-archiv" onclick="adArchivGo('archiv')">Archiviert</button>
       </div>
       <div class="bar-tools">
         <div class="search">
           <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input class="inp" type="search" id="adQ" placeholder="Name, Ort, E-Mail oder Nummer …" oninput="adZeichnen()">
+          <input class="inp" type="search" id="adQ" placeholder="Kunde, Nummer, Kontaktperson, Notiz …" oninput="adZeichnen()">
         </div>
-        <div class="sp"></div>
+        <!-- Nur auf dem Handy: Am Desktop sortieren die Spaltenkoepfe, die
+             es auf der Karte nicht gibt. -->
+        <button type="button" class="btn btn-quiet btn-sm nur-schmal" id="adSortBtn" onclick="adSortNameUm()">
+          <svg class="i i-sm" viewBox="0 0 24 24"><line x1="6" y1="4" x2="6" y2="20"/><polyline points="3 17 6 20 9 17"/><line x1="13" y1="6" x2="21" y2="6"/><line x1="13" y1="12" x2="19" y2="12"/><line x1="13" y1="18" x2="17" y2="18"/></svg>
+          <span class="lbl">A – Z</span>
+        </button>
+        <div class="sp" style="flex:1"></div>
+        <button type="button" class="btn btn-plain" onclick="impOeffnen()" title="Adressbestand aus einer CSV-Datei einlesen">
+          <svg class="i" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Importieren
+        </button>
         <button type="button" class="btn btn-primary" onclick="adDlgOeffnen(null)">
           <svg class="i" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Adresse erfassen
+          Neuer Kunde
         </button>
       </div>
       <div class="card"><div class="card-bd flush"><div class="tw" id="adTable"></div></div></div>
@@ -1587,7 +1636,7 @@ html[data-glas="an"] .gs-schieber svg { stroke: #2F5BD7; }
 
         <!-- ── Reiter: Offerten ── -->
         <div id="ofv-liste">
-          <div class="tabs" id="ofArchivTabs">
+          <div class="tabs" id="ofArchivTabs" style="margin-bottom:10px">
             <button type="button" class="tab on" id="ofatab-alle" onclick="ofArchivGo('alle')">Alle</button>
             <button type="button" class="tab" id="ofatab-archiv" onclick="ofArchivGo('archiv')">Archiviert</button>
           </div>
@@ -1703,7 +1752,7 @@ html[data-glas="an"] .gs-schieber svg { stroke: #2F5BD7; }
          drueben unter "Offerten". Zweimal dasselbe Formular waere zweimal
          derselbe Briefkopf, und einer davon irgendwann veraltet. -->
     <section class="bereich versteckt" id="b-rechnungen">
-      <div class="tabs" id="reArchivTabs">
+      <div class="tabs" id="reArchivTabs" style="margin-bottom:10px">
         <button type="button" class="tab on" id="reatab-alle" onclick="reArchivGo('alle')">Alle</button>
         <button type="button" class="tab" id="reatab-erledigt" onclick="reArchivGo('erledigt')">Erledigt</button>
         <button type="button" class="tab" id="reatab-archiv" onclick="reArchivGo('archiv')">Archiviert</button>
@@ -1891,7 +1940,7 @@ html[data-glas="an"] .gs-schieber svg { stroke: #2F5BD7; }
 <div class="of-dlg-huelle" id="dlgAdresse">
   <div class="of-dlg breit">
     <div class="of-dlg-hd">
-      <h2 id="adDlgTitel">Adresse erfassen</h2>
+      <h2 id="adDlgTitel">Neuer Kunde</h2>
       <p>Ein Betrieb, der diese Plattform nutzen soll. Aus ihm wird später ein Mandant.</p>
     </div>
     <div class="of-dlg-bd">
@@ -1942,6 +1991,62 @@ html[data-glas="an"] .gs-schieber svg { stroke: #2F5BD7; }
     <div class="of-dlg-ft">
       <button type="button" class="btn btn-plain" onclick="dlgZu('dlgAdresse')">Abbrechen</button>
       <button type="button" class="btn btn-primary" id="adSaveBtn" onclick="adSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Adressen aus einer CSV-Datei einlesen (ENT-610).
+     Aufbau wie im Cockpit: Datei waehlen, Spalten zuordnen, Trockenlauf
+     ansehen, erst dann anlegen. -->
+<div class="of-dlg-huelle" id="dlgImp">
+  <div class="of-dlg breit">
+    <div class="of-dlg-hd">
+      <h2>Kunden importieren</h2>
+      <p>Aus einer CSV-Datei. Eine Zeile je Kunde, oberste Zeile sind die Spaltennamen.</p>
+    </div>
+    <div class="of-dlg-bd">
+      <div class="meldung fehler versteckt" id="impErr"></div>
+
+      <!-- Schritt 1 -->
+      <div id="impSchritt1">
+        <div class="ki-hint web on" style="margin-bottom:14px">
+          <span><b>Excel speichert das mit zwei Klicks:</b> „Datei → Speichern unter“
+          und als Format <b>CSV</b> wählen. Semikolon oder Komma als Trenner erkennt
+          das Werkzeug selbst, Umlaute ebenso. Nichts wird gespeichert, bevor du den
+          Bericht gesehen und bestätigt hast.</span>
+        </div>
+        <div class="f">
+          <label for="impDatei">CSV-Datei</label>
+          <input class="inp" type="file" id="impDatei" accept=".csv,text/csv,text/plain" onchange="impDateiGewaehlt(event)">
+        </div>
+      </div>
+
+      <!-- Schritt 2: Zuordnung -->
+      <div id="impSchritt2" class="versteckt">
+        <p class="zone-note" id="impGefunden"></p>
+        <div class="ki-hint web on" style="margin-bottom:14px">
+          <span><b>Die Kundennummer vergibt das System</b> fortlaufend selbst und
+          unveränderlich (ENT-040) — sie lässt sich darum nicht importieren. Willst du
+          die Nummer aus dem Vorsystem behalten, ordne sie der <b>Notiz</b> zu, dann
+          bleibt sie auffindbar.</span>
+        </div>
+        <div class="tw" id="impZuordnung"></div>
+        <div style="display:flex;gap:10px;margin-top:14px">
+          <button type="button" class="btn btn-primary" onclick="impPruefen()">Prüfen</button>
+          <button type="button" class="btn btn-plain" onclick="impZuruecksetzen()">Andere Datei</button>
+        </div>
+      </div>
+
+      <!-- Schritt 3: Bericht -->
+      <div id="impSchritt3" class="versteckt">
+        <div id="impBericht"></div>
+      </div>
+    </div>
+    <div class="of-dlg-ft">
+      <button type="button" class="btn btn-plain" onclick="dlgZu('dlgImp')">Schliessen</button>
+      <button type="button" class="btn btn-primary versteckt" id="impAnwendenBtn" onclick="impAnwenden()">
+        Jetzt anlegen
+      </button>
     </div>
   </div>
 </div>
@@ -3199,6 +3304,9 @@ const ofStatusInfo = w => OF_STATUS.find(s => s.wert === w) || OF_STATUS[0];
 let adressen = [];
 let adNaechsteNummer = '';
 let adArchivTab = 'alle';
+let adSortFeld = 'kundennummer';
+let adSortRichtung = 'auf';    // 'auf' oder 'ab'
+let adOffen = new Set();       // aufgeklappte Karten am Handy
 let produkte = [];
 let belege = [];
 let ofNaechsteNummer = '';
@@ -3357,44 +3465,414 @@ function adTelefon(k) {
   return w ? w.wert : (k.telefon || '');
 }
 
+function adTh(feld, label, num) {
+  const aktiv = adSortFeld === feld;
+  const pfeil = aktiv && adSortRichtung === 'ab' ? '▼' : '▲';
+  return `<th class="sortbar${aktiv ? ' aktiv' : ''}${num ? ' num' : ''}" onclick="adSort('${feld}')">${esc(label)}<span class="pf">${pfeil}</span></th>`;
+}
+function adSort(feld) {
+  adSortRichtung = (adSortFeld === feld && adSortRichtung === 'auf') ? 'ab' : 'auf';
+  adSortFeld = feld;
+  adZeichnen();
+}
+
+/* Adresse zum Anzeigen wieder zusammensetzen. Gespeichert wird sie in
+   Einzelteilen (ENT-044) -- gelesen wird sie fast immer am Stueck. */
+function adStrasse(k) { return [k.strasse, k.hausnummer].filter(Boolean).join(' ').trim(); }
+function adPlzOrt(k) { return [k.plz, k.ort].filter(Boolean).join(' ').trim(); }
+
+/* Der Umschalter am Handy setzt ausdruecklich AUCH das Sortierfeld: Am
+   Desktop sortieren die Spaltenkoepfe nach sechs Feldern, auf dem Handy
+   gibt es keine Koepfe, und der einzige Schluessel, nach dem man eine
+   Adressliste durchsieht, ist der Name. */
+function adSortNameUm() {
+  adSortRichtung = (adSortFeld === 'name' && adSortRichtung === 'auf') ? 'ab' : 'auf';
+  adSortFeld = 'name';
+  adZeichnen();
+}
+
+function adKarteUm(id) {
+  const k = Number(id);
+  if (adOffen.has(k)) { adOffen.delete(k); } else { adOffen.add(k); }
+  adZeichnen();
+}
+
+/* Telefon und E-Mail als echte Verweise: Auf dem Handy ist das der ganze
+   Zweck einer Adressliste -- anrufen, ohne die Nummer abzuschreiben. Am
+   Desktop steht dieselbe Angabe als Text in der Tabelle, dort waere ein
+   Anruf-Verweis wirkungslos. */
+function adWahlZeile(wert, art) {
+  if (!wert) { return '<span style="color:var(--ink-3)">–</span>'; }
+  const ziel = art === 'tel' ? 'tel:' + String(wert).replace(/[^\d+]/g, '') : 'mailto:' + wert;
+  return `<a href="${esc(ziel)}" onclick="event.stopPropagation()">${esc(wert)}</a>`;
+}
+
+/* Die zweite Zeile unter dem Namen. Im Cockpit steht dort "Privatperson";
+   hier kommt "Mandant" dazu, weil das die eine Angabe ist, die es dort
+   nicht gibt und die hier zaehlt. NICHT als eigene Spalte und nicht als
+   Gegenstueck "Interessent": Eine Marke an jeder Zeile sagt nichts -- die
+   Ausnahme ist die Aussage, die Regel steht in der Bereichszeile. */
+function adZweitzeile(k) {
+  const teile = [];
+  if (k.art === 'privat') { teile.push('Privatperson'); }
+  if (k.mandant_id) { teile.push('Mandant'); }
+  return teile.length ? `<div class="sec">${teile.join(' · ')}</div>` : '';
+}
+
+function adKarte(k) {
+  const id = Number(k.id);
+  const offen = adOffen.has(id);
+  const zeilen = [
+    ['Kunden-Nr.', strich(k.kundennummer)],
+    ['Kunde', esc(k.name)],
+    ...(k.art === 'privat' ? [['Art', 'Privatperson']] : []),
+    ['Strasse', strich(adStrasse(k))],
+    ['PLZ / Ort', strich(adPlzOrt(k))],
+    ['Telefon', adWahlZeile(adTelefon(k), 'tel')],
+    ['E-Mail', adWahlZeile(adEmail(k), 'mail')],
+    ['Kontaktperson', strich(k.kontaktperson)],
+    ['Belege', Number(k.belege_anzahl)
+      ? nf(k.belege_anzahl)
+      : '<span style="color:var(--ink-3)">noch keine</span>'],
+    ['Notiz', strich(k.notiz)],
+  ];
+  const koerper = offen ? `
+    <div class="kk-koerper">
+      <dl class="dl">${zeilen.map(([a, v]) => `<dt>${a}</dt><dd>${v}</dd>`).join('')}</dl>
+      <div class="kk-tasten">
+        <button type="button" class="btn btn-plain btn-sm" onclick="event.stopPropagation(); adDlgOeffnen(${id})">Bearbeiten</button>
+        <div class="sp" style="flex:1"></div>
+        <button type="button" class="btn btn-quiet btn-sm rowmenu-btn" onclick="adMenuOeffnen(event, ${id})" aria-label="Weitere Aktionen">
+          <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+        </button>
+      </div>
+    </div>` : '';
+  return `<div class="ag-karte klickbar" tabindex="0" role="button" aria-expanded="${offen ? 'true' : 'false'}"
+      onclick="adKarteUm(${id})"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();adKarteUm(${id});}">
+      <div class="kopf">
+        <b>${esc(k.name)}</b>
+        ${k.kundennummer ? `<span class="chip chip-n">${esc(k.kundennummer)}</span>` : ''}
+        <div class="sp" style="flex:1"></div>
+        <svg class="kk-pfeil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="wer">${strich(adPlzOrt(k))}${adStrasse(k) ? ' · ' + esc(adStrasse(k)) : ''}</div>
+      <div class="zeiten">${adTelefon(k) ? esc(adTelefon(k)) : 'keine Telefonnummer'}${
+        Number(k.belege_anzahl) ? ` · ${nf(k.belege_anzahl)} Belege` : ''}</div>
+      ${k.art === 'privat' || k.mandant_id ? `<div class="marken">${
+        k.art === 'privat' ? '<span class="chip chip-n">Privatperson</span>' : ''}${
+        k.mandant_id ? '<span class="chip chip-p">Mandant</span>' : ''}</div>` : ''}
+      ${koerper}
+    </div>`;
+}
+
 function adZeichnen() {
   if (offertenBereit === false) { return; }
   const q = ($('adQ').value || '').toLowerCase().trim();
   const wollAktiv = adArchivTab === 'alle' ? 1 : 0;
-  const d = adressen.filter(k => Number(k.aktiv ?? 1) === wollAktiv
-    && (!q || [k.name, k.ort, k.plz, k.kundennummer, adEmail(k), adTelefon(k)]
-        .some(f => String(f || '').toLowerCase().includes(q))));
+  /* Gesucht wird ueber dieselben Felder wie im Cockpit -- auch ueber
+     Ansprechpersonen und Kommunikationswege (ENT-044): Eine Nummer
+     wiederzufinden, ohne den Betrieb zu kennen, ist der haeufigere Fall
+     als umgekehrt. */
+  const d = adressen.filter(k => Number(k.aktiv ?? 1) === wollAktiv && (!q ||
+    [k.kundennummer, k.name, k.zusatzfeld, k.plz, k.ort, k.strasse, k.hausnummer, k.adresszusatz,
+     k.telefon, k.kontaktperson, k.email, k.uid, k.notiz]
+      .some(f => String(f || '').toLowerCase().includes(q))
+    || (k.kontaktwege || []).some(w => String(w.wert || '').toLowerCase().includes(q))
+    || (k.personen || []).some(p => [p.vorname, p.nachname].some(f => String(f || '').toLowerCase().includes(q))
+      || (p.kontaktwege || []).some(w => String(w.wert || '').toLowerCase().includes(q)))));
+
+  d.sort((a, b) => {
+    const c = String(a[adSortFeld] || '').localeCompare(String(b[adSortFeld] || ''), 'de',
+      { numeric: true, sensitivity: 'base' });
+    return adSortRichtung === 'auf' ? c : -c;
+  });
+
+  /* Der Umschalter sagt, wonach TATSAECHLICH sortiert ist -- steht das Feld
+     aus einer Desktop-Sitzung auf Nummer oder Ort, behauptet er nicht
+     "A–Z", sondern bietet an, auf den Namen zu wechseln. */
+  const sortBtn = $('adSortBtn');
+  if (sortBtn) {
+    const lbl = sortBtn.querySelector('.lbl');
+    if (lbl) {
+      lbl.textContent = adSortFeld !== 'name' ? 'Nach Name sortieren'
+        : (adSortRichtung === 'auf' ? 'A – Z' : 'Z – A');
+    }
+  }
 
   if (!d.length) {
     /* "Kein Treffer" und "nichts vorhanden" sind verschiedene Aussagen. */
     $('adTable').innerHTML = adressen.length
-      ? LEER('Keine Treffer', q
-          ? 'Für diese Suche gibt es keine Adresse. Suchbegriff zurücksetzen.'
-          : 'Hier stehen keine archivierten Adressen.')
-      : LEER('Noch keine Adresse', 'Über „Adresse erfassen“ oben rechts den ersten Betrieb anlegen.');
+      ? LEER('Keine Treffer', adArchivTab === 'alle'
+          ? 'Für diese Suche gibt es keine Kunden.'
+          : 'Für diese Suche gibt es keine archivierten Kunden.')
+      : LEER('Noch keine Kunden', 'Über „Neuer Kunde“ oben rechts anlegen.');
     return;
   }
 
-  d.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'de', { sensitivity: 'base' }));
-
-  $('adTable').innerHTML = `<table><thead><tr>
-      <th>Nr.</th><th>Firma</th><th>Ort</th><th>E-Mail</th><th>Telefon</th><th>Mandant</th><th class="num">Aktion</th>
+  /* Handy: dieselben Adressen als Karten, Desktop die Tabelle -- beide aus
+     demselben gefilterten und sortierten d[]. */
+  $('adTable').innerHTML = `<div class="nur-schmal">${d.map(k => adKarte(k)).join('')}</div>`
+    + `<table class="nur-breit"><thead><tr>
+      ${adTh('kundennummer', 'Nr.')}${adTh('name', 'Kunde')}${adTh('strasse', 'Strasse')}${adTh('ort', 'Ort')}${adTh('telefon', 'Telefon')}<th>E-Mail</th><th class="num">Belege</th><th class="num">Aktion</th>
     </tr></thead><tbody>` + d.map(k => `
-      <tr class="click${Number(k.aktiv ?? 1) ? '' : ' aus'}" onclick="adDlgOeffnen(${Number(k.id)})">
+      <tr class="click" onclick="adDlgOeffnen(${Number(k.id)})">
         <td class="nowrap">${strich(k.kundennummer)}</td>
-        <td class="strong">${esc(k.name)}${k.zusatzfeld ? `<div class="sec">${esc(k.zusatzfeld)}</div>` : ''}</td>
-        <td class="nowrap">${strich([k.plz, k.ort].filter(Boolean).join(' '))}</td>
-        <td>${strich(adEmail(k))}</td>
+        <td class="strong">${esc(k.name)}${adZweitzeile(k)}</td>
+        <td>${strich(adStrasse(k))}</td>
+        <td class="nowrap">${strich(adPlzOrt(k))}</td>
         <td class="nowrap">${strich(adTelefon(k))}</td>
-        <td class="nowrap">${k.mandant_id
-            ? '<span class="chip chip-p">Mandant</span>'
-            : '<span class="chip chip-n">Interessent</span>'}</td>
+        <td>${strich(adEmail(k))}</td>
+        <td class="num">${Number(k.belege_anzahl)
+            ? nf(k.belege_anzahl)
+            : '<span style="color:var(--ink-3)">–</span>'}</td>
         <td class="num" onclick="event.stopPropagation()">
           <button type="button" class="btn btn-quiet btn-sm rowmenu-btn" onclick="adMenuOeffnen(event, ${Number(k.id)})" aria-label="Aktionen">
             <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
           </button>
         </td>
-      </tr>`).join('') + '</tbody></table>';
+      </tr>`).join('') + `</tbody></table>`;
+}
+
+/* ── Import aus CSV (ENT-610) ───────────────────────────────────────
+   Zeichengleich zum Cockpit (kunden_import.php und die imp*-Funktionen in
+   dashboard.html), nur der Endpunkt ist ein anderer. Die Datei wird im
+   Browser gelesen und zerlegt; an den Server gehen fertige Zeilen, nie die
+   Datei. */
+const IMP_ZIELE = [
+  ['name',          'Name / Firma'],
+  ['art',           'Art (unternehmen / privat)'],
+  ['anrede',        'Anrede'],
+  ['vorname',       'Vorname'],
+  ['nachname',      'Nachname'],
+  ['zusatzfeld',    'Namenszusatz'],
+  ['strasse',       'Strasse'],
+  ['hausnummer',    'Hausnummer'],
+  ['adresszusatz',  'Adresszusatz'],
+  ['plz',           'PLZ'],
+  ['ort',           'Ort'],
+  ['telefon',       'Telefon'],
+  ['email',         'E-Mail'],
+  ['kontaktperson', 'Kontaktperson'],
+  ['uid',           'UID'],
+  ['mwst_nr',       'MwSt-Nummer'],
+  ['notiz',         'Notiz'],
+];
+
+/* Uebliche Spaltenueberschriften je Ziel, kleingeschrieben und ohne
+   Sonderzeichen. Die Liste muss nicht vollstaendig sein -- was sie nicht
+   trifft, ordnet man im Dialog von Hand zu. */
+const IMP_SYNONYME = {
+  name:          ['name', 'firma', 'firmenname', 'unternehmensname', 'kunde', 'kundenname', 'bezeichnung', 'company'],
+  art:           ['art', 'kundenart', 'typ', 'kundentyp'],
+  anrede:        ['anrede', 'titel', 'salutation'],
+  vorname:       ['vorname', 'firstname'],
+  nachname:      ['nachname', 'name2', 'lastname', 'familienname'],
+  zusatzfeld:    ['zusatz', 'namenszusatz', 'zusatzfeld', 'co'],
+  strasse:       ['strasse', 'str', 'adresse', 'street', 'strassenname'],
+  hausnummer:    ['hausnummer', 'nr', 'hausnr', 'nummer', 'housenumber'],
+  adresszusatz:  ['adresszusatz', 'postfach', 'adresszeile2'],
+  plz:           ['plz', 'postleitzahl', 'zip', 'postcode'],
+  ort:           ['ort', 'stadt', 'city', 'wohnort', 'plzort', 'plzundort'],
+  telefon:       ['telefon', 'tel', 'telefonnummer', 'phone', 'festnetz', 'mobil', 'natel'],
+  email:         ['email', 'mail', 'emailadresse', 'epost'],
+  kontaktperson: ['kontaktperson', 'ansprechpartner', 'ansprechperson', 'kontakt'],
+  uid:           ['uid', 'uidnummer', 'unternehmensid', 'che'],
+  mwst_nr:       ['mwst', 'mwstnr', 'mwstnummer', 'ustid', 'vat'],
+  notiz:         ['notiz', 'notizen', 'bemerkung', 'bemerkungen', 'hinweis', 'kommentar', 'info'],
+};
+
+let impKopf = [], impRohZeilen = [], impLetzterBericht = null;
+
+const impNorm = t => (t || '').toLowerCase().replace(/[^a-zäöüß0-9]/g, '')
+  .replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ß/g, 'ss');
+
+/* CSV zerlegen. Beruecksichtigt Anfuehrungszeichen (ein Feld darf den
+   Trenner und Zeilenumbrueche enthalten) und die verdoppelten
+   Anfuehrungszeichen, mit denen Excel ein echtes " im Text schreibt. */
+function impCsvZerlegen(text) {
+  text = text.replace(/^﻿/, '');                  // BOM aus Excel
+  const kopfzeile = text.split(/\r?\n/)[0] || '';
+  /* Trenner raten: derjenige, der in der Kopfzeile am haeufigsten
+     vorkommt. */
+  let trenner = ';', beste = -1;
+  [';', ',', '\t', '|'].forEach(t => {
+    const n = kopfzeile.split(t).length - 1;
+    if (n > beste) { beste = n; trenner = t; }
+  });
+
+  const zeilen = [];
+  let feld = '', zeile = [], inAnf = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inAnf) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { feld += '"'; i++; } else { inAnf = false; }
+      } else { feld += c; }
+      continue;
+    }
+    if (c === '"') { inAnf = true; continue; }
+    if (c === trenner) { zeile.push(feld); feld = ''; continue; }
+    if (c === '\r') { continue; }
+    if (c === '\n') { zeile.push(feld); zeilen.push(zeile); zeile = []; feld = ''; continue; }
+    feld += c;
+  }
+  if (feld !== '' || zeile.length) { zeile.push(feld); zeilen.push(zeile); }
+
+  /* Voellig leere Zeilen fliegen raus -- Excel haengt gern welche an. */
+  const gefiltert = zeilen.filter(z => z.some(w => (w || '').trim() !== ''));
+  if (!gefiltert.length) { return { kopf: [], zeilen: [], trenner }; }
+  return { kopf: gefiltert[0].map(w => w.trim()), zeilen: gefiltert.slice(1), trenner };
+}
+
+/* Vorschlag je Spalte. Jedes Ziel wird hoechstens einmal vergeben, sonst
+   landen "Telefon" und "Mobil" beide auf demselben Feld und der zweite
+   Wert ueberschreibt den ersten still. */
+function impRaten(kopf) {
+  const vergeben = {}, zuordnung = kopf.map(() => '');
+  kopf.forEach((sp, i) => {
+    const n = impNorm(sp);
+    for (const [ziel, namen] of Object.entries(IMP_SYNONYME)) {
+      if (vergeben[ziel]) { continue; }
+      if (namen.includes(n)) { zuordnung[i] = ziel; vergeben[ziel] = true; return; }
+    }
+  });
+  return zuordnung;
+}
+
+function impOeffnen() { impZuruecksetzen(); dlgAuf('dlgImp'); }
+
+function impZuruecksetzen() {
+  impKopf = []; impRohZeilen = []; impLetzterBericht = null;
+  zeig($('impSchritt1'), true);
+  zeig($('impSchritt2'), false);
+  zeig($('impSchritt3'), false);
+  zeig($('impAnwendenBtn'), false);
+  zeig($('impErr'), false);
+  if ($('impDatei')) { $('impDatei').value = ''; }
+}
+
+function impFehler(text) {
+  $('impErr').textContent = text;
+  zeig($('impErr'), !!text);
+}
+
+function impDateiGewaehlt(ev) {
+  const datei = ev.target.files && ev.target.files[0];
+  if (!datei) { return; }
+  impFehler('');
+  const leser = new FileReader();
+  leser.onload = () => {
+    const z = impCsvZerlegen(String(leser.result || ''));
+    if (!z.kopf.length || !z.zeilen.length) {
+      impFehler('Die Datei enthält keine auswertbaren Zeilen. Erwartet wird eine Kopfzeile mit Spaltennamen und darunter je eine Zeile pro Kunde.');
+      return;
+    }
+    impKopf = z.kopf; impRohZeilen = z.zeilen;
+    const trennerName = { ';': 'Semikolon', ',': 'Komma', '\t': 'Tabulator', '|': 'Strich' }[z.trenner] || z.trenner;
+    $('impGefunden').textContent =
+      `${z.zeilen.length} Zeile${z.zeilen.length === 1 ? '' : 'n'} und ${z.kopf.length} Spalten gelesen, `
+      + `Trennzeichen ${trennerName}. Bitte die Zuordnung prüfen — nicht zugeordnete Spalten werden übergangen.`;
+    impZuordnungZeichnen();
+    zeig($('impSchritt1'), false);
+    zeig($('impSchritt2'), true);
+  };
+  leser.onerror = () => impFehler('Die Datei liess sich nicht lesen.');
+  leser.readAsText(datei, 'utf-8');
+}
+
+function impZuordnungZeichnen() {
+  const raten = impRaten(impKopf);
+  const optionen = ziel => ['<option value="">— nicht übernehmen —</option>']
+    .concat(IMP_ZIELE.map(([k, l]) =>
+      `<option value="${k}"${k === ziel ? ' selected' : ''}>${esc(l)}</option>`)).join('');
+  $('impZuordnung').innerHTML = `<table class="tbl"><thead><tr>
+      <th>Spalte in der Datei</th><th>Beispielwert</th><th>wird übernommen als</th>
+    </tr></thead><tbody>` + impKopf.map((sp, i) => {
+      const bsp = (impRohZeilen.find(z => (z[i] || '').trim() !== '') || [])[i] || '';
+      return `<tr>
+        <td><b>${esc(sp || '(ohne Namen)')}</b></td>
+        <td style="color:var(--ink-3)">${esc(bsp.length > 40 ? bsp.slice(0, 40) + '…' : bsp)}</td>
+        <td><select class="inp" id="impZ${i}">${optionen(raten[i])}</select></td>
+      </tr>`;
+    }).join('') + `</tbody></table>`;
+}
+
+/* Aus Kopf, Zeilen und Zuordnung die Objekte bauen, die der Server
+   erwartet. */
+function impZeilenBauen() {
+  const ziele = impKopf.map((_, i) => { const el = $('impZ' + i); return el ? el.value : ''; });
+  return impRohZeilen.map(z => {
+    const o = {};
+    ziele.forEach((ziel, i) => {
+      if (!ziel) { return; }
+      const w = (z[i] || '').trim();
+      if (w === '') { return; }
+      /* Mehrere Spalten auf dasselbe Ziel: aneinanderhaengen statt
+         ueberschreiben. Verlorene Daten sind schlimmer als ein langes
+         Feld. */
+      o[ziel] = o[ziel] ? o[ziel] + ' ' + w : w;
+    });
+    return o;
+  });
+}
+
+async function impSenden(modus) {
+  const zeilen = impZeilenBauen();
+  if (!zeilen.length) { impFehler('Keine Zeilen zu übernehmen.'); return; }
+  impFehler('');
+  const a = await ruf('betreiber_kunden_import.php', { modus, zeilen });
+  if (a.status !== 'ok') {
+    impFehler(a.message || 'Der Import ist fehlgeschlagen.');
+    return;
+  }
+  impLetzterBericht = a;
+  impBerichtZeichnen(a);
+  zeig($('impSchritt2'), false);
+  zeig($('impSchritt3'), true);
+  zeig($('impAnwendenBtn'), modus === 'pruefen' && a.neu > 0);
+}
+
+const impPruefen  = () => impSenden('pruefen');
+const impAnwenden = () => impSenden('anwenden').then(() => ladeAdressen());
+
+function impBerichtZeichnen(b) {
+  const liste = (titel, eintraege, farbe) => !eintraege.length ? '' : `
+    <div style="margin-top:14px">
+      <div class="feld-titel" style="color:${farbe}">${titel} (${eintraege.length})</div>
+      <div class="tw"><table class="tbl"><tbody>${eintraege.slice(0, 50).map(e => `
+        <tr><td class="num" style="width:70px;color:var(--ink-3)">Zeile ${e.zeile}</td>
+            <td>${esc(e.name || '—')}</td>
+            <td style="color:var(--ink-3)">${esc(e.grund)}</td></tr>`).join('')}
+      </tbody></table></div>
+      ${eintraege.length > 50 ? '<p class="zone-note">… und ' + (eintraege.length - 50) + ' weitere.</p>' : ''}
+    </div>`;
+
+  const angewendet = b.modus === 'anwenden';
+  const kopf = angewendet
+    ? `<div class="ki-hint web on"><span><b>${b.angelegt} Kunde${b.angelegt === 1 ? '' : 'n'} angelegt.</b>
+        ${b.angelegt ? 'Vergebene Nummern: ' + esc(b.von_nummer) + ' bis ' + esc(b.bis_nummer) + '.' : ''}</span></div>`
+    : `<div class="ki-hint web on"><span><b>Trockenlauf — es wurde noch nichts gespeichert.</b>
+        Von ${b.gelesen} gelesenen Zeilen ${b.neu === 0 ? 'wäre nichts anzulegen' :
+        'würden <b>' + b.neu + '</b> Kunde' + (b.neu === 1 ? '' : 'n') + ' neu angelegt'}.</span></div>`;
+
+  const vorschau = (!angewendet && b.vorschau && b.vorschau.length) ? `
+    <div style="margin-top:14px">
+      <div class="feld-titel">So kämen sie an${b.neu > b.vorschau.length ? ' (erste ' + b.vorschau.length + ')' : ''}</div>
+      <div class="tw"><table class="tbl"><thead><tr><th>Zeile</th><th>Name</th><th>PLZ</th><th>Ort</th></tr></thead>
+      <tbody>${b.vorschau.map(v => `<tr><td style="color:var(--ink-3)">${v.zeile}</td>
+        <td><b>${esc(v.name)}</b></td><td>${esc(v.plz)}</td><td>${esc(v.ort)}</td></tr>`).join('')}
+      </tbody></table></div>
+    </div>` : '';
+
+  $('impBericht').innerHTML = kopf + vorschau
+    + liste('Übersprungen', b.uebersprungen || [], 'var(--ink-2)')
+    + liste('Nicht übernommen — unvollständig', b.fehler || [], 'var(--warn)')
+    + ((b.fehler || []).length ? `<p class="zone-note" style="margin-top:10px">
+        Unvollständige Zeilen bleiben liegen statt halb angelegt zu werden. Ergänze sie in
+        der Datei und importiere sie erneut — bereits angelegte Kunden werden dabei
+        übersprungen, es entstehen keine Doppel.</p>` : '');
 }
 
 function adMenuOeffnen(ev, id) {
@@ -3408,7 +3886,7 @@ function adMenuOeffnen(ev, id) {
     <button type="button" onclick="menuSchliessen(); ofNeuFuerAdresse(${id}, 'offerte')">Offerte erstellen</button>
     <button type="button" onclick="menuSchliessen(); ofNeuFuerAdresse(${id}, 'rechnung')">Rechnung erstellen</button>
     <hr>
-    <button type="button" onclick="menuSchliessen(); adArchivKlick(${id}, ${Number(k.aktiv) ? 0 : 1})">${Number(k.aktiv) ? 'Archivieren' : 'Zurückholen'}</button>`;
+    <button type="button" onclick="menuSchliessen(); adArchivKlick(${id}, ${Number(k.aktiv) ? 0 : 1})">${Number(k.aktiv) ? 'Archivieren' : 'Wiederherstellen'}</button>`;
   pop.dataset.wer = 'ad' + id;
   pop.classList.add('on');
   menuPositionieren(ev, 190);
@@ -3417,7 +3895,7 @@ function adMenuOeffnen(ev, id) {
 async function adArchivKlick(id, aktiv) {
   const a = await ruf('betreiber_kunden_archivieren.php', { id, aktiv });
   if (a.status !== 'ok') { kurzmeldung(a.message || 'Fehlgeschlagen.'); return; }
-  kurzmeldung(aktiv ? 'Adresse zurückgeholt.' : 'Adresse archiviert.');
+  kurzmeldung(aktiv ? 'Kunde wiederhergestellt.' : 'Kunde archiviert.');
   await ladeAdressen();
 }
 
@@ -3516,7 +3994,7 @@ function adPersonWegWeg(pi, wi) {
 function adDlgOeffnen(id) {
   const k = id ? adressen.find(x => Number(x.id) === Number(id)) : null;
   adId = k ? Number(k.id) : null;
-  $('adDlgTitel').textContent = k ? 'Adresse ändern' : 'Adresse erfassen';
+  $('adDlgTitel').textContent = k ? 'Kunde bearbeiten' : 'Neuer Kunde';
   zeig($('adErr'), false);
   const setz = (feld, wert) => { $('ad_' + feld).value = wert || ''; };
   ['name', 'zusatzfeld', 'adresszusatz', 'strasse', 'hausnummer', 'plz', 'ort',
@@ -3563,7 +4041,7 @@ async function adSpeichern() {
   $('adSaveBtn').disabled = false;
   if (a.status !== 'ok') { zeigeFehler(a.message || 'Speichern fehlgeschlagen.'); return; }
   dlgZu('dlgAdresse');
-  kurzmeldung(adId ? 'Adresse geändert.' : 'Adresse angelegt.');
+  kurzmeldung(adId ? 'Kunde gespeichert.' : 'Kunde angelegt.');
   const neuerId = Number(a.id);
   const rueckruf = adNachAnlage;
   adNachAnlage = null;
@@ -3821,17 +4299,27 @@ function ofKarte(b, heute) {
     ['Referenz', strich(b.referenz)],
     ['Titel', b.titel ? esc(b.titel) : '<span style="color:var(--ink-3)">ohne Titel</span>'],
     ['Empfänger', empf ? esc(empf) : '<span style="color:var(--ink-3)">–</span>'],
+    ['Kunden-Nr.', strich(b.kundennummer)],
     ['Offertendatum', dmy(b.datum)],
     ['Offertensumme', '<strong>CHF ' + chf(b.total_rappen) + '</strong>'],
     ['Gültig bis', dmy(b.gueltig_bis) + (abgelaufen
       ? ' <span style="color:var(--warn)">· abgelaufen</span>' : '')],
   ];
+  /* Dieselben Wege wie am Desktop, kein neuer: Die Knoepfe rufen exakt die
+     Funktionen der Zeilenmenues, und fuer alles Weitere oeffnet derselbe
+     Knopf dasselbe Zeilenmenue wie in der Tabelle. */
   const koerper = offen ? `
-    <div>
-      <dl>${zeilen.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
+    <div class="kk-koerper">
+      <dl class="dl">${zeilen.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
       <div class="kk-tasten">
-        <button type="button" class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofHerunterladen(${id}, this)">Herunterladen</button>
-        <button type="button" class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofTeilen(${id}, this)">Teilen</button>
+        <button type="button" class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofHerunterladen(${id}, this)">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Herunterladen
+        </button>
+        <button type="button" class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofTeilen(${id}, this)">
+          <svg class="i i-sm" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          Teilen
+        </button>
         <button type="button" class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofVorschau(${id})">Vorschau</button>
         <button type="button" class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofOeffnen(${id})">Bearbeiten</button>
         <button type="button" class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofDrucken(${id})">Drucken</button>
@@ -3841,19 +4329,19 @@ function ofKarte(b, heute) {
         </button>
       </div>
     </div>` : '';
-  return `<div class="of-karte" tabindex="0" role="button" aria-expanded="${offen ? 'true' : 'false'}"
+  return `<div class="ag-karte klickbar" tabindex="0" role="button" aria-expanded="${offen ? 'true' : 'false'}"
       onclick="ofKarteUm(${id})"
       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();ofKarteUm(${id});}">
       <div class="kopf">
         <b>${dmy(b.datum)}</b>
         <span class="chip ${si.chip}">${esc(si.text)}</span>
-        <div class="sp"></div>
+        <div class="sp" style="flex:1"></div>
         <svg class="kk-pfeil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       <div class="wer">${esc(b.nummer)}${b.titel ? ' · ' + esc(b.titel) : ''}</div>
       <div class="zeiten">${empf ? esc(empf) : '–'} · <b>CHF ${chf(b.total_rappen)}</b></div>
-      ${abgelaufen && !offen ? '<div style="margin-top:6px"><span class="chip chip-w">abgelaufen</span></div>' : ''}
+      ${abgelaufen && !offen ? '<div class="marken"><span class="chip chip-w">abgelaufen</span></div>' : ''}
       ${koerper}
     </div>`;
 }
@@ -3919,7 +4407,7 @@ function renderOfferten() {
   const heute = isoTag();
   /* Handy: dieselben Offerten als aufklappbare Karten, Desktop die Tabelle
      -- beide aus demselben sortierten d[]. */
-  $('ofTable').innerHTML = `<div class="nur-schmal" style="padding:12px">${d.map(b => ofKarte(b, heute)).join('')}</div>`
+  $('ofTable').innerHTML = `<div class="nur-schmal">${d.map(b => ofKarte(b, heute)).join('')}</div>`
     + `<table class="nur-breit"><thead><tr>
       ${ofTh('status', 'Status')}${ofTh('nummer', 'Nr.')}${ofTh('referenz', 'Referenz')}
       ${ofTh('titel', 'Titel')}${ofTh('empfaenger', 'Empfänger')}
