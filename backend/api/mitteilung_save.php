@@ -103,7 +103,12 @@ if ($art !== 'termin') {
     // offene Frage. Ausdruecklich gesetzt statt als Sonderregel im Lesen --
     // so gilt fuer Termine dieselbe Sichtbarkeitsregel wie fuer alles
     // andere (mitteilungen.php), und die Verwaltung kann sie ueberschreiben.
-    if ($bis === null) { $bis = $ende ?? $beginn; }
+    //
+    // Die Regel selbst steht in mitteilungen.php, neben der Lese-Seite, die
+    // sie auswertet -- und ist dort pruefbar, ohne diesen Endpunkt zu
+    // starten. Wer sie frueher ablaufen lassen will, traegt "sichtbar bis"
+    // von Hand ein.
+    if ($bis === null) { $bis = termin_sichtbar_bis($beginn, $ende); }
 }
 
 if ($ab !== null && $bis !== null && $bis < $ab) {

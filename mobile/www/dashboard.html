@@ -15991,6 +15991,21 @@ function mtlBearbeiten(id) {
   window.scrollTo(0, 0);
 }
 
+// Liegt der Termintag hinter uns? Massgeblich ist der TAG, nicht die
+// Uhrzeit: Ein Termin von heute 08:00 steht mittags noch in der App
+// (mitteilung_save.php setzt "sichtbar bis" auf das Tagesende), ein
+// Termin von gestern nicht mehr. Das Ende zaehlt, wenn eines da ist --
+// ein mehrtaegiger Termin ist nicht vorbei, nur weil er gestern begann.
+function mtlTerminVorbei() {
+  const letzter = ($('mtlEnde').value || $('mtlBeginn').value).slice(0, 10);
+  if (!letzter) { return false; }
+  const h = new Date();
+  const heute = h.getFullYear() + '-'
+    + String(h.getMonth() + 1).padStart(2, '0') + '-'
+    + String(h.getDate()).padStart(2, '0');
+  return letzter < heute;
+}
+
 function mtlSpeichern() {
   const titel = $('mtlTitel').value.trim();
   const text  = $('mtlText').value.trim();
@@ -16001,6 +16016,21 @@ function mtlSpeichern() {
   // Umweg über das Netz.
   if (mtlArt === 'termin' && !$('mtlBeginn').value) {
     toast('Ein Termin braucht einen Beginn.'); return;
+  }
+
+  // Ein Termin, dessen Tag vorbei ist, erscheint bei niemandem mehr --
+  // er ist im selben Moment abgelaufen, in dem er gespeichert wird.
+  // Vorher ging das kommentarlos durch: Man drückte auf
+  // "Veröffentlichen", bekam "Termin veröffentlicht." und niemand sah
+  // ihn je. Wer einen alten Termin bewusst nachträgt, trägt
+  // "sichtbar bis" ein -- dann greift die Regel nicht und es wird auch
+  // nicht gefragt.
+  if (mtlArt === 'termin' && !$('mtlBis').value && mtlTerminVorbei()) {
+    if (!confirm('Dieser Termin liegt in der Vergangenheit.\n\n'
+      + 'Er läuft am Ende seines eigenen Tages ab und erscheint damit '
+      + 'bei niemandem mehr in der App. Soll er trotzdem gespeichert '
+      + 'werden? Wer ihn sichtbar machen will, trägt unten '
+      + '„sichtbar bis" ein.')) { return; }
   }
   const koerper = {
     titel, text,
