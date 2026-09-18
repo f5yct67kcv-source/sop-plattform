@@ -1159,6 +1159,11 @@ function be_tabellen(): array
   uid VARCHAR(40) NOT NULL DEFAULT '',
   mwst_nr VARCHAR(40) NOT NULL DEFAULT '',
   iban VARCHAR(40) NOT NULL DEFAULT '',
+  qr_iban VARCHAR(40) NOT NULL DEFAULT '',
+  qr_strasse VARCHAR(200) NOT NULL DEFAULT '',
+  qr_hausnummer VARCHAR(20) NOT NULL DEFAULT '',
+  qr_plz VARCHAR(20) NOT NULL DEFAULT '',
+  qr_ort VARCHAR(100) NOT NULL DEFAULT '',
   email VARCHAR(200) NOT NULL DEFAULT '',
   telefon VARCHAR(60) NOT NULL DEFAULT '',
   webseite VARCHAR(200) NOT NULL DEFAULT '',
@@ -1213,6 +1218,19 @@ function be_spalten(): array
         ['betreiber', 'anrede',   "ALTER TABLE betreiber ADD COLUMN anrede VARCHAR(20) NOT NULL DEFAULT '' AFTER name"],
         ['betreiber', 'nachname', "ALTER TABLE betreiber ADD COLUMN nachname VARCHAR(100) NOT NULL DEFAULT '' AFTER anrede"],
         ['betreiber', 'vorname',  "ALTER TABLE betreiber ADD COLUMN vorname VARCHAR(100) NOT NULL DEFAULT '' AFTER anrede"],
+        // Zahlungsteil der Rechnung (ENT-616). Die Adresse des
+        // Zahlungsempfaengers steht hier ein zweites Mal, obwohl `absender`
+        // schon einen Adressblock traegt: Der ist ein Freitext fuer den
+        // Briefkopf, mit Zeilenumbruechen und beliebigem Aufbau. Der
+        // Zahlteil braucht Strasse, PLZ und Ort EINZELN, in eigenen Feldern
+        // mit eigenen Laengengrenzen -- die Bank weist einen Code zurueck,
+        // dessen Adressblock nicht passt. Dieselbe Trennung wie in der
+        // Tabelle `betrieb` auf der Mandantenseite.
+        ['be_briefkopf', 'qr_iban',       "ALTER TABLE be_briefkopf ADD COLUMN qr_iban VARCHAR(40) NOT NULL DEFAULT '' AFTER iban"],
+        ['be_briefkopf', 'qr_strasse',    "ALTER TABLE be_briefkopf ADD COLUMN qr_strasse VARCHAR(200) NOT NULL DEFAULT '' AFTER qr_iban"],
+        ['be_briefkopf', 'qr_hausnummer', "ALTER TABLE be_briefkopf ADD COLUMN qr_hausnummer VARCHAR(20) NOT NULL DEFAULT '' AFTER qr_strasse"],
+        ['be_briefkopf', 'qr_plz',        "ALTER TABLE be_briefkopf ADD COLUMN qr_plz VARCHAR(20) NOT NULL DEFAULT '' AFTER qr_hausnummer"],
+        ['be_briefkopf', 'qr_ort',        "ALTER TABLE be_briefkopf ADD COLUMN qr_ort VARCHAR(100) NOT NULL DEFAULT '' AFTER qr_plz"],
     ];
 }
 

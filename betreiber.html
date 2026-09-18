@@ -1988,6 +1988,32 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                 <div class="f"><label for="bk_iban">IBAN</label>
                   <input class="inp" id="bk_iban"></div>
               </div>
+
+              <!-- Zahlteil (ENT-616). Eigener Block mit eigener Überschrift,
+                   nicht unter die Briefkopf-Felder gemischt: Diese fünf
+                   Angaben stehen nicht auf dem Blatt, sie stecken im
+                   Einzahlungsschein und werden von der Bank geprüft. Wer
+                   sie für Gestaltung hält, wundert sich, warum ein Umbruch
+                   im Adressblock die Zahlung verhindert. -->
+              <h3 style="margin:22px 0 4px;font-size:13.5px;font-weight:650">Zahlteil der Rechnung</h3>
+              <div class="of-hinweis" style="margin-bottom:10px">
+                Daraus entsteht der QR-Einzahlungsschein auf jeder offenen Rechnung.
+                Die Adresse gehört hier einzeln hin — die Bank weist einen Zahlteil zurück,
+                dessen Adressblock nicht passt.
+              </div>
+              <div class="f"><label for="bk_qr_iban">IBAN für den Zahlteil</label>
+                <input class="inp" id="bk_qr_iban" placeholder="CH.. oder LI..">
+                <div class="of-hinweis" id="bkZahlteilLage" style="margin-top:6px"></div></div>
+              <div class="raster2">
+                <div class="f"><label for="bk_qr_strasse">Strasse</label>
+                  <input class="inp" id="bk_qr_strasse"></div>
+                <div class="f"><label for="bk_qr_hausnummer">Nummer</label>
+                  <input class="inp" id="bk_qr_hausnummer"></div>
+                <div class="f"><label for="bk_qr_plz">PLZ</label>
+                  <input class="inp" id="bk_qr_plz"></div>
+                <div class="f"><label for="bk_qr_ort">Ort</label>
+                  <input class="inp" id="bk_qr_ort"></div>
+              </div>
               <div class="f">
                 <label for="bk_logo">Logo</label>
                 <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -4966,8 +4992,11 @@ async function pdArchivKlick(id, aktiv) {
 let bkLogoNeu = null;    // data:-URL, solange nicht gespeichert
 let bkLogoWegSetzen = false;
 
+const BK_FELDER = ['firma', 'absender', 'telefon', 'email', 'webseite', 'uid', 'iban',
+                   'qr_iban', 'qr_strasse', 'qr_hausnummer', 'qr_plz', 'qr_ort'];
+
 function bkFuellen() {
-  ['firma', 'absender', 'telefon', 'email', 'webseite', 'uid', 'iban'].forEach(f => {
+  BK_FELDER.forEach(f => {
     const el = $('bk_' + f);
     if (el) { el.value = briefkopf[f] || ''; }
   });
@@ -4975,6 +5004,36 @@ function bkFuellen() {
   bkLogoNeu = null;
   bkLogoWegSetzen = false;
   bkLogoZeichnen(briefkopf.logo || null);
+  bkZahlteilLage();
+}
+
+/* Vier Lagen, vier Texte -- und keine davon darf wie eine andere aussehen
+   (Hausregel). Die Auskunft kommt aus dem Server: Ob eine IBAN eine QR-IBAN
+   ist, entscheidet ihre Bankleitzahl, und das gehoert nicht in den Browser
+   nachgebaut. */
+const BK_ZAHLTEIL_TEXT = {
+  ohne_iban: ['', 'Ohne IBAN trägt die Rechnung keinen Einzahlungsschein. '
+    + 'Der Empfänger muss die Angaben von Hand abtippen.'],
+  iban_ungueltig: ['var(--neg)', 'Diese IBAN ist keine gültige Schweizer oder '
+    + 'Liechtensteiner IBAN — gespeichert wird sie so nicht.'],
+  adresse_fehlt: ['var(--warn)', 'Die IBAN ist gültig, aber Strasse, PLZ oder Ort fehlen. '
+    + 'Ohne vollständige Adresse weist die Bank den Zahlteil zurück, darum bleibt er weg.'],
+  bereit_QRR: ['var(--pos)', 'QR-IBAN erkannt. Jede Rechnung bekommt eine eigene '
+    + 'Referenznummer aus ihrer Belegnummer — die Bank meldet den Zahlungseingang damit zurück.'],
+  bereit_NON: ['var(--pos)', 'Normale IBAN. Der Einzahlungsschein ist gültig; '
+    + 'die Rechnungsnummer steht in der Mitteilung, nicht als Referenz. '
+    + 'Den Zahlungseingang ordnest du damit von Hand zu.'],
+};
+
+function bkZahlteilLage() {
+  const el = $('bkZahlteilLage');
+  if (!el) { return; }
+  const z = (briefkopf && briefkopf.zahlteil) || null;
+  if (!z) { el.textContent = ''; return; }
+  const schluessel = z.lage === 'bereit' ? 'bereit_' + z.art : z.lage;
+  const [farbe, text] = BK_ZAHLTEIL_TEXT[schluessel] || ['', ''];
+  el.textContent = text;
+  el.style.color = farbe || '';
 }
 
 function bkLogoZeichnen(datenUrl) {
@@ -5018,6 +5077,11 @@ async function bkSpeichern() {
     uid: ($('bk_uid').value || '').trim(),
     mwst_nr: ($('bk_mwst').value || '').trim(),
     iban: ($('bk_iban').value || '').trim(),
+    qr_iban: ($('bk_qr_iban').value || '').trim(),
+    qr_strasse: ($('bk_qr_strasse').value || '').trim(),
+    qr_hausnummer: ($('bk_qr_hausnummer').value || '').trim(),
+    qr_plz: ($('bk_qr_plz').value || '').trim(),
+    qr_ort: ($('bk_qr_ort').value || '').trim(),
   };
   if (bkLogoNeu) { koerper.logo = bkLogoNeu; }
   if (bkLogoWegSetzen) { koerper.logo_weg = true; }
