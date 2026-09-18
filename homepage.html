@@ -1142,7 +1142,7 @@ p{margin:0 0 1em}
         </div>
         <div class="reihe">
           <label><span>E-Mail <abbr class="pflicht" title="Pflichtfeld">*</abbr></span><input type="email" name="email" required autocomplete="email" placeholder="name@firma.ch"></label>
-          <label><span>Telefon <abbr class="pflicht" title="Pflichtfeld">*</abbr></span><input type="tel" name="telefon" required autocomplete="tel" placeholder="079 123 45 67"></label>
+          <label><span>Telefon <abbr class="pflicht" title="Pflichtfeld">*</abbr></span><input type="tel" name="telefon" required autocomplete="tel" inputmode="tel" placeholder="+41 79 123 45 67"></label>
         </div>
         <button class="btn primaer" type="submit" id="demoKnopf">Zugang jetzt erhalten <svg><use href="#i-pfeil"/></svg></button>
         <p class="hinweis"><abbr class="pflicht" title="Pflichtfeld">*</abbr> Pflichtfeld. Die Zugangsdaten gehen ausschliesslich an die angegebene E-Mail-Adresse. Keine Newsletter, keine Weitergabe. Bitte keine echten Personendaten in der Demo erfassen – sie wird nach 14 Tagen vollständig gelöscht.</p>
@@ -1224,20 +1224,31 @@ p{margin:0 0 1em}
       email: feld('email').value.trim(), telefon: feld('telefon').value.trim(),
       website: feld('website').value
     };
-    // Dieselben Regeln wie im Rechenkern (backend/demo_zugang.php): beim
-    // Telefon zaehlen die Ziffern, nicht die Schreibweise. Ob es die
-    // E-Mail-Adresse wirklich gibt, kann nur der Server sagen -- der Browser
-    // kann keinen Mailserver nachschlagen.
-    var fehlend = [];
+    // Dieselben Regeln wie im Rechenkern (backend/demo_zugang.php): eine
+    // Schweizer Nummer hat nach der Landesvorwahl neun Ziffern, die erste
+    // davon 2-9; geschrieben national (079 123 45 67) oder international
+    // (+41 79 123 45 67, auch 0041). Ob es die E-Mail-Adresse wirklich
+    // gibt, kann nur der Server sagen -- der Browser kann keinen
+    // Mailserver nachschlagen.
+    function telefonGueltig(wert){
+      var roh = wert.replace(/[\s\/\-\.\(\)]+/g, '');
+      return /^(?:\+41|0041)[2-9]\d{8}$/.test(roh) || /^0[2-9]\d{8}$/.test(roh);
+    }
+    var fehlend = [], leer = false;
     ['firma','name','email','telefon'].forEach(function(n){
       var fehlt = daten[n] === ''
         || (n === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(daten[n]))
-        || (n === 'telefon' && daten[n].replace(/\D+/g, '').length < 9);
+        || (n === 'telefon' && !telefonGueltig(daten[n]));
+      if (daten[n] === '') leer = true;
       feld(n).setAttribute('aria-invalid', fehlt ? 'true' : 'false');
       if (fehlt) fehlend.push(n);
     });
     if (fehlend.length) {
-      melde('Bitte Firma, Name, Telefon und eine gültige E-Mail-Adresse angeben.', true);
+      // Ein leeres Feld und eine falsch geschriebene Nummer sind zwei
+      // verschiedene Aussagen und bekommen zwei verschiedene Texte.
+      melde(!leer && fehlend.length === 1 && fehlend[0] === 'telefon'
+        ? 'Bitte eine Schweizer Telefonnummer angeben, z. B. +41 79 123 45 67 oder 079 123 45 67.'
+        : 'Bitte Firma, Name, Telefon und eine gültige E-Mail-Adresse angeben.', true);
       feld(fehlend[0]).focus();
       return;
     }

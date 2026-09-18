@@ -185,12 +185,31 @@ $pruef('demo_zugang_einzeilig ersetzt Umbrueche und kuerzt',
     demo_zugang_einzeilig("Zeile 1\r\nZeile 2\t\tEnde", 100) === 'Zeile 1 Zeile 2 Ende'
     && demo_zugang_einzeilig('123456789', 5) === '12345');
 
-// Telefon ist der Preis fuer den Sofort-Zugang (ENT-601/ENT-613).
-$pruef('KRITISCH: eine Nummer mit weniger als neun Ziffern zaehlt nicht',
-    demo_zugang_telefon_ziffern('079 12') < DEMO_ZUGANG_TELEFON_MIN_ZIFFERN);
-$pruef('eine gueltige Schweizer Nummer in jeder Schreibweise zaehlt',
-    demo_zugang_telefon_ziffern('+41 79 123 45 67') >= DEMO_ZUGANG_TELEFON_MIN_ZIFFERN
-    && demo_zugang_telefon_ziffern('079/123 45 67') >= DEMO_ZUGANG_TELEFON_MIN_ZIFFERN);
+// Telefon ist der Preis fuer den Sofort-Zugang (ENT-601/ENT-613). Geprueft
+// wird die Nummer, nicht nur die Anzahl Ziffern (Befund 2026-09-18).
+$pruef('eine Schweizer Nummer in jeder ueblichen Schreibweise gilt',
+    demo_zugang_telefon_gueltig('+41 79 123 45 67')
+    && demo_zugang_telefon_gueltig('0041 79 123 45 67')
+    && demo_zugang_telefon_gueltig('079 123 45 67')
+    && demo_zugang_telefon_gueltig('079/123 45 67')
+    && demo_zugang_telefon_gueltig('+41-79-123-45-67')
+    && demo_zugang_telefon_gueltig('(044) 123 45 67')
+    && demo_zugang_telefon_gueltig('0791234567'));
+$pruef('KRITISCH: neun beliebige Ziffern sind keine Telefonnummer',
+    !demo_zugang_telefon_gueltig('123456789')
+    && !demo_zugang_telefon_gueltig('111 111 111'));
+$pruef('KRITISCH: zu kurz, zu lang oder gar keine Ziffern wird abgewiesen',
+    !demo_zugang_telefon_gueltig('079 12')
+    && !demo_zugang_telefon_gueltig('079 123 45 678')
+    && !demo_zugang_telefon_gueltig('qwd')
+    && !demo_zugang_telefon_gueltig(''));
+$pruef('KRITISCH: nach der Vorwahl kommt kein 0 und kein 1',
+    !demo_zugang_telefon_gueltig('+41 09 123 45 67')
+    && !demo_zugang_telefon_gueltig('+41 19 123 45 67')
+    && !demo_zugang_telefon_gueltig('009 123 45 67'));
+$pruef('eine auslaendische Nummer gilt hier nicht',
+    !demo_zugang_telefon_gueltig('+49 151 12345678')
+    && !demo_zugang_telefon_gueltig('+33 6 12 34 56 78'));
 
 // Zustellbarkeit: dieselbe Absicherung wie beim Kontaktformular, mit
 // einspeisbarem Nachschlag statt echtem DNS (ENT-469-Bauart).

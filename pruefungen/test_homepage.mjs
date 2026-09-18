@@ -204,6 +204,19 @@ await fuell(desktop, '[name="telefon"]', '079 12');
 await klick(desktop, '#demoKnopf');
 await desktop.waitForTimeout(200);
 check('KRITISCH: eine zu kurze Telefonnummer geht ebenfalls nicht durch', aufrufe.length === 0);
+// Neun beliebige Ziffern sind keine Nummer (Befund des Projektinhabers,
+// 2026-09-18): geprueft wird die Schweizer Form, nicht die Anzahl Ziffern.
+await fuell(desktop, '[name="telefon"]', '123456789');
+await klick(desktop, '#demoKnopf');
+await desktop.waitForTimeout(200);
+check('KRITISCH: neun beliebige Ziffern gehen nicht als Telefonnummer durch', aufrufe.length === 0);
+check('die Meldung sagt, wie eine Schweizer Nummer aussieht -- nicht nur "fehlt"',
+  /\+41|079/.test(await desktop.textContent('#demoMeldung')));
+// Eine auslaendische Nummer ist hier ebenfalls keine gueltige Angabe.
+await fuell(desktop, '[name="telefon"]', '+49 151 12345678');
+await klick(desktop, '#demoKnopf');
+await desktop.waitForTimeout(200);
+check('KRITISCH: eine auslaendische Nummer geht nicht durch', aufrufe.length === 0);
 
 await fuell(desktop, '[name="telefon"]', '079 123 45 67');
 await klick(desktop, '#demoKnopf');

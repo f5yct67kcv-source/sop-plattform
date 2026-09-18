@@ -75,10 +75,8 @@ const DEMO_ZUGANG_MAX_TELEFON  = 40;
 const DEMO_ZUGANG_FALLE        = 'website';
 // Telefon ist der Preis fuer den Sofort-Zugang (Entscheidung des
 // Projektinhabers): Wer in einer Minute eine eigene Instanz bekommt, gibt
-// dafuer eine erreichbare Nummer an. Dieselbe Grenze wie beim
-// Kontaktformular (demo_anfrage.php) -- neun Ziffern sind die Untergrenze,
-// unter der keine erreichbare Schweizer Nummer mehr liegt.
-const DEMO_ZUGANG_TELEFON_MIN_ZIFFERN = 9;
+// dafuer eine erreichbare Nummer an. Wie eine solche Nummer aussieht,
+// steht bei demo_zugang_telefon_gueltig() weiter unten.
 
 function demo_zugang_ist_falle(array $in): bool
 {
@@ -91,9 +89,26 @@ function demo_zugang_einzeilig(mixed $wert, int $max): string
     return mb_substr(trim($s), 0, $max);
 }
 
-function demo_zugang_telefon_ziffern(string $wert): int
+// Ziffern zaehlen allein reicht nicht: "123456789" hat neun Ziffern und ist
+// trotzdem keine Nummer, unter der jemand erreichbar ist (Befund des
+// Projektinhabers, 2026-09-18). Eine Schweizer Rufnummer hat nach der
+// Landesvorwahl genau neun Ziffern, und die erste davon liegt zwischen 2
+// und 9 -- 0 und 1 sind keine Anschlussbereiche, sondern Vorwahl- und
+// Kurznummernraum. Geschrieben wird sie entweder national mit fuehrender
+// Null (079 123 45 67) oder international (+41 79 123 45 67, auch 0041).
+// Trennzeichen -- Leerschlag, Schraegstrich, Bindestrich, Punkt, Klammern
+// -- sind dem Menschen ueberlassen und werden vorher entfernt.
+//
+// BEWUSST NUR SCHWEIZER NUMMERN: Die Zielgruppe ist der Schweizer
+// Bewachungsmarkt. Kommt eine auslaendische Nummer vor, ist das eine
+// Entscheidung des Projektinhabers, keine stille Lockerung hier.
+function demo_zugang_telefon_gueltig(string $wert): bool
 {
-    return strlen((string)preg_replace('/\D+/', '', $wert));
+    $roh = (string)preg_replace('/[\s\/\-\.\(\)]+/u', '', $wert);
+    if (preg_match('/^(?:\+41|0041)([2-9]\d{8})$/', $roh) === 1) {
+        return true;
+    }
+    return preg_match('/^0([2-9]\d{8})$/', $roh) === 1;
 }
 
 // ── Ist die angegebene Adresse ueberhaupt zustellbar? ─────────────────
