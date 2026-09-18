@@ -1265,6 +1265,23 @@ jobs:
           cp backend/demo_instanz.php  dist-betreiber/demo_instanz.php
           cp backend/demo_reset.php    dist-betreiber/demo_reset.php
           cp backend/demo_daten.php    dist-betreiber/demo_daten.php
+          # demo_daten.php befuellt den Musterbetrieb ueber genau dieselben
+          # Rechenkerne wie ein echter Betrieb (Kopf von demo_daten.php:
+          # "NIE erfunden, sondern ausschliesslich ueber die bestehenden,
+          # geprueften Funktionen"). Das zieht einen Teil der rund 30
+          # Rapport-Tool-Dateien in dieses eigentlich schlanke Buendel
+          # zurueck, die der Kommentar oben bewusst ausschliessen wollte --
+          # ENT-601 kam spaeter dazu und hat diese Kette nicht geerbt.
+          # BESTANDSFEHLER (gefunden am 2026-09-18 live auf
+          # betreiber.guardops.ch): ohne diese sechs Dateien stirbt jede
+          # Demo-Anforderung an einem fehlenden require_once, sichtbar nur
+          # als "Unerwarteter Serverfehler" ohne weiteren Hinweis.
+          cp backend/mitarbeiter.php   dist-betreiber/mitarbeiter.php
+          cp backend/planung.php       dist-betreiber/planung.php
+          cp backend/gavzeit.php       dist-betreiber/gavzeit.php
+          cp backend/lohnlauf.php      dist-betreiber/lohnlauf.php
+          cp backend/logbuch.php       dist-betreiber/logbuch.php
+          cp backend/lohn.php          dist-betreiber/lohn.php
           # Bremse gegen zu viele Anfragen (ENT-601), von
           # api/demo_anfordern.php und api/demo_erneut_senden.php benutzt --
           # dieselbe Datei wie beim Kontaktformular der Homepage, eigenes

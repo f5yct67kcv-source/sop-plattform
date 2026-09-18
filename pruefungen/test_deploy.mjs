@@ -1015,15 +1015,32 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   const OEFFENTLICHE_DEMO_ENDPUNKTE = ['demo_anfordern.php', 'demo_erneut_senden.php'];
   check('KRITISCH: die öffentlichen Demo-Endpunkte (ENT-601) werden ins betreiber-Bündel kopiert',
     OEFFENTLICHE_DEMO_ENDPUNKTE.every(e => wirdKopiert(`backend/api/${e}`)));
-  const oeffentlicheQuellen = OEFFENTLICHE_DEMO_ENDPUNKTE
-    .map(e => readFileSync(`${WURZEL}/backend/api/${e}`, 'utf8'));
-  const oeffentlicheModule = [...new Set(
-    oeffentlicheQuellen.join('\n')
-      .matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g))]
-    .map(m => m[1]);
-  const fehlendeOeffentlicheModule = oeffentlicheModule.filter(m => !liegtImBuendel(`dist-betreiber/${m}`));
-  check('KRITISCH: jede Datei, die ein öffentlicher Demo-Endpunkt einbindet, liegt im betreiber-Bündel',
-    oeffentlicheModule.length >= 3 && fehlendeOeffentlicheModule.length === 0);
+  // TRANSITIV, nicht nur die direkten Einbindungen: demo_daten.php zieht
+  // seinerseits mitarbeiter.php, planung.php usw. nach -- ein Endpunkt, der
+  // nur die eigene Datei liest, haette genau die Kette uebersehen, die am
+  // 2026-09-18 live als "Unerwarteter Serverfehler" auffiel (fehlendes
+  // require_once, keine PDOException, darum keine der beiden anderen
+  // Meldungen aus db_fehlermeldung()). Ein Modul, das selbst nicht existiert
+  // (Tippfehler o.ae.), wird beim Lesen uebersprungen -- das faengt eine
+  // andere Pruefung ab, nicht diese hier.
+  const oeffentlicheModule = new Set();
+  const zuLesen = [...OEFFENTLICHE_DEMO_ENDPUNKTE.map(e => `api/${e}`)];
+  const gelesen = new Set();
+  while (zuLesen.length) {
+    const pfad = zuLesen.shift();
+    if (gelesen.has(pfad)) { continue; }
+    gelesen.add(pfad);
+    const voll = `${WURZEL}/backend/${pfad}`;
+    if (!existsSync(voll)) { continue; }
+    const inhalt = readFileSync(voll, 'utf8');
+    for (const m of inhalt.matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g)) {
+      oeffentlicheModule.add(m[1]);
+      zuLesen.push(m[1]);
+    }
+  }
+  const fehlendeOeffentlicheModule = [...oeffentlicheModule].filter(m => !liegtImBuendel(`dist-betreiber/${m}`));
+  check('KRITISCH: jede Datei, die ein öffentlicher Demo-Endpunkt transitiv einbindet, liegt im betreiber-Bündel',
+    oeffentlicheModule.size >= 3 && fehlendeOeffentlicheModule.length === 0);
   if (fehlendeOeffentlicheModule.length) {
     bad.push('Einbindung fehlt im betreiber-Bündel (öffentliche Demo-Endpunkte): ' + fehlendeOeffentlicheModule.join(', '));
   }
