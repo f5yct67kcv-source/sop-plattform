@@ -2590,6 +2590,11 @@ function bereichZeigen(welcher) {
      veraendern (eine neue Adresse, eine neue Offerte). Beim Betreten frisch
      holen ist billiger als ein Stand, der nicht mehr stimmt. */
   unterreiterZeichnen();
+  /* Die Übersicht lebt von zwei Listen, die sich anderswo ändern können --
+     ein Mandant wird angelegt, eine Rechnung als bezahlt markiert. Beim
+     Betreten frisch holen ist billiger als ein Stand, der nicht mehr
+     stimmt. */
+  if (welcher === 'uebersicht') { ladeMandanten(); ladeRechnungen(); }
   if (welcher === 'konten')   { ladeKonten(); }
   if (welcher === 'adressen') { ladeAdressen(); }
   if (welcher === 'offerten') { ladeBelege(); ladeProdukte(); }
@@ -2908,14 +2913,14 @@ async function ladeMandanten() {
 
   if (a.code === 503) {
     // Nicht eingerichtet ist etwas anderes als "keine vorhanden".
-    uebersichtSetzen('');
+    uebersichtSetzen('mandanten', '');
     inhalt.innerHTML = leerBlock('⚙', 'Noch nicht eingerichtet',
       'Der Mandantenstamm ist auf diesem Server noch nicht angelegt. '
       + 'Die Einrichtung läuft einmalig über das Cockpit.');
     return;
   }
   if (a.status !== 'ok') {
-    uebersichtSetzen('');
+    uebersichtSetzen('mandanten', '');
     inhalt.innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
     return;
   }
@@ -2969,7 +2974,7 @@ async function ladeMandanten() {
   const ohneVertrag = liste.filter(m =>
     !m.vertrag || m.vertrag.lage === 'unbekannt').length;
 
-  uebersichtSetzen(
+  uebersichtSetzen('mandanten',
       zahlBlock('Mandanten', liste.length, null)
     + zahlBlock('Aktiv', aktiv, liste.length ? aktiv + ' von ' + liste.length : null)
     + zahlBlock('Verträge', faellig,
@@ -3830,9 +3835,19 @@ async function demoAblauf() {
   ladeDemo();
 }
 
-function uebersichtSetzen(zahlenHtml) {
+/* ZWEI QUELLEN, EINE ZEILE (ENT-618). Bis hierher schrieb nur
+   ladeMandanten() die Kennzahlen. Seit die Rechnungen mitzaehlen, schreiben
+   zwei Stellen -- und wer das mit innerHTML tut, loescht die Zahlen der
+   jeweils anderen, je nachdem welche zuletzt fertig wird. Darum merkt sich
+   jede Quelle ihr Stueck, und gezeichnet wird immer beides in fester
+   Reihenfolge. */
+const uebersichtTeile = { mandanten: '', rechnungen: '' };
+function uebersichtSetzen(teil, zahlenHtml) {
+  if (Object.prototype.hasOwnProperty.call(uebersichtTeile, teil)) {
+    uebersichtTeile[teil] = zahlenHtml || '';
+  }
   const el = $('u-zahlen');
-  if (el) { el.innerHTML = zahlenHtml; }
+  if (el) { el.innerHTML = uebersichtTeile.mandanten + uebersichtTeile.rechnungen; }
 }
 
 
@@ -4384,6 +4399,37 @@ async function ladeRechnungenRoh() {
   rechnungen = a.belege || [];
   reNaechsteNummer = a.naechste_nummer || '';
   renderRechnungen();
+  kassenstandZeichnen();
+}
+
+/* ── Was liegt beim Geld (ENT-618) ──────────────────────────────────
+   Gerechnet aus DERSELBEN Liste und denselben Funktionen wie der Bereich
+   selbst: reOffenRappen() sagt, was offen ist, reFaelligTage() sagt, ob es
+   überfällig ist. Eine zweite Definition von "überfällig" -- hier im
+   Browser, dort im Server -- liefe irgendwann auseinander, und es fiele
+   erst auf, wenn zwei Zahlen nebeneinander stehen. */
+function kassenstandZeichnen() {
+  /* Archivierte zählen nicht mit: Sie sind aus dem Verkehr gezogen, und
+     eine archivierte Rechnung im offenen Betrag wäre eine Forderung, die
+     niemand mehr stellt. */
+  const offen = (rechnungen || []).filter(b =>
+    Number(b.aktiv ?? 1) === 1 && !Number(b.bezahlt));
+  const ueber = offen.filter(b => {
+    const t = reFaelligTage(b);
+    return t !== null && t < 0;
+  });
+  const summe = offen.reduce((s, b) => s + reOffenRappen(b), 0);
+  const summeUeber = ueber.reduce((s, b) => s + reOffenRappen(b), 0);
+
+  /* Die Zahl ist die Anzahl Rechnungen, der Bezug der Betrag -- Einheiten
+     nicht vermischen (Hausregel). Und "überfällig" bekommt seinen eigenen
+     Block statt einer Klammer hinter der ersten Zahl: Es ist eine andere
+     Aussage, keine Verfeinerung derselben. */
+  uebersichtSetzen('rechnungen',
+      zahlBlock('Offene Rechnungen', offen.length,
+        offen.length ? chf(summe) + ' CHF' : 'nichts offen')
+    + zahlBlock('Davon überfällig', ueber.length,
+        ueber.length ? chf(summeUeber) + ' CHF' : 'nichts überfällig'));
 }
 
 async function ladeBriefkopfRoh() {
