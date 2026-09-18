@@ -31,18 +31,37 @@ cd "$(dirname "$0")"
 # Gesucht wird in vier Quellen, weil die Kennung je nach Vorgeschichte
 # woanders liegt -- beim ersten Lauf typischerweise im Stash, wo die
 # frueher in Xcode gesetzte Projektaenderung gelandet ist.
+# Eine Apple-Team-Kennung hat IMMER genau zehn Zeichen, Grossbuchstaben
+# und Ziffern. Das ist die eigentliche Pruefung -- und nicht "irgendwas
+# Grossgeschriebenes": Eine frueher zu lasche Fassung liess den
+# Platzhalter "DEINEKENNUNG" aus der Anleitung durchgehen, schrieb ihn in
+# die Datei und meldete danach bei jedem Lauf zufrieden "vorhanden".
+# Gescheitert ist es erst der Bau, mit "No Account for Team".
+team_gueltig() {
+  local t
+  t="$(printf '%s' "${1:-}" | tr -dc 'A-Z0-9')"
+  [ ${#t} -eq 10 ] && printf '%s' "$t"
+}
+
+# Den Wert hinter dem Gleichheitszeichen holen, ohne ihn schon zu
+# beschneiden -- die Laengenpruefung kommt danach. Wer hier gleich zehn
+# Zeichen herausschneidet, macht aus "DEINEKENNUNG" klaglos "DEINEKENNU".
+team_aus_zeile() {
+  sed -n 's/^[+[:space:]]*DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*\([^;[:space:]]*\).*/\1/p' | head -1
+}
+
 team_finden() {
   local t=""
 
   # 1. Schon eingerichtet.
   if [ -f mobile/ios/lokal.xcconfig ]; then
-    t="$(sed -n 's/^[[:space:]]*DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*\([A-Z0-9]\{8,\}\).*/\1/p' mobile/ios/lokal.xcconfig | head -1 || true)"
+    t="$(team_gueltig "$(team_aus_zeile < mobile/ios/lokal.xcconfig || true)")"
     [ -n "$t" ] && { echo "$t"; return; }
   fi
 
   # 2. Von Hand hinterlegt.
   if [ -f mobile/.team-id ]; then
-    t="$(tr -dc 'A-Z0-9' < mobile/.team-id || true)"
+    t="$(team_gueltig "$(cat mobile/.team-id || true)")"
     [ -n "$t" ] && { echo "$t"; return; }
   fi
 
@@ -50,8 +69,7 @@ team_finden() {
   #    Xcode ins Projekt geschrieben und spaeter weggeraeumt wurde.
   local s
   for s in $(git stash list --format='%gd' 2>/dev/null); do
-    t="$(git stash show -p "$s" 2>/dev/null \
-      | sed -n 's/^+.*DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*\([A-Z0-9]\{8,\}\).*/\1/p' | head -1 || true)"
+    t="$(team_gueltig "$(git stash show -p "$s" 2>/dev/null | grep '^+' | team_aus_zeile || true)")"
     [ -n "$t" ] && { echo "$t"; return; }
   done
 
@@ -61,8 +79,8 @@ team_finden() {
   local p
   for p in "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision; do
     [ -f "$p" ] || continue
-    t="$(security cms -D -i "$p" 2>/dev/null \
-      | plutil -extract TeamIdentifier.0 raw -o - - 2>/dev/null || true)"
+    t="$(team_gueltig "$(security cms -D -i "$p" 2>/dev/null \
+      | plutil -extract TeamIdentifier.0 raw -o - - 2>/dev/null || true)")"
     [ -n "$t" ] && { echo "$t"; return; }
   done
 
@@ -96,10 +114,18 @@ if [ -z "$TEAM" ]; then
   echo ""
   echo "  Die Kennung steht in Xcode unter:"
   echo "    Xcode > Settings > Accounts > Apple-ID auswaehlen > Team"
-  echo "  Es sind zehn Zeichen, Grossbuchstaben und Ziffern."
+  echo "  Es sind genau zehn Zeichen, Grossbuchstaben und Ziffern,"
+  echo "  zum Beispiel in der Form A1B2C3D4E5."
   echo ""
-  echo "  Danach einmalig ablegen (Kennung einsetzen) und neu starten:"
-  echo "    echo 'DEVELOPMENT_TEAM = DEINEKENNUNG' > mobile/ios/lokal.xcconfig"
+  echo "  Danach einmal ablegen und neu starten. Die zehn Zeichen dabei"
+  echo "  wirklich durch die eigenen ersetzen -- ein Platzhalter wird hier"
+  echo "  nicht angenommen:"
+  echo ""
+  echo "    nano mobile/ios/lokal.xcconfig"
+  echo ""
+  echo "  In die leere Datei diese eine Zeile schreiben, dann Ctrl+O,"
+  echo "  Enter, Ctrl+X:"
+  echo "    DEVELOPMENT_TEAM = <die zehn Zeichen>"
   exit 1
 fi
 if grep -q "DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*$TEAM" mobile/ios/lokal.xcconfig 2>/dev/null; then
