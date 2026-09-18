@@ -731,6 +731,38 @@ check('KRITISCH: mit der Klasse ist die Kartenhülle gemessen durchsichtig',
     return !durchsichtig(vorher) && durchsichtig(nachher);
   }));
 
+// ══════════ DIE DURCHSICHT DARF NICHT KLEBEN ══════════════════════════
+// Vom Projektinhaber gemeldet: "Es überlappen sich Masken." Ursache war
+// die Durchsicht für die native Karte -- sie blieb beim Reiterwechsel
+// stehen. Dann ist die ganze Seite durchsichtig, und man sieht auf die
+// Ebenen darunter.
+//
+// Die native Ansicht liegt NICHT im Dokument: Sie verschwindet nicht, wenn
+// der Rumpf ersetzt wird. Beides muss ausdrücklich weg, und zwar an jeder
+// Stelle, durch die man die Karte verlässt.
+{
+  const durchsicht = () => page.evaluate(() => document.body.classList.contains('karte-nativ'));
+
+  await page.evaluate(() => { document.body.classList.add('karte-nativ'); });
+  await page.evaluate(() => { rgsReiter = 'punkte'; rgLaufZeichnen(); });
+  await page.waitForTimeout(250);
+  check('KRITISCH: der Wechsel auf einen anderen Reiter nimmt die Durchsicht weg',
+    (await durchsicht()) === false);
+
+  await page.evaluate(() => { document.body.classList.add('karte-nativ'); });
+  await page.evaluate(() => { rgsReiter = 'funktionen'; rgLaufZeichnen(); });
+  await page.waitForTimeout(250);
+  check('KRITISCH: auch der Wechsel auf die Funktionen nimmt sie weg',
+    (await durchsicht()) === false);
+
+  // Der Weg hinaus ist der wichtigste: Bleibt sie hier stehen, ist danach
+  // die ganze App durchsichtig, nicht nur die Runde.
+  await page.evaluate(() => { document.body.classList.add('karte-nativ'); rgSeiteZu(); });
+  await page.waitForTimeout(250);
+  check('KRITISCH: das Verlassen der Runde nimmt die Durchsicht weg',
+    (await durchsicht()) === false);
+}
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

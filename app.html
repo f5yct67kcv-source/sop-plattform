@@ -5468,6 +5468,11 @@ function rgSeiteZu() {
   rgTimerStoppen();   // sonst tickt er unsichtbar weiter
   rgOrtungStoppen();  // sonst ortet das Geraet weiter, ohne dass es jemand sieht
   rgsMeinOrt = null;  // die Position ueberdauert die Runde nicht
+  // Dieselbe Ueberlegung fuer die native Karte (ENT-609): Sie liegt als
+  // eigene Ansicht unter der Seite und verschwindet nicht mit ihr. Wer sie
+  // hier stehen laesst, hat sie danach ueber der Uebersicht liegen -- samt
+  // der Durchsicht, die die ganze App durchscheinen laesst.
+  rgKarteNativAbbauen();
   $('rgsReiter').hidden = true;
   rgZahlenAn(false);
   $('rgsFuss').hidden = false;
@@ -7764,6 +7769,14 @@ function rgLaufZeichnen() {
   // Anders herum bliebe sie stehen, wenn die Karte nichts zu zeigen hat und
   // stattdessen ein Warnblock erscheint -- der klebte dann am Bildschirmrand.
   rgVollflaeche(false);
+  // Die native Karte gehoert NUR auf den Karten-Reiter (ENT-609). Sie liegt
+  // nicht im Dokument, sondern als eigene Ansicht darunter -- und die
+  // Durchsicht, die sie sichtbar macht, gilt fuer die ganze Seite. Bleibt
+  // beides beim Reiterwechsel stehen, sieht man durch die App hindurch auf
+  // die Ebenen darunter, und die Masken schieben sich uebereinander. Genau
+  // so vom Projektinhaber gemeldet. Abgebaut wird darum HIER, an der einen
+  // Stelle, durch die jeder Reiterwechsel laeuft.
+  if (rgsReiter !== 'karte') { rgKarteNativAbbauen(); }
   if (rgsReiter === 'karte') { rgKarteZeichnen(); }
   else if (rgsReiter === 'funktionen') { rgLaufFunktionen(); }
   else {
@@ -8426,6 +8439,10 @@ function rgKarteZeichnen() {
     ? `<div class="rgs-karte-hinweis" id="rgsKarteOhneOrt">${d.ohneOrt.length} ${esc(d.ohneOrt.length === 1 ? w('rgsReiterPunkte').slice(0, -1) : w('rgsReiterPunkte'))} ${esc(w('rgsKarteOhneOrt'))}</div>`
     : '';
   if (!d.zeigbar.length) {
+    // Auch hier: keine Karte, also auch keine native Ansicht und keine
+    // Durchsicht -- sonst bliebe der Warnblock auf einer durchsichtigen
+    // Seite stehen.
+    rgKarteNativAbbauen();
     $('rgsBody').innerHTML = `<div class="rgs-warn" id="rgsKarteLeer">
       <svg class="i i-sm" style="flex:none" viewBox="0 0 24 24"><polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21"/><line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/></svg>
       <span>${esc(w('rgsKarteLeer'))}</span></div>${hinweis}`;

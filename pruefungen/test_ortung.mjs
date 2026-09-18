@@ -51,8 +51,20 @@ check('KRITISCH: eine einzige Stelle entscheidet über die Ortung',
   && /status !== 'abgeschlossen'/.test(APP)
   && /status !== 'abgebrochen'/.test(APP)
   && /status !== 'pausiert'/.test(APP));
-check('Beim Verlassen der Seite wird die Ortung beendet und die Position verworfen',
-  /rgOrtungStoppen\(\);\s*\/\/[^\n]*\n\s*rgsMeinOrt = null;/.test(APP));
+// Hier stand eine Pruefung auf zwei unmittelbar aufeinanderfolgende
+// Zeilen. Sie ist rot geworden, als eine dritte Zeile dazwischenkam --
+// ohne dass sich an der Aussage etwas geaendert haette. Eine Pruefung, die
+// den Zeilenabstand bewacht statt die Sache, meldet Fehlalarm und
+// erzieht dazu, sie beim naechsten Mal wegzuschieben. Geprueft wird jetzt,
+// dass rgSeiteZu BEIDES tut, in welcher Reihenfolge auch immer.
+{
+  const zu = APP.slice(APP.indexOf('function rgSeiteZu()'));
+  const rumpf = zu.slice(0, zu.indexOf('\n}'));
+  check('Beim Verlassen der Seite wird die Ortung beendet',
+    /rgOrtungStoppen\(\);/.test(rumpf));
+  check('Beim Verlassen der Seite wird die Position verworfen',
+    /rgsMeinOrt = null;/.test(rumpf));
+}
 // Diese Suite deckt die Ortung IM GERAET ab (ENT-317). Die Uebermittlung
 // der Spur kam mit ENT-318 dazu und hat eine eigene Suite (test_spur).
 // Hier stand zunaechst die Pruefung, dass die Position das Geraet NICHT
