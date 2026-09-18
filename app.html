@@ -1102,6 +1102,21 @@ button.rd-kopf:active { background: var(--line-soft); }
 .rgs-bd.voll > :not(.rgs-karte-huelle) { margin: 0 16px; }
 .rgs-bd.voll > :last-child:not(.rgs-karte-huelle) { margin-bottom: calc(12px + env(safe-area-inset-bottom)); }
 .rgs-karte { position: absolute; inset: 0; }
+/* Durchsicht auf die native Karte (ENT-609).
+
+   VERMUTUNG, am Geraet zu bestaetigen: Die native Kartenansicht liegt
+   nicht IM Dokument, sondern darunter. Was darueber liegt und einen
+   eigenen Hintergrund hat, deckt sie zu -- man sieht dann eine leere
+   Flaeche in genau der Farbe der Huelle, und nicht etwa Schwarz. Beim
+   ersten Versuch auf dem Geraet war es genau diese Farbe.
+
+   Darum wird die Kette vom Seitenkoerper bis zur Karte durchsichtig
+   gestellt, solange die native Karte steht -- und nur dann. Die Klasse
+   setzt rgKarteNativBauen(), rgKarteNativAbbauen() nimmt sie weg. Ohne
+   diese Begrenzung staende die ganze App auf Durchsicht, auch auf den
+   anderen Reitern. */
+body.karte-nativ, body.karte-nativ .rgs, body.karte-nativ .rgs-bd,
+body.karte-nativ .rgs-karte-huelle, body.karte-nativ .rgs-karte { background: transparent; }
 /* Ladehinweis und Fehlermeldung an derselben Stelle: Beides beantwortet
    dieselbe Frage ("warum sehe ich nichts"), darum derselbe Ort. */
 .rgs-karte-stand { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; font-size: 14px; line-height: 1.5; color: var(--ink-3); }
@@ -8219,6 +8234,9 @@ function rgsNativLaden() {
    auch auf dem Reiter mit der Liste. Darum wird sie ausdruecklich
    abgebaut, und zwar vor jedem Ersetzen des Rumpfs. */
 async function rgKarteNativAbbauen() {
+  // Die Durchsicht gilt nur, solange die Karte steht. Bliebe die Klasse
+  // stehen, saehe man auf den anderen Reitern durch die App hindurch.
+  document.body.classList.remove('karte-nativ');
   if (!rgsNativKarte) { return; }
   const weg = rgsNativKarte;
   rgsNativKarte = null;
@@ -8603,6 +8621,7 @@ async function rgKarteNativBauen(d, bauLauf) {
   // native Ansichten uebereinander.
   if (bauLauf !== rgsKarteBauLauf) { rgKarteNativAbbauen(); return; }
   rgsKarteEl = el;
+  document.body.classList.add('karte-nativ');
   // Den Hinweis erst entfernen, wenn die Karte wirklich steht -- dieselbe
   // Reihenfolge wie in der Browser-Fassung.
   const stand = $('rgsKarteStand');

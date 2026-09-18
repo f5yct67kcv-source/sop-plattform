@@ -704,6 +704,33 @@ check('KRITISCH: mit Hülle UND Schlüssel wird der native Weg gewählt',
     finally { window.Capacitor = merkC; window.mapsSchluesselTauglich = merkP; }
   }));
 
+// Die Durchsicht gilt nur, solange die native Karte steht. Bliebe die
+// Klasse hängen, sähe man auf den anderen Reitern durch die App hindurch --
+// und im Browser, wo es gar keine native Karte gibt, wäre sie schlicht
+// falsch.
+check('KRITISCH: im Browser steht die App nie auf Durchsicht',
+  await page.evaluate(() => !document.body.classList.contains('karte-nativ')));
+check('KRITISCH: das Abbauen nimmt die Durchsicht weg',
+  await page.evaluate(async () => {
+    document.body.classList.add('karte-nativ');
+    await rgKarteNativAbbauen();
+    return !document.body.classList.contains('karte-nativ');
+  }));
+// Die Durchsicht muss auch wirklich greifen: eine Regel, die von einer
+// späteren gleicher Spezifität überschrieben wird, bliebe wirkungslos,
+// ohne dass etwas kaputtgeht (CLAUDE.md: gemessen, nicht nachgelesen).
+check('KRITISCH: mit der Klasse ist die Kartenhülle gemessen durchsichtig',
+  await page.evaluate(() => {
+    const h = document.querySelector('.rgs-karte-huelle');
+    if (!h) { return false; }
+    const vorher = getComputedStyle(h).backgroundColor;
+    document.body.classList.add('karte-nativ');
+    const nachher = getComputedStyle(h).backgroundColor;
+    document.body.classList.remove('karte-nativ');
+    const durchsichtig = (f) => f === 'transparent' || /rgba\(0, 0, 0, 0\)/.test(f);
+    return !durchsichtig(vorher) && durchsichtig(nachher);
+  }));
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

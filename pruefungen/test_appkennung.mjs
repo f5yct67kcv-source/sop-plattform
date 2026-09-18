@@ -189,6 +189,53 @@ for (const [datei, feld, muster] of stellen) {
   }
 }
 
+// ══════════ GERÄTERECHTE: WER FRAGT, MUSS ES BEGRÜNDEN ════════════════
+// Vom Projektinhaber am Gerät gemeldet: "Standort wird gesucht ..." lief
+// endlos, die Frage nach der Erlaubnis kam nie. Ursache war nicht die App,
+// sondern Info.plist: Fehlt die Nutzungsbeschreibung, fragt iOS gar nicht
+// erst, es lehnt still ab. Dieselbe Falle wie beim Push (ENT-604) -- im
+// Browser bringt Safari die Beschreibungen mit, in der eigenen Hülle muss
+// die App sie selbst stellen.
+//
+// Der Sollwert wird aus dem ABGELEITET, was die App wirklich benutzt, nicht
+// aus einer Liste hier: Wer morgen eine weitere Gerätefunktion einbaut und
+// die Beschreibung vergisst, wird hier rot. Eine abgeschriebene Liste
+// bliebe dagegen grün.
+{
+  const app = readFileSync(`${WURZEL}/app.html`, 'utf8');
+  const plist = readFileSync(`${WURZEL}/mobile/ios/App/App/Info.plist`, 'utf8');
+  const beschreibung = (schluessel) => {
+    const m = plist.match(new RegExp(`<key>${schluessel}</key>\\s*<string>([^<]*)</string>`));
+    return m ? m[1].trim() : null;
+  };
+
+  const braucht = [
+    { was: 'Standort', benutzt: /navigator\.geolocation/.test(app),
+      schluessel: 'NSLocationWhenInUseUsageDescription' },
+    { was: 'Kamera', benutzt: /capture="(environment|user)"|getUserMedia/.test(app),
+      schluessel: 'NSCameraUsageDescription' },
+  ];
+
+  for (const { was, benutzt, schluessel } of braucht) {
+    check(`KRITISCH: die App benutzt ${was} -- die Prüfung sieht das auch`, benutzt);
+    const text = beschreibung(schluessel);
+    check(`KRITISCH: für ${was} steht eine Nutzungsbeschreibung in Info.plist`,
+      !benutzt || (text !== null && text.length > 0));
+    // Ein leerer oder nichtssagender Text ist so schlecht wie keiner: Wer
+    // nicht weiss, warum gefragt wird, lehnt ab -- und Apple weist
+    // Platzhaltertexte bei der Einreichung zurück.
+    check(`Die Beschreibung für ${was} sagt etwas, statt nur den Zugriff zu nennen`,
+      !benutzt || (text !== null && text.length >= 30));
+  }
+
+  // Um "immer" wird NICHT gebeten: Die Runde läuft im Vordergrund, der
+  // Bildschirm wird dafür wachgehalten. Eine Hintergrundortung zu
+  // verlangen, die niemand braucht, ist ein Grund für eine Zurückweisung
+  // im Store -- und gegenüber den Mitarbeitenden nicht zu rechtfertigen.
+  check('KRITISCH: es wird NICHT um dauerhafte Hintergrundortung gebeten',
+    !/NSLocationAlwaysAndWhenInUseUsageDescription|NSLocationAlwaysUsageDescription/.test(plist));
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');
