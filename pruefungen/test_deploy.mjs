@@ -1706,6 +1706,61 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   }
 }
 
+// ══════════ WELCHES iPHONE GENOMMEN WIRD (aufs-handy.sh) ══════════════
+// devicectl führt eine Spalte "State": "connected" heisst erreichbar,
+// "available (paired)" heisst nur bekannt -- das Telefon war schon einmal
+// da. Vom Projektinhaber gemeldet: Der Bau lief durch, und erst das
+// Installieren fiel um mit "CoreDeviceService was unable to locate a
+// device". Die Zeile stand in der Liste, erreichbar war das Gerät nicht.
+//
+// Auch hier durch AUSFÜHREN geprüft: die Funktion bekommt echte
+// Tabellenausgaben zu lesen.
+{
+  const { execFileSync } = await import('child_process');
+  const skript = readFileSync(`${WURZEL}/aufs-handy.sh`, 'utf8');
+  const von = skript.indexOf('geraet_waehlen() {');
+  const bis = skript.indexOf('\n}\n', von);
+  check('KRITISCH: die Wahl des iPhones steht als eigene, prüfbare Funktion da',
+    von !== -1 && bis !== -1);
+
+  if (von !== -1 && bis !== -1) {
+    const fn = skript.slice(von, bis + 3);
+    const KOPF = 'Name  Hostname  Identifier  State  Model';
+    const lauf = (tabelle) => execFileSync('bash',
+      ['-c', fn + '\ngeraet_waehlen'],
+      { encoding: 'utf8', input: tabelle }).trim();
+
+    const NUR_BEKANNT = `${KOPF}
+iPhone A  a.coredevice.local  AAAAAAAA-0000-0000-0000-000000000001  available (paired)  iPhone17,1`;
+    const BEIDE = `${KOPF}
+iPhone A  a.coredevice.local  AAAAAAAA-0000-0000-0000-000000000001  available (paired)  iPhone14,2
+iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  iPhone17,1`;
+
+    // Der eigentliche Befund: Vorher gewann schlicht die erste Zeile.
+    check('KRITISCH: steht ein verbundenes Gerät weiter unten, gewinnt trotzdem es',
+      lauf(BEIDE).startsWith('BBBBBBBB-0000-0000-0000-000000000002'));
+    check('KRITISCH: und sein Zustand wird mitgeführt, nicht weggeworfen',
+      lauf(BEIDE).includes('connected'));
+    // Ein nur bekanntes Gerät bleibt brauchbar -- es kann inzwischen
+    // wieder angesteckt sein. Aber der Zustand muss mitkommen, sonst
+    // sieht "bekannt" wie "verbunden" aus (CLAUDE.md).
+    check('KRITISCH: ist keines verbunden, wird das bekannte genommen -- mit seinem Zustand',
+      lauf(NUR_BEKANNT).startsWith('AAAAAAAA-0000-0000-0000-000000000001')
+      && lauf(NUR_BEKANNT).includes('available (paired)'));
+    check('KRITISCH: die Kopfzeile der Tabelle gilt nicht als Gerät',
+      lauf(KOPF) === '');
+    check('Eine leere Liste ergibt nichts, statt etwas zu erfinden',
+      lauf('') === '');
+  } else {
+    ['KRITISCH: steht ein verbundenes Gerät weiter unten, gewinnt trotzdem es',
+     'KRITISCH: und sein Zustand wird mitgeführt, nicht weggeworfen',
+     'KRITISCH: ist keines verbunden, wird das bekannte genommen -- mit seinem Zustand',
+     'KRITISCH: die Kopfzeile der Tabelle gilt nicht als Gerät',
+     'Eine leere Liste ergibt nichts, statt etwas zu erfinden',
+    ].forEach(n => check(n + ' (nicht prüfbar: Funktion nicht gefunden)', false));
+  }
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

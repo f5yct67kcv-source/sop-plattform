@@ -241,13 +241,45 @@ UDID="$(xcrun xctrace list devices 2>/dev/null \
   | grep -i "iPhone" | head -1 \
   | sed -E 's/.*\(([0-9A-Fa-f-]{25,})\).*/\1/' || true)"
 
-# Fuer devicectl. Die Kopfzeile der Tabelle traegt das Wort "Identifier"
-# und wird darum ausgelassen; der Hostname enthaelt ebenfalls "iPhone",
-# stoert aber nicht, weil nur das UUID-Muster gelesen wird.
-DEVCTL="$(xcrun devicectl list devices 2>/dev/null \
-  | grep -i "iPhone" | grep -v "Identifier" | head -1 \
-  | grep -oE '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}' \
-  | head -1 || true)"
+# Fuer devicectl.
+#
+# Die Tabelle fuehrt eine Spalte "State", und die ist nicht nebensaechlich:
+# "connected" heisst erreichbar, "available (paired)" heisst nur bekannt --
+# das Telefon war schon einmal da. Wer den Unterschied uebergeht, bekommt
+# eine Kennung, die spaeter beim Installieren an
+# "CoreDeviceService was unable to locate a device" scheitert. Genau so
+# gemeldet vom Projektinhaber: Der Bau lief durch, und erst das
+# Installieren fiel um.
+#
+# Darum wird das verbundene Geraet bevorzugt und der Zustand mitgefuehrt,
+# statt ihn wegzuwerfen. Als Funktion, damit sich das ohne angeschlossenes
+# iPhone pruefen laesst.
+geraet_waehlen() {
+  awk '
+    /Identifier/ { next }
+    {
+      pos = 0
+      for (i = 1; i <= NF; i++) {
+        if ($i ~ /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/) { pos = i }
+      }
+      if (pos == 0) { next }
+      # Zwischen Kennung und Modell (letzte Spalte) steht der Zustand.
+      zustand = ""
+      for (i = pos + 1; i < NF; i++) { zustand = zustand (zustand == "" ? "" : " ") $i }
+      if (zustand == "") { zustand = "unbekannt" }
+      if (zustand ~ /connected/ && verbunden == "") { verbunden = $pos; vz = zustand }
+      if (ersatz == "") { ersatz = $pos; ez = zustand }
+    }
+    END {
+      if (verbunden != "") { print verbunden "\t" vz }
+      else if (ersatz != "") { print ersatz "\t" ez }
+    }'
+}
+
+GERAET="$(xcrun devicectl list devices 2>/dev/null | grep -i "iPhone" | geraet_waehlen || true)"
+DEVCTL="${GERAET%%	*}"
+ZUSTAND="${GERAET#*	}"
+[ "$ZUSTAND" = "$DEVCTL" ] && ZUSTAND=""
 
 # Ohne devicectl-Kennung geht gar nichts -- ueber sie laeuft das
 # Installieren und das Starten. Die UDID ist dagegen KEINE Vorbedingung
@@ -273,6 +305,15 @@ if [ -n "$UDID" ]; then
 else
   echo "        gefunden (Installation: ${DEVCTL})"
 fi
+case "$ZUSTAND" in
+  *connected*) echo "        Zustand: ${ZUSTAND}" ;;
+  "")          echo "        Zustand: unbekannt -- das Installieren kann scheitern" ;;
+  *)           echo "        Zustand: ${ZUSTAND} -- NICHT verbunden."
+               echo "        Das iPhone ist bekannt, aber gerade nicht erreichbar."
+               echo "        Der Bau laeuft trotzdem; scheitert das Installieren,"
+               echo "        liegt es daran: Kabel einstecken, Bildschirm entsperren"
+               echo "        und die Frage \"Diesem Computer vertrauen?\" bestaetigen." ;;
+esac
 
 echo "── 5/5  Bauen, installieren, starten"
 # Bewusst NICHT "npx cap run ios": Dessen Hilfsprogramm native-run kennt
@@ -379,7 +420,26 @@ fi
 APPID="$(python3 -c "import json;print(json.load(open('capacitor.config.json'))['appId'])")"
 
 echo "        installieren"
-xcrun devicectl device install app --device "$DEVCTL" "$APP"
+if ! xcrun devicectl device install app --device "$DEVCTL" "$APP"; then
+  echo ""
+  echo "  Die App ist gebaut, aber nicht auf dem Telefon gelandet."
+  echo "  devicectl kommt an dieses Geraet gerade nicht heran"
+  [ -n "$ZUSTAND" ] && echo "  (zuletzt gemeldeter Zustand: ${ZUSTAND})"
+  echo ""
+  echo "  Der Reihe nach durchgehen:"
+  echo "    1. Kabel direkt am Mac, nicht ueber einen Hub"
+  echo "    2. Bildschirm entsperren -- ein gesperrtes iPhone nimmt nichts an"
+  echo "    3. \"Diesem Computer vertrauen?\" bestaetigen, falls die Frage kommt"
+  echo "    4. Einstellungen > Datenschutz & Sicherheit > Entwicklermodus: ein"
+  echo "    5. Xcode: Window > Devices and Simulators -- steht dort"
+  echo "       \"Preparing iPhone for development\", erst abwarten"
+  echo ""
+  echo "  Was devicectl gerade sieht:"
+  xcrun devicectl list devices 2>&1 | sed 's/^/    /'
+  echo ""
+  echo "  Der Bau bleibt erhalten. Danach genuegt ein erneuter Lauf."
+  exit 1
+fi
 echo "        starten"
 xcrun devicectl device process launch --device "$DEVCTL" "$APPID"
 
