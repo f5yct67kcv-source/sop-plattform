@@ -22,6 +22,18 @@
   try { w = localStorage.getItem('rv3_app_thema'); } catch (e) {}
   document.documentElement.setAttribute('data-thema', w === 'hell' ? 'hell' : 'dunkel');
 })();
+
+/* Native App-Huelle (ENT-588), gleiches Muster wie in app.html: Capacitor
+   haengt sich unter window.Capacitor ein -- im Browser gibt es das nie.
+   Steht hier oben und nicht weiter unten beim uebrigen Skript, weil die
+   Kopfzeile die Antwort braucht, bevor jemand sie antippen kann. Frueher
+   entschied sich das erst in DOMContentLoaded, ganz am Ende einer langen
+   Kette: Wirft etwas davor, blieb der Zurueck-Knopf auf "app.html" stehen
+   -- eine Datei, die es im App-Buendel gar nicht gibt. */
+function nativeAppHuelle() {
+  return typeof window !== 'undefined'
+      && !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+}
 </script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -290,6 +302,33 @@ tr:hover td { background: var(--accent-light); }
     <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
   </button>
 </header>
+<script>
+/* Beides sofort nach der Kopfzeile, nicht erst in DOMContentLoaded: Der
+   Nutzer sieht diese beiden Knoepfe als Erstes und kann sie antippen,
+   bevor die uebrige Einrichtung durch ist.
+
+   1. Der Weg zurueck. Im Buendel liegt diese Datei als "rapport-tool.html"
+      neben der kopierten app.html, die dort "index.html" heisst -- eine
+      "app.html" gibt es im Buendel gar nicht (mobile-buendel-erstellen.py).
+      Das Ziel steht im Markup trotzdem auf "app.html", damit der Browser
+      auch ohne Skript einen gueltigen Weg hat.
+
+   2. Das Abmelden. In der App fuehrt der Weg ueber den Menue-Reiter, nicht
+      ueber diesen Knopf -- zwei Wege zum selben Ziel, und der hier meldete
+      nur diese eine Oberflaeche ab. Im Browser bleibt er, dort gibt es
+      keinen Menue-Reiter. Das Raster der Kopfzeile ist fest dreispaltig
+      (1fr auto 1fr), der Titel bleibt darum auch ohne den Knopf mittig. */
+(function () {
+  if (!nativeAppHuelle()) return;
+  document.getElementById('btn-zurueck').href = 'index.html';
+  document.getElementById('btn-header-logout').style.display = 'none';
+})();
+</script>
+
+<!-- Bleibt leer und unsichtbar, solange die Einrichtung durchlaeuft. Steht
+     ueber den Reitern, weil ein halb eingerichtetes Formular sonst
+     benutzbar aussieht. -->
+<div class="err-msg" id="initFehler" style="display:none;margin:12px 16px 0"></div>
 
 <div class="tabs">
   <div class="tab active" onclick="showTab('erfassen')" id="tab-erfassen">Erfassen</div>
@@ -490,14 +529,8 @@ let kundenOptions  = [];
 let deleteTargetId = null;
 let detailTargetId = null;
 
-// ── Native App-Huelle (ENT-588), gleiches Muster wie in app.html: Capacitor
-// haengt sich unter window.Capacitor ein -- im Browser gibt es das nie.
-function nativeAppHuelle() {
-  return typeof window !== 'undefined'
-      && !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-}
-
 // ── BACKEND API
+// nativeAppHuelle() steht im Kopf der Datei (siehe dort).
 // In der Huelle ist die Herkunft capacitor://localhost (iOS) bzw.
 // http://localhost (Android) -- ein relativer Pfad zeigte ins Buendel statt
 // auf den Server (siehe app.html, API-Konstante).
@@ -505,6 +538,12 @@ const API_BASE  = nativeAppHuelle() ? 'https://cupi24.guardops.ch/api/' : 'api/'
 let authToken   = localStorage.getItem('rv3_token') || '';
 let currentUser = JSON.parse(localStorage.getItem('rv3_user') || 'null');
 
+// "status" kommt mit zurueck, weil der Aufrufer sonst eine abgelaufene
+// Sitzung (401) nicht von einem Serverfehler (500) unterscheiden kann --
+// vorher fuehrte beides zum sofortigen Abmelden samt Neuladen.
+// Antwortet der Server kein JSON (Fehlerseite des Webservers, Zwangsportal
+// in einem fremden WLAN), warf r.json() bisher in eine Zusage, die niemand
+// auffing. Daraus wird jetzt ein gewoehnlicher Fehlschlag mit Status.
 function apiCall(path, opts) {
   opts = opts || {};
   const headers = { 'Content-Type': 'application/json' };
@@ -513,8 +552,13 @@ function apiCall(path, opts) {
     method: opts.method || 'GET',
     headers,
     body: opts.body ? JSON.stringify(opts.body) : undefined
-  }).then(r => r.json().then(data => ({ ok: r.ok, data })));
+  }).then(r => r.json().catch(() => ({})).then(data => ({ ok: r.ok, status: r.status, data })));
 }
+
+// Eine Sitzung ist abgelaufen oder wurde entzogen -- das ist der EINZIGE
+// Grund, jemanden abzumelden. Ein 500er ist ein Serverfehler und darf den
+// Nutzer nicht aus seiner Sitzung werfen.
+function sitzungWeg(status) { return status === 401 || status === 403; }
 
 function doLogin(name, password) {
   return apiCall('login.php', { method: 'POST', body: { name, password } }).then(({ ok, data }) => {
@@ -532,6 +576,23 @@ function doLogout() {
   authToken = ''; currentUser = null;
   localStorage.removeItem('rv3_token'); localStorage.removeItem('rv3_user');
   location.reload();
+}
+
+// Die Sitzung ist von sich aus abgelaufen -- anders als beim Abmelden hat
+// der Nutzer das nicht veranlasst und soll es nicht als Fehler erleben.
+// Ohne diesen Hinweis sah es aus, als werfe die Seite einen grundlos
+// hinaus: Das Rapport Tool stempelt die Sitzung nur beim Laden, wer ein
+// Verwaltungsrecht traegt, faellt dabei unter die 30-Minuten-Ruhefrist
+// (SITZUNG_BUERO_RUHE_MIN, backend/db.php).
+function sitzungBeenden() {
+  authToken = ''; currentUser = null;
+  localStorage.removeItem('rv3_token'); localStorage.removeItem('rv3_user');
+  const el = document.getElementById('loginError');
+  document.getElementById('loginScreen').style.display = '';
+  if (el) {
+    el.textContent = 'Die Sitzung ist abgelaufen. Bitte neu anmelden.';
+    el.style.display = '';
+  }
 }
 
 function submitLogin() {
@@ -577,10 +638,30 @@ function mapRapport(r) {
   };
 }
 
+// Kein Treffer, nichts vorhanden und "Abruf gescheitert" sind drei
+// verschiedene Aussagen (CLAUDE.md). Bisher sahen alle drei gleich aus:
+// Die Liste blieb leer und darunter stand "noch keine Rapporte" -- auch
+// dann, wenn der Server gar nicht geantwortet hatte.
+let listeFehler = '';
+
 function loadAll() {
-  apiCall('rapport_list.php').then(({ ok, data }) => {
-    if (!ok || data.status !== 'ok') { if (!ok) doLogout(); return; }
+  apiCall('rapport_list.php').then(({ ok, status, data }) => {
+    if (sitzungWeg(status)) { sitzungBeenden(); return; }
+    if (!ok || data.status !== 'ok') {
+      // Der feste Rahmen zuerst, die Meldung des Servers als Zusatz: Allein
+      // steht dort sonst ein blosses "kaputt", das nicht sagt, WAS nicht
+      // geklappt hat -- und die leere Liste darunter sieht weiter aus wie
+      // "nichts erfasst".
+      listeFehler = 'Die Rapporte konnten nicht geladen werden.'
+        + (data.message ? ' (' + data.message + ')' : '');
+      renderTable();
+      return;
+    }
+    listeFehler = '';
     rapports = data.rapporte.map(mapRapport);
+    renderTable();
+  }).catch(() => {
+    listeFehler = 'Keine Verbindung zum Server. Die Liste zeigt nicht, was wirklich erfasst ist.';
     renderTable();
   });
 }
@@ -749,8 +830,17 @@ function saveRapport() {
     sig:Unterschrift.daten()
   };
   const btn=document.getElementById('btn-save'); btn.disabled=true;
-  apiCall('rapport_create.php',{method:'POST',body}).then(({ok,data})=>{
+  apiCall('rapport_create.php',{method:'POST',body}).then(({ok,status,data})=>{
     btn.disabled=false;
+    // Der schlimmste Fall: ausgefuellt, unterschrieben, und dann ist die
+    // Sitzung abgelaufen. Das Formular bleibt darum stehen -- wer sich in
+    // der Maske darueber neu anmeldet, kann denselben Rapport gleich
+    // nochmal absenden, statt alles noch einmal einzutippen.
+    if(sitzungWeg(status)){
+      sitzungBeenden();
+      showToast('Sitzung abgelaufen. Bitte neu anmelden — der Rapport bleibt erhalten.');
+      return;
+    }
     if(!ok||data.status!=='ok'){showToast(data.message||'Fehler beim Speichern.');return;}
     document.getElementById('formArea').style.display='none';
     document.getElementById('successScreen').classList.add('show');
@@ -799,6 +889,10 @@ function renderStats(data) {
 function renderTable() {
   const data=getFiltered(); renderStats(data);
   const wrap=document.getElementById('tableWrap');
+  // Gescheiterter Abruf zuerst: Sonst behauptet die Seite "nichts erfasst",
+  // obwohl sie es gar nicht weiss (CLAUDE.md, "Unbekannt darf nie wie keine
+  // aussehen").
+  if(listeFehler){wrap.innerHTML=`<div class="empty"><div class="ico">⚠️</div><p>${listeFehler}</p><button class="btn" style="margin-top:12px" onclick="loadAll()">Erneut versuchen</button></div>`;return;}
   if(!data.length){wrap.innerHTML=`<div class="empty"><div class="ico">📋</div><p>${t('no-data')}</p></div>`;return;}
   const ths=t('th').map(h=>`<th>${h}</th>`).join('');
   const rows=data.map(r=>`<tr onclick="showDetail(${r.id})" style="cursor:pointer">
@@ -821,11 +915,14 @@ function clearFilter(){document.getElementById('filterQ').value='';document.getE
 function askDelete(id){deleteTargetId=id;document.getElementById('deleteModal').classList.add('show');}
 function closeModal(){document.getElementById('deleteModal').classList.remove('show');deleteTargetId=null;}
 function confirmDelete(){
-  apiCall('rapport_delete.php',{method:'POST',body:{id:deleteTargetId}}).then(({ok,data})=>{
+  apiCall('rapport_delete.php',{method:'POST',body:{id:deleteTargetId}}).then(({ok,status,data})=>{
     closeModal();
+    if(sitzungWeg(status)){sitzungBeenden();return;}
+    // Ohne diese Meldung sah ein gescheitertes Loeschen aus wie ein
+    // erfolgreiches: Das Fenster ging zu, die Zeile blieb stehen.
     if(!ok||data.status!=='ok'){showToast(data.message||'Fehler beim Löschen.');return;}
     loadAll();showToast(t('tDel'));
-  });
+  }).catch(()=>{closeModal();showToast('Netzwerkfehler. Der Rapport wurde nicht gelöscht.');});
 }
 
 // ── DETAIL / KUNDEN-BERICHT
@@ -938,14 +1035,24 @@ function applyKundeSelect(){
 // Fehler selbst blieb still, weil er in einem Promise steckt und darum kein
 // pageerror ausloest.
 function loadKundenOptions(){
-  apiCall('kunden_list.php').then(({ok,data})=>{
-    if(!ok||data.status!=='ok') return;
-    kundenOptions = data.kunden;
+  // Scheiterte der Abruf, blieb hier stumm nur "manuell eingeben" stehen --
+  // nicht zu unterscheiden von "kein Kunde hinterlegt". Wer den Kunden
+  // daraufhin von Hand eintippt, legt ihn unter einer abweichenden
+  // Schreibweise neben dem bestehenden Eintrag ab.
+  const zeigen = (liste, hinweis) => {
     const sel = document.getElementById('kundeSelect');
+    if (!sel) return;
     const cur = sel.value;
-    sel.innerHTML = '<option value="">— manuell eingeben —</option>' + kundenOptions.map((k,i)=>`<option value="${i}">${k.name}</option>`).join('');
+    sel.innerHTML = `<option value="">${hinweis}</option>`
+      + liste.map((k,i)=>`<option value="${i}">${k.name}</option>`).join('');
     if (cur) sel.value = cur;
-  });
+  };
+  apiCall('kunden_list.php').then(({ok,status,data})=>{
+    if(sitzungWeg(status)){sitzungBeenden();return;}
+    if(!ok||data.status!=='ok'){kundenOptions=[];zeigen([], '— Kundenliste nicht abrufbar, bitte von Hand eintragen —');return;}
+    kundenOptions = data.kunden;
+    zeigen(kundenOptions, '— manuell eingeben —');
+  }).catch(()=>{kundenOptions=[];zeigen([], '— Kundenliste nicht abrufbar, bitte von Hand eintragen —');});
 }
 
 // ── UTILS
@@ -954,17 +1061,37 @@ const fmtDate = d => d ? d.split('-').reverse().join('.') : '';
 function showToast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2800);}
 
 // ── INIT
+// Jeder Schritt einzeln: Diese Datei laedt drei eigenstaendige Skripte
+// (zeitwahl.js, unterschrift.js, testumgebung.js). Fehlt eines davon,
+// warf der erste Aufruf, der es braucht -- und alles Weitere blieb
+// ungetan, obwohl es damit nichts zu tun hat. Genau so liefen die drei
+// schon einmal ins Leere, ohne dass ein Fehler das gemeldet haette
+// (Befund im Kopf von mobile-buendel-erstellen.py); im Buendel liegen sie
+// seither, gemeldet wurde ein Ausfall aber immer noch nicht.
+// Die Meldung ist bewusst sichtbar und nicht nur in der Konsole: Ohne
+// Unterschriftenfeld ist der Rapport unvollstaendig, das muss VOR dem
+// Ausfuellen auffallen und nicht erst beim Kunden vor Ort.
+function initSchritt(was, fn) {
+  try { fn(); }
+  catch (e) {
+    const el = document.getElementById('initFehler');
+    if (el) {
+      el.textContent = 'Ein Teil der Seite konnte nicht geladen werden (' + was
+        + '). Bitte die App schliessen und neu oeffnen.';
+      el.style.display = '';
+    }
+  }
+}
+
 document.addEventListener('DOMContentLoaded',()=>{
-  document.getElementById('datum').value=today();
-  sigEinrichten();
-  applyLang();
-  calcNet();
-  if (authToken && currentUser) { afterLogin(); }
+  initSchritt('Datum', ()=>{ document.getElementById('datum').value=today(); });
+  initSchritt('Unterschrift', sigEinrichten);
+  initSchritt('Beschriftungen', applyLang);
+  initSchritt('Zeitberechnung', calcNet);
+  if (authToken && currentUser) { initSchritt('Anmeldung', afterLogin); }
   else { document.getElementById('loginName').focus(); }
-  // Im Buendel liegt "index.html" unter dem Namen "rapport-tool.html" neben
-  // der kopierten app.html (siehe mobile-buendel-erstellen.py) -- "app.html"
-  // gibt es dort gar nicht.
-  document.getElementById('btn-zurueck').href = nativeAppHuelle() ? 'index.html' : 'app.html';
+  // Zurueck-Knopf und Abmelden-Knopf sind schon direkt nach der Kopfzeile
+  // gesetzt (siehe dort) -- sie duerfen nicht von dieser Kette abhaengen.
   // Service Worker bleibt in der nativen Huelle aus (ENT-588, wie in app.html).
   if (!nativeAppHuelle() && 'serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 });
