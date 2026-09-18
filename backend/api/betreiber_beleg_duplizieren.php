@@ -18,7 +18,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../belege.php';
 
-require_betreiber_voll();
+$ich = require_betreiber_voll();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
@@ -74,5 +74,8 @@ try {
     $pdo->rollBack();
     throw $e;
 }
+
+be_log($pdo, $ich, 'beleg', $neuId, 'angelegt', null,
+       $nummer . ' · Doppel von ' . (string)($quelle['nummer'] ?? ''));
 
 json_response(['status' => 'ok', 'id' => $neuId, 'nummer' => $nummer]);

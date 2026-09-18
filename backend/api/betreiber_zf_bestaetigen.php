@@ -48,6 +48,10 @@ $pdo->prepare(
     'UPDATE betreiber_zwei_faktor SET bestaetigt_am = NOW(), notfallcodes = ? WHERE betreiber_id = ?'
 )->execute([json_encode($hashes), $id]);
 
+// OHNE WERTE (ENT-614): Dass der zweite Faktor eingerichtet wurde, gehoert
+// in den Verlauf -- das Geheimnis und die Notfallcodes nie.
+be_log($pdo, $ich, 'konto', $id, 'zwei_faktor_eingerichtet', null, null, true);
+
 json_response([
     'status'       => 'ok',
     'notfallcodes' => $codes,

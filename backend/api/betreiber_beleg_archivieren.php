@@ -6,7 +6,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 
-require_betreiber_voll();
+$ich = require_betreiber_voll();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
@@ -19,12 +19,18 @@ if ($id <= 0) {
 }
 
 $pdo = betreiber_db();
-$chk = $pdo->prepare('SELECT id FROM be_belege WHERE id = ?');
+$chk = $pdo->prepare('SELECT aktiv FROM be_belege WHERE id = ?');
 $chk->execute([$id]);
-if (!$chk->fetch()) {
+$vorher = $chk->fetchColumn();
+if ($vorher === false) {
     json_response(['status' => 'error', 'message' => 'Beleg nicht gefunden'], 404);
 }
 
 $pdo->prepare('UPDATE be_belege SET aktiv = ? WHERE id = ?')->execute([$aktiv, $id]);
+
+if ((int)$vorher !== $aktiv) {
+    be_log($pdo, $ich, 'beleg', $id, 'zustand',
+           (int)$vorher === 1 ? 'aktiv' : 'archiviert', $aktiv ? 'aktiv' : 'archiviert');
+}
 
 json_response(['status' => 'ok', 'aktiv' => $aktiv]);

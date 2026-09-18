@@ -10,7 +10,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../produkte.php';
 
-require_betreiber_voll();
+$ich = require_betreiber_voll();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
@@ -43,6 +43,11 @@ $felder = [
 ];
 
 if ($id > 0) {
+    // Stand vor der Aenderung, fuer das Logbuch (ENT-614).
+    $vor = $pdo->prepare('SELECT ' . implode(', ', array_keys($felder)) . ' FROM be_produkte WHERE id = ?');
+    $vor->execute([$id]);
+    $vorher = $vor->fetch(PDO::FETCH_ASSOC) ?: [];
+
     $satz = implode(', ', array_map(fn($f) => "$f = ?", array_keys($felder)));
     $s = $pdo->prepare("UPDATE be_produkte SET $satz WHERE id = ?");
     $s->execute(array_merge(array_values($felder), [$id]));
@@ -55,6 +60,7 @@ if ($id > 0) {
             json_response(['status' => 'error', 'message' => 'Leistung nicht gefunden'], 404);
         }
     }
+    be_log_vergleich($pdo, $ich, 'produkt', $id, $vorher, $felder);
 } else {
     $felder = ['nummer' => naechste_produktnummer($pdo, 'be_')] + $felder;
     $spalten = array_keys($felder);
@@ -64,6 +70,7 @@ if ($id > 0) {
         . $platzhalter . ', 1)'
     )->execute(array_values($felder));
     $id = (int)$pdo->lastInsertId();
+    be_log($pdo, $ich, 'produkt', $id, 'angelegt', null, (string)$felder['name']);
 }
 
 json_response(['status' => 'ok', 'id' => $id]);

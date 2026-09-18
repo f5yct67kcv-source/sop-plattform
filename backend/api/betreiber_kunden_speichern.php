@@ -15,7 +15,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../kunden.php';
 
-require_betreiber_voll();
+$ich = require_betreiber_voll();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
@@ -91,6 +91,14 @@ try {
 } catch (Throwable $e) {
     $pdo->rollBack();
     throw $e;
+}
+
+// Logbuch (ENT-614) NACH dem Commit: Ein Eintrag ueber eine Aenderung, die
+// dann doch zurueckgerollt wird, waere schlimmer als keiner.
+if ($bestand) {
+    be_log_vergleich($pdo, $ich, 'adresse', $id, $bestand, $spalten);
+} else {
+    be_log($pdo, $ich, 'adresse', $id, 'angelegt', null, $nummer . ' · ' . $spalten['name']);
 }
 
 json_response(['status' => 'ok', 'id' => $id, 'kundennummer' => $nummer]);

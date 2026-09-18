@@ -10,7 +10,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 
-require_betreiber_voll();
+$ich = require_betreiber_voll();
 $pdo = betreiber_db();
 
 if (!hat_tabelle($pdo, 'mandant')) {
@@ -69,6 +69,12 @@ foreach (['db_pass', 'db_passwort', 'passwort', 'secret'] as $verboten) {
 }
 
 if ($id > 0) {
+    // Der Stand VOR der Aenderung, fuer das Logbuch (ENT-614). Genau die
+    // Spalten, die gleich geschrieben werden -- nicht mehr.
+    $vor = $pdo->prepare('SELECT ' . implode(', ', array_keys($werte)) . ' FROM mandant WHERE id = ?');
+    $vor->execute([$id]);
+    $vorher = $vor->fetch(PDO::FETCH_ASSOC) ?: [];
+
     $stmt = $pdo->prepare(
         'UPDATE mandant SET name = ?, subdomain = ?, kanton = ?, db_host = ?, db_name = ?, db_user = ?,
                             secret_name = ?, geaendert_am = NOW()
@@ -84,6 +90,7 @@ if ($id > 0) {
             json_response(['status' => 'error', 'message' => 'Diesen Mandanten gibt es nicht.'], 404);
         }
     }
+    be_log_vergleich($pdo, $ich, 'mandant', $id, $vorher, $werte);
     json_response(['status' => 'ok', 'id' => $id, 'angelegt' => false]);
 }
 
@@ -92,4 +99,6 @@ $stmt = $pdo->prepare(
      VALUES (?, ?, ?, ?, ?, ?, ?)'
 );
 $stmt->execute(array_values($werte));
-json_response(['status' => 'ok', 'id' => (int)$pdo->lastInsertId(), 'angelegt' => true]);
+$neueId = (int)$pdo->lastInsertId();
+be_log($pdo, $ich, 'mandant', $neueId, 'angelegt', null, $werte['name']);
+json_response(['status' => 'ok', 'id' => $neueId, 'angelegt' => true]);

@@ -24,7 +24,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../kunden.php';
 
-require_betreiber_voll();
+$ich = require_betreiber_voll();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
@@ -149,6 +149,16 @@ try {
 } catch (Throwable $e) {
     $pdo->rollBack();
     throw $e;
+}
+
+// EIN Eintrag fuer den ganzen Import, nicht einer je Zeile (ENT-614): Bei
+// 2000 Zeilen waere das Logbuch danach nur noch dieser eine Import. Die
+// einzelnen Adressen stehen ohnehin in der Liste; was hier fehlt, ist die
+// Aussage, wer sie wann in einem Zug eingespielt hat.
+if ($neu) {
+    be_log($pdo, $ich, 'adresse', 0, 'import', null,
+           count($neu) . ' Adressen · ' . ($nummern[0] ?? '') . ' bis '
+           . ($nummern[count($nummern) - 1] ?? ''));
 }
 
 $bericht['angelegt']    = count($neu);

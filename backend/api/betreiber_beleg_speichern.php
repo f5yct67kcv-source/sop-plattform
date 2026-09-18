@@ -16,7 +16,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../belege.php';
 
-require_betreiber_voll();
+$ich = require_betreiber_voll();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
@@ -110,10 +110,12 @@ foreach ((array)($in['positionen'] ?? []) as $p) {
 
 $pdo->beginTransaction();
 try {
+    $vorher = [];
     if ($id > 0) {
-        $chk = $pdo->prepare('SELECT id FROM be_belege WHERE id = ?');
+        $chk = $pdo->prepare('SELECT ' . implode(', ', array_keys($kopf)) . ' FROM be_belege WHERE id = ?');
         $chk->execute([$id]);
-        if (!$chk->fetch()) {
+        $vorher = $chk->fetch(PDO::FETCH_ASSOC) ?: [];
+        if (!$vorher) {
             $pdo->rollBack();
             json_response(['status' => 'error', 'message' => 'Beleg nicht gefunden'], 404);
         }
@@ -141,6 +143,17 @@ try {
 } catch (Throwable $e) {
     $pdo->rollBack();
     throw $e;
+}
+
+// Logbuch (ENT-614) NACH dem Commit -- ein Eintrag ueber eine Aenderung, die
+// dann zurueckgerollt wird, waere schlimmer als keiner. Die Positionszeilen
+// bleiben aussen vor: Sie werden bei jedem Speichern neu geschrieben, ein
+// Zeilenvergleich ergaebe Rauschen statt Verlauf. Was zaehlt, sind Kopf und
+// Summe -- und die Summe steht im Kopf.
+if ($nummer === null) {
+    be_log_vergleich($pdo, $ich, 'beleg', $id, $vorher, $kopf);
+} else {
+    be_log($pdo, $ich, 'beleg', $id, 'angelegt', null, $art . ' ' . $nummer);
 }
 
 $antwort = ['status' => 'ok', 'id' => $id, 'summen' => $summen];

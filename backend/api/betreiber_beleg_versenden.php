@@ -21,7 +21,7 @@ require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../belege.php';
 require_once __DIR__ . '/../mailer.php';
 
-require_betreiber_voll();
+$ich = require_betreiber_voll();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
@@ -147,5 +147,11 @@ $alt = (string)$beleg['status'];
 if (!in_array($alt, ['bestaetigt', 'abgelehnt'], true)) {
     $pdo->prepare('UPDATE be_belege SET status = ? WHERE id = ?')->execute(['versendet', $id]);
 }
+
+// Der Versand selbst ist der Eintrag, nicht der Statuswechsel: Wer nach einer
+// Zusage ein zweites Mal erinnert, aendert keinen Status -- und genau das
+// waere die Zeile, die man spaeter sucht. Die Adresse steht dabei, weil
+// "verschickt" ohne Empfaenger nichts beantwortet.
+be_log($pdo, $ich, 'beleg', $id, 'versendet', null, $anEmail);
 
 json_response(['status' => 'ok', 'link' => $link]);
