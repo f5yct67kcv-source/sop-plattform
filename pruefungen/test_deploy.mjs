@@ -1592,7 +1592,13 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     von !== -1 && bis !== -1);
 
   if (von !== -1 && bis !== -1) {
-    const fn = skript.slice(von, bis + 3);
+    // Die Funktion meldet über warnen() -- die gehört mit dazu, sonst
+    // prüfte man sie in einer Umgebung, die es so nie gibt.
+    const vonW = skript.indexOf('warnen() {');
+    const bisW = skript.indexOf('\n}\n', vonW);
+    check('KRITISCH: das Sammeln der Warnungen steht ebenfalls als Funktion da',
+      vonW !== -1 && bisW !== -1);
+    const fn = skript.slice(vonW, bisW + 3) + '\n' + skript.slice(von, bis + 3);
     const lauf = (schluesselInhalt) => {
       const ordner = mkdtempSync(join(tmpdir(), 'mapskey-'));
       try {
@@ -1767,6 +1773,67 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
      'KRITISCH: ist keines verbunden, wird das bekannte genommen -- mit seinem Zustand',
      'KRITISCH: die Kopfzeile der Tabelle gilt nicht als Gerät',
      'Eine leere Liste ergibt nichts, statt etwas zu erfinden',
+    ].forEach(n => check(n + ' (nicht prüfbar: Funktion nicht gefunden)', false));
+  }
+}
+
+// ══════════ WAS GIT NICHT KENNT, BLEIBT LIEGEN (aufs-handy.sh) ════════
+// Zweimal echten Schaden angerichtet: Das Skript legte vor dem Pull alles
+// in den Stash, auch unversionierte Dateien ("git stash push -u"). Damit
+// verschwanden die Xcode-Team-Einstellung des Projektinhabers und später
+// seine frisch angelegte Datei mit dem Maps-Schlüssel. Beide standen in
+// .gitignore -- aber der Eintrag kam erst mit dem Stand, der gerade geholt
+// werden sollte. Vor dem Pull waren sie für Git gewöhnliche unversionierte
+// Dateien.
+//
+// Geprüft in einem echten Wegwerf-Repository, nicht am Quelltext: Eine
+// Prüfung, die nach "-u" sucht, bliebe grün, sobald jemand dasselbe anders
+// schreibt.
+{
+  const { mkdtempSync, writeFileSync, existsSync: da, rmSync } = await import('fs');
+  const { execFileSync } = await import('child_process');
+  const { tmpdir } = await import('os');
+  const { join } = await import('path');
+
+  const skript = readFileSync(`${WURZEL}/aufs-handy.sh`, 'utf8');
+  const von = skript.indexOf('lokale_aenderungen_sichern() {');
+  const bis = skript.indexOf('\n}\n', von);
+  check('KRITISCH: das Beiseitelegen steht als eigene, prüfbare Funktion da',
+    von !== -1 && bis !== -1);
+
+  if (von !== -1 && bis !== -1) {
+    const fn = skript.slice(von, bis + 3);
+    const ordner = mkdtempSync(join(tmpdir(), 'stash-'));
+    try {
+      const sh = (befehl) => execFileSync('bash', ['-c', befehl],
+        { cwd: ordner, encoding: 'utf8', env: { ...process.env,
+          GIT_AUTHOR_NAME: 'p', GIT_AUTHOR_EMAIL: 'p@example.invalid',
+          GIT_COMMITTER_NAME: 'p', GIT_COMMITTER_EMAIL: 'p@example.invalid' } });
+      sh('git init -q . && git commit -q --allow-empty -m start');
+      writeFileSync(join(ordner, 'verwaltet.txt'), 'eins\n');
+      sh('git add verwaltet.txt && git commit -q -m dazu');
+      // Eine geänderte verwaltete Datei -- die SOLL beiseite.
+      writeFileSync(join(ordner, 'verwaltet.txt'), 'zwei\n');
+      // Und eine von Hand angelegte, die Git noch nicht kennt -- wie der
+      // Schlüssel, bevor der Eintrag in .gitignore da war.
+      writeFileSync(join(ordner, '.maps-ios-key'), 'GEHEIM\n');
+
+      sh(fn + '\nlokale_aenderungen_sichern');
+
+      check('KRITISCH: eine von Hand angelegte Datei überlebt das Beiseitelegen',
+        da(join(ordner, '.maps-ios-key')));
+      // Die eigentliche Aufgabe muss trotzdem erledigt sein, sonst hätte
+      // man den Fehler nur gegen einen anderen getauscht.
+      check('KRITISCH: die geänderte verwaltete Datei liegt trotzdem im Stash',
+        sh('git stash list').trim().length > 0
+        && sh('cat verwaltet.txt').trim() === 'eins');
+      check('Und sie lässt sich zurückholen',
+        (sh('git stash pop >/dev/null 2>&1; cat verwaltet.txt')).trim() === 'zwei');
+    } finally { rmSync(ordner, { recursive: true, force: true }); }
+  } else {
+    ['KRITISCH: eine von Hand angelegte Datei überlebt das Beiseitelegen',
+     'KRITISCH: die geänderte verwaltete Datei liegt trotzdem im Stash',
+     'Und sie lässt sich zurückholen',
     ].forEach(n => check(n + ' (nicht prüfbar: Funktion nicht gefunden)', false));
   }
 }

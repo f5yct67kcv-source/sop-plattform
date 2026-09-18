@@ -87,15 +87,30 @@ team_finden() {
   echo ""
 }
 
-echo "── 1/5  Stand holen ($ZWEIG)"
-# Angefangene Arbeit wird beiseitegelegt, nicht weggeworfen: Ohne das
-# bricht "git pull" ab, sobald irgendetwas geaendert ist -- auch der
-# Maps-Schluessel weiter unten zaehlt dazu. Zurueck kommt sie mit
-# "git stash pop".
-if [ -n "$(git status --porcelain)" ]; then
-  git stash push -u -m "aufs-handy $(date '+%d.%m. %H:%M')" >/dev/null
+# Angefangene Arbeit beiseitelegen, damit "git pull" durchkommt -- aber
+# NUR, was Git schon kennt.
+#
+# Hier stand einmal "git stash push -u", also samt unversionierter Dateien.
+# Das hat zweimal echten Schaden angerichtet: Es hat die Xcode-Team-
+# Einstellung des Projektinhabers eingesammelt und spaeter seine frisch
+# angelegte Datei mit dem Maps-Schluessel. Beide Male war die Datei in
+# .gitignore eingetragen -- aber der Eintrag kam mit dem Stand, der gerade
+# erst geholt werden sollte. VOR dem Pull war sie fuer Git schlicht eine
+# unversionierte Datei.
+#
+# Daraus die Regel: Was Git nicht verwaltet, fasst dieses Skript nicht an.
+# Wer eine Datei von Hand ins Arbeitsverzeichnis legt, darf sich darauf
+# verlassen, dass sie dort bleibt. Bricht der Pull deshalb an einer neu
+# hinzukommenden Datei ab, sagt das die Meldung von git deutlich genug --
+# das ist ein Fall zum Hinsehen, kein Fall zum Wegraeumen.
+lokale_aenderungen_sichern() {
+  [ -n "$(git status --porcelain --untracked-files=no)" ] || return 0
+  git stash push -m "aufs-handy $(date '+%d.%m. %H:%M')" >/dev/null
   echo "        Lokale Aenderungen liegen im Stash (zurueck mit: git stash pop)"
-fi
+}
+
+echo "── 1/5  Stand holen ($ZWEIG)"
+lokale_aenderungen_sichern
 git fetch origin "$ZWEIG"
 git checkout "$ZWEIG"
 git pull origin "$ZWEIG"
@@ -142,6 +157,21 @@ python3 mobile-buendel-erstellen.py
 # Der Maps-Schluessel gehoert nicht ins Repository (siehe Kopf von
 # mobile-buendel-erstellen.py). Wer die Karte auf dem Geraet braucht, legt
 # ihn einmal in mobile/.maps-key -- Git nimmt die Datei nie mit.
+# Was am Ende noch einmal gesagt werden muss.
+#
+# Eine Warnung mitten im Bau liest niemand: Danach laufen Hunderte Zeilen
+# von xcodebuild durch, und oben steht dann etwas Wichtiges, das niemand
+# mehr sucht. Genau so ist der fehlende Maps-Schluessel untergegangen --
+# der Projektinhaber hat eine App ohne Karte auf dem Telefon gehabt und
+# nicht gewusst, warum. Darum wird jede solche Meldung hier gesammelt und
+# ganz zum Schluss wiederholt, wo der Blick ohnehin hinfaellt.
+WARNUNGEN=""
+warnen() {
+  echo "        $1"
+  WARNUNGEN="${WARNUNGEN}${WARNUNGEN:+
+}$1"
+}
+
 maps_schluessel_einsetzen() {
   ZIEL="$1"
   QUELLE="${2:-mobile/.maps-key}"
@@ -152,7 +182,7 @@ maps_schluessel_einsetzen() {
     # der laufenden Runde stand statt der Karte eine graue Tafel --
     # gemeldet vom Projektinhaber. Ein uebersprungener Schritt darf nicht
     # wie ein gelungener aussehen (CLAUDE.md).
-    echo "        KEINE Karte ($PLATZ): $QUELLE fehlt."
+    warnen "KEINE Karte: $QUELLE fehlt ($PLATZ steht noch im Buendel)."
     echo "        Die Rundgang-Karte bleibt auf dem Geraet leer, alles andere laeuft."
     echo "        Abhilfe: den Google-Maps-JS-Schluessel einmal ablegen --"
     echo "            printf '%s' 'DEIN_SCHLUESSEL' > $QUELLE"
@@ -164,7 +194,7 @@ maps_schluessel_einsetzen() {
   fi
   KEY="$(tr -d '[:space:]' < "$QUELLE")"
   if [ -z "$KEY" ]; then
-    echo "        KEINE Karte ($PLATZ): $QUELLE ist leer."
+    warnen "KEINE Karte: $QUELLE ist leer ($PLATZ steht noch im Buendel)."
     echo "        Die Rundgang-Karte bleibt auf dem Geraet leer, alles andere laeuft."
     return 0
   fi
@@ -491,3 +521,11 @@ fi
 
 echo ""
 echo "Fertig. Die App laeuft auf dem iPhone."
+if [ -n "$WARNUNGEN" ]; then
+  echo ""
+  echo "  ABER -- das fehlt in dieser Fassung:"
+  printf '%s\n' "$WARNUNGEN" | sed 's/^/    /'
+  echo ""
+  echo "  Alles andere laeuft. Wer das behebt, laesst dieses Skript einfach"
+  echo "  noch einmal laufen."
+fi
