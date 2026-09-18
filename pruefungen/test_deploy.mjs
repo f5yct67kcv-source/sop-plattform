@@ -1504,6 +1504,22 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     }
     check('KRITISCH: jeder Platzhalter in jeder Datei des cupi24-Bündels (auch über Wildcards kopierte) wird GENAU IN DIESER DATEI ersetzt oder bleibt mit Grund stehen',
       textDateienCupi.length >= 40 && offenCupi.length === 0);
+
+    // Der Deploy führt dieselbe Liste NOCH EINMAL, als eigene Prüfung im
+    // Arbeitsablauf. Das ist Absicht -- sie hält an, bevor etwas
+    // hochgeladen wird. Nur: Wer hier eine Ausnahme einträgt und dort
+    // nicht, bekommt eine grüne Regression und einen abgebrochenen Deploy.
+    // Genau so geschehen: __MAPS_IOS_KEY__ stand hier, nicht dort, und der
+    // Deploy brach nach dem Hauptbündel ab -- cupi24.guardops.ch blieb auf
+    // dem alten Stand, während alles andere schon live war.
+    {
+      const zeile = bauen.match(/dist-cupi24\/ \\\n\s*\| grep -v ([^\\\n]*)/);
+      const imDeploy = new Set(
+        [...(zeile ? zeile[1] : '').matchAll(/'\^?(__[A-Z0-9_]+__)\$?'/g)].map(m => m[1]));
+      const hier = ['__DIR__', '__MAPS_IOS_KEY__'].filter(p => absichtlichCupi.test(p));
+      check('KRITISCH: der Deploy selbst kennt dieselben Ausnahmen wie diese Prüfung',
+        !!zeile && hier.length > 0 && hier.every(p => imDeploy.has(p)));
+    }
     if (offenCupi.length) { bad.push('bricht den cupi24-Deploy: ' + offenCupi.join(', ')); }
   }
 
