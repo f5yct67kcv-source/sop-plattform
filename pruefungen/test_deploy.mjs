@@ -1440,8 +1440,18 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
       ersetztJeZiel.get(ziel).add(platzhalter);
     }
     // __MANDANT_SECRETS__ wird seit OP-526 auch hier per sed ersetzt (siehe
-    // Kommentar beim betreiber-Bündel oben) -- nur noch __DIR__ bleibt aus.
-    const absichtlichCupi = /^__DIR__$/;
+    // Kommentar beim betreiber-Bündel oben). Zwei bleiben aus:
+    //   __DIR__          PHPs eigene Konstante, kein Platzhalter.
+    //   __MAPS_IOS_KEY__ der Schlüssel der NATIVEN Karte (ENT-609). Er
+    //                    gehört ins App-Bündel und wird dort von
+    //                    aufs-handy.sh eingesetzt; die Web-Fassung nimmt
+    //                    ihn nie in die Hand und zeichnet weiterhin mit
+    //                    der JavaScript-Karte. Ihn hier einzusetzen hiesse,
+    //                    einen Schlüssel zu veröffentlichen, den die Seite
+    //                    gar nicht braucht. Dass der Platzhalter stehen
+    //                    bleibt, ist im Code abgefangen:
+    //                    mapsSchluesselTauglich() erkennt ihn.
+    const absichtlichCupi = /^(__DIR__|__MAPS_IOS_KEY__)$/;
 
     const offenCupi = [];
     for (const { quelle, ziel } of textDateienCupi) {

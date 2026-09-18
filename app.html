@@ -8019,6 +8019,15 @@ function rgLaufFunktionen() {
 // unvermeidbar (Client-Schluessel), der Schutz laeuft weiterhin ueber die
 // Referrer-Einschraenkung, nicht ueber Geheimhaltung.
 const RGS_MAPS_SCHLUESSEL = '__MAPS_JS_KEY__';
+/* Der Schluessel fuer die NATIVE Karte (ENT-609). Ein anderer als der
+   darueber, und das ist keine Doppelung: Dieser ist auf die Bundle-ID
+   ch.guardops.mitarbeiter und auf das Maps-SDK eingeschraenkt, jener auf
+   die Web-Adresse und die JavaScript-API. Eine Website-Einschraenkung kann
+   in der App nach Googles eigener Dokumentation gar nicht greifen -- die
+   WebView laedt ihre Seiten aus dem Buendel und schickt dabei keinen
+   Referrer mit. In der Web-Fassung bleibt hier der Platzhalter stehen; sie
+   braucht ihn nicht und kaeme auch nicht daran vorbei. */
+const RGS_MAPS_IOS_SCHLUESSEL = '__MAPS_IOS_KEY__';
 let rgsMapsVersprechen = null;
 let rgsKarte = null, rgsKartenMarken = [], rgsKartenKreise = [], rgsStandortMarke = null;
 /* Der mitwachsende Kreis waehrend der Verweilzeit (ENT-579). Bewusst NICHT
@@ -8161,6 +8170,60 @@ function mapsSchluesselTauglich(wert) {
    in der Datei auf der Platte immer der Platzhalter steht (ersetzt wird er
    erst beim Ausliefern). */
 let rgsMapsSchluesselDa = mapsSchluesselTauglich(RGS_MAPS_SCHLUESSEL);
+
+/* ══ Die native Karte (ENT-609) ══════════════════════════════════════
+   In der App zeichnet nicht mehr die JavaScript-Karte, sondern das native
+   Maps-SDK. Der Grund steht bei RGS_MAPS_IOS_SCHLUESSEL: Die
+   JavaScript-Karte laesst sich in der App gar nicht ordentlich absichern.
+
+   Die Browser-Fassung bleibt unveraendert daneben bestehen, solange es die
+   Runde im Browser gibt. */
+let rgsNativKarte = null;       // die native Karte, solange sie steht
+let rgsNativVersprechen = null; // das einmal geladene Kartenplugin
+
+function rgKarteNativMoeglich() {
+  return nativeAppHuelle() && mapsSchluesselTauglich(RGS_MAPS_IOS_SCHLUESSEL);
+}
+
+/* Die zusammengefasste Kartenschicht nachladen (karte-nativ.js, erzeugt in
+   aufs-handy.sh). Eigener Weg statt eines festen <script>-Eintrags: Die
+   Datei liegt NUR im App-Buendel. Im Browser gaebe es sie nicht, und ein
+   fester Eintrag brummte dort bei jedem Seitenaufruf gegen einen 404. */
+function rgsNativLaden() {
+  if (window.KarteNativ && window.KarteNativ.GoogleMap) { return Promise.resolve(); }
+  if (rgsNativVersprechen) { return rgsNativVersprechen; }
+  rgsNativVersprechen = new Promise((resolve, reject) => {
+    const skript = document.createElement('script');
+    skript.src = 'karte-nativ.js';
+    // Dieselbe Vorsicht wie beim Kartenskript weiter unten: Ein leer
+    // beantwortetes Skript loest ebenfalls onload aus, ohne etwas zu
+    // definieren. Ohne diese Weiche bliebe eine graue Flaeche ohne jede
+    // Erklaerung zurueck.
+    skript.onload = () => {
+      if (window.KarteNativ && window.KarteNativ.GoogleMap) { resolve(); return; }
+      rgsNativVersprechen = null;
+      reject(new Error('karte-nativ-leer'));
+    };
+    skript.onerror = () => {
+      rgsNativVersprechen = null;
+      reject(new Error('karte-nativ'));
+    };
+    document.head.appendChild(skript);
+  });
+  return rgsNativVersprechen;
+}
+
+/* Die native Karte liegt NICHT im Dokument -- sie ist eine eigene Ansicht,
+   die das Betriebssystem an die Stelle des Elements haelt. Wer nur das
+   Element wegwirft, laesst sie stehen: Sie bliebe ueber der Seite liegen,
+   auch auf dem Reiter mit der Liste. Darum wird sie ausdruecklich
+   abgebaut, und zwar vor jedem Ersetzen des Rumpfs. */
+async function rgKarteNativAbbauen() {
+  if (!rgsNativKarte) { return; }
+  const weg = rgsNativKarte;
+  rgsNativKarte = null;
+  try { await weg.destroy(); } catch (e) {}
+}
 
 function rgsMapsLaden() {
   if (rgsMapsVersprechen) { return rgsMapsVersprechen; }
@@ -8365,9 +8428,23 @@ function rgKarteZeichnen() {
     rgKarteAktualisieren(d, ortungHinweis, hinweis);
     return;
   }
+  // Dasselbe fuer die native Karte (ENT-609): Steht sie, wird sie nicht
+  // weggeworfen. Der Grund ist derselbe wie bei ENT-543 darueber, und er
+  // wiegt hier schwerer -- eine native Ansicht neu aufzubauen kostet
+  // sichtbar Zeit, und der selbst gewaehlte Ausschnitt waere jedes Mal weg.
+  if (rgsNativKarte && rgsKarteEl && rgsKarteEl === $('rgsKarte')) {
+    rgKarteNativAktualisieren(d, ortungHinweis, hinweis);
+    return;
+  }
+  // Der Rumpf wird gleich ersetzt. Eine noch stehende native Karte muss
+  // VORHER weg -- sie haengt nicht am Element und bliebe sonst ueber der
+  // Seite liegen.
+  rgKarteNativAbbauen();
   $('rgsBody').innerHTML = `
     <div class="rgs-karte-huelle">
-      <div class="rgs-karte" id="rgsKarte"></div>
+      ${rgKarteNativMoeglich()
+        ? '<capacitor-google-map class="rgs-karte" id="rgsKarte"></capacitor-google-map>'
+        : '<div class="rgs-karte" id="rgsKarte"></div>'}
       <div class="rgs-karte-stand" id="rgsKarteStand">${esc(w('rgsKarteLaedt'))}</div>
       ${rgZahlenChipsHtml(true)}${rgOrtChipHtml()}
       <button type="button" class="rgs-karte-btn" id="rgsZentrieren" onclick="rgKarteZentrieren()">
@@ -8389,6 +8466,7 @@ function rgKarteZeichnen() {
   // erneut, meldet sich der Anbieter von selbst wieder.
 
   const bauLauf = ++rgsKarteBauLauf;
+  if (rgKarteNativMoeglich()) { rgKarteNativBauen(d, bauLauf); return; }
   rgsMapsLaden().then(() => {
     // Ein neuerer Aufbau hat inzwischen uebernommen -- dieser hier ist
     // ueberholt und darf nichts mehr in die Karte schreiben.
@@ -8467,6 +8545,85 @@ function rgKarteZeichnen() {
     const stand = $('rgsKarteStand');
     if (stand) { stand.textContent = w('rgsKarteFehler'); stand.classList.add('fehler'); }
   });
+}
+
+/* Die native Karte aufbauen (ENT-609).
+
+   Erster Schritt: die Karte selbst. Marken, Kreise und der eigene Standort
+   kommen darauf, sobald feststeht, dass die Karte auf dem Geraet
+   ueberhaupt erscheint -- fuer das Plugin liegt ein offener Bericht vor,
+   dass sie unter Capacitor 8 leer bleiben kann. Lieber eine Probe als ein
+   Tag Arbeit gegen eine schwarze Flaeche. */
+async function rgKarteNativBauen(d, bauLauf) {
+  const zeigen = (wort) => {
+    const stand = $('rgsKarteStand');
+    if (stand) { stand.textContent = w(wort); stand.classList.add('fehler'); }
+  };
+  try {
+    await rgsNativLaden();
+  } catch (e) {
+    // Die zusammengefasste Kartenschicht fehlt im Buendel. Das ist ein
+    // uebersprungener Schritt beim Bauen, keine Sperre beim Anbieter und
+    // kein Netzproblem -- also derselbe Text wie beim fehlenden
+    // Schluessel, nicht der Freigabe-Text.
+    if (bauLauf === rgsKarteBauLauf) { zeigen('rgsKarteOhneSchluessel'); }
+    return;
+  }
+  // Waehrend des Ladens kann ein neuerer Aufbau uebernommen oder der
+  // Reiter gewechselt haben.
+  if (bauLauf !== rgsKarteBauLauf) { return; }
+  const el = $('rgsKarte');
+  if (!el) { return; }
+  try {
+    rgsNativKarte = await window.KarteNativ.GoogleMap.create({
+      id: 'rgs-karte',
+      element: el,
+      apiKey: RGS_MAPS_IOS_SCHLUESSEL,
+      config: {
+        center: { lat: d.zeigbar[0].lat, lng: d.zeigbar[0].lng },
+        zoom: 17,
+        // NACHTSICHT FEHLT HIER NOCH -- absichtlich, und es ist der
+        // naechste Schritt. Die Browser-Fassung faerbt seit ENT-543 ueber
+        // das eingebaute Farbschema der Vektorkarte (colorScheme: DARK);
+        // die native Karte kennt das nicht, sie nimmt eine
+        // Stilvorschrift entgegen. Die frueheren Farbwerte stehen im
+        // Entscheidungsprotokoll bei ENT-543 und werden von dort geholt,
+        // sobald feststeht, dass die Karte auf dem Geraet ueberhaupt
+        // erscheint. Bis dahin ist sie hell -- auffaellig genug, dass es
+        // niemand fuer fertig haelt.
+      },
+    });
+  } catch (e) {
+    rgsNativKarte = null;
+    if (bauLauf === rgsKarteBauLauf) { zeigen('rgsKarteFehler'); }
+    return;
+  }
+  // Ein noch neuerer Aufbau hat waehrenddessen uebernommen: Diese Karte
+  // gehoert nicht mehr dorthin und muss wieder weg, sonst liegen zwei
+  // native Ansichten uebereinander.
+  if (bauLauf !== rgsKarteBauLauf) { rgKarteNativAbbauen(); return; }
+  rgsKarteEl = el;
+  // Den Hinweis erst entfernen, wenn die Karte wirklich steht -- dieselbe
+  // Reihenfolge wie in der Browser-Fassung.
+  const stand = $('rgsKarteStand');
+  if (stand) { stand.remove(); }
+}
+
+/* Was sich an der nativen Karte ohne Neubau aendert. Vorerst nur das, was
+   NEBEN der Karte steht -- die Marken kommen mit dem naechsten Schritt. */
+function rgKarteNativAktualisieren(d, ortungHinweis, hinweis) {
+  const huelle = $('rgsBody') ? $('rgsBody').querySelector('.rgs-karte-huelle') : null;
+  if (huelle) {
+    while (huelle.nextSibling) { huelle.nextSibling.remove(); }
+    huelle.insertAdjacentHTML('afterend', ortungHinweis + hinweis);
+  }
+  const chipAlt = $('rgsOrtChip');
+  const chipNeu = rgOrtChipHtml();
+  if (chipAlt && !chipNeu) { chipAlt.remove(); }
+  else if (!chipAlt && chipNeu && $('rgsZentrieren')) {
+    $('rgsZentrieren').insertAdjacentHTML('beforebegin', chipNeu);
+  }
+  rgOrtChipZeichnen();
 }
 
 /* Was sich ohne Neubau aendern kann (ENT-543).

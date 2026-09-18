@@ -673,6 +673,37 @@ if (rueckrufDa) {
   ].forEach(n => check(n + ' (nicht prüfbar: kein gm_authFailure)', false));
 }
 
+// ══════════ NATIVE KARTE NUR IN DER APP (ENT-609) ═════════════════════
+// In der App zeichnet das native Maps-SDK, im Browser weiterhin die
+// JavaScript-Karte. Geprüft wird die ENTSCHEIDUNG, nicht das Zeichnen --
+// die native Ansicht gibt es hier nicht, und genau darum muss sicher sein,
+// dass sie im Browser nie gewählt wird. Ein Browser, der in den nativen
+// Zweig liefe, bekäme gar keine Karte mehr.
+check('KRITISCH: im Browser wird NICHT der native Weg gewählt',
+  await page.evaluate(() => rgKarteNativMoeglich() === false));
+check('KRITISCH: und die Karte steht als gewöhnliches Element da, nicht als natives',
+  await page.evaluate(() => {
+    const el = document.getElementById('rgsKarte');
+    return !!el && el.tagName.toLowerCase() !== 'capacitor-google-map';
+  }));
+// Beide Bedingungen zählen einzeln. Nur die Hülle genügt nicht: Ohne
+// eingesetzten Schlüssel käme eine leere Karte statt einer Auskunft.
+check('KRITISCH: native Hülle allein genügt nicht -- ohne Schlüssel kein nativer Weg',
+  await page.evaluate(() => {
+    const merk = window.Capacitor;
+    window.Capacitor = { isNativePlatform: () => true };
+    try { return rgKarteNativMoeglich() === false; }
+    finally { window.Capacitor = merk; }
+  }));
+check('KRITISCH: mit Hülle UND Schlüssel wird der native Weg gewählt',
+  await page.evaluate(() => {
+    const merkC = window.Capacitor, merkP = window.mapsSchluesselTauglich;
+    window.Capacitor = { isNativePlatform: () => true };
+    window.mapsSchluesselTauglich = () => true;
+    try { return rgKarteNativMoeglich() === true; }
+    finally { window.Capacitor = merkC; window.mapsSchluesselTauglich = merkP; }
+  }));
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

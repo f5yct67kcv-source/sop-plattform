@@ -145,13 +145,14 @@ python3 mobile-buendel-erstellen.py
 maps_schluessel_einsetzen() {
   ZIEL="$1"
   QUELLE="${2:-mobile/.maps-key}"
+  PLATZ="${3:-__MAPS_JS_KEY__}"
   if [ ! -f "$QUELLE" ]; then
     # Frueher schwieg dieser Zweig. Die App landete dann mit dem Platzhalter
     # statt eines Schluessels auf dem Geraet, Google lehnte ihn ab, und in
     # der laufenden Runde stand statt der Karte eine graue Tafel --
     # gemeldet vom Projektinhaber. Ein uebersprungener Schritt darf nicht
     # wie ein gelungener aussehen (CLAUDE.md).
-    echo "        KEINE Karte: $QUELLE fehlt."
+    echo "        KEINE Karte ($PLATZ): $QUELLE fehlt."
     echo "        Die Rundgang-Karte bleibt auf dem Geraet leer, alles andere laeuft."
     echo "        Abhilfe: den Google-Maps-JS-Schluessel einmal ablegen --"
     echo "            printf '%s' 'DEIN_SCHLUESSEL' > $QUELLE"
@@ -163,7 +164,7 @@ maps_schluessel_einsetzen() {
   fi
   KEY="$(tr -d '[:space:]' < "$QUELLE")"
   if [ -z "$KEY" ]; then
-    echo "        KEINE Karte: $QUELLE ist leer."
+    echo "        KEINE Karte ($PLATZ): $QUELLE ist leer."
     echo "        Die Rundgang-Karte bleibt auf dem Geraet leer, alles andere laeuft."
     return 0
   fi
@@ -171,14 +172,22 @@ maps_schluessel_einsetzen() {
   # aussteigt ("illegal byte sequence"). Das leere Argument nach -i ist
   # die BSD-Schreibweise fuer "keine Sicherungskopie".
   if sed --version >/dev/null 2>&1; then
-    LC_ALL=C sed -i "s|__MAPS_JS_KEY__|$KEY|g" "$ZIEL"
+    LC_ALL=C sed -i "s|$PLATZ|$KEY|g" "$ZIEL"
   else
-    LC_ALL=C sed -i '' "s|__MAPS_JS_KEY__|$KEY|g" "$ZIEL"
+    LC_ALL=C sed -i '' "s|$PLATZ|$KEY|g" "$ZIEL"
   fi
-  echo "        Maps-Schluessel eingesetzt"
+  echo "        Maps-Schluessel eingesetzt ($PLATZ)"
 }
 
 maps_schluessel_einsetzen mobile/www/index.html
+
+# Der zweite Schluessel, fuer die NATIVE Karte (ENT-609). Bewusst ein
+# anderer: Dieser ist auf die Bundle-ID und das Maps-SDK eingeschraenkt,
+# der obige auf die Web-Adresse und die JavaScript-API. In der App wird
+# der native gebraucht -- eine Website-Einschraenkung kann dort nach
+# Googles eigener Dokumentation gar nicht greifen, weil die WebView beim
+# Laden aus dem Buendel keinen Referrer mitschickt.
+maps_schluessel_einsetzen mobile/www/index.html mobile/.maps-ios-key __MAPS_IOS_KEY__
 
 echo "── 3/5  Nach iOS uebertragen"
 cd mobile
@@ -192,6 +201,25 @@ cd mobile
 # geschriebene Package.swift bei jedem Lauf als lokale Aenderung im Stash
 # landete.
 npm install --silent
+
+# Die Kartenschicht des Plugins zu EINER Datei zusammenfassen (ENT-609).
+#
+# Muss nach npm install laufen (die Quelle liegt in node_modules) und vor
+# cap sync (das Ergebnis gehoert ins Buendel, das dort kopiert wird).
+#
+# Warum ueberhaupt: app.html ist eine einzelne Datei ohne Buendler und
+# spricht Plugins sonst ueber window.Capacitor.Plugins an. Fuer die Karte
+# genuegt das nicht -- siehe Kopf von karte-nativ-eingang.js.
+echo "        Kartenschicht zusammenfassen"
+if ! npx --no-install esbuild karte-nativ-eingang.js \
+     --bundle --format=iife --global-name=KarteNativ \
+     --outfile=www/karte-nativ.js --log-level=warning; then
+  echo ""
+  echo "  Die Kartenschicht liess sich nicht zusammenfassen."
+  echo "  Ohne sie bleibt die Karte in der Runde leer, alles andere laeuft."
+  echo "  Meist hilft: cd mobile && rm -rf node_modules && npm install"
+  exit 1
+fi
 
 npx cap sync ios
 
