@@ -99,6 +99,26 @@ function termin_antwort(array $m): string
     return termin_antwort_gueltig($a) ? $a : 'offen';
 }
 
+/**
+ * Bis wann ein Termin von selbst sichtbar bleibt, wenn niemand ein
+ * "sichtbar bis" von Hand eingetragen hat: bis zum ENDE seines letzten
+ * Tages.
+ *
+ * Der Tag entscheidet, nicht die Uhrzeit. Frueher lief ein Termin genau in
+ * dem Moment ab, in dem er begann -- ein Termin um 10 Uhr war um 10 Uhr aus
+ * der App verschwunden, und wer mittags nachsah, fand nicht einmal mehr,
+ * was er verpasst hatte. Ein Termin, dessen Tag laeuft, gehoert auf den
+ * Bildschirm.
+ *
+ * $ende darf NULL sein (Termin ohne eigenes Ende), dann zaehlt der Beginn.
+ * Beide kommen als "JJJJ-MM-TT HH:MM:SS".
+ */
+function termin_sichtbar_bis(string $beginn, ?string $ende): string
+{
+    $letzter = ($ende !== null && $ende !== '') ? $ende : $beginn;
+    return substr($letzter, 0, 10) . ' 23:59:59';
+}
+
 function mitteilung_zielgruppe_gueltig(string $wert): bool
 {
     return in_array($wert, MITTEILUNG_ZIELGRUPPEN, true);

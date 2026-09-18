@@ -380,8 +380,8 @@ function push_apns_jwt(?int $jetzt = null): ?string
  * laeuft -- ein content-available-Push (still, ohne Anzeige) braucht eine
  * eigene Hintergrundausfuehrung, die diese App nicht hat.
  *
- * "apns-priority: 10" nur fuer wichtige Mitteilungen, sonst 5 -- dieselbe
- * Idee wie "Urgency" bei Web Push.
+ * Die Dringlichkeit steht in push_apns_kopfzeilen(), samt Begruendung,
+ * warum sie fuer JEDE Mitteilung hoch ist.
  */
 /**
  * Die Adresse eines Geraets bei Apple. Zwei Umgebungen, streng getrennt:
@@ -400,7 +400,7 @@ function push_apns_adresse(string $token, bool $sandkasten): string
     return 'https://' . $wirt . '/3/device/' . $token;
 }
 
-function push_apns_senden(array $abo, bool $wichtig): array
+function push_apns_senden(array $abo): array
 {
     $token = (string)($abo['endpunkt'] ?? '');
     if (!push_apns_token_gueltig($token)) {
@@ -421,9 +421,9 @@ function push_apns_senden(array $abo, bool $wichtig): array
     // BadDeviceToken. Dieser Grund gilt unten als "Geraet gibt es nicht
     // mehr" -- das Abo wurde also bei JEDEM Versuch geloescht, und es kam
     // nie etwas an.
-    $ergebnis = push_apns_versuch($token, $jwt, $wichtig, false);
+    $ergebnis = push_apns_versuch($token, $jwt, false);
     if (push_apns_sandkasten_probieren($ergebnis)) {
-        $ergebnis = push_apns_ergebnis_waehlen($ergebnis, push_apns_versuch($token, $jwt, $wichtig, true));
+        $ergebnis = push_apns_ergebnis_waehlen($ergebnis, push_apns_versuch($token, $jwt, true));
     }
     return $ergebnis;
 }
@@ -459,7 +459,42 @@ function push_apns_ergebnis_waehlen(array $erster, array $zweiter): array
     return ($zweiter['ausgang'] ?? '') === 'entfernen' ? $erster : $zweiter;
 }
 
-function push_apns_versuch(string $token, string $jwt, bool $wichtig, bool $sandkasten): array
+/**
+ * Die Kopfzeilen fuer Apple. Eigene Funktion, damit sich die Dringlichkeit
+ * ohne Netzverbindung pruefen laesst.
+ *
+ * "apns-priority: 10" heisst SOFORT zustellen, und zwar fuer JEDE
+ * Mitteilung -- nicht nur fuer wichtige (ENT-604, Aenderung vom
+ * Projektinhaber nach dem ersten Geraetetest).
+ *
+ * WARUM: Vorher trug eine normale Mitteilung die 5. Die bedeutet bei
+ * Apple "stell zu, wenn es dem Akku gerade passt" -- der Dienst darf sie
+ * sammeln und Stunden spaeter ausliefern. Beim Testen sah das aus, als
+ * kaeme ueberhaupt nur eine wichtige Mitteilung durch, und die normale
+ * tauchte erst viel spaeter auf. Fuer eine Belegschaft, die im Dienst auf
+ * eine Ansage wartet, ist "irgendwann" kein Zustand: Wer eine Mitteilung
+ * schreibt, will, dass sie ankommt.
+ *
+ * Die Stufe bleibt davon unberuehrt sichtbar: "wichtig" legt sich in der
+ * App beim naechsten Oeffnen ueber den Bildschirm und muss bestaetigt
+ * werden. Der Unterschied steckt also weiter drin, nur nicht mehr in der
+ * Frage, OB die Meldung ankommt.
+ *
+ * Preis, bewusst in Kauf genommen: etwas mehr Akku, und eine Mitteilung um
+ * drei Uhr klingelt auch um drei Uhr.
+ */
+function push_apns_kopfzeilen(string $jwt): array
+{
+    return [
+        'authorization: bearer ' . $jwt,
+        'apns-topic: ' . APNS_BUNDLE_ID,
+        'apns-push-type: alert',
+        'apns-priority: 10',
+        'content-type: application/json',
+    ];
+}
+
+function push_apns_versuch(string $token, string $jwt, bool $sandkasten): array
 {
     $ch = curl_init(push_apns_adresse($token, $sandkasten));
     curl_setopt_array($ch, [
@@ -471,13 +506,7 @@ function push_apns_versuch(string $token, string $jwt, bool $wichtig, bool $sand
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 10,
         CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_2_0,
-        CURLOPT_HTTPHEADER     => [
-            'authorization: bearer ' . $jwt,
-            'apns-topic: ' . APNS_BUNDLE_ID,
-            'apns-push-type: alert',
-            'apns-priority: ' . ($wichtig ? '10' : '5'),
-            'content-type: application/json',
-        ],
+        CURLOPT_HTTPHEADER     => push_apns_kopfzeilen($jwt),
     ]);
     $antwort = curl_exec($ch);
     $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
@@ -599,25 +628,29 @@ function push_antwort_deuten(int $code): string
  * jeder Kanal bringt seinen eigenen Transportweg und seine eigene
  * Kryptografie mit.
  */
-function push_zustellen(array $abo, bool $wichtig): array
+function push_zustellen(array $abo): array
 {
     if ((string)($abo['kanal'] ?? 'webpush') === 'apns') {
-        return push_apns_senden($abo, $wichtig);
+        return push_apns_senden($abo);
     }
-    return push_webpush_senden($abo, $wichtig);
+    return push_webpush_senden($abo);
 }
 
 /**
  * Eine Benachrichtigung an ein Web-Push-Abo zustellen.
  *
  * Ohne Nutzlast (Festlegung 2): leerer Rumpf, kein Content-Encoding.
- * "Urgency: high" nur fuer wichtige Mitteilungen -- niedrige Dringlichkeit
- * darf ein Push-Dienst zurueckhalten, bis das Geraet ohnehin wach ist.
+ * "Urgency: high" fuer JEDE Mitteilung, aus demselben Grund wie die
+ * apns-priority bei Apple (siehe push_apns_kopfzeilen): Eine niedrige
+ * Dringlichkeit darf ein Push-Dienst zurueckhalten, bis das Geraet ohnehin
+ * wach ist -- fuer eine Ansage an die Belegschaft ist "irgendwann" kein
+ * Zustand. Beide Kanaele verhalten sich hier gleich, sonst haenge das
+ * Ankommen davon ab, welches Telefon jemand hat.
  *
  * Der Netzzugriff steckt in einer eigenen, ersetzbaren Funktion, damit
  * die Pruefung alles davor und danach ohne Netz durchspielen kann.
  */
-function push_webpush_senden(array $abo, bool $wichtig): array
+function push_webpush_senden(array $abo): array
 {
     // Zwei verschiedene Fehler, und sie brauchen zwei verschiedene Folgen
     // (ENT-501). Bis hierher gab es nur "keine https-Adresse" -> entfernen.
@@ -656,7 +689,7 @@ function push_webpush_senden(array $abo, bool $wichtig): array
         CURLOPT_HTTPHEADER     => [
             'Authorization: vapid t=' . $jwt . ', k=' . $pub,
             'TTL: 86400',
-            'Urgency: ' . ($wichtig ? 'high' : 'normal'),
+            'Urgency: high',
             'Content-Length: 0',
         ],
     ]);
@@ -776,11 +809,10 @@ function push_fuer_mitteilung(PDO $pdo, array $m, string $jetzt): array
     if (!push_konfiguriert() || !hat_tabelle($pdo, 'push_abo')) { return $bilanz; }
 
     $abos = push_abos_fuer_mitteilung($pdo, $m);
-    $wichtig = (string)($m['stufe'] ?? 'normal') === 'wichtig';
 
     foreach ($abos as $abo) {
         $bilanz['geraete']++;
-        $e = push_zustellen($abo, $wichtig);
+        $e = push_zustellen($abo);
         if ($e['ausgang'] === 'ok') {
             $bilanz['zugestellt']++;
             push_abo_erfolg($pdo, (int)$abo['id'], $jetzt);

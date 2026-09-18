@@ -555,5 +555,40 @@ pruef('KRITISCH: lehnt auch der Sandkasten ab, bleibt es beim ERSTEN Ergebnis',
 pruef('KRITISCH: eine Stoerung im Sandkasten ueberschreibt das Entfernen nicht stillschweigend mit Erfolg',
     push_apns_ergebnis_waehlen($badToken, $gestoert)['ausgang'] === 'fehler');
 
+// ── Jede Mitteilung wird sofort zugestellt ───────────────────────────────
+//
+// Vorher trug eine normale Mitteilung "apns-priority: 5". Das heisst bei
+// Apple "stell zu, wenn es dem Akku gerade passt" -- der Dienst darf sie
+// sammeln und Stunden spaeter ausliefern. Beim ersten Geraetetest sah das
+// aus, als komme ueberhaupt nur eine als "wichtig" gekennzeichnete
+// Mitteilung durch. Auf Entscheidung des Projektinhabers geht jetzt jede
+// sofort hinaus; die Stufe bleibt in der App sichtbar (das
+// Bestaetigungsfenster bei "wichtig"), nur nicht mehr an der Frage, OB
+// etwas ankommt.
+$kopf = push_apns_kopfzeilen('jwt-attrappe');
+$kopfText = implode("\n", $kopf);
+pruef('KRITISCH: Apple bekommt die sofortige Zustellung angesagt',
+    in_array('apns-priority: 10', $kopf, true));
+pruef('KRITISCH: keine zurueckhaltbare Dringlichkeit mehr im Kopf',
+    !str_contains($kopfText, 'apns-priority: 5'));
+// Ohne "alert" zeigt iOS nichts an, solange die App nicht laeuft -- eine
+// sofort zugestellte Meldung, die niemand sieht, waere sinnlos.
+pruef('KRITISCH: die Meldung ist als anzuzeigender Alarm gekennzeichnet',
+    in_array('apns-push-type: alert', $kopf, true));
+pruef('KRITISCH: die App-Kennung faehrt mit, sonst weist Apple die Meldung ab',
+    in_array('apns-topic: ' . APNS_BUNDLE_ID, $kopf, true));
+pruef('KRITISCH: das JWT steht im Kopf, sonst fehlt die Berechtigung',
+    str_contains($kopfText, 'jwt-attrappe'));
+
+// Die Dringlichkeit haengt an NICHTS mehr: Die Versandfunktionen nehmen
+// die Stufe gar nicht mehr entgegen. Damit kann sie auch nicht versehentlich
+// wieder eingeschleift werden, ohne dass diese Pruefung faellt.
+$r = new ReflectionFunction('push_zustellen');
+pruef('KRITISCH: push_zustellen() kennt keine Stufe mehr -- sie kann die Zustellung nicht beeinflussen',
+    $r->getNumberOfParameters() === 1);
+$rw = new ReflectionFunction('push_webpush_senden');
+pruef('KRITISCH: auch der Web-Push-Weg kennt sie nicht mehr',
+    $rw->getNumberOfParameters() === 1);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

@@ -4626,8 +4626,9 @@ function mitZeichnen() {
     if (m.verfasser_name) { fuss.push(esc(w('mitVon')) + ' ' + esc(m.verfasser_name)); }
     fuss.push(dmy(m.erstellt_am));
     // Bei einem Termin steht das Ablaufdatum NICHT im Fuss: Es ist
-    // derselbe Zeitpunkt wie der Termin selbst (siehe mitteilung_save.php)
-    // und stuende sonst zweimal da, einmal als "läuft ab".
+    // derselbe TAG wie der Termin selbst -- mitteilung_save.php setzt
+    // "sichtbar bis" auf dessen Tagesende -- und stuende sonst zweimal
+    // da, einmal als "läuft ab".
     if (m.sichtbar_bis && !termin) { fuss.push(esc(w('mitLaeuftAb')) + ' ' + dmy(m.sichtbar_bis)); }
     return `<article class="mit-karte${m.gelesen ? '' : ' neu'}${wichtig ? ' wichtig' : ''}${termin ? ' termin' : ''}" data-id="${m.id}">
       ${marken.length ? `<div class="mit-marken">${marken.join('')}</div>` : ''}
