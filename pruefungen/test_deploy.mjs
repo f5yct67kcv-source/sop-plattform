@@ -1629,6 +1629,73 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   }
 }
 
+// ══════════ FÜR WELCHES ZIEL GEBAUT WIRD (aufs-handy.sh) ══════════════
+// Vom Projektinhaber gemeldet: Der Lauf brach mit "Unable to find a
+// destination matching { id:... }" ab und listete nur Simulatoren auf --
+// obwohl das iPhone angeschlossen war und Schritt 4 es eben noch gefunden
+// hatte. Apples zwei Werkzeuge führen getrennte Gerätelisten: devicectl
+// sah es, xcodebuild nicht.
+//
+// Wieder durch AUSFÜHREN geprüft, nicht durch Lesen: xcodebuild wird für
+// den Test durch ein Skript ersetzt, das einmal mit und einmal ohne das
+// Gerät antwortet.
+{
+  const { mkdtempSync, writeFileSync, chmodSync, rmSync } = await import('fs');
+  const { execFileSync } = await import('child_process');
+  const { tmpdir } = await import('os');
+  const { join } = await import('path');
+
+  const skript = readFileSync(`${WURZEL}/aufs-handy.sh`, 'utf8');
+  const von = skript.indexOf('bau_ziel_waehlen() {');
+  const bis = skript.indexOf('\n}\n', von);
+  check('KRITISCH: die Wahl des Bauziels steht als eigene, prüfbare Funktion da',
+    von !== -1 && bis !== -1);
+
+  if (von !== -1 && bis !== -1) {
+    const fn = skript.slice(von, bis + 3);
+    const KENNUNG = '00008130-000000000000000A';
+    // Was xcodebuild -showdestinations ausgibt, wenn es das Gerät NICHT
+    // sieht: nur Simulatoren und die beiden Platzhalter.
+    const OHNE = [
+      '{ platform:macOS, arch:arm64, id:00006034-000000000000001C, name:My Mac }',
+      '{ platform:iOS, id:dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder, name:Any iOS Device }',
+      '{ platform:iOS Simulator, arch:arm64, id:D30B9AE4-0000-0000-0000-000000000000, OS:26.5, name:iPhone 17 }',
+    ].join('\n');
+    const MIT = OHNE + `\n{ platform:iOS, arch:arm64, id:${KENNUNG}, name:Diensthandy }`;
+
+    const lauf = (liste, kennung) => {
+      const ordner = mkdtempSync(join(tmpdir(), 'bauziel-'));
+      try {
+        const stub = join(ordner, 'xcodebuild');
+        writeFileSync(stub, `#!/bin/sh\ncat <<'ENDE'\n${liste}\nENDE\n`);
+        chmodSync(stub, 0o755);
+        return execFileSync('bash', ['-c',
+          fn + '\nbau_ziel_waehlen "$1" -project irgendwas -scheme App', '--', kennung],
+          { encoding: 'utf8', env: { ...process.env, PATH: `${ordner}:${process.env.PATH}` } }).trim();
+      } finally { rmSync(ordner, { recursive: true, force: true }); }
+    };
+
+    check('KRITISCH: sieht xcodebuild das Gerät, wird für genau dieses gebaut',
+      lauf(MIT, KENNUNG) === `id=${KENNUNG}`);
+    // Der eigentliche Befund: Vorher stand hier fest "id=<UDID>", und der
+    // Lauf brach ab, statt auszuweichen.
+    check('KRITISCH: sieht es xcodebuild NICHT, wird allgemein für iOS gebaut statt abgebrochen',
+      lauf(OHNE, KENNUNG) === 'generic/platform=iOS');
+    check('KRITISCH: ohne bekannte Gerätekennung ebenfalls allgemein für iOS',
+      lauf(MIT, '') === 'generic/platform=iOS');
+    // Ein Simulator darf die Wahl nie gewinnen -- sonst landet die App
+    // nicht auf dem Telefon, und das fiele erst beim Installieren auf.
+    check('KRITISCH: das Ergebnis ist nie ein Simulator',
+      !lauf(OHNE, KENNUNG).includes('Simulator') && !lauf(MIT, KENNUNG).includes('Simulator'));
+  } else {
+    ['KRITISCH: sieht xcodebuild das Gerät, wird für genau dieses gebaut',
+     'KRITISCH: sieht es xcodebuild NICHT, wird allgemein für iOS gebaut statt abgebrochen',
+     'KRITISCH: ohne bekannte Gerätekennung ebenfalls allgemein für iOS',
+     'KRITISCH: das Ergebnis ist nie ein Simulator',
+    ].forEach(n => check(n + ' (nicht prüfbar: Funktion nicht gefunden)', false));
+  }
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

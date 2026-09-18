@@ -249,18 +249,30 @@ DEVCTL="$(xcrun devicectl list devices 2>/dev/null \
   | grep -oE '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}' \
   | head -1 || true)"
 
-if [ -z "$UDID" ] || [ -z "$DEVCTL" ]; then
+# Ohne devicectl-Kennung geht gar nichts -- ueber sie laeuft das
+# Installieren und das Starten. Die UDID ist dagegen KEINE Vorbedingung
+# mehr: Sie dient nur dazu, gezielt fuer dieses eine Geraet zu bauen, und
+# xcodebuild fuehrt seine Geraeteliste getrennt von devicectl. Genau das
+# ist hier passiert -- devicectl sah das iPhone, xcodebuild nicht, und der
+# Lauf brach mit "Unable to find a destination" ab, obwohl das Telefon
+# angeschlossen war. Fehlt sie, wird allgemein fuer iOS gebaut; das
+# Ergebnis landet ueber devicectl genauso auf dem Geraet.
+if [ -z "$DEVCTL" ]; then
   echo ""
   echo "  Kein einsatzbereites iPhone gefunden."
-  [ -z "$UDID" ]   && echo "    - xcodebuild sieht keines (Kabel, Sperre, Vertrauensfrage?)"
-  [ -z "$DEVCTL" ] && echo "    - devicectl sieht keines (Entwicklermodus eingeschaltet?)"
+  echo "    - devicectl sieht keines (Kabel, Sperre, Vertrauensfrage,"
+  echo "      Entwicklermodus eingeschaltet?)"
   echo ""
   echo "  Was die beiden Werkzeuge melden:"
   xcrun xctrace list devices 2>/dev/null | sed -n '1,/== Simulators ==/p' | sed 's/^/    /'
   xcrun devicectl list devices 2>&1 | sed 's/^/    /'
   exit 1
 fi
-echo "        gefunden (Bau: ${UDID}, Installation: ${DEVCTL})"
+if [ -n "$UDID" ]; then
+  echo "        gefunden (Bau: ${UDID}, Installation: ${DEVCTL})"
+else
+  echo "        gefunden (Installation: ${DEVCTL})"
+fi
 
 echo "── 5/5  Bauen, installieren, starten"
 # Bewusst NICHT "npx cap run ios": Dessen Hilfsprogramm native-run kennt
@@ -298,13 +310,46 @@ else
   WIE=(-target App)
 fi
 
+# Fuer WELCHES Ziel gebaut wird.
+#
+# Am liebsten fuer genau dieses iPhone (-destination id=...): Dann baut
+# Xcode nur die noetige Architektur und traegt das Geraet bei Bedarf gleich
+# ins Bereitstellungsprofil ein.
+#
+# Nur sieht xcodebuild das Geraet nicht immer, auch wenn es dasteht --
+# waehrend Xcode es nach einem iOS-Update noch vorbereitet, bei gesperrtem
+# Bildschirm, ueber WLAN statt Kabel. devicectl sieht es in diesen Faellen
+# laengst. Frueher brach der Lauf dann mit "Unable to find a destination
+# matching ..." ab und listete hilflos alle Simulatoren auf.
+#
+# Darum wird gefragt statt angenommen: Bietet xcodebuild dieses Geraet an,
+# wird es genommen; sonst wird allgemein fuer iOS gebaut. Installiert wird
+# so oder so ueber devicectl, und dem ist die Herkunft des Bauwerks egal.
+bau_ziel_waehlen() {
+  GESUCHT="$1"; shift
+  if [ -n "$GESUCHT" ] \
+     && xcodebuild "$@" -showdestinations 2>/dev/null | grep -q "$GESUCHT"; then
+    echo "id=$GESUCHT"
+  else
+    echo "generic/platform=iOS"
+  fi
+}
+
+BAUZIEL="$(bau_ziel_waehlen "$UDID" "${ZIEL[@]}" "${WIE[@]}")"
+if [ "$BAUZIEL" = "generic/platform=iOS" ]; then
+  echo "        xcodebuild sieht dieses iPhone gerade nicht --"
+  echo "        es wird allgemein fuer iOS gebaut und danach ueber devicectl"
+  echo "        installiert. Haeufigster Grund: Xcode bereitet das Geraet nach"
+  echo "        einem iOS-Update noch vor (Fenster \"Devices and Simulators\")."
+fi
+
 # -allowProvisioningUpdates laesst Xcode ein fehlendes Bereitstellungs-
 # profil selbst anlegen, statt den Bau abzubrechen.
 xcodebuild \
   "${ZIEL[@]}" \
   "${WIE[@]}" \
   -configuration Debug \
-  -destination "id=$UDID" \
+  -destination "$BAUZIEL" \
   -derivedDataPath "$DD" \
   -allowProvisioningUpdates \
   build
