@@ -454,11 +454,23 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
       border: 1px solid var(--line); border-radius: 9px; margin-bottom: 16px; }
 .qr svg { display: block; width: 180px; height: 180px; }
 
-/* Fuenf Reiter zu je 84 px passen unter rund 900 px nicht mehr neben
+/* Die Reiter passen unterhalb einer bestimmten Breite nicht mehr neben
    Titel und Abmelden-Knopf. Sie bekommen dann eine eigene Zeile ueber die
    ganze Breite und scrollen darin waagrecht -- die SEITE selbst scrollt
-   nie quer, das ist der Unterschied (Hausregel). */
-@media (max-width: 900px) {
+   nie quer, das ist der Unterschied (Hausregel).
+
+   DIE GRENZE HAENGT AN DER ZAHL DER REITER und ist GEMESSEN, nicht
+   geschaetzt: Sie lag bei fuenf Reitern bei 900 px. Mit "Adressen"
+   (ENT-605) sind es sieben, das Band ist 615 px breit, und die Mitte
+   kippt ab 1085 px nach links -- die rechte Spalte (Zahnrad,
+   Hell/Dunkel, Abmelden) laesst sich nicht weiter schmaelern, die linke
+   schon. Ein Raster 1fr auto 1fr haelt die Mitte nur, solange BEIDE
+   Aussenspalten ihren Inhalt fassen; sonst steht Mittiges zwischen zwei
+   ungleich langen Seiten statt in der Mitte des Containers.
+
+   Wer einen Reiter hinzufuegt oder wegnimmt, misst diese Grenze neu.
+   test_marke_portale.mjs schlaegt an, wenn sie nicht mehr stimmt. */
+@media (max-width: 1090px) {
   .kopf { grid-template-columns: 1fr auto; row-gap: 10px; }
   .kopf-nav {
     grid-row: 2; grid-column: 1 / -1; justify-content: flex-start;
@@ -597,18 +609,27 @@ tbody tr.aus td { opacity: .55; }
 .rowmenu-pop button:hover { background: var(--surface-3); }
 .rowmenu-pop hr { border: none; border-top: 1px solid var(--line-soft); margin: 4px 2px; }
 
-/* ── Dialoge ── */
-.dlg-huelle { position: fixed; inset: 0; background: rgba(12,14,20,.45); z-index: 900;
+/* ── Dialoge des Offertenteils ──
+   Heissen of-dlg* und NICHT dlg*: Die kurzen Namen gehoeren seit dem
+   Einrichtungs-Zahnrad bereits dem Dialog daneben (.dlg-schleier/.dlg,
+   weiter oben). Eine zweite Regel gleichen Namens haette ihn stillschweigend
+   umgestaltet -- breiter, anders gerundet, anderer Schatten -- ohne dass
+   irgendetwas kaputtgegangen waere. Genau dieser Fall ist hier schon einmal
+   teuer geworden (ENT-536: ".leer" traf den Leerzustand UND eine Kennzahl
+   auf null). Beim Zusammenfuehren zweier Sitzungen faellt er nicht auf:
+   Git verschmilzt zwei Bloecke geraeuschlos, und die spaetere Regel
+   gewinnt. */
+.of-dlg-huelle { position: fixed; inset: 0; background: rgba(12,14,20,.45); z-index: 900;
   display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
-.dlg-huelle.on { display: flex; }
-.dlg { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh-3);
+.of-dlg-huelle.on { display: flex; }
+.of-dlg { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh-3);
   width: 100%; max-width: 560px; display: flex; flex-direction: column; max-height: calc(100vh - 80px); }
-.dlg.breit { max-width: 900px; }
-.dlg-hd { padding: 18px 22px 14px; border-bottom: 1px solid var(--line-soft); }
-.dlg-hd h2 { margin: 0; font-size: 16px; }
-.dlg-hd p { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-3); }
-.dlg-bd { padding: 20px 22px; overflow-y: auto; }
-.dlg-ft { padding: 14px 22px; border-top: 1px solid var(--line-soft);
+.of-dlg.breit { max-width: 900px; }
+.of-dlg-hd { padding: 18px 22px 14px; border-bottom: 1px solid var(--line-soft); }
+.of-dlg-hd h2 { margin: 0; font-size: 16px; }
+.of-dlg-hd p { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.of-dlg-bd { padding: 20px 22px; overflow-y: auto; }
+.of-dlg-ft { padding: 14px 22px; border-top: 1px solid var(--line-soft);
   display: flex; gap: 9px; justify-content: flex-end; }
 
 /* ── Offertformular ──
@@ -695,8 +716,8 @@ tbody tr.aus td { opacity: .55; }
   .search { flex: 1 1 100%; max-width: none; }
   .bar-tools .sp { display: none; }
   .bar-tools .btn { flex: 1 1 auto; }
-  .dlg-huelle { padding: 0; }
-  .dlg, .dlg.breit { max-width: none; border-radius: 0; height: 100%; max-height: none; }
+  .of-dlg-huelle { padding: 0; }
+  .of-dlg, .of-dlg.breit { max-width: none; border-radius: 0; height: 100%; max-height: none; }
 }
 
 /* ── Druck ──
@@ -1515,13 +1536,13 @@ tbody tr.aus td { opacity: .55; }
 <div class="rowmenu-pop" id="rowmenuPop"></div>
 
 <!-- Adresse erfassen oder ändern -->
-<div class="dlg-huelle" id="dlgAdresse">
-  <div class="dlg breit">
-    <div class="dlg-hd">
+<div class="of-dlg-huelle" id="dlgAdresse">
+  <div class="of-dlg breit">
+    <div class="of-dlg-hd">
       <h2 id="adDlgTitel">Adresse erfassen</h2>
       <p>Ein Betrieb, der diese Plattform nutzen soll. Aus ihm wird später ein Mandant.</p>
     </div>
-    <div class="dlg-bd">
+    <div class="of-dlg-bd">
       <div class="meldung fehler versteckt" id="adErr"></div>
       <div class="raster2">
         <div class="f"><label for="ad_name">Firma *</label>
@@ -1566,7 +1587,7 @@ tbody tr.aus td { opacity: .55; }
         <textarea class="inp" id="ad_notiz" rows="2" style="min-height:60px"
           placeholder="Nur intern — steht auf keiner Offerte."></textarea></div>
     </div>
-    <div class="dlg-ft">
+    <div class="of-dlg-ft">
       <button type="button" class="btn btn-plain" onclick="dlgZu('dlgAdresse')">Abbrechen</button>
       <button type="button" class="btn btn-primary" id="adSaveBtn" onclick="adSpeichern()">Speichern</button>
     </div>
@@ -1574,13 +1595,13 @@ tbody tr.aus td { opacity: .55; }
 </div>
 
 <!-- Leistung anlegen oder ändern -->
-<div class="dlg-huelle" id="dlgLeistung">
-  <div class="dlg">
-    <div class="dlg-hd">
+<div class="of-dlg-huelle" id="dlgLeistung">
+  <div class="of-dlg">
+    <div class="of-dlg-hd">
       <h2 id="pdDlgTitel">Leistung anlegen</h2>
       <p>Vorschlagswert für Offerten. Eine Änderung wirkt nur auf künftige Belege — bereits erfasste behalten ihre Werte.</p>
     </div>
-    <div class="dlg-bd">
+    <div class="of-dlg-bd">
       <div class="meldung fehler versteckt" id="pdErr"></div>
       <div class="f"><label for="pd_name">Name *</label>
         <input class="inp" id="pd_name"></div>
@@ -1598,7 +1619,7 @@ tbody tr.aus td { opacity: .55; }
           <input class="inp num" id="pd_sortierung" inputmode="numeric" value="0"></div>
       </div>
     </div>
-    <div class="dlg-ft">
+    <div class="of-dlg-ft">
       <button type="button" class="btn btn-plain" onclick="dlgZu('dlgLeistung')">Abbrechen</button>
       <button type="button" class="btn btn-primary" id="pdSaveBtn" onclick="pdSpeichern()">Speichern</button>
     </div>
@@ -1607,18 +1628,18 @@ tbody tr.aus td { opacity: .55; }
 
 <!-- Vorschau: dasselbe Blatt wie beim Drucken, nur in einem Dialog statt
      im Druckdialog. Diese Ansicht IST das Dokument. -->
-<div class="dlg-huelle" id="dlgOfVorschau">
-  <div class="dlg breit">
-    <div class="dlg-hd">
+<div class="of-dlg-huelle" id="dlgOfVorschau">
+  <div class="of-dlg breit">
+    <div class="of-dlg-hd">
       <h2>Vorschau</h2>
       <p>So sieht die Offerte für den Empfänger aus.</p>
     </div>
-    <div class="dlg-bd" id="ofVorschauInhalt">
+    <div class="of-dlg-bd" id="ofVorschauInhalt">
       <div id="ofVorschauMass" style="overflow:hidden">
         <div id="ofVorschauBlatt" style="transform-origin:top left"></div>
       </div>
     </div>
-    <div class="dlg-ft">
+    <div class="of-dlg-ft">
       <button type="button" class="btn btn-plain" onclick="dlgZu('dlgOfVorschau')">Schliessen</button>
       <button type="button" class="btn btn-primary" onclick="ofDrucken(ofFormId)">Drucken</button>
     </div>
@@ -1628,13 +1649,13 @@ tbody tr.aus td { opacity: .55; }
 <!-- Sicherheitsabfrage. Eigener Dialog statt confirm(): Eine verschickte
      E-Mail laesst sich nicht zurueckholen, und ein Browser-Dialog sagt
      nicht, was genau passiert. -->
-<div class="dlg-huelle" id="dlgFrage">
-  <div class="dlg" style="max-width:440px">
-    <div class="dlg-hd">
+<div class="of-dlg-huelle" id="dlgFrage">
+  <div class="of-dlg" style="max-width:440px">
+    <div class="of-dlg-hd">
       <h2 id="frageTitel">–</h2>
       <p id="frageText">–</p>
     </div>
-    <div class="dlg-ft">
+    <div class="of-dlg-ft">
       <button type="button" class="btn btn-plain" onclick="dlgZu('dlgFrage')">Abbrechen</button>
       <button type="button" class="btn btn-primary" id="frageJa">Weiter</button>
     </div>
@@ -2836,19 +2857,13 @@ function nichtEingerichtet(ziel, was) {
     was + ' braucht Tabellen, die auf diesem Server noch fehlen. '
     + 'Einmal einrichten, dann steht der Bereich.')
     + '<div style="text-align:center;padding:0 24px 32px">'
-    + '<button type="button" class="btn btn-primary" onclick="offertenEinrichten(this)">Jetzt einrichten</button></div>';
+    + '<button type="button" class="btn btn-primary" onclick="einrichtungOeffnen()">Jetzt einrichten</button></div>';
 }
 
-async function offertenEinrichten(knopf) {
-  if (knopf) { knopf.disabled = true; }
-  const a = await ruf('betreiber_einrichtung.php', {});
-  if (knopf) { knopf.disabled = false; }
-  if (a.status !== 'ok') {
-    kurzmeldung((a.fehler && a.fehler[0]) || a.message || 'Einrichten fehlgeschlagen.');
-    return;
-  }
-  kurzmeldung(a.getan && a.getan.length ? 'Eingerichtet.' : 'War bereits eingerichtet.');
-  offertenBereit = a.offerten_bereit === true;
+/* Nach der Einrichtung noch einmal holen -- sonst stuende hier weiter
+   "noch nicht eingerichtet", obwohl die Tabellen inzwischen stehen. Genau
+   die Sorte Anzeige, die laenger falsch bleibt als der Zustand. */
+async function offertenteilNachladen() {
   await ladeAdressen();
   await ladeProdukte();
   await ladeBelege();
@@ -4435,6 +4450,10 @@ function einrichtungOeffnen() {
 }
 function einrichtungSchliessen() {
   $('dlgEinrichtung').classList.remove('on');
+  /* Der Offertenteil (ENT-605) haengt an denselben Tabellen. Wurden sie
+     gerade nachgetragen, sollen seine Listen das sofort zeigen und nicht
+     erst beim naechsten Anmelden. */
+  if (typeof offertenteilNachladen === 'function') { offertenteilNachladen(); }
 }
 
 async function einrichtungLauf() {

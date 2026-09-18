@@ -74,7 +74,7 @@ check('die Offerten-Endpunkte sprechen die be_-Tabellen wirklich an',
 // greift: Zieht die Betreiber-Ebene auf eine eigene Datenbank, ist es ein
 // Deploy-Wert -- aber nur fuer den, der betreiber_db() ruft.
 const falscheVerbindung = betreiberEndpunkte
-  .filter(f => /^betreiber_(beleg|kunden|produkt|briefkopf|einrichtung)/.test(f))
+  .filter(f => /^betreiber_(beleg|kunden|produkt|briefkopf)/.test(f))
   .filter(f => {
     const q = nurCode(lies(`backend/api/${f}`));
     return !q.includes('betreiber_db()') || /=\s*db\(\)/.test(q);
@@ -136,7 +136,45 @@ check('KRITISCH: jede Datei, die betreiber.html nachlaedt, liegt im betreiber-Bu
   fehlend.length === 0);
 if (fehlend.length) { bad.push('fehlt im Buendel: ' + fehlend.join(', ')); }
 
-// ── 5. Rechnungen bleiben ein Geruest, und zwar sichtbar ──────────────
+// ── 5. Kein Klassenname zweimal ──────────────────────────────────────
+//
+// Beim Zusammenfuehren mit main traf der uebernommene Dialog des
+// Offertenteils (.dlg) auf den Einrichtungsdialog, der denselben Namen
+// schon trug. Git verschmilzt zwei solche Bloecke GERAEUSCHLOS, und die
+// spaetere Regel gewinnt: Der fremde Dialog war danach 560 statt 460 Pixel
+// breit und anders gerundet -- ohne dass irgendetwas kaputtgegangen waere.
+//
+// Genau derselbe Fall wie ENT-536, wo ".leer" den Leerzustand UND eine
+// Kennzahl auf null traf. Zweimal ist eine Wache faellig.
+//
+// Geprueft wird nur die OBERSTE Ebene: Eine Regel in einer @media-Abfrage
+// soll die Grundregel ueberschreiben, das ist ihr Zweck.
+{
+  const stil = [...seite.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n');
+  const ohneKommentar = stil.replace(/\/\*[\s\S]*?\*\//g, '');
+  const zaehler = new Map();
+  let tiefe = 0, i = 0;
+  while (i < ohneKommentar.length) {
+    const auf = ohneKommentar.indexOf('{', i);
+    const zu  = ohneKommentar.indexOf('}', i);
+    if (auf === -1 && zu === -1) { break; }
+    if (zu !== -1 && (auf === -1 || zu < auf)) { tiefe = Math.max(0, tiefe - 1); i = zu + 1; continue; }
+    const kopf = ohneKommentar.slice(i, auf).trim();
+    if (tiefe === 0 && kopf && !kopf.startsWith('@')) {
+      kopf.split(',').map(t => t.trim()).filter(Boolean)
+        .forEach(t => zaehler.set(t, (zaehler.get(t) || 0) + 1));
+    }
+    tiefe += 1;
+    i = auf + 1;
+  }
+  const doppelt = [...zaehler.entries()].filter(([, n]) => n > 1).map(([t]) => t);
+  check('es wurden ueberhaupt Selektoren gefunden', zaehler.size > 60);
+  check('KRITISCH: kein Selektor ist in betreiber.html zweimal auf oberster Ebene definiert',
+    doppelt.length === 0);
+  if (doppelt.length) { bad.push('doppelt definiert: ' + doppelt.join(', ')); }
+}
+
+// ── 6. Rechnungen bleiben ein Geruest, und zwar sichtbar ──────────────
 //
 // Die Freigabe traegt den definierten Umfang. Offerten sind gebaut, die
 // wiederkehrende Rechnung nicht -- sie braucht die Antwort auf "wonach wird
