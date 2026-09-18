@@ -38,7 +38,7 @@ const check = (n, c) => (c ? ok : bad).push(n);
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 1 — Datenbank und Endpunkte (Quelltext)
 // ══════════════════════════════════════════════════════════════════════════
-const EINR = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const EINR = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
 const SAVE = readFileSync(`${WURZEL}/backend/api/einsatz_save.php`, 'utf8');
 const LIST = readFileSync(`${WURZEL}/backend/api/einsatz_list.php`, 'utf8');
 

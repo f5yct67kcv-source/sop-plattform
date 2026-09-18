@@ -858,6 +858,31 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     /__SMTP_ABSENDER__\|info@guardops\.ch\|g"\s+dist-guardops\/mailer\.php/.test(bauen)
     && /__SMTP_ABSENDER_NAME__\|GuardOpS\|g"\s+dist-guardops\/mailer\.php/.test(bauen));
 
+  // Der Betreiber-Bereich verschickt eigene Kommunikation der Betreiberin
+  // (Demo-Zugaenge, Offerten, Rechnungen) und darf dafuer nie den Absender
+  // der Mandantin tragen (ENT-568/ENT-569). Genau das ist am 2026-09-18
+  // passiert: Der erste erfolgreiche Demo-Zugang kam beim Interessenten
+  // unter dem Firmennamen der Mandantin an, weil dieses Buendel Konto und
+  // Absender aus den geteilten SMTP_*-Werten erbte.
+  //
+  // Geprueft wird die Aussage, nicht der Wortlaut: Die sed-Zeilen duerfen
+  // die geteilten Werte nicht mehr unmittelbar einsetzen, sondern nur noch
+  // die Variablen der Fallunterscheidung -- und in deren GuardOpS-Zweig
+  // stehen Adresse und Name fest.
+  const beMailer = (workflow.match(/^.*dist-betreiber\/mailer\.php.*$/gm) || []).join('\n');
+  check('KRITISCH: liegt das eigene Postfach vor, verschickt der Betreiber-Bereich als GuardOpS ueber info@guardops.ch',
+    /__SMTP_ABSENDER__\|info@guardops\.ch\|g"\s+dist-betreiber\/mailer\.php/.test(beMailer)
+    && /__SMTP_ABSENDER_NAME__\|GuardOpS\|g"\s+dist-betreiber\/mailer\.php/.test(beMailer)
+    && /__SMTP_HOST__\|\$EFF_GUARDOPS_SMTP_HOST\|g"\s+dist-betreiber\/mailer\.php/.test(beMailer)
+    && /__SMTP_USER__\|\$EFF_GUARDOPS_SMTP_USER\|g"\s+dist-betreiber\/mailer\.php/.test(beMailer));
+  check('KRITISCH: der eigene Absender haengt daran, dass das Postfach wirklich hinterlegt ist -- sonst verschickt der Bereich gar nichts mehr',
+    /if \[ -n "\$EFF_GUARDOPS_SMTP_HOST" \][\s\S]{0,200}?dist-betreiber\/mailer\.php/.test(workflow));
+  // Fehlt das Postfach, wird NICHT lautlos weitergemacht: Ein Versandfehler
+  // aendert die Antwort an den Interessenten nicht, ein falscher Absender
+  // faellt also niemandem auf, der nicht zufaellig in sein Postfach sieht.
+  check('KRITISCH: fehlt das GuardOpS-Postfach, meldet der Deploy das sichtbar, statt still den falschen Absender zu nehmen',
+    /::warning::Betreiber-Bereich: Die GUARDOPS_SMTP_\*-Secrets fehlen/.test(workflow));
+
   // Das Rapport-Tool selbst bleibt unberuehrt: sein Buendel (dist/) traegt
   // weiterhin die geteilten Produktions-Werte -- sonst zeigten CUPI 24s
   // eigene Offert-Mails ploetzlich den falschen Absender.
@@ -988,21 +1013,41 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   check('KRITISCH: jeder betreiber_*-Endpunkt aus backend/api wird ins betreiber-Bündel kopiert',
     endpunkte.length >= 10 && endpunkte.every(e => wirdKopiert(`backend/api/${e}`)));
 
-  // Die Einbindungen von betreiber.php UND all seinen Endpunkten, aus den
-  // Dateien selbst gelesen -- genau die Backend-Dateien, die dieses
-  // schlanke Bündel tatsächlich braucht, nicht die rund 30 Dateien des
-  // Rapport-Tool-Bündels. betreiber.php selbst bindet nur db.php und
-  // zweifaktor.php ein; anmeldung.php, rechte.php, support.php und
-  // supportvorgang.php kommen erst über die einzelnen Endpunkte dazu.
-  const betreiberPhp = readFileSync(`${WURZEL}/backend/betreiber.php`, 'utf8');
-  const endpunktQuellen = endpunkte.map(e => readFileSync(`${WURZEL}/backend/api/${e}`, 'utf8'));
-  const noetigeModule = [...new Set(
-    [betreiberPhp, ...endpunktQuellen].join('\n')
-      .matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g))]
-    .map(m => m[1])
+  // Alle Einbindungen ab einer Startdatei, TRANSITIV -- nicht nur die
+  // direkten. ANLASS (2026-09-18, live auf betreiber.guardops.ch):
+  // demo_daten.php zieht seinerseits mitarbeiter.php, planung.php usw.
+  // nach; eine Pruefung, die nur die Startdatei selbst liest, haette genau
+  // diese Kette uebersehen -- der Fehler zeigte sich als "Unerwarteter
+  // Serverfehler" (fehlendes require_once, keine PDOException, darum keine
+  // der beiden anderen Meldungen aus db_fehlermeldung()). Ein Modul, das
+  // selbst nicht existiert (Tippfehler o.ae.), wird beim Lesen
+  // uebersprungen -- das faengt eine andere Pruefung ab, nicht diese hier.
+  function transitiveModule(startPfade) {
+    const gefunden = new Set();
+    const zuLesen = [...startPfade];
+    const gelesen = new Set();
+    while (zuLesen.length) {
+      const pfad = zuLesen.shift();
+      if (gelesen.has(pfad)) { continue; }
+      gelesen.add(pfad);
+      const voll = `${WURZEL}/backend/${pfad}`;
+      if (!existsSync(voll)) { continue; }
+      const inhalt = readFileSync(voll, 'utf8');
+      for (const m of inhalt.matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g)) {
+        gefunden.add(m[1]);
+        zuLesen.push(m[1]);
+      }
+    }
+    return gefunden;
+  }
+
+  // Die Einbindungen von betreiber.php UND all seinen Endpunkten -- genau
+  // die Backend-Dateien, die dieses schlanke Bündel tatsächlich braucht,
+  // nicht die rund 30 Dateien des Rapport-Tool-Bündels.
+  const noetigeModule = [...transitiveModule(['betreiber.php', ...endpunkte.map(e => `api/${e}`)])]
     .filter(m => m !== 'betreiber.php');
   const fehlendeModule = noetigeModule.filter(m => !liegtImBuendel(`dist-betreiber/${m}`));
-  check('KRITISCH: jede Datei, die betreiber.php oder einer seiner Endpunkte einbindet, liegt im betreiber-Bündel',
+  check('KRITISCH: jede Datei, die betreiber.php oder einer seiner Endpunkte transitiv einbindet, liegt im betreiber-Bündel',
     noetigeModule.length >= 5 && fehlendeModule.length === 0
     && liegtImBuendel('dist-betreiber/betreiber.php'));
   if (fehlendeModule.length) { bad.push('Einbindung fehlt im betreiber-Bündel: ' + fehlendeModule.join(', ')); }
@@ -1015,15 +1060,10 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   const OEFFENTLICHE_DEMO_ENDPUNKTE = ['demo_anfordern.php', 'demo_erneut_senden.php'];
   check('KRITISCH: die öffentlichen Demo-Endpunkte (ENT-601) werden ins betreiber-Bündel kopiert',
     OEFFENTLICHE_DEMO_ENDPUNKTE.every(e => wirdKopiert(`backend/api/${e}`)));
-  const oeffentlicheQuellen = OEFFENTLICHE_DEMO_ENDPUNKTE
-    .map(e => readFileSync(`${WURZEL}/backend/api/${e}`, 'utf8'));
-  const oeffentlicheModule = [...new Set(
-    oeffentlicheQuellen.join('\n')
-      .matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g))]
-    .map(m => m[1]);
-  const fehlendeOeffentlicheModule = oeffentlicheModule.filter(m => !liegtImBuendel(`dist-betreiber/${m}`));
-  check('KRITISCH: jede Datei, die ein öffentlicher Demo-Endpunkt einbindet, liegt im betreiber-Bündel',
-    oeffentlicheModule.length >= 3 && fehlendeOeffentlicheModule.length === 0);
+  const oeffentlicheModule = transitiveModule(OEFFENTLICHE_DEMO_ENDPUNKTE.map(e => `api/${e}`));
+  const fehlendeOeffentlicheModule = [...oeffentlicheModule].filter(m => !liegtImBuendel(`dist-betreiber/${m}`));
+  check('KRITISCH: jede Datei, die ein öffentlicher Demo-Endpunkt transitiv einbindet, liegt im betreiber-Bündel',
+    oeffentlicheModule.size >= 3 && fehlendeOeffentlicheModule.length === 0);
   if (fehlendeOeffentlicheModule.length) {
     bad.push('Einbindung fehlt im betreiber-Bündel (öffentliche Demo-Endpunkte): ' + fehlendeOeffentlicheModule.join(', '));
   }

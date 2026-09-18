@@ -268,7 +268,7 @@ const wiederholt = ['betreiber', 'betreiber_sessions', 'mandant', 'betreiber_zwe
     // daran ist die erste Fassung dieser Pruefung gescheitert -- die
     // Gegenprobe (dieselbe Tabelle ein zweites Mal definiert) blieb gruen.
     const muster = new RegExp(`CREATE TABLE (?:IF NOT EXISTS )?\`?${t}\`?\\b`);
-    const orte = [modul, einr, lies('backend/api/planung_einrichten.php')]
+    const orte = [modul, einr, lies('backend/planung_einrichten_kern.php')]
       .filter(q => muster.test(nurCode(q)));
     return orte.length > 1;
   });
@@ -278,7 +278,7 @@ if (wiederholt.length) { bad.push('doppelt definiert: ' + wiederholt.join(', '))
 // Und der Einrichtungsknopf des Cockpits legt sie tatsaechlich mit an --
 // sonst waere der eigene Knopf zwar weg, aber nichts an seine Stelle
 // getreten.
-const planEinr = nurCode(lies('backend/api/planung_einrichten.php'));
+const planEinr = nurCode(lies('backend/planung_einrichten_kern.php'));
 check('KRITISCH: der Einrichtungsknopf legt die Betreiber-Tabellen mit an',
   /be_tabellen_anlegen\(/.test(planEinr));
 check('KRITISCH: er tut das nur, solange der Bootstrap offen ist',
@@ -426,6 +426,16 @@ check('KRITISCH: der Code wird vor der Sitzung geprueft, nicht danach',
 // Erlaubt ist darum genau eines: die Erreichbarkeit und den
 // Einrichtungsstand pruefen. Wer mandant_db() fuer etwas anderes benutzt,
 // faellt hier durch.
+//
+// AUSNAHME SEIT ENT-612: betreiber_schema_pruefen.php legt ueber
+// planung_einrichten_ausfuehren() SCHEMA an (Tabellen/Spalten), nicht
+// Inhalte -- ausdruecklich vom Projektinhaber entschieden (Runbook-Sperre:
+// zehn Demo-Datenbanken blieben ohne diesen Weg dauerhaft uneinrichtbar,
+// weil niemand sich je in eine leere, kontolose Instanz einloggen kann, um
+// die Einrichtung dort selbst auszuloesen). Das ist keine Wiederkehr des
+// Support-Zugriffs: Es liest keine Kundendaten und schreibt keine, nur
+// Tabellendefinitionen -- derselbe Rechenkern, den jeder Mandant ohnehin
+// selbst gegen seine eigene Verbindung auslösen kann.
 // Seit ENT-601 kommen zwei OEFFENTLICHE Endpunkte dazu, die ebenfalls zu
 // einer Mandantendatenbank verbinden (die Selbstbedienung braucht das,
 // um eine Demo-Instanz zu befuellen bzw. ihr Konto zurueckzusetzen). Sie
@@ -460,6 +470,9 @@ const DARF_VERBINDEN = {
   'betreiber_demo_ablauf.php':     'leert abgelaufene Demo-Instanzen (ENT-600)',
   'demo_anfordern.php':            'befuellt eine Demo-Instanz fuer eine neue Anfrage, ohne Anmeldung (ENT-601)',
   'demo_erneut_senden.php':        'setzt das Passwort einer bestehenden Demo-Instanz zurueck, ohne Anmeldung (ENT-601)',
+  // ENT-612: legt Schema an (Tabellen/Spalten ueber planung_einrichten_ausfuehren),
+  // liest und schreibt keine Betriebsdaten -- siehe Begruendung oben.
+  'betreiber_schema_pruefen.php':  'richtet Tabellen/Spalten JEDER Mandanten-Datenbank zentral ein (ENT-612)',
 };
 const heimlich = nutztMandantDb.filter(f => !DARF_VERBINDEN[f]);
 check('KRITISCH: nur namentlich genannte Endpunkte verbinden zu einer Mandantendatenbank',
@@ -722,7 +735,7 @@ check('betreiber_einrichten.php ergaenzt ebenfalls Spalten, nicht nur Tabellen',
 // Umformulierung pruefen -- geprueft wird stattdessen, dass die geteilte
 // Funktion tatsaechlich BENUTZT wird und kein zweiter Array-Eintrag mit
 // derselben ALTER-Anweisung danebensteht.
-const planungEinrichten = nurCode(lies('backend/api/planung_einrichten.php'));
+const planungEinrichten = nurCode(lies('backend/planung_einrichten_kern.php'));
 check('KRITISCH: planung_einrichten.php nutzt die geteilte Funktion statt einer eigenen Kopie der ALTER-Anweisung',
   /be_spalten_anlegen\(/.test(planungEinrichten)
   && !/ALTER TABLE mandant ADD COLUMN subdomain/.test(planungEinrichten));
@@ -740,7 +753,10 @@ check('KRITISCH: der Dialog-Lauf ruft betreiber_schema_pruefen.php tatsaechlich 
   /function einrichtungLauf\(\)[\s\S]{0,600}betreiber_schema_pruefen\.php[\s\S]{0,40}'POST'/.test(betreiberHtml));
 check('KRITISCH: das Zahnrad faerbt sich, sobald etwas nachzutragen ist -- stiller GET-Check, kein Toast',
   /function pruefeEinrichtungUpdate\(\)[\s\S]{0,300}betreiber_schema_pruefen\.php[\s\S]{0,200}hat-update/.test(betreiberHtml)
-  && /\.icon-knopf\.hat-update\s*\{[^}]*color:\s*var\(--warn\)/.test(betreiberHtml));
+  // Ohne Klassennamen davor: Das Zahnrad sitzt seit ENT-611 im Kontomenue
+  // und traegt die Klasse der Menueeintraege. Geprueft ist die Aussage --
+  // "hat-update" faerbt warn --, nicht wo der Knopf gerade haengt.
+  && /\.hat-update\s*\{[^}]*color:\s*var\(--warn\)/.test(betreiberHtml));
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

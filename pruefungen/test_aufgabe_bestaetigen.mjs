@@ -30,7 +30,7 @@ const tag = n => iso(new Date(Date.now() + n * 864e5));
 
 // ══════════ ENDPUNKT UND DATENMODELL, STATISCH ════════════════════════
 const SCAN = readFileSync(`${WURZEL}/backend/api/mein_rundgang_scan.php`, 'utf8');
-const EINR = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const EINR = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
 const RG   = readFileSync(`${WURZEL}/backend/rundgang.php`, 'utf8');
 
 check('KRITISCH: die Erledigung bekommt eine EIGENE Tabelle, wie ENT-302 vorgesehen hat',

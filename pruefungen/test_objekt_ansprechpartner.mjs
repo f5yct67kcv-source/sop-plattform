@@ -35,7 +35,7 @@ const EP = readFileSync(`${WURZEL}/backend/api/objekt_personen.php`, 'utf8');
 const UEB = readFileSync(`${WURZEL}/backend/rundgang.php`, 'utf8');
 const UEB_EP = readFileSync(`${WURZEL}/backend/api/mein_rundgang_uebersicht.php`, 'utf8');
 const OFFEN = readFileSync(`${WURZEL}/backend/api/mein_rundgang_offen.php`, 'utf8');
-const EINR = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const EINR = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
 
 check('KRITISCH: es gibt eigene Tabellen für Objekt-Kontakte, nach dem Muster der Kunden',
   /CREATE TABLE IF NOT EXISTS objekt_person \(/.test(EINR)

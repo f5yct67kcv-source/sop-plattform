@@ -35,7 +35,7 @@ const HEUTE = iso(new Date());
 // ══════════════════════════════════════════════════════════════════════════
 const BER = readFileSync(`${WURZEL}/backend/api/einsatz_bericht.php`, 'utf8');
 const CRE = readFileSync(`${WURZEL}/backend/api/rapport_create.php`, 'utf8');
-const EINR = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const EINR = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
 const MEIN = readFileSync(`${WURZEL}/backend/api/meine_schichten.php`, 'utf8');
 
 check('KRITISCH: die Unterschrift-Spalten liegen am EINSATZ, nicht nur am Rapport',

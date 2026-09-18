@@ -38,14 +38,33 @@ function json_response($data, int $status = 200): void {
 // ein blind erlaubter fremder Ursprung koennte ihn sonst mitlesen.
 const APP_NATIVE_HERKUENFTE = ['capacitor://localhost', 'http://localhost'];
 
-// Reine Funktion -- pruefbar mit einem frei gewaehlten Wert, ohne echten
-// Request (gleiche Ueberlegung wie bei basis_url_pruefen()).
-function cors_erlaubte_herkunft(string $herkunft): ?string {
-    return in_array($herkunft, APP_NATIVE_HERKUENFTE, true) ? $herkunft : null;
+// Die eigene Marketingseite (ENT-601-Nachtrag, 2026-09-18): guardops.ch
+// traegt bewusst keine Datenbank-Zugangsdaten (siehe deploy-hostpoint.yml,
+// Schritt "Homepage-Buendel fuer guardops.ch bauen") und ruft darum die
+// zwei oeffentlichen Selbstbedienungs-Endpunkte -- die Zugriff auf die
+// Mandanten-Datenbank brauchen -- auf betreiber.guardops.ch statt bei sich
+// selbst auf. Nur DIESE eine Herkunft und nur fuer DIESE zwei Skripte:
+// jeder andere Endpunkt bleibt same-origin-only, genau wie zuvor.
+const WEB_HERKUNFT_OEFFENTLICHE_DEMO = 'https://guardops.ch';
+const OEFFENTLICHE_DEMO_SKRIPTE = ['demo_anfordern.php', 'demo_erneut_senden.php'];
+
+// Reine Funktion -- pruefbar mit frei gewaehlten Werten, ohne echten
+// Request (gleiche Ueberlegung wie bei basis_url_pruefen()). $skript ist
+// der Dateiname ohne Pfad, wie basename($_SERVER['SCRIPT_NAME']) ihn
+// liefert -- nicht die Herkunft entscheidet allein, sondern Herkunft UND
+// Ziel zusammen.
+function cors_erlaubte_herkunft(string $herkunft, string $skript = ''): ?string {
+    if (in_array($herkunft, APP_NATIVE_HERKUENFTE, true)) { return $herkunft; }
+    if ($herkunft === WEB_HERKUNFT_OEFFENTLICHE_DEMO
+        && in_array($skript, OEFFENTLICHE_DEMO_SKRIPTE, true)) {
+        return $herkunft;
+    }
+    return null;
 }
 
 function cors_kopfzeilen_setzen(): void {
-    $erlaubt = cors_erlaubte_herkunft($_SERVER['HTTP_ORIGIN'] ?? '');
+    $skript = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $erlaubt = cors_erlaubte_herkunft($_SERVER['HTTP_ORIGIN'] ?? '', $skript);
     if ($erlaubt !== null) {
         header('Access-Control-Allow-Origin: ' . $erlaubt);
         header('Vary: Origin');
@@ -405,7 +424,17 @@ function db_fehlermeldung(Throwable $e): string {
 // Haeufigster Fall im Alltag ist eine noch nicht ausgefuehrte Schemadatei --
 // darauf wird ausdruecklich hingewiesen, statt den Fehler zu verschlucken.
 set_exception_handler(function (Throwable $e): void {
-    // Bewusst ohne technische Einzelheiten: die Meldung geht an den Browser.
+    // INS PROTOKOLL, bevor die Meldung entschaerft wird. Die Meldung an den
+    // Browser bleibt bewusst ohne technische Einzelheiten -- fuer einen
+    // Fehler ausserhalb der Datenbank ist das aber nur "Unerwarteter
+    // Serverfehler", also gar keine Aussage. Genau daran ist der
+    // oeffentliche Demo-Zugang am 2026-09-18 sieben Anlaeufe lang
+    // haengengeblieben: Die Ursache (eine nicht geladene Funktion) stand
+    // nirgends, weil sie hier verworfen wurde, und jeder Anlauf musste
+    // erraten werden. Was der Browser nicht sehen darf, gehoert ins
+    // Serverprotokoll -- nicht in den Papierkorb.
+    error_log(get_class($e) . ' in ' . $e->getFile() . ':' . $e->getLine()
+        . ' -- ' . $e->getMessage());
     json_response(['status' => 'error', 'message' => db_fehlermeldung($e)], 500);
 });
 
@@ -455,16 +484,27 @@ register_shutdown_function(function (): void {
 // koennen, sonst hielte es eine gerade angelegte Tabelle fuer fehlend.
 if (!function_exists('hat_tabelle')) {
     function hat_tabelle(PDO $pdo, string $tabelle, bool $ohneGedaechtnis = false): bool {
+        // Der Schluessel traegt die Verbindung mit, nicht nur den
+        // Tabellennamen. BESTANDSFEHLER (gefunden am 2026-09-18, live): eine
+        // einzige Anfrage kann hat_tabelle() gegen MEHRERE Datenbanken
+        // aufrufen -- betreiber_db() fuer den Mandantenstamm, danach
+        // mandant_db($m) je Mandant fuer dessen eigene Tabellen (siehe
+        // mandant_stand() in betreiber.php). Ohne die Verbindung im
+        // Schluessel uebernahm die erste gepruefte Datenbank ihr Ergebnis
+        // fuer JEDE andere -- ein Mandant mit vollstaendigem Schema machte
+        // jeden leeren Demo-Platz in derselben Anfrage faelschlich "5 von 5
+        // Tabellen", waehrend seine Datenbank tatsaechlich leer war.
         static $bekannt = [];
-        if ($ohneGedaechtnis || !array_key_exists($tabelle, $bekannt)) {
+        $schluessel = spl_object_id($pdo) . ':' . $tabelle;
+        if ($ohneGedaechtnis || !array_key_exists($schluessel, $bekannt)) {
             $s = $pdo->prepare(
                 'SELECT 1 FROM information_schema.TABLES
                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?'
             );
             $s->execute([$tabelle]);
-            $bekannt[$tabelle] = (bool)$s->fetchColumn();
+            $bekannt[$schluessel] = (bool)$s->fetchColumn();
         }
-        return $bekannt[$tabelle];
+        return $bekannt[$schluessel];
     }
 }
 
@@ -518,8 +558,10 @@ if (!function_exists('hat_spalte')) {
     // beim Pruefen der Sitzung danach, und information_schema ist keine
     // Abfrage, die man ein Dutzend Mal pro Seitenaufruf stellen will.
     function hat_spalte(PDO $pdo, string $tabelle, string $spalte): bool {
+        // Derselbe Fehler wie bei hat_tabelle() oben, dieselbe Korrektur:
+        // die Verbindung gehoert in den Schluessel.
         static $bekannt = [];
-        $schluessel = $tabelle . '.' . $spalte;
+        $schluessel = spl_object_id($pdo) . ':' . $tabelle . '.' . $spalte;
         if (!array_key_exists($schluessel, $bekannt)) {
             $s = $pdo->prepare(
                 'SELECT 1 FROM information_schema.COLUMNS

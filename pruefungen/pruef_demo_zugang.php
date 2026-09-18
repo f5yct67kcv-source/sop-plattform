@@ -41,7 +41,7 @@ $pruef('KRITISCH: ist alles belegt, kommt null und nicht der erste Platz',
     demo_platz_waehlen(DEMO_PLAETZE) === null);
 $pruef('ein unbekannter Platz in der Belegung verschiebt nichts',
     demo_platz_waehlen(['nichtimvorrat']) === 'demo1');
-$pruef('der Vorrat hat zehn Plaetze (ENT-603 -- ENT-600 nannte noch drei)',
+$pruef('der Vorrat hat zehn Plaetze (ENT-613 -- ENT-600 nannte noch drei)',
     count(DEMO_PLAETZE) === 10);
 
 // ── 2. Ablauf ────────────────────────────────────────────────────────
@@ -185,7 +185,7 @@ $pruef('demo_zugang_einzeilig ersetzt Umbrueche und kuerzt',
     demo_zugang_einzeilig("Zeile 1\r\nZeile 2\t\tEnde", 100) === 'Zeile 1 Zeile 2 Ende'
     && demo_zugang_einzeilig('123456789', 5) === '12345');
 
-// Telefon ist der Preis fuer den Sofort-Zugang (ENT-601/ENT-603).
+// Telefon ist der Preis fuer den Sofort-Zugang (ENT-601/ENT-613).
 $pruef('KRITISCH: eine Nummer mit weniger als neun Ziffern zaehlt nicht',
     demo_zugang_telefon_ziffern('079 12') < DEMO_ZUGANG_TELEFON_MIN_ZIFFERN);
 $pruef('eine gueltige Schweizer Nummer in jeder Schreibweise zaehlt',

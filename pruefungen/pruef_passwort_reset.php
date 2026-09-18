@@ -12,7 +12,7 @@ function pruef(string $name, bool $c) { global $ok, $bad; if ($c) { $ok++; } els
 
 $anfordern = file_get_contents(__DIR__ . '/../backend/api/passwort_vergessen.php');
 $zuruecksetzen = file_get_contents(__DIR__ . '/../backend/api/passwort_zuruecksetzen.php');
-$einrichten = file_get_contents(__DIR__ . '/../backend/api/planung_einrichten.php');
+$einrichten = file_get_contents(__DIR__ . '/../backend/planung_einrichten_kern.php');
 
 // ══════════ TABELLE IST REGISTRIERT ═════════════════════════════════
 pruef('KRITISCH: passwort_reset ist im Einrichtungs-Mechanismus registriert',

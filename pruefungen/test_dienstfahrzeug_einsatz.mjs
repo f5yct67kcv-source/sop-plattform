@@ -52,7 +52,7 @@ phpBeanstandet.forEach(z => bad.push('PHP: ' + z.trim()));
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 2 — Was sich nur am Quelltext zeigt
 // ══════════════════════════════════════════════════════════════════════════
-const EINR = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const EINR = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
 const SAVE = readFileSync(`${WURZEL}/backend/api/einsatz_save.php`, 'utf8');
 const FZEP = readFileSync(`${WURZEL}/backend/api/einsatz_fahrzeug.php`, 'utf8');
 const VM   = readFileSync(`${WURZEL}/backend/api/einsatz_verkehrsmittel.php`, 'utf8');

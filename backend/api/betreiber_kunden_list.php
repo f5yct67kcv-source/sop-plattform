@@ -36,10 +36,32 @@ $rows = $pdo->query(
 )->fetchAll();
 
 $kinder = kunden_kinder_laden($pdo, 'be_');
+
+// Wie viele Belege je Adresse -- das Gegenstueck zur Rapporte-Spalte der
+// Kundenliste im Cockpit. Rapporte gibt es hier nicht: Die Betreiberin
+// bewirtschaftet keine Einsaetze, sie stellt Offerten und Rechnungen.
+//
+// Gezaehlt wird der GESAMTE Bestand, auch archivierte Belege: Die Spalte
+// beantwortet "hatten wir mit denen schon zu tun", und die Antwort aendert
+// sich nicht dadurch, dass eine alte Offerte weggeraeumt wurde.
+//
+// EINE Abfrage fuer alle Adressen statt einer je Zeile -- bei ein paar
+// hundert Adressen waeren das sonst ebenso viele.
+$belegzahl = [];
+if (hat_tabelle($pdo, 'be_belege')) {
+    foreach ($pdo->query(
+        'SELECT kunde_id, COUNT(*) AS anzahl FROM be_belege
+         WHERE kunde_id IS NOT NULL GROUP BY kunde_id'
+    )->fetchAll() as $z) {
+        $belegzahl[(int)$z['kunde_id']] = (int)$z['anzahl'];
+    }
+}
+
 foreach ($rows as &$k) {
     $eigen = $kinder[(int)$k['id']] ?? [];
     $k['kontaktwege'] = $eigen['kontaktwege'] ?? [];
     $k['personen']    = $eigen['personen'] ?? [];
+    $k['belege_anzahl'] = $belegzahl[(int)$k['id']] ?? 0;
 }
 unset($k);
 

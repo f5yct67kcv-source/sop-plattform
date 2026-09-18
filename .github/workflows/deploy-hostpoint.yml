@@ -1265,6 +1265,34 @@ jobs:
           cp backend/demo_instanz.php  dist-betreiber/demo_instanz.php
           cp backend/demo_reset.php    dist-betreiber/demo_reset.php
           cp backend/demo_daten.php    dist-betreiber/demo_daten.php
+          # demo_daten.php befuellt den Musterbetrieb ueber genau dieselben
+          # Rechenkerne wie ein echter Betrieb (Kopf von demo_daten.php:
+          # "NIE erfunden, sondern ausschliesslich ueber die bestehenden,
+          # geprueften Funktionen"). Das zieht einen Teil der rund 30
+          # Rapport-Tool-Dateien in dieses eigentlich schlanke Buendel
+          # zurueck, die der Kommentar oben bewusst ausschliessen wollte --
+          # ENT-601 kam spaeter dazu und hat diese Kette nicht geerbt.
+          # BESTANDSFEHLER (gefunden am 2026-09-18 live auf
+          # betreiber.guardops.ch): ohne diese sechs Dateien stirbt jede
+          # Demo-Anforderung an einem fehlenden require_once, sichtbar nur
+          # als "Unerwarteter Serverfehler" ohne weiteren Hinweis.
+          cp backend/mitarbeiter.php   dist-betreiber/mitarbeiter.php
+          cp backend/planung.php       dist-betreiber/planung.php
+          cp backend/gavzeit.php       dist-betreiber/gavzeit.php
+          cp backend/lohnlauf.php      dist-betreiber/lohnlauf.php
+          cp backend/logbuch.php       dist-betreiber/logbuch.php
+          cp backend/lohn.php          dist-betreiber/lohn.php
+          # Rechenkern der zentralen Mandanten-Einrichtung (ENT-612):
+          # api/betreiber_schema_pruefen.php richtet ueber
+          # planung_einrichten_kern.php jede Mandanten-Datenbank ein, zu der
+          # der Betreiber Zugangsdaten hat -- derselbe Rechenkern wie bei
+          # api/planung_einrichten.php (eigene Einrichtung eines Mandanten),
+          # "eine Definition, nicht zwei". Bindet seinerseits rundgang.php
+          # und fahrzeug.php ein (kunden.php/produkte.php stehen schon
+          # weiter unten im Buendel).
+          cp backend/planung_einrichten_kern.php dist-betreiber/planung_einrichten_kern.php
+          cp backend/rundgang.php      dist-betreiber/rundgang.php
+          cp backend/fahrzeug.php      dist-betreiber/fahrzeug.php
           # Bremse gegen zu viele Anfragen (ENT-601), von
           # api/demo_anfordern.php und api/demo_erneut_senden.php benutzt --
           # dieselbe Datei wie beim Kontaktformular der Homepage, eigenes
@@ -1341,13 +1369,50 @@ jobs:
           # Die beiden Testmail-Platzhalter werden geleert -- der
           # Betreiber-Bereich laeuft nur auf Produktion, eine Umleitung auf
           # eine Testadresse gaebe es dort nie.
-          sed -i "s|__SMTP_HOST__|$EFF_SMTP_HOST|g" dist-betreiber/mailer.php
-          sed -i "s|__SMTP_PORT__|$EFF_SMTP_PORT|g" dist-betreiber/mailer.php
-          sed -i "s|__SMTP_VERSCHLUESSELUNG__|$EFF_SMTP_VERSCHLUESSELUNG|g" dist-betreiber/mailer.php
-          sed -i "s|__SMTP_USER__|$EFF_SMTP_USER|g" dist-betreiber/mailer.php
-          sed -i "s|__SMTP_PASSWORD__|$EFF_SMTP_PASSWORD|g" dist-betreiber/mailer.php
-          sed -i "s|__SMTP_ABSENDER__|$EFF_SMTP_ABSENDER|g" dist-betreiber/mailer.php
-          sed -i "s|__SMTP_ABSENDER_NAME__|$EFF_SMTP_ABSENDER_NAME|g" dist-betreiber/mailer.php
+          # ABSENDER IST DIE BETREIBERIN, NIE DIE MANDANTIN (ENT-568/ENT-569).
+          # Bis 2026-09-18 erbte dieses Buendel Konto UND Absender aus den
+          # geteilten SMTP_*-Werten -- also aus dem Postfach der Mandantin.
+          # Der erste erfolgreiche Demo-Zugang kam deshalb sichtbar unter
+          # ihrem Firmennamen beim Interessenten an. Der Betreiber-Bereich
+          # verschickt aber ausschliesslich eigene Kommunikation der
+          # Betreiberin (Demo-Zugaenge, Offerten, Rechnungen); dafuer gibt
+          # es info@guardops.ch, ueber das die oeffentliche Seite laeuft.
+          #
+          # Warum mit Fallunterscheidung statt fest wie beim guardops-
+          # Buendel: Die GUARDOPS_SMTP_*-Secrets sind ausdruecklich NICHT
+          # erforderlich (siehe oben). Waeren sie leer und dieses Buendel
+          # zoege sie trotzdem, bliebe __SMTP_HOST__ unersetzt und der
+          # Demo-Zugang verschickte gar nichts mehr -- lautlos, weil ein
+          # Versandfehler die Antwort an den Interessenten nicht aendert.
+          # Darum: eigenes Postfach, wenn hinterlegt, sonst der bisherige
+          # Weg UND eine sichtbare Warnung. Kein stiller Rueckfall, in
+          # keine der beiden Richtungen.
+          #
+          # Beide Zweige setzen unmittelbar weitergereichte EFF_*-Werte ein
+          # statt eigener Zwischenvariablen: Der Konfigurationsschritt oben
+          # steht dicht an GitHubs Groessengrenze fuer einen run-Block, und
+          # eine Zwischenvariable muesste dort entstehen und ueber
+          # $GITHUB_ENV hierher gereicht werden.
+          if [ -n "$EFF_GUARDOPS_SMTP_HOST" ] && [ -n "$EFF_GUARDOPS_SMTP_USER" ] \
+             && [ -n "$EFF_GUARDOPS_SMTP_PASSWORD" ]; then
+            sed -i "s|__SMTP_HOST__|$EFF_GUARDOPS_SMTP_HOST|g" dist-betreiber/mailer.php
+            sed -i "s|__SMTP_PORT__|$EFF_GUARDOPS_SMTP_PORT|g" dist-betreiber/mailer.php
+            sed -i "s|__SMTP_VERSCHLUESSELUNG__|$EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG|g" dist-betreiber/mailer.php
+            sed -i "s|__SMTP_USER__|$EFF_GUARDOPS_SMTP_USER|g" dist-betreiber/mailer.php
+            sed -i "s|__SMTP_PASSWORD__|$EFF_GUARDOPS_SMTP_PASSWORD|g" dist-betreiber/mailer.php
+            sed -i "s|__SMTP_ABSENDER__|info@guardops.ch|g" dist-betreiber/mailer.php
+            sed -i "s|__SMTP_ABSENDER_NAME__|GuardOpS|g" dist-betreiber/mailer.php
+            echo "Betreiber-Bereich: Versand ueber das eigene Postfach info@guardops.ch, Absendername GuardOpS."
+          else
+            sed -i "s|__SMTP_HOST__|$EFF_SMTP_HOST|g" dist-betreiber/mailer.php
+            sed -i "s|__SMTP_PORT__|$EFF_SMTP_PORT|g" dist-betreiber/mailer.php
+            sed -i "s|__SMTP_VERSCHLUESSELUNG__|$EFF_SMTP_VERSCHLUESSELUNG|g" dist-betreiber/mailer.php
+            sed -i "s|__SMTP_USER__|$EFF_SMTP_USER|g" dist-betreiber/mailer.php
+            sed -i "s|__SMTP_PASSWORD__|$EFF_SMTP_PASSWORD|g" dist-betreiber/mailer.php
+            sed -i "s|__SMTP_ABSENDER__|$EFF_SMTP_ABSENDER|g" dist-betreiber/mailer.php
+            sed -i "s|__SMTP_ABSENDER_NAME__|$EFF_SMTP_ABSENDER_NAME|g" dist-betreiber/mailer.php
+            echo "::warning::Betreiber-Bereich: Die GUARDOPS_SMTP_*-Secrets fehlen. Demo-Zugaenge, Offerten und Rechnungen gehen weiter ueber das geteilte Postfach hinaus und tragen dessen Absender -- also den der Mandantin statt den der Betreiberin (ENT-569). Sobald die Secrets hinterlegt sind, stellt der naechste Deploy von selbst um."
+          fi
           sed -i "s|__STAGING_TESTMAIL__||g" dist-betreiber/mailer.php
           sed -i "s|__DEMO_TESTMAIL__||g" dist-betreiber/mailer.php
           # Der Zeitgeber-Schluessel fuer den Ablauf der Demo-Zugaenge

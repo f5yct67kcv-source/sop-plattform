@@ -118,7 +118,7 @@ await browser.close();
 // TEIL 3 — Datenmodell (Quelltext, da ohne Datenbank nicht ausfuehrbar --
 // derselbe Ansatz wie test_auslagenersatz.mjs Teil 2)
 // ══════════════════════════════════════════════════════════════════════════
-const EINRICHTEN = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const EINRICHTEN = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
 const RECHTE     = readFileSync(`${WURZEL}/backend/rechte.php`, 'utf8');
 const BELEGE     = readFileSync(`${WURZEL}/backend/belege.php`, 'utf8');
 

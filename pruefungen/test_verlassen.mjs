@@ -27,7 +27,7 @@ const check = (n, c) => (c ? ok : bad).push(n);
 const APP = readFileSync(`${WURZEL}/app.html`, 'utf8');
 const DASH = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
 const ABBR = readFileSync(`${WURZEL}/backend/api/mein_rundgang_abbrechen.php`, 'utf8');
-const EINR = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const EINR = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
 const RG = readFileSync(`${WURZEL}/backend/rundgang.php`, 'utf8');
 
 // ══════════ SERVER: DER ABBRUCH LANDET IM MELDEWEG ═══════════════════

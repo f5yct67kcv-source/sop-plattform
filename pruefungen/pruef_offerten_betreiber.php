@@ -54,8 +54,16 @@ foreach (['', 'be_'] as $p) {
         id INTEGER PRIMARY KEY AUTOINCREMENT, beleg_id INTEGER, sortierung INTEGER,
         produkt_id INTEGER, produkt_name TEXT, beschreibung TEXT, menge REAL,
         einheit TEXT, einzelpreis_rappen INTEGER, rabatt_bp INTEGER, mwst_satz_bp INTEGER)");
+    // Vollstaendig genug fuer kunden_eingabe_lesen(): Der Import schreibt
+    // alle Spalten, die diese Funktion liefert, und nicht nur Name und
+    // Nummer (ENT-610).
     $pdo->exec("CREATE TABLE {$p}kunden (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, kundennummer TEXT, name TEXT, aktiv INTEGER DEFAULT 1)");
+        id INTEGER PRIMARY KEY AUTOINCREMENT, kundennummer TEXT, art TEXT,
+        anrede TEXT, vorname TEXT, nachname TEXT, name TEXT, zusatzfeld TEXT,
+        strasse TEXT, hausnummer TEXT, adresszusatz TEXT, plz TEXT, ort TEXT,
+        uid TEXT, mwst_nr TEXT, telefon TEXT, email TEXT, kontaktperson TEXT, notiz TEXT,
+        re_name TEXT, re_zusatz TEXT, re_strasse TEXT, re_hausnummer TEXT,
+        re_plz TEXT, re_ort TEXT, aktiv INTEGER DEFAULT 1)");
     $pdo->exec("CREATE TABLE {$p}kunden_person (
         id INTEGER PRIMARY KEY AUTOINCREMENT, kunde_id INTEGER, anrede TEXT, vorname TEXT,
         nachname TEXT, sortierung INTEGER)");
@@ -66,9 +74,9 @@ foreach (['', 'be_'] as $p) {
         id INTEGER PRIMARY KEY AUTOINCREMENT, nummer TEXT, name TEXT, aktiv INTEGER DEFAULT 1)");
 }
 
-$anlegen = function (string $praefix, string $nummer, array $positionen) use ($pdo): int {
+$anlegen = function (string $praefix, string $nummer, array $positionen, string $art = 'offerte') use ($pdo): int {
     $pdo->prepare('INSERT INTO ' . $praefix . 'belege (art, nummer, datum, status) VALUES (?, ?, ?, ?)')
-        ->execute(['offerte', $nummer, '2026-03-01', 'entwurf']);
+        ->execute([$art, $nummer, '2026-03-01', 'entwurf']);
     $id = (int)$pdo->lastInsertId();
     beleg_positionen_schreiben($pdo, $id, array_map('beleg_position_lesen', $positionen), $praefix);
     beleg_summen_schreiben($pdo, $id, 0, $praefix);
@@ -119,6 +127,36 @@ check('KRITISCH: die Betreiberin zaehlt ihre Offerten selbst',
 check('die Mandantin zaehlt weiter ihre eigenen',
     beleg_naechste_nummer($pdo, 'offerte') === 'OF-0100');
 
+// ── 3b. Rechnungen zaehlen noch einmal fuer sich (ENT-608) ───────────
+//
+// Zwei Reihen je Tabellensatz, nicht eine: RE und OF duerfen einander
+// nicht weiterzaehlen. Und die Reihe der Betreiberin faengt auch dann bei
+// RE-0001 an, wenn die Mandantin schon bei RE-0207 steht -- solange
+// betreiber_db() auf dieselbe Datenbank zeigt (OP-518), haengt genau
+// daran, dass die erste eigene Rechnung nicht RE-0208 heisst.
+check('KRITISCH: die erste Rechnung der Betreiberin heisst RE-0001',
+    beleg_naechste_nummer($pdo, 'rechnung', 'be_') === 'RE-0001');
+$pdo->prepare("INSERT INTO belege (art, nummer, datum, status) VALUES ('rechnung', ?, '2026-03-02', 'entwurf')")
+    ->execute(['RE-0207']);
+check('KRITISCH: die Rechnungen der Mandantin zaehlen die der Betreiberin nicht hoch',
+    beleg_naechste_nummer($pdo, 'rechnung', 'be_') === 'RE-0001'
+    && beleg_naechste_nummer($pdo, 'rechnung') === 'RE-0208');
+$beRechnung = $anlegen('be_', 'RE-0001', [
+    ['menge' => 3, 'einzelpreis_rappen' => 20000, 'mwst_satz_bp' => 810],
+], 'rechnung');
+// Zwei im eigenen Satz (OF-0001 und RE-0001), drei im fremden (OF-0001,
+// OF-0099 und die RE-0207 von eben) -- gezaehlt statt geschaetzt.
+check('KRITISCH: die Rechnung der Betreiberin steht in be_belege, nicht daneben',
+    $zaehle('be_belege') === 2 && $zaehle('belege') === 3);
+check('sie rechnet mit demselben Kern wie die Offerte',
+    (int)beleg_lesen($pdo, $beRechnung, 'be_')['total_rappen'] === 64860);  // 600.00 + 8.1 %
+check('und die naechste ist danach RE-0002',
+    beleg_naechste_nummer($pdo, 'rechnung', 'be_') === 'RE-0002');
+// Die Offertenreihe bleibt davon unberuehrt -- sonst zaehlte eine Rechnung
+// die Offerten weiter.
+check('KRITISCH: die Offertenreihe zaehlt davon nicht mit',
+    beleg_naechste_nummer($pdo, 'offerte', 'be_') === 'OF-0002');
+
 // ── 4. Adressen und Leistungen ebenso ────────────────────────────────
 $pdo->prepare('INSERT INTO be_kunden (kundennummer, name) VALUES (?, ?)')->execute(['K0001', 'Betrieb A']);
 $beKunde = (int)$pdo->lastInsertId();
@@ -139,6 +177,45 @@ check('KRITISCH: die Kundennummern zaehlen getrennt',
 $pdo->prepare('INSERT INTO be_produkte (nummer, name) VALUES (?, ?)')->execute(['P0001', 'Nutzung']);
 check('KRITISCH: die Leistungsnummern zaehlen getrennt',
     naechste_produktnummer($pdo, 'be_') === 'P0002' && naechste_produktnummer($pdo) === 'P0001');
+
+// ── 4b. Der Sammelimport zaehlt innerhalb EINES Laufs weiter (ENT-610) ─
+//
+// Der teure Fall beim Import ist nicht die Datei, sondern die Nummer:
+// betreiber_kunden_import.php ruft naechste_kundennummer() INNERHALB der
+// Transaktion, einmal je Zeile. Zaehlt die Funktion die schon eingefuegten
+// Zeilen nicht mit, bekaeme jede importierte Adresse dieselbe Nummer --
+// und zwar geraeuschlos, weil kundennummer keinen eindeutigen Schluessel
+// traegt. Hundert Adressen mit K0002 faellt erst beim Offerieren auf.
+//
+// Zweite Aussage im selben Block: Der Import schreibt mit dem Praefix.
+// Ohne ihn landete der ganze Bestand der Betreiberin im Adressbuch ihrer
+// Mandantin -- derselbe teure Fall wie bei den Belegen ganz oben.
+$vorher = $zaehle('kunden');
+$importNummern = [];
+$pdo->beginTransaction();
+foreach ([['name' => 'Betrieb B', 'plz' => '3000', 'ort' => 'Musterstadt'],
+          ['name' => 'Betrieb C', 'plz' => '4000', 'ort' => 'Beispielort'],
+          ['name' => 'Betrieb D', 'plz' => '5000', 'ort' => 'Musterdorf']] as $zeile) {
+    $spalten = kunden_eingabe_lesen($zeile)['spalten'];
+    $nummer  = naechste_kundennummer($pdo, 'be_');
+    $felder  = array_keys($spalten);
+    $pdo->prepare('INSERT INTO be_kunden (kundennummer, ' . implode(', ', $felder) . ', aktiv) VALUES (?'
+        . str_repeat(', ?', count($felder)) . ', 1)')
+        ->execute(array_merge([$nummer], array_values($spalten)));
+    $importNummern[] = $nummer;
+}
+$pdo->commit();
+
+check('KRITISCH: jede importierte Zeile bekommt ihre eigene, fortlaufende Nummer',
+    $importNummern === ['K0002', 'K0003', 'K0004']);
+check('KRITISCH: der Import schreibt in be_kunden, nicht ins Adressbuch der Mandantin',
+    $zaehle('be_kunden') === 4 && $zaehle('kunden') === $vorher);
+// Und die Felder kommen wirklich an -- eine Zeile, die nur Name und Nummer
+// traegt, waere ein stiller Datenverlust gegenueber dem Anlegen von Hand.
+$geprueft = $pdo->query("SELECT * FROM be_kunden WHERE name = 'Betrieb C'")->fetch();
+check('KRITISCH: die importierte Adresse traegt PLZ und Ort, nicht nur den Namen',
+    $geprueft && $geprueft['plz'] === '4000' && $geprueft['ort'] === 'Beispielort'
+    && $geprueft['art'] === 'unternehmen');
 
 // ── 5. Ein Tabellenname kann nur aus der geschlossenen Menge kommen ──
 //

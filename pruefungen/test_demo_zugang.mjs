@@ -64,7 +64,7 @@ check('die Tabellendefinition laesst sich erzeugen', sql.includes('create table'
 check('KRITISCH: im Register steht kein Passwort und kein Hash',
   sql.includes('create table') && !sql.includes('passwort') && !sql.includes('hash'));
 
-// ── 3b. Telefon ist Pflicht, die Adresse wird geprueft (ENT-601/ENT-603) ─
+// ── 3b. Telefon ist Pflicht, die Adresse wird geprueft (ENT-601/ENT-613) ─
 // Strukturell geprueft, weil ein echter Aufruf eine Datenbank braucht --
 // die reine Logik dahinter laeuft in pruef_demo_zugang.php.
 const anfordern = nurCode(lies('backend/api/demo_anfordern.php'));
@@ -76,6 +76,24 @@ check('KRITISCH: demo_anfordern.php prueft die Zustellbarkeit, bevor ein Platz v
   && anfordern.indexOf('demo_zugang_adresse_zustellbar') < anfordern.indexOf('demo_platz_waehlen'));
 check('das Telefon wird im Register gespeichert, nicht verworfen',
   /INSERT INTO demo_zugang[\s\S]{0,120}telefon/.test(anfordern) && /\$telefon\b/.test(anfordern));
+
+// KRITISCH (gefunden live am 2026-09-18, ENT-612-Nachtrag): Bis hierher
+// rief demo_anfordern.php demo_daten_erzeugen_ausfuehren() -- die Fassung,
+// die json_response() SELBST aufruft und den Prozess damit beendet. Diese
+// Anfrage macht danach aber noch weiter: das angeforderte Konto anlegen,
+// den Registereintrag schreiben, die Mail verschicken. Der erste
+// erfolgreiche Demo-Zugang ueberhaupt (erst moeglich, seit ENT-612 die
+// Einrichtung selbst reparierte) haette diesen Rest stillschweigend
+// abgeschnitten -- keine Zugangsdaten, keine Mail, obwohl der Musterbetrieb
+// erfolgreich entstand.
+check('KRITISCH: demo_anfordern.php ruft die reine demo_daten_erzeugen() auf, nicht die selbst-antwortende Fassung',
+  /\bdemo_daten_erzeugen\(\$instanz\)/.test(anfordern)
+  && !/\bdemo_daten_erzeugen_ausfuehren\(/.test(anfordern));
+// Kehrseite: Nach diesem Aufruf muss die Anfrage tatsaechlich weitergehen
+// -- sonst waere die Aufteilung selbst zwecklos gewesen.
+check('KRITISCH: nach der Musterbetrieb-Erzeugung legt die Anfrage noch das angeforderte Konto an',
+  anfordern.indexOf('demo_daten_erzeugen($instanz)') <
+  anfordern.indexOf("INSERT INTO mitarbeiter"));
 
 // ── 4. Der Rechenkern geht in JEDES Buendel mit, das betreiber.php hat ─
 // Das ist der Fall, der beim ersten Bau tatsaechlich danebengegangen

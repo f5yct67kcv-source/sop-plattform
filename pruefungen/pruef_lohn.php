@@ -685,7 +685,7 @@ pruef('Basispunkte werden ohne nachlaufende Nullen als Prozent geschrieben',
 // den echten INSERT aus planung_einrichten.php, legt die Tabelle in SQLite
 // an und fuehrt jede echte Zeile ein. Aendert jemand eine der beiden
 // Stellen ohne die andere, wird sie rot.
-$einr = file_get_contents(__DIR__ . '/../backend/api/planung_einrichten.php');
+$einr = file_get_contents(__DIR__ . '/../backend/planung_einrichten_kern.php');
 
 // Das Schema und die Anweisung aus dem Quelltext holen.
 preg_match("/'lohnart' => \"(.*?)\" ?,\n/s", $einr, $mSchema);

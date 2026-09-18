@@ -112,8 +112,8 @@ if (fremdeAufrufe.length) { bad.push('fremder Aufruf: ' + fremdeAufrufe.join(', 
 // Cockpit duerfen nirgends stehengeblieben sein.
 const COCKPIT_NAMEN = ['beleg_list.php', 'beleg_lesen.php', 'beleg_speichern.php',
   'beleg_versenden.php', 'beleg_status.php', 'beleg_archivieren.php',
-  'beleg_duplizieren.php', 'kunden_list.php', 'kunden_create.php',
-  'kunden_update.php', 'produkt_list.php', 'produkt_speichern.php'];
+  'beleg_duplizieren.php', 'beleg_bezahlt.php', 'kunden_list.php', 'kunden_create.php',
+  'kunden_update.php', 'kunden_import.php', 'produkt_list.php', 'produkt_speichern.php'];
 const stehengeblieben = COCKPIT_NAMEN.filter(n =>
   new RegExp(`(?<!betreiber_)${n.replace('.', '\\.')}`).test(nurCode(seite)));
 check('KRITISCH: kein Endpunktname aus dem Cockpit ist stehengeblieben',
@@ -152,7 +152,16 @@ if (fehlend.length) { bad.push('fehlt im Buendel: ' + fehlend.join(', ')); }
 {
   const stil = [...seite.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n');
   const ohneKommentar = stil.replace(/\/\*[\s\S]*?\*\//g, '');
-  const zaehler = new Map();
+  // Gezaehlt wird nicht, WIE OFT ein Selektor vorkommt, sondern WIE WEIT
+  // die Vorkommen auseinanderliegen. Der Unterschied ist der ganze Punkt:
+  // Zwei Regeln fuer denselben Selektor ein paar Zeilen untereinander sind
+  // gewoehnliches CSS -- erst die Flaeche, dann der Radius. Gefaehrlich ist
+  // der Fall, den es hier tatsaechlich gab: zwei Bloecke in verschiedenen
+  // Teilen der Datei, die nichts voneinander wissen, weil sie aus zwei
+  // Sitzungen stammen. Die Grenze von 60 Zeilen ist gemessen an genau dem
+  // Fall: .dlg lag damals rund 400 Zeilen auseinander.
+  const NAHE = 60;
+  const zeilen = new Map();
   let tiefe = 0, i = 0;
   while (i < ohneKommentar.length) {
     const auf = ohneKommentar.indexOf('{', i);
@@ -161,29 +170,120 @@ if (fehlend.length) { bad.push('fehlt im Buendel: ' + fehlend.join(', ')); }
     if (zu !== -1 && (auf === -1 || zu < auf)) { tiefe = Math.max(0, tiefe - 1); i = zu + 1; continue; }
     const kopf = ohneKommentar.slice(i, auf).trim();
     if (tiefe === 0 && kopf && !kopf.startsWith('@')) {
+      const zeile = ohneKommentar.slice(0, auf).split('\n').length;
       kopf.split(',').map(t => t.trim()).filter(Boolean)
-        .forEach(t => zaehler.set(t, (zaehler.get(t) || 0) + 1));
+        .forEach(t => { if (!zeilen.has(t)) { zeilen.set(t, []); } zeilen.get(t).push(zeile); });
     }
     tiefe += 1;
     i = auf + 1;
   }
-  const doppelt = [...zaehler.entries()].filter(([, n]) => n > 1).map(([t]) => t);
+  const zaehler = zeilen;
+  const doppelt = [...zeilen.entries()]
+    .filter(([, z]) => z.some((n, k) => k > 0 && n - z[k - 1] > NAHE))
+    .map(([t, z]) => `${t} (Zeilen ${z.join(', ')})`);
   check('es wurden ueberhaupt Selektoren gefunden', zaehler.size > 60);
   check('KRITISCH: kein Selektor ist in betreiber.html zweimal auf oberster Ebene definiert',
     doppelt.length === 0);
   if (doppelt.length) { bad.push('doppelt definiert: ' + doppelt.join(', ')); }
 }
 
-// ── 6. Rechnungen bleiben ein Geruest, und zwar sichtbar ──────────────
+// ── 6. Rechnungen (ENT-608) ──────────────────────────────────────────
 //
-// Die Freigabe traegt den definierten Umfang. Offerten sind gebaut, die
-// wiederkehrende Rechnung nicht -- sie braucht die Antwort auf "wonach wird
-// abgerechnet" (OP-536). Steht das nicht mehr da, behauptet die Oberflaeche
-// eine Funktion, die es nicht gibt.
-check('KRITISCH: der Rechnungsbereich sagt weiterhin, dass er nicht gebaut ist',
-  /geruestZeigen\('re-inhalt', 'Noch nicht gebaut'/.test(seite));
-check('und nennt den Grund, nicht nur den Zustand',
-  /wonach abgerechnet wird/.test(seite));
+// Bis ENT-608 stand hier das Gegenteil: Der Rechnungsbereich MUSSTE sagen,
+// dass er nicht gebaut ist. Er ist es jetzt -- und die Wache wird darum
+// umgehaengt, nicht gestrichen. Geprueft wird ab hier, dass die Rechnung
+// wirklich eine Rechnung ist und nicht eine Offerte mit anderer
+// Beschriftung.
+const seiteCode = nurCode(seite);
+
+check('KRITISCH: die Rechnungsliste holt ausdruecklich art=rechnung',
+  /betreiber_beleg_list\.php\?art=rechnung/.test(seiteCode));
+check('KRITISCH: das Formular schickt die Belegart mit, statt sie festzuschreiben',
+  /art:\s*ofArt/.test(seiteCode) && !/art:\s*'offerte'/.test(seiteCode));
+// Das zweite Datumsfeld ist der eigentliche Unterschied der beiden Arten.
+// Traegt eine Rechnung "gueltig_bis", steht ihre Frist in der falschen
+// Spalte -- und die Liste zeigt danach ueberall einen Strich.
+check('KRITISCH: das zweite Datum geht in die Spalte der jeweiligen Art',
+  /\[t\.zweitFeld\]:/.test(seiteCode)
+  && /zweitFeld:\s*'faellig_bis'/.test(seiteCode)
+  && /zweitFeld:\s*'gueltig_bis'/.test(seiteCode));
+// Vier Spalten, die es nur bei Rechnungen gibt.
+check('die Rechnungsliste rechnet Faelligkeit und offenen Betrag',
+  /function reFaelligTage/.test(seiteCode) && /function reOffenRappen/.test(seiteCode));
+// "Unbekannt darf nie wie laengst vorbei aussehen": '0000-00-00' ist
+// truthy UND kleiner als jeder echte Tag.
+check('KRITISCH: eine Rechnung ohne Frist gilt nicht als ueberfaellig',
+  /leeresDatum\(b\.faellig_bis\)/.test(seiteCode));
+check('KRITISCH: bestaetigt und abgelehnt gibt es bei einer Rechnung nicht',
+  /function belegStatusOptionen/.test(seiteCode)
+  && /art !== 'rechnung'/.test(seiteCode));
+
+// Der neue Endpunkt: Er steht auf derselben Ebene wie die uebrigen und
+// markiert ausschliesslich Rechnungen.
+{
+  const bez = nurCode(lies('backend/api/betreiber_beleg_bezahlt.php'));
+  check('KRITISCH: der Bezahlt-Endpunkt verlangt die Betreiber-Anmeldung',
+    /require_betreiber_voll\(\)/.test(bez));
+  check('KRITISCH: er arbeitet auf be_belege und betreiber_db()',
+    bez.includes('be_belege') && bez.includes('betreiber_db()') && !/FROM\s+belege\b/.test(bez));
+  check('KRITISCH: nur eine Rechnung kann bezahlt sein -- eine Offerte nicht',
+    /\$art\s*!==\s*'rechnung'/.test(bez));
+  check('das Bezahldatum setzt der Server, nicht die Eingabe',
+    /date\('Y-m-d'\)/.test(bez) && !/\$in\['bezahlt_am'\]/.test(bez));
+  check('nur POST', /REQUEST_METHOD.*!==.*POST/.test(bez));
+}
+
+// Der Import (ENT-610). Er ist der zweite Schreibweg in be_kunden und damit
+// genau die Stelle, an der ein zweites Regelwerk entstehen koennte.
+{
+  const imp = nurCode(lies('backend/api/betreiber_kunden_import.php'));
+  check('KRITISCH: der Import verlangt die Betreiber-Anmeldung',
+    /require_betreiber_voll\(\)/.test(imp));
+  check('KRITISCH: er arbeitet auf be_kunden und betreiber_db()',
+    imp.includes('be_kunden') && imp.includes('betreiber_db()')
+    && !/\bFROM\s+kunden\b/.test(imp) && !/INSERT INTO kunden\b/.test(imp));
+  check('KRITISCH: jede Zeile laeuft durch dieselbe Lesefunktion wie das Anlegen von Hand',
+    /kunden_eingabe_lesen\(/.test(imp));
+  check('KRITISCH: die Kundennummer vergibt der Server, mit dem be_-Praefix',
+    /naechste_kundennummer\(\$pdo, 'be_'\)/.test(imp));
+  check('KRITISCH: der Trockenlauf schreibt nichts',
+    /\$modus === 'pruefen'[\s\S]{0,120}json_response/.test(imp)
+    && imp.indexOf("'pruefen'") < imp.indexOf('beginTransaction'));
+  check('KRITISCH: geschrieben wird alles oder nichts',
+    /beginTransaction\(\)/.test(imp) && /rollBack\(\)/.test(imp));
+  check('eine Obergrenze je Durchgang, damit eine grosse Datei nicht den Server bindet',
+    /BE_IMPORT_MAX_ZEILEN/.test(imp));
+  check('nur POST', /REQUEST_METHOD.*!==.*POST/.test(imp));
+  check('ohne eingerichtete Tabelle sagt er das, statt zu schreiben',
+    /hat_tabelle\(\$pdo, 'be_kunden'\)/.test(imp));
+
+  // Und die Oberflaeche: Die Datei wird im Browser gelesen, nicht
+  // hochgeladen -- sonst laegen Adressdaten unbeaufsichtigt auf dem Server.
+  check('KRITISCH: die CSV-Datei wird im Browser gelesen, nicht hochgeladen',
+    /FileReader\(\)/.test(seiteCode) && !/FormData\(/.test(seiteCode));
+  check('erst pruefen, dann anlegen -- der Knopf erscheint erst nach dem Trockenlauf',
+    /impSenden\('pruefen'\)/.test(seiteCode) && /impSenden\('anwenden'\)/.test(seiteCode));
+  check('nach dem Anlegen wird die Liste neu geladen',
+    /impAnwenden[\s\S]{0,140}ladeAdressen\(\)/.test(seiteCode));
+}
+
+// ── Die Adressenliste selbst ──────────────────────────────────────────
+//
+// Das WIE prueft test_offerten_gleich.mjs am gerenderten Bild. Hier steht
+// nur, dass die Liste die Wege hat, die eine sortierbare Liste braucht --
+// und dass die eine bewusste Abweichung benannt ist.
+check('die Adressenliste ist sortierbar und hat Handy-Karten',
+  /function adTh\(/.test(seiteCode) && /function adSort\(/.test(seiteCode)
+  && /function adKarte\(/.test(seiteCode) && /function adSortNameUm\(/.test(seiteCode));
+check('KRITISCH: die Zaehlspalte zaehlt Belege -- Rapporte gibt es beim Betreiber nicht',
+  /belege_anzahl/.test(seiteCode) && !/rapporte/i.test(seiteCode));
+{
+  const list = nurCode(lies('backend/api/betreiber_kunden_list.php'));
+  check('KRITISCH: die Belegzahl kommt aus EINER Abfrage, nicht einer je Adresse',
+    /GROUP BY kunde_id/.test(list) && (list.match(/be_belege/g) || []).length <= 2);
+  check('fehlt die Belegtabelle, bleibt die Zahl 0 statt eines Fehlers',
+    /hat_tabelle\(\$pdo, 'be_belege'\)/.test(list));
+}
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden`);
 if (bad.length) {

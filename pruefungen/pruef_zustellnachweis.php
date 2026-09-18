@@ -135,7 +135,7 @@ $GLOBALS['tabellen']['portal_abruf'] = true;
 // den INSERT aus). Ab hier wird darum das echte CREATE TABLE aus dem
 // Einrichtungslauf geholt und die echte Abfrage aus rundgang_detail.php.
 {
-    $einr = file_get_contents(__DIR__ . '/../backend/api/planung_einrichten.php');
+    $einr = file_get_contents(__DIR__ . '/../backend/planung_einrichten_kern.php');
     preg_match("/'portal_abruf' => \"(.*?)\",\n/s", $einr, $mSchema);
     pruef('Das Schema fuer portal_abruf ist im Einrichtungslauf auffindbar',
         !empty($mSchema[1]));

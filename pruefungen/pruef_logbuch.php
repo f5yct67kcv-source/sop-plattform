@@ -6,7 +6,15 @@ $ok = 0; $bad = [];
 function pruef(string $name, bool $c) { global $ok, $bad; if ($c) { $ok++; } else { $bad[] = $name; } }
 
 $GLOBALS['tabelleDa'] = true;
-function hat_tabelle(PDO $pdo, string $t, bool $frisch = false): bool { return $GLOBALS['tabelleDa']; }
+// Ehrlich statt pauschal: Seit es zwei Tabellensaetze gibt (ENT-614), haengt
+// die halbe Aussage daran, WELCHE Tabelle gefragt wurde. Ein Stub, der auf
+// jeden Namen "ja" sagt, koennte ein fehlendes Praefix nicht bemerken.
+function hat_tabelle(PDO $pdo, string $t, bool $frisch = false): bool {
+    if (!$GLOBALS['tabelleDa']) { return false; }
+    $s = $pdo->prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?");
+    $s->execute([$t]);
+    return (bool)$s->fetchColumn();
+}
 
 require __DIR__ . '/../backend/logbuch.php';
 
@@ -119,6 +127,80 @@ pruef('Der Verlauf eines Fahrzeugs enthaelt keine fremden Bereiche',
     logbuch_lesen($pdo, 'fahrzeug', 7) === []);
 pruef('KRITISCH: ein unbekannter Bereich wird weiterhin abgewiesen',
     logbuch_schreiben($pdo, $chefin, 'erfundenerbereich', 1, 'x', 'a', 'b') === false);
+
+// ══════════════ ZWEITER TABELLENSATZ: DIE BETREIBER-EBENE (ENT-614)
+//
+// DER TEURE FALL, derselbe wie bei den Belegen (pruef_offerten_betreiber.php):
+// Solange die vier Betreiber-Secrets nicht gesetzt sind, zeigt betreiber_db()
+// auf DIESELBE Datenbank wie db() (OP-518). Greift das Praefix nicht, landet
+// die Vertragsaenderung an einem Mandanten in der Personalakten-Tabelle der
+// Mandantin. Darum hier: EINE Datenbank, beide Tabellensaetze nebeneinander.
+$pdo->exec("CREATE TABLE be_aenderungslog (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  zeitpunkt TEXT DEFAULT CURRENT_TIMESTAMP,
+  akteur_id INT NOT NULL, akteur_name TEXT NOT NULL,
+  bereich TEXT NOT NULL, objekt_id INT NOT NULL, feld TEXT NOT NULL,
+  wert_alt TEXT NULL, wert_neu TEXT NULL, werte_verborgen INT NOT NULL DEFAULT 0)");
+
+$betreiberin = ['id' => 9, 'name' => 'betreiberin'];
+$vorherBe  = ['aenderungslog' => (int)$pdo->query('SELECT COUNT(*) FROM aenderungslog')->fetchColumn()];
+
+pruef('KRITISCH: ein Betreiber-Eintrag wird geschrieben',
+    logbuch_schreiben($pdo, $betreiberin, 'mandant', 3, 'status', 'aktiv', 'gesperrt', false, 'be_') === true);
+pruef('KRITISCH: und zwar in be_aenderungslog',
+    (int)$pdo->query("SELECT COUNT(*) FROM be_aenderungslog WHERE bereich = 'mandant'")->fetchColumn() === 1);
+pruef('KRITISCH: und NICHT in der Tabelle der Mandantin',
+    (int)$pdo->query('SELECT COUNT(*) FROM aenderungslog')->fetchColumn() === $vorherBe['aenderungslog']);
+
+// Die geschlossenen Mengen gelten je Satz -- und zwar in beide Richtungen.
+pruef('KRITISCH: ein Mandanten-Bereichsname geht im Betreiber-Satz nicht',
+    logbuch_schreiben($pdo, $betreiberin, 'mitarbeiter', 1, 'x', 'a', 'b', false, 'be_') === false);
+pruef('KRITISCH: und ein Betreiber-Bereichsname nicht im Mandanten-Satz',
+    logbuch_schreiben($pdo, $chefin, 'mandant', 1, 'x', 'a', 'b') === false);
+pruef('KRITISCH: ein erfundener Tabellensatz wird abgewiesen, nicht gebaut',
+    (function () use ($pdo, $betreiberin) {
+        try { logbuch_schreiben($pdo, $betreiberin, 'mandant', 1, 'x', 'a', 'b', false, 'fremd_'); }
+        catch (InvalidArgumentException $e) { return true; }
+        return false;
+    })());
+
+logbuch_schreiben($pdo, $betreiberin, 'konto', 4, 'passwort', null, null, true, 'be_');
+logbuch_schreiben($pdo, ['id' => 10, 'name' => 'zweite'], 'adresse', 5, 'name', 'alt', 'neu', false, 'be_');
+
+// Die Gesamtsicht: leerer Bereichsname heisst "alle Bereiche DIESES Satzes".
+$alle = logbuch_lesen($pdo, '', 0, 200, 'be_');
+pruef('KRITISCH: die Gesamtsicht zeigt alle Bereiche des Betreiber-Satzes', count($alle) === 3);
+pruef('KRITISCH: und keine Zeile der Mandantenseite',
+    count(array_filter($alle, fn($z) => in_array($z['bereich'], LOGBUCH_BEREICHE, true))) === 0);
+
+// Ein Tippfehler im Filter darf nicht wie "nichts passiert" aussehen --
+// und schon gar nicht wie "alles".
+pruef('KRITISCH: ein unbekannter Bereichsfilter liefert nichts, nicht alles',
+    logbuch_lesen($pdo, 'mitarbeiter', 0, 200, 'be_') === []);
+
+// Der Filter auf die handelnde Person gehoert in die Abfrage, nicht dahinter.
+$ihre = logbuch_lesen($pdo, '', 0, 200, 'be_', 10);
+pruef('KRITISCH: der Personenfilter zeigt nur deren Eintraege',
+    count($ihre) === 1 && $ihre[0]['akteur_name'] === 'zweite');
+pruef('Und der Bereichsfilter greift daneben weiter',
+    count(logbuch_lesen($pdo, 'konto', 0, 200, 'be_')) === 1);
+
+// Ein Geheimnis steht als Tatsache im Buch, nie mit Wert.
+$konto = logbuch_lesen($pdo, 'konto', 4, 200, 'be_');
+pruef('KRITISCH: der Passwortwechsel steht ohne Werte im Buch',
+    count($konto) === 1 && $konto[0]['wert_alt'] === null
+    && $konto[0]['wert_neu'] === null && $konto[0]['werte_verborgen'] === true);
+
+// Fehlt die Betreiber-Tabelle, wird nichts in die Mandanten-Tabelle
+// umgeleitet -- der Eintrag entfaellt, laut und ohne Umweg.
+$pdo->exec('DROP TABLE be_aenderungslog');
+$vorherZahl = (int)$pdo->query('SELECT COUNT(*) FROM aenderungslog')->fetchColumn();
+pruef('KRITISCH: ohne eigene Tabelle wird nichts geschrieben',
+    logbuch_schreiben($pdo, $betreiberin, 'mandant', 3, 'status', 'a', 'b', false, 'be_') === false);
+pruef('KRITISCH: und nichts in die Tabelle der Mandantin umgeleitet',
+    (int)$pdo->query('SELECT COUNT(*) FROM aenderungslog')->fetchColumn() === $vorherZahl);
+pruef('Das Lesen antwortet dann leer statt mit fremden Zeilen',
+    logbuch_lesen($pdo, '', 0, 200, 'be_') === []);
 
 // Ein misslungener Eintrag darf das Speichern nicht verhindern
 $pdo->exec('DROP TABLE aenderungslog');

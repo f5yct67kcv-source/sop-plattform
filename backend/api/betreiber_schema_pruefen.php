@@ -23,6 +23,13 @@
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
+// Der Rechenkern der Mandanten-eigenen Einrichtung (ENT-612) -- dieselbe
+// Funktion, die api/planung_einrichten.php gegen die eigene Verbindung
+// eines Mandanten aufruft, hier gegen JEDE Mandanten-Datenbank aufgerufen,
+// zu der der Betreiber die Zugangsdaten hat. "Eine Definition, nicht
+// zwei": Die rund 50 Tabellen des Rapport-Tools stehen nur an einer
+// Stelle, dieser Endpunkt richtet sie nur ein, er definiert sie nicht neu.
+require_once __DIR__ . '/../planung_einrichten_kern.php';
 
 require_betreiber_voll();
 $pdo = betreiber_db();
@@ -47,6 +54,51 @@ if (!$nurPruefen) {
 } elseif (hat_tabelle($pdo, 'mandant')
        && (int)$pdo->query('SELECT COUNT(*) FROM mandant')->fetchColumn() === 0) {
     $offen[] = 'Bestandsbetrieb als Mandant 1';
+}
+
+// ── Die Betriebstabellen JEDES Mandanten (ENT-612) ───────────────────
+//
+// ANLASS: Bis hierher richtete diesen Teil ausschliesslich der Mandant
+// selbst ein, im eigenen Cockpit -- fuer die zehn Demo-Plaetze (ENT-600/
+// 601/603) heisst das: eine leere, frisch angelegte Datenbank, in der
+// nie jemand eingeloggt war, weil der erste Zugang ja erst die Demo-
+// Anforderung selbst erzeugt. Die Mandanten-Liste zeigte "5 von 5
+// Tabellen" -- eine Falschmeldung, verursacht durch einen inzwischen
+// behobenen Fehler in hat_tabelle() (siehe db.php), der das Ergebnis
+// EINES Mandanten faelschlich fuer JEDEN anderen in derselben Anfrage
+// wiederverwendete. Die Datenbanken selbst waren nie eingerichtet, und
+// niemand konnte das ohne FTP-Zugriff auf jede einzelne Adresse nachholen.
+//
+// Jeder Mandant fuer sich: Ein Fehlschlag bei einem darf die uebrigen
+// nicht verhindern -- dieselbe Ueberlegung wie bei schritt() im Kern
+// selbst. $mitBetreiberEbene = false: Die Betreiber-Ebene ist oben bereits
+// EINMAL zentral eingerichtet, nicht ein zweites Mal je Mandant.
+$mandanten = $pdo->query('SELECT id, name, db_host, db_name, db_user, secret_name FROM mandant ORDER BY id')
+    ->fetchAll(PDO::FETCH_ASSOC);
+foreach ($mandanten as $m) {
+    $lage = mandant_verbindung_bereit($m);
+    $bezug = 'Mandant „' . $m['name'] . '“';
+    if ($lage !== 'bereit' && $lage !== 'standardverbindung') {
+        // Vier Lagen, vier Texte (Hausregel) -- dieselbe Wortwahl wie in
+        // betreiber.html (STAND_TEXT), damit dieselbe Lage ueberall
+        // gleich heisst.
+        $text = [
+            'unvollstaendig' => 'Datenbank-Angaben unvollständig',
+            'secret_fehlt'   => 'Zugangsdaten fehlen im Deploy',
+        ][$lage] ?? $lage;
+        $offen[] = $bezug . ': ' . $text;
+        continue;
+    }
+    try {
+        $mpdo = mandant_db($m);
+        $ergebnis = planung_einrichten_ausfuehren($mpdo, $nurPruefen, false);
+        foreach ($ergebnis['getan'] as $g)  { $getan[]  = $bezug . ': ' . $g; }
+        foreach ($ergebnis['fehler'] as $f) { $fehler[] = $bezug . ': ' . $f; }
+    } catch (Throwable $e) {
+        // Der Treibertext kann Host und Benutzer tragen und geht nicht
+        // nach aussen -- dieselbe Ueberlegung wie bei mandant_stand().
+        $fehler[] = $bezug . ': Verbindung fehlgeschlagen';
+    }
 }
 
 json_response([

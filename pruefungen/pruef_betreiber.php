@@ -15,6 +15,25 @@
 //
 // Gegenproben stehen jeweils direkt bei der Pruefung.
 declare(strict_types=1);
+
+// Tabellen- und Spaltenauskunft fuer SQLite. db.php definiert beide nur,
+// wenn es sie noch nicht gibt (`function_exists`), und seine Fassung fragt
+// information_schema -- die es in SQLite nicht gibt. Darum hier zuerst, und
+// ehrlich statt pauschal: Ein Stub, der auf jeden Namen "ja" sagt, koennte
+// eine fehlende Nachtragsspalte nicht bemerken.
+function hat_tabelle(PDO $pdo, string $t, bool $frisch = false): bool {
+    $s = $pdo->prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?");
+    $s->execute([$t]);
+    return (bool)$s->fetchColumn();
+}
+function hat_spalte(PDO $pdo, string $tabelle, string $spalte): bool {
+    if (!hat_tabelle($pdo, $tabelle)) { return false; }
+    foreach ($pdo->query('PRAGMA table_info(' . $tabelle . ')')->fetchAll() as $z) {
+        if (($z['name'] ?? '') === $spalte) { return true; }
+    }
+    return false;
+}
+
 require __DIR__ . '/../backend/betreiber.php';
 
 $ok = 0; $bad = [];
@@ -252,6 +271,45 @@ $pruef('KRITISCH: auch bei vielen Mandanten bleibt er zu',
     $pruef('KRITISCH: eine nicht feststellbare Teilzahl bleibt unbekannt, nicht null',
         $r['ma_im_einsatz'] === null);
 }
+
+// ══════════════ NAMENSTEILE (ENT-615)
+//
+// Die Teilung laeuft EINMAL ueber den Bestand. Ein Fehler hier steht danach
+// dauerhaft in der Liste, und niemand sieht ihm an, dass er aus einer
+// Nachtragsspalte stammt -- darum ausgefuehrt und nicht nachgelesen.
+$pruef('KRITISCH: das erste Wort ist der Vorname, der Rest der Nachname',
+    be_name_teilen('Anna von Gunten') === ['vorname' => 'Anna', 'nachname' => 'von Gunten']);
+$pruef('Zwei Wortteile werden normal geteilt',
+    be_name_teilen('Peter Muster') === ['vorname' => 'Peter', 'nachname' => 'Muster']);
+$pruef('KRITISCH: ein einzelnes Wort gilt als Nachname, nicht als Vorname',
+    be_name_teilen('Muster') === ['vorname' => '', 'nachname' => 'Muster']);
+$pruef('Mehrfache Leerzeichen erzeugen keine leeren Teile',
+    be_name_teilen('  Anna   von   Gunten  ') === ['vorname' => 'Anna', 'nachname' => 'von Gunten']);
+$pruef('Ein leerer Name ergibt zwei leere Teile, keine Erfindung',
+    be_name_teilen('') === ['vorname' => '', 'nachname' => '']);
+$pruef('KRITISCH: Teilen und wieder Zusammensetzen ergibt denselben Namen',
+    be_name_bauen(...array_values(be_name_teilen('Anna von Gunten'))) === 'Anna von Gunten');
+$pruef('Ohne Vorname entsteht kein fuehrendes Leerzeichen',
+    be_name_bauen('', 'Muster') === 'Muster');
+
+// ══════════════ NACHTRAG UEBER EINEN ECHTEN BESTAND
+$nb = new PDO('sqlite::memory:', null, null,
+    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+$nb->exec("CREATE TABLE betreiber (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+  anrede TEXT NOT NULL DEFAULT '', vorname TEXT NOT NULL DEFAULT '', nachname TEXT NOT NULL DEFAULT '')");
+$nb->exec("INSERT INTO betreiber (name) VALUES ('Anna von Gunten'), ('Muster')");
+$nb->exec("INSERT INTO betreiber (name, vorname, nachname) VALUES ('Peter Muster', 'Peter', 'Muster')");
+
+$zahl = be_namen_nachtragen($nb);
+$pruef('KRITISCH: der Nachtrag fasst nur Konten ohne Namensteile an', $zahl === 2);
+$alle = $nb->query('SELECT name, vorname, nachname FROM betreiber ORDER BY id')->fetchAll();
+$pruef('KRITISCH: der Bestand wird richtig geteilt',
+    $alle[0]['vorname'] === 'Anna' && $alle[0]['nachname'] === 'von Gunten');
+$pruef('Ein einzelnes Wort landet im Nachnamen',
+    $alle[1]['vorname'] === '' && $alle[1]['nachname'] === 'Muster');
+$pruef('KRITISCH: der Anzeigename wird dabei nicht veraendert',
+    $alle[0]['name'] === 'Anna von Gunten');
+$pruef('KRITISCH: ein zweiter Lauf aendert nichts mehr', be_namen_nachtragen($nb) === 0);
 
 echo count($bad) === 0
     ? "$ok bestanden, 0 nicht bestanden\n"

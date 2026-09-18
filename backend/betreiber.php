@@ -45,6 +45,31 @@ require_once __DIR__ . '/db.php';
 // Rechenkern der Demo-Zugaenge (ENT-600) -- liefert die Tabellendefinition
 // fuer be_tabellen() und die Ablauflogik fuer die Endpunkte.
 require_once __DIR__ . '/demo_zugang.php';
+require_once __DIR__ . '/logbuch.php';
+
+// ── Logbuch der Betreiber-Ebene (ENT-614) ────────────────────────────
+//
+// Zwei Zeilen Umweg, und sie haben einen Grund: Das Praefix 'be_' steht so
+// an EINER Stelle. Vergisst ein Endpunkt es, schreibt er nicht etwa nichts,
+// sondern in die Tabelle der MANDANTIN -- der Fehler waere unsichtbar, bis
+// jemand dort einen Eintrag findet, der ihn nichts angeht. Genau diese Sorte
+// Regel ist hier schon mehrfach an etwas Neuem gescheitert, das sie nicht
+// geerbt hat (CLAUDE.md).
+//
+// $ich ist das Ergebnis von require_betreiber_voll() -- id und name des
+// Kontos, das handelt.
+function be_log(PDO $pdo, array $ich, string $bereich, int $objektId,
+                string $feld, ?string $alt, ?string $neu, bool $ohneWerte = false): bool
+{
+    return logbuch_schreiben($pdo, $ich, $bereich, $objektId, $feld, $alt, $neu, $ohneWerte, 'be_');
+}
+
+// Schreibt je Unterschied zwischen zwei Datensaetzen eine Zeile.
+function be_log_vergleich(PDO $pdo, array $ich, string $bereich, int $objektId,
+                          array $vorher, array $nachher, array $ohneWerte = []): int
+{
+    return logbuch_vergleichen($pdo, $ich, $bereich, $objektId, $vorher, $nachher, $ohneWerte, 'be_');
+}
 
 // ── Verbindung zur Betreiber-Datenbank ────────────────────────────────
 //
@@ -739,6 +764,9 @@ function be_tabellen(): array
 'betreiber' => "CREATE TABLE IF NOT EXISTS betreiber (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(200) NOT NULL,
+  anrede VARCHAR(20) NOT NULL DEFAULT '',
+  vorname VARCHAR(100) NOT NULL DEFAULT '',
+  nachname VARCHAR(100) NOT NULL DEFAULT '',
   email VARCHAR(200) NOT NULL,
   passwort_hash VARCHAR(255) NOT NULL,
   aktiv TINYINT(1) NOT NULL DEFAULT 1,
@@ -1095,6 +1123,32 @@ function be_tabellen(): array
 // Vertraulichkeit) -- was hier steht, traegt die Betreiberin selbst ein.
 // Solange sie leer ist, verweigert der Versand mit klarer Begruendung,
 // statt eine Offerte ohne Absender zu verschicken.
+// Logbuch der Betreiber-Ebene (ENT-614).
+//
+// Gleicher Bau wie `aenderungslog` auf der Mandantenseite -- und trotzdem
+// eine eigene Tabelle: Solange die vier Betreiber-Secrets nicht gesetzt sind,
+// steht sie in DERSELBEN Datenbank wie die Personalakten der Mandantin
+// (OP-518). Ein gemeinsames Logbuch haette zwei Leserkreise und zwei
+// Loeschfristen in einem Topf.
+//
+// KEIN Fremdschluessel auf betreiber: Ein Verlauf muss den Datensatz
+// ueberleben, ueber den er berichtet -- darum steht der Name des Akteurs
+// als Text daneben und nicht nur seine ID.
+'be_aenderungslog' => "CREATE TABLE IF NOT EXISTS be_aenderungslog (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  zeitpunkt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  akteur_id INT NOT NULL,
+  akteur_name VARCHAR(100) NOT NULL,
+  bereich VARCHAR(30) NOT NULL,
+  objekt_id INT NOT NULL,
+  feld VARCHAR(60) NOT NULL,
+  wert_alt TEXT NULL,
+  wert_neu TEXT NULL,
+  werte_verborgen TINYINT(1) NOT NULL DEFAULT 0,
+  KEY idx_be_objekt (bereich, objekt_id, zeitpunkt),
+  KEY idx_be_zeit (zeitpunkt)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 'be_briefkopf' => "CREATE TABLE IF NOT EXISTS be_briefkopf (
   id TINYINT UNSIGNED NOT NULL PRIMARY KEY DEFAULT 1,
   firma VARCHAR(200) NOT NULL DEFAULT '',
@@ -1150,7 +1204,73 @@ function be_spalten(): array
         // nach, deren `mandant`-Tabelle schon vor ENT-589 entstanden ist --
         // eine frische Anlage bekommt sie ueber be_tabellen() bereits mit.
         ['mandant', 'subdomain', "ALTER TABLE mandant ADD COLUMN subdomain VARCHAR(100) NOT NULL DEFAULT '' AFTER name"],
+        // Namensteile am Betreiber-Konto (ENT-615). `name` bleibt als
+        // Anzeigename stehen und wird aus Vor- und Nachname zusammengesetzt --
+        // Anmeldung, Support und Logbuch sprechen weiter ueber dieses eine
+        // Feld. Gefuellt werden die Teile nicht hier, sondern in
+        // be_namen_nachtragen() hinter der Schleife -- erst dann stehen beide
+        // Spalten, und die Reihenfolge der drei Eintraege spielt keine Rolle.
+        ['betreiber', 'anrede',   "ALTER TABLE betreiber ADD COLUMN anrede VARCHAR(20) NOT NULL DEFAULT '' AFTER name"],
+        ['betreiber', 'nachname', "ALTER TABLE betreiber ADD COLUMN nachname VARCHAR(100) NOT NULL DEFAULT '' AFTER anrede"],
+        ['betreiber', 'vorname',  "ALTER TABLE betreiber ADD COLUMN vorname VARCHAR(100) NOT NULL DEFAULT '' AFTER anrede"],
     ];
+}
+
+// Teilt einen Anzeigenamen in Vor- und Nachname.
+//
+// Erstes Wort ist der Vorname, alles Weitere der Nachname -- und nicht
+// umgekehrt: Bei "Anna von Gunten" ist "von Gunten" der Nachname. Die
+// Umkehrung (letztes Wort = Nachname) zerschneidet genau die
+// zusammengesetzten Namen, die es hier haeufig gibt.
+//
+// Bleibt nur ein Wort uebrig, gilt es als Nachname. Das ist die Annahme, die
+// sich leichter korrigieren laesst: Ein fehlender Vorname faellt in der Liste
+// auf, ein falsch zugeordneter nicht.
+function be_name_teilen(string $name): array
+{
+    $teile = preg_split('/\s+/u', trim($name), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    if (count($teile) === 0) { return ['vorname' => '', 'nachname' => '']; }
+    if (count($teile) === 1) { return ['vorname' => '', 'nachname' => $teile[0]]; }
+    return ['vorname' => array_shift($teile), 'nachname' => implode(' ', $teile)];
+}
+
+// Setzt den Anzeigenamen aus den Teilen zusammen. Eine Stelle, damit `name`
+// nicht an drei Endpunkten leicht verschieden entsteht.
+function be_name_bauen(string $vorname, string $nachname): string
+{
+    return trim(trim($vorname) . ' ' . trim($nachname));
+}
+
+// Fuellt Vor- und Nachname bestehender Konten einmalig aus `name`.
+//
+// Laeuft aus be_spalten_anlegen() heraus, nicht als eigener Aufruf an drei
+// Einrichtungsstellen: Eine Nachtragsspalte, die an einer davon vergessen
+// wird, laesst genau die Anlage ohne Namen zurueck, die den Nachtrag am
+// noetigsten hat. Idempotent -- wer schon geteilte Namen hat, wird nicht
+// angefasst.
+function be_namen_nachtragen(PDO $pdo): int
+{
+    if (!hat_tabelle($pdo, 'betreiber')
+        || !hat_spalte($pdo, 'betreiber', 'vorname')
+        || !hat_spalte($pdo, 'betreiber', 'nachname')) {
+        return 0;
+    }
+    try {
+        $offen = $pdo->query(
+            "SELECT id, name FROM betreiber WHERE vorname = '' AND nachname = ''"
+        )->fetchAll(PDO::FETCH_ASSOC);
+        $s = $pdo->prepare('UPDATE betreiber SET vorname = ?, nachname = ? WHERE id = ?');
+        $zahl = 0;
+        foreach ($offen as $k) {
+            $t = be_name_teilen((string)$k['name']);
+            if ($t['vorname'] === '' && $t['nachname'] === '') { continue; }
+            $s->execute([$t['vorname'], $t['nachname'], (int)$k['id']]);
+            $zahl++;
+        }
+        return $zahl;
+    } catch (Throwable $e) {
+        return 0;
+    }
 }
 
 function be_spalten_anlegen(PDO $pdo, bool $nurPruefen = false): array
@@ -1165,6 +1285,12 @@ function be_spalten_anlegen(PDO $pdo, bool $nurPruefen = false): array
         } catch (Throwable $e) {
             $fehler[] = 'Spalte ' . $tabelle . '.' . $spalte . ' — ' . $e->getMessage();
         }
+    }
+    // Direkt hinter den Spalten, im selben Durchlauf: Ein Konto, dessen
+    // Namensteile leer bleiben, waere in der neuen Liste namenlos.
+    if (!$nurPruefen) {
+        $zahl = be_namen_nachtragen($pdo);
+        if ($zahl > 0) { $getan[] = 'Namensteile fuer ' . $zahl . ' Betreiber-Konten nachgetragen'; }
     }
     return ['getan' => $getan, 'offen' => $offen, 'fehler' => $fehler];
 }
