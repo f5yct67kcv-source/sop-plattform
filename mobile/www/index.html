@@ -7855,7 +7855,7 @@ function rgLaufKopfZeichnen() {
   const lage = rgOrtLage().art;
   if (lage !== rgsOrtLageGezeichnet) {
     rgsOrtLageGezeichnet = lage;
-    if (rgsReiter === 'punkte' && abPunktId === null) { rundgangListeZeichnen(); }
+    if (rgsReiter === 'punkte' && abPunktId === null) { rundgangListeZeichnen('ortung'); }
   }
   // Dasselbe gilt fuer den Richtungspfeil (ENT-542): Er altert ebenfalls.
   try { rgRichtungMarkeNachfuehren(); } catch (e) {}
@@ -9172,7 +9172,7 @@ function rgOrtungStarten() {
     // Die Liste zeigt Entfernungen -- sie muss mitwandern. Nur wenn sie
     // gerade sichtbar ist: sonst wuerde ein offenes Formular (Ersatzscan,
     // "nicht verfuegbar") beim naechsten Positionswechsel weggeworfen.
-    if (rgsReiter === 'punkte' && abPunktId === null) { rundgangListeZeichnen(); }
+    if (rgsReiter === 'punkte' && abPunktId === null) { rundgangListeZeichnen('ortung'); }
   }, fehler => {
     // Ausgewertet statt verschluckt (ENT-320).
     // 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT.
@@ -10139,8 +10139,50 @@ function rundgangFussZeichnen() {
   $('blFuss').innerHTML = zurueck + aktion;
 }
 
-function rundgangListeZeichnen() {
+/* Steht der Cursor in einem Feld der Liste, wird NICHT neu gezeichnet.
+
+   Vom Projektinhaber gemeldet: "Bei Grund erforderlich kann man nicht
+   reinschreiben." Der Text ging nicht verloren -- er wird vor jedem
+   Zeichnen gesichert (ENT-324) --, aber das Feld selbst wurde ersetzt,
+   und damit war der Cursor weg. Bei laufender Ortung passiert das im
+   Sekundentakt; tippen laesst sich so nicht.
+
+   Aufgeschoben ist nicht aufgehoben: Sobald das Feld verlassen wird,
+   zeichnet die Liste nach. Entfernungen und Zustaende sind damit
+   hoechstens so lange alt, wie jemand tippt -- und wer tippt, sieht
+   ohnehin auf die Tastatur, nicht auf die Meterzahl. */
+let rdZeichnenNachholen = false;
+function rdCursorInListe() {
+  const a = document.activeElement;
+  if (!a) { return false; }
+  const tag = a.tagName;
+  if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') { return false; }
+  const liste = $('rdListe');
+  return !!liste && liste.contains(a);
+}
+
+document.addEventListener('focusout', () => {
+  if (!rdZeichnenNachholen) { return; }
+  // Erst im naechsten Durchlauf: Beim Wechsel von einem Feld ins naechste
+  // ist der Cursor fuer einen Augenblick nirgends, und ein Zeichnen genau
+  // dann raeumte das Ziel des Wechsels weg.
+  setTimeout(() => {
+    if (rdZeichnenNachholen && !rdCursorInListe()) {
+      rdZeichnenNachholen = false;
+      try { rundgangListeZeichnen('ortung'); } catch (e) {}
+    }
+  }, 0);
+});
+
+function rundgangListeZeichnen(anlass) {
   if (!rundgangAktiv) return;
+  // Aufgeschoben wird NUR, was die Ortung anstoesst. Eine Handlung des
+  // Benutzers muss immer sofort wirken -- sonst oeffnet sich ein Formular
+  // nicht, weil der Cursor noch im vorigen steht. Genau das hat die
+  // Regression gefunden, nachdem hier zuerst jedes Zeichnen aufgeschoben
+  // wurde.
+  if (anlass === 'ortung' && rdCursorInListe()) { rdZeichnenNachholen = true; return; }
+  rdZeichnenNachholen = false;
   rundgangFussZeichnen();
   const kps = rundgangAktiv.kontrollpunkte;
   // #rdFortschritt ist mit ENT-541 entfallen: Den Zustand der Runde nennt
@@ -10346,7 +10388,7 @@ function rdZeile(k, gesperrt, naechsterId) {
       <button class="btn btn-plain" onclick="rdNvUm(${k.id})">${esc(w('kpNichtVerfuegbar'))}</button>
     </div>
     <div class="rd-nv" id="rdEs${k.id}"${k.offen === 'es' ? '' : ' style="display:none"'}>
-      <input type="file" accept="image/*" capture="environment" id="rdEsInput${k.id}" onchange="rdEsFotoGewaehlt(${k.id})" style="display:none">
+      <input type="file" accept="image/*" capture="environment" id="rdEsInput${k.id}" onchange="rdEsFotoGewaehlt(${k.id}, this)" style="display:none">
       <button class="btn btn-plain" onclick="document.getElementById('rdEsInput${k.id}').click()">${esc(w('kpEsFotoAufnehmen'))}</button>
       <!-- Auch hier geht das Bild an den Kunden (seit ENT-455 ins Portal,
            mit ENT-544 in Lesegroesse ins Rapport-PDF) -- und auch hier stand
@@ -10674,8 +10716,21 @@ function rdEsKomprimieren(datei) {
   });
 }
 
-function rdEsFotoGewaehlt(kontrollpunktId) {
-  const input = $('rdEsInput' + kontrollpunktId);
+/* Das Feld kommt MIT (zweiter Parameter), statt hier nachgeschlagen zu
+   werden.
+
+   Vom Projektinhaber gemeldet: Foto aufgenommen, "Verwenden" getippt --
+   und nichts geschah; beim Melden hiess es weiterhin "Foto erforderlich".
+   Der Grund: Waehrend die Kamera offen ist, laeuft die Ortung weiter, und
+   jede neue Position zeichnet die Liste neu (ENT-317). Das Dateifeld im
+   Dokument ist danach ein ANDERES. Das Foto kam beim alten an -- und
+   $('rdEsInput...') lieferte das neue, leere.
+
+   Mit dem Feld aus dem Ereignis ist das gleichgueltig: Es ist immer das,
+   bei dem das Foto tatsaechlich angekommen ist, auch wenn es inzwischen
+   aus dem Dokument geloest wurde. */
+function rdEsFotoGewaehlt(kontrollpunktId, feld) {
+  const input = feld || $('rdEsInput' + kontrollpunktId);
   const datei = input && input.files && input.files[0];
   if (!datei) return;
   rdEsKomprimieren(datei).then(dataUrl => {
