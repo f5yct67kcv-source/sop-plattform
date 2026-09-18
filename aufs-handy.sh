@@ -152,7 +152,37 @@ fi
 
 echo "── 3/5  Nach iOS uebertragen"
 cd mobile
+
+# ERST installieren, DANN uebertragen. Ohne das fehlt ein neu
+# eingetragenes Plugin in node_modules, und "cap sync" schreibt
+# Package.swift ohne es neu -- der Bau gelingt, das Plugin ist aber nicht
+# dabei. Genau so fehlte das Push-Plugin auf dem Geraet: keine Frage nach
+# der Erlaubnis, die App tauchte nicht einmal in den Mitteilungs-
+# einstellungen auf. Nebenwirkung war ausserdem, dass die neu
+# geschriebene Package.swift bei jedem Lauf als lokale Aenderung im Stash
+# landete.
+npm install --silent
+
 npx cap sync ios
+
+# Nachsehen, ob jedes native Plugin auch wirklich im Bau landet. Geprueft
+# wird die Aussage, nicht ein Name: Jedes Paket unter node_modules/@capacitor/
+# mit eigener Package.swift IST ein natives Plugin und muss in der
+# Package.swift des Projekts auftauchen.
+FEHLEND=""
+for pfad in node_modules/@capacitor/*/; do
+  [ -f "${pfad}Package.swift" ] || continue
+  name="$(basename "$pfad")"
+  grep -q "@capacitor/${name}" ios/App/CapApp-SPM/Package.swift || FEHLEND="$FEHLEND $name"
+done
+if [ -n "$FEHLEND" ]; then
+  echo ""
+  echo "  Diese Plugins fehlen im nativen Bau:$FEHLEND"
+  echo "  Der Bau wuerde gelingen, die Funktion auf dem Geraet aber fehlen."
+  echo "  Meist hilft: cd mobile && rm -rf node_modules && npm install"
+  exit 1
+fi
+echo "        Plugins vollstaendig"
 
 if [ "$SAUBER" = "sauber" ]; then
   echo "── 3b/5 Zwischenspeicher leeren"
