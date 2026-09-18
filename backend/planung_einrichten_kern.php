@@ -98,6 +98,85 @@ $fehler = [];
 // ── 1. Tabellen. Reihenfolge zaehlt: worauf verwiesen wird, muss zuerst da sein.
 $tabellen = [
 
+// Die vier aeltesten Tabellen (ENT-010), bis zum 2026-09-18 einzeln von
+// Hand in phpMyAdmin angelegt (siehe schema.sql, Kopfkommentar: "Ausfuehren
+// im Hostpoint-Datenbank-Tool, einmalig"). Wortgleich mit schema.sql, nur
+// mit IF NOT EXISTS wie jede andere Tabelle hier -- eine bestehende
+// Datenbank (jeder heutige Mandant) hat sie laengst, dieser Eintrag aendert
+// dort nichts.
+//
+// BESTANDSFEHLER (gefunden am 2026-09-18, ENT-612): Eine wirklich neue,
+// nie von Hand eingerichtete Datenbank (ein frischer Demo-Platz) hatte
+// keine dieser vier Tabellen. objekte.kunde_id verweist auf kunden(id) --
+// ohne kunden schlaegt objekte fehl (MySQL-Fehler 150, "Foreign key
+// constraint is incorrectly formed"), und mit objekte jede Tabelle, die
+// wiederum darauf verweist. Bis hierher fiel das nie auf, weil jede
+// bestehende Datenbank schema.sql bereits laengst manuell durchlaufen
+// hatte -- der zentrale Betreiber-Lauf (ENT-612) war der erste Weg, der
+// eine WIRKLICH leere Datenbank je erreicht hat.
+'mitarbeiter' => "
+CREATE TABLE IF NOT EXISTS mitarbeiter (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  ist_admin TINYINT(1) NOT NULL DEFAULT 0,
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  personalnummer VARCHAR(20),
+  anrede VARCHAR(20),
+  vorname VARCHAR(100),
+  nachname VARCHAR(100),
+  geburtsdatum DATE,
+  strasse VARCHAR(200),
+  ort VARCHAR(200),
+  telefon VARCHAR(50),
+  mobil VARCHAR(50),
+  email VARCHAR(200),
+  erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+'kunden' => "
+CREATE TABLE IF NOT EXISTS kunden (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(200) NOT NULL,
+  strasse VARCHAR(200) NOT NULL,
+  ort VARCHAR(200) NOT NULL,
+  telefon VARCHAR(50) NOT NULL,
+  email VARCHAR(200),
+  erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+'sessions' => "
+CREATE TABLE IF NOT EXISTS sessions (
+  token VARCHAR(64) PRIMARY KEY,
+  mitarbeiter_id INT NOT NULL,
+  erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// einsatz_id (Verweis auf einsaetze) kommt erst per ALTER TABLE dazu, weiter
+// unten -- einsaetze entsteht selbst erst im Lauf dieser Einrichtung.
+'rapporte' => "
+CREATE TABLE IF NOT EXISTS rapporte (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mitarbeiter_id INT NOT NULL,
+  einsatz_id INT NULL,
+  datum DATE NOT NULL,
+  kunde VARCHAR(200) NOT NULL,
+  strasse VARCHAR(200) NOT NULL,
+  ort VARCHAR(200) NOT NULL,
+  auftrag_nr VARCHAR(100),
+  einsatzart VARCHAR(100) NOT NULL DEFAULT 'Verkehrsdienst',
+  von TIME NOT NULL,
+  bis TIME NOT NULL,
+  pause_min INT NOT NULL DEFAULT 0,
+  netto_h DECIMAL(5,2) NOT NULL,
+  unterzeichner VARCHAR(200),
+  unterschrift MEDIUMTEXT,
+  bemerkung TEXT,
+  erfasst_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 // Vertraglich vereinbarte Anstellungsorte nach Art. 18 Ziff. 2 (ENT-054).
 // Der GAV erlaubt HOECHSTENS ZWEI, und wenn es zwei sind, muss der eine
 // als Hauptanstellungsort (HAO) und der andere als Nebenanstellungsort

@@ -720,6 +720,30 @@ check('KRITISCH: meine_schichten.php laedt ohne Parameter ab Monatsanfang, nicht
     && /UPDATE einsaetze SET status = 'abgeschlossen' WHERE id = \?/.test(einrichten));
   check('Ausgenommen sind abgesagte und bereits abgeschlossene Einsaetze -- keine unnoetige Arbeit',
     /status NOT IN \('abgesagt', 'abgeschlossen'\)/.test(einrichten));
+
+  // KRITISCH (ENT-612, gefunden am 2026-09-18 live an einem echten frischen
+  // Demo-Platz): "objekte" verweist per FOREIGN KEY auf kunden(id),
+  // "sessions" und "rapporte" auf mitarbeiter(id). Fehlen diese vier
+  // aeltesten Tabellen (frueher nur per Hand via schema.sql angelegt), bricht
+  // "objekte" mit MySQL-Fehler 150 ab -- und mit ihr jede Tabelle, die
+  // (mittelbar) auf sie verweist. Geprueft wird die Reihenfolge im
+  // Quelltext, nicht nur das Vorhandensein: Ein spaeter eingefuegtes
+  // "mitarbeiter" naehme demselben Fehler nur die Tarnung.
+  const posMitarbeiter = einrichten.indexOf("'mitarbeiter' =>");
+  const posKunden      = einrichten.indexOf("'kunden' =>");
+  const posSessions    = einrichten.indexOf("'sessions' =>");
+  const posRapporte    = einrichten.indexOf("'rapporte' =>");
+  const posObjekte     = einrichten.indexOf("'objekte' =>");
+  check('KRITISCH: mitarbeiter/kunden/sessions/rapporte legt die Einrichtung selbst an (nicht nur schema.sql)',
+    [posMitarbeiter, posKunden, posSessions, posRapporte, posObjekte].every(p => p > -1));
+  check('KRITISCH: mitarbeiter und kunden stehen vor objekte, das auf beide verweist',
+    posMitarbeiter < posObjekte && posKunden < posObjekte
+    && posMitarbeiter < posSessions && posMitarbeiter < posRapporte);
+  check('KRITISCH: die vier aeltesten Tabellen tragen IF NOT EXISTS -- eine bestehende Datenbank bleibt unangetastet',
+    /'mitarbeiter' => "\s*CREATE TABLE IF NOT EXISTS mitarbeiter/.test(einrichten)
+    && /'kunden' => "\s*CREATE TABLE IF NOT EXISTS kunden/.test(einrichten)
+    && /'sessions' => "\s*CREATE TABLE IF NOT EXISTS sessions/.test(einrichten)
+    && /'rapporte' => "\s*CREATE TABLE IF NOT EXISTS rapporte/.test(einrichten));
 }
 
 
