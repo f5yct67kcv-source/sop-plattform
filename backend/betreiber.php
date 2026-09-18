@@ -909,6 +909,211 @@ function be_tabellen(): array
   erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_support_nachricht_vorgang (vorgang_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// ══════════════════════════════════════════════════════════════════════════
+// Offerten der Betreiberin (ENT-605)
+// ══════════════════════════════════════════════════════════════════════════
+//
+// Die Betreiberin schreibt Offerten an Betriebe, die noch KEINE Mandanten
+// sind -- das ist der ganze Zweck. Darum sechs eigene Tabellen und nicht die
+// des Mandanten:
+//
+//   be_kunden            Empfaenger: kuenftige Mandanten mit Adresse
+//   be_kunden_person     Ansprechpersonen dazu
+//   be_kunden_kontaktweg Kommunikationswege, am Empfaenger oder an der Person
+//   be_produkte          Leistungen als Vorschlagswerte (Preise: OP-536)
+//   be_belege            Offerten und spaeter Rechnungen
+//   be_beleg_positionen  deren Positionszeilen
+//   be_briefkopf         Absender der Betreiberin auf dem Dokument
+//
+// WARUM NICHT DIESELBEN TABELLEN WIE IM COCKPIT: Solange die vier
+// Betreiber-Secrets nicht gesetzt sind, zeigt betreiber_db() auf dieselbe
+// Datenbank wie db() (Kopf dieser Datei, OP-518). Gleiche Namen hiessen
+// heute: Die Offerten der Betreiberin stuenden in der Offertenliste der
+// Mandantin, beide teilten sich die Nummernreihe ab OF-0001, und die
+// Interessenten der Betreiberin stuenden in deren Kundenliste. Zieht die
+// Betreiber-Ebene spaeter auf eine eigene Datenbank, bleiben die Namen
+// trotzdem richtig -- ein Praefix stoert dort niemanden.
+//
+// Die Felder sind absichtlich dieselben wie beim Mandanten, denn der
+// Rechenkern ist derselbe: belege.php, kunden.php und produkte.php bekommen
+// seit ENT-605 einen Tabellenpraefix und werden NICHT kopiert. Eine zweite
+// Kopie der Geldrechnung waere die Stelle, an der die beiden Seiten
+// auseinanderlaufen.
+
+'be_kunden' => "CREATE TABLE IF NOT EXISTS be_kunden (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  kundennummer VARCHAR(20) NOT NULL DEFAULT '',
+  -- 'privat' gibt es hier praktisch nicht: Empfaenger sind Betriebe. Das
+  -- Feld bleibt trotzdem, weil kunden.php dieselbe Eingabelogik fuer beide
+  -- Seiten fuehrt und eine fehlende Spalte sie am Praefix zerbrechen liesse.
+  art ENUM('unternehmen','privat') NOT NULL DEFAULT 'unternehmen',
+  anrede VARCHAR(50) NOT NULL DEFAULT '',
+  vorname VARCHAR(100) NOT NULL DEFAULT '',
+  nachname VARCHAR(100) NOT NULL DEFAULT '',
+  name VARCHAR(200) NOT NULL,
+  zusatzfeld VARCHAR(200) NOT NULL DEFAULT '',
+  strasse VARCHAR(200) NOT NULL DEFAULT '',
+  hausnummer VARCHAR(20) NOT NULL DEFAULT '',
+  adresszusatz VARCHAR(200) NOT NULL DEFAULT '',
+  plz VARCHAR(20) NOT NULL DEFAULT '',
+  ort VARCHAR(120) NOT NULL DEFAULT '',
+  uid VARCHAR(40) NOT NULL DEFAULT '',
+  mwst_nr VARCHAR(40) NOT NULL DEFAULT '',
+  telefon VARCHAR(60) NOT NULL DEFAULT '',
+  email VARCHAR(200) NOT NULL DEFAULT '',
+  kontaktperson VARCHAR(200) NOT NULL DEFAULT '',
+  notiz TEXT NULL,
+  re_name VARCHAR(200) NOT NULL DEFAULT '',
+  re_zusatz VARCHAR(200) NOT NULL DEFAULT '',
+  re_strasse VARCHAR(200) NOT NULL DEFAULT '',
+  re_hausnummer VARCHAR(20) NOT NULL DEFAULT '',
+  re_plz VARCHAR(20) NOT NULL DEFAULT '',
+  re_ort VARCHAR(120) NOT NULL DEFAULT '',
+  -- Wird aus dem Interessenten ein Mandant, zeigt diese Spalte auf seine
+  -- Zeile im Stamm. NULL heisst 'noch keiner' und ist der Normalfall --
+  -- genau dafuer gibt es diese Tabelle. KEIN Fremdschluessel: Wer kuendigt,
+  -- verschwindet aus dem Stamm, seine Offerten und Rechnungen bleiben
+  -- (gleiche Ueberlegung wie bei mandant_zaehlstand, ENT-539).
+  mandant_id INT UNSIGNED NULL,
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  angelegt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_be_kunden_name (name),
+  KEY idx_be_kunden_mandant (mandant_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+'be_kunden_person' => "CREATE TABLE IF NOT EXISTS be_kunden_person (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  kunde_id INT UNSIGNED NOT NULL,
+  anrede VARCHAR(50) NULL,
+  vorname VARCHAR(100) NULL,
+  nachname VARCHAR(100) NULL,
+  sortierung INT NOT NULL DEFAULT 0,
+  KEY idx_be_kunden_person_kunde (kunde_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// person_id NULL heisst: Der Weg gehoert dem Betrieb, nicht einer Person.
+// Das ist eine eigene Aussage und kein fehlender Wert.
+'be_kunden_kontaktweg' => "CREATE TABLE IF NOT EXISTS be_kunden_kontaktweg (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  kunde_id INT UNSIGNED NOT NULL,
+  person_id INT UNSIGNED NULL,
+  art ENUM('email','telefon','mobil','webseite','fax') NOT NULL,
+  wert VARCHAR(200) NOT NULL,
+  sortierung INT NOT NULL DEFAULT 0,
+  KEY idx_be_kunden_weg_kunde (kunde_id),
+  KEY idx_be_kunden_weg_person (person_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Vorschlagswerte fuer Positionszeilen. Die Tabelle steht heute leer da,
+// und das ist richtig so: Welche Grundgebuehr und welche Staffelung gilt,
+// ist nicht entschieden (ENT-539 Punkt 7, OP-536). Eine Offerte braucht sie
+// nicht -- ihre Positionen tragen Text, Menge und Preis selbst.
+'be_produkte' => "CREATE TABLE IF NOT EXISTS be_produkte (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  nummer VARCHAR(20) NOT NULL DEFAULT '',
+  name VARCHAR(200) NOT NULL,
+  beschreibung TEXT NULL,
+  einzelpreis_rappen INT NOT NULL DEFAULT 0,
+  einheit VARCHAR(20) NOT NULL DEFAULT 'Std.',
+  mwst_satz_bp INT NOT NULL DEFAULT 810,
+  sortierung INT NOT NULL DEFAULT 0,
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  KEY idx_be_produkte_sort (sortierung, name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Spaltenaufbau wie `belege` beim Mandanten, damit belege.php beide Saetze
+// mit derselben Abfrage bedient. ALLES IN RAPPEN, Prozentsaetze in
+// Basispunkten -- siehe Kopf von belege.php.
+//
+// versand_token bleibt ROH und ist bewusst kein Abdruck (ENT-501 nimmt ihn
+// ausdruecklich aus): Er ist kein Sitzungsausweis, sondern der Link selbst.
+// Ein Abdruck liesse sich nicht mehr verschicken.
+'be_belege' => "CREATE TABLE IF NOT EXISTS be_belege (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  art ENUM('offerte','rechnung') NOT NULL DEFAULT 'offerte',
+  nummer VARCHAR(20) NOT NULL,
+  kunde_id INT UNSIGNED NULL,
+  person_id INT UNSIGNED NULL,
+  titel VARCHAR(200) NOT NULL DEFAULT '',
+  referenz VARCHAR(100) NOT NULL DEFAULT '',
+  datum DATE NOT NULL,
+  gueltig_bis DATE NULL,
+  faellig_bis DATE NULL,
+  status ENUM('entwurf','versendet','angeschaut','bestaetigt','abgelehnt')
+         NOT NULL DEFAULT 'entwurf',
+  bemerkung TEXT NULL,
+  oeffentliche_notizen TEXT NULL,
+  bedingungen TEXT NULL,
+  fusszeile_text TEXT NULL,
+  unterschriftsseite TINYINT(1) NOT NULL DEFAULT 0,
+  ist_vorlage TINYINT(1) NOT NULL DEFAULT 0,
+  rabatt_bp INT NOT NULL DEFAULT 0,
+  zwischensumme_rappen INT NOT NULL DEFAULT 0,
+  rabatt_rappen INT NOT NULL DEFAULT 0,
+  mwst_rappen INT NOT NULL DEFAULT 0,
+  rundung_rappen INT NOT NULL DEFAULT 0,
+  total_rappen INT NOT NULL DEFAULT 0,
+  bezahlt TINYINT(1) NOT NULL DEFAULT 0,
+  bezahlt_am DATE NULL,
+  versand_token CHAR(64) NULL,
+  entscheidung_am DATETIME NULL,
+  entscheidung_ip VARCHAR(64) NULL,
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  geaendert_am DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_be_belege_token (versand_token),
+  KEY idx_be_belege_art (art, datum),
+  KEY idx_be_belege_kunde (kunde_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// produkt_id ist nur ein Rueckverweis. Name, Preis, Einheit und Satz stehen
+// als KOPIE in der Zeile: Stand beim Erfassen, nicht heutiger Stand des
+// Produkts (Schnappschuss-Regel, siehe belege.php). Eine Preisaenderung
+// darf eine verschickte Offerte nie rueckwirkend veraendern.
+'be_beleg_positionen' => "CREATE TABLE IF NOT EXISTS be_beleg_positionen (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  beleg_id INT UNSIGNED NOT NULL,
+  sortierung INT NOT NULL DEFAULT 0,
+  produkt_id INT UNSIGNED NULL,
+  produkt_name VARCHAR(200) NOT NULL DEFAULT '',
+  beschreibung TEXT NULL,
+  menge DECIMAL(12,2) NOT NULL DEFAULT 1.00,
+  einheit VARCHAR(20) NOT NULL DEFAULT 'Std.',
+  einzelpreis_rappen INT NOT NULL DEFAULT 0,
+  rabatt_bp INT NOT NULL DEFAULT 0,
+  mwst_satz_bp INT NOT NULL DEFAULT 0,
+  KEY idx_be_beleg_pos_beleg (beleg_id, sortierung)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Der Absender auf dem Dokument und im Versandtext. Beim Mandanten kommt er
+// aus `betrieb` in dessen eigener Datenbank -- diese Tabelle gibt es auf der
+// Betreiber-Ebene nicht, und sie darf es auch nicht: Der Briefkopf der
+// Betreiberin gehoert nicht in die Datenbank einer Mandantin.
+//
+// GENAU EINE ZEILE, id = 1. Kein Firmenname im Quelltext (Hausregel
+// Vertraulichkeit) -- was hier steht, traegt die Betreiberin selbst ein.
+// Solange sie leer ist, verweigert der Versand mit klarer Begruendung,
+// statt eine Offerte ohne Absender zu verschicken.
+'be_briefkopf' => "CREATE TABLE IF NOT EXISTS be_briefkopf (
+  id TINYINT UNSIGNED NOT NULL PRIMARY KEY DEFAULT 1,
+  firma VARCHAR(200) NOT NULL DEFAULT '',
+  -- Vier Zeilen Anschrift als EIN Textfeld, wie die Fusszeile beim
+  -- Mandanten: Auf dem Blatt steht sie ohnehin als Block, und getrennte
+  -- Felder waeren vier Orte, an denen dieselbe Adresse veralten kann.
+  absender TEXT NULL,
+  uid VARCHAR(40) NOT NULL DEFAULT '',
+  mwst_nr VARCHAR(40) NOT NULL DEFAULT '',
+  iban VARCHAR(40) NOT NULL DEFAULT '',
+  email VARCHAR(200) NOT NULL DEFAULT '',
+  telefon VARCHAR(60) NOT NULL DEFAULT '',
+  webseite VARCHAR(200) NOT NULL DEFAULT '',
+  -- Das Logo liegt als data:-URL in der Zeile, wie beim Mandanten: Der
+  -- Betreiber-Bereich hat kein Verzeichnis fuer hochgeladene Dateien, und
+  -- ein Bild, das nur auf einem Blatt erscheint, braucht keines.
+  logo MEDIUMTEXT NULL,
+  geaendert_am DATETIME NULL ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
     ];
 }
 

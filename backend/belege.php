@@ -40,6 +40,35 @@ const BELEG_ARTEN = [
 // Behauptung. 'abgelehnt' und 'bestaetigt' sind die beiden Endpunkte.
 const BELEG_STATUS = ['entwurf', 'versendet', 'angeschaut', 'bestaetigt', 'abgelehnt'];
 
+// ── Zwei Tabellensaetze, EINE Rechnung (ENT-605) ──────────────────────────
+//
+// Der Mandant schreibt seine Offerten an `belege`/`beleg_positionen`, die
+// Betreiberin ihre an `be_belege`/`be_beleg_positionen`. Getrennte Tabellen
+// sind hier keine Vorsicht, sondern Pflicht: Solange die vier
+// Betreiber-Secrets nicht gesetzt sind, zeigt betreiber_db() auf DIESELBE
+// Datenbank wie db() (Kopf von betreiber.php, OP-518). Gleiche Tabellennamen
+// hiessen dann: Die Offerten der Betreiberin stuenden in der Offertenliste
+// des Mandanten, und beide teilten sich die Nummernreihe ab OF-0001.
+//
+// Warum trotzdem nur EINE Rechenstelle: Was auf einem Beleg steht, wird an
+// genau einem Ort gerechnet. Eine zweite Kopie dieser Datei waere die Stelle,
+// an der die beiden Seiten in einem Jahr um einen Rappen auseinanderliegen --
+// und test_belege.mjs prueft eine Formel, nicht zwei.
+//
+// Der Praefix ist IMMER ein Literal aus dem aufrufenden Endpunkt, nie ein
+// Wert aus einer Anfrage. Diese Liste ist die Wache dafuer: Ein Tabellenname
+// laesst sich nicht als Platzhalter binden, er landet als Text in der
+// Abfrage -- also darf er nur aus einer geschlossenen Menge stammen.
+const BELEG_TABELLENSAETZE = ['', 'be_'];
+
+function beleg_tabelle(string $praefix, string $name): string
+{
+    if (!in_array($praefix, BELEG_TABELLENSAETZE, true)) {
+        throw new InvalidArgumentException('Unbekannter Tabellensatz');
+    }
+    return $praefix . $name;
+}
+
 function beleg_art_gueltig(string $art): bool
 {
     return array_key_exists($art, BELEG_ARTEN);
@@ -58,12 +87,13 @@ function beleg_status_gueltig(string $status): bool
 // Je Belegart ein eigener Zaehler: Offerten und Rechnungen zaehlen
 // unabhaengig, sonst haette die erste Rechnung eine Nummer, die aussieht,
 // als fehlten neunzig Rechnungen davor.
-function beleg_naechste_nummer(PDO $pdo, string $art): string
+function beleg_naechste_nummer(PDO $pdo, string $art, string $tabPraefix = ''): string
 {
     $praefix = BELEG_ARTEN[$art]['praefix'] ?? null;
     if ($praefix === null) { throw new InvalidArgumentException('Unbekannte Belegart'); }
+    $tab = beleg_tabelle($tabPraefix, 'belege');
     $s = $pdo->prepare(
-        "SELECT nummer FROM belege
+        "SELECT nummer FROM {$tab}
           WHERE art = ? AND nummer REGEXP ?
           ORDER BY CAST(SUBSTRING(nummer, 4) AS UNSIGNED) DESC LIMIT 1"
     );
@@ -225,12 +255,13 @@ function beleg_position_lesen(array $p): array
     ];
 }
 
-function beleg_positionen_lesen(PDO $pdo, int $belegId): array
+function beleg_positionen_lesen(PDO $pdo, int $belegId, string $tabPraefix = ''): array
 {
+    $tab = beleg_tabelle($tabPraefix, 'beleg_positionen');
     $s = $pdo->prepare(
-        'SELECT id, sortierung, produkt_id, produkt_name, beschreibung, menge,
+        "SELECT id, sortierung, produkt_id, produkt_name, beschreibung, menge,
                 einheit, einzelpreis_rappen, rabatt_bp, mwst_satz_bp
-           FROM beleg_positionen WHERE beleg_id = ? ORDER BY sortierung, id'
+           FROM {$tab} WHERE beleg_id = ? ORDER BY sortierung, id"
     );
     $s->execute([$belegId]);
     return $s->fetchAll();
@@ -241,14 +272,16 @@ function beleg_positionen_lesen(PDO $pdo, int $belegId): array
 // ausserhalb ihres Belegs keine Identitaet, auf die etwas verweist.
 // Gehoert IMMER in dieselbe Transaktion wie beleg_summen_schreiben(), sonst
 // stuenden Positionen und Summen fuer einen Moment im Widerspruch.
-function beleg_positionen_schreiben(PDO $pdo, int $belegId, array $positionen): void
+function beleg_positionen_schreiben(PDO $pdo, int $belegId, array $positionen,
+                                    string $tabPraefix = ''): void
 {
-    $pdo->prepare('DELETE FROM beleg_positionen WHERE beleg_id = ?')->execute([$belegId]);
+    $tab = beleg_tabelle($tabPraefix, 'beleg_positionen');
+    $pdo->prepare("DELETE FROM {$tab} WHERE beleg_id = ?")->execute([$belegId]);
     $ein = $pdo->prepare(
-        'INSERT INTO beleg_positionen
+        "INSERT INTO {$tab}
             (beleg_id, sortierung, produkt_id, produkt_name, beschreibung, menge,
              einheit, einzelpreis_rappen, rabatt_bp, mwst_satz_bp)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     foreach (array_values($positionen) as $i => $p) {
         $ein->execute([$belegId, $i, $p['produkt_id'], $p['produkt_name'], $p['beschreibung'],
@@ -264,12 +297,14 @@ function beleg_positionen_schreiben(PDO $pdo, int $belegId, array $positionen): 
 // Browser mitschickt, ist eine Vorschau. Massgeblich ist, was tatsaechlich
 // gespeichert wurde -- sonst koennte ein Beleg Summen tragen, die zu seinen
 // eigenen Positionen nicht passen.
-function beleg_summen_schreiben(PDO $pdo, int $belegId, int $rabattBp): array
+function beleg_summen_schreiben(PDO $pdo, int $belegId, int $rabattBp,
+                                string $tabPraefix = ''): array
 {
-    $s = beleg_summen(beleg_positionen_lesen($pdo, $belegId), $rabattBp);
+    $tab = beleg_tabelle($tabPraefix, 'belege');
+    $s = beleg_summen(beleg_positionen_lesen($pdo, $belegId, $tabPraefix), $rabattBp);
     $pdo->prepare(
-        'UPDATE belege SET rabatt_bp = ?, zwischensumme_rappen = ?, rabatt_rappen = ?,
-                mwst_rappen = ?, rundung_rappen = ?, total_rappen = ? WHERE id = ?'
+        "UPDATE {$tab} SET rabatt_bp = ?, zwischensumme_rappen = ?, rabatt_rappen = ?,
+                mwst_rappen = ?, rundung_rappen = ?, total_rappen = ? WHERE id = ?"
     )->execute([$rabattBp, $s['zwischensumme_rappen'], $s['rabatt_rappen'],
                 $s['mwst_rappen'], $s['rundung_rappen'], $s['total_rappen'], $belegId]);
     return $s;
@@ -278,13 +313,14 @@ function beleg_summen_schreiben(PDO $pdo, int $belegId, int $rabattBp): array
 // Ein Beleg mit allem, was das Formular und die Druckvorlage brauchen.
 // Der Kunde kommt mit -- die Adresse wird LIVE gelesen, nicht als
 // Schnappschuss gehalten (siehe OP-108).
-function beleg_lesen(PDO $pdo, int $id): ?array
+function beleg_lesen(PDO $pdo, int $id, string $tabPraefix = ''): ?array
 {
-    $s = $pdo->prepare('SELECT * FROM belege WHERE id = ?');
+    $tab = beleg_tabelle($tabPraefix, 'belege');
+    $s = $pdo->prepare("SELECT * FROM {$tab} WHERE id = ?");
     $s->execute([$id]);
     $b = $s->fetch();
     if (!$b) { return null; }
-    $b['positionen'] = beleg_positionen_lesen($pdo, $id);
+    $b['positionen'] = beleg_positionen_lesen($pdo, $id, $tabPraefix);
     $b['summen'] = beleg_summen($b['positionen'], (int)$b['rabatt_bp']);
     return $b;
 }

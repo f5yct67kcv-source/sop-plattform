@@ -12,14 +12,37 @@ const KUNDE_ARTEN = ['unternehmen', 'privat'];
 // nichts laesst sich mehr auswerten.
 const KONTAKT_ARTEN = ['email', 'telefon', 'mobil', 'webseite', 'fax'];
 
+// ── Zwei Tabellensaetze, EINE Adresslogik (ENT-605) ───────────────────────
+//
+// Der Mandant fuehrt seine Kunden in `kunden`, die Betreiberin ihre
+// Empfaenger in `be_kunden` -- kuenftige Mandanten, an die eine Offerte
+// geht. Gleiche Felder, gleiche Pruefungen, getrennte Tabellen. Getrennt
+// muss es sein, weil betreiber_db() heute auf dieselbe Datenbank zeigt wie
+// db() (OP-518); gleiche Namen hiessen, dass die Interessenten der
+// Betreiberin in der Kundenliste des Mandanten stuenden.
+//
+// Der Praefix ist immer ein Literal aus dem aufrufenden Endpunkt, nie ein
+// Wert aus einer Anfrage -- ein Tabellenname laesst sich nicht binden,
+// darum die geschlossene Menge. Gleiche Bauart wie in belege.php.
+const KUNDEN_TABELLENSAETZE = ['', 'be_'];
+
+function kunden_tabelle(string $praefix, string $name): string
+{
+    if (!in_array($praefix, KUNDEN_TABELLENSAETZE, true)) {
+        throw new InvalidArgumentException('Unbekannter Tabellensatz');
+    }
+    return $praefix . $name;
+}
+
 // Naechste freie Kundennummer, Format K0001 aufwaerts. Wird aus dem
 // bestehenden Hoechststand abgeleitet statt aus einem eigenen Zaehler --
 // so bleibt die Vergabe luecken- und kollisionsfrei, auch wenn zwischendurch
 // Kunden geloescht wurden oder die Nummer aus einem Nachtrag stammt.
-function naechste_kundennummer(PDO $pdo): string
+function naechste_kundennummer(PDO $pdo, string $tabPraefix = ''): string
 {
+    $tab = kunden_tabelle($tabPraefix, 'kunden');
     $s = $pdo->query(
-        "SELECT kundennummer FROM kunden WHERE kundennummer REGEXP '^K[0-9]{4}$'
+        "SELECT kundennummer FROM {$tab} WHERE kundennummer REGEXP '^K[0-9]{4}$'
          ORDER BY CAST(SUBSTRING(kundennummer, 2) AS UNSIGNED) DESC LIMIT 1"
     );
     $letzte = $s->fetchColumn();
@@ -104,20 +127,23 @@ function personen_bereinigen(array $roh): array
 // schickt den gewuenschten Endzustand, nicht einzelne Aenderungsbefehle.
 // Die Kontaktwege der Personen haengen per Fremdschluessel an der Person und
 // verschwinden mit ihr.
-function kunden_kinder_speichern(PDO $pdo, int $kundeId, array $kontaktwege, array $personen): void
+function kunden_kinder_speichern(PDO $pdo, int $kundeId, array $kontaktwege, array $personen,
+                                 string $tabPraefix = ''): void
 {
-    $pdo->prepare('DELETE FROM kunden_kontaktweg WHERE kunde_id = ?')->execute([$kundeId]);
-    $pdo->prepare('DELETE FROM kunden_person WHERE kunde_id = ?')->execute([$kundeId]);
+    $tWeg    = kunden_tabelle($tabPraefix, 'kunden_kontaktweg');
+    $tPerson = kunden_tabelle($tabPraefix, 'kunden_person');
+    $pdo->prepare("DELETE FROM {$tWeg} WHERE kunde_id = ?")->execute([$kundeId]);
+    $pdo->prepare("DELETE FROM {$tPerson} WHERE kunde_id = ?")->execute([$kundeId]);
 
     $wegEin = $pdo->prepare(
-        'INSERT INTO kunden_kontaktweg (kunde_id, person_id, art, wert, sortierung) VALUES (?, ?, ?, ?, ?)'
+        "INSERT INTO {$tWeg} (kunde_id, person_id, art, wert, sortierung) VALUES (?, ?, ?, ?, ?)"
     );
     foreach ($kontaktwege as $i => $w) {
         $wegEin->execute([$kundeId, null, $w['art'], $w['wert'], $i]);
     }
 
     $personEin = $pdo->prepare(
-        'INSERT INTO kunden_person (kunde_id, anrede, vorname, nachname, sortierung) VALUES (?, ?, ?, ?, ?)'
+        "INSERT INTO {$tPerson} (kunde_id, anrede, vorname, nachname, sortierung) VALUES (?, ?, ?, ?, ?)"
     );
     foreach ($personen as $i => $p) {
         $personEin->execute([$kundeId, $p['anrede'] ?: null, $p['vorname'] ?: null, $p['nachname'] ?: null, $i]);
@@ -131,11 +157,13 @@ function kunden_kinder_speichern(PDO $pdo, int $kundeId, array $kontaktwege, arr
 // Laedt Personen und Kommunikationswege fuer alle Kunden in zwei Abfragen,
 // nach Kunden-Id gebuendelt. Bewusst kein eigener Endpunkt je Kunde: die
 // Kundenliste wird ohnehin am Stueck geladen (siehe OP-31 zur Datenmenge).
-function kunden_kinder_laden(PDO $pdo): array
+function kunden_kinder_laden(PDO $pdo, string $tabPraefix = ''): array
 {
+    $tWeg    = kunden_tabelle($tabPraefix, 'kunden_kontaktweg');
+    $tPerson = kunden_tabelle($tabPraefix, 'kunden_person');
     $nach = [];
     $personenNach = [];
-    foreach ($pdo->query('SELECT id, kunde_id, anrede, vorname, nachname FROM kunden_person ORDER BY kunde_id, sortierung, id') as $p) {
+    foreach ($pdo->query("SELECT id, kunde_id, anrede, vorname, nachname FROM {$tPerson} ORDER BY kunde_id, sortierung, id") as $p) {
         $kid = (int)$p['kunde_id'];
         $nach[$kid]['personen'][] = [
             'id' => (int)$p['id'], 'anrede' => $p['anrede'], 'vorname' => $p['vorname'],
@@ -143,7 +171,7 @@ function kunden_kinder_laden(PDO $pdo): array
         ];
         $personenNach[(int)$p['id']] = [$kid, count($nach[$kid]['personen']) - 1];
     }
-    foreach ($pdo->query('SELECT kunde_id, person_id, art, wert FROM kunden_kontaktweg ORDER BY kunde_id, sortierung, id') as $w) {
+    foreach ($pdo->query("SELECT kunde_id, person_id, art, wert FROM {$tWeg} ORDER BY kunde_id, sortierung, id") as $w) {
         $kid = (int)$w['kunde_id'];
         $eintrag = ['art' => $w['art'], 'wert' => $w['wert']];
         if ($w['person_id'] === null) {

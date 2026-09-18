@@ -143,7 +143,12 @@ const ANTWORTEN = {
 const browser = await chromium.launch({ executablePath: browserPfad() });
 const seite = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 seite.on('pageerror', e => bad.push('JS-Fehler in der Ansicht: ' + e.message));
-await seite.route('**/api/*.php', r => {
+// Muster mit ** statt *: Seit ENT-605 rufen manche Endpunkte mit einem
+// Fragezeichen dahinter (betreiber_beleg_list.php?art=offerte). "*.php"
+// trifft die nicht -- der Aufruf ginge dann als echte Datei-Anfrage ins
+// Leere und die Seite bekaeme einen Netzfehler, der mit dieser Pruefung
+// nichts zu tun hat.
+await seite.route('**/api/**', r => {
   const datei = r.request().url().split('/').pop().split('?')[0];
   r.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify(ANTWORTEN[datei] || { status: 'ok' }) });

@@ -64,6 +64,15 @@
   --shell:#16181D; --shell-hi:#1E2128; --shell-line:#272B33;
   --shell-txt:#9298A5; --shell-txt-hi:#F3F5F8;
   --nix:#D8DCE2;
+  /* Seit ENT-605 zusaetzlich: Die aus dem Cockpit uebernommenen Bausteine
+     (Karten, Tabellen, Eingabefelder, Dialoge) rechnen mit diesen Marken.
+     Gleiche Werte wie dort -- ein eigener Satz hiesse, dass dieselbe Karte
+     auf zwei Seiten verschieden gerundet waere. */
+  --surface-3:#FAFBFD;
+  --r-xs:6px; --r-sm:8px; --r:12px; --r-lg:16px;
+  --sh-1:0 1px 2px rgba(16,18,22,.06);
+  --sh-2:0 8px 28px -8px rgba(16,18,22,.18);
+  --sh-3:0 24px 64px -16px rgba(16,18,22,.30);
 }
 
 /* Dieselben Werte wie im Cockpit (dashboard.html). Sie stehen hier als
@@ -84,6 +93,10 @@ html[data-thema="dunkel"] {
   --shell:#0B0D11; --shell-hi:#14171C; --shell-line:#23272F;
   --shell-txt:#8A919E; --shell-txt-hi:#F2F4F8;
   --nix:#3B4560;
+  --surface-3:#242C3E;
+  --sh-1:none;
+  --sh-2:0 8px 28px -8px rgba(0,0,0,.6);
+  --sh-3:0 24px 64px -16px rgba(0,0,0,.7);
   /* Damit der Browser Bildlaufleisten und eingebaute Bedienelemente dunkel
      zeichnet -- sonst steht ein weisses Auswahlmenue im dunklen Formular. */
   color-scheme: dark;
@@ -441,11 +454,23 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
       border: 1px solid var(--line); border-radius: 9px; margin-bottom: 16px; }
 .qr svg { display: block; width: 180px; height: 180px; }
 
-/* Fuenf Reiter zu je 84 px passen unter rund 900 px nicht mehr neben
+/* Die Reiter passen unterhalb einer bestimmten Breite nicht mehr neben
    Titel und Abmelden-Knopf. Sie bekommen dann eine eigene Zeile ueber die
    ganze Breite und scrollen darin waagrecht -- die SEITE selbst scrollt
-   nie quer, das ist der Unterschied (Hausregel). */
-@media (max-width: 900px) {
+   nie quer, das ist der Unterschied (Hausregel).
+
+   DIE GRENZE HAENGT AN DER ZAHL DER REITER und ist GEMESSEN, nicht
+   geschaetzt: Sie lag bei fuenf Reitern bei 900 px. Mit "Adressen"
+   (ENT-605) sind es sieben, das Band ist 615 px breit, und die Mitte
+   kippt ab 1085 px nach links -- die rechte Spalte (Zahnrad,
+   Hell/Dunkel, Abmelden) laesst sich nicht weiter schmaelern, die linke
+   schon. Ein Raster 1fr auto 1fr haelt die Mitte nur, solange BEIDE
+   Aussenspalten ihren Inhalt fassen; sonst steht Mittiges zwischen zwei
+   ungleich langen Seiten statt in der Mitte des Containers.
+
+   Wer einen Reiter hinzufuegt oder wegnimmt, misst diese Grenze neu.
+   test_marke_portale.mjs schlaegt an, wenn sie nicht mehr stimmt. */
+@media (max-width: 1090px) {
   .kopf { grid-template-columns: 1fr auto; row-gap: 10px; }
   .kopf-nav {
     grid-row: 2; grid-column: 1 / -1; justify-content: flex-start;
@@ -460,6 +485,249 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
   .leiste { padding: 14px 16px; }
   .leiste h1 { font-size: 17px; }
   .karte-leib { padding: 16px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   OFFERTEN UND ADRESSEN (ENT-605)
+   ══════════════════════════════════════════════════════════════════════
+   Die Bausteine dieses Abschnitts sind aus dem Cockpit uebernommen --
+   Karten, Tabellen, Eingabefelder, Reiter, Zeilenmenues, Dialoge und das
+   Offertformular. Bewusst dieselben Klassennamen und dieselben Werte: Der
+   Projektinhaber hat verlangt, dass Offerten hier genauso aussehen und
+   sich genauso bedienen wie dort. Zwei Fassungen desselben Knopfs waeren
+   zwei Orte, an denen er sich unterschiedlich entwickelt.
+
+   Ein Namenskonflikt ist hier schon einmal teuer geworden (ENT-536:
+   ".leer" traf sowohl den Leerzustand als auch eine Kennzahl auf null).
+   Darum vorher geprueft: Keine der Klassen unten kommt in der bisherigen
+   Gestaltung dieser Seite vor -- die heisst .karte/.karte-kopf/.karte-leib
+   und .leerblock, nicht .card/.card-hd/.card-bd und .empty. */
+
+/* ── Karten, Flaechen ── */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-1); }
+.card-hd { display: flex; align-items: center; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid var(--line-soft); }
+.card-hd h2 { font-size: 14px; font-weight: 600; letter-spacing: -.15px; margin: 0; }
+.card-hd .sp { flex: 1; }
+.card-bd { padding: 20px; }
+.card-bd.flush { padding: 0; overflow-x: auto; }
+.tw { overflow-x: auto; }
+
+/* ── Eingabefelder ── */
+.f { margin-bottom: 14px; }
+.f label { display: block; font-size: 11px; font-weight: 650; color: var(--ink-2);
+  letter-spacing: .4px; text-transform: uppercase; margin-bottom: 6px; }
+.inp { width: 100%; border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--ink); font: inherit; font-size: 13.5px;
+  padding: 9px 11px; }
+.inp::placeholder { color: var(--ink-3); }
+.inp:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.inp[readonly] { background: var(--surface-2); color: var(--ink-3); cursor: default; }
+.inp.num { text-align: right; font-variant-numeric: tabular-nums; }
+textarea.inp { resize: vertical; min-height: 92px; font-family: inherit; line-height: 1.55; }
+.check { display: flex; align-items: center; gap: 9px; cursor: pointer; font-size: 13.5px; }
+.check input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+.sec { font-size: 11.5px; color: var(--ink-3); line-height: 1.45; }
+
+/* ── Knoepfe ── */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  border: 1px solid transparent; border-radius: var(--r-sm); padding: 9px 15px;
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background .13s, border-color .13s, color .13s; white-space: nowrap; text-decoration: none; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hi); }
+.btn-plain { background: var(--surface); border-color: var(--line); color: var(--ink); }
+.btn-plain:hover { background: var(--bg); border-color: var(--line-hi); }
+.btn-quiet { background: transparent; color: var(--ink-2); }
+.btn-quiet:hover { background: var(--line-soft); color: var(--ink); }
+.btn-danger { background: var(--neg); color: #fff; }
+.btn:disabled { opacity: .55; cursor: default; }
+.btn-sm { padding: 6px 11px; font-size: 12px; }
+svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round; flex: none; }
+svg.i-sm { width: 15px; height: 15px; }
+
+/* ── Reiter und Werkzeugleiste ── */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 18px; overflow-x: auto; }
+.tab { border: none; background: transparent; padding: 10px 14px 9px; font: inherit;
+  font-size: 15px; font-weight: 600; color: var(--ink-3); cursor: pointer;
+  border-bottom: 2px solid transparent; white-space: nowrap; }
+.tab:hover { color: var(--ink); }
+.tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+.bar-tools { display: flex; align-items: flex-start; gap: 9px; flex-wrap: wrap; padding: 10px 0; margin-bottom: 16px; }
+.bar-tools .sp { flex: 1; }
+.search { position: relative; flex: 1; min-width: 200px; max-width: 340px; }
+.search svg.i { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--ink-3); }
+.search .inp { padding-left: 34px; }
+
+/* ── Tabellen ── */
+.tw table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tw th { text-align: left; font-size: 10.5px; font-weight: 650; letter-spacing: .5px;
+  text-transform: uppercase; color: var(--ink-3); padding: 10px 14px;
+  border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tw td { padding: 11px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+.tw tbody tr:last-child td { border-bottom: none; }
+.tw tr.click { cursor: pointer; }
+.tw tr.click:hover td { background: var(--surface-3); }
+.tw td.num, .tw th.num { text-align: right; }
+.tw td.strong { font-weight: 650; }
+.tw td.nowrap, .tw th.nowrap { white-space: nowrap; }
+.tw th.sortbar { cursor: pointer; user-select: none; }
+.tw th.sortbar .pf { opacity: 0; margin-left: 4px; font-size: 9px; }
+.tw th.sortbar:hover .pf { opacity: .45; }
+.tw th.sortbar.aktiv { color: var(--ink); }
+.tw th.sortbar.aktiv .pf { opacity: 1; }
+tbody tr.aus td { opacity: .55; }
+
+/* ── Marken (Status) ── */
+.chip { display: inline-flex; align-items: center; border-radius: var(--r-xs); padding: 2px 8px;
+  font-size: 11px; font-weight: 620; letter-spacing: .1px; white-space: nowrap; }
+.chip-n { background: var(--line-soft); color: var(--ink-2); }
+.chip-a { background: var(--accent-soft); color: var(--accent); }
+.chip-p { background: var(--pos-soft); color: var(--pos); }
+.chip-w { background: var(--warn-soft); color: var(--warn); }
+.chip-x { background: var(--neg-soft); color: var(--neg); }
+
+/* ── Leerzustand ──
+   Heisst .empty und nicht .leerblock: Die uebernommenen Bausteine bringen
+   ihn so mit. Beide Leerzustaende bleiben nebeneinander bestehen, weil die
+   bisherigen Bereiche den ihren weiterbenutzen. */
+.empty { text-align: center; padding: 44px 24px; }
+.empty .ic { width: 40px; height: 40px; border-radius: 11px; background: var(--line-soft);
+  color: var(--ink-3); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+.empty h3 { font-size: 14px; font-weight: 650; margin: 0 0 5px; }
+.empty p { font-size: 12.5px; color: var(--ink-3); max-width: 420px; margin: 0 auto; line-height: 1.6; }
+
+/* ── Zeilenmenue ── */
+.rowmenu-btn { color: var(--ink-3); }
+.rowmenu-pop { position: fixed; z-index: 60; min-width: 220px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-sm); box-shadow: var(--sh-3);
+  padding: 4px; display: none; }
+.rowmenu-pop.on { display: block; }
+.rowmenu-pop button { display: block; width: 100%; text-align: left; border: none;
+  background: transparent; font: inherit; font-size: 13px; color: var(--ink);
+  padding: 8px 11px; border-radius: var(--r-xs); cursor: pointer; }
+.rowmenu-pop button:hover { background: var(--surface-3); }
+.rowmenu-pop hr { border: none; border-top: 1px solid var(--line-soft); margin: 4px 2px; }
+
+/* ── Dialoge des Offertenteils ──
+   Heissen of-dlg* und NICHT dlg*: Die kurzen Namen gehoeren seit dem
+   Einrichtungs-Zahnrad bereits dem Dialog daneben (.dlg-schleier/.dlg,
+   weiter oben). Eine zweite Regel gleichen Namens haette ihn stillschweigend
+   umgestaltet -- breiter, anders gerundet, anderer Schatten -- ohne dass
+   irgendetwas kaputtgegangen waere. Genau dieser Fall ist hier schon einmal
+   teuer geworden (ENT-536: ".leer" traf den Leerzustand UND eine Kennzahl
+   auf null). Beim Zusammenfuehren zweier Sitzungen faellt er nicht auf:
+   Git verschmilzt zwei Bloecke geraeuschlos, und die spaetere Regel
+   gewinnt. */
+.of-dlg-huelle { position: fixed; inset: 0; background: rgba(12,14,20,.45); z-index: 900;
+  display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
+.of-dlg-huelle.on { display: flex; }
+.of-dlg { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh-3);
+  width: 100%; max-width: 560px; display: flex; flex-direction: column; max-height: calc(100vh - 80px); }
+.of-dlg.breit { max-width: 900px; }
+.of-dlg-hd { padding: 18px 22px 14px; border-bottom: 1px solid var(--line-soft); }
+.of-dlg-hd h2 { margin: 0; font-size: 16px; }
+.of-dlg-hd p { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.of-dlg-bd { padding: 20px 22px; overflow-y: auto; }
+.of-dlg-ft { padding: 14px 22px; border-top: 1px solid var(--line-soft);
+  display: flex; gap: 9px; justify-content: flex-end; }
+
+/* ── Offertformular ──
+   Bemerkung links, Summenblock rechts: Der Summenblock ist die Zahl, auf
+   die es ankommt -- er steht darum rechts unten, wo er auch auf dem
+   gedruckten Blatt steht. */
+.of-abschluss { display: grid; grid-template-columns: 1fr 380px; gap: 14px; align-items: start; }
+.of-kopf-zwei { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 14px; }
+.of-lbl-zeile { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+.of-lbl-zeile label { margin-bottom: 0; }
+.of-schnell { border: 1px solid var(--line); background: var(--surface); border-radius: 999px;
+  padding: 1px 9px; font: inherit; font-size: 11px; font-weight: 700; color: var(--ink-3); cursor: pointer; }
+.of-schnell:hover { border-color: var(--accent); color: var(--accent); }
+.seg2 { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; flex-shrink: 0; }
+.seg2 button { border: none; background: var(--surface); padding: 9px 14px; font: inherit;
+  font-size: 13px; font-weight: 600; color: var(--ink-3); cursor: pointer; }
+.seg2 button + button { border-left: 1px solid var(--line); }
+.seg2 button.on { background: var(--accent); color: #fff; }
+/* Eine Positionszeile. Raster statt Tabelle: Die Beschreibung ist
+   mehrzeilig und braucht die volle Breite unter den schmalen Zahlenfeldern. */
+.of-pos { padding: 12px 18px; border-bottom: 1px solid var(--line-soft); }
+.of-pos:last-child { border-bottom: none; }
+.of-pos-kopf { display: grid; gap: 8px; align-items: end;
+  grid-template-columns: minmax(140px, 1.6fr) 90px 88px 110px 92px 120px 36px; }
+.of-pos-kopf .f { margin: 0; }
+/* Beschriftungen nur ueber der ERSTEN Zeile -- ab der zweiten waeren sie
+   eine Wiederholung. Ausgeblendet statt weggelassen, damit Screenreader
+   sie weiter vorlesen. */
+.of-pos:not(:first-child) .of-pos-kopf label { position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.of-pos-summe { align-self: end; padding-bottom: 9px; font-weight: 650; text-align: right; white-space: nowrap; }
+.of-pos-weg { align-self: end; }
+.of-pos textarea { min-height: 54px; margin-top: 8px; }
+.of-summe-z { display: flex; justify-content: space-between; gap: 16px; padding: 5px 0; font-size: 13px; }
+.of-summe-z .wert { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.of-summe-z.matt { color: var(--ink-3); }
+.of-summe-z.total { margin-top: 8px; padding-top: 10px; border-top: 1.5px solid var(--ink);
+  font-size: 15px; font-weight: 750; }
+.of-detail-hd { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.of-detail-hd h2 { font-size: 20px; margin: 0; }
+.of-detail-hd .sub { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+.of-zurueck { display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--ink-2); cursor: pointer; flex: none; }
+.of-zurueck:hover { background: var(--bg); }
+
+/* ── Kontaktzeilen im Adressdialog ── */
+.kw-reihe { display: grid; grid-template-columns: 130px 1fr auto; gap: 8px; margin-bottom: 8px; align-items: center; }
+.kw-person { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px; margin-bottom: 10px; }
+.kw-person .kopf { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.kw-person .kopf .sp { flex: 1; }
+
+/* ── Handy ──
+   Unter 900 px steht die Offertenliste als aufklappbare Karte statt als
+   Tabelle mit neun Spalten (dieselbe Entscheidung wie im Cockpit,
+   ENT-400), und jedes Bedienelement wird 44 px hoch. */
+.nur-schmal { display: none; }
+.of-karte { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface);
+  padding: 14px; margin-bottom: 10px; cursor: pointer; }
+.of-karte .kopf { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.of-karte .kopf .sp { flex: 1; }
+.of-karte .wer { font-weight: 650; font-size: 14px; }
+.of-karte .zeiten { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
+.of-karte .kk-pfeil { width: 18px; height: 18px; color: var(--ink-3); }
+.of-karte dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 12px 0 0; font-size: 12.5px; }
+.of-karte dt { color: var(--ink-3); }
+.of-karte dd { margin: 0; }
+.of-karte .kk-tasten { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+
+@media (max-width: 900px) {
+  .of-abschluss { grid-template-columns: 1fr; }
+  .of-kopf-zwei { grid-template-columns: 1fr; }
+  .of-pos-kopf { grid-template-columns: 1fr 1fr 1fr; }
+  /* Auf dem Handy stehen die Beschriftungen in JEDER Zeile: Ohne die
+     Kopfzeile daneben waere nicht erkennbar, was "70" und was "42.00" ist. */
+  .of-pos:not(:first-child) .of-pos-kopf label { position: static; width: auto; height: auto; clip: auto; }
+  .of-schnell { min-height: 44px; padding: 0 14px; display: inline-flex; align-items: center; }
+  .seg2 button { min-height: 44px; }
+  .nur-schmal { display: block; }
+  .nur-breit { display: none; }
+  .btn { min-height: 44px; }
+  .check { min-height: 44px; }
+  .inp, input, select, textarea { font-size: 16px; }
+  .search { flex: 1 1 100%; max-width: none; }
+  .bar-tools .sp { display: none; }
+  .bar-tools .btn { flex: 1 1 auto; }
+  .of-dlg-huelle { padding: 0; }
+  .of-dlg, .of-dlg.breit { max-width: none; border-radius: 0; height: 100%; max-height: none; }
+}
+
+/* ── Druck ──
+   Beim Drucken bleibt genau das Blatt stehen, nichts von der Oberflaeche
+   darum herum. Dieselbe Bauart wie im Cockpit: ein eigener Bereich, der
+   nur im Druck sichtbar ist. */
+#druckflaeche { display: none; }
+@media print {
+  body > *:not(#druckflaeche) { display: none !important; }
+  #druckflaeche { display: block !important; }
 }
 </style>
 </head>
@@ -622,6 +890,10 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
       <button type="button" class="nav-item" data-bereich="mandanten" aria-current="false">
         <svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-5h6v5"/><path d="M9 10h.01"/><path d="M15 10h.01"/></svg>
         <span class="lbl">Mandanten</span>
+      </button>
+      <button type="button" class="nav-item" data-bereich="adressen" aria-current="false">
+        <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span class="lbl">Adressen</span>
       </button>
       <button type="button" class="nav-item" data-bereich="offerten" aria-current="false">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
@@ -943,16 +1215,289 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
     </div>
     </section>
 
-    <!-- ══ Offerten ═══════════════════════════════════════════════ -->
+    <!-- ══ Adressen (ENT-605) ═════════════════════════════════════
+         Empfaenger einer Offerte sind Betriebe, die noch KEINE Mandanten
+         sind. Sie stehen darum nicht im Mandantenstamm, sondern hier --
+         eigener Bereich, eigene Tabelle. Wird aus einem von ihnen ein
+         Mandant, verweist seine Zeile auf den Stamm; die Adresse bleibt,
+         wo sie ist, weil die Rechnung spaeter dieselbe Rechnungsadresse
+         braucht. -->
+    <section class="bereich versteckt" id="b-adressen">
+      <div class="tabs" id="adArchivTabs">
+        <button type="button" class="tab on" id="adatab-alle" onclick="adArchivGo('alle')">Alle</button>
+        <button type="button" class="tab" id="adatab-archiv" onclick="adArchivGo('archiv')">Archiviert</button>
+      </div>
+      <div class="bar-tools">
+        <div class="search">
+          <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="inp" type="search" id="adQ" placeholder="Name, Ort, E-Mail oder Nummer …" oninput="adZeichnen()">
+        </div>
+        <div class="sp"></div>
+        <button type="button" class="btn btn-primary" onclick="adDlgOeffnen(null)">
+          <svg class="i" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Adresse erfassen
+        </button>
+      </div>
+      <div class="card"><div class="card-bd flush"><div class="tw" id="adTable"></div></div></div>
+    </section>
+
+    <!-- ══ Offerten (ENT-605) ═════════════════════════════════════
+         Aufbau wie im Cockpit: Liste mit Suche, Statusfilter und
+         sortierbaren Spalten; das Formular ist eine eigene Ansicht und
+         kein Dialog, weil eine Offerte beliebig viele Positionszeilen mit
+         mehrzeiligen Beschreibungen hat. -->
     <section class="bereich versteckt" id="b-offerten">
-      <div class="karte">
-        <div class="karte-kopf">
-          <div>
-            <h2>Offerten</h2>
-            <div class="sub">Angebote an Betriebe, die diese Plattform nutzen wollen</div>
+
+      <!-- Liste, Leistungen und Briefkopf -->
+      <div id="of-rahmen">
+        <div class="tabs" id="ofHauptTabs">
+          <button type="button" class="tab on" id="oftab-liste" onclick="ofHauptTab('liste')">Offerten</button>
+          <button type="button" class="tab" id="oftab-leistungen" onclick="ofHauptTab('leistungen')">Leistungen</button>
+          <button type="button" class="tab" id="oftab-briefkopf" onclick="ofHauptTab('briefkopf')">Briefkopf</button>
+        </div>
+
+        <!-- ── Reiter: Offerten ── -->
+        <div id="ofv-liste">
+          <div class="tabs" id="ofArchivTabs">
+            <button type="button" class="tab on" id="ofatab-alle" onclick="ofArchivGo('alle')">Alle</button>
+            <button type="button" class="tab" id="ofatab-archiv" onclick="ofArchivGo('archiv')">Archiviert</button>
+          </div>
+          <div class="bar-tools">
+            <div class="search">
+              <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input class="inp" type="search" id="ofQ" placeholder="Nummer, Titel, Empfänger oder Referenz …" oninput="renderOfferten()">
+            </div>
+            <select class="inp" id="ofStatus" style="width:auto" onchange="renderOfferten()">
+              <option value="">Alle Status</option>
+            </select>
+            <!-- Nur auf dem Handy, und er setzt das Sortierfeld ausdruecklich
+                 auf "datum" zurueck: Am Desktop kann vorher nach Titel oder
+                 Summe sortiert worden sein, und dieselbe Zustandsvariable
+                 traegt beide Ansichten. -->
+            <button type="button" class="btn btn-quiet btn-sm nur-schmal" id="ofSortBtn" onclick="ofSortDatumUm()">
+              <svg class="i i-sm" viewBox="0 0 24 24"><line x1="6" y1="4" x2="6" y2="20"/><polyline points="3 17 6 20 9 17"/><line x1="13" y1="6" x2="21" y2="6"/><line x1="13" y1="12" x2="19" y2="12"/><line x1="13" y1="18" x2="17" y2="18"/></svg>
+              <span class="lbl">Neueste zuerst</span>
+            </button>
+            <div class="sp"></div>
+            <button type="button" class="btn btn-primary" onclick="ofNeuStarten()">
+              <svg class="i" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Offerte erstellen
+            </button>
+          </div>
+          <div class="card"><div class="card-bd flush"><div class="tw" id="ofTable"></div></div></div>
+        </div>
+
+        <!-- ── Reiter: Leistungen ──
+             Vorschlagswerte fuer Positionszeilen. Dass die Liste heute leer
+             ist, ist kein Mangel: Was die Nutzung kostet, ist nicht
+             entschieden (ENT-539 Punkt 7). Eine Offerte braucht diese
+             Stammdaten nicht -- ihre Positionen tragen Text, Menge und Preis
+             selbst. -->
+        <div id="ofv-leistungen" class="versteckt">
+          <div class="bar-tools">
+            <div class="search">
+              <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input class="inp" type="search" id="pdQ" placeholder="Name oder Nummer …" oninput="pdZeichnen()">
+            </div>
+            <div class="sp"></div>
+            <button type="button" class="btn btn-primary" onclick="pdDlgOeffnen(null)">
+              <svg class="i" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Leistung anlegen
+            </button>
+          </div>
+          <div class="card"><div class="card-bd flush"><div class="tw" id="pdTable"></div></div></div>
+        </div>
+
+        <!-- ── Reiter: Briefkopf ──
+             Der Absender auf dem Dokument und in der Versandmail. Beim
+             Mandanten steht er in dessen eigener Betriebstabelle; die
+             Betreiberin hat eine solche nicht, und ihr Briefkopf gehoert
+             auch nicht in die Datenbank einer Mandantin. -->
+        <div id="ofv-briefkopf" class="versteckt">
+          <div class="card" style="max-width:720px">
+            <div class="card-hd">
+              <div>
+                <h2>Briefkopf</h2>
+                <div class="sec">Steht als Absender auf jeder Offerte und in der Versandmail</div>
+              </div>
+            </div>
+            <div class="card-bd">
+              <div class="meldung versteckt" id="bkMeldung"></div>
+              <div class="f"><label for="bk_firma">Firma *</label>
+                <input class="inp" id="bk_firma" placeholder="Wird als Absender genannt"></div>
+              <div class="f"><label for="bk_absender">Anschrift</label>
+                <textarea class="inp" id="bk_absender" rows="4"
+                  placeholder="Erscheint oben links auf dem Blatt — eine Zeile je Zeile."></textarea></div>
+              <div class="raster2">
+                <div class="f"><label for="bk_telefon">Telefon</label>
+                  <input class="inp" id="bk_telefon"></div>
+                <div class="f"><label for="bk_email">E-Mail</label>
+                  <input class="inp" id="bk_email" type="email"></div>
+                <div class="f"><label for="bk_webseite">Webseite</label>
+                  <input class="inp" id="bk_webseite"></div>
+                <div class="f"><label for="bk_uid">UID</label>
+                  <input class="inp" id="bk_uid" placeholder="CHE-123.456.789"></div>
+                <div class="f"><label for="bk_mwst">MWST-Nummer</label>
+                  <input class="inp" id="bk_mwst"></div>
+                <div class="f"><label for="bk_iban">IBAN</label>
+                  <input class="inp" id="bk_iban"></div>
+              </div>
+              <div class="f">
+                <label for="bk_logo">Logo</label>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                  <input class="inp" id="bk_logo" type="file" accept="image/png,image/jpeg,image/gif,image/webp"
+                         style="flex:1;min-width:200px" onchange="bkLogoGewaehlt(this)">
+                  <button type="button" class="btn btn-plain btn-sm" onclick="bkLogoWeg()">Logo entfernen</button>
+                </div>
+                <div class="sec" style="margin-top:6px">PNG, JPEG, GIF oder WEBP, höchstens rund 1 MB.</div>
+                <div id="bkLogoVorschau" style="margin-top:10px"></div>
+              </div>
+              <div class="knopfzeile">
+                <button type="button" class="btn btn-primary" id="bkSaveBtn" onclick="bkSpeichern()">Speichern</button>
+              </div>
+            </div>
           </div>
         </div>
-        <div id="of-inhalt"></div>
+      </div>
+
+      <!-- ══ Offerte erfassen ══
+           Eigene Ansicht statt eines Dialogs: Eine Offerte hat beliebig
+           viele Positionszeilen mit mehrzeiligen Beschreibungen -- das ist
+           kein Formular, das in ein Fenster passt, ohne dass man darin
+           scrollt und dabei den Summenblock verliert. -->
+      <div id="of-formular" class="versteckt">
+        <div class="of-detail-hd">
+          <button type="button" class="of-zurueck" id="ofBtnZurueck" onclick="ofZurueck()" aria-label="Zurück zur Offertenliste">
+            <svg class="i" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div style="flex:1;min-width:140px">
+            <h2 id="ofFormNummer">–</h2>
+            <div class="sub" id="ofFormSub">–</div>
+          </div>
+          <button type="button" class="btn btn-quiet btn-sm rowmenu-btn" id="ofFormMenuBtn" onclick="ofFormMenuOeffnen(event)"
+                  aria-label="Aktionen" style="display:none">
+            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+          </button>
+          <button type="button" class="btn btn-plain btn-sm" id="ofFormVorschauBtn" onclick="ofVorschau(ofFormId)"
+                  title="Vorschau" style="display:none">
+            <svg class="i i-sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            Vorschau
+          </button>
+          <button type="button" class="btn btn-plain btn-sm" id="ofFormLadenBtn" onclick="ofHerunterladen(ofFormId, this)" style="display:none">
+            <svg class="i i-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Herunterladen
+          </button>
+          <button type="button" class="btn btn-plain btn-sm" id="ofFormDruckBtn" onclick="ofDrucken(ofFormId)" style="display:none">
+            <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Drucken
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" id="ofFormSaveBtn" onclick="ofSpeichern()">
+            <svg class="i i-sm" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Speichern
+          </button>
+        </div>
+
+        <div class="meldung fehler versteckt" id="ofFormErr"></div>
+
+        <div class="of-kopf-zwei">
+          <div class="card"><div class="card-bd">
+            <div class="f"><label for="of_kunde">Empfänger *</label>
+              <input class="inp" id="of_kunde" list="dlAdressen" autocomplete="off"
+                     placeholder="Betrieb suchen …" oninput="ofKundeGewaehlt()"></div>
+            <div class="f" style="margin-bottom:10px"><label for="of_person">Ansprechperson</label>
+              <select class="inp" id="of_person"></select></div>
+            <button class="btn btn-plain btn-sm" type="button" onclick="ofNeueAdresse()">
+              <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Neue Adresse erstellen
+            </button>
+          </div></div>
+
+          <div class="card"><div class="card-bd">
+            <div class="f"><label for="of_datum">Offertendatum *</label>
+              <input class="inp" type="date" id="of_datum" onchange="ofGueltigNachziehen()"></div>
+            <div class="f"><label for="of_nummer">Offertennummer</label>
+              <input class="inp" id="of_nummer" readonly tabindex="-1"></div>
+            <div class="f">
+              <div class="of-lbl-zeile">
+                <label for="of_gueltig">Gültig bis</label>
+                <span>
+                  <button type="button" class="of-schnell" onclick="ofGueltigSetzen(10)"
+                          title="10 Tage ab Offertendatum">+10</button>
+                  <button type="button" class="of-schnell" onclick="ofGueltigSetzen(30)"
+                          title="30 Tage ab Offertendatum">+30</button>
+                </span>
+              </div>
+              <input class="inp" type="date" id="of_gueltig">
+            </div>
+            <div class="f" style="margin-bottom:0"><label for="of_referenz">Referenz</label>
+              <input class="inp" id="of_referenz" placeholder="Ihre Bestellnummer o. Ä."></div>
+          </div></div>
+        </div>
+
+        <div class="card" style="margin-bottom:14px"><div class="card-bd">
+          <div class="f" style="margin-bottom:0"><label for="of_titel">Titel</label>
+            <input class="inp" id="of_titel" placeholder="z. B. Nutzung GuardOpS"></div>
+        </div></div>
+
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-hd"><h2>Positionen</h2></div>
+          <div class="card-bd flush"><div class="tw"><div id="ofPositionen"></div></div></div>
+          <div class="card-bd" style="display:flex;gap:8px;border-top:1px solid var(--line-soft)">
+            <button type="button" class="btn btn-plain btn-sm" onclick="ofZeileHinzu()">
+              <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Position hinzufügen
+            </button>
+            <button type="button" class="btn btn-plain btn-sm" onclick="ofNeuesProduktAnlegen()">
+              <svg class="i i-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Neue Leistung
+            </button>
+          </div>
+        </div>
+
+        <div class="of-abschluss">
+          <div class="card"><div class="card-bd">
+            <div class="f"><label for="of_bemerkung">Interne Bemerkung</label>
+              <textarea class="inp" id="of_bemerkung" rows="3" style="min-height:60px"
+                placeholder="Steht nicht auf dem Dokument — nur für den eigenen Gebrauch."></textarea></div>
+            <div class="f"><label for="of_notizen">Öffentliche Notizen</label>
+              <textarea class="inp" id="of_notizen" rows="3" style="min-height:60px"
+                placeholder="Erscheint auf dem Dokument, unterhalb der Positionen."></textarea></div>
+            <div class="f"><label for="of_bedingungen">Bedingungen</label>
+              <textarea class="inp" id="of_bedingungen" rows="3" style="min-height:60px"
+                placeholder="Zahlungs- oder Lieferbedingungen — erscheinen auf dem Dokument."></textarea></div>
+            <div class="f" style="margin-bottom:0"><label for="of_fusszeile">Fusszeile</label>
+              <textarea class="inp" id="of_fusszeile" rows="2"
+                placeholder="Abschliessender Text auf dem Dokument."></textarea></div>
+          </div></div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div class="card"><div class="card-bd">
+              <div class="f" style="margin-bottom:10px">
+                <label for="of_rabatt">Gesamtrabatt auf alle Positionen</label>
+                <div style="display:flex;gap:8px">
+                  <input class="inp" id="of_rabatt" inputmode="decimal" value="0" oninput="ofSummenZeichnen()" style="flex:1">
+                  <div class="seg2">
+                    <button type="button" id="of_rabatt_pct" class="on" onclick="ofRabattEinheitSetzen('pct')">%</button>
+                    <button type="button" id="of_rabatt_chf" onclick="ofRabattEinheitSetzen('chf')">CHF</button>
+                  </div>
+                </div>
+              </div>
+              <div id="ofSummen"></div>
+            </div></div>
+            <div class="card"><div class="card-bd">
+              <div style="font-size:11px;font-weight:650;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-2);margin-bottom:12px">
+                Unterschriften
+              </div>
+              <label class="check">
+                <input type="checkbox" id="of_unterschriftsseite">
+                Unterschriftsfelder hinzufügen
+              </label>
+              <div class="sec" style="margin-top:8px">
+                Setzt Felder für Ort, Datum und Unterschrift ans Ende des Belegs — auf
+                dieselbe Seite, nicht auf ein eigenes Blatt.
+              </div>
+            </div></div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -970,6 +1515,163 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
     </section>
   </div>
 </div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     Dialoge, Zeilenmenue, Meldungsstreifen und Druckflaeche (ENT-605)
+     ══════════════════════════════════════════════════════════════════ -->
+
+<!-- Vorschlagswerte fuer Empfaenger, Leistungen und Einheiten. Getrennte
+     Listen, weil eine gemeinsame in jedem Feld alles vorschlagen wuerde. -->
+<datalist id="dlAdressen"></datalist>
+<datalist id="dlProdukte"></datalist>
+<datalist id="dlEinheiten">
+  <option value="Std."></option><option value="Stk."></option>
+  <option value="Pauschal"></option><option value="Monat"></option>
+  <option value="Jahr"></option><option value="km"></option>
+</datalist>
+
+<!-- Zeilenmenue. EIN Element fuer alle Listen: Zwei gleichzeitig offene
+     Menues gibt es nicht, und zwei Elemente waeren zwei Orte, an denen
+     dieselbe Positionierung stehen muesste. -->
+<div class="rowmenu-pop" id="rowmenuPop"></div>
+
+<!-- Adresse erfassen oder ändern -->
+<div class="of-dlg-huelle" id="dlgAdresse">
+  <div class="of-dlg breit">
+    <div class="of-dlg-hd">
+      <h2 id="adDlgTitel">Adresse erfassen</h2>
+      <p>Ein Betrieb, der diese Plattform nutzen soll. Aus ihm wird später ein Mandant.</p>
+    </div>
+    <div class="of-dlg-bd">
+      <div class="meldung fehler versteckt" id="adErr"></div>
+      <div class="raster2">
+        <div class="f"><label for="ad_name">Firma *</label>
+          <input class="inp" id="ad_name"></div>
+        <div class="f"><label for="ad_nummer">Nummer</label>
+          <input class="inp" id="ad_nummer" readonly tabindex="-1"></div>
+        <div class="f"><label for="ad_zusatzfeld">Zusatz</label>
+          <input class="inp" id="ad_zusatzfeld" placeholder="z. B. Abteilung"></div>
+        <div class="f"><label for="ad_adresszusatz">Adresszusatz</label>
+          <input class="inp" id="ad_adresszusatz" placeholder="c/o, Postfach"></div>
+        <div class="f"><label for="ad_strasse">Strasse</label>
+          <input class="inp" id="ad_strasse"></div>
+        <div class="f"><label for="ad_hausnummer">Nummer</label>
+          <input class="inp" id="ad_hausnummer"></div>
+        <div class="f"><label for="ad_plz">PLZ *</label>
+          <input class="inp" id="ad_plz"></div>
+        <div class="f"><label for="ad_ort">Ort *</label>
+          <input class="inp" id="ad_ort"></div>
+        <div class="f"><label for="ad_uid">UID</label>
+          <input class="inp" id="ad_uid" placeholder="CHE-123.456.789"></div>
+        <div class="f"><label for="ad_mwst_nr">MWST-Nummer</label>
+          <input class="inp" id="ad_mwst_nr"></div>
+      </div>
+
+      <!-- Kommunikationswege des Betriebs. Die Haupt-E-Mail ist das Feld,
+           an das der Versand geht -- darum steht hier, welche gemeint ist,
+           statt dass man es erraten muss. -->
+      <div class="f">
+        <label>Kommunikationswege</label>
+        <div class="sec" style="margin-bottom:8px">Die erste E-Mail ist die Adresse, an die eine Offerte verschickt wird.</div>
+        <div id="adWege"></div>
+        <button type="button" class="btn btn-plain btn-sm" onclick="adWegHinzu()">Weg hinzufügen</button>
+      </div>
+
+      <div class="f">
+        <label>Ansprechpersonen</label>
+        <div id="adPersonen"></div>
+        <button type="button" class="btn btn-plain btn-sm" onclick="adPersonHinzu()">Person hinzufügen</button>
+      </div>
+
+      <div class="f" style="margin-bottom:0"><label for="ad_notiz">Notiz</label>
+        <textarea class="inp" id="ad_notiz" rows="2" style="min-height:60px"
+          placeholder="Nur intern — steht auf keiner Offerte."></textarea></div>
+    </div>
+    <div class="of-dlg-ft">
+      <button type="button" class="btn btn-plain" onclick="dlgZu('dlgAdresse')">Abbrechen</button>
+      <button type="button" class="btn btn-primary" id="adSaveBtn" onclick="adSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Leistung anlegen oder ändern -->
+<div class="of-dlg-huelle" id="dlgLeistung">
+  <div class="of-dlg">
+    <div class="of-dlg-hd">
+      <h2 id="pdDlgTitel">Leistung anlegen</h2>
+      <p>Vorschlagswert für Offerten. Eine Änderung wirkt nur auf künftige Belege — bereits erfasste behalten ihre Werte.</p>
+    </div>
+    <div class="of-dlg-bd">
+      <div class="meldung fehler versteckt" id="pdErr"></div>
+      <div class="f"><label for="pd_name">Name *</label>
+        <input class="inp" id="pd_name"></div>
+      <div class="f"><label for="pd_beschreibung">Beschreibung</label>
+        <textarea class="inp" id="pd_beschreibung" rows="3" style="min-height:60px"
+          placeholder="Erscheint als Vorschlag in der Offerte und lässt sich dort je Position anpassen."></textarea></div>
+      <div class="raster2">
+        <div class="f"><label for="pd_preis">Einzelpreis (CHF)</label>
+          <input class="inp num" id="pd_preis" inputmode="decimal" value="0.00"></div>
+        <div class="f"><label for="pd_einheit">Einheit</label>
+          <input class="inp" id="pd_einheit" list="dlEinheiten" value="Std."></div>
+        <div class="f"><label for="pd_mwst">MWST</label>
+          <select class="inp" id="pd_mwst"></select></div>
+        <div class="f"><label for="pd_sortierung">Reihenfolge</label>
+          <input class="inp num" id="pd_sortierung" inputmode="numeric" value="0"></div>
+      </div>
+    </div>
+    <div class="of-dlg-ft">
+      <button type="button" class="btn btn-plain" onclick="dlgZu('dlgLeistung')">Abbrechen</button>
+      <button type="button" class="btn btn-primary" id="pdSaveBtn" onclick="pdSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Vorschau: dasselbe Blatt wie beim Drucken, nur in einem Dialog statt
+     im Druckdialog. Diese Ansicht IST das Dokument. -->
+<div class="of-dlg-huelle" id="dlgOfVorschau">
+  <div class="of-dlg breit">
+    <div class="of-dlg-hd">
+      <h2>Vorschau</h2>
+      <p>So sieht die Offerte für den Empfänger aus.</p>
+    </div>
+    <div class="of-dlg-bd" id="ofVorschauInhalt">
+      <div id="ofVorschauMass" style="overflow:hidden">
+        <div id="ofVorschauBlatt" style="transform-origin:top left"></div>
+      </div>
+    </div>
+    <div class="of-dlg-ft">
+      <button type="button" class="btn btn-plain" onclick="dlgZu('dlgOfVorschau')">Schliessen</button>
+      <button type="button" class="btn btn-primary" onclick="ofDrucken(ofFormId)">Drucken</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sicherheitsabfrage. Eigener Dialog statt confirm(): Eine verschickte
+     E-Mail laesst sich nicht zurueckholen, und ein Browser-Dialog sagt
+     nicht, was genau passiert. -->
+<div class="of-dlg-huelle" id="dlgFrage">
+  <div class="of-dlg" style="max-width:440px">
+    <div class="of-dlg-hd">
+      <h2 id="frageTitel">–</h2>
+      <p id="frageText">–</p>
+    </div>
+    <div class="of-dlg-ft">
+      <button type="button" class="btn btn-plain" onclick="dlgZu('dlgFrage')">Abbrechen</button>
+      <button type="button" class="btn btn-primary" id="frageJa">Weiter</button>
+    </div>
+  </div>
+</div>
+
+<!-- Kurzmeldung unten. Kein Dialog: Sie bestaetigt etwas, das bereits
+     geschehen ist, und darf den naechsten Handgriff nicht aufhalten. -->
+<div id="meldungsstreifen" style="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+     background:var(--shell);color:var(--shell-txt-hi);padding:11px 18px;border-radius:999px;
+     font-size:13.5px;box-shadow:var(--sh-3);z-index:1000;display:none;max-width:90vw;text-align:center"></div>
+
+<!-- Die Druckflaeche steht ausserhalb aller Bereiche: Beim Drucken bleibt
+     genau sie stehen, der Rest der Oberflaeche verschwindet (siehe
+     @media print oben). -->
+<div id="druckflaeche"></div>
 
 <script>
 'use strict';
@@ -1007,6 +1709,7 @@ function stumm(el) { zeig(el, false); }
 const BEREICHE = {
   uebersicht: ['Übersicht',  'Die Lage über allen Betrieben'],
   mandanten:  ['Mandanten',  'Betriebe, die diese Plattform nutzen, samt Demo-Zugängen'],
+  adressen:   ['Adressen',   'Betriebe, an die eine Offerte geht — künftige Mandanten'],
   offerten:   ['Offerten',   'Angebote an künftige Mandanten'],
   rechnungen: ['Rechnungen', 'Was die Mandanten für die Nutzung zahlen'],
   support:    ['Support',    'Anfragen der Mandanten, die auf eine Antwort warten'],
@@ -1030,6 +1733,16 @@ function bereichZeigen(welcher) {
   $('leiste-unter').textContent = BEREICHE[welcher][1];
   // Ein Formular, das beim Bereichswechsel offen bliebe, stuende beim
   // naechsten Besuch halb ausgefuellt da, ohne dass jemand weiss warum.
+  /* Das Offertformular ist eine eigene Ansicht INNERHALB des Bereichs.
+     Wer den Bereich verlaesst, soll beim naechsten Besuch die Liste sehen
+     und nicht ein halb ausgefuelltes Formular, dessen Herkunft nirgends
+     mehr steht. */
+  if (welcher !== 'offerten') { ofFormularZeigen(false); }
+  /* Beide Bereiche lesen aus denselben Tabellen und koennen sich gegenseitig
+     veraendern (eine neue Adresse, eine neue Offerte). Beim Betreten frisch
+     holen ist billiger als ein Stand, der nicht mehr stimmt. */
+  if (welcher === 'adressen') { ladeAdressen(); }
+  if (welcher === 'offerten') { ladeBelege(); ladeProdukte(); }
   if (welcher !== 'mandanten') {
     zeig($('m-form-karte'), false);
     zeig($('sup-karte'), false);
@@ -1940,6 +2653,1781 @@ async function svStatus(status) {
   await ladeSupport();
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════
+   OFFERTEN, ADRESSEN, LEISTUNGEN UND BRIEFKOPF (ENT-605)
+   ══════════════════════════════════════════════════════════════════════
+
+   Aus dem Cockpit uebernommen, auf Wunsch des Projektinhabers 1:1: gleiche
+   Maske, gleiche Liste, gleiche Wege (Vorschau, Drucken, Herunterladen,
+   Teilen, Versenden, Status, Duplizieren, Archivieren).
+
+   WAS ANDERS IST, UND WARUM:
+   - Die Endpunkte heissen betreiber_* und laufen ueber betreiber_db().
+     Der Empfaenger ist ein Betrieb, der noch KEIN Mandant ist -- er steht
+     darum in be_kunden und nicht im Kundenstamm einer Mandantin.
+   - Der Absender kommt aus be_briefkopf statt aus der Betriebstabelle
+     eines Mandanten.
+   - Rechnungen sind hier noch nicht gebaut. Die Tabellen tragen sie
+     (art = 'rechnung'), die Oberflaeche zeigt nur Offerten.
+
+   DIE SUMMENRECHNUNG IST EIN ZWILLING des Servers (backend/belege.php).
+   Massgeblich ist immer der Server; was hier steht, ist die Vorschau beim
+   Tippen. Wer die Formel aendert, aendert sie an BEIDEN Stellen --
+   test_belege.mjs prueft beide gegen dieselben Faelle. */
+
+/* ── Kleine Helfer ─────────────────────────────────────────────────── */
+const esc = text;
+const nf = (n, d) => Number(n || 0).toLocaleString('de-CH',
+  { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 });
+/* Ein Nulldatum ist KEIN Datum. MySQL legt ausserhalb des strengen Modus
+   '0000-00-00' in eine DATE-Spalte, wenn ein leerer Text ankommt. Das darf
+   nie als "00.00.0000" erscheinen und schon gar nicht als abgelaufenes
+   Datum gelesen werden -- unbekannt saehe sonst aus wie laengst vorbei. */
+const leeresDatum = d => !d || String(d).slice(0, 10) === '0000-00-00';
+const dmy = d => leeresDatum(d) ? '–' : String(d).slice(0, 10).split('-').reverse().join('.');
+/* Franken aus Rappen, immer mit zwei Nachkommastellen -- Geldbetraege
+   erscheinen nie als "42" oder "42.5", auch wenn sie glatt aufgehen. */
+const chf = rappen => nf((Number(rappen) || 0) / 100, 2);
+/* Prozentsatz aus Basispunkten: 810 -> "8.10", 700 -> "7". Nachkommastellen
+   nur, wo es welche gibt -- "7.00 % Rabatt" liest sich falsch genau. */
+const bpText = bp => {
+  const p = (Number(bp) || 0) / 100;
+  return nf(p, Number.isInteger(p) ? 0 : 2);
+};
+/* CHF-Eingabe zu Rappen. Akzeptiert Komma wie Punkt -- auf einer Schweizer
+   Tastatur tippt man das eine so schnell wie das andere, und ein Betrag,
+   der wegen des Trennzeichens als 0 gelesen wird, faellt erst auf dem
+   Papier auf. */
+function chfZuRappen(wert) {
+  const n = parseFloat(String(wert == null ? '' : wert).replace(/'/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+}
+const rappenZuChf = r => ((Number(r) || 0) / 100).toFixed(2);
+const isoTag = () => new Date().toISOString().slice(0, 10);
+const strich = v => (v === null || v === undefined || String(v).trim() === '')
+  ? '<span style="color:var(--ink-3)">–</span>' : esc(v);
+
+/* Leerzustand. Die vier Aussagen "nicht eingerichtet", "kein Zugriff",
+   "nichts vorhanden" und "kein Treffer" bekommen jede ihren eigenen Text
+   -- unbekannt darf nie wie keine aussehen (CLAUDE.md). */
+const LEER = (titel, satz) =>
+  `<div class="empty"><div class="ic">
+     <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/>
+     <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+   </div><h3>${esc(titel)}</h3><p>${esc(satz)}</p></div>`;
+
+/* Kurzmeldung unten. Bestaetigt etwas, das bereits geschehen ist, und haelt
+   den naechsten Handgriff nicht auf. */
+let kurzmeldungUhr = null;
+function kurzmeldung(txt) {
+  const el = $('meldungsstreifen');
+  el.textContent = txt;
+  el.style.display = 'block';
+  if (kurzmeldungUhr) { clearTimeout(kurzmeldungUhr); }
+  kurzmeldungUhr = setTimeout(() => { el.style.display = 'none'; }, 3600);
+}
+
+/* ── Dialoge ───────────────────────────────────────────────────────── */
+function dlgAuf(id) { $(id).classList.add('on'); }
+function dlgZu(id)  { $(id).classList.remove('on'); }
+
+/* Sicherheitsabfrage mit eigenem Wortlaut. Der Knopf traegt, was er tut --
+   "OK" sagt nicht, dass eine E-Mail rausgeht. */
+function frageStellen(titel, satz, knopftext, dann) {
+  $('frageTitel').textContent = titel;
+  $('frageText').textContent = satz;
+  const ja = $('frageJa');
+  ja.textContent = knopftext;
+  ja.onclick = () => { dlgZu('dlgFrage'); dann(); };
+  dlgAuf('dlgFrage');
+}
+
+/* ── Summenrechnung: Zwilling von beleg_summen() ───────────────────── */
+function belegRunden(wert) {
+  /* Kaufmaennisch runden, halbe Rappen WEG VON DER NULL. Math.round rundet
+     halbe Werte zur groesseren Zahl -- bei -0.5 waere das 0 statt -1, und
+     die Rechnung ginge auf dem Papier nicht auf. */
+  return wert < 0 ? -Math.round(-wert) : Math.round(wert);
+}
+/* Schweizer Rappenrundung auf 5 Rappen. */
+function belegRappenRunden(rappen) {
+  return belegRunden(rappen / 5) * 5;
+}
+const BELEG_MENGE_FAKTOR = 100;
+
+function belegSummen(positionen, rabattBp) {
+  rabattBp = Math.max(0, Number(rabattBp) || 0);
+  const zeilen = [];
+  let zwischensumme = 0;
+
+  (positionen || []).forEach(p => {
+    const mengeGanz = belegRunden((Number(p.menge) || 0) * BELEG_MENGE_FAKTOR);
+    const einzelpreis = Number(p.einzelpreis_rappen) || 0;
+    const posRabattBp = Math.max(0, Number(p.rabatt_bp) || 0);
+    const satzBp = Math.max(0, Number(p.mwst_satz_bp) || 0);
+
+    const brutto = belegRunden(mengeGanz * einzelpreis / BELEG_MENGE_FAKTOR);
+    const posRabatt = belegRunden(brutto * posRabattBp / 10000);
+    const netto = brutto - posRabatt;
+
+    zeilen.push({ brutto_rappen: brutto, pos_rabatt_rappen: posRabatt,
+                  zwischen_rappen: netto, mwst_satz_bp: satzBp });
+    zwischensumme += netto;
+  });
+
+  /* Gesamtrabatt ANTEILIG je Position, nicht von der Summe: Die Positionen
+     tragen verschiedene MWST-Saetze, und sonst stuende nicht mehr fest,
+     wieviel Rabatt auf die steuerpflichtige und wieviel auf die
+     steuerfreie Position entfaellt. */
+  let rabattTotal = 0;
+  zeilen.forEach(z => {
+    const anteil = belegRunden(z.zwischen_rappen * rabattBp / 10000);
+    z.gesamt_rabatt_rappen = anteil;
+    z.netto_rappen = z.zwischen_rappen - anteil;
+    rabattTotal += anteil;
+  });
+  const netto = zwischensumme - rabattTotal;
+
+  /* MWST je SATZ, nicht je Position -- sonst wuerde bei mehreren Positionen
+     desselben Satzes mehrfach gerundet. */
+  const grundlagen = new Map();
+  zeilen.forEach(z => {
+    grundlagen.set(z.mwst_satz_bp, (grundlagen.get(z.mwst_satz_bp) || 0) + z.netto_rappen);
+  });
+  const mwst = [];
+  let mwstTotal = 0;
+  [...grundlagen.keys()].sort((a, b) => b - a).forEach(satz => {
+    if (!satz) { return; }   // steuerfrei: keine Zeile, kein Betrag
+    const grundlage = grundlagen.get(satz);
+    const betrag = belegRunden(grundlage * satz / 10000);
+    mwst.push({ satz_bp: satz, grundlage_rappen: grundlage, betrag_rappen: betrag });
+    mwstTotal += betrag;
+  });
+
+  const vorRundung = netto + mwstTotal;
+  const total = belegRappenRunden(vorRundung);
+
+  return {
+    zeilen, zwischensumme_rappen: zwischensumme, rabatt_bp: rabattBp,
+    rabatt_rappen: rabattTotal, netto_rappen: netto, mwst, mwst_rappen: mwstTotal,
+    rundung_rappen: total - vorRundung, total_rappen: total,
+  };
+}
+
+/* ── Zustand ───────────────────────────────────────────────────────── */
+const MWST_SAETZE = [
+  { bp: 810, text: '8.10 % (Normalsatz)' },
+  { bp: 260, text: '2.60 % (reduziert)' },
+  { bp: 380, text: '3.80 % (Beherbergung)' },
+  { bp: 0,   text: 'steuerfrei / ohne MWST' },
+];
+/* Reihenfolge = Ablauf, Farbe = Bedeutung: Entwurf neutral, Versendet und
+   Angeschaut unterwegs, Bestaetigt gewonnen, Abgelehnt verloren. */
+const OF_STATUS = [
+  { wert: 'entwurf',    text: 'Entwurf',    chip: 'chip-n' },
+  { wert: 'versendet',  text: 'Versendet',  chip: 'chip-a' },
+  { wert: 'angeschaut', text: 'Angeschaut', chip: 'chip-w' },
+  { wert: 'bestaetigt', text: 'Bestätigt',  chip: 'chip-p' },
+  { wert: 'abgelehnt',  text: 'Abgelehnt',  chip: 'chip-x' },
+];
+const ofStatusInfo = w => OF_STATUS.find(s => s.wert === w) || OF_STATUS[0];
+
+let adressen = [];
+let adNaechsteNummer = '';
+let adArchivTab = 'alle';
+let produkte = [];
+let belege = [];
+let ofNaechsteNummer = '';
+let ofArchivTab = 'alle';
+let ofSortFeld = 'datum';
+let ofSortRichtung = 'ab';
+let ofOffen = new Set();       // aufgeklappte Karten am Handy
+let briefkopf = { firma: '', absender: '', logo: null };
+/* null heisst "noch nicht nachgesehen" und ist etwas anderes als false.
+   Solange es null ist, behauptet die Oberflaeche nichts. */
+let offertenBereit = null;
+
+/* ── Laden ─────────────────────────────────────────────────────────── */
+/* Fehlt eine Tabelle, ist der Offertenteil nicht eingerichtet. Das ist
+   etwas anderes als "nichts erfasst" und bekommt darum einen eigenen
+   Zustand, keinen leeren Kasten. */
+function nichtEingerichtet(ziel, was) {
+  $(ziel).innerHTML = LEER('Noch nicht eingerichtet',
+    was + ' braucht Tabellen, die auf diesem Server noch fehlen. '
+    + 'Einmal einrichten, dann steht der Bereich.')
+    + '<div style="text-align:center;padding:0 24px 32px">'
+    + '<button type="button" class="btn btn-primary" onclick="einrichtungOeffnen()">Jetzt einrichten</button></div>';
+}
+
+/* Nach der Einrichtung noch einmal holen -- sonst stuende hier weiter
+   "noch nicht eingerichtet", obwohl die Tabellen inzwischen stehen. Genau
+   die Sorte Anzeige, die laenger falsch bleibt als der Zustand. */
+async function offertenteilNachladen() {
+  await ladeAdressen();
+  await ladeProdukte();
+  await ladeBelege();
+  await ladeBriefkopf();
+}
+
+/* Ein Abruf, der gar nicht durchkommt (kein Netz, Server weg), wirft eine
+   Ausnahme. Sie darf nicht bis ladeAlles() durchschlagen: Dort wuerde sie
+   die ganze Seite auf halbem Weg stehen lassen, und man saehe einen halb
+   gezeichneten Bereich ohne jede Erklaerung. Gefangen wird sie hier, und
+   die Flaeche sagt "Nicht abrufbar" -- das ist etwas anderes als "nichts
+   vorhanden". */
+async function sicher(arbeit, ziel, was) {
+  try {
+    await arbeit();
+  } catch (e) {
+    if (ziel && $(ziel)) {
+      $(ziel).innerHTML = LEER('Nicht abrufbar',
+        was + ' liess sich gerade nicht laden. Bitte später erneut versuchen.');
+    }
+  }
+}
+
+async function ladeAdressen() {
+  return sicher(ladeAdressenRoh, 'adTable', 'Das Adressbuch');
+}
+async function ladeProdukte() {
+  return sicher(ladeProdukteRoh, 'pdTable', 'Die Leistungen');
+}
+async function ladeBelege() {
+  return sicher(ladeBelegeRoh, 'ofTable', 'Die Offerten');
+}
+async function ladeBriefkopf() {
+  return sicher(ladeBriefkopfRoh, null, 'Der Briefkopf');
+}
+
+async function ladeAdressenRoh() {
+  const a = await ruf('betreiber_kunden_list.php');
+  if (a.status !== 'ok') {
+    $('adTable').innerHTML = LEER('Nicht abrufbar', a.message || 'Unbekannter Fehler.');
+    return;
+  }
+  if (a.eingerichtet === false) {
+    offertenBereit = false;
+    nichtEingerichtet('adTable', 'Das Adressbuch');
+    return;
+  }
+  offertenBereit = true;
+  adressen = a.kunden || [];
+  adNaechsteNummer = a.naechste_nummer || '';
+  /* Eingabehilfe des Empfaengerfeldes mitfuehren -- archivierte Adressen
+     schlagen sich nicht mehr vor. */
+  $('dlAdressen').innerHTML = adressen.filter(k => Number(k.aktiv ?? 1))
+    .map(k => `<option value="${esc(k.name)}"></option>`).join('');
+  adZeichnen();
+}
+
+async function ladeProdukteRoh() {
+  const a = await ruf('betreiber_produkt_list.php');
+  if (a.status !== 'ok') { return; }
+  if (a.eingerichtet === false) { nichtEingerichtet('pdTable', 'Die Leistungen'); return; }
+  produkte = a.produkte || [];
+  $('dlProdukte').innerHTML = produkte.filter(p => Number(p.aktiv ?? 1))
+    .map(p => `<option value="${esc(p.name)}"></option>`).join('');
+  pdZeichnen();
+}
+
+async function ladeBelegeRoh() {
+  const a = await ruf('betreiber_beleg_list.php?art=offerte');
+  if (a.status !== 'ok') {
+    $('ofTable').innerHTML = LEER('Nicht abrufbar', a.message || 'Unbekannter Fehler.');
+    return;
+  }
+  if (a.eingerichtet === false) { nichtEingerichtet('ofTable', 'Die Offerten'); return; }
+  belege = a.belege || [];
+  ofNaechsteNummer = a.naechste_nummer || '';
+  renderOfferten();
+}
+
+async function ladeBriefkopfRoh() {
+  const a = await ruf('betreiber_briefkopf.php');
+  if (a.status !== 'ok' || !a.briefkopf) { return; }
+  briefkopf = a.briefkopf;
+  bkFuellen();
+}
+
+/* ── Adressen ──────────────────────────────────────────────────────── */
+function adArchivGo(t) {
+  adArchivTab = t;
+  document.querySelectorAll('#adArchivTabs .tab').forEach(b => b.classList.remove('on'));
+  $('adatab-' + t).classList.add('on');
+  adZeichnen();
+}
+
+function adEmail(k) {
+  const w = (k.kontaktwege || []).find(x => x.art === 'email' && x.wert);
+  return w ? w.wert : (k.email || '');
+}
+function adTelefon(k) {
+  const w = (k.kontaktwege || []).find(x => (x.art === 'telefon' || x.art === 'mobil') && x.wert);
+  return w ? w.wert : (k.telefon || '');
+}
+
+function adZeichnen() {
+  if (offertenBereit === false) { return; }
+  const q = ($('adQ').value || '').toLowerCase().trim();
+  const wollAktiv = adArchivTab === 'alle' ? 1 : 0;
+  const d = adressen.filter(k => Number(k.aktiv ?? 1) === wollAktiv
+    && (!q || [k.name, k.ort, k.plz, k.kundennummer, adEmail(k), adTelefon(k)]
+        .some(f => String(f || '').toLowerCase().includes(q))));
+
+  if (!d.length) {
+    /* "Kein Treffer" und "nichts vorhanden" sind verschiedene Aussagen. */
+    $('adTable').innerHTML = adressen.length
+      ? LEER('Keine Treffer', q
+          ? 'Für diese Suche gibt es keine Adresse. Suchbegriff zurücksetzen.'
+          : 'Hier stehen keine archivierten Adressen.')
+      : LEER('Noch keine Adresse', 'Über „Adresse erfassen“ oben rechts den ersten Betrieb anlegen.');
+    return;
+  }
+
+  d.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'de', { sensitivity: 'base' }));
+
+  $('adTable').innerHTML = `<table><thead><tr>
+      <th>Nr.</th><th>Firma</th><th>Ort</th><th>E-Mail</th><th>Telefon</th><th>Mandant</th><th class="num">Aktion</th>
+    </tr></thead><tbody>` + d.map(k => `
+      <tr class="click${Number(k.aktiv ?? 1) ? '' : ' aus'}" onclick="adDlgOeffnen(${Number(k.id)})">
+        <td class="nowrap">${strich(k.kundennummer)}</td>
+        <td class="strong">${esc(k.name)}${k.zusatzfeld ? `<div class="sec">${esc(k.zusatzfeld)}</div>` : ''}</td>
+        <td class="nowrap">${strich([k.plz, k.ort].filter(Boolean).join(' '))}</td>
+        <td>${strich(adEmail(k))}</td>
+        <td class="nowrap">${strich(adTelefon(k))}</td>
+        <td class="nowrap">${k.mandant_id
+            ? '<span class="chip chip-p">Mandant</span>'
+            : '<span class="chip chip-n">Interessent</span>'}</td>
+        <td class="num" onclick="event.stopPropagation()">
+          <button type="button" class="btn btn-quiet btn-sm rowmenu-btn" onclick="adMenuOeffnen(event, ${Number(k.id)})" aria-label="Aktionen">
+            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+          </button>
+        </td>
+      </tr>`).join('') + '</tbody></table>';
+}
+
+function adMenuOeffnen(ev, id) {
+  ev.stopPropagation();
+  const k = adressen.find(x => Number(x.id) === Number(id));
+  if (!k) { return; }
+  const pop = $('rowmenuPop');
+  if (pop.classList.contains('on') && pop.dataset.wer === 'ad' + id) { menuSchliessen(); return; }
+  pop.innerHTML = `
+    <button type="button" onclick="menuSchliessen(); adDlgOeffnen(${id})">Bearbeiten</button>
+    <button type="button" onclick="menuSchliessen(); ofNeuFuerAdresse(${id})">Offerte erstellen</button>
+    <hr>
+    <button type="button" onclick="menuSchliessen(); adArchivKlick(${id}, ${Number(k.aktiv) ? 0 : 1})">${Number(k.aktiv) ? 'Archivieren' : 'Zurückholen'}</button>`;
+  pop.dataset.wer = 'ad' + id;
+  pop.classList.add('on');
+  menuPositionieren(ev, 150);
+}
+
+async function adArchivKlick(id, aktiv) {
+  const a = await ruf('betreiber_kunden_archivieren.php', { id, aktiv });
+  if (a.status !== 'ok') { kurzmeldung(a.message || 'Fehlgeschlagen.'); return; }
+  kurzmeldung(aktiv ? 'Adresse zurückgeholt.' : 'Adresse archiviert.');
+  await ladeAdressen();
+}
+
+/* Kommunikationswege und Ansprechpersonen im Dialog. Sie stehen als
+   Arbeitsstand in eigenen Feldern und werden erst beim Speichern gelesen
+   -- ein Neuzeichnen waehrend des Tippens setzte den Cursor zurueck. */
+let adId = null;
+let adWege = [];
+let adPersonen = [];
+let adNachAnlage = null;   // Rueckruf, wenn aus dem Offertformular angelegt
+
+const WEG_ARTEN = [
+  { wert: 'email', text: 'E-Mail' }, { wert: 'telefon', text: 'Telefon' },
+  { wert: 'mobil', text: 'Mobil' }, { wert: 'webseite', text: 'Webseite' },
+  { wert: 'fax', text: 'Fax' },
+];
+const wegOptionen = gewaehlt => WEG_ARTEN.map(a =>
+  `<option value="${a.wert}"${a.wert === gewaehlt ? ' selected' : ''}>${a.text}</option>`).join('');
+
+function adWegeZeichnen() {
+  $('adWege').innerHTML = adWege.map((w, i) => `
+    <div class="kw-reihe">
+      <select class="inp" id="adw_art${i}">${wegOptionen(w.art)}</select>
+      <input class="inp" id="adw_wert${i}" value="${esc(w.wert)}" placeholder="Wert">
+      <button type="button" class="btn btn-quiet btn-sm" onclick="adWegWeg(${i})" aria-label="Weg entfernen">
+        <svg class="i i-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>`).join('');
+}
+function adWegeLesen() {
+  adWege = adWege.map((w, i) => ({
+    art: ($('adw_art' + i) || {}).value || w.art,
+    wert: (($('adw_wert' + i) || {}).value || '').trim(),
+  }));
+}
+function adWegHinzu() { adWegeLesen(); adWege.push({ art: 'email', wert: '' }); adWegeZeichnen(); }
+function adWegWeg(i) { adWegeLesen(); adWege.splice(i, 1); adWegeZeichnen(); }
+
+function adPersonenZeichnen() {
+  $('adPersonen').innerHTML = adPersonen.map((p, pi) => `
+    <div class="kw-person">
+      <div class="kopf">
+        <strong style="font-size:13px">Person ${pi + 1}</strong>
+        <div class="sp"></div>
+        <button type="button" class="btn btn-quiet btn-sm" onclick="adPersonWeg(${pi})" aria-label="Person entfernen">
+          <svg class="i i-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="raster2">
+        <div class="f"><label for="adp_anrede${pi}">Anrede</label>
+          <input class="inp" id="adp_anrede${pi}" value="${esc(p.anrede || '')}"></div>
+        <div class="f"><label for="adp_vorname${pi}">Vorname</label>
+          <input class="inp" id="adp_vorname${pi}" value="${esc(p.vorname || '')}"></div>
+        <div class="f"><label for="adp_nachname${pi}">Nachname</label>
+          <input class="inp" id="adp_nachname${pi}" value="${esc(p.nachname || '')}"></div>
+      </div>
+      <div id="adpw${pi}">${(p.kontaktwege || []).map((w, wi) => `
+        <div class="kw-reihe">
+          <select class="inp" id="adpw_art${pi}_${wi}">${wegOptionen(w.art)}</select>
+          <input class="inp" id="adpw_wert${pi}_${wi}" value="${esc(w.wert)}" placeholder="Wert">
+          <button type="button" class="btn btn-quiet btn-sm" onclick="adPersonWegWeg(${pi}, ${wi})" aria-label="Weg entfernen">
+            <svg class="i i-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>`).join('')}</div>
+      <button type="button" class="btn btn-plain btn-sm" onclick="adPersonWegHinzu(${pi})">Weg hinzufügen</button>
+    </div>`).join('');
+}
+function adPersonenLesen() {
+  adPersonen = adPersonen.map((p, pi) => ({
+    anrede: (($('adp_anrede' + pi) || {}).value || '').trim(),
+    vorname: (($('adp_vorname' + pi) || {}).value || '').trim(),
+    nachname: (($('adp_nachname' + pi) || {}).value || '').trim(),
+    kontaktwege: (p.kontaktwege || []).map((w, wi) => ({
+      art: (($(`adpw_art${pi}_${wi}`) || {}).value) || w.art,
+      wert: ((($(`adpw_wert${pi}_${wi}`) || {}).value) || '').trim(),
+    })),
+  }));
+}
+function adPersonHinzu() {
+  adPersonenLesen();
+  adPersonen.push({ anrede: '', vorname: '', nachname: '', kontaktwege: [] });
+  adPersonenZeichnen();
+}
+function adPersonWeg(pi) { adPersonenLesen(); adPersonen.splice(pi, 1); adPersonenZeichnen(); }
+function adPersonWegHinzu(pi) {
+  adPersonenLesen();
+  adPersonen[pi].kontaktwege.push({ art: 'email', wert: '' });
+  adPersonenZeichnen();
+}
+function adPersonWegWeg(pi, wi) {
+  adPersonenLesen();
+  adPersonen[pi].kontaktwege.splice(wi, 1);
+  adPersonenZeichnen();
+}
+
+function adDlgOeffnen(id) {
+  const k = id ? adressen.find(x => Number(x.id) === Number(id)) : null;
+  adId = k ? Number(k.id) : null;
+  $('adDlgTitel').textContent = k ? 'Adresse ändern' : 'Adresse erfassen';
+  zeig($('adErr'), false);
+  const setz = (feld, wert) => { $('ad_' + feld).value = wert || ''; };
+  ['name', 'zusatzfeld', 'adresszusatz', 'strasse', 'hausnummer', 'plz', 'ort',
+   'uid', 'mwst_nr', 'notiz'].forEach(f => setz(f, k ? k[f] : ''));
+  $('ad_nummer').value = k ? (k.kundennummer || '–') : (adNaechsteNummer || 'wird beim Speichern vergeben');
+  adWege = k && k.kontaktwege ? k.kontaktwege.map(w => ({ art: w.art, wert: w.wert })) : [{ art: 'email', wert: '' }];
+  adPersonen = k && k.personen
+    ? k.personen.map(p => ({ anrede: p.anrede || '', vorname: p.vorname || '', nachname: p.nachname || '',
+                             kontaktwege: (p.kontaktwege || []).map(w => ({ art: w.art, wert: w.wert })) }))
+    : [];
+  adWegeZeichnen();
+  adPersonenZeichnen();
+  dlgAuf('dlgAdresse');
+  setTimeout(() => $('ad_name').focus(), 60);
+}
+
+async function adSpeichern() {
+  adWegeLesen();
+  adPersonenLesen();
+  const zeigeFehler = txt => { melde($('adErr'), 'fehler', txt); };
+  const name = ($('ad_name').value || '').trim();
+  if (!name) { zeigeFehler('Ein Firmenname ist erforderlich.'); return; }
+  if (!($('ad_plz').value || '').trim() || !($('ad_ort').value || '').trim()) {
+    zeigeFehler('PLZ und Ort sind erforderlich.'); return;
+  }
+  const koerper = {
+    id: adId || 0,
+    art: 'unternehmen',
+    name,
+    zusatzfeld: ($('ad_zusatzfeld').value || '').trim(),
+    adresszusatz: ($('ad_adresszusatz').value || '').trim(),
+    strasse: ($('ad_strasse').value || '').trim(),
+    hausnummer: ($('ad_hausnummer').value || '').trim(),
+    plz: ($('ad_plz').value || '').trim(),
+    ort: ($('ad_ort').value || '').trim(),
+    uid: ($('ad_uid').value || '').trim(),
+    mwst_nr: ($('ad_mwst_nr').value || '').trim(),
+    notiz: ($('ad_notiz').value || '').trim(),
+    kontaktwege: adWege.filter(w => w.wert),
+    personen: adPersonen.filter(p => p.vorname || p.nachname),
+  };
+  $('adSaveBtn').disabled = true;
+  const a = await ruf('betreiber_kunden_speichern.php', koerper);
+  $('adSaveBtn').disabled = false;
+  if (a.status !== 'ok') { zeigeFehler(a.message || 'Speichern fehlgeschlagen.'); return; }
+  dlgZu('dlgAdresse');
+  kurzmeldung(adId ? 'Adresse geändert.' : 'Adresse angelegt.');
+  const neuerId = Number(a.id);
+  const rueckruf = adNachAnlage;
+  adNachAnlage = null;
+  await ladeAdressen();
+  if (rueckruf) { rueckruf(neuerId); }
+}
+
+/* ── Leistungen ────────────────────────────────────────────────────── */
+let pdId = null;
+let pdOfferteZeile = null;   // Index der Position, die das neue Produkt uebernimmt
+
+function pdZeichnen() {
+  if (offertenBereit === false) { return; }
+  const q = ($('pdQ').value || '').toLowerCase().trim();
+  const d = produkte.filter(p => !q
+    || [p.name, p.nummer, p.beschreibung].some(f => String(f || '').toLowerCase().includes(q)));
+  if (!d.length) {
+    $('pdTable').innerHTML = produkte.length
+      ? LEER('Keine Treffer', 'Für diese Suche gibt es keine Leistung.')
+      : LEER('Noch keine Leistung',
+          'Leistungen sind Vorschlagswerte für Positionszeilen. Eine Offerte lässt sich '
+          + 'auch ohne sie schreiben — die Positionen tragen Text, Menge und Preis selbst.');
+    return;
+  }
+  $('pdTable').innerHTML = `<table><thead><tr>
+      <th>Nr.</th><th>Name</th><th>Beschreibung</th><th class="num">Preis</th>
+      <th>Einheit</th><th class="num">MWST</th><th class="num">Aktion</th>
+    </tr></thead><tbody>` + d.map(p => `
+      <tr class="click${Number(p.aktiv ?? 1) ? '' : ' aus'}" onclick="pdDlgOeffnen(${Number(p.id)})">
+        <td class="nowrap">${strich(p.nummer)}</td>
+        <td class="strong">${esc(p.name)}</td>
+        <td>${strich(p.beschreibung)}</td>
+        <td class="num nowrap">CHF ${chf(p.einzelpreis_rappen)}</td>
+        <td class="nowrap">${esc(p.einheit || '')}</td>
+        <td class="num nowrap">${bpText(p.mwst_satz_bp)} %</td>
+        <td class="num" onclick="event.stopPropagation()">
+          <button type="button" class="btn btn-quiet btn-sm" onclick="pdArchivKlick(${Number(p.id)}, ${Number(p.aktiv) ? 0 : 1})">
+            ${Number(p.aktiv) ? 'Archivieren' : 'Zurückholen'}
+          </button>
+        </td>
+      </tr>`).join('') + '</tbody></table>';
+}
+
+function pdDlgOeffnen(id) {
+  const p = id ? produkte.find(x => Number(x.id) === Number(id)) : null;
+  pdId = p ? Number(p.id) : null;
+  $('pdDlgTitel').textContent = p ? 'Leistung ändern' : 'Leistung anlegen';
+  zeig($('pdErr'), false);
+  $('pd_name').value = p ? p.name : '';
+  $('pd_beschreibung').value = p ? (p.beschreibung || '') : '';
+  $('pd_preis').value = rappenZuChf(p ? p.einzelpreis_rappen : 0);
+  $('pd_einheit').value = p ? (p.einheit || 'Std.') : 'Std.';
+  $('pd_sortierung').value = p ? (p.sortierung || 0) : 0;
+  $('pd_mwst').innerHTML = MWST_SAETZE.map(m =>
+    `<option value="${m.bp}"${Number(m.bp) === Number(p ? p.mwst_satz_bp : 810) ? ' selected' : ''}>${esc(m.text)}</option>`).join('');
+  dlgAuf('dlgLeistung');
+  setTimeout(() => $('pd_name').focus(), 60);
+}
+
+/* "Neue Leistung" aus einer Positionszeile heraus: dieselbe Maske, aber
+   das Ergebnis wandert sofort in genau diese Zeile -- statt dass man den
+   Namen danach noch einmal tippen muss. */
+function ofNeuesProduktAnlegen() {
+  ofPos.push(ofLeereZeile());
+  ofZeilenZeichnen();
+  pdOfferteZeile = ofPos.length - 1;
+  pdDlgOeffnen(null);
+}
+
+async function pdSpeichern() {
+  const name = ($('pd_name').value || '').trim();
+  if (!name) { melde($('pdErr'), 'fehler', 'Ein Name ist erforderlich.'); return; }
+  const koerper = {
+    id: pdId || 0,
+    name,
+    beschreibung: ($('pd_beschreibung').value || '').trim(),
+    einzelpreis_rappen: chfZuRappen($('pd_preis').value),
+    einheit: ($('pd_einheit').value || 'Std.').trim() || 'Std.',
+    mwst_satz_bp: Number($('pd_mwst').value) || 0,
+    sortierung: Number($('pd_sortierung').value) || 0,
+  };
+  $('pdSaveBtn').disabled = true;
+  const a = await ruf('betreiber_produkt_speichern.php', koerper);
+  $('pdSaveBtn').disabled = false;
+  if (a.status !== 'ok') { melde($('pdErr'), 'fehler', a.message || 'Speichern fehlgeschlagen.'); return; }
+  dlgZu('dlgLeistung');
+  kurzmeldung(pdId ? 'Leistung geändert.' : 'Leistung angelegt.');
+  const ziel = pdOfferteZeile;
+  pdOfferteZeile = null;
+  await ladeProdukte();
+  if (ziel !== null && ofPos[ziel]) { ofProduktUebernehmen(ziel, name); }
+}
+
+async function pdArchivKlick(id, aktiv) {
+  const a = await ruf('betreiber_produkt_archivieren.php', { id, aktiv });
+  if (a.status !== 'ok') { kurzmeldung(a.message || 'Fehlgeschlagen.'); return; }
+  kurzmeldung(aktiv ? 'Leistung zurückgeholt.' : 'Leistung archiviert.');
+  await ladeProdukte();
+}
+
+/* ── Briefkopf ─────────────────────────────────────────────────────── */
+let bkLogoNeu = null;    // data:-URL, solange nicht gespeichert
+let bkLogoWegSetzen = false;
+
+function bkFuellen() {
+  ['firma', 'absender', 'telefon', 'email', 'webseite', 'uid', 'iban'].forEach(f => {
+    const el = $('bk_' + f);
+    if (el) { el.value = briefkopf[f] || ''; }
+  });
+  $('bk_mwst').value = briefkopf.mwst_nr || '';
+  bkLogoNeu = null;
+  bkLogoWegSetzen = false;
+  bkLogoZeichnen(briefkopf.logo || null);
+}
+
+function bkLogoZeichnen(datenUrl) {
+  $('bkLogoVorschau').innerHTML = datenUrl
+    ? `<img src="${esc(datenUrl)}" alt="Logo" style="max-height:90px;max-width:220px;border:1px solid var(--line);border-radius:8px;padding:6px;background:#fff">`
+    : '<div class="sec">Kein Logo hinterlegt.</div>';
+}
+
+function bkLogoGewaehlt(feld) {
+  const datei = feld.files && feld.files[0];
+  if (!datei) { return; }
+  if (datei.size > 1000000) {
+    melde($('bkMeldung'), 'fehler', 'Das Logo ist zu gross (höchstens rund 1 MB).');
+    feld.value = '';
+    return;
+  }
+  const leser = new FileReader();
+  leser.onload = () => {
+    bkLogoNeu = String(leser.result || '');
+    bkLogoWegSetzen = false;
+    bkLogoZeichnen(bkLogoNeu);
+    stumm($('bkMeldung'));
+  };
+  leser.readAsDataURL(datei);
+}
+
+function bkLogoWeg() {
+  bkLogoNeu = null;
+  bkLogoWegSetzen = true;
+  $('bk_logo').value = '';
+  bkLogoZeichnen(null);
+}
+
+async function bkSpeichern() {
+  const koerper = {
+    firma: ($('bk_firma').value || '').trim(),
+    absender: ($('bk_absender').value || '').trim(),
+    telefon: ($('bk_telefon').value || '').trim(),
+    email: ($('bk_email').value || '').trim(),
+    webseite: ($('bk_webseite').value || '').trim(),
+    uid: ($('bk_uid').value || '').trim(),
+    mwst_nr: ($('bk_mwst').value || '').trim(),
+    iban: ($('bk_iban').value || '').trim(),
+  };
+  if (bkLogoNeu) { koerper.logo = bkLogoNeu; }
+  if (bkLogoWegSetzen) { koerper.logo_weg = true; }
+  $('bkSaveBtn').disabled = true;
+  const a = await ruf('betreiber_briefkopf.php', koerper);
+  $('bkSaveBtn').disabled = false;
+  if (a.status !== 'ok') { melde($('bkMeldung'), 'fehler', a.message || 'Speichern fehlgeschlagen.'); return; }
+  briefkopf = a.briefkopf || briefkopf;
+  bkFuellen();
+  melde($('bkMeldung'), 'gut', 'Briefkopf gespeichert.');
+}
+
+/* Der Absenderblock auf dem Blatt: die Anschrift, sonst wenigstens die
+   Firma. Steht beides nicht da, bleibt der Platz leer statt mit einem
+   erfundenen Namen gefuellt. */
+function bkAbsenderZeilen() {
+  const zeilen = String(briefkopf.absender || '').split('\n').map(z => z.trim()).filter(Boolean);
+  if (zeilen.length) { return zeilen.slice(0, 5); }
+  const firma = String(briefkopf.firma || '').trim();
+  return firma ? [firma] : [];
+}
+
+/* Fusszeile am unteren Blattrand. Leere Felder erscheinen nicht -- "UID:"
+   ohne Nummer waere eine leere Behauptung. */
+function bkFusszeile() {
+  const kontakt = ['telefon', 'email', 'webseite']
+    .map(f => String(briefkopf[f] || '').trim()).filter(Boolean).join(' · ');
+  const kennung = [['UID', 'uid'], ['MWST-Nr.', 'mwst_nr'], ['IBAN', 'iban']]
+    .map(([l, f]) => String(briefkopf[f] || '').trim() ? l + ' ' + String(briefkopf[f]).trim() : '')
+    .filter(Boolean).join(' · ');
+  if (!kontakt && !kennung) { return ''; }
+  return `<div style="margin-top:30px;padding-top:10px;border-top:1px solid #E5E8EC;
+      display:flex;align-items:center;justify-content:space-between;gap:32px;
+      font-size:10.5px;color:#6B7280;line-height:1.5">
+      <div>${esc(kontakt)}</div><div>${esc(kennung)}</div></div>`;
+}
+
+/* ── Offertenliste ─────────────────────────────────────────────────── */
+function ofHauptTab(t) {
+  ['liste', 'leistungen', 'briefkopf'].forEach(k => {
+    zeig($('ofv-' + k), k === t);
+    $('oftab-' + k).classList.toggle('on', k === t);
+  });
+}
+
+function ofArchivGo(t) {
+  ofArchivTab = t;
+  document.querySelectorAll('#ofArchivTabs .tab').forEach(b => b.classList.remove('on'));
+  $('ofatab-' + t).classList.add('on');
+  renderOfferten();
+}
+
+function ofTh(feld, label, num) {
+  const aktiv = ofSortFeld === feld;
+  const pfeil = aktiv && ofSortRichtung === 'ab' ? '▼' : '▲';
+  return `<th class="sortbar${aktiv ? ' aktiv' : ''}${num ? ' num' : ''}" onclick="ofSort('${feld}')">${esc(label)}<span class="pf">${pfeil}</span></th>`;
+}
+function ofSort(feld) {
+  ofSortRichtung = (ofSortFeld === feld && ofSortRichtung === 'auf') ? 'ab' : 'auf';
+  ofSortFeld = feld;
+  renderOfferten();
+}
+
+/* Der Umschalter am Handy setzt ausdruecklich AUCH das Sortierfeld: Am
+   Desktop kann zuletzt nach Titel oder Summe sortiert worden sein, und
+   beide Ansichten teilen sich dieselbe Zustandsvariable. */
+function ofSortDatumUm() {
+  ofSortRichtung = (ofSortFeld === 'datum' && ofSortRichtung === 'ab') ? 'auf' : 'ab';
+  ofSortFeld = 'datum';
+  renderOfferten();
+}
+
+function ofKarteUm(id) {
+  const k = Number(id);
+  if (ofOffen.has(k)) { ofOffen.delete(k); } else { ofOffen.add(k); }
+  renderOfferten();
+}
+
+/* Der Empfaenger steht nicht am Beleg, sondern kommt aus dem Adressbuch --
+   die Liste zeigt darum den heutigen Namen. Faellt die Adresse weg, bleibt
+   die Offerte bestehen, und hier steht ein Hinweis statt eines leeren
+   Feldes, das wie ein Fehler aussaehe. */
+function ofEmpfaenger(b) {
+  if (b.kunde_name) { return String(b.kunde_name); }
+  return b.kunde_id ? '(Adresse entfernt)' : '';
+}
+
+function ofKarte(b, heute) {
+  const id = Number(b.id);
+  const offen = ofOffen.has(id);
+  const si = ofStatusInfo(b.status);
+  /* Abgelaufen heisst nicht abgelehnt -- und bei einer bestaetigten oder
+     abgelehnten Offerte ist das Datum belanglos. */
+  const abgelaufen = !leeresDatum(b.gueltig_bis) && String(b.gueltig_bis) < heute
+    && b.status !== 'bestaetigt' && b.status !== 'abgelehnt';
+  const empf = ofEmpfaenger(b);
+  const zeilen = [
+    ['Nummer', esc(b.nummer)],
+    ['Referenz', strich(b.referenz)],
+    ['Titel', b.titel ? esc(b.titel) : '<span style="color:var(--ink-3)">ohne Titel</span>'],
+    ['Empfänger', empf ? esc(empf) : '<span style="color:var(--ink-3)">–</span>'],
+    ['Offertendatum', dmy(b.datum)],
+    ['Offertensumme', '<strong>CHF ' + chf(b.total_rappen) + '</strong>'],
+    ['Gültig bis', dmy(b.gueltig_bis) + (abgelaufen
+      ? ' <span style="color:var(--warn)">· abgelaufen</span>' : '')],
+  ];
+  const koerper = offen ? `
+    <div>
+      <dl>${zeilen.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
+      <div class="kk-tasten">
+        <button type="button" class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofHerunterladen(${id}, this)">Herunterladen</button>
+        <button type="button" class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofTeilen(${id}, this)">Teilen</button>
+        <button type="button" class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofVorschau(${id})">Vorschau</button>
+        <button type="button" class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofOeffnen(${id})">Bearbeiten</button>
+        <button type="button" class="btn btn-plain btn-sm" onclick="event.stopPropagation(); ofDrucken(${id})">Drucken</button>
+        <div class="sp" style="flex:1"></div>
+        <button type="button" class="btn btn-quiet btn-sm rowmenu-btn" onclick="ofMenuOeffnen(event, ${id})" aria-label="Weitere Aktionen">
+          <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+        </button>
+      </div>
+    </div>` : '';
+  return `<div class="of-karte" tabindex="0" role="button" aria-expanded="${offen ? 'true' : 'false'}"
+      onclick="ofKarteUm(${id})"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();ofKarteUm(${id});}">
+      <div class="kopf">
+        <b>${dmy(b.datum)}</b>
+        <span class="chip ${si.chip}">${esc(si.text)}</span>
+        <div class="sp"></div>
+        <svg class="kk-pfeil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="wer">${esc(b.nummer)}${b.titel ? ' · ' + esc(b.titel) : ''}</div>
+      <div class="zeiten">${empf ? esc(empf) : '–'} · <b>CHF ${chf(b.total_rappen)}</b></div>
+      ${abgelaufen && !offen ? '<div style="margin-top:6px"><span class="chip chip-w">abgelaufen</span></div>' : ''}
+      ${koerper}
+    </div>`;
+}
+
+function renderOfferten() {
+  if (offertenBereit === false) { return; }
+  const q = ($('ofQ').value || '').toLowerCase().trim();
+  const statusFilter = $('ofStatus').value || '';
+  const wollAktiv = ofArchivTab === 'alle' ? 1 : 0;
+  const d = belege.filter(b => Number(b.aktiv ?? 1) === wollAktiv
+    && (!statusFilter || b.status === statusFilter)
+    && (!q || [b.nummer, b.titel, b.referenz, ofEmpfaenger(b), b.kundennummer]
+        .some(f => String(f || '').toLowerCase().includes(q))));
+
+  /* Betraege numerisch vergleichen, nicht als Text: "1'048.55" gegen
+     "952.00" als Zeichenkette sortiert falsch, und zwar unauffaellig
+     falsch. */
+  d.sort((a, b) => {
+    let c;
+    if (ofSortFeld === 'total_rappen') {
+      c = (Number(a.total_rappen) || 0) - (Number(b.total_rappen) || 0);
+    } else if (ofSortFeld === 'empfaenger') {
+      c = ofEmpfaenger(a).localeCompare(ofEmpfaenger(b), 'de', { sensitivity: 'base' });
+    } else {
+      c = String(a[ofSortFeld] ?? '').localeCompare(String(b[ofSortFeld] ?? ''), 'de',
+        { numeric: true, sensitivity: 'base' });
+    }
+    return ofSortRichtung === 'auf' ? c : -c;
+  });
+
+  /* Der Umschalter sagt, wonach TATSAECHLICH sortiert ist -- "Neueste
+     zuerst" bei einer Sortierung nach Titel waere schlicht falsch. */
+  const sortBtn = $('ofSortBtn');
+  if (sortBtn) {
+    const lbl = sortBtn.querySelector('.lbl');
+    if (lbl) {
+      lbl.textContent = ofSortFeld !== 'datum' ? 'Nach Datum sortieren'
+        : (ofSortRichtung === 'ab' ? 'Neueste zuerst' : 'Älteste zuerst');
+    }
+  }
+
+  /* Der Statusfilter wird aus den TATSAECHLICH vorhandenen Status gefuellt:
+     Ein Filter, der auf nichts zeigt, ist eine Sackgasse mit Ankuendigung. */
+  const vorhanden = new Set(belege.map(b => b.status));
+  const gewaehlt = $('ofStatus').value;
+  $('ofStatus').innerHTML = '<option value="">Alle Status</option>'
+    + OF_STATUS.filter(s => vorhanden.has(s.wert)).map(s =>
+        `<option value="${s.wert}"${s.wert === gewaehlt ? ' selected' : ''}>${esc(s.text)}</option>`).join('');
+
+  if (!d.length) {
+    /* "Kein Treffer" und "nichts vorhanden" sind verschiedene Aussagen --
+       ein Filter, der alles ausblendet, darf nie wie ein leerer Bestand
+       aussehen. */
+    const gefiltert = q || statusFilter;
+    $('ofTable').innerHTML = belege.length
+      ? LEER('Keine Treffer', gefiltert
+          ? 'Für diese Suche gibt es keine Offerte. Suchbegriff oder Status zurücksetzen.'
+          : 'Hier stehen keine archivierten Offerten.')
+      : LEER('Noch keine Offerten', 'Über „Offerte erstellen“ oben rechts die erste anlegen.');
+    return;
+  }
+
+  const heute = isoTag();
+  /* Handy: dieselben Offerten als aufklappbare Karten, Desktop die Tabelle
+     -- beide aus demselben sortierten d[]. */
+  $('ofTable').innerHTML = `<div class="nur-schmal" style="padding:12px">${d.map(b => ofKarte(b, heute)).join('')}</div>`
+    + `<table class="nur-breit"><thead><tr>
+      ${ofTh('status', 'Status')}${ofTh('nummer', 'Nr.')}${ofTh('referenz', 'Referenz')}
+      ${ofTh('titel', 'Titel')}${ofTh('empfaenger', 'Empfänger')}
+      ${ofTh('datum', 'Offertendatum')}${ofTh('total_rappen', 'Offertensumme', true)}
+      ${ofTh('gueltig_bis', 'Gültig bis')}<th class="num">Aktion</th>
+    </tr></thead><tbody>` + d.map(b => {
+      const si = ofStatusInfo(b.status);
+      const abgelaufen = !leeresDatum(b.gueltig_bis) && String(b.gueltig_bis) < heute
+        && b.status !== 'bestaetigt' && b.status !== 'abgelehnt';
+      return `
+      <tr class="click" onclick="ofOeffnen(${Number(b.id)})">
+        <td><span class="chip ${si.chip}">${esc(si.text)}</span></td>
+        <td class="strong nowrap">${esc(b.nummer)}</td>
+        <td class="nowrap">${strich(b.referenz)}</td>
+        <td>${b.titel ? esc(b.titel) : '<span style="color:var(--ink-3)">ohne Titel</span>'}</td>
+        <td>${ofEmpfaenger(b) ? esc(ofEmpfaenger(b)) : '<span style="color:var(--ink-3)">–</span>'}
+            ${b.kundennummer ? `<div class="sec">${esc(b.kundennummer)}</div>` : ''}</td>
+        <td class="nowrap">${dmy(b.datum)}</td>
+        <td class="num nowrap strong">CHF ${chf(b.total_rappen)}</td>
+        <td class="nowrap">${dmy(b.gueltig_bis)}
+            ${abgelaufen ? '<div class="sec" style="color:var(--warn)">abgelaufen</div>' : ''}</td>
+        <td class="num" onclick="event.stopPropagation()">
+          <button type="button" class="btn btn-quiet btn-sm rowmenu-btn" onclick="ofMenuOeffnen(event, ${Number(b.id)})" aria-label="Aktionen">
+            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+          </button>
+        </td>
+      </tr>`;
+    }).join('') + '</tbody></table>';
+}
+
+/* ── Zeilenmenue ───────────────────────────────────────────────────── */
+/* EINE Positionierung fuer Liste und Formular, damit beide dieselbe
+   Kante-oben/Kante-unten-Logik haben und nicht zwei Kopien davon. */
+function menuPositionieren(ev, hoeheGeschaetzt) {
+  const pop = $('rowmenuPop');
+  const r = ev.currentTarget.getBoundingClientRect();
+  const breite = 230;
+  pop.style.left = Math.max(8, r.right - breite) + 'px';
+  /* Nach unten oeffnen, ausser es waere unten kein Platz -- ein Menue, das
+     aus dem Fenster ragt, laesst sich nicht bedienen. */
+  const nachOben = r.bottom + hoeheGeschaetzt > window.innerHeight && r.top > hoeheGeschaetzt;
+  pop.style.top = (nachOben ? Math.max(8, r.top - hoeheGeschaetzt) : r.bottom + 4) + 'px';
+}
+function menuSchliessen() {
+  const pop = $('rowmenuPop');
+  pop.classList.remove('on');
+  delete pop.dataset.wer;
+}
+
+function ofMenuOeffnen(ev, id) {
+  ev.stopPropagation();
+  const b = belege.find(x => Number(x.id) === Number(id));
+  if (!b) { return; }
+  const pop = $('rowmenuPop');
+  if (pop.classList.contains('on') && pop.dataset.wer === 'of' + id) { menuSchliessen(); return; }
+  /* Der aktuelle Status steht nicht als Knopf da -- ihn auf sich selbst zu
+     setzen ist keine Handlung. */
+  const statusKnoepfe = OF_STATUS.filter(s => s.wert !== b.status).map(s =>
+    `<button type="button" onclick="menuSchliessen(); ofStatusSetzen(${id}, '${s.wert}')">Als „${esc(s.text)}" markieren</button>`).join('');
+  pop.innerHTML = `
+    <button type="button" onclick="menuSchliessen(); ofOeffnen(${id})">Bearbeiten</button>
+    <button type="button" onclick="menuSchliessen(); ofDrucken(${id})">Drucken</button>
+    <hr>
+    ${statusKnoepfe}
+    <hr>
+    <button type="button" onclick="menuSchliessen(); ofDuplizieren(${id}, 0)">Duplizieren</button>
+    <button type="button" onclick="menuSchliessen(); ofDuplizieren(${id}, 1)">In Vorlage umwandeln</button>
+    <hr>
+    <button type="button" onclick="menuSchliessen(); ofArchivKlick(${id}, ${Number(b.aktiv) ? 0 : 1})">${Number(b.aktiv) ? 'Archivieren' : 'Zurückholen'}</button>`;
+  pop.dataset.wer = 'of' + id;
+  pop.classList.add('on');
+  menuPositionieren(ev, 300);
+}
+
+/* Dasselbe Menue, aber IM Formular -- spart den Umweg ueber "zurueck zur
+   Liste", nur um den Status zu aendern oder zu versenden. */
+function ofFormMenuOeffnen(ev) {
+  ev.stopPropagation();
+  const pop = $('rowmenuPop');
+  if (pop.classList.contains('on') && pop.dataset.wer === 'form') { menuSchliessen(); return; }
+  const id = ofFormId;
+  const statusKnoepfe = OF_STATUS.filter(s => s.wert !== ofFormStatus).map(s =>
+    `<button type="button" onclick="menuSchliessen(); ofStatusSetzen(${id}, '${s.wert}')">Als „${esc(s.text)}" markieren</button>`).join('');
+  pop.innerHTML = `
+    <button type="button" onclick="menuSchliessen(); ofVersenden(${id})">Per E-Mail versenden</button>
+    <button type="button" onclick="menuSchliessen(); ofTeilen(${id}, null)">Teilen</button>
+    <hr>
+    ${statusKnoepfe}
+    <hr>
+    <button type="button" onclick="menuSchliessen(); ofDuplizieren(${id}, 0)">Duplizieren</button>
+    <button type="button" onclick="menuSchliessen(); ofDuplizieren(${id}, 1)">In Vorlage umwandeln</button>
+    <hr>
+    <button type="button" onclick="menuSchliessen(); ofArchivKlick(${id}, ${ofFormAktiv ? 0 : 1})">${ofFormAktiv ? 'Archivieren' : 'Zurückholen'}</button>`;
+  pop.dataset.wer = 'form';
+  pop.classList.add('on');
+  menuPositionieren(ev, 320);
+}
+
+async function ofStatusSetzen(id, neu) {
+  const a = await ruf('betreiber_beleg_status.php', { id, neuer_status: neu });
+  if (a.status !== 'ok') { kurzmeldung(a.message || 'Fehlgeschlagen.'); return; }
+  kurzmeldung('Status: ' + ofStatusInfo(neu).text);
+  /* Ist gerade dieser Beleg im Formular offen, muss auch dessen Anzeige
+     nachziehen -- sonst zeigt das Formular nach einer Aenderung ueber sein
+     eigenes Menue kurzzeitig den alten Status. */
+  if (ofFormId === Number(id)) { ofFormStatus = neu; ofFormSubZeichnen(); }
+  await ladeBelege();
+}
+
+async function ofArchivKlick(id, aktiv) {
+  const a = await ruf('betreiber_beleg_archivieren.php', { id, aktiv });
+  if (a.status !== 'ok') { kurzmeldung(a.message || 'Fehlgeschlagen.'); return; }
+  kurzmeldung(aktiv ? 'Offerte zurückgeholt.' : 'Offerte archiviert.');
+  if (ofFormId === Number(id)) { ofFormAktiv = Number(aktiv); ofFormSubZeichnen(); }
+  await ladeBelege();
+}
+
+async function ofDuplizieren(id, alsVorlage) {
+  const a = await ruf('betreiber_beleg_duplizieren.php', { id, als_vorlage: alsVorlage });
+  if (a.status !== 'ok') { kurzmeldung(a.message || 'Fehlgeschlagen.'); return; }
+  kurzmeldung(alsVorlage ? 'Als Vorlage gespeichert.' : 'Kopie angelegt: ' + (a.nummer || ''));
+  await ladeBelege();
+}
+
+/* ── Offertformular ────────────────────────────────────────────────── */
+/* ofPos[] ist der Arbeitsstand der Positionen. Bewusst NICHT direkt aus den
+   Eingabefeldern gelesen, wenn gerechnet wird: Ein Feld, in dem gerade
+   getippt wird, kann "4," enthalten -- gueltig als Zwischenschritt,
+   unbrauchbar als Zahl. */
+let ofFormId = null;      // null = neue Offerte
+let ofPos = [];
+let ofFormKundeId = null;
+/* Status und Aktiv-Merker stehen nicht als sichtbares Feld im Formular (sie
+   werden ueber das Dreipunkt-Menue geaendert), muessen beim Speichern aber
+   mitgeschickt werden -- sonst wuerde jedes Bearbeiten eine versendete
+   Offerte still auf "Entwurf" zuruecksetzen. */
+let ofFormStatus = 'entwurf';
+let ofFormAktiv = 1;
+/* Nur die EINGABE-Einheit des Gesamtrabatts. Gespeichert wird immer in
+   Basispunkten -- siehe ofRabattBp(). */
+let ofRabattEinheit = 'pct';
+const OF_GUELTIG_TAGE = 30;
+
+function ofFormularZeigen(an) {
+  zeig($('of-formular'), an);
+  zeig($('of-rahmen'), !an);
+}
+
+function ofZurueck() {
+  ofFormularZeigen(false);
+  ofHauptTab('liste');
+}
+
+function ofLeereZeile() {
+  return { produkt_id: null, produkt_name: '', beschreibung: '', menge: 1,
+           einheit: 'Std.', einzelpreis_rappen: 0, rabatt_bp: 0, mwst_satz_bp: 810 };
+}
+
+/* Ein Datum um n Tage verschieben, ohne Bibliothek und ohne Zeitzonenfalle:
+   ueber den Mittag gerechnet, damit die Sommerzeitumstellung nicht einen
+   Tag verschluckt. */
+function ofTagePlus(iso, tage) {
+  const d = new Date(iso + 'T12:00:00');
+  d.setDate(d.getDate() + tage);
+  return d.toISOString().slice(0, 10);
+}
+
+/* Verschiebt "gueltig bis" mit, solange der bisherige Abstand dem Standard
+   entspricht. Wer das Feld von Hand gesetzt hat, behaelt seinen Wert -- ein
+   Datum, das sich unter der Hand aendert, ist schlimmer als eines, das
+   stehenbleibt. */
+function ofGueltigNachziehen() {
+  const datum = $('of_datum').value;
+  const bis = $('of_gueltig').value;
+  if (!datum) { return; }
+  if (!bis) { $('of_gueltig').value = ofTagePlus(datum, OF_GUELTIG_TAGE); return; }
+  const alt = $('of_datum').dataset.vorher;
+  if (alt && bis === ofTagePlus(alt, OF_GUELTIG_TAGE)) {
+    $('of_gueltig').value = ofTagePlus(datum, OF_GUELTIG_TAGE);
+  }
+  $('of_datum').dataset.vorher = datum;
+}
+
+/* Ausgehend vom Offertendatum, nicht von heute: Eine Offerte mit
+   rueckdatiertem Erstelldatum soll trotzdem die richtige Frist bekommen. */
+function ofGueltigSetzen(tage) {
+  $('of_gueltig').value = ofTagePlus($('of_datum').value || isoTag(), tage);
+}
+
+function ofFormSubZeichnen() {
+  $('ofFormSub').textContent = ofStatusInfo(ofFormStatus).text + (ofFormAktiv ? '' : ' · archiviert');
+}
+
+/* Die Ansprechpersonen des gewaehlten Betriebs. Wechselt der Empfaenger,
+   wird die Auswahl geleert -- eine Person, die zu einem anderen Betrieb
+   gehoert, waere auf dem Beleg schlicht falsch. */
+function ofPersonenFuellen(personId) {
+  const k = adressen.find(x => Number(x.id) === Number(ofFormKundeId));
+  const personen = (k && k.personen) || [];
+  $('of_person').innerHTML = '<option value="">– keine –</option>' + personen.map(p => {
+    const name = [p.anrede, p.vorname, p.nachname].filter(Boolean).join(' ');
+    const email = (p.kontaktwege || []).find(w => w.art === 'email' && w.wert);
+    return `<option value="${Number(p.id)}"${Number(p.id) === Number(personId) ? ' selected' : ''}>${esc(email ? `${name} (${email.wert})` : name)}</option>`;
+  }).join('');
+  $('of_person').disabled = personen.length === 0;
+}
+
+function ofKundeGewaehlt() {
+  const name = ($('of_kunde').value || '').trim();
+  const k = adressen.find(x => String(x.name) === name);
+  const vorher = ofFormKundeId;
+  ofFormKundeId = k ? Number(k.id) : null;
+  if (ofFormKundeId !== vorher) { ofPersonenFuellen(null); }
+}
+
+/* "Neue Adresse erstellen" direkt aus dem Formular: derselbe Dialog wie im
+   Adressbereich, der neu angelegte Betrieb wird aber sofort als Empfaenger
+   gesetzt, statt ihn erneut suchen zu lassen. */
+function ofNeueAdresse() {
+  adNachAnlage = neuerId => {
+    const k = adressen.find(x => Number(x.id) === Number(neuerId));
+    if (!k) { return; }
+    $('of_kunde').value = k.name;
+    ofFormKundeId = Number(k.id);
+    ofPersonenFuellen(null);
+  };
+  adDlgOeffnen(null);
+}
+
+function ofNeu() {
+  ofFormId = null;
+  ofPos = [ofLeereZeile()];
+  ofFormKundeId = null;
+  ofFormStatus = 'entwurf';
+  ofFormAktiv = 1;
+  const heute = isoTag();
+  $('ofFormNummer').textContent = ofNaechsteNummer || 'Neue Offerte';
+  $('ofFormSub').textContent = 'Entwurf · noch nicht gespeichert';
+  zeig($('ofFormErr'), false);
+  ['of_kunde', 'of_titel', 'of_referenz', 'of_bemerkung', 'of_notizen',
+   'of_bedingungen', 'of_fusszeile'].forEach(f => { $(f).value = ''; });
+  $('of_unterschriftsseite').checked = false;
+  $('of_nummer').value = ofNaechsteNummer || 'wird beim Speichern vergeben';
+  ofRabattEinheit = 'pct';
+  $('of_rabatt_pct').classList.add('on');
+  $('of_rabatt_chf').classList.remove('on');
+  $('of_rabatt').value = '0';
+  $('of_datum').value = heute;
+  $('of_datum').dataset.vorher = heute;
+  $('of_gueltig').value = ofTagePlus(heute, OF_GUELTIG_TAGE);
+  ofPersonenFuellen(null);
+  /* Vorschau, Drucken, Herunterladen und das Dreipunkt-Menue ergeben vor
+     dem ersten Speichern keinen Sinn -- es gibt noch keinen Beleg, den der
+     Server ausliefern koennte. */
+  ['ofFormVorschauBtn', 'ofFormDruckBtn', 'ofFormLadenBtn', 'ofFormMenuBtn']
+    .forEach(b => { $(b).style.display = 'none'; });
+  ofZeilenZeichnen();
+  ofFormularZeigen(true);
+  setTimeout(() => $('of_kunde').focus(), 60);
+}
+
+/* Aus der Liste heraus. Leistungen und Adressen muessen da sein, bevor das
+   Formular erscheint -- sonst steht die Vervollstaendigung der ersten
+   Positionszeile leer da, und man haelt sie fuer ein Freitextfeld. */
+async function ofNeuStarten() {
+  if (!produkte.length) { await ladeProdukte(); }
+  if (!adressen.length) { await ladeAdressen(); }
+  ofNeu();
+}
+
+/* Eine neue Offerte mit bereits gesetztem Empfaenger -- aus dem Zeilenmenue
+   des Adressbuchs. Spart den Schritt, den Betrieb noch einmal zu suchen,
+   den man gerade angeklickt hat. */
+async function ofNeuFuerAdresse(kundeId) {
+  if (!produkte.length) { await ladeProdukte(); }
+  bereichZeigen('offerten');
+  ofNeu();
+  const k = adressen.find(x => Number(x.id) === Number(kundeId));
+  if (k) {
+    $('of_kunde').value = k.name;
+    ofFormKundeId = Number(k.id);
+    ofPersonenFuellen(null);
+    setTimeout(() => $('of_titel').focus(), 60);
+  }
+}
+
+/* ── Positionszeilen ───────────────────────────────────────────────── */
+function ofZeilenZeichnen() {
+  $('ofPositionen').innerHTML = ofPos.length
+    ? ofPos.map((p, i) => ofZeileHtml(p, i)).join('')
+    : `<div style="padding:22px 18px;color:var(--ink-3);font-size:13px">
+         Noch keine Position. Über „Position hinzufügen“ die erste anlegen.</div>`;
+  ofSummenZeichnen();
+}
+
+function ofZeileHtml(p, i) {
+  const s = belegSummen([p], 0);
+  return `<div class="of-pos">
+    <div class="of-pos-kopf">
+      <div class="f"><label for="ofp_name${i}">Leistung</label>
+        <input class="inp" id="ofp_name${i}" list="dlProdukte" value="${esc(p.produkt_name)}"
+               oninput="ofZeileFeld(${i}, 'produkt_name', this.value)"
+               onchange="ofProduktUebernehmen(${i}, this.value)"></div>
+      <div class="f"><label for="ofp_menge${i}">Menge</label>
+        <input class="inp num" id="ofp_menge${i}" inputmode="decimal" value="${esc(String(p.menge))}"
+               oninput="ofZeileFeld(${i}, 'menge', this.value)"></div>
+      <div class="f"><label for="ofp_einheit${i}">Einheit</label>
+        <input class="inp" id="ofp_einheit${i}" list="dlEinheiten" value="${esc(p.einheit)}"
+               oninput="ofZeileFeld(${i}, 'einheit', this.value)"></div>
+      <div class="f"><label for="ofp_preis${i}">Einzelpreis</label>
+        <input class="inp num" id="ofp_preis${i}" inputmode="decimal" value="${rappenZuChf(p.einzelpreis_rappen)}"
+               oninput="ofZeileFeld(${i}, 'einzelpreis_rappen', this.value)"></div>
+      <div class="f"><label for="ofp_rabatt${i}">Rabatt %</label>
+        <input class="inp num" id="ofp_rabatt${i}" inputmode="decimal" value="${bpText(p.rabatt_bp)}"
+               oninput="ofZeileFeld(${i}, 'rabatt_bp', this.value)"></div>
+      <div class="f"><label for="ofp_mwst${i}">MWST</label>
+        <select class="inp" id="ofp_mwst${i}" onchange="ofZeileFeld(${i}, 'mwst_satz_bp', this.value)">
+          ${MWST_SAETZE.map(m => `<option value="${m.bp}"${Number(m.bp) === Number(p.mwst_satz_bp) ? ' selected' : ''}>${esc(m.text.split(' ')[0])}</option>`).join('')}
+        </select></div>
+      <div class="of-pos-weg">
+        <button type="button" class="btn btn-quiet btn-sm" onclick="ofZeileWeg(${i})" title="Position entfernen" aria-label="Position entfernen">
+          <svg class="i i-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <textarea class="inp" id="ofp_text${i}" rows="2" placeholder="Beschreibung — erscheint so auf dem Dokument"
+              oninput="ofZeileFeld(${i}, 'beschreibung', this.value)">${esc(p.beschreibung)}</textarea>
+    <div class="of-pos-summe" id="ofp_summe${i}">CHF ${chf(s.zwischensumme_rappen)}</div>
+  </div>`;
+}
+
+/* Ein Feld hat sich geaendert. Nur der Wert wandert ins Array, die Zeile
+   wird NICHT neu gezeichnet -- ein Neuzeichnen waehrend des Tippens setzte
+   den Cursor an den Anfang zurueck. */
+function ofZeileFeld(i, feld, wert) {
+  if (!ofPos[i]) { return; }
+  if (feld === 'einzelpreis_rappen') { ofPos[i][feld] = chfZuRappen(wert); }
+  else if (feld === 'menge') {
+    const n = parseFloat(String(wert).replace(',', '.'));
+    ofPos[i][feld] = Number.isFinite(n) ? n : 0;
+  } else if (feld === 'rabatt_bp' || feld === 'mwst_satz_bp') {
+    const n = parseFloat(String(wert).replace(',', '.'));
+    /* Prozent zu Basispunkten -- beim MWST-Satz kommt der Wert schon als
+       Basispunkt aus dem Auswahlfeld, beim Rabatt als Prozentzahl. */
+    ofPos[i][feld] = feld === 'mwst_satz_bp'
+      ? (Number.isFinite(n) ? Math.round(n) : 0)
+      : (Number.isFinite(n) ? Math.max(0, Math.min(10000, Math.round(n * 100))) : 0);
+  } else { ofPos[i][feld] = wert; }
+
+  const z = belegSummen([ofPos[i]], 0);
+  const zelle = $('ofp_summe' + i);
+  if (zelle) { zelle.textContent = 'CHF ' + chf(z.zwischensumme_rappen); }
+  ofSummenZeichnen();
+}
+
+/* Eine Leistung aus den Stammdaten in die Zeile uebernehmen. Nur bei
+   GENAUER Namensuebereinstimmung, und nur Felder, die noch leer sind bzw.
+   auf dem Standard stehen -- wer den Preis schon von Hand gesetzt hat, soll
+   ihn nicht durch die Auswahl verlieren. */
+function ofProduktUebernehmen(i, name) {
+  const p = produkte.find(x => Number(x.aktiv ?? 1) === 1 && String(x.name) === String(name).trim());
+  if (!p || !ofPos[i]) { return; }
+  const z = ofPos[i];
+  z.produkt_id = Number(p.id);
+  z.produkt_name = p.name;
+  if (!z.beschreibung) { z.beschreibung = p.beschreibung || ''; }
+  if (!z.einzelpreis_rappen) { z.einzelpreis_rappen = Number(p.einzelpreis_rappen) || 0; }
+  if (!z.einheit || z.einheit === 'Std.') { z.einheit = p.einheit || 'Std.'; }
+  z.mwst_satz_bp = Number(p.mwst_satz_bp) || 0;
+  /* Die Felder DIESER Zeile einzeln nachziehen statt die ganze Liste neu zu
+     zeichnen: Das Ereignis kommt aus 'change', also beim Verlassen des
+     Feldes -- ein Neuzeichnen loeschte genau das Element, das den Wechsel
+     gerade ausloest. */
+  const setz = (id, wert) => { const f = $(id); if (f) { f.value = wert; } };
+  setz('ofp_name' + i, z.produkt_name);
+  setz('ofp_text' + i, z.beschreibung);
+  setz('ofp_preis' + i, rappenZuChf(z.einzelpreis_rappen));
+  setz('ofp_einheit' + i, z.einheit);
+  setz('ofp_mwst' + i, String(z.mwst_satz_bp));
+  const zs = belegSummen([z], 0);
+  const zelle = $('ofp_summe' + i);
+  if (zelle) { zelle.textContent = 'CHF ' + chf(zs.zwischensumme_rappen); }
+  ofSummenZeichnen();
+}
+
+function ofZeileHinzu() {
+  ofPos.push(ofLeereZeile());
+  ofZeilenZeichnen();
+  setTimeout(() => { const f = $('ofp_name' + (ofPos.length - 1)); if (f) { f.focus(); } }, 40);
+}
+function ofZeileWeg(i) {
+  ofPos.splice(i, 1);
+  ofZeilenZeichnen();
+}
+
+/* ── Gesamtrabatt: Eingabeeinheit %/CHF ────────────────────────────── */
+/* Gespeichert wird IMMER in Basispunkten -- eine CHF-Eingabe ist nur ein
+   zweiter Weg, denselben %-Wert zu treffen, umgerechnet gegen die aktuelle
+   Zwischensumme. */
+function ofRabattBp() {
+  const roh = parseFloat(String($('of_rabatt').value || '0').replace(',', '.'));
+  if (!Number.isFinite(roh) || roh <= 0) { return 0; }
+  if (ofRabattEinheit === 'pct') {
+    return Math.max(0, Math.min(10000, Math.round(roh * 100)));
+  }
+  const zwischenRappen = belegSummen(ofPos, 0).zwischensumme_rappen;
+  if (zwischenRappen <= 0) { return 0; }
+  return Math.max(0, Math.min(10000, Math.round((roh * 100) / zwischenRappen * 10000)));
+}
+
+function ofRabattEinheitSetzen(neu) {
+  if (neu === ofRabattEinheit) { return; }
+  const bp = ofRabattBp();
+  ofRabattEinheit = neu;
+  $('of_rabatt_pct').classList.toggle('on', neu === 'pct');
+  $('of_rabatt_chf').classList.toggle('on', neu === 'chf');
+  if (neu === 'pct') {
+    $('of_rabatt').value = bpText(bp);
+  } else {
+    const zwischenRappen = belegSummen(ofPos, 0).zwischensumme_rappen;
+    $('of_rabatt').value = rappenZuChf(Math.round(zwischenRappen * bp / 10000));
+  }
+  ofSummenZeichnen();
+}
+
+function ofSummenZeichnen() {
+  const rabattBp = ofRabattBp();
+  const s = belegSummen(ofPos, rabattBp);
+  const zeile = (label, wert, klasse) =>
+    `<div class="of-summe-z${klasse ? ' ' + klasse : ''}"><span>${label}</span><span class="wert">${wert}</span></div>`;
+
+  let html = zeile('Zwischensumme', 'CHF ' + chf(s.zwischensumme_rappen));
+  if (s.rabatt_rappen > 0) {
+    html += zeile(`${esc(bpText(rabattBp))} % Rabatt`, '−CHF ' + chf(s.rabatt_rappen));
+  }
+  /* Die MWST-Grundlage steht mit dabei, nicht nur der Betrag: Bei
+     gemischten Saetzen ist "8.10 % = 221.47" ohne die Grundlage nicht
+     nachvollziehbar. */
+  s.mwst.forEach(m => {
+    html += zeile(`MWST ${esc(bpText(m.satz_bp))} % auf CHF ${chf(m.grundlage_rappen)}`,
+                  'CHF ' + chf(m.betrag_rappen));
+  });
+  if (!s.mwst.length && s.zwischensumme_rappen > 0) {
+    html += zeile('Ohne MWST', 'CHF 0.00', 'matt');
+  }
+  if (s.rundung_rappen !== 0) {
+    html += zeile('Rundungsdifferenz',
+      (s.rundung_rappen > 0 ? '+' : '−') + 'CHF ' + chf(Math.abs(s.rundung_rappen)), 'matt');
+  }
+  html += zeile('Total', 'CHF ' + chf(s.total_rappen), 'total');
+  $('ofSummen').innerHTML = html;
+}
+
+/* ── Laden und Speichern ───────────────────────────────────────────── */
+async function ofOeffnen(id) {
+  if (!produkte.length) { await ladeProdukte(); }
+  if (!adressen.length) { await ladeAdressen(); }
+  const a = await ruf('betreiber_beleg_lesen.php?id=' + Number(id));
+  if (a.status !== 'ok') { kurzmeldung(a.message || 'Offerte konnte nicht geladen werden.'); return; }
+  const b = a.beleg;
+  ofFormId = Number(b.id);
+  ofFormKundeId = b.kunde_id ? Number(b.kunde_id) : null;
+  ofPos = (b.positionen || []).map(p => ({
+    produkt_id: p.produkt_id ? Number(p.produkt_id) : null,
+    produkt_name: p.produkt_name || '',
+    beschreibung: p.beschreibung || '',
+    menge: Number(p.menge) || 0,
+    einheit: p.einheit || 'Std.',
+    einzelpreis_rappen: Number(p.einzelpreis_rappen) || 0,
+    rabatt_bp: Number(p.rabatt_bp) || 0,
+    mwst_satz_bp: Number(p.mwst_satz_bp) || 0,
+  }));
+  ofFormStatus = b.status;
+  ofFormAktiv = Number(b.aktiv);
+  $('ofFormNummer').textContent = b.nummer || '–';
+  ofFormSubZeichnen();
+  zeig($('ofFormErr'), false);
+  $('of_kunde').value = (a.kunde && a.kunde.name) || '';
+  $('of_titel').value = b.titel || '';
+  $('of_referenz').value = b.referenz || '';
+  $('of_bemerkung').value = b.bemerkung || '';
+  $('of_notizen').value = b.oeffentliche_notizen || '';
+  $('of_bedingungen').value = b.bedingungen || '';
+  $('of_fusszeile').value = b.fusszeile_text || '';
+  $('of_unterschriftsseite').checked = !!Number(b.unterschriftsseite);
+  $('of_nummer').value = b.nummer || '–';
+  /* Immer in % geoeffnet, unabhaengig davon, in welcher Einheit zuletzt
+     eingegeben wurde -- gespeichert ist ohnehin nur der %-Wert. */
+  ofRabattEinheit = 'pct';
+  $('of_rabatt_pct').classList.add('on');
+  $('of_rabatt_chf').classList.remove('on');
+  $('of_rabatt').value = bpText(b.rabatt_bp);
+  $('of_datum').value = leeresDatum(b.datum) ? '' : String(b.datum).slice(0, 10);
+  $('of_datum').dataset.vorher = $('of_datum').value;
+  $('of_gueltig').value = leeresDatum(b.gueltig_bis) ? '' : String(b.gueltig_bis).slice(0, 10);
+  ofPersonenFuellen(b.person_id);
+  ['ofFormVorschauBtn', 'ofFormDruckBtn', 'ofFormLadenBtn', 'ofFormMenuBtn']
+    .forEach(x => { $(x).style.display = ''; });
+  ofZeilenZeichnen();
+  ofFormularZeigen(true);
+}
+
+async function ofSpeichern() {
+  const datum = $('of_datum').value;
+  const zeigeFehler = txt => {
+    melde($('ofFormErr'), 'fehler', txt);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  if (!datum) { zeigeFehler('Ein Offertendatum ist erforderlich.'); return; }
+  if (!ofFormKundeId) { zeigeFehler('Bitte einen Empfänger aus dem Adressbuch wählen.'); return; }
+  const bis = $('of_gueltig').value;
+  if (bis && bis < datum) { zeigeFehler('„Gültig bis" liegt vor dem Offertendatum.'); return; }
+
+  const koerper = {
+    id: ofFormId || 0,
+    art: 'offerte',
+    kunde_id: ofFormKundeId,
+    person_id: Number($('of_person').value) || null,
+    titel: ($('of_titel').value || '').trim(),
+    referenz: ($('of_referenz').value || '').trim(),
+    datum,
+    gueltig_bis: bis || null,
+    /* Unveraendert mitgeschickt, damit ein Speichern den Status nicht auf
+       "Entwurf" zurueckwirft. */
+    status: ofFormStatus,
+    bemerkung: ($('of_bemerkung').value || '').trim(),
+    unterschriftsseite: $('of_unterschriftsseite').checked ? 1 : 0,
+    oeffentliche_notizen: ($('of_notizen').value || '').trim(),
+    bedingungen: ($('of_bedingungen').value || '').trim(),
+    fusszeile_text: ($('of_fusszeile').value || '').trim(),
+    rabatt_bp: ofRabattBp(),
+    positionen: ofPos,
+  };
+  $('ofFormSaveBtn').disabled = true;
+  const a = await ruf('betreiber_beleg_speichern.php', koerper);
+  $('ofFormSaveBtn').disabled = false;
+  if (a.status !== 'ok') { zeigeFehler(a.message || 'Speichern fehlgeschlagen.'); return; }
+  zeig($('ofFormErr'), false);
+  const warNeu = !ofFormId;
+  ofFormId = Number(a.id);
+  if (a.nummer) { $('ofFormNummer').textContent = a.nummer; $('of_nummer').value = a.nummer; }
+  ofFormSubZeichnen();
+  ['ofFormVorschauBtn', 'ofFormDruckBtn', 'ofFormLadenBtn', 'ofFormMenuBtn']
+    .forEach(x => { $(x).style.display = ''; });
+  /* Die Summen aus der SERVERANTWORT uebernehmen, nicht die eigene Vorschau
+     stehenlassen: Weichen beide ab, soll das sofort auffallen. */
+  if (a.summen) { ofSummenAusServer(a.summen); }
+  kurzmeldung(warNeu ? 'Offerte angelegt.' : 'Offerte gespeichert.');
+  await ladeBelege();
+}
+
+function ofSummenAusServer(s) {
+  const vorschau = belegSummen(ofPos, s.rabatt_bp);
+  if (vorschau.total_rappen !== s.total_rappen) {
+    /* Sollte nie vorkommen: test_belege.mjs prueft beide Rechenwege gegen
+       dieselben Faelle. Wenn doch, gilt der Server -- und es steht ein
+       Hinweis da, statt dass zwei Zahlen stumm nebeneinander leben. */
+    kurzmeldung('Hinweis: Der Server hat CHF ' + chf(s.total_rappen) + ' gerechnet.');
+  }
+  ofSummenZeichnen();
+}
+
+/* ── Das Blatt ─────────────────────────────────────────────────────── */
+/* Getrennt vom Drucken, damit es sich ohne Druckvorgang pruefen laesst.
+   Dasselbe Blatt geht in die Vorschau, in den Druck und ins PDF -- und es
+   ist derselbe Aufbau wie auf der oeffentlichen Seite
+   (betreiber_beleg_oeffentlich.php). Wer hier etwas aendert, aendert es
+   auch dort. */
+function ofBlatt(b, kunde, person) {
+  const s = b.summen || belegSummen(b.positionen || [], Number(b.rabatt_bp) || 0);
+  const absender = bkAbsenderZeilen();
+  const logo = briefkopf.logo
+    ? `<img src="${esc(briefkopf.logo)}" alt="" style="max-height:96px;max-width:200px;display:block;margin-left:auto">`
+    : '';
+
+  const empfaenger = [
+    kunde ? (kunde.name || '') : '',
+    person ? [person.anrede, person.vorname, person.nachname].filter(Boolean).join(' ') : '',
+    kunde ? [kunde.strasse, kunde.hausnummer].filter(Boolean).join(' ') : '',
+    kunde ? kunde.adresszusatz : '',
+    kunde ? [kunde.plz, kunde.ort].filter(Boolean).join(' ') : '',
+  ].filter(Boolean);
+
+  const kopfZeile = (a, v) =>
+    `<tr><td style="padding:2px 0;color:#14161A;width:150px">${a}</td>
+         <td style="padding:2px 0">${v}</td></tr>`;
+
+  const th = 'padding:7px 8px;text-align:left;font-size:11px;font-weight:700;background:#EDEFF2';
+  const td = 'padding:9px 8px;border-bottom:1px solid #14161A;font-size:12px;vertical-align:top';
+  const zeilen = (b.positionen || []).map((p, i) => {
+    const z = s.zeilen[i] || {};
+    return `<tr>
+      <td style="${td}">${esc(p.produkt_name)}</td>
+      <td style="${td};white-space:pre-line">${esc(p.beschreibung || '')}</td>
+      <td style="${td};text-align:right;white-space:nowrap">${chf(p.einzelpreis_rappen)}</td>
+      <td style="${td};text-align:right;white-space:nowrap">${nf(Number(p.menge), Number.isInteger(Number(p.menge)) ? 0 : 2)} ${esc(p.einheit)}</td>
+      <td style="${td};text-align:right;white-space:nowrap">${chf(z.zwischen_rappen != null ? z.zwischen_rappen : 0)} CHF</td>
+    </tr>`;
+  }).join('');
+
+  const sz = (label, wert, stark) =>
+    `<tr><td style="padding:4px 8px;text-align:right;font-size:12px${stark ? ';font-weight:700' : ''}">${label}</td>
+         <td style="padding:4px 8px;text-align:right;font-size:${stark ? '13px' : '12px'};white-space:nowrap${stark ? ';font-weight:700' : ''}">${wert}</td></tr>`;
+  let summen = sz('Zwischensumme', chf(s.zwischensumme_rappen) + ' CHF');
+  if (s.rabatt_rappen > 0) {
+    summen += sz(esc(bpText(s.rabatt_bp)) + '% Rabatt', '-' + chf(s.rabatt_rappen) + ' CHF');
+  }
+  s.mwst.forEach(m => {
+    summen += sz(chf(m.grundlage_rappen) + ' CHF ' + esc(bpText(m.satz_bp)) + '% MWST',
+                 chf(m.betrag_rappen) + ' CHF');
+  });
+  if (s.rundung_rappen !== 0) {
+    summen += sz('Rundungsdifferenz',
+      (s.rundung_rappen > 0 ? '' : '-') + chf(Math.abs(s.rundung_rappen)) + ' CHF');
+  }
+  summen += sz('Total', chf(s.total_rappen) + ' CHF', true);
+
+  const abschnitt = (label, txt) => txt ? `
+      <div style="margin-top:22px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#6B7280;margin-bottom:4px">${label}</div>
+        <div style="white-space:pre-line;line-height:1.5">${esc(txt)}</div>
+      </div>` : '';
+
+  /* Der Unterschriftsblock steht im normalen Fluss am Ende des Blattes,
+     nicht auf einer erzwungenen zweiten Seite -- ein kurzer Beleg passte
+     sonst allein wegen dieses Blocks nie auf eine Seite.
+     page-break-inside:avoid haelt ihn zusammen. */
+  const unterschriften = Number(b.unterschriftsseite) ? `
+    <div style="margin-top:34px;page-break-inside:avoid;break-inside:avoid">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#6B7280;margin-bottom:18px">Unterschriften</div>
+      <div style="color:#6B7280;margin-bottom:34px">Ort, Datum</div>
+      <div style="border-bottom:1px solid #14161A;width:260px;margin-bottom:40px"></div>
+      <div style="display:flex;gap:60px">
+        <div style="flex:1">
+          <div style="border-bottom:1px solid #14161A;height:46px"></div>
+          <div style="margin-top:8px;font-size:11px;color:#6B7280">
+            Unterschrift ${esc((kunde && kunde.name) || 'Auftraggeber')}</div>
+        </div>
+        <div style="flex:1">
+          <div style="border-bottom:1px solid #14161A;height:46px"></div>
+          <div style="margin-top:8px;font-size:11px;color:#6B7280">
+            Unterschrift ${esc(String(briefkopf.firma || '').trim() || 'Auftragnehmer')}</div>
+        </div>
+      </div>
+    </div>` : '';
+
+  return `
+    <div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;max-width:700px;margin:0 auto;font-size:12px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:56px">
+        <div style="line-height:1.45">${absender.map(z => esc(z)).join('<br>')}</div>
+        <div>${logo}</div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;gap:40px;margin-bottom:52px">
+        <table style="border-collapse:collapse;line-height:1.5">
+          ${kopfZeile('Offertennummer', esc(b.nummer))}
+          ${kopfZeile('Offertendatum', dmy(b.datum))}
+          ${b.gueltig_bis && !leeresDatum(b.gueltig_bis) ? kopfZeile('Gültig bis', dmy(b.gueltig_bis)) : ''}
+          ${b.referenz ? kopfZeile('Referenz', esc(b.referenz)) : ''}
+        </table>
+        <div style="line-height:1.5;min-width:230px">${empfaenger.map(z => esc(z)).join('<br>')}</div>
+      </div>
+
+      <div style="font-size:19px;font-weight:700;margin-bottom:14px">
+        ${esc(b.titel || '')} ${esc(b.nummer)}
+      </div>
+
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th style="${th}">Leistung</th><th style="${th}">Beschreibung</th>
+          <th style="${th};text-align:right">Einzelpreis</th>
+          <th style="${th};text-align:right">Menge</th>
+          <th style="${th};text-align:right">Summe</th>
+        </tr></thead>
+        <tbody>${zeilen}</tbody>
+      </table>
+
+      <table style="margin-left:auto;margin-top:14px;border-collapse:collapse">${summen}</table>
+      ${abschnitt('Notizen', b.oeffentliche_notizen)}
+      ${abschnitt('Bedingungen', b.bedingungen)}
+      ${unterschriften}
+      ${b.fusszeile_text ? `<div style="margin-top:26px;padding-top:14px;border-top:1px solid #E5E8EC;white-space:pre-line;line-height:1.5">${esc(b.fusszeile_text)}</div>` : ''}
+      ${bkFusszeile()}
+    </div>`;
+}
+
+/* Die Zahlen kommen vom SERVER (betreiber_beleg_lesen.php rechnet sie
+   frisch), nicht aus dem Formular -- was gedruckt wird, soll das sein, was
+   gespeichert ist. */
+async function ofBlattHolen(id) {
+  const a = await ruf('betreiber_beleg_lesen.php?id=' + Number(id));
+  if (a.status !== 'ok') { throw new Error(a.message || 'Der Beleg liess sich nicht laden.'); }
+  return a;
+}
+
+async function ofDrucken(id) {
+  if (!id) { kurzmeldung('Die Offerte muss zuerst gespeichert werden.'); return; }
+  try {
+    const a = await ofBlattHolen(id);
+    $('druckflaeche').innerHTML = ofBlatt(a.beleg, a.kunde, a.person);
+    window.print();
+  } catch (e) {
+    kurzmeldung(e.message || 'Der Beleg liess sich nicht laden.');
+  }
+}
+
+/* ── PDF ───────────────────────────────────────────────────────────── */
+/* html2pdf wird erst BEIM KLICK nachgeladen -- wer nie herunterlaedt,
+   zahlt das Gewicht nicht beim blossen Ansehen der Seite. */
+let html2pdfVersprechen = null;
+function html2pdfLaden() {
+  if (html2pdfVersprechen) { return html2pdfVersprechen; }
+  html2pdfVersprechen = new Promise((loes, brich) => {
+    if (typeof html2pdf !== 'undefined') { loes(); return; }
+    const skript = document.createElement('script');
+    skript.src = 'html2pdf.bundle.min.js';
+    skript.onload = () => (typeof html2pdf !== 'undefined'
+      ? loes() : brich(new Error('html2pdf nicht geladen')));
+    skript.onerror = () => brich(new Error('html2pdf konnte nicht geladen werden.'));
+    document.head.appendChild(skript);
+  });
+  return html2pdfVersprechen;
+}
+
+/* Ein zu hohes Blatt schneidet html2pdf stumpf an der Seitengrenze ab und
+   setzt den Rest auf Seite 2 -- bei einer kurzen Offerte landete so der
+   Unterschriftsblock allein auf der zweiten Seite. Darum: rendern, nachsehen,
+   und bei mehr als einer Seite dasselbe Bild auf eine verkleinern -- aber
+   nur, solange es lesbar bleibt. "Nach Möglichkeit auf eine Seite" heisst
+   nicht "um jeden Preis". */
+const PDF_RAND = 10;            // mm, auf allen Seiten
+const PDF_MIN_MASSSTAB = 0.62;  // darunter lieber zwei Seiten als eine Lupe
+const PDF_SEITE = { breite: 210, hoehe: 297 };   // A4 hoch, passend zu jsPDF unten
+const PDF_OPTIONEN = {
+  margin: PDF_RAND,
+  image: { type: 'jpeg', quality: 0.95 },
+  html2canvas: { scale: 2, useCORS: true },
+  jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+  pagebreak: { mode: ['css', 'legacy'] },
+};
+
+function leeresBlattPdf() {
+  const winzig = document.createElement('div');
+  winzig.style.cssText = 'width:10px;height:10px;background:#fff';
+  return html2pdf().set(PDF_OPTIONEN).from(winzig).toPdf().get('pdf').then(pdf => {
+    for (let i = pdf.internal.getNumberOfPages(); i >= 1; i--) { pdf.deletePage(i); }
+    pdf.addPage();
+    return pdf;
+  });
+}
+
+function blattPdfBlob(el) {
+  const arbeit = html2pdf().set(PDF_OPTIONEN).from(el);
+  return arbeit.toCanvas().get('canvas').then(canvas => {
+    const alsSatz = () => arbeit.toPdf().get('pdf').then(pdf => pdf.output('blob'));
+    if (!canvas || !canvas.width || !canvas.height) { return alsSatz(); }
+    const maxB = PDF_SEITE.breite - 2 * PDF_RAND;
+    const maxH = PDF_SEITE.hoehe - 2 * PDF_RAND;
+    const volleHoehe = maxB * canvas.height / canvas.width;
+    const massstab = Math.min(1, maxH / volleHoehe);
+    if (massstab >= 1 || massstab < PDF_MIN_MASSSTAB) { return alsSatz(); }
+    const b = maxB * massstab, h = volleHoehe * massstab;
+    return leeresBlattPdf().then(pdf => {
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG',
+        (PDF_SEITE.breite - b) / 2, PDF_RAND, b, h);
+      return pdf.output('blob');
+    });
+  });
+}
+
+function ofDateiname(b) {
+  const teil = String(b.nummer || 'Offerte').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return (teil || 'Offerte') + '.pdf';
+}
+
+async function ofPdfBauen(id) {
+  const a = await ofBlattHolen(id);
+  await html2pdfLaden();
+  /* In dieselbe verborgene Flaeche wie beim Drucken: Es gibt genau ein
+     Blatt, und es entsteht genau einmal. */
+  $('druckflaeche').innerHTML = ofBlatt(a.beleg, a.kunde, a.person);
+  const blob = await blattPdfBlob($('druckflaeche'));
+  return { blob, beleg: a.beleg };
+}
+
+async function ofHerunterladen(id, knopf) {
+  if (!id) { kurzmeldung('Die Offerte muss zuerst gespeichert werden.'); return; }
+  if (knopf) { knopf.disabled = true; }
+  try {
+    const { blob, beleg } = await ofPdfBauen(id);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = ofDateiname(beleg);
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  } catch (e) {
+    kurzmeldung('Die Offerte liess sich nicht erzeugen.');
+  } finally {
+    if (knopf) { knopf.disabled = false; }
+  }
+}
+
+async function ofTeilen(id, knopf) {
+  if (!id) { kurzmeldung('Die Offerte muss zuerst gespeichert werden.'); return; }
+  if (knopf) { knopf.disabled = true; }
+  try {
+    const { blob, beleg } = await ofPdfBauen(id);
+    const name = ofDateiname(beleg);
+    const datei = new File([blob], name, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [datei] })) {
+      await navigator.share({ files: [datei], title: name });
+      return;
+    }
+    /* Kein Datei-Teilen auf diesem Geraet: herunterladen UND es sagen -- ein
+       Knopf, der wortlos nichts tut, ist von einem Fehler nicht zu
+       unterscheiden. */
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    kurzmeldung('Teilen wird hier nicht unterstützt — die Offerte wurde stattdessen heruntergeladen.');
+  } catch (e) {
+    if (e && e.name === 'AbortError') { return; }
+    kurzmeldung('Die Offerte liess sich nicht teilen.');
+  } finally {
+    if (knopf) { knopf.disabled = false; }
+  }
+}
+
+/* ── Vorschau ──────────────────────────────────────────────────────── */
+const OF_VORSCHAU_BREITE = 700;   // Dokumentbreite aus ofBlatt()
+
+/* Das Blatt auf die verfuegbare Breite herunterrechnen. Nie vergroessern:
+   Ein A4-Blatt auf einem breiten Schirm aufzublasen macht es nicht
+   lesbarer, nur ungewohnt. */
+function ofVorschauEinpassen() {
+  const rahmen = $('ofVorschauInhalt'), mass = $('ofVorschauMass'), blatt = $('ofVorschauBlatt');
+  if (!rahmen || !mass || !blatt || !blatt.firstElementChild) { return; }
+  blatt.style.width = OF_VORSCHAU_BREITE + 'px';
+  const verfuegbar = rahmen.clientWidth - 2 * parseFloat(getComputedStyle(rahmen).paddingLeft || 0);
+  const k = Math.min(1, verfuegbar / OF_VORSCHAU_BREITE);
+  blatt.style.transform = k < 1 ? `scale(${k})` : '';
+  mass.style.height = Math.ceil(blatt.offsetHeight * k) + 'px';
+}
+
+async function ofVorschau(id) {
+  if (!id) { kurzmeldung('Die Offerte muss zuerst gespeichert werden.'); return; }
+  try {
+    const a = await ofBlattHolen(id);
+    $('ofVorschauBlatt').innerHTML = ofBlatt(a.beleg, a.kunde, a.person);
+    dlgAuf('dlgOfVorschau');
+    /* Erst nach dem Oeffnen einpassen: Vorher ist der Dialog verborgen und
+       clientWidth 0 -- man wuerde durch Null teilen und auf Verdacht
+       skalieren, statt am gerenderten Zustand zu messen. */
+    ofVorschauEinpassen();
+    /* Und noch einmal, sobald das Logo steht: Vorher ist das Blatt
+       niedriger, als es sein wird. */
+    const bilder = [...$('ofVorschauBlatt').querySelectorAll('img')].filter(i => !i.complete);
+    let offen = bilder.length;
+    bilder.forEach(i => {
+      const fertig = () => { if (--offen <= 0) { ofVorschauEinpassen(); } };
+      i.addEventListener('load', fertig, { once: true });
+      i.addEventListener('error', fertig, { once: true });
+    });
+  } catch (e) {
+    kurzmeldung(e.message || 'Der Beleg liess sich nicht laden.');
+  }
+}
+
+/* ── Versand ───────────────────────────────────────────────────────── */
+/* Verschickt keinen PDF-Anhang, sondern einen Link auf eine unangemeldete
+   Ansicht, auf der der Empfaenger annehmen oder ablehnen kann. Eine
+   Sicherheitsabfrage davor, weil eine einmal verschickte Mail sich nicht
+   zurueckholen laesst. */
+function ofVersenden(id) {
+  if (!id) { kurzmeldung('Die Offerte muss zuerst gespeichert werden.'); return; }
+  frageStellen('Offerte per E-Mail versenden?',
+    'Der Betrieb erhält eine E-Mail mit einem Link zur Offerte. Dort kann er sie direkt '
+    + 'annehmen oder ablehnen.',
+    'Versenden', async () => {
+      const a = await ruf('betreiber_beleg_versenden.php', { id: Number(id) });
+      if (a.status !== 'ok') { kurzmeldung(a.message || 'Versand fehlgeschlagen.'); return; }
+      kurzmeldung('Offerte per E-Mail verschickt.');
+      if (ofFormId === Number(id)) { ofFormStatus = 'versendet'; ofFormSubZeichnen(); }
+      await ladeBelege();
+    });
+}
+
+/* Ein Klick irgendwo sonst schliesst das Zeilenmenue. Ohne das bliebe es
+   stehen, waehrend darunter schon etwas anderes passiert. */
+document.addEventListener('click', ev => {
+  const pop = $('rowmenuPop');
+  if (pop && pop.classList.contains('on') && !pop.contains(ev.target)) { menuSchliessen(); }
+});
+window.addEventListener('resize', () => {
+  if ($('dlgOfVorschau').classList.contains('on')) { ofVorschauEinpassen(); }
+});
+
 /* ── Rahmen ─────────────────────────────────────────────────────── */
 /* Fehlende Tabellen/Spalten dieser Ebene selbst nachtragen (ENT-524),
    api/betreiber_schema_pruefen.php. Zwei getrennte Wege, dasselbe Muster
@@ -1962,6 +4450,10 @@ function einrichtungOeffnen() {
 }
 function einrichtungSchliessen() {
   $('dlgEinrichtung').classList.remove('on');
+  /* Der Offertenteil (ENT-605) haengt an denselben Tabellen. Wurden sie
+     gerade nachgetragen, sollen seine Listen das sofort zeigen und nicht
+     erst beim naechsten Anmelden. */
+  if (typeof offertenteilNachladen === 'function') { offertenteilNachladen(); }
 }
 
 async function einrichtungLauf() {
@@ -2012,21 +4504,28 @@ async function ladeAlles() {
   const hinweis = $('u-sitzung');
   if (hinweis) { hinweis.textContent = 'Die Sitzung endet nach 30 Minuten ohne Nutzung.'; }
 
-  /* Beide Gerueste sagen dasselbe, aber nicht mit demselben Satz: Eine
-     Offerte geht an einen Betrieb, der noch keiner ist, eine Rechnung an
-     einen, der es schon ist. */
-  geruestZeigen('of-inhalt', 'Noch nicht gebaut',
-    'Das Gerüst steht. Offerten an künftige Mandanten entstehen hier, sobald '
-    + 'feststeht, was angeboten wird — die Positionen einer Offerte sind die '
-    + 'Preise, und die sind noch nicht entschieden.');
+  /* Offerten sind seit ENT-605 gebaut. Rechnungen bleiben ein Geruest --
+     und das aus einem anderen Grund als bisher: Eine Offerte laesst sich
+     schreiben, ohne dass ein Preismodell feststeht (ihre Positionen tragen
+     Text, Menge und Preis selbst). Eine wiederkehrende Rechnung nicht: Sie
+     braucht die Antwort auf "wonach wird abgerechnet" (OP-536), und davon
+     haengt der Datenaufbau ab. */
   geruestZeigen('re-inhalt', 'Noch nicht gebaut',
     'Das Gerüst steht. Rechnungen an die Mandanten entstehen hier, sobald '
     + 'entschieden ist, wonach abgerechnet wird — Grundgebühr, Zahl der '
-    + 'Mitarbeitenden oder Einsätze. Davon hängt ab, wie die Daten liegen.');
+    + 'Mitarbeitenden oder Einsätze. Davon hängt ab, wie die Daten liegen. '
+    + 'Offerten hängen nicht daran und stehen seit ENT-605 unter „Offerten“.');
 
   await ladeMandanten();
   await ladeDemo();
   await ladeKonten();
+  /* Der Offertenteil (ENT-605). ladeAdressen() entscheidet dabei auch, ob
+     der Teil ueberhaupt eingerichtet ist -- steht die Tabelle nicht, sagen
+     die Listen das und bieten das Einrichten an, statt leer dazustehen. */
+  await ladeAdressen();
+  await ladeProdukte();
+  await ladeBelege();
+  await ladeBriefkopf();
   /* Zuletzt, aber auf jeder Seite sichtbar: Das Abzeichen am Reiter steht
      auch dann im Blick, wenn gerade ein anderer Bereich offen ist. */
   await ladeSupport();

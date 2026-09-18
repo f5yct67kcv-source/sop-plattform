@@ -1274,6 +1274,31 @@ jobs:
           # mailer.php traegt das SMTP-Passwort -- die Platzhalter werden
           # weiter unten ersetzt, wie in den anderen Buendeln.
           cp backend/mailer.php        dist-betreiber/mailer.php
+          # Offerten der Betreiberin (ENT-605). Drei geteilte Rechenkerne,
+          # die seit ENT-605 einen Tabellenpraefix nehmen und darum von
+          # beiden Ebenen benutzt werden: die Summen eines Belegs, die
+          # Adresslogik und die Leistungsnummern. Sie liegen NICHT doppelt
+          # im Haus -- eine zweite Kopie der Geldrechnung waere die Stelle,
+          # an der die beiden Seiten auseinanderlaufen.
+          cp backend/belege.php        dist-betreiber/belege.php
+          cp backend/kunden.php        dist-betreiber/kunden.php
+          cp backend/produkte.php      dist-betreiber/produkte.php
+          # html2pdf erzeugt die PDF-Fassung einer Offerte -- im
+          # Betreiber-Bereich selbst (Herunterladen/Teilen) und auf der
+          # oeffentlichen Seite, die der Empfaenger am Link sieht. Beide
+          # laden sie erst BEIM KLICK nach; fehlt die Datei, bleibt der
+          # Knopf ohne Wirkung, und lokal faellt das NICHT auf.
+          cp html2pdf.bundle.min.js    dist-betreiber/html2pdf.bundle.min.js
+          # qrcode.js zeichnet den QR-Code der Zwei-Faktor-Einrichtung
+          # (betreiber.html, qrLaden()). BESTANDSFEHLER, gefunden durch die
+          # neue Pruefung in test_offerten_betreiber.mjs ("jede Datei, die
+          # betreiber.html nachlaedt, liegt im Buendel"): Die Datei fehlte
+          # hier seit ENT-580. Live blieb der QR-Code darum leer und die
+          # Seite zeigte ihren Ersatztext -- der abtippbare Schluessel
+          # daneben trug weiter, die Einrichtung war also nie blockiert,
+          # aber unnoetig umstaendlich. Lokal faellt es nicht auf, weil dort
+          # die Datei neben der Seite liegt.
+          cp qrcode.js                 dist-betreiber/qrcode.js
           cp backend/api/betreiber_*.php dist-betreiber/api/
           # Die oeffentliche Selbstbedienung (ENT-601): kein betreiber_-
           # Praefix, weil sie ausdruecklich OHNE Anmeldung laeuft -- der
