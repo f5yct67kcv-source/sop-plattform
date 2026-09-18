@@ -6,8 +6,17 @@ declare(strict_types=1);
 // require_demo_umgebung() im Weg zu haben -- gleiches Prinzip wie
 // backend/demo_daten.php/api/demo_daten_erzeugen.php.
 //
-// Erwartet, dass rechte.php (system_rollen()) bereits geladen ist, genau
-// wie demo_daten.php es fuer seine eigenen Abhaengigkeiten erwartet.
+// BINDET RECHTE.PHP SELBST EIN, statt es vom Aufrufer zu erwarten. Bis
+// 2026-09-18 stand hier "Erwartet, dass rechte.php (system_rollen())
+// bereits geladen ist" -- ein stiller Vertrag, den jeder neue Aufrufer
+// erben musste, ohne dass ihn etwas daran erinnert haette. Genau daran ist
+// der oeffentliche Demo-Zugang gescheitert: demo_anfordern.php laedt
+// rechte.php in seiner Kette nicht, also brach demo_reset_systemrollen_-
+// saeen() mit "Call to undefined function system_rollen()" ab. Das ist
+// kein Datenbankfehler, also blieb davon beim Anfragenden nur das
+// nichtssagende "Unerwarteter Serverfehler" uebrig (db.php). Eine Datei,
+// die eine fremde Funktion braucht, laedt sie ab jetzt selbst.
+require_once __DIR__ . '/rechte.php';
 
 // ── Zeitgeber-Geheimnis ─────────────────────────────────────────────
 // Zeitsicherer Vergleich (hash_equals) des beim Deploy per sed-Ersetzung
