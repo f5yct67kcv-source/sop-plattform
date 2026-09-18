@@ -2562,6 +2562,17 @@ const W = {
     rgOrtAusTitel: 'Kein Standort — die Runde lässt sich so nicht bestätigen',
     rgOrtVerweigert: 'Der Standortzugriff ist gesperrt. Ohne ihn kannst du keinen Kontrollpunkt bestätigen, und es kommt kein Signal, wenn du einen erreichst.',
     rgOrtWegIos: 'iPhone: Einstellungen › Datenschutz & Sicherheit › Ortungsdienste › Safari › „Beim Verwenden der App". Danach in Safari auf „aA" in der Adressleiste › Website-Einstellungen › Standort › Erlauben.',
+    // In der App fuehrt ein GANZ anderer Weg zum Ziel (ENT-609). Der Text
+    // darueber lotst durch Safari -- in der App gibt es weder den Eintrag
+    // "Safari" noch das "aA" in der Adressleiste, und wer danach sucht,
+    // sucht sich zu Tode. Ein Weg, den es nicht gibt, ist schlimmer als
+    // gar keiner: Er sieht aus wie eine Auskunft.
+    //
+    // Und iOS fragt NICHT noch einmal. Die Systemabfrage kommt genau
+    // einmal; wer sie wegtippt, kommt nur ueber die Einstellungen zurueck.
+    // Darum steht der Weg dorthin hier, und der Warnblock bleibt stehen,
+    // solange die Sperre gilt.
+    rgOrtWegApp: 'iPhone: Einstellungen › GuardOpS › Standort › „Beim Verwenden der App". Danach hierher zurück und auf „Erneut versuchen" tippen.',
     rgOrtWegAndroid: 'Android: Einstellungen › Apps › Browser › Berechtigungen › Standort › Zulassen.',
     rgOrtKeinSignal: 'Der Standort ist nicht verfügbar — draussen oder am Fenster geht es meist besser.',
     rgOrtWartet: 'Standort wird gesucht …',
@@ -9375,10 +9386,13 @@ function rgOrtungHinweisHtml(aufKarte) {
   if (rgsOrtWache === null) { return ''; }
   if (rgsOrtFehler === 'verweigert') {
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    // Drei Wege, nicht zwei: In der App fuehrt der Weg ueber die
+    // Einstellungen der App selbst, nicht ueber die des Browsers.
+    const weg = nativeAppHuelle() ? 'rgOrtWegApp' : (iOS ? 'rgOrtWegIos' : 'rgOrtWegAndroid');
     return `<div class="rgs-ortwarn" id="rgsOrtWarn">
       <div class="rgs-ortwarn-tt">${esc(w('rgOrtAusTitel'))}</div>
       <div>${esc(w('rgOrtVerweigert'))}</div>
-      <div class="rgs-ortwarn-weg">${esc(w(iOS ? 'rgOrtWegIos' : 'rgOrtWegAndroid'))}</div>
+      <div class="rgs-ortwarn-weg">${esc(w(weg))}</div>
       <button type="button" class="btn btn-plain btn-wide" style="margin-top:12px"
         onclick="rgOrtungErneut()">${esc(w('rgOrtErneut'))}</button>
     </div>`;

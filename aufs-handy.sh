@@ -469,7 +469,25 @@ if ! xcrun devicectl device install app --device "$DEVCTL" "$APP"; then
   exit 1
 fi
 echo "        starten"
-xcrun devicectl device process launch --device "$DEVCTL" "$APPID"
+if ! xcrun devicectl device process launch --device "$DEVCTL" "$APPID"; then
+  echo ""
+  echo "  Die App ist installiert, laesst sich aber nicht starten."
+  echo "  Fast immer ist es dasselbe: Ein selbst signiertes Programm muss auf"
+  echo "  dem Geraet einmal ausdruecklich freigegeben werden. iOS meldet das"
+  echo "  als \"invalid code signature, inadequate entitlements or its profile"
+  echo "  has not been explicitly trusted\" -- gemeint ist meist das Letzte."
+  echo ""
+  echo "  Am iPhone:"
+  echo "    Einstellungen > Allgemein > VPN & Geraeteverwaltung"
+  echo "    > unter \"Entwickler-App\" den eigenen Eintrag > Vertrauen"
+  echo ""
+  echo "  Danach die App vom Homescreen starten. Dieses Skript muss dafuer"
+  echo "  NICHT noch einmal laufen -- sie liegt schon auf dem Geraet."
+  echo ""
+  echo "  Die Frage kommt auch dann wieder, wenn sich die Berechtigungen der"
+  echo "  App geaendert haben: Fuer iOS ist sie dann nicht mehr dieselbe."
+  exit 1
+fi
 
 echo ""
 echo "Fertig. Die App laeuft auf dem iPhone."
