@@ -187,11 +187,36 @@ echo "── 5/5  Bauen, installieren, starten"
 # eigenen Werkzeugen: bauen, installieren, starten.
 DD="$PWD/ios/DerivedData"
 
+# Workspace oder Projekt? Capacitor 8 bindet seine Plugins ueber den Swift
+# Package Manager ein, und dann gibt es GAR KEIN App.xcworkspace -- das
+# entsteht nur bei CocoaPods. Fest auf das Workspace zu zeigen, brach hier
+# mit "does not exist" ab. Geprueft wird darum, was wirklich da liegt.
+if [ -d ios/App/App.xcworkspace ]; then
+  ZIEL=(-workspace ios/App/App.xcworkspace)
+elif [ -d ios/App/App.xcodeproj ]; then
+  ZIEL=(-project ios/App/App.xcodeproj)
+else
+  echo "  Weder App.xcworkspace noch App.xcodeproj unter ios/App/ gefunden."
+  echo "  Lief 'npx cap sync ios' oben durch?"
+  exit 1
+fi
+
+# Das Schema liegt bei Capacitor nicht im Repository, sondern entsteht,
+# wenn das Projekt einmal in Xcode geoeffnet wurde (xcuserdata, bewusst
+# nicht versioniert). Fehlt es, ist -target der Weg, der ohne Schema
+# auskommt.
+if xcodebuild -list "${ZIEL[@]}" 2>/dev/null | sed -n '/Schemes:/,$p' | grep -qw "App"; then
+  WIE=(-scheme App)
+else
+  echo "        kein Schema vorhanden, baue ueber das Ziel"
+  WIE=(-target App)
+fi
+
 # -allowProvisioningUpdates laesst Xcode ein fehlendes Bereitstellungs-
 # profil selbst anlegen, statt den Bau abzubrechen.
 xcodebuild \
-  -workspace ios/App/App.xcworkspace \
-  -scheme App \
+  "${ZIEL[@]}" \
+  "${WIE[@]}" \
   -configuration Debug \
   -destination "id=$UDID" \
   -derivedDataPath "$DD" \
