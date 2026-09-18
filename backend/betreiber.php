@@ -930,6 +930,40 @@ function be_tabellen_anlegen(PDO $pdo, bool $nurPruefen = false): array
     return ['getan' => $getan, 'offen' => $offen, 'fehler' => $fehler];
 }
 
+// Spalten, die eine bestehende Betreiber-Tabelle nachtraeglich braucht --
+// CREATE TABLE IF NOT EXISTS in be_tabellen_anlegen() legt sie nur bei einer
+// FRISCHEN Anlage gleich mit an, eine schon vorhandene Tabelle bleibt davon
+// unberuehrt. Dieselbe "eine Definition, nicht zwei"-Ueberlegung wie bei
+// be_tabellen(): sie steht hier, weil sowohl api/planung_einrichten.php
+// (solange der Bootstrap offen ist) als auch api/betreiber_schema_pruefen.php
+// sie ausfuehren koennen muessen.
+function be_spalten(): array
+{
+    return [
+        // Eigene Ausliefer-Adresse je Mandant (ENT-589, Spaltenkommentar bei
+        // der CREATE-TABLE-Definition oben). Traegt sie fuer eine Anlage
+        // nach, deren `mandant`-Tabelle schon vor ENT-589 entstanden ist --
+        // eine frische Anlage bekommt sie ueber be_tabellen() bereits mit.
+        ['mandant', 'subdomain', "ALTER TABLE mandant ADD COLUMN subdomain VARCHAR(100) NOT NULL DEFAULT '' AFTER name"],
+    ];
+}
+
+function be_spalten_anlegen(PDO $pdo, bool $nurPruefen = false): array
+{
+    $getan = []; $offen = []; $fehler = [];
+    foreach (be_spalten() as [$tabelle, $spalte, $sql]) {
+        if (!hat_tabelle($pdo, $tabelle) || hat_spalte($pdo, $tabelle, $spalte)) { continue; }
+        if ($nurPruefen) { $offen[] = 'Spalte ' . $tabelle . '.' . $spalte; continue; }
+        try {
+            $pdo->exec($sql);
+            $getan[] = 'Spalte ' . $tabelle . '.' . $spalte . ' ergaenzt';
+        } catch (Throwable $e) {
+            $fehler[] = 'Spalte ' . $tabelle . '.' . $spalte . ' — ' . $e->getMessage();
+        }
+    }
+    return ['getan' => $getan, 'offen' => $offen, 'fehler' => $fehler];
+}
+
 // Traegt den aufrufenden Betrieb als Mandant 1 ein -- einmalig, und nur
 // wenn der Stamm noch leer ist. Der Name kommt aus der Tabelle `betrieb`
 // der MANDANTEN-Datenbank und nicht aus dem Quelltext (Hausregel

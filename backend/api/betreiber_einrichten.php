@@ -49,6 +49,15 @@ $getan  = $ergebnis['getan'];
 $offen  = $ergebnis['offen'];
 $fehler = $ergebnis['fehler'];
 
+// ── Spalten, die eine bestehende Tabelle nachtraeglich braucht ─────────
+// Dieselbe Ueberlegung wie bei den Tabellen zwei Zeilen oben: CREATE TABLE
+// IF NOT EXISTS legt eine Spalte nur bei einer frischen Anlage mit an. Die
+// Definitionen stehen ebenfalls im Modul (be_spalten), aus demselben Grund.
+$spErgebnis = be_spalten_anlegen($pdo, $nurPruefen);
+$getan  = [...$getan,  ...$spErgebnis['getan']];
+$offen  = [...$offen,  ...$spErgebnis['offen']];
+$fehler = [...$fehler, ...$spErgebnis['fehler']];
+
 // ── Der Bestandsmandant ───────────────────────────────────────────────
 //
 // Der Betrieb, der heute läuft, wird Mandant 1 -- ohne dass eine einzige
