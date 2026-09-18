@@ -1204,7 +1204,7 @@ function be_spalten(): array
         // nach, deren `mandant`-Tabelle schon vor ENT-589 entstanden ist --
         // eine frische Anlage bekommt sie ueber be_tabellen() bereits mit.
         ['mandant', 'subdomain', "ALTER TABLE mandant ADD COLUMN subdomain VARCHAR(100) NOT NULL DEFAULT '' AFTER name"],
-        // Namensteile am Betreiber-Konto (ENT-613). `name` bleibt als
+        // Namensteile am Betreiber-Konto (ENT-615). `name` bleibt als
         // Anzeigename stehen und wird aus Vor- und Nachname zusammengesetzt --
         // Anmeldung, Support und Logbuch sprechen weiter ueber dieses eine
         // Feld. Gefuellt werden die Teile nicht hier, sondern in

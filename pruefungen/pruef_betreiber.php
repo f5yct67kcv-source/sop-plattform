@@ -272,7 +272,7 @@ $pruef('KRITISCH: auch bei vielen Mandanten bleibt er zu',
         $r['ma_im_einsatz'] === null);
 }
 
-// ══════════════ NAMENSTEILE (ENT-613)
+// ══════════════ NAMENSTEILE (ENT-615)
 //
 // Die Teilung laeuft EINMAL ueber den Bestand. Ein Fehler hier steht danach
 // dauerhaft in der Liste, und niemand sieht ihm an, dass er aus einer

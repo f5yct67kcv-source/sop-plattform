@@ -64,8 +64,8 @@ $daten = json_decode(file_get_contents('php://input') ?: '', true) ?: [];
 $email = mb_strtolower(trim((string)($daten['email'] ?? '')));
 $pass  = (string)($daten['passwort'] ?? '');
 
-// ZWEI EINSTIEGE, EIN ERGEBNIS (ENT-613): Der Betreiber-Bereich schickt seit
-// ENT-613 Anrede, Vorname und Nachname einzeln. Der Bootstrap aus dem Cockpit
+// ZWEI EINSTIEGE, EIN ERGEBNIS (ENT-615): Der Betreiber-Bereich schickt seit
+// ENT-615 Anrede, Vorname und Nachname einzeln. Der Bootstrap aus dem Cockpit
 // kennt nur ein Namensfeld und soll dafuer nicht umgebaut werden -- er richtet
 // das allererste Konto ein, an einer Stelle, die selten laeuft und nie
 // scheitern darf. Kommen die Teile nicht, werden sie aus `name` geteilt.

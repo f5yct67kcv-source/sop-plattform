@@ -1,5 +1,5 @@
 // Die Kontoseite des Betreiber-Bereichs gegen die Mitarbeitendenakte des
-// Cockpits — GEMESSEN, nicht nachgelesen (ENT-613).
+// Cockpits — GEMESSEN, nicht nachgelesen (ENT-615).
 //
 // WARUM SO: "1:1 uebernommen" laesst sich nicht behaupten, nur nachweisen.
 // Eine Pruefung auf feste Zahlen waere gruen und falsch an dem Tag, an dem
@@ -8,7 +8,7 @@
 //
 // VERGLICHEN WIRD DIE BAUART, NICHT DER INHALT. Die Akte im Cockpit traegt
 // acht Reiter und Dutzende Felder, das Konto drei Reiter und vier Felder --
-// das ist die Entscheidung aus ENT-613 und kein Befund. Gleich sein muessen
+// das ist die Entscheidung aus ENT-615 und kein Befund. Gleich sein muessen
 // die Bauteile: Kopfzeile, Zurueck-Knopf, Reiter, Karten und die
 // Beschriftungsliste darin.
 import { chromium } from 'playwright';
