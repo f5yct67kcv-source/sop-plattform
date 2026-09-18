@@ -8198,9 +8198,23 @@ function rgKarteGesperrtZeigen() {
 function mapsSchluesselTauglich(wert) {
   const k = String(wert || '').trim();
   if (k === '') { return false; }
-  // Nicht auf den genauen Platzhalter pruefen, sondern auf seine Form:
-  // Ein Google-Schluessel sieht nie so aus.
-  return !/^__.*__$/.test(k);
+  // Geprueft wird die FORM, nicht der Wortlaut eines bestimmten
+  // Platzhalters. Ein Schluessel von Google beginnt mit "AIza" und ist
+  // deutlich laenger als 30 Zeichen.
+  //
+  // Zuerst stand hier nur, dass es nicht wie ein Platzhalter mit
+  // Unterstrichen am Rand aussehen darf. Das reichte
+  // nicht: Beim Einrichten landete der Beispieltext aus einer Anleitung im
+  // Buendel ("DER_NEUE_SCHLUESSEL"). Fuer diese Funktion war das ein
+  // Schluessel, die App baute die Karte auf, Google lieferte keine Kacheln
+  // -- und der Waechter las "nicht freigegeben", obwohl schlicht kein
+  // Schluessel da war. Zwei verschiedene Sachverhalte, ein Text: genau das,
+  // was hier nie passieren darf (CLAUDE.md).
+  //
+  // Das ist KEINE Echtheitspruefung. Ein falscher Schluessel dieser Form
+  // kommt durch und wird dann von Google abgelehnt -- dafuer gibt es die
+  // andere Meldung. Abgefangen wird nur, was offensichtlich gar keiner ist.
+  return /^AIza[0-9A-Za-z_-]{26,}$/.test(k);
 }
 
 /* Einmal beim Start beantwortet und in einer Variablen gehalten, nicht bei

@@ -198,6 +198,33 @@ maps_schluessel_einsetzen() {
     echo "        Die Rundgang-Karte bleibt auf dem Geraet leer, alles andere laeuft."
     return 0
   fi
+  # Sieht das ueberhaupt nach einem Schluessel aus?
+  #
+  # Der Grund ist ein echter Vorfall: In der Anleitung stand eine fertige
+  # Befehlszeile mit einem erfundenen Wert darin, und genau der landete
+  # danach im Buendel ("DER_NEUE_SCHLUESSEL"). Google lehnte ihn ab, die
+  # Karte blieb grau, und weder Skript noch App sagten warum -- fuer beide
+  # war ja "ein Schluessel da". Dasselbe war vorher schon einmal mit der
+  # Xcode-Team-Kennung passiert.
+  #
+  # Ein Schluessel von Google beginnt mit AIza und ist deutlich laenger als
+  # 30 Zeichen. Das ist keine Echtheitspruefung -- ein falscher Schluessel
+  # dieser Form kommt hier durch. Es faengt nur den Fall ab, in dem
+  # offensichtlich gar kein Schluessel eingetragen wurde.
+  case "$KEY" in
+    AIza*) ;;
+    *)
+      warnen "KEINE Karte: $QUELLE enthaelt keinen Schluessel ($PLATZ steht noch im Buendel)."
+      echo "        Gefunden: ${KEY%"${KEY#??????????}"}... -- ein Schluessel von Google"
+      echo "        beginnt mit AIza. Sieht nach einem Platzhalter aus dem Text aus."
+      echo "        Den echten Wert gibt es in der Google-Cloud-Konsole beim"
+      echo "        Schluessel unter \"Schluessel anzeigen\"."
+      return 0 ;;
+  esac
+  if [ "${#KEY}" -lt 30 ]; then
+    warnen "KEINE Karte: der Schluessel in $QUELLE ist zu kurz ($PLATZ steht noch im Buendel)."
+    return 0
+  fi
   # LC_ALL=C, weil sed auf macOS sonst bei nicht-ASCII im Dateiinhalt
   # aussteigt ("illegal byte sequence"). Das leere Argument nach -i ist
   # die BSD-Schreibweise fuer "keine Sicherungskopie".

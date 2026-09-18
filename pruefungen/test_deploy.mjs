@@ -1633,6 +1633,19 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     const leer = lauf('   \n');
     check('KRITISCH: eine leere Schlüsseldatei gilt nicht als Schlüssel',
       leer.seite.includes('__MAPS_JS_KEY__') && /KEINE Karte/i.test(leer.ausgabe));
+
+    // Der Fall, an dem es tatsächlich gescheitert ist: In der Anleitung
+    // stand eine fertige Befehlszeile mit einem erfundenen Wert, und genau
+    // der landete im Bündel. Weder Skript noch App sagten etwas -- für
+    // beide war "ein Schlüssel da".
+    const platzhalter = lauf('DER_NEUE_SCHLUESSEL\n');
+    check('KRITISCH: ein Platzhaltertext wird NICHT als Schlüssel eingesetzt',
+      platzhalter.seite.includes('__MAPS_JS_KEY__'));
+    check('KRITISCH: und das Skript sagt, dass es keiner ist',
+      /KEINE Karte/i.test(platzhalter.ausgabe) && /AIza/.test(platzhalter.ausgabe));
+    const zuKurz = lauf('AIzaKurz\n');
+    check('Ein abgeschnittener Schlüssel wird ebenfalls abgewiesen',
+      zuKurz.seite.includes('__MAPS_JS_KEY__') && /KEINE Karte/i.test(zuKurz.ausgabe));
   } else {
     ['KRITISCH: mit hinterlegtem Schlüssel steht er danach wirklich in der Seite',
      'KRITISCH: ohne hinterlegten Schlüssel bleibt der Platzhalter stehen',

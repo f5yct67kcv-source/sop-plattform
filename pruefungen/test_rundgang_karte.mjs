@@ -650,6 +650,17 @@ check('Ein leerer Schlüssel auch nicht',
     && mapsSchluesselTauglich(null) === false));
 check('KRITISCH: ein echter Schlüssel gilt',
   await page.evaluate(() => mapsSchluesselTauglich('AIzaSyD-Beispiel_ohne_Bedeutung_123') === true));
+// Der Fall, an dem es tatsächlich gescheitert ist: Beim Einrichten landete
+// der Beispieltext aus der Anleitung im Bündel. Für die frühere Fassung
+// dieser Funktion war das ein Schlüssel -- die App baute die Karte auf,
+// Google lieferte nichts, und der Wächter las "nicht freigegeben", obwohl
+// schlicht keiner da war.
+check('KRITISCH: ein Platzhaltertext aus einer Anleitung gilt NICHT als Schlüssel',
+  await page.evaluate(() => mapsSchluesselTauglich('DER_NEUE_SCHLUESSEL') === false
+    && mapsSchluesselTauglich('HIER_DEINEN_ECHTEN_SCHLUESSEL_EINSETZEN') === false
+    && mapsSchluesselTauglich('DEINEKENNUNG') === false));
+check('Ein abgeschnittener Schlüssel gilt auch nicht',
+  await page.evaluate(() => mapsSchluesselTauglich('AIzaSyD') === false));
 
 if (rueckrufDa) {
   await page.evaluate(() => {
