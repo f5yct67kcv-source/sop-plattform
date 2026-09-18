@@ -10,10 +10,11 @@
 //   3. Die Masse fuer das Handy: Bedienelemente mindestens 44 px, Eingabe-
 //      felder mindestens 16 px Schrift. Der Demo-Knopf steht in der
 //      Kopfleiste genau einmal.
-//   4. Das Formular: Ohne Pflichtangaben geht nichts zum Server; mit ihnen
-//      geht genau EIN JSON-Aufruf an api/demo_senden.php, das Fallenfeld
-//      bleibt leer, und die Antwort des Servers erscheint -- Erfolg wie
-//      "nicht eingerichtet" (503) sind zwei verschiedene Texte.
+//   4. Das Formular (seit ENT-601 Selbstbedienung statt Kontaktanfrage):
+//      Ohne Pflichtangaben geht nichts zum Server; mit ihnen geht genau EIN
+//      JSON-Aufruf an api/demo_anfordern.php, das Fallenfeld bleibt leer,
+//      und die Antwort des Servers erscheint -- Erfolg wie "nicht
+//      eingerichtet" (503) sind zwei verschiedene Texte.
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
@@ -41,8 +42,8 @@ desktop.on('request', r => { if (/^https?:/.test(r.url())) { fremdeAbrufe.push(r
 // registrierte Umleitung greift bei einer file://-Seite nicht mehr (der
 // Browser weist den Aufruf vorher als Cross-Origin ab).
 const aufrufe = [];
-let antwort = { status: 200, body: { status: 'ok', message: 'Vielen Dank. Wir melden uns innert eines Arbeitstages.' } };
-await desktop.route('**/api/demo_senden.php', async route => {
+let antwort = { status: 200, body: { status: 'ok', message: 'Vielen Dank. Sie erhalten in Kürze eine E-Mail mit Ihren Zugangsdaten.' } };
+await desktop.route('**/api/demo_anfordern.php', async route => {
   const r = route.request();
   aufrufe.push({ methode: r.method(), typ: r.headers()['content-type'] || '', daten: r.postDataJSON() });
   await route.fulfill({ status: antwort.status, contentType: 'application/json', body: JSON.stringify(antwort.body) });
@@ -194,7 +195,6 @@ check('Das Fallenfeld ist da, aber fuer Menschen nicht sichtbar',
 await fuell(desktop, '[name="firma"]', 'Muster Sicherheitsdienst AG');
 await fuell(desktop, '[name="name"]', 'A. Beispielperson');
 await fuell(desktop, '[name="email"]', 'a.beispiel@example.invalid');
-await fuell(desktop, '[name="nachricht"]', 'Revierdienst mit Kundenportal');
 // Alles ausser der Nummer: Es darf trotzdem nichts zum Server gehen.
 await klick(desktop, '#demoKnopf');
 await desktop.waitForTimeout(200);
@@ -213,13 +213,12 @@ const a = aufrufe[0] || {};
 check('KRITISCH: der Aufruf ist ein POST mit JSON und traegt die Felder',
   a.methode === 'POST' && /application\/json/.test(a.typ) && a.daten
   && a.daten.firma === 'Muster Sicherheitsdienst AG' && a.daten.email === 'a.beispiel@example.invalid'
-  && a.daten.telefon === '079 123 45 67'
-  && a.daten.nachricht === 'Revierdienst mit Kundenportal');
+  && a.daten.telefon === '079 123 45 67');
 check('KRITISCH: das Fallenfeld wird leer mitgeschickt (ein Mensch fuellt es nicht)',
   a.daten && a.daten.website === '');
 check('Nach dem Erfolg steht die Antwort des Servers da und die Felder sind weg',
   await desktop.isVisible('#demoDanke')
-  && (await desktop.textContent('#demoDankeText')).includes('innert eines Arbeitstages')
+  && (await desktop.textContent('#demoDankeText')).includes('Zugangsdaten')
   && !(await desktop.isVisible('#demoKnopf')));
 await desktop.screenshot({ path: `${OUT}/homepage-02-gesendet.png`, fullPage: false });
 

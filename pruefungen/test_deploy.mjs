@@ -1007,6 +1007,27 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     && liegtImBuendel('dist-betreiber/betreiber.php'));
   if (fehlendeModule.length) { bad.push('Einbindung fehlt im betreiber-Bündel: ' + fehlendeModule.join(', ')); }
 
+  // Die zwei öffentlichen Selbstbedienungs-Endpunkte (ENT-601) tragen kein
+  // betreiber_-Präfix -- absichtlich, sie laufen ohne Anmeldung -- und
+  // fallen darum durch die Prüfung zwei Blöcke oben. Eigene, schmale
+  // Prüfung mit derselben Aussage: mitgeliefert, und jede ihrer
+  // Einbindungen liegt ebenfalls im Bündel.
+  const OEFFENTLICHE_DEMO_ENDPUNKTE = ['demo_anfordern.php', 'demo_erneut_senden.php'];
+  check('KRITISCH: die öffentlichen Demo-Endpunkte (ENT-601) werden ins betreiber-Bündel kopiert',
+    OEFFENTLICHE_DEMO_ENDPUNKTE.every(e => wirdKopiert(`backend/api/${e}`)));
+  const oeffentlicheQuellen = OEFFENTLICHE_DEMO_ENDPUNKTE
+    .map(e => readFileSync(`${WURZEL}/backend/api/${e}`, 'utf8'));
+  const oeffentlicheModule = [...new Set(
+    oeffentlicheQuellen.join('\n')
+      .matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g))]
+    .map(m => m[1]);
+  const fehlendeOeffentlicheModule = oeffentlicheModule.filter(m => !liegtImBuendel(`dist-betreiber/${m}`));
+  check('KRITISCH: jede Datei, die ein öffentlicher Demo-Endpunkt einbindet, liegt im betreiber-Bündel',
+    oeffentlicheModule.length >= 3 && fehlendeOeffentlicheModule.length === 0);
+  if (fehlendeOeffentlicheModule.length) {
+    bad.push('Einbindung fehlt im betreiber-Bündel (öffentliche Demo-Endpunkte): ' + fehlendeOeffentlicheModule.join(', '));
+  }
+
   check('KRITISCH: die eigene .htaccess und robots.txt der Adresse werden mitgeliefert',
     cpZeilen.some(z => z.von === 'htaccess-betreiber' && z.nach === 'dist-betreiber/.htaccess')
     && cpZeilen.some(z => z.von === 'robots-betreiber.txt' && z.nach === 'dist-betreiber/robots.txt')
@@ -1084,15 +1105,16 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     const endpunktPfade = endpunkte.map(e => `backend/api/${e}`);
     for (const p of endpunktPfade) { quellen.push(p); }
     const ersetzt = new Set([...bauen.matchAll(/sed -i "s\|(__[A-Z_]+__)\|/g)].map(m => m[1]));
-    // __BETREIBER_DB_*__ (backend/betreiber.php) wird seit OP-518 auch hier
-    // oben per sed ersetzt -- notfalls mit einer leeren Zeichenkette, wenn
-    // die vier Secrets noch nicht gesetzt sind; betreiber_db() faellt dann
-    // bewusst auf db() zurueck (siehe Kommentar dort). Es steht darum NICHT
-    // mehr in dieser Ausnahmeliste, sondern muss ueber "ersetzt" oben
-    // gefunden werden wie jeder andere Platzhalter. __MANDANT_SECRETS__
-    // bleibt eigene, noch unersetzte Ausnahme -- eigenes, noch offenes
-    // Thema (OP-526). __DIR__ ist PHPs eigene Konstante, kein Platzhalter.
-    const absichtlich = /^(__MANDANT_SECRETS__|__DIR__)$/;
+    // __BETREIBER_DB_*__ (backend/betreiber.php, OP-518) und seit OP-526
+    // auch __MANDANT_SECRETS__ (dieselbe Datei) werden hier oben per sed
+    // ersetzt -- notfalls mit einer leeren Zeichenkette, wenn die
+    // zugehoerigen Secrets noch nicht gesetzt sind; betreiber_db() und
+    // mandant_secret() fallen dann bewusst auf ihren jeweiligen Normalfall
+    // zurueck (siehe Kommentare dort). Beide stehen darum NICHT mehr in
+    // dieser Ausnahmeliste, sondern muessen ueber "ersetzt" oben gefunden
+    // werden wie jeder andere Platzhalter. __DIR__ ist PHPs eigene
+    // Konstante, kein Platzhalter.
+    const absichtlich = /^__DIR__$/;
     const offen = [];
     for (const q of quellen) {
       if (!existsSync(`${WURZEL}/${q}`)) { offen.push(`${q}: Datei fehlt`); continue; }
@@ -1417,7 +1439,9 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
       if (!ersetztJeZiel.has(ziel)) { ersetztJeZiel.set(ziel, new Set()); }
       ersetztJeZiel.get(ziel).add(platzhalter);
     }
-    const absichtlichCupi = /^(__MANDANT_SECRETS__|__DIR__)$/;
+    // __MANDANT_SECRETS__ wird seit OP-526 auch hier per sed ersetzt (siehe
+    // Kommentar beim betreiber-Bündel oben) -- nur noch __DIR__ bleibt aus.
+    const absichtlichCupi = /^__DIR__$/;
 
     const offenCupi = [];
     for (const { quelle, ziel } of textDateienCupi) {

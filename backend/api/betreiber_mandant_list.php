@@ -19,7 +19,7 @@ if (!hat_tabelle($pdo, 'mandant')) {
 }
 
 $zeilen = $pdo->query(
-    'SELECT id, name, status, kanton, gav_unterstellt, gav_bestaetigt_am,
+    'SELECT id, name, subdomain, status, kanton, gav_unterstellt, gav_bestaetigt_am,
             gav_bestaetigt_von, db_host, db_name, db_user, secret_name,
             angelegt_am, geaendert_am
        FROM mandant ORDER BY id'

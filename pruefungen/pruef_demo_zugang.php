@@ -38,11 +38,11 @@ $pruef('Luecken werden gefuellt, nicht uebersprungen',
 // zurueck, stuende dieser Punkt rot -- und im Betrieb sassen zwei
 // Interessenten auf derselben Datenbank.
 $pruef('KRITISCH: ist alles belegt, kommt null und nicht der erste Platz',
-    demo_platz_waehlen(['demo1', 'demo2', 'demo3']) === null);
+    demo_platz_waehlen(DEMO_PLAETZE) === null);
 $pruef('ein unbekannter Platz in der Belegung verschiebt nichts',
-    demo_platz_waehlen(['demo9']) === 'demo1');
-$pruef('der Vorrat hat drei Plaetze (ENT-600)',
-    count(DEMO_PLAETZE) === 3);
+    demo_platz_waehlen(['nichtimvorrat']) === 'demo1');
+$pruef('der Vorrat hat zehn Plaetze (ENT-603 -- ENT-600 nannte noch drei)',
+    count(DEMO_PLAETZE) === 10);
 
 // ── 2. Ablauf ────────────────────────────────────────────────────────
 $pruef('die Laufzeit betraegt 14 Tage (ENT-600)', DEMO_ZUGANG_TAGE === 14);
@@ -125,7 +125,86 @@ $pruef('das Register traegt Platz, Adresse, Anmeldename und Ablauf',
     str_contains($tabelle, 'platz') && str_contains($tabelle, 'email')
     && str_contains($tabelle, 'login') && str_contains($tabelle, 'laeuft_ab_am'));
 
-// ── Ergebnis ─────────────────────────────────────────────────────────
+// ── 9. Adresse eines Platzes ─────────────────────────────────────────
+$pruef('ein Platz ergibt seine eigene Adresse',
+    demo_platz_adresse('demo2') === 'https://demo2.guardops.ch');
+// Gegenprobe: Ein Platz, den es nicht gibt, ergibt KEINE Adresse. Sonst
+// stuende in einer Mail ein Link auf etwas, das nirgends steht.
+$pruef('KRITISCH: ein unbekannter Platz ergibt keine Adresse',
+    demo_platz_adresse('demo99') === null && demo_platz_adresse('') === null);
+$pruef('die Adresse ist verschluesselt (https)',
+    str_starts_with((string)demo_platz_adresse('demo1'), 'https://'));
+
+// ── 10. Passwort ─────────────────────────────────────────────────────
+$pw = demo_passwort_erzeugen();
+$pruef('das Passwort hat die vorgegebene Laenge', strlen($pw) === 12);
+// Der Grund fuer den eigenen Zeichenvorrat: Wer 0 und O nicht unterscheiden
+// kann, tippt falsch und haelt sich selbst fuer den Fehler.
+$pruef('KRITISCH: keine verwechselbaren Zeichen im Vorrat (0 O 1 l I)',
+    preg_match('/[0O1lI]/', DEMO_PASSWORT_ZEICHEN) === 0);
+$pruef('und auch nicht im erzeugten Passwort',
+    preg_match('/[0O1lI]/', $pw) === 0);
+// Zwei Laeufe duerfen nicht dasselbe ergeben. Bei 54^12 Moeglichkeiten
+// waere eine Wiederholung ein Zeichen dafuer, dass gar nicht gezogen wird.
+$pruef('KRITISCH: zwei Passwoerter sind nicht dasselbe',
+    demo_passwort_erzeugen() !== demo_passwort_erzeugen());
+$pruef('der Vorrat ist gross genug, um 12 Stellen zu tragen',
+    strlen(DEMO_PASSWORT_ZEICHEN) >= 50);
+
+// ── 11. Die Mail an den Interessenten ────────────────────────────────
+$mail = demo_zugang_mail('Muster AG', 'R. Beispiel', 'https://demo1.guardops.ch',
+    'musterag', 'AbcDefGhiJkm', '2026-03-16 09:00:00');
+foreach (['text', 'html'] as $teil) {
+    $pruef("die Mail ($teil) traegt die Adresse",
+        str_contains($mail[$teil], 'demo1.guardops.ch'));
+    $pruef("die Mail ($teil) traegt den Anmeldenamen",
+        str_contains($mail[$teil], 'musterag'));
+    $pruef("die Mail ($teil) traegt das Passwort",
+        str_contains($mail[$teil], 'AbcDefGhiJkm'));
+    // Ohne Datum meldet sich jemand am 15. Tag und haelt den Zugang fuer
+    // kaputt.
+    $pruef("KRITISCH: die Mail ($teil) nennt das Ablaufdatum",
+        str_contains($mail[$teil], '16.03.2026'));
+    $pruef("KRITISCH: die Mail ($teil) warnt vor echten Personendaten",
+        str_contains($mail[$teil], 'echten Personendaten'));
+}
+$pruef('der Betreff sagt, worum es geht',
+    str_contains($mail['betreff'], 'Demo-Zugang'));
+// Ein Firmenname mit spitzen Klammern darf im HTML-Teil kein Markup werden.
+$boes = demo_zugang_mail('<b>Muster</b>', 'X', 'https://demo1.guardops.ch',
+    'x', 'y', '2026-03-16 09:00:00');
+$pruef('KRITISCH: ein Firmenname wird im HTML-Teil maskiert, nicht eingebaut',
+    !str_contains($boes['html'], '<b>Muster</b>') && str_contains($boes['html'], '&lt;b&gt;'));
+
+// ── Formhelfer der Selbstbedienung (ENT-601) ─────────────────────────
+$pruef('das Fallenfeld erkennt eine gefuellte Falle',
+    demo_zugang_ist_falle(['website' => 'irgendwas']));
+$pruef('ein leeres Fallenfeld ist keine Falle',
+    !demo_zugang_ist_falle(['website' => '']) && !demo_zugang_ist_falle([]));
+$pruef('demo_zugang_einzeilig ersetzt Umbrueche und kuerzt',
+    demo_zugang_einzeilig("Zeile 1\r\nZeile 2\t\tEnde", 100) === 'Zeile 1 Zeile 2 Ende'
+    && demo_zugang_einzeilig('123456789', 5) === '12345');
+
+// Telefon ist der Preis fuer den Sofort-Zugang (ENT-601/ENT-603).
+$pruef('KRITISCH: eine Nummer mit weniger als neun Ziffern zaehlt nicht',
+    demo_zugang_telefon_ziffern('079 12') < DEMO_ZUGANG_TELEFON_MIN_ZIFFERN);
+$pruef('eine gueltige Schweizer Nummer in jeder Schreibweise zaehlt',
+    demo_zugang_telefon_ziffern('+41 79 123 45 67') >= DEMO_ZUGANG_TELEFON_MIN_ZIFFERN
+    && demo_zugang_telefon_ziffern('079/123 45 67') >= DEMO_ZUGANG_TELEFON_MIN_ZIFFERN);
+
+// Zustellbarkeit: dieselbe Absicherung wie beim Kontaktformular, mit
+// einspeisbarem Nachschlag statt echtem DNS (ENT-469-Bauart).
+$immerJa      = fn(string $d): bool => true;
+$nieJa        = fn(string $d): bool => false;
+$nurKontrolle = fn(string $d): bool => $d === DEMO_ZUGANG_KONTROLL_DOMAIN;
+$pruef('eine Domain mit Mailserver gilt als zustellbar',
+    demo_zugang_adresse_zustellbar('a@echt.ch', $immerJa) === true);
+$pruef('KRITISCH: gestoerter Namensdienst (auch die Kontrolldomain faellt durch) heisst UNBEKANNT, nicht "keine"',
+    demo_zugang_adresse_zustellbar('a@irgendwas.ch', $nieJa) === null);
+$pruef('KRITISCH: erreichbarer Namensdienst, aber die Domain gibt es wirklich nicht, heisst "keine"',
+    demo_zugang_adresse_zustellbar('a@nirgends.test', $nurKontrolle) === false);
+$pruef('eine Adresse ohne @ gilt als nicht zustellbar, ohne Absturz',
+    demo_zugang_adresse_zustellbar('keine-email', $immerJa) === false);
 echo "\n$ok bestanden, " . count($bad) . " nicht bestanden\n";
 foreach ($bad as $n) { echo "  x $n\n"; }
 exit(count($bad) ? 1 : 0);

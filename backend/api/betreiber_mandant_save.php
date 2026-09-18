@@ -33,8 +33,23 @@ if (trim($kantonRoh) !== '' && $kanton === null) {
         'message' => 'Der Kanton wird als zweistelliges Kürzel erwartet, zum Beispiel BE.'], 400);
 }
 
+// Ohne '.guardops.ch' -- nur das Wort davor, z. B. 'demo1'. Darueber findet
+// die Demo-Zuteilung (demo_instanz.php, demo_anfordern.php) den passenden
+// Platz; zwei Mandanten mit derselben Subdomain waeren dort nicht mehr
+// unterscheidbar (SELECT ... LIMIT 1 traefe eine stille Wahl).
+$subdomain = trim((string)($daten['subdomain'] ?? ''));
+if ($subdomain !== '') {
+    $stmt = $pdo->prepare('SELECT id FROM mandant WHERE subdomain = ? AND id <> ?');
+    $stmt->execute([$subdomain, $id]);
+    if ($stmt->fetchColumn() !== false) {
+        json_response(['status' => 'error',
+            'message' => 'Diese Subdomain ist bereits einem anderen Mandanten zugeteilt.'], 400);
+    }
+}
+
 $werte = [
     'name'        => $name,
+    'subdomain'   => $subdomain,
     'kanton'      => $kanton,
     'db_host'     => trim((string)($daten['db_host'] ?? '')),
     'db_name'     => trim((string)($daten['db_name'] ?? '')),
@@ -55,7 +70,7 @@ foreach (['db_pass', 'db_passwort', 'passwort', 'secret'] as $verboten) {
 
 if ($id > 0) {
     $stmt = $pdo->prepare(
-        'UPDATE mandant SET name = ?, kanton = ?, db_host = ?, db_name = ?, db_user = ?,
+        'UPDATE mandant SET name = ?, subdomain = ?, kanton = ?, db_host = ?, db_name = ?, db_user = ?,
                             secret_name = ?, geaendert_am = NOW()
           WHERE id = ?'
     );
@@ -73,8 +88,8 @@ if ($id > 0) {
 }
 
 $stmt = $pdo->prepare(
-    'INSERT INTO mandant (name, kanton, db_host, db_name, db_user, secret_name)
-     VALUES (?, ?, ?, ?, ?, ?)'
+    'INSERT INTO mandant (name, subdomain, kanton, db_host, db_name, db_user, secret_name)
+     VALUES (?, ?, ?, ?, ?, ?, ?)'
 );
 $stmt->execute(array_values($werte));
 json_response(['status' => 'ok', 'id' => (int)$pdo->lastInsertId(), 'angelegt' => true]);

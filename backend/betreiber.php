@@ -244,7 +244,7 @@ function be_konten_zahl(PDO $pdo, int $ausser = 0): int
 // und dazu gehoeren hier Felder, die NIEMAND ueber die Oberflaeche setzen
 // soll (angelegt_am) oder die eine eigene Bestaetigung brauchen
 // (gav_bestaetigt_am/-von, siehe be_gav_bestaetigen()).
-const BE_MANDANT_FELDER = ['name', 'kanton', 'db_host', 'db_name', 'db_user', 'secret_name'];
+const BE_MANDANT_FELDER = ['name', 'subdomain', 'kanton', 'db_host', 'db_name', 'db_user', 'secret_name'];
 
 // Der Kanton steuert den Feiertagskalender. Zwei Buchstaben, gross --
 // mehr wird hier nicht geprueft: Eine Liste der 26 Kantone waere eine
@@ -506,19 +506,38 @@ function be_bootstrap_offen(PDO $pdo): bool
 // Angaben liegen auf dem SERVER, nicht in der Datenbank. Ein
 // Datenbank-Backup, ein Datenbankwerkzeug oder eine versehentlich offene
 // Ansicht enthält sie nicht.
+// Reine, testbare Zerlegung -- mandant_secret() darunter reicht nur den
+// hartcodierten Platzhalter hinein. Dieselbe Aufteilung wie
+// basis_url()/basis_url_pruefen() (db.php) und
+// demo_empfaenger()/demo_empfaenger_pruefen() (demo_anfrage.php): Was hier
+// steht, laesst sich mit frei gewaehlten Werten ausfuehren, ohne den
+// Deploy-Platzhalter selbst ersetzen zu muessen.
+//
+// BASE64, NICHT ROHES JSON (OP-526): Der Deploy ersetzt Platzhalter per
+// sed, und sed behandelt "&" in der Ersetzung als Rueckverweis auf den
+// gefundenen Text und den gewaehlten Trenner "|" als Befehlsende -- ein
+// Passwort, das eines von beiden enthaelt, zerschoesse entweder den
+// sed-Aufruf oder den Wert selbst, unbemerkt. Base64 kennt beide Zeichen
+// nicht (Alphabet A-Z a-z 0-9 + / =), genau aus diesem Grund traegt
+// VAPID_PRIVATE_PEM_B64 (push.php) schon base64 statt der rohen PEM-Datei.
+// Das GitHub-Secret MANDANT_SECRETS traegt darum base64(JSON), nicht JSON
+// selbst -- siehe deploy-hostpoint.yml.
+function mandant_secrets_tafel_pruefen(string $roh): array
+{
+    // Unersetzt oder leer: Es gibt noch keine fremden Mandanten. Das
+    // ist der heutige Normalfall und kein Fehler.
+    if ($roh === '' || $roh === '__MANDANT' . '_SECRETS__') { return []; }
+    $json = base64_decode($roh, true);
+    if ($json === false) { return []; }
+    $d = json_decode($json, true);
+    return is_array($d) ? $d : [];
+}
+
 function mandant_secret(string $name): ?string
 {
     static $tafel = null;
     if ($tafel === null) {
-        $roh = '__MANDANT_SECRETS__';
-        // Unersetzt oder leer: Es gibt noch keine fremden Mandanten. Das
-        // ist der heutige Normalfall und kein Fehler.
-        if ($roh === '' || $roh === '__MANDANT' . '_SECRETS__') {
-            $tafel = [];
-        } else {
-            $d = json_decode($roh, true);
-            $tafel = is_array($d) ? $d : [];
-        }
+        $tafel = mandant_secrets_tafel_pruefen('__MANDANT_SECRETS__');
     }
     if ($name === '' || !array_key_exists($name, $tafel)) { return null; }
     return (string)$tafel[$name];
@@ -787,12 +806,15 @@ function be_tabellen(): array
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(200) NOT NULL,
   -- Eigene Ausliefer-Adresse dieses Mandanten unter guardops.ch (ENT-589),
-  -- z. B. 'cupi24' fuer cupi24.guardops.ch. Rein informativ -- KEINE
-  -- Server-Logik liest diese Spalte zur Laufzeit, um zu entscheiden, welche
-  -- Datenbank oder Konfiguration gilt (ENT-501: die eigene Adresse kommt
-  -- ausschliesslich aus dem Deploy-Buendel des jeweiligen Mandanten, nie aus
-  -- einer Anfrage oder einer Tabellenzeile). Leer, solange ein Mandant noch
-  -- unter der geteilten Testadresse laeuft.
+  -- z. B. 'cupi24' fuer cupi24.guardops.ch. Fuer einen regulaeren Mandanten
+  -- bleibt sie informativ -- die eigene Adresse eines Deploy-Buendels kommt
+  -- weiterhin ausschliesslich aus dem Buendel selbst, nie aus einer Anfrage
+  -- oder einer Tabellenzeile (ENT-501, basis_url()). Seit ENT-600 hat sie
+  -- fuer Demo-Plaetze aber eine zweite, aktive Rolle: demo_instanz.php und
+  -- demo_anfordern.php lesen sie zur Laufzeit, um zu einem freien Platz
+  -- (z. B. 'demo1') die zugehoerige Mandantenzeile und damit deren
+  -- Datenbankangaben zu finden. Leer, solange ein Mandant noch unter der
+  -- geteilten Testadresse laeuft.
   subdomain VARCHAR(100) NOT NULL DEFAULT '',
   status ENUM('aktiv','gesperrt','gekuendigt') NOT NULL DEFAULT 'aktiv',
   kanton CHAR(2) NULL,

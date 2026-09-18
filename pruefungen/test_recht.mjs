@@ -57,7 +57,7 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
 // veralteter Text.
 {
   const setztCookies = /document\.cookie|localStorage|sessionStorage|indexedDB/.test(homepage)
-    || ['backend/api/demo_senden.php', 'backend/demo_bremse.php', 'backend/demo_anfrage.php']
+    || ['backend/api/demo_anfordern.php', 'backend/demo_bremse.php', 'backend/demo_zugang.php']
        .some(d => /setcookie|session_start/i.test(lies(d)));
   check('KRITISCH: die Behauptung "keine Cookies" stimmt mit dem Code ueberein',
     !setztCookies && /keine Cookies/i.test(datenschutz));
@@ -79,11 +79,18 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
   check('KRITISCH: die Behauptung "nichts von fremden Servern" stimmt mit dem Code ueberein',
     !holtFremd && /fremden Servern/i.test(datenschutz));
 
-  // Nichts gespeichert: Der Endpunkt darf keine Anfrage in die Datenbank
-  // schreiben. Wuerde er es je tun, waere die Seite eine Falschaussage.
-  const endpunkt = lies('backend/api/demo_senden.php');
-  check('KRITISCH: die Behauptung "nicht in einer Datenbank gespeichert" stimmt mit dem Code ueberein',
-    !/INSERT INTO|UPDATE\s+\w+\s+SET/i.test(endpunkt) && /nicht in\s*\n?\s*einer Datenbank gespeichert/i.test(datenschutz.replace(/\s+/g, ' ')));
+  // Seit ENT-601 die Gegenrichtung: Der Endpunkt, an den das Formular
+  // tatsaechlich geht, LEGT einen Datensatz an -- die Seite muss das genau
+  // so sagen, nicht mehr das Gegenteil behaupten. Waere je kein INSERT mehr
+  // da, waere die neue Behauptung ihrerseits falsch.
+  const endpunkt = lies('backend/api/demo_anfordern.php');
+  check('KRITISCH: das Formular fuehrt tatsaechlich zu diesem Endpunkt',
+    /action="api\/demo_anfordern\.php"/.test(homepage));
+  check('KRITISCH: die Behauptung "wird in einer Datenbank gespeichert" stimmt mit dem Code ueberein',
+    /INSERT INTO demo_zugang/i.test(endpunkt)
+    && /werden dafür in\s*\n?\s*einer Datenbank gespeichert/i.test(datenschutz.replace(/\s+/g, ' ')));
+  check('KRITISCH: die Seite behauptet NICHT mehr, nichts werde gespeichert',
+    !/nicht in\s*\n?\s*einer Datenbank gespeichert/i.test(datenschutz.replace(/\s+/g, ' ')));
 
   // Die Bremse: Pruefwert statt Adresse, und die genannte Frist muss die
   // im Code eingestellte sein -- eine Erklaerung, die 15 Minuten verspricht,
@@ -108,14 +115,16 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
   // ebenfalls. Ein neues Feld laesst sich damit nicht stillschweigend
   // ergaenzen, ohne dass jemand die Erklaerung anfasst.
   const WORT_ZUM_FELD = { firma: 'Firma', name: 'Name', email: 'E-Mail-Adresse',
-    telefon: 'Telefonnummer', groesse: 'Mitarbeitende', nachricht: 'Nachricht' };
+    telefon: 'Telefonnummer' };
   const erhoben = [...homepage.matchAll(/<(?:input|select|textarea)[^>]*\bname="([a-zA-Z]+)"/g)]
     .map(m => m[1])
     .filter(n => n !== 'website');   // Das Fallenfeld erhebt nichts, es faengt Skripte.
   const ohneZuordnung = erhoben.filter(n => !WORT_ZUM_FELD[n]);
   const ungenannt = erhoben.filter(n => WORT_ZUM_FELD[n] && !datenschutz.includes(WORT_ZUM_FELD[n]));
+  // Seit ENT-601 sind es vier Pflichtfelder, keine optionalen mehr
+  // (Mitarbeitende/Nachricht sind mit dem Kontaktformular weggefallen).
   check('KRITISCH: jedes Feld, das das Formular erhebt, steht in der Datenschutzerklaerung',
-    erhoben.length >= 5 && ohneZuordnung.length === 0 && ungenannt.length === 0);
+    erhoben.length === 4 && ohneZuordnung.length === 0 && ungenannt.length === 0);
   if (ohneZuordnung.length) { bad.push('Feld ohne Zuordnung in dieser Pruefung: ' + ohneZuordnung.join(', ')); }
   if (ungenannt.length) { bad.push('Feld fehlt in der Datenschutzerklaerung: ' + ungenannt.join(', ')); }
 }

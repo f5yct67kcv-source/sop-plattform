@@ -127,22 +127,23 @@ jobs:
           P_BETREIBER_FTP_HOST: ${{ secrets.BETREIBER_FTP_HOST }}
           P_BETREIBER_FTP_USER: ${{ secrets.BETREIBER_FTP_USER }}
           P_BETREIBER_FTP_PASSWORD: ${{ secrets.BETREIBER_FTP_PASSWORD }}
-          # Eigene Datenbank der Betreiber-Ebene (OP-518, sop-projekt/
-          # 00-projekt/offene-punkte.md): Mandantenstamm, Betreiber-Konten
-          # und Support-Vorgaenge sollen NICHT in derselben Datenbank liegen
-          # wie der erste Mandant. Eigene Secret-NAMEN aus demselben Grund
-          # wie bei BETREIBER_FTP_* oben: kein stiller Rueckfall. NICHT
-          # erforderlich -- fehlen sie, faellt betreiber_db() weiterhin
-          # bewusst auf db() zurueck (siehe Kopf von backend/betreiber.php).
-          # Das ist der heutige, unveraenderte Normalfall und ausdruecklich
-          # KEIN Fehlerzustand, solange OP-518 auf der Hostpoint-/Secret-
-          # Seite noch nicht abgeschlossen ist. Nur fuer Production -- die
-          # Betreiber-Ebene als eigene Datenbank ist wie BETREIBER_FTP_*
-          # ein Production-Konzept.
+          # Eigene Datenbank der Betreiber-Ebene (OP-518): Mandantenstamm,
+          # Betreiber-Konten, Support sollen nicht in der Datenbank des
+          # ersten Mandanten liegen. Eigener Secret-Name wie BETREIBER_FTP_*
+          # oben, kein stiller Rueckfall. NICHT erforderlich -- fehlen sie,
+          # faellt betreiber_db() bewusst auf db() zurueck (Kopf von
+          # backend/betreiber.php), solange OP-518 offen ist. Nur Production.
           P_BETREIBER_DB_HOST: ${{ secrets.BETREIBER_DB_HOST }}
           P_BETREIBER_DB_NAME: ${{ secrets.BETREIBER_DB_NAME }}
           P_BETREIBER_DB_USER: ${{ secrets.BETREIBER_DB_USER }}
           P_BETREIBER_DB_PASSWORD: ${{ secrets.BETREIBER_DB_PASSWORD }}
+          # OP-526: base64(JSON) {"secret_name":"passwort",...}, NICHT roh --
+          # sed weiter unten vertraegt kein "&"/"|" in einem Passwort, base64
+          # kennt beide nicht (wie VAPID_PRIVATE_PEM_B64, siehe
+          # mandant_secrets_tafel_pruefen() in backend/betreiber.php).
+          # Erzeugen: base64 -w0 mandant-secrets.json ("-w0": $GITHUB_ENV ist
+          # eine KEY=value-Zeile). Leer bleibt kein Fehler, wie P_BETREIBER_DB_*.
+          P_MANDANT_SECRETS: ${{ secrets.MANDANT_SECRETS }}
           # Eigener FTP-Zugang fuer portal.guardops.ch, beschraenkt auf
           # /home/itufeden/www/portal.guardops.ch (ENT-580, zweite Etappe
           # des schrittweisen Umzugs). Eigene Secret-NAMEN aus demselben
@@ -215,6 +216,15 @@ jobs:
           # api/demo_reset.php) -- gleiches Prinzip wie D_PUSH_CRON_SCHLUESSEL
           # weiter unten, nur umgebungsgebunden statt produktionsweit.
           D_RESET_TOKEN: ${{ secrets.DEMO_RESET_TOKEN }}
+          # Zeitgeber fuer den Ablauf der Demo-Zugaenge (ENT-600,
+          # api/betreiber_demo_ablauf.php). EIGENES Secret und NICHT
+          # DEMO_RESET_TOKEN: Jener gilt nur in der Demo-Umgebung, dieser
+          # laeuft auf Produktion -- der Betreiber-Bereich steht dort. Wer
+          # beide zusammenlegte, haette einen Zeitgeber-Schluessel, der je
+          # nach Umgebung etwas anderes oeffnet.
+          # Ohne dieses Secret laeuft der Ablauf nicht von selbst; der
+          # Endpunkt verlangt dann eine Betreiber-Sitzung und sagt das auch.
+          P_DEMO_ABLAUF_TOKEN: ${{ secrets.DEMO_ABLAUF_TOKEN }}
           # Push-Benachrichtigungen (ENT-424). Eigene, von den
           # Production-Namen VERSCHIEDENE Secret-Namen fuer Staging -- kein
           # struktureller Rueckfall moeglich (ENT-343 Punkt 1). Und
@@ -269,6 +279,9 @@ jobs:
             # Nur die Demo-Umgebung kennt einen Reset -- kein Zeitgeber-Zugang
             # ausserhalb von ihr, aus demselben Grund wie EFF_DEMO_TESTMAIL.
             EFF_DEMO_RESET_TOKEN=""
+            # Der Ablauf der Demo-Zugaenge laeuft dagegen AUF Produktion --
+            # dort steht der Betreiber-Bereich mit dem Register (ENT-600).
+            EFF_DEMO_ABLAUF_TOKEN="$P_DEMO_ABLAUF_TOKEN"
             EFF_VAPID_PRIVATE_PEM_B64="$P_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$P_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$P_PUSH_CRON_SCHLUESSEL"
@@ -297,6 +310,9 @@ jobs:
             EFF_BETREIBER_DB_NAME="$P_BETREIBER_DB_NAME"
             EFF_BETREIBER_DB_USER="$P_BETREIBER_DB_USER"
             EFF_BETREIBER_DB_PASSWORD="$P_BETREIBER_DB_PASSWORD"
+            # OP-526, wie EFF_BETREIBER_DB_* zwei Zeilen darueber: leer bleibt
+            # kein Fehler, mandant_secret() liest das als "kein Secret".
+            EFF_MANDANT_SECRETS="$P_MANDANT_SECRETS"
             EFF_PORTAL_FTP_HOST="$P_PORTAL_FTP_HOST"
             EFF_PORTAL_FTP_USER="$P_PORTAL_FTP_USER"
             EFF_PORTAL_FTP_PASSWORD="$P_PORTAL_FTP_PASSWORD"
@@ -342,6 +358,7 @@ jobs:
             EFF_STAGING_TESTMAIL=""
             EFF_DEMO_TESTMAIL="$D_TESTMAIL"
             EFF_DEMO_RESET_TOKEN="$D_RESET_TOKEN"
+            EFF_DEMO_ABLAUF_TOKEN=""
             EFF_VAPID_PRIVATE_PEM_B64="$D_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$D_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$D_PUSH_CRON_SCHLUESSEL"
@@ -385,6 +402,8 @@ jobs:
             EFF_BETREIBER_DB_NAME=""
             EFF_BETREIBER_DB_USER=""
             EFF_BETREIBER_DB_PASSWORD=""
+            # OP-526, wie EFF_BETREIBER_DB_* direkt darueber: nur Production.
+            EFF_MANDANT_SECRETS=""
             # portal.guardops.ch ist wie betreiber.guardops.ch nur fuer
             # Production gedacht (ENT-580) -- dieselbe Begruendung.
             EFF_PORTAL_FTP_HOST=""
@@ -435,6 +454,7 @@ jobs:
             # teilen sich keine Mailziele (ENT-523-N1).
             EFF_DEMO_TESTMAIL=""
             EFF_DEMO_RESET_TOKEN=""
+            EFF_DEMO_ABLAUF_TOKEN=""
             EFF_VAPID_PRIVATE_PEM_B64="$S_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$S_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$S_PUSH_CRON_SCHLUESSEL"
@@ -470,6 +490,8 @@ jobs:
             EFF_BETREIBER_DB_NAME=""
             EFF_BETREIBER_DB_USER=""
             EFF_BETREIBER_DB_PASSWORD=""
+            # OP-526, wie EFF_BETREIBER_DB_* direkt darueber: nur Production.
+            EFF_MANDANT_SECRETS=""
             # portal.guardops.ch ist wie betreiber.guardops.ch nur fuer
             # Production gedacht (ENT-580) -- dieselbe Begruendung.
             EFF_PORTAL_FTP_HOST=""
@@ -480,16 +502,11 @@ jobs:
             EFF_CUPI24_FTP_HOST=""
             EFF_CUPI24_FTP_USER=""
             EFF_CUPI24_FTP_PASSWORD=""
-            # Eigene Adresse (ENT-501), siehe Begruendung im Production-Zweig.
-            # Fuer Staging steht die Domain bereits als Environment-Variable
-            # STAGING_DOMAIN bereit -- dieselbe, mit der die beiden
-            # Verifikationsschritte weiter unten die Seite abrufen. KEIN
-            # Rueckfall auf die produktive Adresse: Ein Staging-Link, der auf
-            # Produktion zeigt, waere genau der Fehler, den die urspruengliche
-            # HTTP_HOST-Loesung vermeiden wollte. Fehlt die Variable, bleibt
-            # der Platzhalter stehen, basis_url() liefert null und die
-            # betroffenen Endpunkte verschicken keinen Link, statt einen
-            # falschen.
+            # Eigene Adresse (ENT-501, Begruendung im Production-Zweig).
+            # STAGING_DOMAIN dient auch den Verifikationsschritten weiter
+            # unten. Kein Rueckfall auf die produktive Adresse -- fehlt die
+            # Variable, bleibt der Platzhalter stehen, basis_url() liefert
+            # null statt eines falschen Links.
             EFF_APP_BASIS_URL=""
             if [ -n "${{ vars.STAGING_DOMAIN }}" ]; then
               EFF_APP_BASIS_URL="https://${{ vars.STAGING_DOMAIN }}"
@@ -538,21 +555,13 @@ jobs:
           fi
 
           # Drift-Guard fuer die manuell bei Hostpoint gepflegten Staging-
-          # Dateien (ENT-384, erweitert ENT-387; Demo braucht ihn NICHT --
-          # ENT-523-N1: keinen Passwortschutz, nichts manuell zu pflegen,
-          # siehe htaccess-demo-zusatz weiter unten). Oberhalb der Markierung
-          # "#@__HCP_END__@#" in der dortigen .htaccess verwaltet sich der
-          # Passwortschutz selbst; darunter stehen von Hand die Inhalte von
-          # htaccess-hostpoint UND htaccess-staging-zusatz (X-Robots-Tag),
-          # robots.txt liegt daneben. Der Deploy laesst alle drei fuer
-          # Staging unangetastet (siehe FTP-Schritt unten), sonst wuerde
-          # jeder Deploy den Schutz stillschweigend entfernen -- aendert
-          # sich eine der drei Quelldateien im Repository, driftet die
-          # Staging-Kopie darum unbemerkt auseinander, wenn niemand manuell
-          # nachzieht. Deshalb muss jeder Hash exakt dem zuletzt manuell
-          # uebertragenen Stand entsprechen (staging-htaccess.synced-sha256,
-          # "datei:hash" je Zeile) -- sonst bricht der Staging-Deploy ab,
-          # statt mit veralteten Regeln weiterzulaufen.
+          # Dateien (ENT-384/387; Demo braucht ihn nicht, ENT-523-N1). Der
+          # Deploy laesst htaccess-hostpoint, htaccess-staging-zusatz und
+          # robots-staging.txt fuer Staging unangetastet, sonst wuerde er den
+          # dort manuell gepflegten Passwortschutz stillschweigend entfernen
+          # -- driftet eine der drei Quelldateien im Repository unbemerkt
+          # auseinander, muss jeder Hash exakt staging-htaccess.synced-sha256
+          # entsprechen, sonst bricht der Staging-Deploy ab.
           if [ "$UMGEBUNG" = "staging" ]; then
             for DRIFT_DATEI in htaccess-hostpoint htaccess-staging-zusatz robots-staging.txt; do
               AKTUELLER_HASH=$(sha256sum "$DRIFT_DATEI" | cut -d' ' -f1)
@@ -607,6 +616,7 @@ jobs:
             echo "EFF_STAGING_TESTMAIL=$EFF_STAGING_TESTMAIL"
             echo "EFF_DEMO_TESTMAIL=$EFF_DEMO_TESTMAIL"
             echo "EFF_DEMO_RESET_TOKEN=$EFF_DEMO_RESET_TOKEN"
+            echo "EFF_DEMO_ABLAUF_TOKEN=$EFF_DEMO_ABLAUF_TOKEN"
             echo "EFF_VAPID_PRIVATE_PEM_B64=$EFF_VAPID_PRIVATE_PEM_B64"
             echo "EFF_VAPID_KONTAKT=$EFF_VAPID_KONTAKT"
             echo "EFF_PUSH_CRON_SCHLUESSEL=$EFF_PUSH_CRON_SCHLUESSEL"
@@ -635,6 +645,7 @@ jobs:
             echo "EFF_BETREIBER_DB_NAME=$EFF_BETREIBER_DB_NAME"
             echo "EFF_BETREIBER_DB_USER=$EFF_BETREIBER_DB_USER"
             echo "EFF_BETREIBER_DB_PASSWORD=$EFF_BETREIBER_DB_PASSWORD"
+            echo "EFF_MANDANT_SECRETS=$EFF_MANDANT_SECRETS"
             echo "EFF_PORTAL_FTP_HOST=$EFF_PORTAL_FTP_HOST"
             echo "EFF_PORTAL_FTP_USER=$EFF_PORTAL_FTP_USER"
             echo "EFF_PORTAL_FTP_PASSWORD=$EFF_PORTAL_FTP_PASSWORD"
@@ -663,20 +674,14 @@ jobs:
           # Mitarbeiter-Code, also kann von dort auch nichts versehentlich
           # an einen Kunden geraten.
           cp portal.html dist/portal.html
-          # KEINE homepage.html MEHR AUF DIESER INSTANZ (ENT-563/OP-565).
-          # Die oeffentliche Seite lebt seit guardops.ch dort, und zwar als
-          # index.html auf der Wurzel. Zweimal dieselbe Seite unter zwei
-          # Adressen waere doppelter Inhalt, und die Testadresse soll gar
-          # nicht gefunden werden. Der Upload raeumt sein Zielverzeichnis
-          # auf -- die Datei verschwindet vom Server also von selbst, sobald
-          # diese Zeile fehlt. Das Buendel fuer guardops.ch baut sie weiter
-          # (siehe weiter unten); test_deploy.mjs achtet darauf, dass sie
-          # hier NICHT zurueckkehrt.
-          # Betreiber-Bereich (ENT-519 bis ENT-521). Eigene Seite neben
-          # dashboard.html und portal.html, mit eigener Anmeldung gegen die
-          # betreiber_*-Endpunkte. Sie traegt weder Cockpit- noch
-          # Mitarbeiter- noch Portalcode -- dieselbe Trennung wie bei den
-          # Anmeldewegen selbst.
+          # KEINE homepage.html MEHR AUF DIESER INSTANZ (ENT-563/OP-565): Die
+          # oeffentliche Seite lebt seit guardops.ch als index.html dort,
+          # doppelter Inhalt unter zwei Adressen soll nicht entstehen. Der
+          # Upload raeumt sein Ziel auf, die Datei fehlt hier also von
+          # selbst; guardops.ch baut sie weiter, test_deploy.mjs achtet
+          # darauf, dass sie hier nicht zurueckkehrt.
+          # Betreiber-Bereich (ENT-519/521): eigene Seite, eigene Anmeldung
+          # gegen betreiber_*-Endpunkte, kein Cockpit-/Mitarbeiter-/Portalcode.
           cp betreiber.html dist/betreiber.html
           # gav.js traegt die GAV-Regeln fuer BEIDE Oberflaechen (ENT-049).
           # Fehlt sie hier, laden dashboard.html und app.html ins Leere und
@@ -1253,7 +1258,28 @@ jobs:
           # Betreiber-Bereich beim ersten Aufruf, nicht erst bei der
           # Demo-Freigabe.
           cp backend/demo_zugang.php   dist-betreiber/demo_zugang.php
+          # Der Griff in eine Demo-Instanz (ENT-600) und was er braucht.
+          # demo_instanz.php bindet demo_reset.php ein, demo_reset.php
+          # erwartet system_rollen() aus rechte.php (oben schon dabei), und
+          # demo_daten.php befuellt die frisch geleerte Instanz.
+          cp backend/demo_instanz.php  dist-betreiber/demo_instanz.php
+          cp backend/demo_reset.php    dist-betreiber/demo_reset.php
+          cp backend/demo_daten.php    dist-betreiber/demo_daten.php
+          # Bremse gegen zu viele Anfragen (ENT-601), von
+          # api/demo_anfordern.php und api/demo_erneut_senden.php benutzt --
+          # dieselbe Datei wie beim Kontaktformular der Homepage, eigenes
+          # Verzeichnis zur Laufzeit.
+          cp backend/demo_bremse.php   dist-betreiber/demo_bremse.php
+          # Der Versand der Zugangsdaten an den Interessenten (ENT-600).
+          # mailer.php traegt das SMTP-Passwort -- die Platzhalter werden
+          # weiter unten ersetzt, wie in den anderen Buendeln.
+          cp backend/mailer.php        dist-betreiber/mailer.php
           cp backend/api/betreiber_*.php dist-betreiber/api/
+          # Die oeffentliche Selbstbedienung (ENT-601): kein betreiber_-
+          # Praefix, weil sie ausdruecklich OHNE Anmeldung laeuft -- der
+          # Wildcard zwei Zeilen darueber faengt sie darum nicht ein.
+          cp backend/api/demo_anfordern.php     dist-betreiber/api/demo_anfordern.php
+          cp backend/api/demo_erneut_senden.php dist-betreiber/api/demo_erneut_senden.php
           cp htaccess-betreiber        dist-betreiber/.htaccess
           cp robots-betreiber.txt      dist-betreiber/robots.txt
 
@@ -1283,21 +1309,51 @@ jobs:
           # Rapport-Tools und bei den GuardOpS-Literalen im guardops-Buendel).
           sed -i "s|__APP_BASIS_URL__|https://betreiber.guardops.ch|g" dist-betreiber/db.php
 
+          # SMTP fuer die Zugangsdaten-Mail an Demo-Interessenten (ENT-600).
+          # Dasselbe Postfach wie das Kundenportal, aus demselben Grund wie
+          # dort: Es ist Kundenkommunikation der Plattform, keine eigene
+          # Anfrage-Mailbox wie beim guardops-Buendel (ENT-371).
+          # Die beiden Testmail-Platzhalter werden geleert -- der
+          # Betreiber-Bereich laeuft nur auf Produktion, eine Umleitung auf
+          # eine Testadresse gaebe es dort nie.
+          sed -i "s|__SMTP_HOST__|$EFF_SMTP_HOST|g" dist-betreiber/mailer.php
+          sed -i "s|__SMTP_PORT__|$EFF_SMTP_PORT|g" dist-betreiber/mailer.php
+          sed -i "s|__SMTP_VERSCHLUESSELUNG__|$EFF_SMTP_VERSCHLUESSELUNG|g" dist-betreiber/mailer.php
+          sed -i "s|__SMTP_USER__|$EFF_SMTP_USER|g" dist-betreiber/mailer.php
+          sed -i "s|__SMTP_PASSWORD__|$EFF_SMTP_PASSWORD|g" dist-betreiber/mailer.php
+          sed -i "s|__SMTP_ABSENDER__|$EFF_SMTP_ABSENDER|g" dist-betreiber/mailer.php
+          sed -i "s|__SMTP_ABSENDER_NAME__|$EFF_SMTP_ABSENDER_NAME|g" dist-betreiber/mailer.php
+          sed -i "s|__STAGING_TESTMAIL__||g" dist-betreiber/mailer.php
+          sed -i "s|__DEMO_TESTMAIL__||g" dist-betreiber/mailer.php
+          # Der Zeitgeber-Schluessel fuer den Ablauf der Demo-Zugaenge
+          # (api/betreiber_demo_ablauf.php). Derselbe Wert wie beim
+          # naechtlichen Demo-Reset -- es ist derselbe Cron-Dienst.
+          sed -i "s|__DEMO_ABLAUF_TOKEN__|$EFF_DEMO_ABLAUF_TOKEN|g" dist-betreiber/api/betreiber_demo_ablauf.php
+          # Die Deploy-Geheimnisse der einzelnen Mandanten-Datenbanken
+          # (OP-526, mandant_secret() in backend/betreiber.php) -- als
+          # base64(JSON), nicht als rohes JSON, siehe Begruendung bei
+          # P_MANDANT_SECRETS oben: "&" und "|" in einem Passwort zerschlagen
+          # sonst diesen sed-Aufruf, unbemerkt. Notfalls mit einer leeren
+          # Zeichenkette ersetzt, solange das Secret noch nicht gesetzt ist
+          # -- mandant_secret() behandelt das dann als "kein Mandant hat ein
+          # Secret", nicht als Fehler.
+          sed -i "s|__MANDANT_SECRETS__|$EFF_MANDANT_SECRETS|g" dist-betreiber/betreiber.php
+
           # Kein uebersehener Platzhalter darf hochgeladen werden. Anders als
           # beim guardops-Buendel braucht dieses hier eine echte
           # Datenbankverbindung (__DB_*__ wird oben ersetzt). Seit OP-518
           # werden auch die eigenen Platzhalter der separaten Betreiber-
-          # Datenbank (__BETREIBER_DB_*__) hier oben IMMER ersetzt --
-          # notfalls mit einer leeren Zeichenkette, wenn die vier Secrets
-          # noch nicht gesetzt sind; betreiber_db() faellt dann bewusst auf
-          # db() zurueck, siehe Kommentar dort. Ein stehen gebliebener
-          # __BETREIBER_DB_*__-Platzhalter waere ab jetzt also ein echter
-          # Fehler (z. B. eine vergessene sed-Zeile oben), keine bewusste
-          # Ausnahme mehr. __MANDANT_SECRETS__ in backend/betreiber.php
-          # bleibt ausgenommen -- eigenes, noch offenes Thema (OP-526), von
-          # dieser Aenderung nicht betroffen.
+          # Datenbank (__BETREIBER_DB_*__) hier oben IMMER ersetzt, und seit
+          # OP-526 genauso __MANDANT_SECRETS__ zwei Zeilen darueber --
+          # notfalls mit einer leeren Zeichenkette, wenn die Secrets noch
+          # nicht gesetzt sind; die betroffenen Funktionen fallen dann
+          # bewusst auf ihren jeweiligen Normalfall zurueck, siehe Kommentare
+          # dort. Ein stehen gebliebener Platzhalter ist ab jetzt also in
+          # jedem Fall ein echter Fehler (z. B. eine vergessene sed-Zeile),
+          # keine bewusste Ausnahme mehr -- die Liste unten traegt darum nur
+          # noch PHPs eigene Konstante __DIR__.
           UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' dist-betreiber/ \
-                   | grep -v -e '^__DIR__$' -e '^__MANDANT_SECRETS__$' \
+                   | grep -v -e '^__DIR__$' \
                    | sort -u || true)
           if [ -n "$UEBRIG" ]; then
             echo "::error::Nicht ersetzte Platzhalter im betreiber-Buendel: $UEBRIG"
@@ -1619,6 +1675,11 @@ jobs:
           sed -i "s|__STAGING_TESTMAIL__|$EFF_STAGING_TESTMAIL|g" dist-cupi24/mailer.php
           sed -i "s|__DEMO_TESTMAIL__|$EFF_DEMO_TESTMAIL|g" dist-cupi24/mailer.php
           sed -i "s|__DEMO_RESET_TOKEN__|$EFF_DEMO_RESET_TOKEN|g" dist-cupi24/api/demo_reset_ausfuehren.php
+          # OP-526, dieselbe Begruendung wie im betreiber-Buendel: dieses
+          # Buendel liefert betreiber.php nur als tote Einbindung mit (kein
+          # betreiber_*-Endpunkt laeuft hier), aber die strenge
+          # Platzhalter-Pruefung unten kennt diesen Unterschied nicht.
+          sed -i "s|__MANDANT_SECRETS__|$EFF_MANDANT_SECRETS|g" dist-cupi24/betreiber.php
           sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist-cupi24/dashboard.html
           sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist-cupi24/portal.html
           sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist-cupi24/app.html
@@ -1679,13 +1740,14 @@ jobs:
           # Kein uebersehener Platzhalter darf hochgeladen werden. Genau wie
           # im betreiber-Buendel und im Hauptschritt (dist/) oben werden die
           # eigenen Platzhalter der separaten Betreiber-Datenbank
-          # (__BETREIBER_DB_*__) seit OP-518 hier oben IMMER ersetzt --
-          # notfalls mit einer leeren Zeichenkette, solange die vier Secrets
-          # noch nicht gesetzt sind; betreiber_db() faellt dann bewusst auf
-          # db() zurueck. Ausgenommen bleibt nur noch __MANDANT_SECRETS__ in
-          # backend/betreiber.php -- eigenes, noch offenes Thema (OP-526).
+          # (__BETREIBER_DB_*__, OP-518) und der Mandanten-Deploy-Geheimnisse
+          # (__MANDANT_SECRETS__, OP-526) hier oben IMMER ersetzt -- notfalls
+          # mit einer leeren Zeichenkette, solange die Secrets noch nicht
+          # gesetzt sind; betreiber_db() und mandant_secret() fallen dann
+          # bewusst auf ihren jeweiligen Normalfall zurueck. Die Liste unten
+          # traegt darum nur noch PHPs eigene Konstante __DIR__.
           UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' dist-cupi24/ \
-                   | grep -v -e '^__DIR__$' -e '^__MANDANT_SECRETS__$' \
+                   | grep -v -e '^__DIR__$' \
                    | sort -u || true)
           if [ -n "$UEBRIG" ]; then
             echo "::error::Nicht ersetzte Platzhalter im cupi24-Buendel: $UEBRIG"

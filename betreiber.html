@@ -723,6 +723,11 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
             <input id="m-name">
           </div>
           <div class="feld">
+            <label for="m-subdomain">Subdomain</label>
+            <input id="m-subdomain" placeholder="z. B. demo1" autocapitalize="none">
+            <div class="hinweis">Ohne „.guardops.ch" — nur das Wort davor. Darüber findet die Zuteilung den Platz.</div>
+          </div>
+          <div class="feld">
             <label for="m-kanton">Kanton</label>
             <input id="m-kanton" maxlength="2" autocapitalize="characters">
             <div class="hinweis">Zweistellig, steuert den Feiertagskalender.</div>
@@ -771,6 +776,34 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
         <div id="sup-freigabe"></div>
         <div id="sup-inhalt"></div>
       </div>
+    </div>
+
+    <!-- Demo-Zugaenge (ENT-600) -- eigener Abschnitt, aber innerhalb von
+         Mandanten statt eines eigenen obersten Reiters: Ein Demo-Zugang ist
+         ein vorlaeufiger Mandant, keine eigene Ebene des Betreiber-Bereichs.
+         Seit ENT-601 nur noch Uebersicht und Not-Aus: Ein Interessent
+         bekommt seinen Zugang ueber die Anmeldemaske selbst, automatisch
+         und sofort. Kein Betreiber schaltet mehr frei -- wer bei
+         Werbe-Anfragen auf einen freien Menschen wartet, ist zu spaet. -->
+    <div class="karte">
+      <div class="karte-kopf">
+        <div>
+          <h2>Demo — Plätze</h2>
+          <div class="sub">Zuteilung läuft automatisch über die Anmeldemaske</div>
+        </div>
+      </div>
+      <div id="demo-plaetze"></div>
+    </div>
+
+    <div class="karte">
+      <div class="karte-kopf">
+        <div>
+          <h2>Demo — Zugänge</h2>
+          <div class="sub">Laufende und beendete, neuste zuerst</div>
+        </div>
+        <button class="klein" id="knopf-demo-ablauf">Abgelaufene schliessen</button>
+      </div>
+      <div id="demo-inhalt"></div>
     </div>
     </section>
 
@@ -899,7 +932,7 @@ function stumm(el) { zeig(el, false); }
    Anmeldung. */
 const BEREICHE = {
   uebersicht: ['Übersicht',  'Die Lage über allen Betrieben'],
-  mandanten:  ['Mandanten',  'Betriebe, die diese Plattform nutzen'],
+  mandanten:  ['Mandanten',  'Betriebe, die diese Plattform nutzen, samt Demo-Zugängen'],
   offerten:   ['Offerten',   'Angebote an künftige Mandanten'],
   rechnungen: ['Rechnungen', 'Was die Mandanten für die Nutzung zahlen'],
   support:    ['Support',    'Anfragen der Mandanten, die auf eine Antwort warten'],
@@ -1215,6 +1248,7 @@ async function ladeMandanten() {
     + '</tr></thead><tbody>'
     + liste.map(m => '<tr>'
         + '<td><strong>' + text(m.name) + '</strong>'
+          + '<div class="zweit">' + (m.subdomain ? text(m.subdomain) + '.guardops.ch' : 'Keine Subdomain gesetzt') + '</div>'
           + '<div class="zweit">' + (m.kanton ? 'Kanton ' + text(m.kanton) : 'Kanton nicht gesetzt') + '</div></td>'
         + '<td>' + groesseZelle(groesse[m.id]) + '</td>'
         + '<td>' + merker(STATUS_TEXT, m.status) + '</td>'
@@ -1271,6 +1305,7 @@ function formularOeffnen(m) {
   $('m-form-titel').textContent = m ? 'Mandant ändern' : 'Mandant anlegen';
   $('m-id').value     = m ? m.id : '';
   $('m-name').value   = m ? m.name : '';
+  $('m-subdomain').value = m && m.subdomain ? m.subdomain : '';
   $('m-kanton').value = m && m.kanton ? m.kanton : '';
   $('m-host').value   = m ? m.db_host : '';
   $('m-db').value     = m ? m.db_name : '';
@@ -1286,6 +1321,7 @@ async function mandantSpeichern() {
   const a = await ruf('betreiber_mandant_save.php', {
     id: id ? +id : 0,
     name: $('m-name').value,
+    subdomain: $('m-subdomain').value,
     kanton: $('m-kanton').value,
     db_host: $('m-host').value,
     db_name: $('m-db').value,
@@ -1434,6 +1470,157 @@ async function kontoSchalten(id, aktiv) {
    ladeMandanten() gereicht. Zwei Stellen, die dieselbe Menge zaehlen,
    laufen irgendwann auseinander -- und es faellt erst auf, wenn zwei
    verschiedene Zahlen nebeneinander stehen. */
+/* ══ Demo-Zugänge (ENT-600) ═══════════════════════════════════════════
+
+   Was diese Ansicht NICHT tut: Sie zeigt nichts aus den Demo-Instanzen
+   selbst. Der Betreiber sieht, wer einen Zugang hat und wie lange -- nicht,
+   was dieser jemand darin erfasst hat. Dieselbe Grenze wie bei den
+   Mandanten.
+
+   Und sie rechnet den Ablauf nicht selbst: Ob ein Zugang abgelaufen ist,
+   sagt der Server (Feld `abgelaufen`). Sonst stünde hier eine zweite
+   Wahrheit neben der des Zeitgebers. */
+/* Reihenfolge wie bei STATUS_TEXT weiter unten: [Klasse, Wort]. Beim
+   ersten Bau stand sie hier vertauscht, und die Tabelle zeigte "m-ok"
+   statt "läuft" -- im Quelltext sah nichts falsch aus, gesehen hat es erst
+   ein Bildschirmfoto (CLAUDE.md: gemessen, nicht nachgelesen). */
+const DEMO_STATUS_TEXT = {
+  aktiv:      ['m-pos',  'läuft'],
+  abgelaufen: ['m-ruhe', 'abgelaufen'],
+  beendet:    ['m-ruhe', 'beendet'],
+};
+
+function demoRestZelle(z) {
+  if (z.status !== 'aktiv') {
+    return '<span class="zweit">' + text((z.beendet_am || '').slice(0, 10)) + '</span>';
+  }
+  /* Vier Aussagen, vier Texte: "Frist um, noch nicht geschlossen" ist
+     etwas anderes als "läuft heute ab" und beides etwas anderes als eine
+     Zahl. Wer daraus eine 0 macht, verschweigt den Fall, der eine
+     Handlung braucht. */
+  if (z.abgelaufen) {
+    return '<span class="merker m-warn">Frist um</span>'
+         + '<div class="zweit">noch nicht geschlossen</div>';
+  }
+  if (z.resttage === 0) { return '<strong>läuft heute ab</strong>'; }
+  return '<strong>' + z.resttage + '</strong> '
+       + '<span style="color:var(--ink-3)">' + (z.resttage === 1 ? 'Tag' : 'Tage') + '</span>'
+       + '<div class="zweit">bis ' + text(String(z.laeuft_ab_am).slice(0, 10)) + '</div>';
+}
+
+async function ladeDemo() {
+  const a = await ruf('betreiber_demo_list.php');
+  const inhalt = $('demo-inhalt');
+  const plaetze = $('demo-plaetze');
+
+  if (a.code === 503) {
+    /* Nicht eingerichtet ist etwas anderes als "keine Zugänge". */
+    plaetze.innerHTML = '';
+    inhalt.innerHTML = leerBlock('⚙', 'Noch nicht eingerichtet',
+      'Das Register der Demo-Zugänge ist auf diesem Server noch nicht angelegt.');
+    return;
+  }
+  if (a.status !== 'ok') {
+    plaetze.innerHTML = '';
+    inhalt.innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
+    return;
+  }
+
+  /* Einheiten nicht vermischen: "Plätze" zählt Instanzen, "Zugänge" zählt
+     Interessenten. Auf einem Platz liegt höchstens ein Zugang, aber die
+     beiden Zahlen sind trotzdem nicht dasselbe -- beendete Zugänge zählen
+     bei den Zugängen mit und bei den Plätzen nicht. */
+  plaetze.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
+    + '<th>Platz</th><th>Belegt durch</th><th>Bis</th>'
+    + '</tr></thead><tbody>'
+    + (a.plaetze || []).map(p => '<tr>'
+        + '<td><strong>' + text(p.platz) + '</strong>'
+          + '<div class="zweit">' + text(p.adresse || 'keine Adresse') + '</div></td>'
+        + '<td>' + (p.frei
+            ? '<span class="merker m-pos">frei</span>'
+            : '<strong>' + text(p.firma || '') + '</strong>') + '</td>'
+        + '<td>' + (p.frei ? '<span class="zweit">—</span>'
+            : text(String(p.laeuft_ab_am || '').slice(0, 10))) + '</td>'
+      + '</tr>').join('')
+    + '</tbody></table></div>'
+    + '<div class="hinweis" style="margin-top:10px">'
+    + text(a.plaetze_frei + ' von ' + a.plaetze_total + ' Plätzen frei · '
+         + 'Laufzeit ' + a.laufzeit_tage + ' Tage · '
+         + a.aktive + ' laufende Zugänge') + '</div>';
+
+  const liste = a.zugaenge || [];
+  if (!liste.length) {
+    inhalt.innerHTML = leerBlock('◇', 'Noch kein Zugang vergeben',
+      'Sobald ein Interessent sich über die Anmeldemaske einen Demo-Zugang holt, steht er hier.');
+    return;
+  }
+
+  inhalt.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
+    + '<th>Interessent</th><th>Platz</th><th>Anmeldename</th><th>Status</th><th>Rest</th><th></th>'
+    + '</tr></thead><tbody>'
+    + liste.map(z => '<tr>'
+        + '<td><strong>' + text(z.firma) + '</strong>'
+          + '<div class="zweit">' + text(z.person) + ' · ' + text(z.email)
+            + (z.telefon ? ' · ' + text(z.telefon) : '') + '</div></td>'
+        + '<td>' + text(z.platz) + '</td>'
+        + '<td>' + text(z.login) + '</td>'
+        + '<td>' + merker(DEMO_STATUS_TEXT, z.status) + '</td>'
+        + '<td>' + demoRestZelle(z) + '</td>'
+        + '<td style="text-align:right;white-space:nowrap">'
+          + (z.status === 'aktiv'
+              ? '<button class="klein" data-demo-beenden="' + z.id + '" title="Not-Aus: leert die Instanz sofort und gibt den Platz frei">Beenden</button>'
+              : '') + '</td>'
+      + '</tr>').join('')
+    + '</tbody></table></div>';
+
+  inhalt.querySelectorAll('[data-demo-beenden]').forEach(b =>
+    b.onclick = () => demoBeenden(liste.find(z => z.id === +b.dataset.demoBeenden)));
+}
+
+/* Beenden heisst hier dasselbe wie Ablaufen: Konto weg, Instanz geleert.
+   Darum die Rückfrage -- und sie sagt, was wirklich geschieht, nicht nur
+   "sind Sie sicher". */
+async function demoBeenden(z) {
+  if (!z) { return; }
+  const ja = confirm('Zugang von ' + z.firma + ' beenden?\n\n'
+    + 'Der Platz ' + z.platz + ' wird dabei vollständig geleert. Alles, was '
+    + 'dort erfasst wurde, ist danach weg, und der Platz ist wieder frei.');
+  if (!ja) { return; }
+  const a = await ruf('betreiber_demo_beenden.php', { id: z.id }, 'POST');
+  if (a.status !== 'ok') {
+    melde($('haus-meldung'), 'fehler', a.message || 'Der Zugang liess sich nicht beenden.');
+    return;
+  }
+  melde($('haus-meldung'), 'gut', 'Zugang beendet, Platz ' + z.platz + ' ist wieder frei.');
+  ladeDemo();
+}
+
+/* Von Hand anstossen, was sonst der Zeitgeber tut. Der Knopf ist kein
+   Ersatz für ihn, sondern die Antwort auf "ist der Ablauf gelaufen?" --
+   solange man es nicht sieht, weiss man es nicht. */
+async function demoAblauf() {
+  const a = await ruf('betreiber_demo_ablauf.php', {}, 'POST');
+  if (a.status !== 'ok') {
+    melde($('haus-meldung'), 'fehler', a.message || 'Der Lauf ist nicht durchgekommen.');
+    return;
+  }
+  const gescheitert = (a.gescheitert || []).length;
+  if (gescheitert) {
+    /* Ein Platz, der nicht erreichbar war, bleibt aktiv -- und das muss
+       dastehen. Stillschweigend "erledigt" zu melden, wäre die Aussage,
+       dass die Daten weg sind, obwohl sie liegen. */
+    melde($('haus-meldung'), 'warn',
+      a.geschlossen + ' geschlossen, ' + gescheitert + ' nicht: '
+      + (a.gescheitert || []).map(g => g.platz + ' (' + g.grund + ')').join(', '));
+  } else if (a.geschlossen === 0) {
+    melde($('haus-meldung'), 'gut', 'Kein Zugang war fällig.');
+  } else {
+    melde($('haus-meldung'), 'gut', a.geschlossen + ' Zugang' + (a.geschlossen === 1 ? '' : 'e')
+      + ' geschlossen und die Plätze geleert.');
+  }
+  ladeDemo();
+}
+
 function uebersichtSetzen(zahlenHtml) {
   const el = $('u-zahlen');
   if (el) { el.innerHTML = zahlenHtml; }
@@ -1705,6 +1892,7 @@ async function ladeAlles() {
     + 'Mitarbeitenden oder Einsätze. Davon hängt ab, wie die Daten liegen.');
 
   await ladeMandanten();
+  await ladeDemo();
   await ladeKonten();
   /* Zuletzt, aber auf jeder Seite sichtbar: Das Abzeichen am Reiter steht
      auch dann im Blick, wenn gerade ein anderer Bereich offen ist. */
@@ -1730,6 +1918,7 @@ $('knopf-zf-weiter').onclick = async () => {
   bereichZeigen('uebersicht'); await ladeAlles();
 };
 $('knopf-neu').onclick        = () => formularOeffnen(null);
+$('knopf-demo-ablauf').onclick    = demoAblauf;
 $('knopf-speichern').onclick  = mandantSpeichern;
 $('knopf-abbrechen').onclick  = () => zeig($('m-form-karte'), false);
 $('knopf-sup-zu').onclick      = () => zeig($('sup-karte'), false);

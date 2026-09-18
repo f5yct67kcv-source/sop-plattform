@@ -35,22 +35,126 @@ declare(strict_types=1);
 //     nicht stimmt. Das sind zwei verschiedene Aussagen und brauchen zwei
 //     Texte (CLAUDE.md). Fuer den Betreiber ist der erste Fall ein Anruf
 //     wert, der zweite nicht.
+//
+// SEIT ENT-601/ENT-603 ZUSAETZLICH: Die Zuteilung eines Platzes laeuft
+// automatisch ueber api/demo_anfordern.php, nicht mehr ueber einen
+// Betreiber von Hand -- Interessenten, die ueber Werbung kommen, sollen
+// nicht auf einen freien Menschen warten. Der Vorrat selbst und die
+// Trennung ueber eigene Datenbanken (Punkte 1 und 2 oben) bleiben
+// unveraendert; nur WER zuteilt und WIE die Zugangsdaten zugestellt
+// werden, hat sich geaendert. Der Betreiber-Bereich behaelt eine
+// Uebersicht mit Not-Aus (einen laufenden Zugang vorzeitig beenden),
+// vergibt aber keinen mehr selbst.
+const DEMO_FREIGEGEBEN_AUTOMATISCH = 'automatisch (Selbstbedienung, ENT-601)';
+
+// Dieselbe Antwort fuer JEDEN erfolgreichen Fall von api/demo_anfordern.php
+// -- Honigtopf, neuer Zugang, bestehender Zugang mit neuem Passwort. Wer
+// bereits einen aktiven Zugang hat, soll das nicht am Antworttext ablesen
+// koennen (dieselbe Regel wie bei passwort_vergessen.php). "Kein Platz
+// frei" bleibt bewusst eine EIGENE, ehrliche Meldung (409) -- eine
+// Kapazitaetsgrenze ist keine sicherheitsrelevante Tatsache, die man
+// verschleiern muesste, und ein Interessent soll nicht auf eine Zusage
+// warten, die nicht kommt.
+const DEMO_ANFORDERN_DANKE = 'Vielen Dank. Sie erhalten in Kürze eine E-Mail mit Ihren Zugangsdaten.';
+
+// ── Kleine Formhelfer fuer api/demo_anfordern.php und
+// api/demo_erneut_senden.php ─────────────────────────────────────────
+//
+// EIGENE, KLEINE FASSUNG STATT demo_anfrage.php EINZUBINDEN: Jene Datei
+// traegt einen Platzhalter fuer den Empfaenger des Kontaktformulars der
+// Homepage (siehe dort) -- im Betreiber-Buendel gaebe es dafuer nie einen
+// Wert, und ein dauerhaft unersetzter Platzhalter in einer mitgelieferten
+// Datei ist genau der Zustand, den test_deploy.mjs abweist. Die paar
+// Zeilen hier zu verdoppeln ist kleiner als eine Ausnahme dafuer zu
+// pflegen. (Der Platzhaltername steht bewusst NICHT woertlich in diesem
+// Kommentar -- sonst faende ihn derselbe Scanner genau hier.)
+const DEMO_ZUGANG_MAX_FIRMA    = 120;
+const DEMO_ZUGANG_MAX_NAME     = 120;
+const DEMO_ZUGANG_MAX_EMAIL    = 200;
+const DEMO_ZUGANG_MAX_TELEFON  = 40;
+const DEMO_ZUGANG_FALLE        = 'website';
+// Telefon ist der Preis fuer den Sofort-Zugang (Entscheidung des
+// Projektinhabers): Wer in einer Minute eine eigene Instanz bekommt, gibt
+// dafuer eine erreichbare Nummer an. Dieselbe Grenze wie beim
+// Kontaktformular (demo_anfrage.php) -- neun Ziffern sind die Untergrenze,
+// unter der keine erreichbare Schweizer Nummer mehr liegt.
+const DEMO_ZUGANG_TELEFON_MIN_ZIFFERN = 9;
+
+function demo_zugang_ist_falle(array $in): bool
+{
+    return trim((string)($in[DEMO_ZUGANG_FALLE] ?? '')) !== '';
+}
+
+function demo_zugang_einzeilig(mixed $wert, int $max): string
+{
+    $s = preg_replace('/[\r\n\t]+/', ' ', (string)$wert) ?? '';
+    return mb_substr(trim($s), 0, $max);
+}
+
+function demo_zugang_telefon_ziffern(string $wert): int
+{
+    return strlen((string)preg_replace('/\D+/', '', $wert));
+}
+
+// ── Ist die angegebene Adresse ueberhaupt zustellbar? ─────────────────
+//
+// DIESELBE ABSICHERUNG WIE BEIM KONTAKTFORMULAR (demo_anfrage.php,
+// Anlass: der Projektinhaber hat am 2026-09-14 absichtlich "info@test.cha"
+// eingegeben und die Anfrage ging durch) -- hier sogar wichtiger, weil eine
+// Anfrage nicht nur eine E-Mail auslöst, sondern SOFORT einen von zehn
+// knappen Demo-Plätzen verbraucht. Eine Adresse, die es nicht gibt, wuerde
+// einen Platz binden, den niemand je abholt.
+//
+// true = zustellbar, false = diese Domain gibt es nicht,
+// null = nicht pruefbar (Namensdienst gestoert oder abgeschaltet) -- und
+// NULL WIRD DURCHGELASSEN, nicht abgewiesen: "unbekannt" ist etwas anderes
+// als "keine" (Hausregel), und im Zweifel soll ein echter Interessent nicht
+// an einer gestoerten DNS-Abfrage scheitern.
+function demo_zugang_domain(string $email): string
+{
+    $pos = strrpos($email, '@');
+    return $pos === false ? '' : substr($email, $pos + 1);
+}
+
+function demo_zugang_hat_mailserver(string $domain): bool
+{
+    return checkdnsrr($domain, 'MX') || checkdnsrr($domain, 'A') || checkdnsrr($domain, 'AAAA');
+}
+
+const DEMO_ZUGANG_KONTROLL_DOMAIN = 'guardops.ch';
+
+function demo_zugang_adresse_zustellbar(string $email, ?callable $nachschlag = null): ?bool
+{
+    if ($nachschlag === null) {
+        if (!function_exists('checkdnsrr')) { return null; }
+        $nachschlag = 'demo_zugang_hat_mailserver';
+    }
+    $domain = demo_zugang_domain($email);
+    if ($domain === '') { return false; }
+    if ($nachschlag($domain)) { return true; }
+    return $nachschlag(DEMO_ZUGANG_KONTROLL_DOMAIN) ? false : null;
+}
 
 // Laufzeit eines Demo-Zugangs. Als Konstante und nicht als Einstellung:
 // Konfigurierbarkeit ist kein Qualitaetsmerkmal, solange niemand eine
 // andere Laufzeit braucht (Optimierungsziel, CLAUDE.md Teil B).
 const DEMO_ZUGANG_TAGE = 14;
 
-// Die Plaetze des Vorrats. Drei zum Start (ENT-600, Punkt 3). Die Namen
-// entsprechen der Subdomain unter guardops.ch und damit der `subdomain`-
-// Spalte der `mandant`-Zeile, ueber die der Betreiber-Bereich die
-// Datenbank des Platzes findet.
+// Die Plaetze des Vorrats. Zehn zum Start (ENT-603 -- ENT-600 nannte drei,
+// bevor sich zeigte, dass eine zehnfach groessere Datenbank-Kapazitaet bei
+// Hostpoint zwei Franken im Monat kostet). Die Namen entsprechen der
+// Subdomain unter guardops.ch und damit der `subdomain`-Spalte der
+// `mandant`-Zeile, ueber die der Betreiber-Bereich die Datenbank des
+// Platzes findet.
 //
-// FESTE LISTE UND KEINE ZAEHLSCHLEIFE ("demo" . $i): Ein vierter Platz
+// FESTE LISTE UND KEINE ZAEHLSCHLEIFE ("demo" . $i): Ein elfter Platz
 // entsteht nicht dadurch, dass jemand eine Zahl hochsetzt -- er braucht
 // eine Datenbank, ein Deploy-Buendel und ein Geheimnis. Eine Liste, die
 // man erweitern MUSS, zwingt zu dem Blick auf das, was sonst noch fehlt.
-const DEMO_PLAETZE = ['demo1', 'demo2', 'demo3'];
+const DEMO_PLAETZE = [
+    'demo1', 'demo2', 'demo3', 'demo4', 'demo5',
+    'demo6', 'demo7', 'demo8', 'demo9', 'demo10',
+];
 
 // Zustaende eines Zugangs. Geschlossene Liste, kein freier Text -- wie der
 // Mandantenstatus in betreiber.php.
@@ -157,6 +261,107 @@ function demo_zugang_meldung(string $lage): string
     };
 }
 
+// Die Lage des Zeitgeber-Schluessels fuer den Ablauf (ENT-600).
+//
+// EIGENE FUNKTION UND EIGENER PLATZHALTERNAME, obwohl demo_reset.php eine
+// fast gleiche hat: Jene prueft "__DEMO_RESET"-Platzhalter und gilt nur in
+// der Demo-Umgebung. Der Ablauf laeuft dagegen auf Produktion, wo der
+// Betreiber-Bereich mit dem Register steht. Ein gemeinsamer Schluessel
+// oeffnete je nach Umgebung etwas anderes.
+//
+// KEIN FREMDER PLATZHALTERNAME IM KLARTEXT in dieser Datei: Sie geht in
+// drei Buendel mit, und der Bau weist jeden Platzhalter ab, der dort nicht
+// ersetzt wird (derselbe Fall wie bei demo_reset.php und mailer.php).
+// Darum wird der erwartete Wert hereingereicht, nicht hier gebildet.
+//
+// hash_equals und kein "===": Ein Vergleich, der beim ersten falschen
+// Zeichen abbricht, verraet ueber die Zeit, wie weit man richtig lag.
+function demo_ablauf_zeitgeber_lage(string $erwartet, string $mitgegeben): string
+{
+    if ($erwartet === '' || str_starts_with($erwartet, '__DEMO_ABLAUF')) {
+        return 'nicht_eingerichtet';
+    }
+    if ($mitgegeben === '') { return 'kein_schluessel_in_der_adresse'; }
+    return hash_equals($erwartet, $mitgegeben) ? 'ok' : 'falscher_schluessel';
+}
+
+// Adresse eines Platzes. Aus der festen Basis und dem Platznamen gebaut,
+// nie aus $_SERVER['HTTP_HOST'] (ENT-501): Der Betreiber-Bereich verschickt
+// hier einen Link auf eine FREMDE Instanz, und der Kopf der eingehenden
+// Anfrage gehoert dem Aufrufer, nicht uns. Ein untergeschobener Host
+// stuende sonst in der Mail an den Interessenten.
+const DEMO_ADRESSE_BASIS = 'guardops.ch';
+
+function demo_platz_adresse(string $platz): ?string
+{
+    if (!in_array($platz, DEMO_PLAETZE, true)) { return null; }
+    return 'https://' . $platz . '.' . DEMO_ADRESSE_BASIS;
+}
+
+// Ein Passwort, das jemand aus einer E-Mail abtippt.
+//
+// OHNE VERWECHSELBARE ZEICHEN: 0 und O, 1 und l und I sehen in vielen
+// Schriften gleich aus. Wer sie drin laesst, baut sich Support-Anrufe --
+// und der Anrufer haelt dann sich selbst fuer den Fehler.
+// Der Vorrat ist damit 54 Zeichen gross; bei 12 Stellen sind das rund
+// 69 Bit, deutlich mehr als jedes Passwort, das sich ein Mensch ausdenkt.
+//
+// random_int und nicht rand(): Das hier ist ein Zugangsschluessel, kein
+// Wuerfelwurf. random_int zieht aus der Zufallsquelle des Systems.
+const DEMO_PASSWORT_ZEICHEN = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function demo_passwort_erzeugen(int $laenge = 12): string
+{
+    $vorrat = DEMO_PASSWORT_ZEICHEN;
+    $max = strlen($vorrat) - 1;
+    $aus = '';
+    for ($i = 0; $i < $laenge; $i++) { $aus .= $vorrat[random_int(0, $max)]; }
+    return $aus;
+}
+
+// Die Mail an den Interessenten. Als reine Funktion, damit ihr Inhalt
+// pruefbar ist, ohne etwas zu verschicken.
+//
+// DREI SACHEN MUESSEN DRINSTEHEN, und jede aus einem eigenen Grund:
+//   - Adresse, Anmeldename und Passwort: ohne sie ist die Mail nutzlos.
+//   - Das Ablaufdatum: Wer nicht weiss, dass die Zeit laeuft, meldet sich
+//     am 15. Tag und haelt den Zugang fuer kaputt.
+//   - Der Hinweis auf echte Personendaten: Die Instanz wird beim Ablauf
+//     restlos geleert, und bis dahin liegt hier fremdes Personal in einer
+//     fremden Datenbank (ENT-600).
+function demo_zugang_mail(string $firma, string $person, string $adresse,
+                          string $login, string $passwort, string $laeuftAbAm): array
+{
+    $ab = date('d.m.Y', strtotime($laeuftAbAm));
+    $betreff = 'Ihr Demo-Zugang zu GuardOpS';
+
+    $text = "Guten Tag $person\n\n"
+          . "Ihr Demo-Zugang für $firma steht bereit.\n\n"
+          . "Adresse:      $adresse\n"
+          . "Anmeldename:  $login\n"
+          . "Passwort:     $passwort\n\n"
+          . "Der Zugang läuft am $ab ab. Danach wird er gesperrt und alles, "
+          . "was Sie erfasst haben, vollständig gelöscht.\n\n"
+          . "Bitte erfassen Sie keine echten Personendaten — die Demo ist zum "
+          . "Ausprobieren da, nicht für den Betrieb.\n\n"
+          . "Freundliche Grüsse\npzu consulting gmbh";
+
+    $e = static fn (string $w): string => htmlspecialchars($w, ENT_QUOTES, 'UTF-8');
+    $html = '<p>Guten Tag ' . $e($person) . '</p>'
+          . '<p>Ihr Demo-Zugang für <b>' . $e($firma) . '</b> steht bereit.</p>'
+          . '<table cellpadding="4"><tr><td>Adresse</td><td><a href="' . $e($adresse) . '">'
+          . $e($adresse) . '</a></td></tr>'
+          . '<tr><td>Anmeldename</td><td><b>' . $e($login) . '</b></td></tr>'
+          . '<tr><td>Passwort</td><td><b>' . $e($passwort) . '</b></td></tr></table>'
+          . '<p>Der Zugang läuft am <b>' . $e($ab) . '</b> ab. Danach wird er gesperrt und '
+          . 'alles, was Sie erfasst haben, vollständig gelöscht.</p>'
+          . '<p>Bitte erfassen Sie keine echten Personendaten — die Demo ist zum '
+          . 'Ausprobieren da, nicht für den Betrieb.</p>'
+          . '<p>Freundliche Grüsse<br>pzu consulting gmbh</p>';
+
+    return ['betreff' => $betreff, 'text' => $text, 'html' => $html];
+}
+
 // Die Tabelle des Registers. Sie liegt in der BETREIBER-Datenbank, nicht in
 // der Demo-Instanz: Der naechtliche Reset (ENT-523) leert generisch JEDE
 // Tabelle der verbundenen Datenbank -- ein Register in der Demo waere am
@@ -171,6 +376,11 @@ function demo_zugang_tabelle(): string
   firma VARCHAR(200) NOT NULL,
   person VARCHAR(200) NOT NULL,
   email VARCHAR(200) NOT NULL,
+  -- Der Preis fuer den Sofort-Zugang (ENT-601/ENT-603, Entscheidung des
+  -- Projektinhabers): Wer die Instanz in einer Minute bekommt, hinterlaesst
+  -- eine erreichbare Nummer. Fuer den Vertrieb, nicht fuer den Zugang
+  -- selbst -- eine leere Zeichenkette bei aelteren Zeilen ist kein Fehler.
+  telefon VARCHAR(40) NOT NULL DEFAULT '',
   login VARCHAR(100) NOT NULL,
   status ENUM('aktiv','abgelaufen','beendet') NOT NULL DEFAULT 'aktiv',
   freigegeben_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

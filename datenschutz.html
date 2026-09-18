@@ -7,11 +7,16 @@
   JEDE AUSSAGE HIER IST AUS DEM CODE ABGELEITET, nicht aus einer Vorlage
   abgeschrieben: keine Cookies (homepage.html setzt keine, der Endpunkt
   startet keine Sitzung), keine fremden Abrufe (test_homepage.mjs misst
-  das), nichts gespeichert (backend/demo_anfrage.php, Festlegung 1), und
-  die Bremse legt einen Pruefwert der Adresse statt der Adresse ab
-  (backend/demo_bremse.php). Aendert sich einer dieser Punkte im Code,
+  das), und die Bremse legt einen Pruefwert der Adresse statt der Adresse
+  ab (backend/demo_bremse.php). Aendert sich einer dieser Punkte im Code,
   wird diese Seite falsch -- test_recht.mjs haelt die pruefbaren davon
   gegen den Code.
+
+  SEIT ENT-601 WIRD SEHR WOHL GESPEICHERT: Das Formular fuehrt zu
+  backend/api/demo_anfordern.php und legt sofort einen Demo-Zugang an
+  (Register in der Betreiber-Datenbank) -- anders als beim frueheren,
+  rein per E-Mail beantworteten Kontaktformular (backend/demo_anfrage.php,
+  heute ungenutzt). Abschnitt 3 beschreibt das.
 
   KEINE RECHTSBERATUNG. Der Text beschreibt, was die Software tut. Ob er
   als Datenschutzerklaerung genuegt, ist eine juristische Frage und
@@ -82,28 +87,34 @@
     <li>Sie bindet kein Werbenetzwerk ein und erstellt kein Profil.</li>
   </ul>
 
-  <h2>3. Wenn Sie das Formular ausfüllen</h2>
+  <h2>3. Wenn Sie einen Demo-Zugang anfordern</h2>
   <h3>Was erhoben wird</h3>
   <ul>
-    <li><strong>Firma, Name, E-Mail-Adresse und Telefonnummer</strong> — nötig, um
-        zu antworten.</li>
-    <li><strong>Anzahl Mitarbeitende und Nachricht</strong> — freiwillig.</li>
+    <li><strong>Firma, Name, E-Mail-Adresse und Telefonnummer</strong> — alle vier
+        sind Pflichtangaben, ohne die kein Zugang entsteht.</li>
   </ul>
   <h3>Was damit geschieht</h3>
-  <p>Die Angaben werden als E-Mail an uns übermittelt. <strong>Sie werden nicht in
-     einer Datenbank gespeichert.</strong> Die Anfrage existiert als Nachricht in
-     unserem Postfach und wird dort so lange aufbewahrt, wie die Bearbeitung und
-     allfällige Rückfragen es erfordern.</p>
+  <p>Anders als bei einer blossen Kontaktanfrage entsteht sofort ein eigener,
+     automatisch eingerichteter Testzugang mit Musterdaten, und die Zugangsdaten
+     dafür gehen ausschliesslich an die angegebene E-Mail-Adresse. <strong>Ihre
+     Angaben werden dafür in einer Datenbank gespeichert</strong> — ein Zugang
+     lässt sich nicht anlegen, ohne dass irgendwo steht, wem er gehört.</p>
+  <p>Der Testzugang selbst und alles, was Sie darin erfassen, wird spätestens
+     nach 14 Tagen automatisch und vollständig gelöscht. Firma, Name,
+     E-Mail-Adresse und Telefonnummer aus Ihrer Anfrage bleiben davon unberührt
+     in unserer Übersicht bestehen, damit wir bei Interesse nachfassen können.</p>
   <h3>Warum wir das dürfen</h3>
-  <p>Weil Sie uns die Anfrage selbst schicken. Wir verwenden die Angaben
-     ausschliesslich, um darauf zu antworten — nicht für Werbung, und nicht, um
-     Sie später unaufgefordert erneut anzuschreiben.</p>
+  <p>Weil Sie den Zugang selbst anfordern. Wir verwenden die Angaben, um ihn
+     einzurichten und Sie danach bei Interesse zu kontaktieren — nicht für
+     Werbung an Dritte und nicht für eine automatisierte Newsletter-Liste.</p>
   <h3>Prüfung der E-Mail-Adresse</h3>
   <p>Beim Absenden schlagen wir nach, ob es zur angegebenen Adresse überhaupt
-     einen Mailserver gibt. Abgefragt wird dabei ausschliesslich der Teil
-     <strong>nach</strong> dem @-Zeichen; Ihr Name und der Teil davor sind daran
-     nicht beteiligt. Lässt sich die Frage gerade nicht beantworten, nehmen wir
-     die Anfrage an, statt Ihre Adresse zu Unrecht abzuweisen.</p>
+     einen Mailserver gibt — eine Anfrage verbraucht sofort einen von wenigen
+     verfügbaren Testzugängen, und eine Adresse, die es nicht gibt, würde einen
+     Platz binden, den niemand abholt. Abgefragt wird dabei ausschliesslich der
+     Teil <strong>nach</strong> dem @-Zeichen; Ihr Name und der Teil davor sind
+     daran nicht beteiligt. Lässt sich die Frage gerade nicht beantworten,
+     nehmen wir die Anfrage an, statt Ihre Adresse zu Unrecht abzuweisen.</p>
 
   <h3>Ein unsichtbares Feld</h3>
   <p>Das Formular enthält ein Feld, das für Menschen nicht sichtbar ist. Nur
@@ -112,8 +123,9 @@
      das echte Interessenten aufhalten würde.</p>
 
   <h2>4. Schutz vor Massenanfragen</h2>
-  <p>Damit niemand das Formular als Versandwerkzeug missbraucht, zählen wir, wie
-     viele Anfragen in kurzer Zeit von derselben Internetadresse kommen.</p>
+  <p>Damit niemand das Formular als Versandwerkzeug missbraucht oder auf Vorrat
+     Testzugänge belegt, zählen wir, wie viele Anfragen in kurzer Zeit von
+     derselben Internetadresse oder derselben E-Mail-Adresse kommen.</p>
   <p>Dabei wird die Adresse selbst <strong>nicht abgelegt</strong>, sondern nur ein
      Prüfwert davon (SHA-256) zusammen mit den Zeitpunkten der Anfragen. Der
      Eintrag verfällt nach 15 Minuten und wird gelöscht. Wir weisen ausdrücklich
