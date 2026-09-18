@@ -1,5 +1,5 @@
 <?php
-// Demo-Zugang anfordern -- oeffentlich, ohne Anmeldung (ENT-601/ENT-603).
+// Demo-Zugang anfordern -- oeffentlich, ohne Anmeldung (ENT-601/ENT-613).
 //
 // Der Nachfolger von betreiber_demo_freigeben.php: Bis hierher schaltete
 // ein Betreiber jeden Interessenten von Hand frei. Sobald bezahlte Werbung

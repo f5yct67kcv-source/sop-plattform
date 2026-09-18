@@ -36,7 +36,7 @@ declare(strict_types=1);
 //     Texte (CLAUDE.md). Fuer den Betreiber ist der erste Fall ein Anruf
 //     wert, der zweite nicht.
 //
-// SEIT ENT-601/ENT-603 ZUSAETZLICH: Die Zuteilung eines Platzes laeuft
+// SEIT ENT-601/ENT-613 ZUSAETZLICH: Die Zuteilung eines Platzes laeuft
 // automatisch ueber api/demo_anfordern.php, nicht mehr ueber einen
 // Betreiber von Hand -- Interessenten, die ueber Werbung kommen, sollen
 // nicht auf einen freien Menschen warten. Der Vorrat selbst und die
@@ -140,7 +140,7 @@ function demo_zugang_adresse_zustellbar(string $email, ?callable $nachschlag = n
 // andere Laufzeit braucht (Optimierungsziel, CLAUDE.md Teil B).
 const DEMO_ZUGANG_TAGE = 14;
 
-// Die Plaetze des Vorrats. Zehn zum Start (ENT-603 -- ENT-600 nannte drei,
+// Die Plaetze des Vorrats. Zehn zum Start (ENT-613 -- ENT-600 nannte drei,
 // bevor sich zeigte, dass eine zehnfach groessere Datenbank-Kapazitaet bei
 // Hostpoint zwei Franken im Monat kostet). Die Namen entsprechen der
 // Subdomain unter guardops.ch und damit der `subdomain`-Spalte der
@@ -376,7 +376,7 @@ function demo_zugang_tabelle(): string
   firma VARCHAR(200) NOT NULL,
   person VARCHAR(200) NOT NULL,
   email VARCHAR(200) NOT NULL,
-  -- Der Preis fuer den Sofort-Zugang (ENT-601/ENT-603, Entscheidung des
+  -- Der Preis fuer den Sofort-Zugang (ENT-601/ENT-613, Entscheidung des
   -- Projektinhabers): Wer die Instanz in einer Minute bekommt, hinterlaesst
   -- eine erreichbare Nummer. Fuer den Vertrieb, nicht fuer den Zugang
   -- selbst -- eine leere Zeichenkette bei aelteren Zeilen ist kein Fehler.

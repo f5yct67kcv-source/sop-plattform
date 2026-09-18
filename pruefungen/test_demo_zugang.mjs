@@ -64,7 +64,7 @@ check('die Tabellendefinition laesst sich erzeugen', sql.includes('create table'
 check('KRITISCH: im Register steht kein Passwort und kein Hash',
   sql.includes('create table') && !sql.includes('passwort') && !sql.includes('hash'));
 
-// ── 3b. Telefon ist Pflicht, die Adresse wird geprueft (ENT-601/ENT-603) ─
+// ── 3b. Telefon ist Pflicht, die Adresse wird geprueft (ENT-601/ENT-613) ─
 // Strukturell geprueft, weil ein echter Aufruf eine Datenbank braucht --
 // die reine Logik dahinter laeuft in pruef_demo_zugang.php.
 const anfordern = nurCode(lies('backend/api/demo_anfordern.php'));
