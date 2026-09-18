@@ -101,6 +101,13 @@ gescheitert ist, das sie nicht geerbt hat:
 
 ## Gestaltung
 
+- **Vor jedem neuen UI-Baustein die Gestaltungslogik erfragen** — nicht nur
+  Text und Funktion, sondern wie es aussieht und sich verhält (eigener
+  Container? Bestehendes Muster als Vorbild? Icon statt Karte? Wann färbt
+  sich etwas?). Erst nach der Antwort bauen. Ausdrücklicher Auftrag des
+  Projektinhabers (2026-09-18), nachdem eine „Einrichtung"-Karte als
+  eigener Container entstand, wo eine dem Cockpit gleichende Lösung (Icon,
+  das sich bei anstehendem Update färbt) erwartet war.
 - **Gemessen, nicht nachgelesen.** Grössen, Positionen und Abstände am
   gerenderten Zustand prüfen. Eine CSS-Regel kann wirkungslos bleiben, ohne
   dass etwas kaputtgeht — durch eine spätere Regel gleicher oder höherer

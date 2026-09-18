@@ -694,12 +694,20 @@ check('KRITISCH: planung_einrichten.php nutzt die geteilte Funktion statt einer 
   /be_spalten_anlegen\(/.test(planungEinrichten)
   && !/ALTER TABLE mandant ADD COLUMN subdomain/.test(planungEinrichten));
 
-// Die Oberflaeche: ein Knopf im Betreiber-Bereich, der den neuen Endpunkt
-// tatsaechlich aufruft -- nicht nur eine Karte, die nichts tut.
+// Die Oberflaeche: ein Zahnrad in der Kopfzeile, dasselbe Muster wie
+// "Einrichtung" im Cockpit (dashboard.html) -- kein eigener Container im
+// Seitenfluss, sondern ein Icon, das sich faerbt, sobald etwas ansteht, und
+// ein Dialog, der den Endpunkt tatsaechlich aufruft (ENT-524, 2026-09-18:
+// ausdruecklicher Gestaltungsauftrag, siehe CLAUDE.md "Gestaltung").
 const betreiberHtml = lies('betreiber.html');
-check('KRITISCH: betreiber.html hat einen Einrichtungs-Knopf, der betreiber_schema_pruefen.php aufruft',
-  /knopf-einrichtung['"]\)\.onclick\s*=[\s\S]{0,80}einrichtungPruefen/.test(betreiberHtml)
-  && /function einrichtungPruefen[\s\S]{0,600}betreiber_schema_pruefen\.php/.test(betreiberHtml));
+check('KRITISCH: das Zahnrad oeffnet den Einrichtungs-Dialog, statt eine Karte im Seitenfluss zu sein',
+  /knopf-einrichtung['"]\)\.onclick\s*=\s*einrichtungOeffnen/.test(betreiberHtml)
+  && /function einrichtungOeffnen\(\)[\s\S]{0,120}dlgEinrichtung[\s\S]{0,40}einrichtungLauf/.test(betreiberHtml));
+check('KRITISCH: der Dialog-Lauf ruft betreiber_schema_pruefen.php tatsaechlich per POST auf',
+  /function einrichtungLauf\(\)[\s\S]{0,600}betreiber_schema_pruefen\.php[\s\S]{0,40}'POST'/.test(betreiberHtml));
+check('KRITISCH: das Zahnrad faerbt sich, sobald etwas nachzutragen ist -- stiller GET-Check, kein Toast',
+  /function pruefeEinrichtungUpdate\(\)[\s\S]{0,300}betreiber_schema_pruefen\.php[\s\S]{0,200}hat-update/.test(betreiberHtml)
+  && /\.icon-knopf\.hat-update\s*\{[^}]*color:\s*var\(--warn\)/.test(betreiberHtml));
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
