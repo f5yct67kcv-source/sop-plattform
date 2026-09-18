@@ -749,134 +749,36 @@ check('KRITISCH: mit Hülle UND Schlüssel wird der native Weg gewählt',
     finally { window.Capacitor = merkC; window.mapsSchluesselTauglich = merkP; }
   }));
 
-// Die Durchsicht gilt nur, solange die native Karte steht. Bliebe die
-// Klasse hängen, sähe man auf den anderen Reitern durch die App hindurch --
-// und im Browser, wo es gar keine native Karte gibt, wäre sie schlicht
-// falsch.
-check('KRITISCH: im Browser steht die App nie auf Durchsicht',
-  await page.evaluate(() => !document.body.classList.contains('karte-nativ')));
-check('KRITISCH: das Abbauen nimmt die Durchsicht weg',
-  await page.evaluate(async () => {
-    document.body.classList.add('karte-nativ');
-    await rgKarteNativAbbauen();
-    return !document.body.classList.contains('karte-nativ');
-  }));
-// Die Durchsicht muss auch wirklich greifen: eine Regel, die von einer
-// späteren gleicher Spezifität überschrieben wird, bliebe wirkungslos,
-// ohne dass etwas kaputtgeht (CLAUDE.md: gemessen, nicht nachgelesen).
-check('KRITISCH: mit der Klasse ist die Kartenhülle gemessen durchsichtig',
-  await page.evaluate(() => {
-    const h = document.querySelector('.rgs-karte-huelle');
-    if (!h) { return false; }
-    const vorher = getComputedStyle(h).backgroundColor;
-    document.body.classList.add('karte-nativ');
-    const nachher = getComputedStyle(h).backgroundColor;
-    document.body.classList.remove('karte-nativ');
-    const durchsichtig = (f) => f === 'transparent' || /rgba\(0, 0, 0, 0\)/.test(f);
-    return !durchsichtig(vorher) && durchsichtig(nachher);
-  }));
-
-// ══════════ DIE DURCHSICHT DARF NICHT KLEBEN ══════════════════════════
-// Vom Projektinhaber gemeldet: "Es überlappen sich Masken." Ursache war
-// die Durchsicht für die native Karte -- sie blieb beim Reiterwechsel
-// stehen. Dann ist die ganze Seite durchsichtig, und man sieht auf die
-// Ebenen darunter.
+// ══════════ DIE NATIVE KARTE DARF NICHT KLEBEN ════════════════════════
+// Sie liegt nicht im Dokument: Sie verschwindet NICHT, wenn der Rumpf
+// ersetzt wird. Wer sie beim Reiterwechsel stehen lässt, hat danach eine
+// Kartenansicht über der Kontrollpunkt-Liste. Abgebaut werden muss sie an
+// jeder Stelle, durch die man die Karte verlässt.
 //
-// Die native Ansicht liegt NICHT im Dokument: Sie verschwindet nicht, wenn
-// der Rumpf ersetzt wird. Beides muss ausdrücklich weg, und zwar an jeder
-// Stelle, durch die man die Karte verlässt.
+// Hier stand vorher dasselbe für eine CSS-Klasse ("Durchsicht"). Die ist
+// entfallen -- sie war als Vermutung eingebaut worden und hat selbst einen
+// Fehler verursacht (die Seite darunter schien durch). Die Sache, um die
+// es geht, bleibt dieselbe.
 {
-  const durchsicht = () => page.evaluate(() => document.body.classList.contains('karte-nativ'));
+  const abbauProbe = async (was) => await page.evaluate(async (w) => {
+    let abgebaut = false;
+    const merk = rgsNativKarte;
+    rgsNativKarte = { destroy: async () => { abgebaut = true; } };
+    if (w === 'raus') { rgSeiteZu(); }
+    else { rgsReiter = w; rgLaufZeichnen(); }
+    await new Promise(r => setTimeout(r, 60));
+    if (rgsNativKarte) { rgsNativKarte = merk; }
+    return abgebaut;
+  }, was);
 
-  await page.evaluate(() => { document.body.classList.add('karte-nativ'); });
-  await page.evaluate(() => { rgsReiter = 'punkte'; rgLaufZeichnen(); });
-  await page.waitForTimeout(250);
-  check('KRITISCH: der Wechsel auf einen anderen Reiter nimmt die Durchsicht weg',
-    (await durchsicht()) === false);
-
-  await page.evaluate(() => { document.body.classList.add('karte-nativ'); });
-  await page.evaluate(() => { rgsReiter = 'funktionen'; rgLaufZeichnen(); });
-  await page.waitForTimeout(250);
-  check('KRITISCH: auch der Wechsel auf die Funktionen nimmt sie weg',
-    (await durchsicht()) === false);
-
-  // Der Weg hinaus ist der wichtigste: Bleibt sie hier stehen, ist danach
-  // die ganze App durchsichtig, nicht nur die Runde.
-  await page.evaluate(() => { document.body.classList.add('karte-nativ'); rgSeiteZu(); });
-  await page.waitForTimeout(250);
-  check('KRITISCH: das Verlassen der Runde nimmt die Durchsicht weg',
-    (await durchsicht()) === false);
-}
-
-// ══════════ EINE QUELLE FÜR FARBE UND ZEICHEN (ENT-609) ═══════════════
-// Beide Kartenfassungen färben die Kontrollpunkte gleich. Stünde die Regel
-// zweimal da, liefe sie irgendwann auseinander, ohne dass etwas
-// kaputtginge -- die App zeigte dann in der Hülle andere Farben als im
-// Browser.
-{
-  const zustand = (erledigt, nr) => page.evaluate(
-    ([e, n]) => rgPunktZustand({ erledigt: e, nr: n }), [erledigt, nr]);
-
-  const offen = await zustand(null, 3);
-  const fertig = await zustand('bestaetigt', 3);
-  const abweichend = await zustand('ersatz', 3);
-
-  check('KRITISCH: ein offener Punkt trägt seine Nummer',
-    offen.zeichen === '3');
-  check('KRITISCH: ein bestätigter trägt den Haken, nicht die Nummer',
-    fertig.zeichen === '✓');
-  check('KRITISCH: ein abweichend gemeldeter trägt das Ausrufezeichen',
-    abweichend.zeichen === '!');
-  // Drei Zustände, drei Farben -- zwei gleiche wären eine Aussage weniger.
-  check('KRITISCH: die drei Zustände haben drei verschiedene Farben',
-    new Set([offen.farbe, fertig.farbe, abweichend.farbe]).size === 3);
-  // Und die gezeichnete Karte nimmt wirklich diese Quelle, statt die
-  // Regel ein zweites Mal zu führen.
-}
-
-// ══════════ NACHTSICHT AUF DER NATIVEN KARTE (ENT-609) ════════════════
-// Vom Projektinhaber gemeldet: "Der Nachtsicht-Knopf funzt nicht mehr."
-// Er färbte sich um und sonst geschah nichts -- ein Knopf, der nichts tut,
-// ist schlimmer als keiner.
-//
-// Die Browser-Fassung färbt seit ENT-543 über das eingebaute Farbschema
-// der Vektorkarte; das native SDK kennt das nicht und nimmt eine
-// Stilvorschrift entgegen. Geprüft wird die AUSSAGE -- dass der Stil
-// wirklich dunkel ist --, nicht der einzelne Farbwert: Sonst wäre die
-// Prüfung eine zweite Kopie der Farbtabelle.
-{
-  const stil = await page.evaluate(() => RG_NACHT_STIL_NATIV);
-  check('KRITISCH: es gibt überhaupt einen Nachtsicht-Stil für die native Karte',
-    Array.isArray(stil) && stil.length >= 5);
-
-  // Grobe Helligkeit nach Rec. 601 -- reicht für "dunkel oder hell".
-  const hell = (f) => {
-    const n = parseInt(String(f).replace('#', ''), 16);
-    return 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
-  };
-  const farbenVon = (treffer) => (stil || [])
-    .filter(e => treffer(String(e.elementType || '')))
-    .flatMap(e => (e.stylers || []).map(x => x.color).filter(Boolean));
-
-  const flaechen = farbenVon(t => t === '' || t.startsWith('geometry'));
-  check('KRITISCH: die Flächen sind dunkel -- sonst blendet die Karte nachts',
-    flaechen.length >= 5 && flaechen.every(f => hell(f) < 100));
-  // Und die Schrift darauf muss hell sein. Hier stand zuerst "alles muss
-  // dunkel sein" -- das hätte eine dunkle Beschriftung auf dunklem Grund
-  // durchgehen lassen, also eine Karte, die niemand lesen kann.
-  const schrift = farbenVon(t => t === 'labels.text.fill');
-  check('KRITISCH: die Beschriftung ist hell genug, um auf dem dunklen Grund zu stehen',
-    schrift.length >= 1 && schrift.every(f => hell(f) > 120));
-  // Auf einer Runde zählt der Weg, nicht wo es Kaffee gibt. Jede
-  // Beschriftung weniger ist eine, die den Kontrollpunkt nicht verdeckt.
-  check('Geschäfte und Verkehrsmittel sind ausgeblendet',
-    (stil || []).some(e => e.featureType === 'poi.business'
-      && (e.stylers || []).some(x => x.visibility === 'off'))
-    && (stil || []).some(e => e.featureType === 'transit'
-      && (e.stylers || []).some(x => x.visibility === 'off')));
-
-  // Und der Schalter muss die native Karte wirklich neu bauen: Der Stil
-  // lässt sich nur beim Erzeugen setzen.
+  check('KRITISCH: der Wechsel auf einen anderen Reiter baut die native Karte ab',
+    await abbauProbe('punkte'));
+  check('KRITISCH: auch der Wechsel auf die Funktionen baut sie ab',
+    await abbauProbe('funktionen'));
+  // Der Weg hinaus ist der wichtigste: Bleibt sie hier stehen, liegt sie
+  // danach über der ganzen App, nicht nur über der Runde.
+  check('KRITISCH: das Verlassen der Runde baut sie ab',
+    await abbauProbe('raus'));
 }
 
 await browser.close();

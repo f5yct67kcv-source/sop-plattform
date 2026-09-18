@@ -1102,21 +1102,24 @@ button.rd-kopf:active { background: var(--line-soft); }
 .rgs-bd.voll > :not(.rgs-karte-huelle) { margin: 0 16px; }
 .rgs-bd.voll > :last-child:not(.rgs-karte-huelle) { margin-bottom: calc(12px + env(safe-area-inset-bottom)); }
 .rgs-karte { position: absolute; inset: 0; }
-/* Durchsicht auf die native Karte (ENT-609).
+/* HIER STAND EINE DURCHSICHT, und sie ist wieder weg (ENT-609).
 
-   VERMUTUNG, am Geraet zu bestaetigen: Die native Kartenansicht liegt
-   nicht IM Dokument, sondern darunter. Was darueber liegt und einen
-   eigenen Hintergrund hat, deckt sie zu -- man sieht dann eine leere
-   Flaeche in genau der Farbe der Huelle, und nicht etwa Schwarz. Beim
-   ersten Versuch auf dem Geraet war es genau diese Farbe.
+   Als die native Karte grau blieb, war die Vermutung: Sie liegt UNTER der
+   Seite und wird von allem zugedeckt, was darueber einen Hintergrund hat.
+   Also wurde die Kette vom Seitenkoerper bis zur Karte durchsichtig
+   gestellt. Danach erschien die Karte -- aber nicht deswegen: Im selben
+   Schritt kam der richtige Schluessel ins Buendel, und daran hatte es
+   gelegen.
 
-   Darum wird die Kette vom Seitenkoerper bis zur Karte durchsichtig
-   gestellt, solange die native Karte steht -- und nur dann. Die Klasse
-   setzt rgKarteNativBauen(), rgKarteNativAbbauen() nimmt sie weg. Ohne
-   diese Begrenzung staende die ganze App auf Durchsicht, auch auf den
-   anderen Reitern. */
-body.karte-nativ, body.karte-nativ .rgs, body.karte-nativ .rgs-bd,
-body.karte-nativ .rgs-karte-huelle, body.karte-nativ .rgs-karte { background: transparent; }
+   Der Preis war ein eigener Fehler: Eine durchsichtige Rundgang-Ebene
+   laesst die Seite darunter durchscheinen. Vom Projektinhaber gemeldet --
+   beim ersten Oeffnen klebten die Revierdienst-Kacheln in der Karte.
+
+   Auf iOS zeichnet das Plugin die Karte IN die Webansicht, nicht darunter
+   (auf Android ist es umgekehrt, dort braucht es die Durchsicht wirklich
+   -- siehe die Anmerkung im Plugin). Fuer die iPhone-Fassung ist sie
+   also ueberfluessig. Kommt Android dazu, gehoert sie zurueck, aber dann
+   auf Android beschraenkt. */
 /* Ladehinweis und Fehlermeldung an derselben Stelle: Beides beantwortet
    dieselbe Frage ("warum sehe ich nichts"), darum derselbe Ort. */
 .rgs-karte-stand { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; font-size: 14px; line-height: 1.5; color: var(--ink-3); }
@@ -8300,9 +8303,6 @@ function rgsNativLaden() {
    auch auf dem Reiter mit der Liste. Darum wird sie ausdruecklich
    abgebaut, und zwar vor jedem Ersetzen des Rumpfs. */
 async function rgKarteNativAbbauen() {
-  // Die Durchsicht gilt nur, solange die Karte steht. Bliebe die Klasse
-  // stehen, saehe man auf den anderen Reitern durch die App hindurch.
-  document.body.classList.remove('karte-nativ');
   if (!rgsNativKarte) { return; }
   const weg = rgsNativKarte;
   rgsNativKarte = null;
@@ -8700,7 +8700,6 @@ async function rgKarteNativBauen(d, bauLauf) {
   // native Ansichten uebereinander.
   if (bauLauf !== rgsKarteBauLauf) { rgKarteNativAbbauen(); return; }
   rgsKarteEl = el;
-  document.body.classList.add('karte-nativ');
   // Ausschnitt AUSDRUECKLICH setzen, obwohl er schon in der Erzeugung
   // stand. Gemessen am Geraet: Die Karte kam ueber halb Mitteleuropa
   // heraus statt ueber dem Kontrollpunkt -- die Angaben aus der Erzeugung
