@@ -75,6 +75,9 @@ if (!be_gav_bestaetigen($pdo, $id, (bool)$daten['unterstellt'], $wer)) {
     json_response(['status' => 'error', 'message' => 'Diesen Mandanten gibt es nicht.'], 404);
 }
 
+be_log($pdo, $ich, 'mandant', $id, 'gav_unterstellt', null,
+       $daten['unterstellt'] ? 'ja' : 'nein');
+
 json_response([
     'status'      => 'ok',
     'id'          => $id,

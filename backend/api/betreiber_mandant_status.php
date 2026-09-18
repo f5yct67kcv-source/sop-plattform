@@ -10,7 +10,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 
-require_betreiber_voll();
+$ich = require_betreiber_voll();
 $pdo = betreiber_db();
 
 if (!hat_tabelle($pdo, 'mandant')) {
@@ -30,12 +30,19 @@ if (!be_mandant_status_gueltig($status)) {
         'message' => 'Unbekannter Status. Möglich sind: ' . implode(', ', BE_STATUS) . '.'], 400);
 }
 
+// Erst lesen, dann schreiben: Ohne den alten Wert stuende im Logbuch nur,
+// worauf der Status gesetzt wurde, nicht, was er vorher war -- und genau
+// der Unterschied ist die Vertragsaussage.
+$vor = $pdo->prepare('SELECT status, name FROM mandant WHERE id = ?');
+$vor->execute([$id]);
+$alt = $vor->fetch(PDO::FETCH_ASSOC);
+if (!$alt) {
+    json_response(['status' => 'error', 'message' => 'Diesen Mandanten gibt es nicht.'], 404);
+}
+
 $stmt = $pdo->prepare('UPDATE mandant SET status = ?, geaendert_am = NOW() WHERE id = ?');
 $stmt->execute([$status, $id]);
 
-$da = (int)$pdo->query('SELECT COUNT(*) FROM mandant WHERE id = ' . $id)->fetchColumn();
-if ($da === 0) {
-    json_response(['status' => 'error', 'message' => 'Diesen Mandanten gibt es nicht.'], 404);
-}
+be_log($pdo, $ich, 'mandant', $id, 'status', (string)$alt['status'], $status);
 
 json_response(['status' => 'ok', 'id' => $id, 'neuer_status' => $status]);

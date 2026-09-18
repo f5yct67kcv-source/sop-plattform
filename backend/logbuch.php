@@ -43,9 +43,45 @@ declare(strict_types=1);
 // Zahl, die sich spurlos aendern laesst, traegt keine Kontrolle.
 const LOGBUCH_BEREICHE = ['mitarbeiter', 'fahrzeug'];
 
-function logbuch_tabelle_da(PDO $pdo): bool
+// ── Zweiter Tabellensatz: die Betreiber-Ebene (ENT-614) ──────────────
+//
+// Dieselbe Bauart wie bei den Kunden (KUNDEN_TABELLENSAETZE in kunden.php):
+// EIN Rechenkern, zwei Tabellensaetze, und welcher gemeint ist, entscheidet
+// ein Praefix aus einer geschlossenen Menge -- nie ein Name aus der Anfrage.
+//
+// WARUM UEBERHAUPT ZWEI SAETZE: Solange die vier Betreiber-Secrets nicht
+// gesetzt sind, zeigt betreiber_db() auf DIESELBE Datenbank wie db()
+// (OP-518). Ohne eigenen Tabellennamen laegen die Aenderungen der
+// Betreiberin in derselben Tabelle wie die Personalakten ihrer Mandantin --
+// zwei Ebenen mit verschiedenen Loeschfristen und verschiedenem
+// Leserkreis in einem Topf.
+//
+// Die Bereichsnamen sind je Satz eigene: Ein Mandanten-Endpunkt kann keinen
+// Eintrag mit bereich 'mandant' schreiben, weil dieser Name in seinem Satz
+// nicht vorkommt. Eine geschlossene Menge, die nur fuer den einen Satz gilt,
+// faengt genau den Fall, den eine gemeinsame Liste durchliesse.
+const LOGBUCH_BEREICHE_BE = ['konto', 'mandant', 'adresse', 'beleg', 'produkt', 'briefkopf'];
+const LOGBUCH_TABELLENSAETZE = ['', 'be_'];
+
+function logbuch_tabelle(string $praefix): string
 {
-    return hat_tabelle($pdo, 'aenderungslog');
+    if (!in_array($praefix, LOGBUCH_TABELLENSAETZE, true)) {
+        throw new InvalidArgumentException('Unbekannter Tabellensatz');
+    }
+    return $praefix . 'aenderungslog';
+}
+
+function logbuch_bereiche(string $praefix): array
+{
+    if (!in_array($praefix, LOGBUCH_TABELLENSAETZE, true)) {
+        throw new InvalidArgumentException('Unbekannter Tabellensatz');
+    }
+    return $praefix === 'be_' ? LOGBUCH_BEREICHE_BE : LOGBUCH_BEREICHE;
+}
+
+function logbuch_tabelle_da(PDO $pdo, string $tabPraefix = ''): bool
+{
+    return hat_tabelle($pdo, logbuch_tabelle($tabPraefix));
 }
 
 // Ein einzelner Eintrag. Schreibt NIE einen Fehler nach aussen: Ein
@@ -55,13 +91,13 @@ function logbuch_tabelle_da(PDO $pdo): bool
 // Rueckgabewert.
 function logbuch_schreiben(PDO $pdo, array $akteur, string $bereich, int $objektId,
                            string $feld, ?string $alt, ?string $neu,
-                           bool $ohneWerte = false): bool
+                           bool $ohneWerte = false, string $tabPraefix = ''): bool
 {
-    if (!in_array($bereich, LOGBUCH_BEREICHE, true)) { return false; }
-    if (!logbuch_tabelle_da($pdo)) { return false; }
+    if (!in_array($bereich, logbuch_bereiche($tabPraefix), true)) { return false; }
+    if (!logbuch_tabelle_da($pdo, $tabPraefix)) { return false; }
     try {
         $s = $pdo->prepare(
-            'INSERT INTO aenderungslog
+            'INSERT INTO ' . logbuch_tabelle($tabPraefix) . '
                (akteur_id, akteur_name, bereich, objekt_id, feld, wert_alt, wert_neu, werte_verborgen)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         );
@@ -99,7 +135,8 @@ function logbuch_kuerzen(?string $wert): ?string
 // eine Zahl als "5" und das Formular sie als "5.0" liefert -- ein Logbuch
 // voller Scheinaenderungen ist so unbrauchbar wie gar keines.
 function logbuch_vergleichen(PDO $pdo, array $akteur, string $bereich, int $objektId,
-                             array $vorher, array $nachher, array $ohneWerte = []): int
+                             array $vorher, array $nachher, array $ohneWerte = [],
+                             string $tabPraefix = ''): int
 {
     $anzahl = 0;
     foreach ($nachher as $feld => $neu) {
@@ -108,7 +145,7 @@ function logbuch_vergleichen(PDO $pdo, array $akteur, string $bereich, int $obje
         $b = logbuch_normal($neu);
         if ($a === $b) { continue; }
         if (logbuch_schreiben($pdo, $akteur, $bereich, $objektId, (string)$feld,
-                              $a, $b, in_array($feld, $ohneWerte, true))) {
+                              $a, $b, in_array($feld, $ohneWerte, true), $tabPraefix)) {
             $anzahl++;
         }
     }
@@ -135,17 +172,32 @@ function logbuch_normal($wert): string
 
 // Liest den Verlauf. Ohne Objekt-ID der ganze Bereich (fuer eine spaetere
 // Gesamtsicht), mit Objekt-ID die Akte einer Person.
-function logbuch_lesen(PDO $pdo, string $bereich, int $objektId = 0, int $grenze = 200): array
+// $akteurId filtert auf eine handelnde Person. Der Filter gehoert in die
+// Abfrage und nicht hinter die Grenze: Wer erst 200 Zeilen holt und dann
+// aussortiert, zeigt "die Eintraege dieser Person unter den letzten 200" und
+// nennt es "die Eintraege dieser Person".
+function logbuch_lesen(PDO $pdo, string $bereich, int $objektId = 0, int $grenze = 200,
+                       string $tabPraefix = '', int $akteurId = 0): array
 {
-    if (!logbuch_tabelle_da($pdo)) { return []; }
-    if (!in_array($bereich, LOGBUCH_BEREICHE, true)) { return []; }
+    if (!logbuch_tabelle_da($pdo, $tabPraefix)) { return []; }
+    // Ein leerer Bereichsname heisst "alle Bereiche dieses Satzes" -- die
+    // Gesamtsicht des Betreiber-Logbuchs (ENT-614). Ein UNBEKANNTER Name
+    // bleibt dagegen leer: Sonst wuerde ein Tippfehler im Filter wie "nichts
+    // passiert" aussehen statt wie "diesen Bereich gibt es nicht".
+    $bereiche = logbuch_bereiche($tabPraefix);
+    if ($bereich !== '' && !in_array($bereich, $bereiche, true)) { return []; }
     $grenze = max(1, min(1000, $grenze));
     $sql = 'SELECT id, zeitpunkt, akteur_id, akteur_name, bereich, objekt_id,
                    feld, wert_alt, wert_neu, werte_verborgen
-              FROM aenderungslog
-             WHERE bereich = ?';
-    $werte = [$bereich];
+              FROM ' . logbuch_tabelle($tabPraefix) . '
+             WHERE bereich IN (' . implode(',', array_fill(0, count($bereiche), '?')) . ')';
+    $werte = $bereiche;
+    if ($bereich !== '') {
+        $sql .= ' AND bereich = ?';
+        $werte[] = $bereich;
+    }
     if ($objektId > 0) { $sql .= ' AND objekt_id = ?'; $werte[] = $objektId; }
+    if ($akteurId > 0) { $sql .= ' AND akteur_id = ?'; $werte[] = $akteurId; }
     $sql .= ' ORDER BY zeitpunkt DESC, id DESC LIMIT ' . $grenze;
     $s = $pdo->prepare($sql);
     $s->execute($werte);

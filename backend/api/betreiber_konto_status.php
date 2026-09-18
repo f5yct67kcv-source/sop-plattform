@@ -43,6 +43,12 @@ if (!$aktiv && be_konten_zahl($pdo, $id) === 0) {
 
 $pdo->prepare('UPDATE betreiber SET aktiv = ? WHERE id = ?')->execute([$aktiv ? 1 : 0, $id]);
 
+// Logbuch (ENT-614). In Worten statt als 0/1: "aktiv → stillgelegt" liest
+// jemand in zwei Jahren noch, "1 → 0" nicht.
+be_log($pdo, $ich, 'konto', $id, 'zustand',
+       (int)$konto['aktiv'] === 1 ? 'aktiv' : 'stillgelegt',
+       $aktiv ? 'aktiv' : 'stillgelegt');
+
 // Wird ein Konto stillgelegt, verfallen seine Sitzungen sofort mit. Ohne
 // das bliebe ein bereits ausgestellter Token bis zum Ablauf gueltig --
 // require_betreiber_voll() prueft zwar aktiv = 1, aber der Aufraeumschritt hier

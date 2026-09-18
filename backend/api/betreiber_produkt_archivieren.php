@@ -6,7 +6,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 
-require_betreiber_voll();
+$ich = require_betreiber_voll();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
@@ -19,12 +19,19 @@ if ($id <= 0) {
 }
 
 $pdo = betreiber_db();
+
+$chk = $pdo->prepare('SELECT aktiv FROM be_produkte WHERE id = ?');
+$chk->execute([$id]);
+$vorher = $chk->fetchColumn();
+if ($vorher === false) {
+    json_response(['status' => 'error', 'message' => 'Leistung nicht gefunden'], 404);
+}
+
 $pdo->prepare('UPDATE be_produkte SET aktiv = ? WHERE id = ?')->execute([$aktiv, $id]);
 
-$chk = $pdo->prepare('SELECT id FROM be_produkte WHERE id = ?');
-$chk->execute([$id]);
-if (!$chk->fetch()) {
-    json_response(['status' => 'error', 'message' => 'Leistung nicht gefunden'], 404);
+if ((int)$vorher !== $aktiv) {
+    be_log($pdo, $ich, 'produkt', $id, 'zustand',
+           (int)$vorher === 1 ? 'aktiv' : 'archiviert', $aktiv ? 'aktiv' : 'archiviert');
 }
 
 json_response(['status' => 'ok', 'aktiv' => $aktiv]);

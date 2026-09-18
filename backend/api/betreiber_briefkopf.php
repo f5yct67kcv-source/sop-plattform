@@ -16,7 +16,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 
-require_betreiber_voll();
+$ich = require_betreiber_voll();
 
 $pdo = betreiber_db();
 if (!hat_tabelle($pdo, 'be_briefkopf')) {
@@ -95,6 +95,19 @@ if ($logoSetzen) { $satz .= ', logo = ?'; $werteL[] = $logo; }
 // KEY UPDATE braeuchte hier zwei Wertelisten; ein Vorab-INSERT der leeren
 // Zeile ist kuerzer und tut beim zweiten Aufruf nichts.
 $pdo->prepare('INSERT IGNORE INTO be_briefkopf (id, firma) VALUES (1, ?)')->execute(['']);
+
+// Stand vor der Aenderung, fuer das Logbuch (ENT-614). Das Logo bleibt
+// aussen vor: Ein Bild gehoert nicht in eine Verlaufszeile -- dass es
+// gewechselt wurde, steht als eigener Eintrag ohne Werte darunter.
+$vor = $pdo->prepare('SELECT ' . implode(', ', $spalten) . ' FROM be_briefkopf WHERE id = 1');
+$vor->execute();
+$vorher = $vor->fetch(PDO::FETCH_ASSOC) ?: [];
+
 $pdo->prepare("UPDATE be_briefkopf SET $satz WHERE id = 1")->execute($werteL);
+
+be_log_vergleich($pdo, $ich, 'briefkopf', 1, $vorher, $werte);
+if ($logoSetzen) {
+    be_log($pdo, $ich, 'briefkopf', 1, 'logo', null, null, true);
+}
 
 json_response(['status' => 'ok', 'briefkopf' => be_briefkopf_lesen($pdo)]);

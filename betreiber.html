@@ -962,6 +962,55 @@ tbody tr.aus td { opacity: .55; }
 .dl dt { border-bottom: 1px solid var(--line-soft); }
 .dl dt:last-of-type, .dl dd:last-of-type { border-bottom: none; }
 
+/* ── Kontenliste und Kontodetails (ENT-613) ──────────────────────────
+   Wortgleich aus dem Cockpit uebernommen (dashboard.html, .ku-detail-hd /
+   .ku-detail-info / .md-tabs): Die Kontoseite soll nicht wie das Cockpit
+   AUSSEHEN, sie soll dieselbe sein. Abweichende Zahlen hier waeren genau
+   der Unterschied, den man erst im Vergleich bemerkt -- test_konten_gleich.mjs
+   misst beide Seiten gegeneinander. */
+.ku-detail-hd { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.ku-detail-hd h2 { font-size: 20px; margin: 0; }
+.ku-detail-hd .sub { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+.ku-zurueck {
+  display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); color: var(--ink-2); cursor: pointer; flex: none;
+  min-height: 0; padding: 0;
+}
+.ku-zurueck:hover { background: var(--surface-3); }
+.ku-detail-info dt { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--ink-3); margin-top: 12px; }
+.ku-detail-info dt:first-child { margin-top: 0; }
+.ku-detail-info dd { margin: 2px 0 0; font-size: 13.5px; }
+.k-tab, .kd-tab { display: none; }
+.k-tab.on, .kd-tab.on { display: block; }
+.md-tabs { display: flex; align-items: center; gap: 4px; }
+.md-tabs .btn { margin-left: 4px; }
+/* Die Karten der Uebersicht nebeneinander, solange Platz ist. Kein festes
+   Dreierraster: Auf dieser Ebene traegt ein Konto zwei Karten, und eine
+   dritte leere Spalte sieht aus wie eine fehlende. */
+.kd-raster { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 14px; align-items: start; }
+/* Die Karten der Kontoseite tragen Schrift und Innenabstand der
+   Mitarbeitendenakte (#mdFlow im Cockpit), nicht die der uebrigen Karten
+   dieses Bereichs. Gemessen, nicht geschaetzt: test_konten_gleich.mjs hat
+   genau diese drei Werte gefunden -- 16.38 px statt 13.5 px Ueberschrift und
+   20 px statt 16/18 px Innenabstand. */
+#kv-detail .card-hd h3 { font-size: 13.5px; font-weight: 650; letter-spacing: .1px;
+  text-transform: none; color: var(--ink); margin: 0; }
+#kv-detail .card-bd { padding: 16px 18px 18px; }
+/* Die Reiter der Akte sind Unterstreichungen, keine Pillen -- dieselbe Form
+   wie im Cockpit. Die Pillen bleiben den Unterreitern vorbehalten, die oben
+   in der Werkzeugleiste stehen (ENT-611); im Cockpit ist die Aufteilung
+   dieselbe. Dreiteilige Auswahl, damit die Hausregel fuer Knoepfe
+   (44 px, Rahmen, 18 px Innenabstand) hier nicht dazwischenfunkt -- genau
+   daran ist ENT-611 schon einmal haengengeblieben. */
+.tabs.md-tabs { gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs.md-tabs .tab { border: none; background: transparent; padding: 10px 14px 9px;
+  font: inherit; font-size: 16px; font-weight: 600; color: var(--ink-3); cursor: pointer;
+  border-bottom: 2px solid transparent; white-space: nowrap; border-radius: 0; min-height: 0; }
+.tabs.md-tabs .tab:hover { color: var(--ink); }
+.tabs.md-tabs .tab.on { color: var(--accent); border-bottom-color: var(--accent);
+  background: transparent; }
+
 @media (max-width: 900px) {
   .of-abschluss { grid-template-columns: 1fr; }
   .of-kopf-zwei { grid-template-columns: 1fr; }
@@ -1727,17 +1776,76 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         </div>
       </div>
     </section>
+    <!-- ══ Konten (ENT-613/ENT-614) ═══════════════════════════════
+         Aufbau wie die Mitarbeitenden im Cockpit: Liste, und ein Klick auf
+         die Zeile oeffnet die Akte mit Reitern. Nicht, weil es hier viele
+         Konten gaebe -- es werden zwei sein --, sondern weil dieselbe
+         Bewegung dasselbe tun soll, egal in welchem Bereich man gerade ist.
+
+         DREI REITER STATT ACHT. Person hat keinen eigenen: Anrede, Vor-,
+         Nachname und E-Mail stehen vollstaendig in der Uebersichtskarte,
+         ein zweiter Reiter mit denselben vier Zeilen waere eine leere
+         Huelse. Was im Cockpit darueber hinaus dransteht -- Anstellung,
+         Einsatz, Lohn, Dienstplaene -- gibt es auf dieser Ebene nicht:
+         Ein Betreiber-Konto ist ein Zugang, kein Arbeitsverhaeltnis. -->
     <section class="bereich versteckt" id="b-konten">
-    <!-- Konten -->
-    <div class="karte">
-      <div class="karte-kopf">
-        <div>
-          <h2>Betreiber-Konten</h2>
-          <div class="sub">Wer diesen Bereich öffnen darf</div>
-        </div>
+      <div class="tabs haupt" id="kontenTabs" style="margin-bottom:10px">
+        <button type="button" class="tab on" id="ktab-konten" onclick="kontenGo('konten')">Konten</button>
+        <button type="button" class="tab" id="ktab-logbuch" onclick="kontenGo('logbuch')">Logbuch</button>
       </div>
-      <div id="k-inhalt"></div>
-    </div>
+
+      <!-- ── Liste ───────────────────────────────────────────────── -->
+      <div class="k-tab on" id="kv-liste">
+        <div class="bar-tools">
+          <div class="search">
+            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="inp" type="search" id="kQ" placeholder="Name oder E-Mail …" oninput="kZeichnen()">
+          </div>
+          <div class="sp" style="flex:1"></div>
+          <button type="button" class="btn btn-primary" onclick="kDlgOeffnen(null)">
+            <svg class="i" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Neues Konto
+          </button>
+        </div>
+        <div class="card"><div class="card-bd flush"><div class="tw" id="kTable"></div></div></div>
+      </div>
+
+      <!-- ── Ein Konto ───────────────────────────────────────────── -->
+      <div class="k-tab" id="kv-detail">
+        <div class="ku-detail-hd">
+          <button type="button" class="ku-zurueck" onclick="kGoListe()" aria-label="Zurück zur Kontenliste">
+            <svg class="i" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div style="flex:1">
+            <h2 id="kdName">–</h2>
+            <div class="sub" id="kdSub">–</div>
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" onclick="kDlgOeffnen(kdId)">Bearbeiten</button>
+        </div>
+        <div class="tabs md-tabs" id="kdTabs" style="margin-bottom:14px">
+          <button type="button" class="tab on" id="kdtab-uebersicht" onclick="kdGoTab('uebersicht')">Übersicht</button>
+          <button type="button" class="tab" id="kdtab-zugang" onclick="kdGoTab('zugang')">Zugang</button>
+          <button type="button" class="tab" id="kdtab-verlauf" onclick="kdGoTab('verlauf')">Verlauf</button>
+        </div>
+        <div class="kd-tab on" id="kd-uebersicht"><div class="kd-raster" id="kdUebersicht"></div></div>
+        <div class="kd-tab" id="kd-zugang"><div id="kdZugang"></div></div>
+        <div class="kd-tab" id="kd-verlauf"><div id="kdVerlauf"></div></div>
+      </div>
+
+      <!-- ── Logbuch des ganzen Bereichs ─────────────────────────── -->
+      <div class="k-tab" id="kv-logbuch">
+        <div class="bar-tools">
+          <select class="inp" id="kLogBereich" style="width:auto" onchange="kLogLaden()" aria-label="Bereich">
+            <option value="">Alle Bereiche</option>
+          </select>
+          <select class="inp" id="kLogAkteur" style="width:auto" onchange="kLogLaden()" aria-label="Person">
+            <option value="">Alle Personen</option>
+          </select>
+          <div class="sp" style="flex:1"></div>
+        </div>
+        <div class="card"><div class="card-bd flush"><div class="tw" id="kLogTable"></div></div></div>
+        <div id="kLogFuss"></div>
+      </div>
     </section>
 
     <!-- ══ Adressen (ENT-605) ═════════════════════════════════════
@@ -2211,6 +2319,67 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   </div>
 </div>
 
+<!-- Konto anlegen oder ändern (ENT-613).
+     Das Passwort steht NUR beim Anlegen im Formular. Ein Feld "neues
+     Passwort" an einem fremden Konto waere die Uebernahme dieses Kontos --
+     wer sein eigenes wechseln will, nimmt den Reiter Zugang. -->
+<div class="of-dlg-huelle" id="dlgKonto">
+  <div class="of-dlg">
+    <div class="of-dlg-hd">
+      <h2 id="kDlgTitel">Neues Konto</h2>
+      <p id="kDlgUnter">Wer dieses Konto hat, sieht jeden Mandanten. Es gibt keine Ebene darüber.</p>
+    </div>
+    <div class="of-dlg-bd">
+      <div class="meldung fehler versteckt" id="kErr"></div>
+      <div class="raster2">
+        <div class="f"><label for="k_anrede">Anrede</label>
+          <select class="inp" id="k_anrede">
+            <option value="">—</option>
+            <option>Herr</option>
+            <option>Frau</option>
+          </select></div>
+        <div class="f"><label for="k_vorname">Vorname</label>
+          <input class="inp" id="k_vorname"></div>
+        <div class="f"><label for="k_nachname">Nachname *</label>
+          <input class="inp" id="k_nachname"></div>
+        <div class="f"><label for="k_email">E-Mail *</label>
+          <input class="inp" id="k_email" type="email" autocomplete="off"></div>
+      </div>
+      <div class="f versteckt" id="kPassFeld" style="margin-bottom:0">
+        <label for="k_pass">Passwort *</label>
+        <input class="inp" id="k_pass" type="password" autocomplete="new-password">
+        <div class="of-hinweis" id="kPassHinweis"></div>
+      </div>
+    </div>
+    <div class="of-dlg-ft">
+      <button type="button" class="btn btn-plain" onclick="dlgZu('dlgKonto')">Abbrechen</button>
+      <button type="button" class="btn btn-primary" id="kSaveBtn" onclick="kSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Eigenes Passwort wechseln (ENT-613). -->
+<div class="of-dlg-huelle" id="dlgPasswort">
+  <div class="of-dlg">
+    <div class="of-dlg-hd">
+      <h2>Passwort wechseln</h2>
+      <p>Nur für das eigene Konto. Alle anderen angemeldeten Geräte dieses Kontos werden dabei abgemeldet.</p>
+    </div>
+    <div class="of-dlg-bd">
+      <div class="meldung fehler versteckt" id="pwErr"></div>
+      <div class="f"><label for="pw_alt">Bisheriges Passwort *</label>
+        <input class="inp" id="pw_alt" type="password" autocomplete="current-password"></div>
+      <div class="f" style="margin-bottom:0"><label for="pw_neu">Neues Passwort *</label>
+        <input class="inp" id="pw_neu" type="password" autocomplete="new-password">
+        <div class="of-hinweis" id="pwHinweis"></div></div>
+    </div>
+    <div class="of-dlg-ft">
+      <button type="button" class="btn btn-plain" onclick="dlgZu('dlgPasswort')">Abbrechen</button>
+      <button type="button" class="btn btn-primary" id="pwSaveBtn" onclick="pwSpeichern()">Wechseln</button>
+    </div>
+  </div>
+</div>
+
 <!-- Leistung anlegen oder ändern -->
 <div class="of-dlg-huelle" id="dlgLeistung">
   <div class="of-dlg">
@@ -2360,6 +2529,7 @@ function bereichZeigen(welcher) {
      veraendern (eine neue Adresse, eine neue Offerte). Beim Betreten frisch
      holen ist billiger als ein Stand, der nicht mehr stimmt. */
   unterreiterZeichnen();
+  if (welcher === 'konten')   { ladeKonten(); }
   if (welcher === 'adressen') { ladeAdressen(); }
   if (welcher === 'offerten') { ladeBelege(); ladeProdukte(); }
   if (welcher === 'rechnungen') { ladeRechnungen(); ladeProdukte(); }
@@ -2915,50 +3085,468 @@ async function supportHolen(m) {
   $('sup-karte').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-/* ── Konten ─────────────────────────────────────────────────────── */
-async function ladeKonten() {
+/* ── Konten (ENT-613) und Logbuch (ENT-614) ─────────────────────────
+   Aufbau wie die Mitarbeitenden im Cockpit: eine Liste, und ein Klick auf
+   die Zeile oeffnet die Akte mit Reitern. Nicht, weil es hier viele Konten
+   gaebe -- es werden zwei sein --, sondern weil dieselbe Bewegung dasselbe
+   tun soll, egal in welchem Bereich man gerade ist.
+
+   DREI ZUSTAENDE, EINE STELLE: Liste, ein Konto, Logbuch. Welcher gilt,
+   entscheidet kAnsichtSetzen() und sonst niemand -- verteilte
+   Sichtbarkeitsschalter sind die Stelle, an der zwei Ansichten gleichzeitig
+   offen stehen. */
+let konten = [], kontenAktive = 0;
+let kSortFeld = 'nachname', kSortRichtung = 'auf';
+let kdId = 0, kdTab = 'uebersicht', kontenTab = 'konten';
+let kdVerlauf = null, kdVerlaufFuer = 0;
+let kLogDaten = null;
+
+const kFindet = id => konten.find(k => Number(k.id) === Number(id)) || null;
+
+async function ladeKonten() { return sicher(ladeKontenRoh, 'kTable', 'Die Konten'); }
+async function ladeKontenRoh() {
   const a = await ruf('betreiber_konto_list.php');
-  const inhalt = $('k-inhalt');
   if (a.status !== 'ok') {
-    inhalt.innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
+    $('kTable').innerHTML = LEER('Nicht abrufbar', a.message || 'Unbekannter Fehler.');
     return;
   }
-  const liste = a.konten || [];
-  inhalt.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
-    + '<th>Konto</th><th>Zustand</th><th>Zuletzt angemeldet</th><th></th>'
-    + '</tr></thead><tbody>'
-    + liste.map(k => '<tr>'
-        + '<td><strong>' + text(k.name) + '</strong>'
-          + '<div class="zweit">' + text(k.email) + (k.ich ? ' · das bin ich' : '') + '</div></td>'
-        + '<td>' + (k.aktiv
-            ? '<span class="merker m-pos">aktiv</span>'
-            : '<span class="merker m-ruhe">stillgelegt</span>') + '</td>'
-        /* "Noch nie angemeldet" ist etwas anderes als ein leeres Feld. */
-        + '<td>' + (k.nie_angemeldet
-            ? '<span style="color:var(--ink-3)">noch nie</span>'
-            : text(String(k.letzte_anmeldung).slice(0, 16))) + '</td>'
-        + '<td style="text-align:right">'
-          + (k.aktiv && a.aktive > 1
-              ? '<button class="klein gefahr" data-still="' + k.id + '">Stilllegen</button>'
-              : (k.aktiv
-                  ? '<span class="zweit">letztes aktives Konto</span>'
-                  : '<button class="klein" data-an="' + k.id + '">Aktivieren</button>'))
-          + '</td>'
-      + '</tr>').join('')
-    + '</tbody></table></div>';
+  konten       = a.konten || [];
+  kontenAktive = Number(a.aktive || 0);
+  kZeichnen();
+  kAkteureFuellen();
+  if (kdId) { kdZeichnen(); }
+}
 
-  inhalt.querySelectorAll('[data-still]').forEach(b =>
-    b.onclick = () => kontoSchalten(+b.dataset.still, false));
-  inhalt.querySelectorAll('[data-an]').forEach(b =>
-    b.onclick = () => kontoSchalten(+b.dataset.an, true));
+/* ── Wo man gerade ist ─────────────────────────────────────────── */
+function kAnsichtSetzen() {
+  const offen = kontenTab === 'logbuch' ? 'kv-logbuch' : (kdId ? 'kv-detail' : 'kv-liste');
+  ['kv-liste', 'kv-detail', 'kv-logbuch'].forEach(n => $(n).classList.toggle('on', n === offen));
+  ['konten', 'logbuch'].forEach(n => $('ktab-' + n).classList.toggle('on', n === kontenTab));
+  /* Die Reiter stehen ueber 1210 px oben in der Werkzeugleiste. Wird hier
+     umgeschaltet, muss die Kopie dort mitkommen -- sonst leuchtet oben noch
+     der Reiter, den man eben verlassen hat. */
+  unterreiterZeichnen();
+}
+function kontenGo(t) {
+  kontenTab = t;
+  kAnsichtSetzen();
+  if (t === 'logbuch') { kLogLaden(); }
+}
+function kOeffnen(id) {
+  kdId = Number(id);
+  kontenTab = 'konten';
+  kdVerlaufFuer = 0;
+  kdGoTab('uebersicht');
+  kAnsichtSetzen();
+  window.scrollTo({ top: 0 });
+}
+function kGoListe() { kdId = 0; kAnsichtSetzen(); }
+function kdGoTab(t) {
+  kdTab = t;
+  ['uebersicht', 'zugang', 'verlauf'].forEach(n => {
+    $('kdtab-' + n).classList.toggle('on', n === t);
+    $('kd-' + n).classList.toggle('on', n === t);
+  });
+  kdZeichnen();
+}
+
+/* ── Liste ─────────────────────────────────────────────────────── */
+function kTh(feld, label) {
+  const aktiv = kSortFeld === feld;
+  const pfeil = aktiv && kSortRichtung === 'ab' ? '▼' : '▲';
+  return `<th class="sortbar${aktiv ? ' aktiv' : ''}" onclick="kSort('${feld}')">${esc(label)}<span class="pf">${pfeil}</span></th>`;
+}
+function kSort(feld) {
+  kSortRichtung = (kSortFeld === feld && kSortRichtung === 'auf') ? 'ab' : 'auf';
+  kSortFeld = feld;
+  kZeichnen();
+}
+
+/* Drei Aussagen, drei Texte: eingerichtet, noch offen, und "die Tabelle
+   dafuer gibt es auf diesem Server nicht". Der dritte Fall darf nie wie der
+   zweite aussehen (Hausregel). */
+function kZfMerker(k) {
+  if (k.zwei_faktor === true)  { return '<span class="merker m-pos">eingerichtet</span>'; }
+  if (k.zwei_faktor === false) { return '<span class="merker m-warn">noch offen</span>'; }
+  return '<span style="color:var(--ink-3)" title="Die Tabelle für den zweiten Faktor ist auf diesem Server noch nicht angelegt.">keine Angabe</span>';
+}
+function kZustandMerker(k) {
+  return k.aktiv ? '<span class="merker m-pos">aktiv</span>'
+                 : '<span class="merker m-ruhe">stillgelegt</span>';
+}
+/* "Noch nie angemeldet" ist etwas anderes als ein leeres Feld. */
+function kAnmeldung(k) {
+  return k.nie_angemeldet
+    ? '<span style="color:var(--ink-3)">noch nie</span>'
+    : esc(String(k.letzte_anmeldung || '').slice(0, 16).replace('T', ' '));
+}
+
+function kKarte(k) {
+  return `<div class="ag-karte klickbar" role="button" tabindex="0"
+       onclick="kOeffnen(${Number(k.id)})"
+       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();kOeffnen(${Number(k.id)})}">
+    <div class="kopf"><b>${esc(k.name)}</b>${kZustandMerker(k)}</div>
+    <div class="wer">${esc(k.email)}${k.ich ? ' · das bin ich' : ''}</div>
+    <div class="marken">${kZfMerker(k)}</div>
+  </div>`;
+}
+
+function kZeichnen() {
+  const q = ($('kQ').value || '').toLowerCase().trim();
+  const d = konten.filter(k => !q ||
+    [k.vorname, k.nachname, k.name, k.email].some(f => String(f || '').toLowerCase().includes(q)));
+
+  d.sort((a, b) => {
+    const c = String(a[kSortFeld] || '').localeCompare(String(b[kSortFeld] || ''), 'de',
+      { numeric: true, sensitivity: 'base' });
+    return kSortRichtung === 'auf' ? c : -c;
+  });
+
+  if (!d.length) {
+    /* "Kein Treffer" und "nichts vorhanden" sind verschiedene Aussagen. */
+    $('kTable').innerHTML = konten.length
+      ? LEER('Keine Treffer', 'Für diese Suche gibt es kein Konto.')
+      : LEER('Noch keine Konten', 'Über „Neues Konto“ oben rechts anlegen.');
+    return;
+  }
+
+  $('kTable').innerHTML = `<div class="nur-schmal">${d.map(k => kKarte(k)).join('')}</div>`
+    + `<table class="nur-breit"><thead><tr>
+      ${kTh('vorname', 'Vorname')}${kTh('nachname', 'Nachname')}${kTh('email', 'E-Mail')}
+      <th>Zwei-Faktor</th>${kTh('letzte_anmeldung', 'Zuletzt angemeldet')}<th>Zustand</th>
+    </tr></thead><tbody>` + d.map(k => `
+      <tr class="click" onclick="kOeffnen(${Number(k.id)})">
+        <td>${strich(k.vorname)}</td>
+        <td class="strong">${esc(k.nachname || k.name)}${k.ich
+            ? '<div class="sec">das bin ich</div>' : ''}</td>
+        <td>${strich(k.email)}</td>
+        <td>${kZfMerker(k)}</td>
+        <td class="nowrap">${kAnmeldung(k)}</td>
+        <td>${kZustandMerker(k)}</td>
+      </tr>`).join('') + `</tbody></table>`;
+}
+
+/* ── Ein Konto ─────────────────────────────────────────────────── */
+const kZeile = (dt, dd) => `<dt>${esc(dt)}</dt><dd>${dd}</dd>`;
+
+function kdZeichnen() {
+  const k = kFindet(kdId);
+  if (!k) { kGoListe(); return; }
+
+  $('kdName').textContent = k.name || '–';
+  $('kdSub').textContent = [k.email, k.aktiv ? 'aktiv' : 'stillgelegt',
+    k.ich ? 'das bin ich' : ''].filter(Boolean).join(' · ');
+
+  if (kdTab === 'uebersicht') {
+    $('kdUebersicht').innerHTML = `
+      <div class="card"><div class="card-hd"><h3>Person</h3></div>
+        <div class="card-bd"><dl class="ku-detail-info">
+          ${kZeile('Anrede',   strich(k.anrede))}
+          ${kZeile('Vorname',  strich(k.vorname))}
+          ${kZeile('Nachname', strich(k.nachname || k.name))}
+          ${kZeile('E-Mail',   strich(k.email))}
+        </dl></div></div>
+      <div class="card"><div class="card-hd"><h3>Zugang</h3></div>
+        <div class="card-bd"><dl class="ku-detail-info">
+          ${kZeile('Zustand',            kZustandMerker(k))}
+          ${kZeile('Zwei-Faktor',        kZfMerker(k))}
+          ${kZeile('Angelegt',           strich(String(k.angelegt_am || '').slice(0, 10)))}
+          ${kZeile('Zuletzt angemeldet', kAnmeldung(k))}
+        </dl></div></div>`;
+  }
+  if (kdTab === 'zugang')  { kdZugang(k); }
+  if (kdTab === 'verlauf') { kdVerlaufZeichnen(k); }
+}
+
+/* Der Reiter Zugang. Er zeigt den Stand und traegt die drei Wege, die es
+   auf dieser Ebene gibt -- jeder mit der Wache, die zu ihm gehoert:
+
+   Passwort wechseln  nur am EIGENEN Konto, mit dem alten als Nachweis.
+   Zwei-Faktor zurücksetzen  nur an einem FREMDEN; das eigene erneuert man
+     ueber die Einrichtung und weist sich dabei mit einem Code aus.
+   Stilllegen  nie am letzten aktiven Konto -- danach kaeme niemand mehr
+     herein, und es gibt keine Ebene darueber, die wieder hereinliesse. */
+function kdZugang(k) {
+  const letztes = k.aktiv && kontenAktive <= 1;
+  const tasten = [];
+  if (k.ich) {
+    tasten.push('<button type="button" class="btn btn-plain btn-sm" onclick="pwOeffnen()">Passwort wechseln</button>');
+  } else if (k.zwei_faktor === true) {
+    tasten.push(`<button type="button" class="btn btn-plain btn-sm" onclick="kZfZuruecksetzen(${Number(k.id)})">Zwei-Faktor zurücksetzen</button>`);
+  }
+  if (k.aktiv && !letztes) {
+    tasten.push(`<button type="button" class="btn btn-danger btn-sm" onclick="kontoSchalten(${Number(k.id)}, false)">Stilllegen</button>`);
+  } else if (!k.aktiv) {
+    tasten.push(`<button type="button" class="btn btn-plain btn-sm" onclick="kontoSchalten(${Number(k.id)}, true)">Aktivieren</button>`);
+  }
+
+  $('kdZugang').innerHTML = `
+    <div class="card" style="max-width:640px"><div class="card-hd"><h3>Anmeldung</h3></div>
+      <div class="card-bd">
+        <dl class="ku-detail-info">
+          ${kZeile('Zustand',            kZustandMerker(k))}
+          ${kZeile('Zwei-Faktor',        kZfMerker(k))}
+          ${kZeile('Zuletzt angemeldet', kAnmeldung(k))}
+          ${kZeile('Angelegt',           strich(String(k.angelegt_am || '').slice(0, 10)))}
+        </dl>
+        ${letztes ? `<div class="of-hinweis" style="margin-top:12px">Das ist das letzte aktive Konto.
+          Es lässt sich nicht stilllegen — ohne es käme niemand mehr in diesen Bereich.</div>` : ''}
+        ${k.ich ? '' : `<div class="of-hinweis" style="margin-top:12px">Das Passwort eines fremden Kontos
+          lässt sich hier nicht setzen. Wer seines verloren hat, bekommt ein neues Konto und dieses
+          wird stillgelegt.</div>`}
+        <div class="kk-tasten">${tasten.join('')}</div>
+        <div class="meldung versteckt" id="kdMeldung" style="margin-top:12px"></div>
+      </div></div>`;
 }
 
 async function kontoSchalten(id, aktiv) {
-  stumm($('haus-meldung'));
   const a = await ruf('betreiber_konto_status.php', { id: id, aktiv: aktiv });
-  if (a.status !== 'ok') { melde($('haus-meldung'), 'fehler', a.message); return; }
+  if (a.status !== 'ok') {
+    const ziel = $('kdMeldung') || $('haus-meldung');
+    melde(ziel, 'fehler', a.message);
+    return;
+  }
+  /* Wer sich selbst stilllegt, ist ab sofort draussen -- die Sitzung gilt
+     nicht mehr, und eine Oberflaeche, die danach weiterlaedt, zeigte nur
+     noch Fehlermeldungen. */
   if (a.selbst && !aktiv) { abmelden(); return; }
+  kdVerlaufFuer = 0;
   await ladeKonten();
+  kurzmeldung(aktiv ? 'Konto aktiviert.' : 'Konto stillgelegt.');
+}
+
+async function kZfZuruecksetzen(id) {
+  const k = kFindet(id);
+  if (!confirm('Den zweiten Faktor von ' + (k ? k.name : 'diesem Konto')
+      + ' zurücksetzen? Das Konto muss ihn bei der nächsten Anmeldung neu einrichten '
+      + 'und wird dabei von allen Geräten abgemeldet.')) { return; }
+  const a = await ruf('betreiber_zf_zuruecksetzen.php', { id: id });
+  if (a.status !== 'ok') { melde($('kdMeldung'), 'fehler', a.message); return; }
+  kdVerlaufFuer = 0;
+  await ladeKonten();
+  kurzmeldung('Zweiter Faktor zurückgesetzt.');
+}
+
+/* ── Verlauf eines Kontos ──────────────────────────────────────── */
+async function kdVerlaufZeichnen(k) {
+  const ziel = $('kdVerlauf');
+  if (kdVerlaufFuer !== kdId) {
+    ziel.innerHTML = '<div style="color:var(--ink-3)">Wird geladen …</div>';
+    kdVerlaufFuer = kdId;
+    const a = await ruf('betreiber_logbuch_list.php?bereich=konto&objekt=' + Number(kdId));
+    kdVerlauf = a;
+    if (kdTab !== 'verlauf' || kdVerlaufFuer !== kdId) { return; }
+  }
+  const d = kdVerlauf || {};
+  if (d.status !== 'ok') {
+    ziel.innerHTML = LEER('Nicht abrufbar', 'Der Verlauf liess sich nicht laden. Bitte später erneut versuchen.');
+    return;
+  }
+  if (!d.tabelle_da) {
+    ziel.innerHTML = LEER('Logbuch noch nicht eingerichtet',
+      'Die Tabelle dafür fehlt auf diesem Server. Ein Lauf der Einrichtung legt sie an — '
+      + 'was vorher geändert wurde, lässt sich nicht nachtragen.');
+    return;
+  }
+  if (!(d.eintraege || []).length) {
+    ziel.innerHTML = LEER('Keine Änderung', 'An diesem Konto wurde seit der Einrichtung des Logbuchs nichts geändert.');
+    return;
+  }
+  ziel.innerHTML = '<div class="card"><div class="card-bd flush"><div class="tw">'
+    + kLogTabelle(d.eintraege, false) + '</div></div></div>' + kLogFussnote(d);
+}
+
+/* ── Konto anlegen und ändern ──────────────────────────────────── */
+function kDlgOeffnen(id) {
+  const k = id ? kFindet(id) : null;
+  stumm($('kErr'));
+  $('kDlgTitel').textContent = k ? 'Konto bearbeiten' : 'Neues Konto';
+  $('kDlgUnter').textContent = k
+    ? 'Name und E-Mail. Das Passwort ändert nur dieses Konto selbst, unter „Zugang“.'
+    : 'Wer dieses Konto hat, sieht jeden Mandanten. Es gibt keine Ebene darüber.';
+  $('k_anrede').value   = k ? (k.anrede || '') : '';
+  $('k_vorname').value  = k ? (k.vorname || '') : '';
+  $('k_nachname').value = k ? (k.nachname || k.name || '') : '';
+  $('k_email').value    = k ? (k.email || '') : '';
+  $('k_pass').value     = '';
+  $('kPassHinweis').textContent = 'Mindestens 12 Zeichen. Dieses Konto darf jeden Mandanten — '
+    + 'es fällt nie unter die Schwelle der Verwaltung.';
+  zeig($('kPassFeld'), !k);
+  $('kSaveBtn').dataset.id = k ? String(k.id) : '';
+  dlgAuf('dlgKonto');
+  setTimeout(() => $('k_vorname').focus(), 30);
+}
+
+async function kSpeichern() {
+  stumm($('kErr'));
+  const id = Number($('kSaveBtn').dataset.id || 0);
+  const daten = {
+    anrede:   $('k_anrede').value,
+    vorname:  $('k_vorname').value.trim(),
+    nachname: $('k_nachname').value.trim(),
+    email:    $('k_email').value.trim(),
+  };
+  if (!daten.nachname) { melde($('kErr'), 'fehler', 'Ein Nachname wird gebraucht.'); return; }
+  if (!daten.email)    { melde($('kErr'), 'fehler', 'Eine E-Mail-Adresse wird gebraucht.'); return; }
+
+  let a;
+  if (id) {
+    a = await ruf('betreiber_konto_speichern.php', Object.assign({ id: id }, daten));
+  } else {
+    a = await ruf('betreiber_konto_anlegen.php', Object.assign({ passwort: $('k_pass').value }, daten));
+  }
+  if (a.status !== 'ok') { melde($('kErr'), 'fehler', a.message || 'Unbekannter Fehler.'); return; }
+  dlgZu('dlgKonto');
+  kdVerlaufFuer = 0;
+  await ladeKonten();
+  kurzmeldung(id ? 'Konto gespeichert.' : 'Konto angelegt.');
+}
+
+/* ── Eigenes Passwort ──────────────────────────────────────────── */
+function pwOeffnen() {
+  stumm($('pwErr'));
+  $('pw_alt').value = '';
+  $('pw_neu').value = '';
+  $('pwHinweis').textContent = 'Mindestens 12 Zeichen, und nicht das bisherige.';
+  dlgAuf('dlgPasswort');
+  setTimeout(() => $('pw_alt').focus(), 30);
+}
+
+async function pwSpeichern() {
+  stumm($('pwErr'));
+  const a = await ruf('betreiber_konto_passwort.php',
+    { alt: $('pw_alt').value, neu: $('pw_neu').value });
+  if (a.status !== 'ok') { melde($('pwErr'), 'fehler', a.message || 'Unbekannter Fehler.'); return; }
+  dlgZu('dlgPasswort');
+  kurzmeldung(Number(a.abgemeldet) > 0
+    ? 'Passwort gewechselt. Andere Geräte wurden abgemeldet.'
+    : 'Passwort gewechselt.');
+}
+
+/* ── Logbuch des ganzen Bereichs (ENT-614) ──────────────────────────
+   Der Verlauf am Konto und diese Gesamtsicht zeichnen dieselbe Tabelle --
+   eine zweite Darstellung liefe irgendwann auseinander, und dann hiesse
+   dasselbe Feld an zwei Orten verschieden. */
+const K_BEREICH_NAMEN = {
+  konto: 'Konto', mandant: 'Mandant', adresse: 'Adresse',
+  beleg: 'Beleg', produkt: 'Leistung', briefkopf: 'Briefkopf',
+};
+/* Nur die Felder, deren Spaltenname sich nicht von selbst liest. Was hier
+   fehlt, erscheint als Spaltenname -- das ist ehrlicher als eine erfundene
+   Beschriftung und faellt auf, wenn es stoert. */
+const K_FELD_NAMEN = {
+  angelegt: 'Angelegt', zustand: 'Zustand', status: 'Status', passwort: 'Passwort',
+  email: 'E-Mail', vorname: 'Vorname', nachname: 'Nachname', anrede: 'Anrede',
+  bezahlt: 'Bezahlt', versendet: 'Versendet', import: 'Import', logo: 'Logo',
+  zwei_faktor_eingerichtet: 'Zwei-Faktor eingerichtet',
+  zwei_faktor_zurueckgesetzt: 'Zwei-Faktor zurückgesetzt',
+  gav_unterstellt: 'GAV-Unterstellung', secret_name: 'Secret', subdomain: 'Subdomain',
+  db_host: 'Datenbank-Host', db_name: 'Datenbank', db_user: 'Datenbank-Benutzer',
+  einzelpreis_rappen: 'Einzelpreis', mwst_satz_bp: 'MWST-Satz',
+};
+const kFeldName    = f => K_FELD_NAMEN[f] || String(f || '');
+const kBereichName = b => K_BEREICH_NAMEN[b] || String(b || '');
+
+/* Der Name des betroffenen Dings, wo er im Browser ohnehin schon liegt.
+   Sonst die Nummer -- "#12" ist eine ehrliche Auskunft, ein erfundener Name
+   waere keine. */
+function kLogObjekt(z) {
+  const id = Number(z.objekt_id || 0);
+  if (!id) { return '<span style="color:var(--ink-3)">–</span>'; }
+  const suche = (liste, feld) => {
+    const t = (liste || []).find(x => Number(x.id) === id);
+    return t ? String(t[feld] || '') : '';
+  };
+  let name = '';
+  if (z.bereich === 'konto')   { const k = kFindet(id); name = k ? k.name : ''; }
+  if (z.bereich === 'adresse') { name = suche(adressen, 'name'); }
+  if (z.bereich === 'produkt') { name = suche(produkte, 'name'); }
+  if (z.bereich === 'beleg')   { name = suche(belege, 'nummer') || suche(rechnungen, 'nummer'); }
+  return name ? esc(name) : '<span style="color:var(--ink-3)">#' + id + '</span>';
+}
+
+function kLogWert(w) {
+  return (w === null || w === undefined || w === '')
+    ? '<span style="color:var(--ink-3)">leer</span>' : esc(String(w));
+}
+
+function kLogTabelle(eintraege, mitBereich) {
+  return `<table><thead><tr>
+      <th>Wann</th><th>Wer</th>${mitBereich ? '<th>Bereich</th><th>Betrifft</th>' : ''}
+      <th>Was</th><th>Änderung</th>
+    </tr></thead><tbody>` + eintraege.map(z => `
+      <tr>
+        <td class="nowrap">${esc(String(z.zeitpunkt || '').slice(0, 16).replace('T', ' '))}</td>
+        <td>${esc(z.akteur_name || '?')}</td>
+        ${mitBereich ? `<td>${esc(kBereichName(z.bereich))}</td><td>${kLogObjekt(z)}</td>` : ''}
+        <td>${esc(kFeldName(z.feld))}</td>
+        <td>${z.werte_verborgen
+              ? '<span class="merker m-ruhe">geändert</span> '
+                + '<span style="color:var(--ink-3)">Werte werden nicht mitgeschrieben</span>'
+              : kLogWert(z.wert_alt) + ' <span style="opacity:.5">→</span> ' + kLogWert(z.wert_neu)}</td>
+      </tr>`).join('') + `</tbody></table>`;
+}
+
+/* Eine Liste, die genau auf der Grenze steht, ist abgeschnitten -- und eine
+   abgeschnittene Liste, die wie die ganze aussieht, ist eine Falschaussage
+   (Hausregel: keine Zahl ohne Bezug). */
+function kLogFussnote(d) {
+  return Number(d.anzahl) >= Number(d.grenze)
+    ? `<div style="margin-top:10px;color:var(--ink-3);font-size:12.5px">Es werden die letzten
+       ${Number(d.grenze)} Einträge gezeigt — es gibt ältere.</div>` : '';
+}
+
+/* Die Personen im Filter kommen aus der Kontenliste, nicht aus den
+   Logzeilen: Wer nichts geaendert hat, soll trotzdem waehlbar sein --
+   sonst sieht "diese Person hat nichts getan" aus wie "diese Person gibt
+   es nicht". */
+function kAkteureFuellen() {
+  const s = $('kLogAkteur');
+  if (!s) { return; }
+  const gewaehlt = s.value;
+  s.innerHTML = '<option value="">Alle Personen</option>'
+    + konten.map(k => `<option value="${Number(k.id)}">${esc(k.name)}</option>`).join('');
+  s.value = gewaehlt;
+}
+
+async function kLogLaden() {
+  const ziel = $('kLogTable');
+  const fuss = $('kLogFuss');
+  ziel.innerHTML = '<div style="padding:14px;color:var(--ink-3)">Wird geladen …</div>';
+  fuss.innerHTML = '';
+  const p = new URLSearchParams();
+  if ($('kLogBereich').value) { p.set('bereich', $('kLogBereich').value); }
+  if ($('kLogAkteur').value)  { p.set('akteur',  $('kLogAkteur').value); }
+  const a = await ruf('betreiber_logbuch_list.php' + (p.toString() ? '?' + p : ''));
+  kLogDaten = a;
+
+  if (a.status !== 'ok') {
+    ziel.innerHTML = LEER('Nicht abrufbar', a.message || 'Das Logbuch liess sich nicht laden.');
+    return;
+  }
+  /* Die Bereichsliste kommt vom Server -- kommt dort einer dazu, steht er
+     hier ohne zweite Pflege im Filter. */
+  const w = $('kLogBereich');
+  if (w.options.length <= 1) {
+    w.innerHTML = '<option value="">Alle Bereiche</option>'
+      + (a.bereiche || []).map(b => `<option value="${esc(b)}">${esc(kBereichName(b))}</option>`).join('');
+  }
+  if (!a.tabelle_da) {
+    ziel.innerHTML = LEER('Logbuch noch nicht eingerichtet',
+      'Die Tabelle dafür fehlt auf diesem Server. Ein Lauf der Einrichtung legt sie an — '
+      + 'was vorher geändert wurde, lässt sich nicht nachtragen.');
+    return;
+  }
+  const e = a.eintraege || [];
+  if (!e.length) {
+    const gefiltert = $('kLogBereich').value || $('kLogAkteur').value;
+    ziel.innerHTML = gefiltert
+      ? LEER('Keine Treffer', 'Für diese Auswahl steht nichts im Logbuch.')
+      : LEER('Noch keine Einträge', 'Seit der Einrichtung des Logbuchs wurde in diesem Bereich nichts geändert.');
+    return;
+  }
+  ziel.innerHTML = kLogTabelle(e, true);
+  fuss.innerHTML = kLogFussnote(a);
 }
 
 /* ── Übersicht ──────────────────────────────────────────────────

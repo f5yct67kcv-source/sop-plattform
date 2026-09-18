@@ -20,7 +20,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../belege.php';
 
-require_betreiber_voll();
+$ich = require_betreiber_voll();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
@@ -54,5 +54,8 @@ if ($art !== 'rechnung') {
 $bezahltAm = $bezahlt ? date('Y-m-d') : null;
 $pdo->prepare('UPDATE be_belege SET bezahlt = ?, bezahlt_am = ? WHERE id = ?')
     ->execute([$bezahlt, $bezahltAm, $id]);
+
+be_log($pdo, $ich, 'beleg', $id, 'bezahlt',
+       $bezahlt ? 'offen' : 'bezahlt', $bezahlt ? 'bezahlt am ' . $bezahltAm : 'offen');
 
 json_response(['status' => 'ok', 'bezahlt' => $bezahlt, 'bezahlt_am' => $bezahltAm]);

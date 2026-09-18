@@ -9,7 +9,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 
-require_betreiber_voll();
+$ich = require_betreiber_voll();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
@@ -22,12 +22,19 @@ if ($id <= 0) {
 }
 
 $pdo = betreiber_db();
+
+$chk = $pdo->prepare('SELECT aktiv FROM be_kunden WHERE id = ?');
+$chk->execute([$id]);
+$vorher = $chk->fetchColumn();
+if ($vorher === false) {
+    json_response(['status' => 'error', 'message' => 'Adresse nicht gefunden'], 404);
+}
+
 $pdo->prepare('UPDATE be_kunden SET aktiv = ? WHERE id = ?')->execute([$aktiv, $id]);
 
-$chk = $pdo->prepare('SELECT id FROM be_kunden WHERE id = ?');
-$chk->execute([$id]);
-if (!$chk->fetch()) {
-    json_response(['status' => 'error', 'message' => 'Adresse nicht gefunden'], 404);
+if ((int)$vorher !== $aktiv) {
+    be_log($pdo, $ich, 'adresse', $id, 'zustand',
+           (int)$vorher === 1 ? 'aktiv' : 'archiviert', $aktiv ? 'aktiv' : 'archiviert');
 }
 
 json_response(['status' => 'ok', 'aktiv' => $aktiv]);

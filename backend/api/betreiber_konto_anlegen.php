@@ -19,6 +19,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../anmeldung.php';
 require_once __DIR__ . '/../betreiber.php';
+require_once __DIR__ . '/../logbuch.php';
 
 $pdo = betreiber_db();
 if (!be_tabellen_da($pdo)) {
@@ -54,14 +55,29 @@ if ($vorhanden === 0) {
     }
     $user = require_session();
     require_verwaltung($user);
+    $ich = null;
 } else {
-    require_betreiber_voll();
+    $ich = require_betreiber_voll();
 }
 
 $daten = json_decode(file_get_contents('php://input') ?: '', true) ?: [];
-$name  = trim((string)($daten['name']  ?? ''));
 $email = mb_strtolower(trim((string)($daten['email'] ?? '')));
 $pass  = (string)($daten['passwort'] ?? '');
+
+// ZWEI EINSTIEGE, EIN ERGEBNIS (ENT-613): Der Betreiber-Bereich schickt seit
+// ENT-613 Anrede, Vorname und Nachname einzeln. Der Bootstrap aus dem Cockpit
+// kennt nur ein Namensfeld und soll dafuer nicht umgebaut werden -- er richtet
+// das allererste Konto ein, an einer Stelle, die selten laeuft und nie
+// scheitern darf. Kommen die Teile nicht, werden sie aus `name` geteilt.
+$anrede   = trim((string)($daten['anrede'] ?? ''));
+$vorname  = trim((string)($daten['vorname']  ?? ''));
+$nachname = trim((string)($daten['nachname'] ?? ''));
+if ($vorname === '' && $nachname === '') {
+    $t = be_name_teilen((string)($daten['name'] ?? ''));
+    $vorname  = $t['vorname'];
+    $nachname = $t['nachname'];
+}
+$name = be_name_bauen($vorname, $nachname);
 
 if ($name === '' || $email === '') {
     json_response(['status' => 'error', 'message' => 'Name und E-Mail werden gebraucht.'], 400);
@@ -90,9 +106,11 @@ if ($fehler !== null) {
 
 try {
     $stmt = $pdo->prepare(
-        'INSERT INTO betreiber (name, email, passwort_hash) VALUES (?, ?, ?)'
+        'INSERT INTO betreiber (name, anrede, vorname, nachname, email, passwort_hash)
+         VALUES (?, ?, ?, ?, ?, ?)'
     );
-    $stmt->execute([$name, $email, password_hash($pass, PASSWORD_BCRYPT, ['cost' => PASSWORT_KOSTEN])]);
+    $stmt->execute([$name, $anrede, $vorname, $nachname, $email,
+                    password_hash($pass, PASSWORD_BCRYPT, ['cost' => PASSWORT_KOSTEN])]);
 } catch (Throwable $e) {
     // Doppelte Adresse ist der einzige erwartbare Fall und bekommt eine
     // eigene Aussage -- "geht nicht" waere hier nicht hilfreich.
@@ -103,4 +121,13 @@ try {
             : 'Das Konto konnte nicht angelegt werden.'], 400);
 }
 
-json_response(['status' => 'ok', 'id' => (int)$pdo->lastInsertId()]);
+$neueId = (int)$pdo->lastInsertId();
+
+// Logbuch (ENT-614): Wer wann welches Konto angelegt hat. Der Bootstrap
+// schreibt nichts -- dort gibt es noch keinen Betreiber als Akteur, und ein
+// Eintrag mit akteur_id 0 waere eine Zeile, die nichts beantwortet.
+if ($ich !== null) {
+    be_log($pdo, $ich, 'konto', $neueId, 'angelegt', null, $name);
+}
+
+json_response(['status' => 'ok', 'id' => $neueId]);
