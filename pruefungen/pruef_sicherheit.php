@@ -56,6 +56,8 @@ hol($anmeldung, '/^const PASSWORT_BLIND_HASH\s*=\s*\'[^\']+\';/m', 'PASSWORT_BLI
 hol($anmeldung, '/function passwort_blindpruefung.*?\n\}/s', 'passwort_blindpruefung()');
 hol($betrieb,   '/function logo_mime_am_inhalt.*?\n\}/s',    'logo_mime_am_inhalt()');
 hol($db,        "/const APP_NATIVE_HERKUENFTE\s*=\s*\[.*?\];/s", 'APP_NATIVE_HERKUENFTE');
+hol($db,        "/const WEB_HERKUNFT_OEFFENTLICHE_DEMO\s*=\s*'[^']+';/s", 'WEB_HERKUNFT_OEFFENTLICHE_DEMO');
+hol($db,        "/const OEFFENTLICHE_DEMO_SKRIPTE\s*=\s*\[.*?\];/s", 'OEFFENTLICHE_DEMO_SKRIPTE');
 hol($db,        '/function cors_erlaubte_herkunft.*?\n\}/s', 'cors_erlaubte_herkunft()');
 
 // ══════════════════════════════════════════════════════════════════════
@@ -199,6 +201,22 @@ pruef('KRITISCH: leer wird abgewiesen', cors_erlaubte_herkunft('') === null);
 pruef('KRITISCH: kein Wildcard -- Gross-/Kleinschreibung und Zusatz aendern nichts',
     cors_erlaubte_herkunft('CAPACITOR://LOCALHOST') === null
     && cors_erlaubte_herkunft('capacitor://localhost.angreifer.example') === null);
+
+// guardops.ch (ENT-601-Nachtrag): nur fuer die zwei oeffentlichen
+// Selbstbedienungs-Endpunkte, nicht fuer jeden anderen. Ohne dieses zweite
+// Kriterium liesse eine einzige erlaubte Herkunft JEDEN Endpunkt
+// cross-origin ansprechen -- genau der Angriff, den ENT-588 verhindern
+// wollte, nur ueber eine andere Herkunft.
+pruef('guardops.ch kommt beim Selbstbedienungs-Endpunkt durch',
+    cors_erlaubte_herkunft('https://guardops.ch', 'demo_anfordern.php') === 'https://guardops.ch');
+pruef('guardops.ch kommt auch beim Erneut-senden-Endpunkt durch',
+    cors_erlaubte_herkunft('https://guardops.ch', 'demo_erneut_senden.php') === 'https://guardops.ch');
+pruef('KRITISCH: guardops.ch kommt bei jedem anderen Skript NICHT durch',
+    cors_erlaubte_herkunft('https://guardops.ch', 'betreiber_mandant_list.php') === null
+    && cors_erlaubte_herkunft('https://guardops.ch', '') === null);
+pruef('KRITISCH: kein Wildcard bei der Herkunft selbst -- Gross-/Kleinschreibung und Zusatz aendern nichts',
+    cors_erlaubte_herkunft('HTTPS://GUARDOPS.CH', 'demo_anfordern.php') === null
+    && cors_erlaubte_herkunft('https://guardops.ch.angreifer.example', 'demo_anfordern.php') === null);
 
 // ══════════════════════════════════════════════════════════════════════
 // 8. Zwei Regeln ueber den GANZEN Quelltext
