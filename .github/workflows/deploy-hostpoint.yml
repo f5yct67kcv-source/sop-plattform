@@ -1311,6 +1311,12 @@ jobs:
           cp backend/belege.php        dist-betreiber/belege.php
           cp backend/kunden.php        dist-betreiber/kunden.php
           cp backend/produkte.php      dist-betreiber/produkte.php
+          # Der Zahlteil der Rechnung (ENT-616) -- derselbe Rechenkern wie
+          # auf der Mandantenseite, aus demselben Grund wie die drei oben:
+          # Eine zweite Kopie der Pruefziffern und des SPC-Aufbaus waere die
+          # Stelle, an der die beiden Seiten auseinanderlaufen, und zwar
+          # unbemerkt bis zu dem Tag, an dem eine Bank einen Code abweist.
+          cp backend/qrrechnung.php    dist-betreiber/qrrechnung.php
           # html2pdf erzeugt die PDF-Fassung einer Offerte -- im
           # Betreiber-Bereich selbst (Herunterladen/Teilen) und auf der
           # oeffentlichen Seite, die der Empfaenger am Link sieht. Beide

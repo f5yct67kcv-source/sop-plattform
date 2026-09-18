@@ -285,6 +285,46 @@ check('KRITISCH: die Zaehlspalte zaehlt Belege -- Rapporte gibt es beim Betreibe
     /hat_tabelle\(\$pdo, 'be_belege'\)/.test(list));
 }
 
+// ── Zahlteil auf der Rechnung der Betreiberin (ENT-616) ──────────────
+//
+// Die Mandantin konnte ihren Kunden seit ENT-205 eine bezahlbare Rechnung
+// schicken, die Betreiberin ihren nicht. Geprueft wird hier die Verdrahtung;
+// dass der Code stimmt, rechnet pruef_qr.php nach.
+{
+  const oeff = nurCode(lies('backend/api/betreiber_beleg_oeffentlich.php'));
+  check('KRITISCH: die oeffentliche Rechnung der Betreiberin traegt einen Zahlteil',
+    /qr_spc_payload\(/.test(oeff));
+  check('KRITISCH: er entsteht nur bei einer RECHNUNG, nie bei einer Offerte',
+    /\$b\['art'\]\s*===\s*'rechnung'/.test(oeff));
+  check('KRITISCH: und nur, solange sie nicht bezahlt ist',
+    /!\$bezahlt/.test(oeff));
+  check('KRITISCH: die Bedingung kommt aus der geteilten Stelle, nicht aus einer zweiten Kopie',
+    /qr_zahlteil_moeglich\(/.test(oeff) && !/iban_ist_qr\([\s\S]{0,200}&&[\s\S]{0,200}qr_strasse/.test(oeff));
+  check('der Zahlteil wird gedruckt, ist also nicht als "keindruck" gesetzt',
+    !/keindruck[^<]{0,80}qrRechnungCode/.test(oeff));
+  check('KRITISCH: Referenz und Mitteilung werden auseinandergehalten',
+    /Mitteilung/.test(oeff) && /Referenz/.test(oeff));
+
+  const bk = nurCode(lies('backend/api/betreiber_briefkopf.php'));
+  check('KRITISCH: eine unbrauchbare IBAN wird abgewiesen, nicht still gespeichert',
+    /iban_ch_li_gueltig\(/.test(bk) && /400/.test(bk));
+  check('die fuenf Zahlungsfelder gehoeren zum Briefkopf',
+    ['qr_iban', 'qr_strasse', 'qr_hausnummer', 'qr_plz', 'qr_ort'].every(f => bk.includes(f)));
+  check('fehlen die Spalten noch, bricht der Briefkopf nicht ab',
+    /hat_spalte\(\$pdo, 'be_briefkopf'/.test(bk));
+  check('KRITISCH: der Server sagt, welche Referenzart daraus folgt -- nicht der Browser',
+    /'QRR'/.test(bk) && /'NON'/.test(bk));
+
+  const seite = lies('betreiber.html');
+  check('die Zahlungsfelder stehen in einem eigenen Block, nicht unter den Briefkopf gemischt',
+    /Zahlteil der Rechnung/.test(seite));
+  check('KRITISCH: vier Lagen, vier Texte -- keine sieht aus wie eine andere',
+    ['ohne_iban', 'iban_ungueltig', 'adresse_fehlt', 'bereit_QRR', 'bereit_NON']
+      .every(k => seite.includes(k)));
+  check('die Oberflaeche sagt bei einer normalen IBAN, dass die Zuordnung von Hand laeuft',
+    /von Hand zu/.test(seite));
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden`);
 if (bad.length) {
   console.log('\n' + bad.map(b => '  ✗ ' + b).join('\n'));

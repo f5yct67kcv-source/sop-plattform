@@ -15,6 +15,7 @@
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
+require_once __DIR__ . '/../qrrechnung.php';
 
 $ich = require_betreiber_voll();
 
@@ -24,20 +25,59 @@ if (!hat_tabelle($pdo, 'be_briefkopf')) {
 }
 
 const BE_BRIEFKOPF_FELDER = ['firma', 'absender', 'uid', 'mwst_nr', 'iban',
-                             'email', 'telefon', 'webseite'];
+                             'email', 'telefon', 'webseite',
+                             // Zahlteil (ENT-616)
+                             'qr_iban', 'qr_strasse', 'qr_hausnummer', 'qr_plz', 'qr_ort'];
+
+// Welche davon gibt es in DIESER Anlage? Die fuenf Zahlungsfelder kommen
+// ueber be_spalten_anlegen() nach; zwischen Deploy und Einrichtungslauf
+// liegt ein Moment, in dem die Tabelle noch die alte ist. Ein Endpunkt, der
+// dann mit einem SQL-Fehler abbricht, macht aus einer fehlenden Spalte einen
+// unbenutzbaren Briefkopf.
+function be_briefkopf_felder(PDO $pdo): array
+{
+    return array_values(array_filter(BE_BRIEFKOPF_FELDER,
+        fn($f) => hat_spalte($pdo, 'be_briefkopf', $f)));
+}
 
 function be_briefkopf_lesen(PDO $pdo): array
 {
+    $felder = be_briefkopf_felder($pdo);
     $s = $pdo->query('SELECT * FROM be_briefkopf WHERE id = 1');
     $r = $s->fetch();
     if (!$r) {
         $leer = array_fill_keys(BE_BRIEFKOPF_FELDER, '');
-        return $leer + ['logo' => null];
+        return $leer + ['logo' => null] + be_briefkopf_zahlteil([]);
     }
     $aus = [];
     foreach (BE_BRIEFKOPF_FELDER as $f) { $aus[$f] = (string)($r[$f] ?? ''); }
     $aus['logo'] = $r['logo'] !== null && $r['logo'] !== '' ? (string)$r['logo'] : null;
-    return $aus;
+    $aus['felder_da'] = count($felder) === count(BE_BRIEFKOPF_FELDER);
+    return $aus + be_briefkopf_zahlteil($aus);
+}
+
+// Was der Briefkopf ueber den Zahlteil aussagt -- gerechnet im Server, nicht
+// im Browser: Ob eine IBAN eine QR-IBAN ist, entscheidet ihre Bankleitzahl,
+// und diese Auskunft darf nicht davon abhaengen, welche Seite gerade fragt.
+//
+// DREI ZUSTAENDE, DREI AUSSAGEN (Hausregel): keine IBAN hinterlegt, eine
+// hinterlegt aber unbrauchbar, oder brauchbar -- und dann mit welcher
+// Referenzart. Ein blosses "kein Zahlteil" liesse offen, woran es liegt.
+function be_briefkopf_zahlteil(array $b): array
+{
+    $iban = trim((string)($b['qr_iban'] ?? ''));
+    if ($iban === '') {
+        return ['zahlteil' => ['lage' => 'ohne_iban', 'art' => null, 'moeglich' => false]];
+    }
+    if (!iban_ch_li_gueltig($iban)) {
+        return ['zahlteil' => ['lage' => 'iban_ungueltig', 'art' => null, 'moeglich' => false]];
+    }
+    $art = iban_ist_qr($iban) ? 'QRR' : 'NON';
+    return ['zahlteil' => [
+        'lage'     => qr_zahlteil_moeglich($b) ? 'bereit' : 'adresse_fehlt',
+        'art'      => $art,
+        'moeglich' => qr_zahlteil_moeglich($b),
+    ]];
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
@@ -48,7 +88,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
 $in = json_decode(file_get_contents('php://input'), true) ?? [];
 
 $werte = [];
-foreach (BE_BRIEFKOPF_FELDER as $f) {
+foreach (be_briefkopf_felder($pdo) as $f) {
     $roh = trim((string)($in[$f] ?? ''));
     // Steuerzeichen raus -- bis auf 'absender', der ist ein Adressblock und
     // traegt Zeilenumbrueche. Dieselbe Ueberlegung wie bei der Kundenadresse
@@ -60,6 +100,16 @@ foreach (BE_BRIEFKOPF_FELDER as $f) {
         : (string)preg_replace('/[\x00-\x1F\x7F]/u', '', $roh);
 }
 $werte['absender'] = mb_substr($werte['absender'], 0, 500);
+
+// Eine unbrauchbare IBAN wird ABGEWIESEN, nicht still gespeichert: Sonst
+// steht sie im Briefkopf, der Zahlteil bleibt trotzdem weg, und niemand
+// erfaehrt warum. Leer bleiben darf sie -- dann gibt es eben keinen.
+if (array_key_exists('qr_iban', $werte) && $werte['qr_iban'] !== ''
+    && !iban_ch_li_gueltig($werte['qr_iban'])) {
+    json_response(['status' => 'error',
+        'message' => 'Diese IBAN ist keine gültige Schweizer oder Liechtensteiner IBAN. '
+                   . 'Ohne sie bleibt die Rechnung ohne Einzahlungsschein.'], 400);
+}
 
 // Das Logo kommt als data:-URL und wird STRENG geprueft, nicht nur
 // entgegengenommen: Es landet spaeter im src eines Bildes auf einer Seite,

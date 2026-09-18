@@ -18,14 +18,24 @@ if (!hat_tabelle($pdo, 'mandant')) {
         'message' => 'Der Mandantenstamm ist noch nicht eingerichtet.'], 503);
 }
 
+// Die Vertragsspalten (ENT-617) kommen ueber be_spalten_anlegen() nach.
+// Zwischen Deploy und Einrichtungslauf gibt es sie noch nicht -- eine
+// Abfrage, die sie dann nennt, bricht mit einem SQL-Fehler ab und macht aus
+// einer fehlenden Spalte einen unbenutzbaren Mandantenstamm.
+$VERTRAG = ['vertrag_beginn', 'mindestlaufzeit_monate', 'kuendigungsfrist_monate',
+            'verlaengerung_monate', 'gekuendigt_per'];
+$vertragDa = array_values(array_filter($VERTRAG, fn($f) => hat_spalte($pdo, 'mandant', $f)));
+
 $zeilen = $pdo->query(
     'SELECT id, name, subdomain, status, kanton, gav_unterstellt, gav_bestaetigt_am,
             gav_bestaetigt_von, db_host, db_name, db_user, secret_name,
-            angelegt_am, geaendert_am
+            angelegt_am, geaendert_am'
+    . ($vertragDa ? ', ' . implode(', ', $vertragDa) : '') . '
        FROM mandant ORDER BY id'
 )->fetchAll(PDO::FETCH_ASSOC);
 
-$liste = array_map(static function (array $m): array {
+$heute = date('Y-m-d');
+$liste = array_map(static function (array $m) use ($VERTRAG, $vertragDa, $heute): array {
     $m['id'] = (int)$m['id'];
     // Die drei Lagen werden vom Server benannt, nicht von der Oberflaeche
     // erraten -- "nicht eingerichtet", "kein Zugriff", "nichts vorhanden"
@@ -38,6 +48,21 @@ $liste = array_map(static function (array $m): array {
     // gav_unterstellt bleibt dreiwertig auch in der Antwort: null heisst
     // "nicht bestaetigt" und darf nicht zu false werden.
     $m['gav_unterstellt'] = $m['gav_unterstellt'] === null ? null : (int)$m['gav_unterstellt'] === 1;
+
+    // Fehlt die Spalte, steht das Feld trotzdem in der Antwort -- als null.
+    // Die Oberflaeche unterscheidet "nichts eingetragen" von "gibt es hier
+    // noch nicht" am Feld `vertrag_felder_da`, nicht am fehlenden Schluessel.
+    foreach ($VERTRAG as $f) {
+        if (!array_key_exists($f, $m)) { $m[$f] = null; }
+    }
+    $m['vertrag_felder_da'] = count($vertragDa) === count($VERTRAG);
+
+    // GERECHNET, nicht gespeichert (ENT-617): Der naechste moegliche
+    // Kuendigungstermin folgt aus Beginn, Mindestlaufzeit, Verlaengerung und
+    // Frist. Ein abgelegter Wert stuende ab dem Tag falsch da, an dem der
+    // Termin verstreicht.
+    $m['vertrag'] = be_vertrag_lage($m, $heute);
+    $m['vertrag']['faellig_90'] = be_vertrag_faellig($m['vertrag'], 90, $heute);
     return $m;
 }, $zeilen);
 

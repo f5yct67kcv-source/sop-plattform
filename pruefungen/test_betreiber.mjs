@@ -312,8 +312,16 @@ check('der Sammel-Schreibweg fasst weder Status noch GAV an',
 // weil demo_instanz.php/demo_anfordern.php per LIMIT 1 darauf zugreifen,
 // muss der Speicherweg eine doppelt vergebene Subdomain selbst abweisen,
 // nicht erst der Zufall der Zuteilung.
+// Geprueft wird die AUSSAGE, nicht der Wortlaut: Seit ENT-617 baut der
+// Endpunkt Spaltenliste und Platzhalter aus denselben Schluesseln, aus denen
+// auch die Werte kommen. Damit landet jedes Feld aus $werte im INSERT -- die
+// Subdomain eingeschlossen. Die alte Fassung suchte den Spaltennamen im
+// INSERT-Text und waere an genau dieser Umstellung rot geworden, obwohl die
+// Subdomain weiterhin gespeichert wird.
 check('KRITISCH: der Schreibweg speichert die Subdomain mit',
-  /['"]subdomain['"]\s*=>/.test(save) && /INSERT INTO mandant[\s\S]{0,60}subdomain/.test(save));
+  /['"]subdomain['"]\s*=>/.test(save)
+  && /INSERT INTO mandant[\s\S]{0,80}implode\(', ', \$spalten\)/.test(save)
+  && /\$spalten = array_keys\(\$werte\)/.test(save));
 check('KRITISCH: eine doppelt vergebene Subdomain wird abgewiesen, nicht kommentarlos gespeichert',
   /SELECT id FROM mandant WHERE subdomain/.test(save) && /400/.test(save));
 
@@ -757,6 +765,53 @@ check('KRITISCH: das Zahnrad faerbt sich, sobald etwas nachzutragen ist -- still
   // und traegt die Klasse der Menueeintraege. Geprueft ist die Aussage --
   // "hat-update" faerbt warn --, nicht wo der Knopf gerade haengt.
   && /\.hat-update\s*\{[^}]*color:\s*var\(--warn\)/.test(betreiberHtml));
+
+// ── Vertragsangaben am Mandanten (ENT-617) ───────────────────────────
+//
+// Die Rechnung selbst laeuft in pruef_betreiber.php. Hier steht die
+// Verdrahtung: dass der Termin GERECHNET und nicht gespeichert wird, dass
+// leer als unbekannt ankommt, und dass die Oberflaeche die Lagen
+// auseinanderhaelt.
+{
+  const save = nurCode(lies('backend/api/betreiber_mandant_save.php'));
+  const list = nurCode(lies('backend/api/betreiber_mandant_list.php'));
+  const seite = lies('betreiber.html');
+
+  check('KRITISCH: der naechste Kuendigungstermin wird gerechnet, nicht gespeichert',
+    /be_vertrag_lage\(/.test(list)
+    && !/vertrag_naechste|naechster_termin/.test(nurCode(modul).replace(/function be_vertrag_lage[\s\S]*?\n}/, ''))
+    && !/(INSERT|UPDATE)[\s\S]{0,200}spaetestens/.test(save));
+
+  // Jedes der fuenf Felder geht durch einen Wandler, der bei leerer Eingabe
+  // null liefert -- nicht 0 und nicht ''. Eine 0 wuerde "null Monate
+  // vereinbart" behaupten, und die Lage waere dann nicht mehr "unbekannt".
+  check('KRITISCH: ein leeres Feld wird NULL, nicht 0',
+    /\$monateOderNull = static function[\s\S]{0,200}return null;/.test(save)
+    && /\$datumOderNull = static function[\s\S]{0,200}return null;/.test(save)
+    && ['mindestlaufzeit_monate', 'kuendigungsfrist_monate', 'verlaengerung_monate']
+         .every(f => new RegExp("'" + f + "'\\s*=> \\$monateOderNull").test(save))
+    && ['vertrag_beginn', 'gekuendigt_per']
+         .every(f => new RegExp("'" + f + "'\\s*=> \\$datumOderNull").test(save)));
+  check('KRITISCH: ein Enddatum vor dem Beginn wird abgewiesen',
+    /gekuendigt_per'\][\s\S]{0,120}vertrag_beginn'\]/.test(save) && /400/.test(save));
+  check('nur mitgeschickte Vertragsfelder werden geschrieben — ein altes Formular leert nichts',
+    /array_key_exists\(\$feld, \$daten\)/.test(save));
+  check('fehlen die Spalten noch, bricht weder Lesen noch Schreiben ab',
+    /hat_spalte\(\$pdo, 'mandant'/.test(save) && /hat_spalte\(\$pdo, 'mandant'/.test(list));
+
+  check('KRITISCH: die Uebersicht zaehlt den Stichtag der Kuendigung, nicht das Vertragsende',
+    /faellig_90/.test(list) && /be_vertrag_faellig\(/.test(list));
+
+  check('KRITISCH: fuenf Lagen, fuenf Texte — keine sieht aus wie eine andere',
+    ['unbekannt', 'ohne_ende', 'laeuft', 'laeuft_aus', 'gekuendigt']
+      .every(k => new RegExp(k + ':\\s*\\[').test(seite)));
+  check('"noch nicht nachgetragen" ist etwas anderes als "nicht erfasst"',
+    /vertrag_felder_da === false/.test(seite) && /keine Angabe/.test(seite));
+  check('ein Vertrag ohne Angaben zaehlt weder als faellig noch als in Ordnung',
+    /ohne Angaben/.test(seite));
+  check('das Formular sagt, dass leer "nicht erfasst" heisst',
+    /nicht erfasst/.test(seite) && /Leer heisst unbefristet/.test(seite));
+}
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

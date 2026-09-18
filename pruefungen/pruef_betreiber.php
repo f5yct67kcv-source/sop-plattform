@@ -311,6 +311,101 @@ $pruef('KRITISCH: der Anzeigename wird dabei nicht veraendert',
     $alle[0]['name'] === 'Anna von Gunten');
 $pruef('KRITISCH: ein zweiter Lauf aendert nichts mehr', be_namen_nachtragen($nb) === 0);
 
+// ══════════════ VERTRAGSLAGE (ENT-617)
+//
+// Der naechste moegliche Kuendigungstermin wird GERECHNET und nie
+// gespeichert. Das heisst: Diese Rechnung ist die einzige Quelle, und ein
+// Fehler darin verschiebt einen Termin, an dem Geld haengt -- darum
+// ausgefuehrt und nicht nachgelesen.
+//
+// Alle Faelle mit ausdruecklichem "heute" und Jahreszahlen weit weg vom
+// heutigen Tag: Ein Fall, der beim Datumswechsel kippt, prueft nichts
+// (test_datumsfest.mjs achtet darauf).
+$v = ['vertrag_beginn' => '2040-01-31', 'mindestlaufzeit_monate' => 12,
+      'kuendigungsfrist_monate' => 3, 'verlaengerung_monate' => 12];
+
+$a = be_vertrag_lage($v, '2040-09-18');
+$pruef('KRITISCH: waehrend der Mindestlaufzeit laeuft der Vertrag', $a['lage'] === 'laeuft');
+$pruef('KRITISCH: das erste Ende ist Beginn plus Mindestlaufzeit',
+    $a['ende'] === '2041-01-31');
+$pruef('KRITISCH: die Kuendigung muss die Frist vorher da sein',
+    $a['spaetestens'] === '2040-10-31');
+
+// Einen Tag NACH dem Stichtag zaehlt das erste Ende nicht mehr.
+$b = be_vertrag_lage($v, '2040-11-01');
+$pruef('KRITISCH: ist der Stichtag vorbei, gilt das naechste Ende',
+    $b['ende'] === '2042-01-31' && $b['spaetestens'] === '2041-10-31');
+$pruef('Am Stichtag selbst geht es noch',
+    be_vertrag_lage($v, '2040-10-31')['ende'] === '2041-01-31');
+
+// ── Monatsklemmung: der 31. plus ein Monat ist nicht der 3. des
+//    uebernaechsten. Bei einer Frist sind das zwei Tage in die falsche
+//    Richtung -- genau die, auf die es ankommt.
+$pruef('KRITISCH: 31. Januar minus ein Monat bleibt im Dezember',
+    be_monate_dazu('2040-01-31', -1) === '2039-12-31');
+$pruef('KRITISCH: 31. Maerz minus ein Monat ist der 29. Februar (Schaltjahr)',
+    be_monate_dazu('2040-03-31', -1) === '2040-02-29');
+$pruef('KRITISCH: 31. Maerz minus ein Monat ist der 28. Februar (kein Schaltjahr)',
+    be_monate_dazu('2041-03-31', -1) === '2041-02-28');
+$pruef('31. Mai plus ein Monat ist der 30. Juni, nicht der 1. Juli',
+    be_monate_dazu('2040-05-31', 1) === '2040-06-30');
+$pruef('Ein Monatsanfang bleibt ein Monatsanfang',
+    be_monate_dazu('2040-01-01', 12) === '2041-01-01');
+
+// ── Die fuenf Lagen, und keine sieht aus wie eine andere ──────────────
+$pruef('KRITISCH: ohne Beginn ist die Lage unbekannt, nicht "sofort kuendbar"',
+    be_vertrag_lage([], '2040-09-18')['lage'] === 'unbekannt');
+$pruef('KRITISCH: unbekannt liefert auch keinen Termin, der wie einer aussieht',
+    be_vertrag_lage([], '2040-09-18')['ende'] === null);
+$pruef('Ohne Mindestlaufzeit ist der Vertrag unbefristet, nicht unbekannt',
+    be_vertrag_lage(['vertrag_beginn' => '2040-01-01', 'kuendigungsfrist_monate' => 3],
+        '2040-09-18')['lage'] === 'ohne_ende');
+
+// Ohne Verlaengerung endet der Vertrag an seinem einzigen Ende.
+$ohneV = ['vertrag_beginn' => '2040-01-01', 'mindestlaufzeit_monate' => 12,
+          'kuendigungsfrist_monate' => 3, 'verlaengerung_monate' => 0];
+$c = be_vertrag_lage($ohneV, '2040-11-01');
+$pruef('KRITISCH: ohne Verlaengerung und nach dem Stichtag laeuft er aus',
+    $c['lage'] === 'laeuft_aus' && $c['ende'] === '2041-01-01');
+$pruef('KRITISCH: er gilt aber noch -- "laeuft aus" ist nicht "beendet"',
+    $c['beendet'] === false);
+$pruef('KRITISCH: erst nach dem Ende ist er beendet',
+    be_vertrag_lage($ohneV, '2041-06-01')['beendet'] === true);
+$pruef('Vor dem Stichtag ist er dagegen noch kuendbar',
+    be_vertrag_lage($ohneV, '2040-06-01')['lage'] === 'laeuft');
+
+// Eine Kuendigung schlaegt jede Rechnung: Steht das Datum, gilt es.
+$gek = $v + ['gekuendigt_per' => '2041-01-31'];
+$pruef('KRITISCH: ein gekuendigter Vertrag endet am eingetragenen Tag',
+    be_vertrag_lage($gek, '2040-09-18')['lage'] === 'gekuendigt'
+    && be_vertrag_lage($gek, '2040-09-18')['ende'] === '2041-01-31');
+$pruef('Und ist danach beendet',
+    be_vertrag_lage($gek, '2041-06-01')['beendet'] === true);
+$pruef('Ein leeres Nulldatum gilt NICHT als Kuendigung',
+    be_vertrag_lage($v + ['gekuendigt_per' => '0000-00-00'], '2040-09-18')['lage'] === 'laeuft');
+
+// ── Das 90-Tage-Fenster der Uebersicht ────────────────────────────────
+//
+// Gemeint ist der Tag, an dem die Kuendigung spaetestens da sein muss --
+// nicht das Vertragsende. Wer aufs Ende schaut, merkt die Frist, wenn sie
+// vorbei ist.
+$lage = be_vertrag_lage($v, '2040-09-18');   // spaetestens 2040-10-31
+$pruef('KRITISCH: ein Stichtag in 43 Tagen faellt ins 90-Tage-Fenster',
+    be_vertrag_faellig($lage, 90, '2040-09-18') === true);
+$pruef('KRITISCH: und in 30 Tagen gemessen nicht',
+    be_vertrag_faellig($lage, 30, '2040-09-18') === false);
+$pruef('KRITISCH: ein unbekannter Vertrag faellt nie ins Fenster -- unbekannt ist nicht faellig',
+    be_vertrag_faellig(be_vertrag_lage([], '2040-09-18'), 90, '2040-09-18') === false);
+$pruef('Ein bereits vergangener Stichtag faellt nicht mehr hinein',
+    be_vertrag_faellig($lage, 90, '2040-11-05') === false);
+
+// Die Schleife endet auch bei Unsinn -- eine Verlaengerung von 0 Monaten
+// wuerde sonst ewig auf der Stelle treten.
+$pruef('KRITISCH: die Terminsuche endet auch bei einer Verlaengerung von 0',
+    in_array(be_vertrag_lage(['vertrag_beginn' => '2000-01-01', 'mindestlaufzeit_monate' => 1,
+        'kuendigungsfrist_monate' => 0, 'verlaengerung_monate' => 0], '2040-09-18')['lage'],
+        ['laeuft_aus'], true));
+
 echo count($bad) === 0
     ? "$ok bestanden, 0 nicht bestanden\n"
     : "$ok bestanden, " . count($bad) . " nicht bestanden\n";

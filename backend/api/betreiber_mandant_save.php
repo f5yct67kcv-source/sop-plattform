@@ -57,6 +57,51 @@ $werte = [
     'secret_name' => trim((string)($daten['secret_name'] ?? '')),
 ];
 
+// ── Vertragsangaben (ENT-617) ────────────────────────────────────────
+//
+// LEER BLEIBT NULL, nicht 0. Ein Vertrag ohne eingetragene Laufzeit hat
+// keine Laufzeit von null Monaten -- er ist unbekannt, und die Oberflaeche
+// muss die beiden auseinanderhalten koennen (Hausregel).
+//
+// Die Spalten kommen ueber be_spalten_anlegen() nach; zwischen Deploy und
+// Einrichtungslauf gibt es sie noch nicht. Was fehlt, wird nicht
+// geschrieben, statt den ganzen Speicherweg an einem SQL-Fehler scheitern
+// zu lassen.
+$datumOderNull = static function ($roh): ?string {
+    $t = trim((string)$roh);
+    if ($t === '' || $t === '0000-00-00') { return null; }
+    $d = DateTimeImmutable::createFromFormat('!Y-m-d', substr($t, 0, 10));
+    return $d && $d->format('Y-m-d') === substr($t, 0, 10) ? $d->format('Y-m-d') : null;
+};
+$monateOderNull = static function ($roh): ?int {
+    if ($roh === null || trim((string)$roh) === '') { return null; }
+    // 600 Monate sind fuenfzig Jahre. Was darueber liegt, ist ein Vertipper.
+    return max(0, min(600, (int)$roh));
+};
+$vertrag = [
+    'vertrag_beginn'          => $datumOderNull($daten['vertrag_beginn'] ?? null),
+    'mindestlaufzeit_monate'  => $monateOderNull($daten['mindestlaufzeit_monate'] ?? null),
+    'kuendigungsfrist_monate' => $monateOderNull($daten['kuendigungsfrist_monate'] ?? null),
+    'verlaengerung_monate'    => $monateOderNull($daten['verlaengerung_monate'] ?? null),
+    'gekuendigt_per'          => $datumOderNull($daten['gekuendigt_per'] ?? null),
+];
+foreach ($vertrag as $feld => $wert) {
+    // Nur was mitgeschickt wurde: Ein Formular, das die Vertragsfelder gar
+    // nicht kennt, soll sie nicht stillschweigend leeren.
+    if (array_key_exists($feld, $daten) && hat_spalte($pdo, 'mandant', $feld)) {
+        $werte[$feld] = $wert;
+    }
+}
+
+// Ein Enddatum vor dem Beginn ist kein Vertrag, sondern ein Vertipper -- und
+// er wuerde die Lage "gekuendigt, beendet" ergeben, die niemand erklaeren
+// kann.
+if (!empty($werte['gekuendigt_per']) && !empty($werte['vertrag_beginn'])
+    && $werte['gekuendigt_per'] < $werte['vertrag_beginn']) {
+    json_response(['status' => 'error',
+        'message' => 'Das Kündigungsdatum liegt vor dem Vertragsbeginn.'], 400);
+}
+
 // Ein Passwort kommt hier nie an, und wenn doch, wird es nicht gespeichert:
 // Der Mandantenstamm traegt kein Passwortfeld (ENT-519). Wer eines mitsendet,
 // bekommt eine klare Antwort statt stillem Verschlucken.
@@ -75,10 +120,13 @@ if ($id > 0) {
     $vor->execute([$id]);
     $vorher = $vor->fetch(PDO::FETCH_ASSOC) ?: [];
 
+    // Der Satz entsteht aus den Schluesseln von $werte, nicht aus einer
+    // zweiten, von Hand gepflegten Spaltenliste: Sonst geht beim naechsten
+    // Feld genau eine der beiden vergessen, und das faellt erst auf, wenn
+    // jemand den Wert sucht.
+    $satz = implode(', ', array_map(fn($f) => "$f = ?", array_keys($werte)));
     $stmt = $pdo->prepare(
-        'UPDATE mandant SET name = ?, subdomain = ?, kanton = ?, db_host = ?, db_name = ?, db_user = ?,
-                            secret_name = ?, geaendert_am = NOW()
-          WHERE id = ?'
+        'UPDATE mandant SET ' . $satz . ', geaendert_am = NOW() WHERE id = ?'
     );
     $stmt->execute([...array_values($werte), $id]);
     if ($stmt->rowCount() === 0) {
@@ -94,9 +142,10 @@ if ($id > 0) {
     json_response(['status' => 'ok', 'id' => $id, 'angelegt' => false]);
 }
 
+$spalten = array_keys($werte);
 $stmt = $pdo->prepare(
-    'INSERT INTO mandant (name, subdomain, kanton, db_host, db_name, db_user, secret_name)
-     VALUES (?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO mandant (' . implode(', ', $spalten) . ') VALUES ('
+    . implode(', ', array_fill(0, count($spalten), '?')) . ')'
 );
 $stmt->execute(array_values($werte));
 $neueId = (int)$pdo->lastInsertId();
