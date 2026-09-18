@@ -40,7 +40,7 @@ DirectoryIndex dashboard.html
 # Zugangsdaten oeffentlich.
 # Diese Dateien werden nur von den Endpunkten unter /api eingebunden und nie
 # direkt aufgerufen; ein direkter Abruf ist also immer verkehrt.
-<FilesMatch "^(db|ai|planung|kunden|mitarbeiter|layout|anmeldung|zweifaktor|rechte|logbuch|ereignisse|auslagen|rundgang|fahrzeug|geofence_bereich|belege|qrrechnung|produkte|mailer|ferien|lohn|gavzeit|lohnlauf|mitteilungen|push|kundenportal|betreiber|supportvorgang|support|setup|demo_anfrage|demo_daten|demo_reset|demo_bremse|demo_zugang)\.php$">
+<FilesMatch "^(db|ai|planung|kunden|mitarbeiter|layout|anmeldung|zweifaktor|rechte|logbuch|ereignisse|auslagen|rundgang|fahrzeug|geofence_bereich|belege|qrrechnung|produkte|mailer|ferien|lohn|gavzeit|lohnlauf|mitteilungen|push|kundenportal|betreiber|supportvorgang|support|setup|demo_anfrage|demo_daten|demo_reset|demo_bremse|demo_zugang|mail_vorlage)\.php$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>
