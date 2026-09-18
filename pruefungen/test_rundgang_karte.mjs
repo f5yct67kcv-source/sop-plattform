@@ -267,6 +267,30 @@ check('Ein offener Punkt trägt seine Listen-Nummer als Zeichen',
         .map(e => e.dataset.zeichen).sort().join('|');
       return soll.length > 0 && soll === ist;
     }));
+
+  // Der Aufbau muss genau den Zustand herstellen, in dem der Knopf sonst
+  // wirkungslos bliebe: Die Karte gilt als STEHEND (das Element ist
+  // dasselbe wie im Dokument). Ohne das lief die Prüfung an der Sache
+  // vorbei und blieb auch dann grün, wenn der Abbau fehlte -- sie ist an
+  // ihrer eigenen Gegenprobe aufgefallen.
+  check('KRITISCH: der Schalter baut eine STEHENDE native Karte ab, damit sie neu entsteht',
+    await page.evaluate(async () => {
+      let abgebaut = false;
+      const merkK = rgsNativKarte, merkE = rgsKarteEl;
+      // Die Wahl selbst gehoert nicht dieser Pruefung: rgNachtUm schreibt
+      // sie um, und die Pruefungen danach lesen sie. Sie wird darum
+      // zurueckgestellt -- ohne das faerbte diese Pruefung der naechsten
+      // die Ausgangslage um, und die waere ohne eigenes Zutun rot.
+      const merkW = localStorage.getItem(RG_NACHT_SCHLUESSEL);
+      rgsNativKarte = { destroy: async () => { abgebaut = true; } };
+      rgsKarteEl = document.getElementById('rgsKarte');
+      try { rgNachtUm(); } catch (e) {}
+      await new Promise(r => setTimeout(r, 50));
+      rgsNativKarte = merkK; rgsKarteEl = merkE;
+      if (merkW === null) { localStorage.removeItem(RG_NACHT_SCHLUESSEL); }
+      else { localStorage.setItem(RG_NACHT_SCHLUESSEL, merkW); }
+      return abgebaut;
+    }));
 // Ein Tipp auf die Marke fuehrt in die Liste: Die Bestaetigung haengt an
 // Standortpruefung, Ersatzscan und Aufgaben-Rueckfrage -- die alle in eine
 // Kartenblase zu holen hiesse, denselben Ablauf ein zweites Mal zu bauen.
@@ -808,6 +832,51 @@ check('KRITISCH: mit der Klasse ist die Kartenhülle gemessen durchsichtig',
     new Set([offen.farbe, fertig.farbe, abweichend.farbe]).size === 3);
   // Und die gezeichnete Karte nimmt wirklich diese Quelle, statt die
   // Regel ein zweites Mal zu führen.
+}
+
+// ══════════ NACHTSICHT AUF DER NATIVEN KARTE (ENT-609) ════════════════
+// Vom Projektinhaber gemeldet: "Der Nachtsicht-Knopf funzt nicht mehr."
+// Er färbte sich um und sonst geschah nichts -- ein Knopf, der nichts tut,
+// ist schlimmer als keiner.
+//
+// Die Browser-Fassung färbt seit ENT-543 über das eingebaute Farbschema
+// der Vektorkarte; das native SDK kennt das nicht und nimmt eine
+// Stilvorschrift entgegen. Geprüft wird die AUSSAGE -- dass der Stil
+// wirklich dunkel ist --, nicht der einzelne Farbwert: Sonst wäre die
+// Prüfung eine zweite Kopie der Farbtabelle.
+{
+  const stil = await page.evaluate(() => RG_NACHT_STIL_NATIV);
+  check('KRITISCH: es gibt überhaupt einen Nachtsicht-Stil für die native Karte',
+    Array.isArray(stil) && stil.length >= 5);
+
+  // Grobe Helligkeit nach Rec. 601 -- reicht für "dunkel oder hell".
+  const hell = (f) => {
+    const n = parseInt(String(f).replace('#', ''), 16);
+    return 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+  };
+  const farbenVon = (treffer) => (stil || [])
+    .filter(e => treffer(String(e.elementType || '')))
+    .flatMap(e => (e.stylers || []).map(x => x.color).filter(Boolean));
+
+  const flaechen = farbenVon(t => t === '' || t.startsWith('geometry'));
+  check('KRITISCH: die Flächen sind dunkel -- sonst blendet die Karte nachts',
+    flaechen.length >= 5 && flaechen.every(f => hell(f) < 100));
+  // Und die Schrift darauf muss hell sein. Hier stand zuerst "alles muss
+  // dunkel sein" -- das hätte eine dunkle Beschriftung auf dunklem Grund
+  // durchgehen lassen, also eine Karte, die niemand lesen kann.
+  const schrift = farbenVon(t => t === 'labels.text.fill');
+  check('KRITISCH: die Beschriftung ist hell genug, um auf dem dunklen Grund zu stehen',
+    schrift.length >= 1 && schrift.every(f => hell(f) > 120));
+  // Auf einer Runde zählt der Weg, nicht wo es Kaffee gibt. Jede
+  // Beschriftung weniger ist eine, die den Kontrollpunkt nicht verdeckt.
+  check('Geschäfte und Verkehrsmittel sind ausgeblendet',
+    (stil || []).some(e => e.featureType === 'poi.business'
+      && (e.stylers || []).some(x => x.visibility === 'off'))
+    && (stil || []).some(e => e.featureType === 'transit'
+      && (e.stylers || []).some(x => x.visibility === 'off')));
+
+  // Und der Schalter muss die native Karte wirklich neu bauen: Der Stil
+  // lässt sich nur beim Erzeugen setzen.
 }
 
 await browser.close();

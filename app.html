@@ -8231,6 +8231,34 @@ let rgsMapsSchluesselDa = mapsSchluesselTauglich(RGS_MAPS_SCHLUESSEL);
 
    Die Browser-Fassung bleibt unveraendert daneben bestehen, solange es die
    Runde im Browser gibt. */
+/* Nachtsicht auf der nativen Karte (ENT-609).
+
+   Die Browser-Fassung faerbt seit ENT-543 ueber das eingebaute Farbschema
+   der Vektorkarte; das native SDK kennt das nicht, es nimmt eine
+   Stilvorschrift entgegen -- also genau die Form, die vor ENT-543 auch im
+   Browser lief. Die Farbwerte stehen im Entscheidungsprotokoll bei
+   ENT-543 und sind von dort geholt, nicht neu erfunden.
+
+   Der Grund fuer die Nachtsicht steht bei RG_NACHT_SCHLUESSEL: Die Runde
+   laeuft abends und nachts, und eine helle Karte mitten in einer dunklen
+   Seite blendet und zerstoert die Nachtsicht. */
+const RG_NACHT_STIL_NATIV = [
+  { elementType: 'geometry', stylers: [{ color: '#1B2230' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#9AA3B2' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#0F1117' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2A3147' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#151B27' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3A4360' }] },
+  { featureType: 'road.local', elementType: 'labels.text.fill', stylers: [{ color: '#7E8798' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#101725' }] },
+  { featureType: 'landscape.man_made', elementType: 'geometry', stylers: [{ color: '#202838' }] },
+  // Geschaefte und Verkehrsmittel aus: Auf einer Runde zaehlt der Weg,
+  // nicht wo es Kaffee gibt -- und jede Beschriftung weniger ist eine
+  // Beschriftung, die den Kontrollpunkt nicht verdeckt.
+  { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+];
+
 let rgsNativKarte = null;       // die native Karte, solange sie steht
 let rgsNativVersprechen = null; // das einmal geladene Kartenplugin
 
@@ -8378,7 +8406,16 @@ function rgNachtUm() {
      Das ist der eine Neubau, der bleibt: Er geschieht auf ausdrueckliches
      Tippen, nicht im Sekundentakt. Und er nimmt Zoom, Ausschnitt und
      Drehung mit, damit der Schalter nicht nebenbei die Ansicht wegwirft. */
-  if (rgsKarte) {
+  if (rgsNativKarte) {
+    // Dieselbe Ueberlegung fuer die native Karte (ENT-609): Auch dort
+    // gilt der Stil nur beim Erzeugen. Ohne diesen Zweig blieb der
+    // Schalter in der App wirkungslos -- er faerbte sich um und sonst
+    // geschah nichts. Genau so vom Projektinhaber gemeldet, und ein
+    // Knopf, der nichts tut, ist schlimmer als keiner.
+    rgKarteNativAbbauen();
+    rgsKarteEl = null;
+    try { rgKarteZeichnen(); } catch (e) {}
+  } else if (rgsKarte) {
     rgsKarteAnsicht = rgKarteAnsichtLesen();
     rgsKarte = null; rgsKarteEl = null; rgsKartenSignatur = null;
     rgsStandortMarke = null; rgsRichtungsMarke = null;
@@ -8647,15 +8684,10 @@ async function rgKarteNativBauen(d, bauLauf) {
       config: {
         center: { lat: d.zeigbar[0].lat, lng: d.zeigbar[0].lng },
         zoom: 17,
-        // NACHTSICHT FEHLT HIER NOCH -- absichtlich, und es ist der
-        // naechste Schritt. Die Browser-Fassung faerbt seit ENT-543 ueber
-        // das eingebaute Farbschema der Vektorkarte (colorScheme: DARK);
-        // die native Karte kennt das nicht, sie nimmt eine
-        // Stilvorschrift entgegen. Die frueheren Farbwerte stehen im
-        // Entscheidungsprotokoll bei ENT-543 und werden von dort geholt,
-        // sobald feststeht, dass die Karte auf dem Geraet ueberhaupt
-        // erscheint. Bis dahin ist sie hell -- auffaellig genug, dass es
-        // niemand fuer fertig haelt.
+        // Der Stil laesst sich nur beim Erzeugen setzen -- der Schalter
+        // baut die Karte darum neu (rgNachtUm), genau wie in der
+        // Browser-Fassung.
+        styles: rgNachtAn() ? RG_NACHT_STIL_NATIV : undefined,
       },
     });
   } catch (e) {
@@ -9962,14 +9994,49 @@ function rgRichtungMarkeNachfuehren() {
 
 /* Zentrieren: alle Punkte ins Bild, danach einmalig die eigene Position
    dazuholen. Einmalig, nicht laufend -- ENT-131. */
+/* "Zentrieren" fuehrt auf den EIGENEN Standort, nicht auf die
+   Kontrollpunkte.
+
+   Bis hierher passte es den Ausschnitt an die Kontrollpunkte an. Vom
+   Projektinhaber am Geraet gemeldet: "Wenn ich zentriere, springt sie auf
+   den Kontrollpunkt." Der Pfeil auf dem Knopf verspricht etwas anderes --
+   in jeder Karten-App heisst dieses Zeichen "zeig mir, wo ich bin". Und
+   auf einer Runde ist genau das die Frage: Wo stehe ich, und wie weit ist
+   es noch?
+
+   Ist der Standort nicht bekannt -- Keller, Tiefgarage, gerade erst
+   geoeffnet --, bleibt es beim alten Verhalten: Dann zeigt der Knopf die
+   Kontrollpunkte, statt gar nichts zu tun. */
 function rgKarteZentrieren() {
   const dn = rgKarteDaten(rundgangAktiv ? rundgangAktiv.kontrollpunkte : []);
   // Die native Karte zuerst: Sie hat ihren eigenen Weg, und den eigenen
-  // Standort zeichnet bei ihr das Betriebssystem. Es gibt hier also
-  // nichts zu setzen ausser dem Ausschnitt.
-  if (rgsNativKarte) { rgKarteNativAusschnitt(dn, true); return; }
+  // Standort zeichnet bei ihr das Betriebssystem.
+  if (rgsNativKarte) {
+    if (rgsMeinOrt) {
+      try {
+        rgsNativKarte.setCamera({
+          coordinate: { lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng },
+          zoom: 17, animate: true,
+        });
+      } catch (e) {}
+      return;
+    }
+    rgKarteNativAusschnitt(dn, true);
+    return;
+  }
   if (!rgsKarte || !window.google) { return; }
   const d = dn;
+  if (!d.zeigbar.length && !rgsMeinOrt) { return; }
+  if (rgsMeinOrt) {
+    rgsKarte.setCenter({ lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng });
+    rgsKarte.setZoom(17);
+    // Die Marke trotzdem frisch setzen -- der Standort kann sich seit dem
+    // letzten Zeichnen bewegt haben, und der Knopf soll zeigen, wo man
+    // JETZT ist.
+    rgStandortMarkeSetzen({ lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng });
+    rgRichtungMarkeSetzen({ lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng }, rgRichtungJetzt());
+    return;
+  }
   if (!d.zeigbar.length) { return; }
   const grenzen = new google.maps.LatLngBounds();
   d.zeigbar.forEach(p => grenzen.extend({ lat: p.lat, lng: p.lng }));
