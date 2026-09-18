@@ -37,6 +37,14 @@ pruefungen/package-lock.json
 # Build-Output.
 mobile/node_modules/
 
+# Maps-JS-Schluessel fuer den Geraete-Build. Im Buendel steht sonst der
+# Platzhalter __MAPS_JS_KEY__ -- fuer den Web-Deploy ersetzt ihn GitHub
+# Actions, fuer die native Huelle gibt es diesen Weg nicht (siehe Kopf von
+# mobile-buendel-erstellen.py). aufs-handy.sh liest den Wert aus dieser
+# Datei, wenn sie da ist. Sie enthaelt einen echten Schluessel und gehoert
+# darum nie ins Repository.
+mobile/.maps-key
+
 # Ausgabe von staging-htaccess-bauen.py (ENT-538). Sie traegt den
 # Passwortschutz-Block aus der Staging-.htaccess von Hostpoint -- also
 # fremde Konfiguration und moeglicherweise Pfade, die niemanden etwas
