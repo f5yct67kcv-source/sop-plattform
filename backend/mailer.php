@@ -48,6 +48,28 @@ function smtp_absender_adresse(): string
     return '__SMTP_ABSENDER__';
 }
 
+// Die Zeilen der persoenlichen Signatur unter Mails der Betreiberin --
+// Name, Funktion, Telefon (ENT-569, Nachtrag 2026-09-18).
+//
+// AUS DEM DEPLOY, NICHT AUS DEM QUELLTEXT, und zwar nicht aus Geheimhaltung:
+// Ein Personenname gehoert nicht ins Repository (Vertraulichkeitsregel in
+// CLAUDE.md). Im Impressum steht aus genau demselben Grund bewusst keiner.
+// Gleiche Einordnung wie die Absenderkennung eine Funktion darueber.
+//
+// EIN Platzhalter statt dreier, mit Strichpunkt getrennt: Der Schritt, der
+// im Deploy die Werte setzt, steht bereits dicht an GitHubs Groessengrenze
+// fuer einen run-Block. Drei eigene Werte haetten ihn ueber die Grenze
+// geschoben, und ein zu grosser Block wird komplett abgewiesen.
+//
+// Leer ist ein zulaessiger Zustand: Dann zeichnet die Firma (siehe
+// mail_signatur() in mail_vorlage.php). Nie ein Platzhaltername.
+function mail_signatur_zeilen(): array
+{
+    $roh = '__MAIL_SIGNATUR__';
+    if ($roh === '') { return []; }
+    return array_values(array_filter(array_map('trim', explode(';', $roh)), fn($z) => $z !== ''));
+}
+
 // Wort nach RFC 2047 kodieren, falls es Nicht-ASCII enthaelt (Umlaute in
 // Firmennamen oder Betreffzeilen). Reines ASCII bleibt unveraendert, damit
 // ein einfacher Betreff nicht unnoetig kodiert im Postfach auftaucht.

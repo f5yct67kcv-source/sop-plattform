@@ -176,6 +176,47 @@ $boes = demo_zugang_mail('<b>Muster</b>', 'X', 'https://demo1.guardops.ch',
 $pruef('KRITISCH: ein Firmenname wird im HTML-Teil maskiert, nicht eingebaut',
     !str_contains($boes['html'], '<b>Muster</b>') && str_contains($boes['html'], '&lt;b&gt;'));
 
+// ── Die Signatur (ENT-569, Nachtrag 2026-09-18) ──────────────────────
+//
+// KEIN PERSONENNAME IM REPOSITORY (Vertraulichkeitsregel in CLAUDE.md; im
+// Impressum steht aus demselben Grund bewusst keiner). Die Zeilen kommen
+// aus dem Deploy. Geprueft wird die Aussage, nicht der Wortlaut: Was
+// hereingereicht wird, steht in der Mail -- und ist nichts hinterlegt,
+// zeichnet die Firma, statt dass ein leerer Gruss oder ein Platzhalter
+// beim Interessenten ankommt.
+$mitName = mail_signatur(['A. Beispiel', 'Funktion', '+41 00 000 00 00']);
+$pruef('KRITISCH: die uebergebene Signatur steht in der Mail',
+    str_contains($mitName, 'A. Beispiel') && str_contains($mitName, 'Funktion')
+    && str_contains($mitName, '+41 00 000 00 00'));
+$ohneName = mail_signatur([]);
+$pruef('KRITISCH: ohne hinterlegte Signatur zeichnet die Firma, nicht niemand',
+    str_contains($ohneName, 'pzu consulting gmbh')
+    && str_contains($ohneName, 'Mit freundlichen Grüssen'));
+$pruef('leere Zeilen fallen weg, statt als Luecke zu erscheinen',
+    !str_contains(mail_signatur(['A. Beispiel', '', '  ']), '<br>'));
+// Der Grussblock der Mail darf den Namen NICHT selbst mitbringen.
+$quelle = (string)file_get_contents(dirname(__DIR__) . '/backend/demo_zugang.php');
+$pruef('KRITISCH: die Mail holt die Signatur aus dem Deploy, statt sie im Quelltext zu fuehren',
+    str_contains($quelle, 'mail_signatur_zeilen()'));
+
+// ── Die gemeinsame Gestaltung ────────────────────────────────────────
+$pruef('KRITISCH: die Mail traegt Marke und Angaben der Betreiberin, nicht die der Mandantin',
+    str_contains($mail['html'], 'GuardOpS')
+    && str_contains($mail['html'], 'pzu consulting gmbh')
+    && str_contains($mail['html'], 'info@guardops.ch'));
+// Hausregel: Ueberschrift oben, Wert darunter -- auch hier, nicht nur in
+// der Oberflaeche. Geprueft ueber die Reihenfolge im Quelltext, weil genau
+// das die Aussage ist.
+// (Die Versalien entstehen per text-transform, im Quelltext steht
+// "Passwort" -- darum wird hier danach gesucht und nicht nach "PASSWORT".)
+$pruef('KRITISCH: die Beschriftung steht vor ihrem Wert, nicht daneben oder darunter',
+    strpos($mail['html'], '>Passwort<') !== false
+    && strpos($mail['html'], '>Passwort<') < strpos($mail['html'], 'AbcDefGhiJkm'));
+// Ein Stylesheet im Kopf wird von Mailprogrammen regelmaessig entfernt --
+// dann stuende die Mail ohne jede Gestaltung da.
+$pruef('KRITISCH: die Gestaltung haengt an Inline-Styles, nicht an einem Stylesheet',
+    !str_contains($mail['html'], '<style') && str_contains($mail['html'], 'style="'));
+
 // ── Formhelfer der Selbstbedienung (ENT-601) ─────────────────────────
 $pruef('das Fallenfeld erkennt eine gefuellte Falle',
     demo_zugang_ist_falle(['website' => 'irgendwas']));

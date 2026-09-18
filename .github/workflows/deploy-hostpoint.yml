@@ -111,6 +111,13 @@ jobs:
           # smtp_konfiguriert() erkennt das und das Formular sagt "noch
           # nicht eingerichtet" (503), statt lautlos ueber das falsche
           # Postfach zu senden.
+          # Zeilen der persoenlichen Signatur unter Mails der Betreiberin,
+          # mit Strichpunkt getrennt (Name; Funktion; Telefon). Aus dem
+          # Deploy, weil ein Personenname nicht ins Repository gehoert
+          # (Vertraulichkeitsregel; im Impressum steht aus demselben Grund
+          # keiner). NICHT erforderlich -- fehlt der Wert, zeichnet die
+          # Firma, siehe mail_signatur() in backend/mail_vorlage.php.
+          P_MAIL_SIGNATUR: ${{ secrets.MAIL_SIGNATUR }}
           P_GUARDOPS_SMTP_HOST: ${{ secrets.GUARDOPS_SMTP_HOST }}
           P_GUARDOPS_SMTP_PORT: ${{ secrets.GUARDOPS_SMTP_PORT }}
           P_GUARDOPS_SMTP_VERSCHLUESSELUNG: ${{ secrets.GUARDOPS_SMTP_VERSCHLUESSELUNG }}
@@ -273,6 +280,7 @@ jobs:
             EFF_SMTP_VERSCHLUESSELUNG="$P_SMTP_VERSCHLUESSELUNG"
             EFF_SMTP_USER="$P_SMTP_USER"; EFF_SMTP_PASSWORD="$P_SMTP_PASSWORD"
             EFF_SMTP_ABSENDER="$P_SMTP_ABSENDER"; EFF_SMTP_ABSENDER_NAME="$P_SMTP_ABSENDER_NAME"
+            EFF_MAIL_SIGNATUR="$P_MAIL_SIGNATUR"
             EFF_ANTHROPIC_API_KEY="$P_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$P_MAPS_JS_KEY"
             EFF_STAGING_TESTMAIL=""
             EFF_DEMO_TESTMAIL=""
@@ -352,6 +360,7 @@ jobs:
             EFF_SMTP_VERSCHLUESSELUNG="$D_SMTP_VERSCHLUESSELUNG"
             EFF_SMTP_USER="$D_SMTP_USER"; EFF_SMTP_PASSWORD="$D_SMTP_PASSWORD"
             EFF_SMTP_ABSENDER="$D_SMTP_ABSENDER"; EFF_SMTP_ABSENDER_NAME="$D_SMTP_ABSENDER_NAME"
+            EFF_MAIL_SIGNATUR=""
             EFF_ANTHROPIC_API_KEY="$D_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$D_MAPS_JS_KEY"
             # KEIN Rueckfall auf die Staging-Testadresse -- eigene Demo-
             # Testadresse, eigenes Secret (siehe smtp_ziel() in mailer.php).
@@ -448,6 +457,7 @@ jobs:
             EFF_SMTP_VERSCHLUESSELUNG="$S_SMTP_VERSCHLUESSELUNG"
             EFF_SMTP_USER="$S_SMTP_USER"; EFF_SMTP_PASSWORD="$S_SMTP_PASSWORD"
             EFF_SMTP_ABSENDER="$S_SMTP_ABSENDER"; EFF_SMTP_ABSENDER_NAME="$S_SMTP_ABSENDER_NAME"
+            EFF_MAIL_SIGNATUR=""
             EFF_ANTHROPIC_API_KEY="$S_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$S_MAPS_JS_KEY"
             EFF_STAGING_TESTMAIL="$S_STAGING_TESTMAIL"
             # Kein Rueckfall auf die Demo-Testadresse -- Staging und Demo
@@ -611,6 +621,7 @@ jobs:
             echo "EFF_SMTP_PASSWORD=$EFF_SMTP_PASSWORD"
             echo "EFF_SMTP_ABSENDER=$EFF_SMTP_ABSENDER"
             echo "EFF_SMTP_ABSENDER_NAME=$EFF_SMTP_ABSENDER_NAME"
+            echo "EFF_MAIL_SIGNATUR=$EFF_MAIL_SIGNATUR"
             echo "EFF_ANTHROPIC_API_KEY=$EFF_ANTHROPIC_API_KEY"
             echo "EFF_MAPS_JS_KEY=$EFF_MAPS_JS_KEY"
             echo "EFF_STAGING_TESTMAIL=$EFF_STAGING_TESTMAIL"
@@ -766,6 +777,7 @@ jobs:
           # ihn per require_once ein. Fehlt er, stirbt jeder Aufruf, der
           # betreiber.php laedt, nicht erst die Demo-Freigabe.
           cp backend/demo_zugang.php dist/demo_zugang.php
+          cp backend/mail_vorlage.php dist/mail_vorlage.php
           # Support-Freigabe (ENT-526). Wird von BEIDEN Seiten eingebunden --
           # von den support_*-Endpunkten des Betriebs und von
           # api/betreiber_support.php -- und nie direkt aufgerufen; steht
@@ -910,6 +922,7 @@ jobs:
           sed -i "s|__SMTP_USER__|$EFF_SMTP_USER|g" dist/mailer.php
           sed -i "s|__SMTP_PASSWORD__|$EFF_SMTP_PASSWORD|g" dist/mailer.php
           sed -i "s|__SMTP_ABSENDER__|$EFF_SMTP_ABSENDER|g" dist/mailer.php
+          sed -i "s|__MAIL_SIGNATUR__|$EFF_MAIL_SIGNATUR|g" dist/mailer.php
           sed -i "s|__SMTP_ABSENDER_NAME__|$EFF_SMTP_ABSENDER_NAME|g" dist/mailer.php
           # Empfaenger der Demo-Anfragen. Fehlt das Secret, bleibt der
           # Platzhalter stehen -- demo_empfaenger_pruefen() erkennt ihn und
@@ -1136,6 +1149,7 @@ jobs:
           sed -i "s|__SMTP_USER__|$EFF_GUARDOPS_SMTP_USER|g"               dist-guardops/mailer.php
           sed -i "s|__SMTP_PASSWORD__|$EFF_GUARDOPS_SMTP_PASSWORD|g"       dist-guardops/mailer.php
           sed -i "s|__SMTP_ABSENDER__|info@guardops.ch|g"                 dist-guardops/mailer.php
+          sed -i "s|__MAIL_SIGNATUR__||g"                 dist-guardops/mailer.php
           sed -i "s|__SMTP_ABSENDER_NAME__|GuardOpS|g"                    dist-guardops/mailer.php
           sed -i "s|__STAGING_TESTMAIL__||g"                              dist-guardops/mailer.php
           # Dieselbe Ueberlegung wie bei __STAGING_TESTMAIL__ direkt darueber:
@@ -1258,6 +1272,8 @@ jobs:
           # Betreiber-Bereich beim ersten Aufruf, nicht erst bei der
           # Demo-Freigabe.
           cp backend/demo_zugang.php   dist-betreiber/demo_zugang.php
+          # Die gemeinsame Mailgestaltung -- demo_zugang.php bindet sie selbst ein.
+          cp backend/mail_vorlage.php  dist-betreiber/mail_vorlage.php
           # Der Griff in eine Demo-Instanz (ENT-600) und was er braucht.
           # demo_instanz.php bindet demo_reset.php ein, demo_reset.php
           # erwartet system_rollen() aus rechte.php (oben schon dabei), und
@@ -1401,6 +1417,7 @@ jobs:
             sed -i "s|__SMTP_USER__|$EFF_GUARDOPS_SMTP_USER|g" dist-betreiber/mailer.php
             sed -i "s|__SMTP_PASSWORD__|$EFF_GUARDOPS_SMTP_PASSWORD|g" dist-betreiber/mailer.php
             sed -i "s|__SMTP_ABSENDER__|info@guardops.ch|g" dist-betreiber/mailer.php
+            sed -i "s|__MAIL_SIGNATUR__|$EFF_MAIL_SIGNATUR|g" dist-betreiber/mailer.php
             sed -i "s|__SMTP_ABSENDER_NAME__|GuardOpS|g" dist-betreiber/mailer.php
             echo "Betreiber-Bereich: Versand ueber das eigene Postfach info@guardops.ch, Absendername GuardOpS."
           else
@@ -1561,6 +1578,7 @@ jobs:
           sed -i "s|__SMTP_USER__|$EFF_SMTP_USER|g" dist-portal/mailer.php
           sed -i "s|__SMTP_PASSWORD__|$EFF_SMTP_PASSWORD|g" dist-portal/mailer.php
           sed -i "s|__SMTP_ABSENDER__|$EFF_SMTP_ABSENDER|g" dist-portal/mailer.php
+          sed -i "s|__MAIL_SIGNATUR__||g" dist-portal/mailer.php
           sed -i "s|__SMTP_ABSENDER_NAME__|$EFF_SMTP_ABSENDER_NAME|g" dist-portal/mailer.php
           sed -i "s|__STAGING_TESTMAIL__||g" dist-portal/mailer.php
           sed -i "s|__DEMO_TESTMAIL__||g" dist-portal/mailer.php
@@ -1680,6 +1698,7 @@ jobs:
           cp backend/betreiber.php dist-cupi24/betreiber.php
           # Siehe dist/: betreiber.php braucht diesen Rechenkern (ENT-600).
           cp backend/demo_zugang.php dist-cupi24/demo_zugang.php
+          cp backend/mail_vorlage.php dist-cupi24/mail_vorlage.php
           cp backend/support.php dist-cupi24/support.php
           cp backend/supportvorgang.php dist-cupi24/supportvorgang.php
           cp backend/demo_anfrage.php dist-cupi24/demo_anfrage.php
@@ -1757,6 +1776,7 @@ jobs:
           sed -i "s|__SMTP_USER__|$EFF_SMTP_USER|g" dist-cupi24/mailer.php
           sed -i "s|__SMTP_PASSWORD__|$EFF_SMTP_PASSWORD|g" dist-cupi24/mailer.php
           sed -i "s|__SMTP_ABSENDER__|$EFF_SMTP_ABSENDER|g" dist-cupi24/mailer.php
+          sed -i "s|__MAIL_SIGNATUR__||g" dist-cupi24/mailer.php
           sed -i "s|__SMTP_ABSENDER_NAME__|$EFF_SMTP_ABSENDER_NAME|g" dist-cupi24/mailer.php
           sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist-cupi24/demo_anfrage.php
           # Dieser Schritt laeuft ausschliesslich in Production (siehe
