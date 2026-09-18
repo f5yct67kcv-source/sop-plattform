@@ -1,5 +1,5 @@
 <?php
-// Die Angaben eines Betreiber-Kontos aendern (ENT-613).
+// Die Angaben eines Betreiber-Kontos aendern (ENT-615).
 //
 // WER DARF DAS: require_betreiber_voll() -- wer selbst auf dieser Ebene
 // angemeldet ist und seinen zweiten Faktor bestaetigt hat, darf jedes Konto

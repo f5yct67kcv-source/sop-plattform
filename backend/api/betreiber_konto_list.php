@@ -12,7 +12,7 @@ require_once __DIR__ . '/../betreiber.php';
 $ich = require_betreiber_voll();
 $pdo = betreiber_db();
 
-// Die Namensteile (ENT-613) kommen nur mit, wenn die Spalten schon da sind:
+// Die Namensteile (ENT-615) kommen nur mit, wenn die Spalten schon da sind:
 // Der Nachtrag laeuft ueber be_spalten_anlegen(), und zwischen Deploy und
 // Einrichtungslauf liegt ein Moment, in dem die Tabelle noch die alte ist.
 // Ein Endpunkt, der in diesem Moment mit einem SQL-Fehler abbricht, macht aus
