@@ -264,7 +264,7 @@ check('SERVER: die Herkunft der Zahl wird mitgeschrieben',
   /quelle/.test(dPhp) && /bestaetigt_von/.test(dPhp));
 check('SERVER: unplausible Werte werden abgewiesen', /unplausibel/.test(dPhp));
 
-const einPhp = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const einPhp = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
 check('EINRICHTUNG: die Tabelle anstellungsorte wird angelegt',
   /CREATE TABLE IF NOT EXISTS anstellungsorte/.test(einPhp));
 check('EINRICHTUNG: die Tabelle objekt_distanz wird angelegt',

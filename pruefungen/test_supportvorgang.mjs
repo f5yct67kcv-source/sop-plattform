@@ -132,10 +132,33 @@ const BETREIBER_EBENE_ERLAUBT = [
   'demo_anfordern.php',
   'demo_erneut_senden.php',
 ];
+// TRANSITIV, nicht nur der eigene Quelltext: seit ENT-612 ist die
+// eigentliche Einrichtung (mitsamt ihrem betreiber_db()-Aufruf, Abschnitt
+// 3b) aus api/planung_einrichten.php in den geteilten Rechenkern
+// backend/planung_einrichten_kern.php ausgelagert -- der Endpunkt selbst
+// enthaelt das Wort "betreiber_db" darum nicht mehr, greift ueber den Kern
+// aber unveraendert zu. Eine Pruefung, die nur die eigene Datei liest,
+// haette diesen Zugriff nach der Auslagerung stillschweigend verloren.
+function beruehrtBetreiberDb(datei, gesehen = new Set()) {
+  if (gesehen.has(datei)) { return false; }
+  gesehen.add(datei);
+  const voll = `${WURZEL}/backend/${datei}`;
+  let inhalt;
+  try { inhalt = ohneKommentar(readFileSync(voll, 'utf8')); } catch { return false; }
+  if (/betreiber_db\s*\(/.test(inhalt)) { return true; }
+  // Die erfasste Gruppe verwirft "../" bereits -- ob __DIR__ dabei aus
+  // backend/api/ (mit "../") oder aus backend/ selbst zeigt, das Ziel liegt
+  // so oder so direkt in backend/, nie ein zweites Mal unter api/.
+  for (const m of inhalt.matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g)) {
+    if (beruehrtBetreiberDb(m[1], gesehen)) { return true; }
+  }
+  return false;
+}
+
 const apiDateien = readdirSync(`${WURZEL}/backend/api`).filter(f => f.endsWith('.php'));
 const fremdeNutzer = apiDateien.filter(f => {
   if (BETREIBER_EBENE_ERLAUBT.includes(f)) { return false; }
-  return /betreiber_db\s*\(/.test(ohneKommentar(readFileSync(`${WURZEL}/backend/api/${f}`, 'utf8')));
+  return beruehrtBetreiberDb(`api/${f}`);
 });
 check('KRITISCH: nur namentlich genannte Endpunkte greifen auf die Betreiber-Ebene zu',
   fremdeNutzer.length === 0);
@@ -147,8 +170,7 @@ if (fremdeNutzer.length) {
 // Namens.
 const totInListe = BETREIBER_EBENE_ERLAUBT.filter(f =>
   !apiDateien.includes(f)
-  || (!f.startsWith('betreiber_')
-      && !/betreiber_db\s*\(/.test(ohneKommentar(readFileSync(`${WURZEL}/backend/api/${f}`, 'utf8')))));
+  || (!f.startsWith('betreiber_') && !beruehrtBetreiberDb(`api/${f}`)));
 check('Die Ausnahmeliste nennt nur Endpunkte, die es gibt und die die Ebene wirklich beruehren',
   totInListe.length === 0);
 if (totInListe.length) { bad.push('Ausnahme ohne Zugriff: ' + totInListe.join(', ')); }

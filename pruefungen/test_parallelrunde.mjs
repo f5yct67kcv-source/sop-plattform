@@ -33,7 +33,7 @@ const tag = n => iso(new Date(Date.now() + n * 864e5));
 const EP = readFileSync(`${WURZEL}/backend/api/mein_rundgang_spontan_starten.php`, 'utf8');
 const RG = readFileSync(`${WURZEL}/backend/rundgang.php`, 'utf8');
 const LIST = readFileSync(`${WURZEL}/backend/api/einsatz_list.php`, 'utf8');
-const EINR = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const EINR = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
 const ABG = readFileSync(`${WURZEL}/backend/api/einsatz_abgleich.php`, 'utf8');
 const AUSL = readFileSync(`${WURZEL}/backend/auslagen.php`, 'utf8');
 const PLA = readFileSync(`${WURZEL}/backend/planung.php`, 'utf8');

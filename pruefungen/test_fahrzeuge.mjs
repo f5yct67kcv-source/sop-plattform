@@ -38,7 +38,7 @@ const WEIT_VORAUS    = iso(new Date(Date.now() + 400 * 864e5));
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 1 — Schema und Endpunkt (Quelltext)
 // ══════════════════════════════════════════════════════════════════════════
-const EINR = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const EINR = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
 const FZ   = readFileSync(`${WURZEL}/backend/api/fahrzeuge.php`, 'utf8');
 
 check('KRITISCH: die Tabelle fahrzeuge steht im Einrichtungsschema',

@@ -1282,6 +1282,17 @@ jobs:
           cp backend/lohnlauf.php      dist-betreiber/lohnlauf.php
           cp backend/logbuch.php       dist-betreiber/logbuch.php
           cp backend/lohn.php          dist-betreiber/lohn.php
+          # Rechenkern der zentralen Mandanten-Einrichtung (ENT-612):
+          # api/betreiber_schema_pruefen.php richtet ueber
+          # planung_einrichten_kern.php jede Mandanten-Datenbank ein, zu der
+          # der Betreiber Zugangsdaten hat -- derselbe Rechenkern wie bei
+          # api/planung_einrichten.php (eigene Einrichtung eines Mandanten),
+          # "eine Definition, nicht zwei". Bindet seinerseits rundgang.php
+          # und fahrzeug.php ein (kunden.php/produkte.php stehen schon
+          # weiter unten im Buendel).
+          cp backend/planung_einrichten_kern.php dist-betreiber/planung_einrichten_kern.php
+          cp backend/rundgang.php      dist-betreiber/rundgang.php
+          cp backend/fahrzeug.php      dist-betreiber/fahrzeug.php
           # Bremse gegen zu viele Anfragen (ENT-601), von
           # api/demo_anfordern.php und api/demo_erneut_senden.php benutzt --
           # dieselbe Datei wie beim Kontaktformular der Homepage, eigenes

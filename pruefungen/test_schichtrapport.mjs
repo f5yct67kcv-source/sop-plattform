@@ -482,7 +482,7 @@ check('KRITISCH: die Unterschrift wird nur EINMAL gesetzt und nie ueberschrieben
 
 // Die Spalte muss auch tatsaechlich angelegt werden -- eine Abfrage auf eine
 // Spalte, die die Einrichtung nie ergaenzt, faellt erst im Betrieb auf.
-const einrichten = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const einrichten = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
 check('KRITISCH: die Einrichtung legt rapporte.einsatz_id an',
   /'rapporte',\s*'einsatz_id'/.test(einrichten)
   && /ALTER TABLE rapporte ADD COLUMN einsatz_id/.test(einrichten));

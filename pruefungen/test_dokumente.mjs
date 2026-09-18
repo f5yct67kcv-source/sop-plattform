@@ -33,7 +33,7 @@ const datei = (name, buffer) => ({ name, mimeType: 'application/pdf', buffer: bu
 // TEIL 1 — Der Endpunkt (Quelltext)
 // ══════════════════════════════════════════════════════════════════════════
 const EP = readFileSync(`${WURZEL}/backend/api/einsatz_dokument.php`, 'utf8');
-const EINR = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const EINR = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
 
 check('KRITISCH: das Anhängen verlangt das Planungsrecht',
   /require_recht_nach_methode\(\$user,\s*'einsaetze'\)/.test(EP));

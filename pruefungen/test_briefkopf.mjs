@@ -39,7 +39,7 @@ const HEUTE = iso(new Date());
 // TEIL 1 — Endpunkt und Schema (Quelltext)
 // ══════════════════════════════════════════════════════════════════════════
 const BET = readFileSync(`${WURZEL}/backend/api/betrieb.php`, 'utf8');
-const EINR = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const EINR = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
 const LIST = readFileSync(`${WURZEL}/backend/api/kunden_list.php`, 'utf8');
 const KUN = readFileSync(`${WURZEL}/backend/kunden.php`, 'utf8');
 const RLIST = readFileSync(`${WURZEL}/backend/api/rapport_list.php`, 'utf8');

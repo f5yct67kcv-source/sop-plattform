@@ -988,21 +988,41 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   check('KRITISCH: jeder betreiber_*-Endpunkt aus backend/api wird ins betreiber-Bündel kopiert',
     endpunkte.length >= 10 && endpunkte.every(e => wirdKopiert(`backend/api/${e}`)));
 
-  // Die Einbindungen von betreiber.php UND all seinen Endpunkten, aus den
-  // Dateien selbst gelesen -- genau die Backend-Dateien, die dieses
-  // schlanke Bündel tatsächlich braucht, nicht die rund 30 Dateien des
-  // Rapport-Tool-Bündels. betreiber.php selbst bindet nur db.php und
-  // zweifaktor.php ein; anmeldung.php, rechte.php, support.php und
-  // supportvorgang.php kommen erst über die einzelnen Endpunkte dazu.
-  const betreiberPhp = readFileSync(`${WURZEL}/backend/betreiber.php`, 'utf8');
-  const endpunktQuellen = endpunkte.map(e => readFileSync(`${WURZEL}/backend/api/${e}`, 'utf8'));
-  const noetigeModule = [...new Set(
-    [betreiberPhp, ...endpunktQuellen].join('\n')
-      .matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g))]
-    .map(m => m[1])
+  // Alle Einbindungen ab einer Startdatei, TRANSITIV -- nicht nur die
+  // direkten. ANLASS (2026-09-18, live auf betreiber.guardops.ch):
+  // demo_daten.php zieht seinerseits mitarbeiter.php, planung.php usw.
+  // nach; eine Pruefung, die nur die Startdatei selbst liest, haette genau
+  // diese Kette uebersehen -- der Fehler zeigte sich als "Unerwarteter
+  // Serverfehler" (fehlendes require_once, keine PDOException, darum keine
+  // der beiden anderen Meldungen aus db_fehlermeldung()). Ein Modul, das
+  // selbst nicht existiert (Tippfehler o.ae.), wird beim Lesen
+  // uebersprungen -- das faengt eine andere Pruefung ab, nicht diese hier.
+  function transitiveModule(startPfade) {
+    const gefunden = new Set();
+    const zuLesen = [...startPfade];
+    const gelesen = new Set();
+    while (zuLesen.length) {
+      const pfad = zuLesen.shift();
+      if (gelesen.has(pfad)) { continue; }
+      gelesen.add(pfad);
+      const voll = `${WURZEL}/backend/${pfad}`;
+      if (!existsSync(voll)) { continue; }
+      const inhalt = readFileSync(voll, 'utf8');
+      for (const m of inhalt.matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g)) {
+        gefunden.add(m[1]);
+        zuLesen.push(m[1]);
+      }
+    }
+    return gefunden;
+  }
+
+  // Die Einbindungen von betreiber.php UND all seinen Endpunkten -- genau
+  // die Backend-Dateien, die dieses schlanke Bündel tatsächlich braucht,
+  // nicht die rund 30 Dateien des Rapport-Tool-Bündels.
+  const noetigeModule = [...transitiveModule(['betreiber.php', ...endpunkte.map(e => `api/${e}`)])]
     .filter(m => m !== 'betreiber.php');
   const fehlendeModule = noetigeModule.filter(m => !liegtImBuendel(`dist-betreiber/${m}`));
-  check('KRITISCH: jede Datei, die betreiber.php oder einer seiner Endpunkte einbindet, liegt im betreiber-Bündel',
+  check('KRITISCH: jede Datei, die betreiber.php oder einer seiner Endpunkte transitiv einbindet, liegt im betreiber-Bündel',
     noetigeModule.length >= 5 && fehlendeModule.length === 0
     && liegtImBuendel('dist-betreiber/betreiber.php'));
   if (fehlendeModule.length) { bad.push('Einbindung fehlt im betreiber-Bündel: ' + fehlendeModule.join(', ')); }
@@ -1015,29 +1035,7 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   const OEFFENTLICHE_DEMO_ENDPUNKTE = ['demo_anfordern.php', 'demo_erneut_senden.php'];
   check('KRITISCH: die öffentlichen Demo-Endpunkte (ENT-601) werden ins betreiber-Bündel kopiert',
     OEFFENTLICHE_DEMO_ENDPUNKTE.every(e => wirdKopiert(`backend/api/${e}`)));
-  // TRANSITIV, nicht nur die direkten Einbindungen: demo_daten.php zieht
-  // seinerseits mitarbeiter.php, planung.php usw. nach -- ein Endpunkt, der
-  // nur die eigene Datei liest, haette genau die Kette uebersehen, die am
-  // 2026-09-18 live als "Unerwarteter Serverfehler" auffiel (fehlendes
-  // require_once, keine PDOException, darum keine der beiden anderen
-  // Meldungen aus db_fehlermeldung()). Ein Modul, das selbst nicht existiert
-  // (Tippfehler o.ae.), wird beim Lesen uebersprungen -- das faengt eine
-  // andere Pruefung ab, nicht diese hier.
-  const oeffentlicheModule = new Set();
-  const zuLesen = [...OEFFENTLICHE_DEMO_ENDPUNKTE.map(e => `api/${e}`)];
-  const gelesen = new Set();
-  while (zuLesen.length) {
-    const pfad = zuLesen.shift();
-    if (gelesen.has(pfad)) { continue; }
-    gelesen.add(pfad);
-    const voll = `${WURZEL}/backend/${pfad}`;
-    if (!existsSync(voll)) { continue; }
-    const inhalt = readFileSync(voll, 'utf8');
-    for (const m of inhalt.matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g)) {
-      oeffentlicheModule.add(m[1]);
-      zuLesen.push(m[1]);
-    }
-  }
+  const oeffentlicheModule = transitiveModule(OEFFENTLICHE_DEMO_ENDPUNKTE.map(e => `api/${e}`));
   const fehlendeOeffentlicheModule = [...oeffentlicheModule].filter(m => !liegtImBuendel(`dist-betreiber/${m}`));
   check('KRITISCH: jede Datei, die ein öffentlicher Demo-Endpunkt transitiv einbindet, liegt im betreiber-Bündel',
     oeffentlicheModule.size >= 3 && fehlendeOeffentlicheModule.length === 0);

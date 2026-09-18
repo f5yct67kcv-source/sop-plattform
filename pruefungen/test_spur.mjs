@@ -18,7 +18,7 @@ const check = (n, c) => (c ? ok : bad).push(n);
 
 const POS = readFileSync(`${WURZEL}/backend/api/mein_rundgang_position.php`, 'utf8');
 const SPUR = readFileSync(`${WURZEL}/backend/api/rundgang_spur.php`, 'utf8');
-const EINR = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const EINR = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
 const RG = readFileSync(`${WURZEL}/backend/rundgang.php`, 'utf8');
 const LISTE = readFileSync(`${WURZEL}/backend/api/rundgang_scan_liste.php`, 'utf8');
 const APP = readFileSync(`${WURZEL}/app.html`, 'utf8');

@@ -711,7 +711,9 @@ check('KRITISCH: meine_schichten.php laedt ohne Parameter ab Monatsanfang, nicht
 // diesen Nachtrag bliebe jeder Einsatz, dessen Rapport(e) schon vor diesem
 // Deploy bestanden, fuer immer auf dem alten Status stehen.
 {
-  const einrichten = execFileSync('cat', [`${WURZEL}/backend/api/planung_einrichten.php`], { encoding: 'utf8' });
+  // Seit ENT-612 steckt die eigentliche Einrichtung im Rechenkern, nicht
+  // mehr im Endpunkt selbst (siehe backend/planung_einrichten_kern.php).
+  const einrichten = execFileSync('cat', [`${WURZEL}/backend/planung_einrichten_kern.php`], { encoding: 'utf8' });
   check('KRITISCH: die Einrichtung traegt "abgeschlossen" nach fuer Einsaetze, die es laengst waeren',
     /einsatz_vollstaendig_rapportiert\(\$pdo, \(int\)\$eid\)/.test(einrichten)
     && /!einsatz_abgeglichen\(\$pdo, \(int\)\$eid\)/.test(einrichten)
@@ -1244,7 +1246,9 @@ if (zugangOhnePortalrecht.length) {
 // zweite, hier gepflegte Aufzaehlung: Eine solche waere beim naechsten
 // Nachtrag sofort veraltet.
 {
-  const einrichtung = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+  // Seit ENT-612 steckt die eigentliche Einrichtung im Rechenkern, nicht
+  // mehr im Endpunkt selbst (siehe backend/planung_einrichten_kern.php).
+  const einrichtung = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
   const spaltenBlock = (einrichtung.match(/\$spalten = \[[\s\S]*?\n\];/) || [''])[0];
   const nachtraege = [...spaltenBlock.matchAll(/\['kundenzugang',\s*'(\w+)'/g)].map(m => m[1]);
   check('Die Nachtragsliste nennt Spalten der Kundenzugaenge', nachtraege.length > 0);

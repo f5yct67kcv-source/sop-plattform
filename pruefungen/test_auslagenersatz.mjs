@@ -54,7 +54,7 @@ phpFehler.forEach(f => bad.push('PHP: ' + f));
 // ausfuehrbar -- derselbe Ansatz wie test_dokumente.mjs Teil 1)
 // ══════════════════════════════════════════════════════════════════════════
 const ABGLEICH = readFileSync(`${WURZEL}/backend/api/einsatz_abgleich.php`, 'utf8');
-const EINRICHTEN = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const EINRICHTEN = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
 const VERKEHR = readFileSync(`${WURZEL}/backend/api/einsatz_verkehrsmittel.php`, 'utf8');
 
 check('KRITISCH: die neue Tabelle einsatz_auslagen wird bei der Einrichtung angelegt',

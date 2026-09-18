@@ -53,7 +53,7 @@ phpFehler.forEach(f => bad.push('PHP: ' + f));
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 2 — Datenmodell, Rechte, Verdrahtung (Quelltext)
 // ══════════════════════════════════════════════════════════════════════════
-const EINRICHTEN = readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8');
+const EINRICHTEN = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
 const MEINE = readFileSync(`${WURZEL}/backend/api/meine_abwesenheit.php`, 'utf8');
 const LISTE = readFileSync(`${WURZEL}/backend/api/abwesenheit_list.php`, 'utf8');
 const ENTSCHEIDEN = readFileSync(`${WURZEL}/backend/api/abwesenheit_entscheiden.php`, 'utf8');

@@ -143,7 +143,10 @@ $quellen = [
     '/backend/schema.sql',
     '/backend/schema_planung.sql',
     '/backend/schema_verfuegbarkeit.sql',
-    '/backend/api/planung_einrichten.php',
+    // Der Rechenkern der Einrichtung selbst, seit ENT-612 aus
+    // api/planung_einrichten.php ausgelagert (jener Endpunkt ist seither
+    // nur noch die Anmelde-Huelle) -- siehe backend/planung_einrichten_kern.php.
+    '/backend/planung_einrichten_kern.php',
 ];
 foreach ($quellen as $q) {
     $pfad = $wurzel . $q;

@@ -175,7 +175,7 @@ check('SERVER: die Pensenuebersicht braucht das Planungsrecht (ENT-077)',
 check('SERVER: nur abgeglichene Schichten zaehlen, offene werden gezaehlt',
   /ist_status/.test(pensenPhp) && /'offen'/.test(pensenPhp));
 check('EINRICHTUNG: die Kategoriespalten werden nachgetragen',
-  /anstellungskategorie/.test(readFileSync(`${WURZEL}/backend/api/planung_einrichten.php`, 'utf8')));
+  /anstellungskategorie/.test(readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8')));
 
 await page.screenshot({ path: `${OUT}/pn-02.png`, fullPage: true });
 await browser.close();
