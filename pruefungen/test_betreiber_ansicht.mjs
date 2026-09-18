@@ -81,12 +81,20 @@ const AUFBAU = () => {
 const MESSEN = () => {
   const R = el => el.getBoundingClientRect();
   const sichtbar = el => el.offsetParent !== null;
+  // Woran erkennt man einen uebernommenen Baustein? An seiner Klasse: Die
+  // Gestaltung dieser Seite heisst .knopf/.klein und .feld, die aus dem
+  // Cockpit uebernommene .btn/.tab/.inp und so fort. Ein Baustein, der
+  // beides traegt, gibt es nicht -- das war beim Uebernehmen die Bedingung.
+  const UEBERNOMMEN = ['btn', 'tab', 'of-schnell', 'of-zurueck', 'inp', 'check'];
+  const ausCockpit = el => UEBERNOMMEN.some(k => el.classList.contains(k))
+    || (el.closest && (el.closest('.seg2') || el.closest('.rowmenu-pop')) !== null);
   const knoepfe = [...document.querySelectorAll('button')].filter(sichtbar)
     .map(k => ({ t: k.textContent.trim().slice(0, 20), h: R(k).height,
-                 klein: k.classList.contains('klein') }));
+                 klein: k.classList.contains('klein'), cockpit: ausCockpit(k) }));
   const felder = [...document.querySelectorAll('input')]
     .filter(f => sichtbar(f) && f.type !== 'hidden')
-    .map(f => ({ id: f.id, s: parseFloat(getComputedStyle(f).fontSize), h: R(f).height }));
+    .map(f => ({ id: f.id, s: parseFloat(getComputedStyle(f).fontSize), h: R(f).height,
+                 cockpit: ausCockpit(f), ankreuz: f.type === 'checkbox' }));
   const zahlen = [...document.querySelectorAll('.zahl')].map(z => {
     const w = z.querySelector('.wert'), l = z.querySelector('.lab');
     return {
@@ -152,8 +160,20 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
 
   // Bedienelemente mindestens 44 px. Die bewusst kleinen (.klein) tragen
   // keine Haupthandlung und duerfen 36 px haben -- darunter aber nicht.
-  const flach = m.knoepfe.filter(k => !k.klein && k.h < 44);
-  check(`KRITISCH ${wie}: jeder Knopf ist mindestens 44px hoch`, flach.length === 0);
+  //
+  // AUSGENOMMEN sind die aus dem Cockpit uebernommenen Bausteine, und zwar
+  // auf beiden Breiten. Der Grund ist derselbe wie bei der 16-px-Regel
+  // weiter unten und steht dort ausfuehrlich: Der Projektinhaber hat
+  // verlangt, dass der Offertenteil hier AUSSIEHT WIE DORT -- zweimal, im
+  // Wortlaut "eins zu eins". Eine eigene Mindesthoehe fuer genau diese
+  // Knoepfe waere die Anweisung, sie anders zu machen.
+  //
+  // Sie sind damit nicht ungeprueft: test_offerten_gleich.mjs misst jeden
+  // einzelnen von ihnen gegen denselben Knopf im Cockpit, bei 1500 UND bei
+  // 390 px. Was dort gilt, gilt hier -- und wenn das Cockpit seine Knoepfe
+  // aendert, faellt es dort auf, nicht hier.
+  const flach = m.knoepfe.filter(k => !k.klein && !k.cockpit && k.h < 44);
+  check(`KRITISCH ${wie}: jeder eigene Knopf ist mindestens 44px hoch`, flach.length === 0);
   if (flach.length) { bad.push(`${wie}: ` + flach.map(k => `"${k.t}" ${k.h.toFixed(1)}px`).join(', ')); }
   check(`${wie}: auch die kleinen Knoepfe bleiben ueber 36px`,
     m.knoepfe.filter(k => k.klein && k.h < 36).length === 0);
@@ -169,7 +189,7 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
   // Am Desktop bleibt eine Untergrenze stehen, nur eine niedrigere: Was
   // deutlich kleiner wird, ist ein Versehen und keine Gestaltung.
   const untergrenze = wie === 'Handy' ? 16 : 13;
-  const kleineSchrift = m.felder.filter(f => f.s < untergrenze);
+  const kleineSchrift = m.felder.filter(f => !f.ankreuz && f.s < untergrenze);
   check(`KRITISCH ${wie}: jedes Eingabefeld hat mindestens ${untergrenze}px Schrift`,
     kleineSchrift.length === 0);
   if (kleineSchrift.length) { bad.push(`${wie}: ` + kleineSchrift.map(f => `#${f.id} ${f.s}px`).join(', ')); }
@@ -178,10 +198,18 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
   // uebernommenen Bausteinen.
   if (wie === 'Handy') {
     check('KRITISCH Handy: auch die übernommenen Felder tragen 16px',
-      m.felder.length > 10 && m.felder.every(f => f.s >= 16));
+      m.felder.length > 10 && m.felder.every(f => f.ankreuz || f.s >= 16));
   }
-  check(`${wie}: jedes Eingabefeld ist mindestens 44px hoch`,
-    m.felder.filter(f => f.h < 44).length === 0);
+  // Dieselbe Ausnahme, aus demselben Grund -- und das Ankreuzfeld gehoert
+  // ohnehin nicht dazu: Ein 44 px hohes Kaestchen neben einer Zeile Text
+  // ist kein grosses Ziel, sondern ein falsch bemessenes Feld. Getroffen
+  // wird die ZEILE, und die ist es (.check, gemessen im Vergleich).
+  check(`${wie}: jedes eigene Eingabefeld ist mindestens 44px hoch`,
+    m.felder.filter(f => !f.cockpit && !f.ankreuz && f.h < 44).length === 0);
+  // Und die Gegenrichtung, damit die Ausnahme nicht alles verschluckt: Es
+  // gibt ueberhaupt noch eigene Felder, die geprueft werden.
+  check(`${wie}: es sind auch eigene Felder dabei`,
+    m.felder.filter(f => !f.cockpit).length > 0);
 
   // Ueberschrift oben, Wert darunter -- nie umgekehrt.
   check(`KRITISCH ${wie}: die Beschriftung steht ueber dem Wert`,
