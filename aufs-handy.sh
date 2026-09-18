@@ -142,13 +142,43 @@ python3 mobile-buendel-erstellen.py
 # Der Maps-Schluessel gehoert nicht ins Repository (siehe Kopf von
 # mobile-buendel-erstellen.py). Wer die Karte auf dem Geraet braucht, legt
 # ihn einmal in mobile/.maps-key -- Git nimmt die Datei nie mit.
-if [ -f mobile/.maps-key ]; then
-  KEY="$(tr -d '[:space:]' < mobile/.maps-key)"
+maps_schluessel_einsetzen() {
+  ZIEL="$1"
+  QUELLE="${2:-mobile/.maps-key}"
+  if [ ! -f "$QUELLE" ]; then
+    # Frueher schwieg dieser Zweig. Die App landete dann mit dem Platzhalter
+    # statt eines Schluessels auf dem Geraet, Google lehnte ihn ab, und in
+    # der laufenden Runde stand statt der Karte eine graue Tafel --
+    # gemeldet vom Projektinhaber. Ein uebersprungener Schritt darf nicht
+    # wie ein gelungener aussehen (CLAUDE.md).
+    echo "        KEINE Karte: $QUELLE fehlt."
+    echo "        Die Rundgang-Karte bleibt auf dem Geraet leer, alles andere laeuft."
+    echo "        Abhilfe: den Google-Maps-JS-Schluessel einmal ablegen --"
+    echo "            printf '%s' 'DEIN_SCHLUESSEL' > $QUELLE"
+    echo "        Git nimmt die Datei nie mit. Danach dieses Skript erneut laufen lassen."
+    echo "        Der Schluessel muss ausserdem fuer die App freigegeben sein:"
+    echo "        Capacitor laedt die Seite unter capacitor://localhost, nicht unter"
+    echo "        der Web-Adresse -- eine reine Web-Freigabe reicht dafuer nicht."
+    return 0
+  fi
+  KEY="$(tr -d '[:space:]' < "$QUELLE")"
+  if [ -z "$KEY" ]; then
+    echo "        KEINE Karte: $QUELLE ist leer."
+    echo "        Die Rundgang-Karte bleibt auf dem Geraet leer, alles andere laeuft."
+    return 0
+  fi
   # LC_ALL=C, weil sed auf macOS sonst bei nicht-ASCII im Dateiinhalt
-  # aussteigt ("illegal byte sequence").
-  LC_ALL=C sed -i '' "s|__MAPS_JS_KEY__|$KEY|g" mobile/www/index.html
+  # aussteigt ("illegal byte sequence"). Das leere Argument nach -i ist
+  # die BSD-Schreibweise fuer "keine Sicherungskopie".
+  if sed --version >/dev/null 2>&1; then
+    LC_ALL=C sed -i "s|__MAPS_JS_KEY__|$KEY|g" "$ZIEL"
+  else
+    LC_ALL=C sed -i '' "s|__MAPS_JS_KEY__|$KEY|g" "$ZIEL"
+  fi
   echo "        Maps-Schluessel eingesetzt"
-fi
+}
+
+maps_schluessel_einsetzen mobile/www/index.html
 
 echo "── 3/5  Nach iOS uebertragen"
 cd mobile

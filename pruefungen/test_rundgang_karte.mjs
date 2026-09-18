@@ -489,6 +489,11 @@ await page.waitForTimeout(700);
 const rueckrufDa = await page.evaluate(() => typeof window.gm_authFailure === 'function');
 check('KRITISCH: es gibt überhaupt einen Rückruf für den abgelehnten Schlüssel (gm_authFailure)', rueckrufDa);
 if (rueckrufDa) {
+// In der Datei auf der Platte steht immer der Platzhalter -- ersetzt wird
+// er erst beim Ausliefern. Hier geht es um die AUSGELIEFERTE Fassung mit
+// gueltigem Schluessel, bei der die Ablehnung wirklich eine Sache der
+// Freigabe beim Anbieter ist. Der andere Fall steht weiter unten.
+await page.evaluate(() => { rgsMapsSchluesselDa = true; });
 await page.evaluate(() => window.gm_authFailure());
 await page.waitForTimeout(300);
 // STEHT die Karte, wird sie NICHT zugedeckt (ENT-312). Vom Projektinhaber
@@ -612,7 +617,7 @@ check('KRITISCH: am Desktop kein waagrechter Seiten-Scroll', await page.evaluate
 // waere hier zu wenig: Es gibt nichts, worunter er stehen koennte.
 // Hier ist die Maps-Attrappe abgewiesen, es existiert also keine Karte.
 if (rueckrufDa) {
-  await page.evaluate(() => { rgsKarte = null; window.gm_authFailure(); });
+  await page.evaluate(() => { rgsMapsSchluesselDa = true; rgsKarte = null; window.gm_authFailure(); });
   await page.waitForTimeout(250);
   check('KRITISCH: ohne stehende Karte erscheint weiterhin die volle Erklärung (ENT-309)',
     await page.isVisible('#rgsKarteStand')
@@ -623,6 +628,48 @@ if (rueckrufDa) {
 } else {
   ['KRITISCH: ohne stehende Karte erscheint weiterhin die volle Erklärung (ENT-309)',
    'Und der Zentrieren-Knopf verschwindet, weil es nichts zu zentrieren gibt',
+  ].forEach(n => check(n + ' (nicht prüfbar: kein gm_authFailure)', false));
+}
+
+// ══════════ ABGELEHNT, WEIL GAR KEIN SCHLÜSSEL DRIN IST ═══════════════
+// Vom Projektinhaber am Geraet gemeldet: In der laufenden Runde stand die
+// graue Tafel des Anbieters, darunter unsere Meldung, die Seite sei nicht
+// freigegeben. Das stimmte nicht. Im Buendel stand noch der Platzhalter
+// __MAPS_JS_KEY__ statt eines Schluessels -- das Einsetzen beim Bauen war
+// uebersprungen worden, weil mobile/.maps-key fehlte.
+//
+// Der Anbieter meldet beides ueber denselben Rueckruf und nennt keinen
+// Grund. Unterscheiden laesst es sich nur am Schluessel selbst. Und es
+// MUSS unterschieden werden: Wer liest, die Seite sei nicht freigegeben,
+// meldet der Verwaltung eine Einstellung, die es gar nicht gibt --
+// waehrend in Wahrheit ein Schritt beim Ausliefern fehlt.
+check('KRITISCH: der Platzhalter gilt nicht als Schlüssel',
+  await page.evaluate(() => mapsSchluesselTauglich('__MAPS_JS_KEY__') === false));
+check('Ein leerer Schlüssel auch nicht',
+  await page.evaluate(() => mapsSchluesselTauglich('') === false
+    && mapsSchluesselTauglich(null) === false));
+check('KRITISCH: ein echter Schlüssel gilt',
+  await page.evaluate(() => mapsSchluesselTauglich('AIzaSyD-Beispiel_ohne_Bedeutung_123') === true));
+
+if (rueckrufDa) {
+  await page.evaluate(() => {
+    rgsMapsSchluesselDa = false;
+    rgsKarte = null;
+    const w = document.getElementById('rgsKarteWarnung'); if (w) { w.remove(); }
+    window.gm_authFailure();
+  });
+  await page.waitForTimeout(250);
+  const t = await txt(page, '#rgsKarteStand');
+  check('KRITISCH: ohne eingesetzten Schlüssel sagt die App, dass die Karte nicht eingerichtet ist',
+    !!t && t.includes('nicht eingerichtet'));
+  check('KRITISCH: und behauptet NICHT, es sei eine Freigabe-Einstellung',
+    !!t && !t.includes('nicht freigegeben') && !t.includes('kein Fehler an deinem Gerät'));
+  check('Sie sagt trotzdem, wie es weitergeht -- Punkte im Reiter daneben, Runde läuft',
+    !!t && t.includes('Reiter daneben') && t.includes('läuft normal weiter'));
+} else {
+  ['KRITISCH: ohne eingesetzten Schlüssel sagt die App, dass die Karte nicht eingerichtet ist',
+   'KRITISCH: und behauptet NICHT, es sei eine Freigabe-Einstellung',
+   'Sie sagt trotzdem, wie es weitergeht -- Punkte im Reiter daneben, Runde läuft',
   ].forEach(n => check(n + ' (nicht prüfbar: kein gm_authFailure)', false));
 }
 

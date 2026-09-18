@@ -2527,6 +2527,17 @@ const W = {
     rgsKarteFehler: 'Die Karte liess sich nicht laden — ohne Netz geht das nicht. Die Kontrollpunkte stehen im Reiter daneben.',
     rgsKarteGesperrt: 'Die Karte ist für diese Seite nicht freigegeben. Das ist eine Einstellung beim Kartenanbieter, kein Fehler an deinem Gerät — bitte der Verwaltung melden. Die Kontrollpunkte stehen im Reiter daneben, die Runde läuft normal weiter.',
     rgsKarteGesperrtKurz: 'Der Kartenanbieter meldet, dass diese Seite nicht freigegeben ist — bitte der Verwaltung melden.',
+    // Vierter Fall, und ein anderer als die drei darueber (ENT-309/312):
+    // Der Schluessel wurde beim Bauen dieser Fassung gar nicht erst
+    // eingesetzt. Das ist kein Netzproblem, keine Sperre beim Anbieter und
+    // nichts, was der Waechter vor Ort beheben koennte -- es fehlt ein
+    // Schritt beim Ausliefern. Genau so gemeldet aus der ersten App-Fassung
+    // auf dem Geraet: Der Platzhalter stand noch im Buendel, Google lehnte
+    // ihn ab, und die App behauptete daraufhin eine Freigabe-Einstellung,
+    // die es gar nicht gibt. Ein falscher Rat kostet den Waechter einen
+    // Anruf.
+    rgsKarteOhneSchluessel: 'Die Karte ist in dieser Fassung der App nicht eingerichtet — bitte der Verwaltung melden. Die Kontrollpunkte stehen im Reiter daneben, die Runde läuft normal weiter.',
+    rgsKarteOhneSchluesselKurz: 'Die Karte ist in dieser Fassung der App nicht eingerichtet — bitte der Verwaltung melden.',
     rgsKarteLeer: 'Für diese Runde ist kein Kontrollpunkt auf der Karte darstellbar.',
     rgsKarteOhneOrt: 'ohne Koordinaten — nur in der Liste',
     rgsZentrieren: 'Zentrieren',
@@ -8084,7 +8095,8 @@ function rgKarteGesperrtZeigen() {
       const streifen = document.createElement('div');
       streifen.className = 'rgs-karte-hinweis fehler';
       streifen.id = 'rgsKarteWarnung';
-      streifen.textContent = w('rgsKarteGesperrtKurz');
+      streifen.textContent = w(rgsMapsSchluesselDa
+        ? 'rgsKarteGesperrtKurz' : 'rgsKarteOhneSchluesselKurz');
       huelle.parentNode.insertBefore(streifen, huelle.nextSibling);
     }
     return;
@@ -8108,12 +8120,47 @@ function rgKarteGesperrtZeigen() {
     stand.id = 'rgsKarteStand';
     karte.parentNode.appendChild(stand);
   }
-  stand.textContent = w('rgsKarteGesperrt');
+  // Zwei verschiedene Sachverhalte, zwei Texte: Der Anbieter lehnt einen
+  // fehlenden Schluessel genauso ab wie eine nicht freigegebene Adresse und
+  // nennt dabei keinen Grund. Wer den falschen Text liest, meldet der
+  // Verwaltung etwas, das gar nicht der Fall ist.
+  stand.textContent = w(rgsMapsSchluesselDa
+    ? 'rgsKarteGesperrt' : 'rgsKarteOhneSchluessel');
   stand.classList.add('fehler');
   // Der Zentrieren-Knopf zentriert nichts mehr -- ein Knopf, der nichts tut,
   // ist schlimmer als keiner.
   const btn = $('rgsZentrieren'); if (btn) { btn.remove(); }
 }
+
+/* Taugt der eingebaute Schluessel ueberhaupt etwas?
+
+   Reine Funktion, damit sie sich ohne Netz und ohne Karte pruefen laesst.
+   Beim Ausliefern wird der Platzhalter __MAPS_JS_KEY__ durch den echten
+   Schluessel ersetzt (deploy-hostpoint.yml fuers Web, aufs-handy.sh fuers
+   Handy). Bleibt er stehen, faehrt die Anfrage trotzdem zu Google und wird
+   abgelehnt -- auf demselben Weg wie eine nicht freigegebene Adresse,
+   naemlich ueber gm_authFailure. Der Anbieter nennt dabei keinen Grund;
+   diese Funktion ist die einzige Stelle, an der sich die beiden Faelle
+   noch auseinanderhalten lassen. Und sie sind zweierlei: hier fehlt ein
+   Schritt beim Ausliefern, dort eine Einstellung beim Anbieter.
+
+   Geladen wird trotzdem. Ein Schluessel, den wir fuer untauglich halten,
+   koennte einer sein, den Google annimmt -- die Karte gar nicht erst zu
+   versuchen, waere eine Vermutung zulasten des Waechters. */
+function mapsSchluesselTauglich(wert) {
+  const k = String(wert || '').trim();
+  if (k === '') { return false; }
+  // Nicht auf den genauen Platzhalter pruefen, sondern auf seine Form:
+  // Ein Google-Schluessel sieht nie so aus.
+  return !/^__.*__$/.test(k);
+}
+
+/* Einmal beim Start beantwortet und in einer Variablen gehalten, nicht bei
+   jeder Meldung neu gerechnet. Der Wert aendert sich waehrend einer Sitzung
+   nicht -- und so laesst sich in den Pruefungen BEIDES herstellen, obwohl
+   in der Datei auf der Platte immer der Platzhalter steht (ersetzt wird er
+   erst beim Ausliefern). */
+let rgsMapsSchluesselDa = mapsSchluesselTauglich(RGS_MAPS_SCHLUESSEL);
 
 function rgsMapsLaden() {
   if (rgsMapsVersprechen) { return rgsMapsVersprechen; }

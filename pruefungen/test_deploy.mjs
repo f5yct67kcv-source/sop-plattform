@@ -1559,6 +1559,76 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   }
 }
 
+// ══════════ DER SCHLÜSSEL FÜRS HANDY (aufs-handy.sh) ══════════════════
+// Fürs Web setzt der Deploy den Schlüssel ein (oben geprüft). Fürs Handy
+// macht das aufs-handy.sh -- und das ging still durch, wenn die Datei mit
+// dem Schlüssel fehlte. Auf dem Gerät stand dann in der laufenden Runde
+// statt der Karte die graue Tafel von Google; vom Projektinhaber gemeldet.
+//
+// Geprüft wird durch AUSFÜHREN, nicht durch Lesen: Die Funktion wird aus
+// dem Skript herausgeschnitten und in einem Wegwerf-Verzeichnis auf eine
+// Kopie losgelassen. Eine Prüfung, die nur nach dem Wort "else" sucht,
+// bliebe grün, wenn der Zweig irgendwann nichts mehr sagt.
+{
+  const { mkdtempSync, writeFileSync, readFileSync: lies, rmSync } = await import('fs');
+  const { execFileSync } = await import('child_process');
+  const { tmpdir } = await import('os');
+  const { join } = await import('path');
+
+  const skript = lies(`${WURZEL}/aufs-handy.sh`, 'utf8');
+  const von = skript.indexOf('maps_schluessel_einsetzen() {');
+  const bis = skript.indexOf('\n}\n', von);
+  check('KRITISCH: das Einsetzen des Maps-Schlüssels steht als eigene, prüfbare Funktion da',
+    von !== -1 && bis !== -1);
+
+  if (von !== -1 && bis !== -1) {
+    const fn = skript.slice(von, bis + 3);
+    const lauf = (schluesselInhalt) => {
+      const ordner = mkdtempSync(join(tmpdir(), 'mapskey-'));
+      try {
+        writeFileSync(join(ordner, 'seite.html'), 'key=__MAPS_JS_KEY__ ende');
+        if (schluesselInhalt !== null) { writeFileSync(join(ordner, 'schluessel'), schluesselInhalt); }
+        const ausgabe = execFileSync('bash', ['-c',
+          fn + '\nmaps_schluessel_einsetzen "$1" "$2"', '--',
+          join(ordner, 'seite.html'), join(ordner, 'schluessel')],
+          { encoding: 'utf8' });
+        return { ausgabe, seite: lies(join(ordner, 'seite.html'), 'utf8') };
+      } finally { rmSync(ordner, { recursive: true, force: true }); }
+    };
+
+    const mit = lauf('AIzaSyD-Beispiel_ohne_Bedeutung_123\n');
+    check('KRITISCH: mit hinterlegtem Schlüssel steht er danach wirklich in der Seite',
+      mit.seite.includes('AIzaSyD-Beispiel_ohne_Bedeutung_123')
+      && !mit.seite.includes('__MAPS_JS_KEY__'));
+
+    const ohne = lauf(null);
+    check('KRITISCH: ohne hinterlegten Schlüssel bleibt der Platzhalter stehen',
+      ohne.seite.includes('__MAPS_JS_KEY__'));
+    // Der eigentliche Befund: Es darf nicht still durchgehen.
+    check('KRITISCH: und das Skript sagt es, statt stillschweigend weiterzumachen',
+      ohne.ausgabe.trim().length > 40);
+    check('Es sagt auch, WAS ausfällt -- die Karte, nicht die ganze App',
+      /Karte/i.test(ohne.ausgabe));
+    check('Und wie man es behebt',
+      ohne.ausgabe.includes('.maps-key') || /schluessel/i.test(ohne.ausgabe));
+    check('KRITISCH: die beiden Fälle sagen nicht dasselbe',
+      ohne.ausgabe.trim() !== mit.ausgabe.trim());
+
+    const leer = lauf('   \n');
+    check('KRITISCH: eine leere Schlüsseldatei gilt nicht als Schlüssel',
+      leer.seite.includes('__MAPS_JS_KEY__') && /KEINE Karte/i.test(leer.ausgabe));
+  } else {
+    ['KRITISCH: mit hinterlegtem Schlüssel steht er danach wirklich in der Seite',
+     'KRITISCH: ohne hinterlegten Schlüssel bleibt der Platzhalter stehen',
+     'KRITISCH: und das Skript sagt es, statt stillschweigend weiterzumachen',
+     'Es sagt auch, WAS ausfällt -- die Karte, nicht die ganze App',
+     'Und wie man es behebt',
+     'KRITISCH: die beiden Fälle sagen nicht dasselbe',
+     'KRITISCH: eine leere Schlüsseldatei gilt nicht als Schlüssel',
+    ].forEach(n => check(n + ' (nicht prüfbar: Funktion nicht gefunden)', false));
+  }
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');
