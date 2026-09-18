@@ -301,6 +301,48 @@ check('KRITISCH: dafür wird die App-Ebene ausgeblendet, sonst scheint sie durch
 // Karte gibt es hier nicht -- also eine Attrappe an ihrer Stelle. Ohne
 // diese Pruefung blieb das Weglassen unbemerkt: Die Regeln standen im
 // Stilblock, nur setzte sie niemand.
+// Erst die Grösse, dann die Karte. Die native Ansicht wird an die Stelle
+// des Elements gelegt, und ihre Masse werden beim Erzeugen EINMAL
+// abgelesen -- wer sie abliest, bevor die Seite fertig umgebrochen hat,
+// bekommt eine Ansicht der Grösse Null. Vom Projektinhaber gemeldet: Beim
+// Start der Runde blieb der Bildschirm schwarz, erst das Umschalten der
+// Nachtsicht brachte die Karte.
+check('KRITISCH: ein Element mit Grösse gilt als bereit',
+  await page.evaluate(async () => {
+    const el = document.getElementById('rgsKarte');
+    return el ? await rgsElementBereit(el, 300) : false;
+  }));
+check('KRITISCH: ein Element OHNE Grösse gilt nicht als bereit',
+  await page.evaluate(async () => {
+    const h = document.createElement('div');
+    document.body.appendChild(h);
+    const r = await rgsElementBereit(h, 120);
+    h.remove();
+    return r === false;
+  }));
+check('Ein Element, das gar nicht im Dokument steht, ebenfalls nicht',
+  await page.evaluate(async () => {
+    const weg = document.createElement('div');
+    return (await rgsElementBereit(weg, 120)) === false;
+  }));
+// Und der Aufbau fragt wirklich danach: Mit einem Element ohne Grösse darf
+// keine Karte entstehen, sonst waere die Prüfung oben folgenlos.
+check('KRITISCH: ohne Grösse wird gar keine native Karte gebaut',
+  await page.evaluate(async () => {
+    const merkN = window.KarteNativ, merkK = rgsNativKarte, merkE = rgsKarteEl;
+    let gebaut = false;
+    window.KarteNativ = { GoogleMap: { create: async () => { gebaut = true; return {}; } } };
+    const el = document.getElementById('rgsKarte');
+    const breite = el.style.width, hoehe = el.style.height, anz = el.style.display;
+    el.style.display = 'none';
+    rgsNativKarte = null;
+    await rgKarteNativBauen(rgKarteDaten(rundgangAktiv.kontrollpunkte), rgsKarteBauLauf);
+    el.style.display = anz; el.style.width = breite; el.style.height = hoehe;
+    window.KarteNativ = merkN; rgsNativKarte = merkK; rgsKarteEl = merkE;
+    document.body.classList.remove('karte-nativ');
+    return gebaut === false;
+  }));
+
 check('KRITISCH: der Aufbau der nativen Karte schaltet die Durchsicht ein',
   await page.evaluate(async () => {
     const merkN = window.KarteNativ, merkK = rgsNativKarte, merkE = rgsKarteEl;
@@ -834,6 +876,59 @@ check('KRITISCH: mit Hülle UND Schlüssel wird der native Weg gewählt',
   check('KRITISCH: das Verlassen der Runde baut sie ab',
     await abbauProbe('raus'));
 
+}
+
+// ══════════ DIE FÜLLUNG AUF DER NATIVEN KARTE (ENT-609) ═══════════════
+// Vom Projektinhaber verlangt: Der Radiuskreis füllt sich grün, bis die
+// Verweilzeit durch ist (ENT-579). Im Browser wächst ein echter
+// Kartenkreis; das native SDK kann einen bestehenden Kreis nicht ändern,
+// darum liegt die Füllung dort als Element ÜBER der Karte. Dafür muss der
+// Kontrollpunkt auf den Bildschirm gerechnet werden.
+//
+// Die Rechnung ist eine reine Funktion und wird hier gegen bekannte Werte
+// geprüft -- ohne Karte, ohne Gerät.
+{
+  // Ein Ausschnitt von genau einem Zehntelgrad in beide Richtungen auf
+  // einer Fläche von 1000 x 1000 Punkten: Dann ist die Rechnung von Hand
+  // nachvollziehbar.
+  const grenzen = { southwest: { lat: 47.0, lng: 8.0 }, northeast: { lat: 47.1, lng: 8.1 } };
+  const masse = { width: 1000, height: 1000 };
+  const mitte = await page.evaluate(([g, m]) =>
+    rgKarteNativAufSchirm(g, m, 47.05, 8.05), [grenzen, masse]);
+  check('KRITISCH: die Mitte des Ausschnitts liegt in der Mitte der Fläche',
+    !!mitte && Math.abs(mitte.x - 500) < 1 && Math.abs(mitte.y - 500) < 1);
+
+  const nordwest = await page.evaluate(([g, m]) =>
+    rgKarteNativAufSchirm(g, m, 47.1, 8.0), [grenzen, masse]);
+  // Norden ist OBEN: Die grösste Breite gehört an den oberen Rand, nicht
+  // an den unteren. Ein Vorzeichenfehler hier legte die Füllung
+  // spiegelverkehrt auf die Karte, ohne dass etwas kaputtginge.
+  check('KRITISCH: Norden liegt oben, nicht unten',
+    !!nordwest && Math.abs(nordwest.x - 0) < 1 && Math.abs(nordwest.y - 0) < 1);
+
+  const suedost = await page.evaluate(([g, m]) =>
+    rgKarteNativAufSchirm(g, m, 47.0, 8.1), [grenzen, masse]);
+  check('Und Südost in der unteren rechten Ecke',
+    !!suedost && Math.abs(suedost.x - 1000) < 1 && Math.abs(suedost.y - 1000) < 1);
+
+  // 0,1 Grad Breite sind rund 11 132 m auf 1000 Punkten -- 20 m sind also
+  // knapp zwei Punkte.
+  const zwanzig = await page.evaluate(([g, m]) =>
+    rgKarteNativMeterInPixel(g, m, 20), [grenzen, masse]);
+  check('KRITISCH: 20 Meter ergeben eine plausible Pixelgrösse',
+    zwanzig > 1.5 && zwanzig < 2.2);
+  check('Doppelte Strecke, doppelte Grösse',
+    Math.abs((await page.evaluate(([g, m]) =>
+      rgKarteNativMeterInPixel(g, m, 40), [grenzen, masse])) - 2 * zwanzig) < 0.01);
+
+  // Ohne Grenzen wird NICHTS gezeichnet: Lieber keine Füllung als eine an
+  // der falschen Stelle -- sie sagt dem Wächter, wo er stehen muss.
+  check('KRITISCH: ohne Kartengrenzen wird nichts gezeichnet',
+    await page.evaluate(() => rgKarteNativAufSchirm(null, { width: 100, height: 100 }, 47, 8) === null));
+  check('Und ein Ausschnitt ohne Ausdehnung ergibt ebenfalls nichts',
+    await page.evaluate(() => rgKarteNativAufSchirm(
+      { southwest: { lat: 47, lng: 8 }, northeast: { lat: 47, lng: 8 } },
+      { width: 100, height: 100 }, 47, 8) === null));
 }
 
 await browser.close();
