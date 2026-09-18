@@ -858,6 +858,31 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     /__SMTP_ABSENDER__\|info@guardops\.ch\|g"\s+dist-guardops\/mailer\.php/.test(bauen)
     && /__SMTP_ABSENDER_NAME__\|GuardOpS\|g"\s+dist-guardops\/mailer\.php/.test(bauen));
 
+  // Der Betreiber-Bereich verschickt eigene Kommunikation der Betreiberin
+  // (Demo-Zugaenge, Offerten, Rechnungen) und darf dafuer nie den Absender
+  // der Mandantin tragen (ENT-568/ENT-569). Genau das ist am 2026-09-18
+  // passiert: Der erste erfolgreiche Demo-Zugang kam beim Interessenten
+  // unter dem Firmennamen der Mandantin an, weil dieses Buendel Konto und
+  // Absender aus den geteilten SMTP_*-Werten erbte.
+  //
+  // Geprueft wird die Aussage, nicht der Wortlaut: Die sed-Zeilen duerfen
+  // die geteilten Werte nicht mehr unmittelbar einsetzen, sondern nur noch
+  // die Variablen der Fallunterscheidung -- und in deren GuardOpS-Zweig
+  // stehen Adresse und Name fest.
+  const beMailer = (workflow.match(/^.*dist-betreiber\/mailer\.php.*$/gm) || []).join('\n');
+  check('KRITISCH: liegt das eigene Postfach vor, verschickt der Betreiber-Bereich als GuardOpS ueber info@guardops.ch',
+    /__SMTP_ABSENDER__\|info@guardops\.ch\|g"\s+dist-betreiber\/mailer\.php/.test(beMailer)
+    && /__SMTP_ABSENDER_NAME__\|GuardOpS\|g"\s+dist-betreiber\/mailer\.php/.test(beMailer)
+    && /__SMTP_HOST__\|\$EFF_GUARDOPS_SMTP_HOST\|g"\s+dist-betreiber\/mailer\.php/.test(beMailer)
+    && /__SMTP_USER__\|\$EFF_GUARDOPS_SMTP_USER\|g"\s+dist-betreiber\/mailer\.php/.test(beMailer));
+  check('KRITISCH: der eigene Absender haengt daran, dass das Postfach wirklich hinterlegt ist -- sonst verschickt der Bereich gar nichts mehr',
+    /if \[ -n "\$EFF_GUARDOPS_SMTP_HOST" \][\s\S]{0,200}?dist-betreiber\/mailer\.php/.test(workflow));
+  // Fehlt das Postfach, wird NICHT lautlos weitergemacht: Ein Versandfehler
+  // aendert die Antwort an den Interessenten nicht, ein falscher Absender
+  // faellt also niemandem auf, der nicht zufaellig in sein Postfach sieht.
+  check('KRITISCH: fehlt das GuardOpS-Postfach, meldet der Deploy das sichtbar, statt still den falschen Absender zu nehmen',
+    /::warning::Betreiber-Bereich: Die GUARDOPS_SMTP_\*-Secrets fehlen/.test(workflow));
+
   // Das Rapport-Tool selbst bleibt unberuehrt: sein Buendel (dist/) traegt
   // weiterhin die geteilten Produktions-Werte -- sonst zeigten CUPI 24s
   // eigene Offert-Mails ploetzlich den falschen Absender.
