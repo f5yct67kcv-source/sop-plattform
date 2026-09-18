@@ -268,6 +268,60 @@ check('Ein offener Punkt trägt seine Listen-Nummer als Zeichen',
       return soll.length > 0 && soll === ist;
     }));
 
+// Die Durchsicht, die die native Karte sichtbar macht, darf NICHT die
+// Seite darunter freilegen. Zweimal am Gerät danebengegriffen: einmal
+// schienen die Revierdienst-Kacheln durch, einmal war gar keine Karte
+// mehr da. Gemessen statt nachgelesen -- eine CSS-Regel kann wirkungslos
+// bleiben, ohne dass etwas kaputtgeht (CLAUDE.md).
+const gemessen = await page.evaluate(() => {
+  const huelle = document.querySelector('.rgs-karte-huelle');
+  const rgs = document.getElementById('rgSeite');
+  const app = document.querySelector('.app');
+  if (!huelle || !rgs || !app) { return null; }
+  const lies = () => ({
+    huelle: getComputedStyle(huelle).backgroundColor,
+    rgs: getComputedStyle(rgs).backgroundColor,
+    app: getComputedStyle(app).visibility,
+  });
+  const ohne = lies();
+  document.body.classList.add('karte-nativ');
+  const mit = lies();
+  document.body.classList.remove('karte-nativ');
+  return { ohne, mit };
+});
+const durchsichtig = (f) => f === 'transparent' || /rgba\(0, 0, 0, 0\)/.test(f);
+check('KRITISCH: mit Durchsicht ist die Kartenhülle gemessen durchsichtig',
+  !!gemessen && !durchsichtig(gemessen.ohne.huelle) && durchsichtig(gemessen.mit.huelle));
+check('KRITISCH: und die Rundgang-Ebene ebenfalls -- sonst bleibt die Karte unsichtbar',
+  !!gemessen && !durchsichtig(gemessen.ohne.rgs) && durchsichtig(gemessen.mit.rgs));
+check('KRITISCH: dafür wird die App-Ebene ausgeblendet, sonst scheint sie durch',
+  !!gemessen && gemessen.ohne.app !== 'hidden' && gemessen.mit.app === 'hidden');
+
+// Und der Aufbau muss die Durchsicht auch wirklich einschalten. Die native
+// Karte gibt es hier nicht -- also eine Attrappe an ihrer Stelle. Ohne
+// diese Pruefung blieb das Weglassen unbemerkt: Die Regeln standen im
+// Stilblock, nur setzte sie niemand.
+check('KRITISCH: der Aufbau der nativen Karte schaltet die Durchsicht ein',
+  await page.evaluate(async () => {
+    const merkN = window.KarteNativ, merkK = rgsNativKarte, merkE = rgsKarteEl;
+    const attrappe = {
+      setCamera: async () => {}, fitBounds: async () => {},
+      enableCurrentLocation: async () => {}, addCircles: async () => [],
+      removeCircles: async () => {}, destroy: async () => {},
+    };
+    window.KarteNativ = { GoogleMap: { create: async () => attrappe } };
+    document.body.classList.remove('karte-nativ');
+    const d = rgKarteDaten(rundgangAktiv.kontrollpunkte);
+    await rgKarteNativBauen(d, rgsKarteBauLauf);
+    const an = document.body.classList.contains('karte-nativ');
+    // Und der Abbau nimmt sie wieder weg -- sonst bliebe die App auf den
+    // anderen Reitern unsichtbar.
+    await rgKarteNativAbbauen();
+    const aus = !document.body.classList.contains('karte-nativ');
+    window.KarteNativ = merkN; rgsNativKarte = merkK; rgsKarteEl = merkE;
+    return an && aus;
+  }));
+
   // Der Aufbau muss genau den Zustand herstellen, in dem der Knopf sonst
   // wirkungslos bliebe: Die Karte gilt als STEHEND (das Element ist
   // dasselbe wie im Dokument). Ohne das lief die Prüfung an der Sache
@@ -779,6 +833,7 @@ check('KRITISCH: mit Hülle UND Schlüssel wird der native Weg gewählt',
   // danach über der ganzen App, nicht nur über der Runde.
   check('KRITISCH: das Verlassen der Runde baut sie ab',
     await abbauProbe('raus'));
+
 }
 
 await browser.close();

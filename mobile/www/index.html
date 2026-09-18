@@ -1102,24 +1102,35 @@ button.rd-kopf:active { background: var(--line-soft); }
 .rgs-bd.voll > :not(.rgs-karte-huelle) { margin: 0 16px; }
 .rgs-bd.voll > :last-child:not(.rgs-karte-huelle) { margin-bottom: calc(12px + env(safe-area-inset-bottom)); }
 .rgs-karte { position: absolute; inset: 0; }
-/* HIER STAND EINE DURCHSICHT, und sie ist wieder weg (ENT-609).
+/* Durchsicht auf die native Karte -- und was darunter NICHT
+   durchscheinen darf (ENT-609).
 
-   Als die native Karte grau blieb, war die Vermutung: Sie liegt UNTER der
-   Seite und wird von allem zugedeckt, was darueber einen Hintergrund hat.
-   Also wurde die Kette vom Seitenkoerper bis zur Karte durchsichtig
-   gestellt. Danach erschien die Karte -- aber nicht deswegen: Im selben
-   Schritt kam der richtige Schluessel ins Buendel, und daran hatte es
-   gelegen.
+   Zwei Fehlversuche, beide am Geraet gemessen, darum steht die Begruendung
+   hier ausfuehrlich:
 
-   Der Preis war ein eigener Fehler: Eine durchsichtige Rundgang-Ebene
-   laesst die Seite darunter durchscheinen. Vom Projektinhaber gemeldet --
-   beim ersten Oeffnen klebten die Revierdienst-Kacheln in der Karte.
+   1. Zuerst wurde die Kette vom Seitenkoerper bis zur Karte durchsichtig
+      gestellt. Die Karte erschien -- aber die Seite DARUNTER schien mit
+      durch: Auf dem Karten-Reiter klebten die Revierdienst-Kacheln im
+      Bild. Die Rundgang-Ebene liegt naemlich UEBER der App und verdeckt
+      sie nur mit ihrem Hintergrund; nimmt man den weg, sieht man sie.
 
-   Auf iOS zeichnet das Plugin die Karte IN die Webansicht, nicht darunter
-   (auf Android ist es umgekehrt, dort braucht es die Durchsicht wirklich
-   -- siehe die Anmerkung im Plugin). Fuer die iPhone-Fassung ist sie
-   also ueberfluessig. Kommt Android dazu, gehoert sie zurueck, aber dann
-   auf Android beschraenkt. */
+   2. Daraufhin wurde die Durchsicht ganz entfernt, in der Annahme, das
+      Plugin zeichne auf iOS in die Webansicht hinein und brauche sie gar
+      nicht. Ergebnis: gar keine Karte mehr, nur noch die Hintergrundfarbe
+      der Huelle. Die Annahme war falsch -- die native Ansicht liegt
+      wirklich unter der Webansicht.
+
+   Also beides: durchsichtig bis nach unten, UND die App-Ebene wird
+   ausgeblendet, statt sich auf ihren Hintergrund zu verlassen. Dann ist
+   unter der Rundgang-Ebene nichts mehr, was durchscheinen koennte --
+   ausser der Karte, um die es geht.
+
+   Ausgeblendet wird mit visibility, nicht mit display: Ein display:none
+   wirft die Masse der Seite weg, und die Rueckkehr kostet dann einen
+   ganzen Neuaufbau samt Sprung im Bildlauf. */
+body.karte-nativ, body.karte-nativ .rgs, body.karte-nativ .rgs-bd,
+body.karte-nativ .rgs-karte-huelle, body.karte-nativ .rgs-karte { background: transparent; }
+body.karte-nativ .app { visibility: hidden; }
 /* Ladehinweis und Fehlermeldung an derselben Stelle: Beides beantwortet
    dieselbe Frage ("warum sehe ich nichts"), darum derselbe Ort. */
 .rgs-karte-stand { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; font-size: 14px; line-height: 1.5; color: var(--ink-3); }
@@ -8303,6 +8314,9 @@ function rgsNativLaden() {
    auch auf dem Reiter mit der Liste. Darum wird sie ausdruecklich
    abgebaut, und zwar vor jedem Ersetzen des Rumpfs. */
 async function rgKarteNativAbbauen() {
+  // Die Durchsicht gilt nur, solange die Karte steht -- sonst bliebe die
+  // App auf den anderen Reitern unsichtbar.
+  document.body.classList.remove('karte-nativ');
   if (!rgsNativKarte) { return; }
   const weg = rgsNativKarte;
   rgsNativKarte = null;
@@ -8700,6 +8714,7 @@ async function rgKarteNativBauen(d, bauLauf) {
   // native Ansichten uebereinander.
   if (bauLauf !== rgsKarteBauLauf) { rgKarteNativAbbauen(); return; }
   rgsKarteEl = el;
+  document.body.classList.add('karte-nativ');
   // Ausschnitt AUSDRUECKLICH setzen, obwohl er schon in der Erzeugung
   // stand. Gemessen am Geraet: Die Karte kam ueber halb Mitteleuropa
   // heraus statt ueber dem Kontrollpunkt -- die Angaben aus der Erzeugung
