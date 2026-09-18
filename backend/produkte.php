@@ -16,10 +16,25 @@ declare(strict_types=1);
 // es bei uns nicht (siehe ENT-215, bewusst nicht aus dem gezeigten
 // Fremdsystem uebernommen) -- ein "P" fuer alle Produkte ist darum die
 // einzige Vorsilbe, die tatsaechlich etwas bedeutet.
-function naechste_produktnummer(PDO $pdo): string
+// Zwei Tabellensaetze wie bei belege.php und kunden.php (ENT-605): Der
+// Mandant fuehrt seine Leistungen in `produkte`, die Betreiberin ihre in
+// `be_produkte`. Der Praefix ist ein Literal aus dem Endpunkt, nie ein Wert
+// aus einer Anfrage.
+const PRODUKT_TABELLENSAETZE = ['', 'be_'];
+
+function produkt_tabelle(string $praefix): string
 {
+    if (!in_array($praefix, PRODUKT_TABELLENSAETZE, true)) {
+        throw new InvalidArgumentException('Unbekannter Tabellensatz');
+    }
+    return $praefix . 'produkte';
+}
+
+function naechste_produktnummer(PDO $pdo, string $tabPraefix = ''): string
+{
+    $tab = produkt_tabelle($tabPraefix);
     $s = $pdo->query(
-        "SELECT nummer FROM produkte WHERE nummer REGEXP '^P[0-9]{4}$'
+        "SELECT nummer FROM {$tab} WHERE nummer REGEXP '^P[0-9]{4}$'
          ORDER BY CAST(SUBSTRING(nummer, 2) AS UNSIGNED) DESC LIMIT 1"
     );
     $letzte = $s->fetchColumn();

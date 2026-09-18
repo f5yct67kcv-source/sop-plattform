@@ -48,6 +48,34 @@ const AUFBAU = () => {
     + '<td><span class="merker m-ruhe">Standardverbindung</span></td>'
     + '<td style="text-align:right;white-space:nowrap"><button class="klein">Ändern</button> '
     + '<button class="klein">GAV</button></td></tr></tbody></table></div>';
+
+  // Seit ENT-605 gehoeren zwei weitere Flaechen dazu, und sie sind die
+  // groesseren: das Adressbuch und das Offertformular. Eine neue Maske, die
+  // niemand misst, ist genau der Fall, fuer den diese Suite da ist. Gefuellt
+  // wird ueber die Funktionen der Seite selbst -- ein nachgebautes Formular
+  // pruefte den Nachbau.
+  offertenBereit = true;
+  produkte = [{ id: 1, nummer: 'P0001', name: 'Nutzung', beschreibung: 'Monatlich',
+                einzelpreis_rappen: 12000, einheit: 'Monat', mwst_satz_bp: 810,
+                aktiv: 1, sortierung: 0 }];
+  adressen = [{ id: 1, kundennummer: 'K0001', name: 'Musterbetrieb AG', plz: '3000',
+                ort: 'Musterstadt', aktiv: 1, mandant_id: null,
+                kontaktwege: [{ art: 'email', wert: 'a@beispiel.invalid' }], personen: [] }];
+  belege = [{ id: 1, nummer: 'OF-0001', titel: 'Nutzung', status: 'entwurf',
+              datum: '2026-03-01', gueltig_bis: '2026-03-31', total_rappen: 129700,
+              aktiv: 1, kunde_name: 'Musterbetrieb AG', referenz: '', kundennummer: 'K0001' }];
+  adZeichnen();
+  renderOfferten();
+  pdZeichnen();
+  document.getElementById('b-adressen').classList.remove('versteckt');
+  document.getElementById('b-offerten').classList.remove('versteckt');
+  // Das Formular mit einer gefuellten Positionszeile -- dort stehen die
+  // meisten Bedienelemente auf engstem Raum.
+  ofNeu();
+  ofPos = [{ produkt_id: 1, produkt_name: 'Nutzung', beschreibung: 'Monatliche Nutzung',
+             menge: 12, einheit: 'Monat', einzelpreis_rappen: 12000,
+             rabatt_bp: 0, mwst_satz_bp: 810 }];
+  ofZeilenZeichnen();
 };
 
 const MESSEN = () => {
@@ -130,10 +158,28 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
   check(`${wie}: auch die kleinen Knoepfe bleiben ueber 36px`,
     m.knoepfe.filter(k => k.klein && k.h < 36).length === 0);
 
-  // Unter 16 px zoomt iOS in ein Eingabefeld hinein und bleibt dort.
-  const kleineSchrift = m.felder.filter(f => f.s < 16);
-  check(`KRITISCH ${wie}: jedes Eingabefeld hat mindestens 16px Schrift`, kleineSchrift.length === 0);
+  // Unter 16 px zoomt iOS in ein Eingabefeld hinein und bleibt dort. Das
+  // ist der GRUND der Regel, und er gilt auf dem Telefon -- so steht sie
+  // auch in CLAUDE.md ("Bedienelemente auf dem Handy mindestens 44 px hoch.
+  // Eingabefelder mindestens 16 px"). Bis ENT-605 wurde sie hier auf beiden
+  // Breiten verlangt; das fiel nicht auf, weil die Seite nur ihre eigenen
+  // 16px-Felder hatte. Seither traegt sie zusaetzlich die Felder aus dem
+  // Cockpit, und die sind am Desktop 13.5px -- dieselbe Groesse wie dort,
+  // denn der Offertenteil soll auf beiden Seiten gleich aussehen.
+  // Am Desktop bleibt eine Untergrenze stehen, nur eine niedrigere: Was
+  // deutlich kleiner wird, ist ein Versehen und keine Gestaltung.
+  const untergrenze = wie === 'Handy' ? 16 : 13;
+  const kleineSchrift = m.felder.filter(f => f.s < untergrenze);
+  check(`KRITISCH ${wie}: jedes Eingabefeld hat mindestens ${untergrenze}px Schrift`,
+    kleineSchrift.length === 0);
   if (kleineSchrift.length) { bad.push(`${wie}: ` + kleineSchrift.map(f => `#${f.id} ${f.s}px`).join(', ')); }
+  // Und die Aussage, die die Regel eigentlich meint, als eigene Pruefung:
+  // Am Handy gibt es kein einziges Feld unter 16px -- auch keines aus den
+  // uebernommenen Bausteinen.
+  if (wie === 'Handy') {
+    check('KRITISCH Handy: auch die übernommenen Felder tragen 16px',
+      m.felder.length > 10 && m.felder.every(f => f.s >= 16));
+  }
   check(`${wie}: jedes Eingabefeld ist mindestens 44px hoch`,
     m.felder.filter(f => f.h < 44).length === 0);
 
@@ -315,7 +361,11 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
   });
 
   const lage = async () => seite.evaluate(() => ({
-    sichtbar: ['uebersicht', 'mandanten', 'offerten', 'rechnungen', 'konten']
+    // Der Katalog kommt aus der SEITE (BEREICHE), nicht aus einer hier
+    // nachgefuehrten Liste: Sonst bliebe ein neuer Bereich unbemerkt, und
+    // die Aussage "genau einer ist sichtbar" waere nur noch die halbe
+    // Wahrheit. Genau das ist bei ENT-605 passiert.
+    sichtbar: Object.keys(BEREICHE)
       .filter(k => !document.getElementById('b-' + k).classList.contains('versteckt')),
     titel: document.getElementById('leiste-titel').textContent.trim(),
     unter: document.getElementById('leiste-unter').textContent.trim(),
@@ -329,7 +379,7 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
   // Jeden Reiter anklicken, nicht nur einen: Ein vergessener Bereich
   // faellt sonst erst auf, wenn jemand ihn braucht.
   const titel = {};
-  for (const k of ['mandanten', 'offerten', 'rechnungen', 'konten', 'uebersicht']) {
+  for (const k of ['mandanten', 'adressen', 'offerten', 'rechnungen', 'konten', 'uebersicht']) {
     await seite.click(`#kopf-nav .nav-item[data-bereich="${k}"]`);
     const l = await lage();
     titel[k] = l.titel;
@@ -337,10 +387,14 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
       l.sichtbar.length === 1 && l.sichtbar[0] === k);
     check(`Die Titelleiste zieht bei "${k}" mit`, l.titel !== '' && l.unter !== '');
   }
-  // Fuenf Bereiche, fuenf verschiedene Titel -- sonst steht auf zwei
-  // Seiten dasselbe und man weiss nicht, wo man ist.
+  // Jeder Bereich sein eigener Titel -- sonst steht auf zwei Seiten
+  // dasselbe und man weiss nicht, wo man ist. Die Zahl kommt aus dem
+  // Durchlauf selbst und wird nicht von Hand nachgefuehrt: Eine Pruefung
+  // mit einer eingetippten Zahl bleibt gruen, wenn ein Bereich dazukommt
+  // und man beides zu aendern vergisst.
   check('KRITISCH: jeder Bereich hat seinen eigenen Titel',
-    new Set(Object.values(titel)).size === 5);
+    Object.keys(titel).length >= 6
+    && new Set(Object.values(titel)).size === Object.keys(titel).length);
 
   // Ein offenes Formular darf beim Wechseln nicht stehen bleiben.
   await seite.evaluate(() => {
@@ -405,30 +459,83 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
 // Die Hausregel, die hier am haeufigsten verletzt wurde. Ein Geruest, das
 // "keine Offerten vorhanden" sagt, behauptet, es gaebe die Funktion --
 // nur eben ohne Inhalt. Das ist falsch und faellt niemandem auf.
+//
+// SEIT ENT-605 GILT SIE FUER EINE ANDERE MENGE: Offerten SIND gebaut, das
+// Geruest dort ist weg. Die Pruefung ist darum umgehaengt und nicht
+// gestrichen worden -- eine Wache, die ihr Pruefobjekt verliert, muss rot
+// werden oder umgehaengt, nicht schweigen (so schon bei der Kopfmitte in
+// ENT-536). Geprueft wird jetzt: Das Geruest der Rechnungen sagt weiter,
+// dass es noch nicht gebaut ist, UND die Offertenliste haelt ihre vier
+// Lagen auseinander.
 {
   const seite = await browser.newPage({ viewport: { width: 1500, height: 900 } });
   await seite.goto(ADRESSE);
-  const texte = await seite.evaluate(async () => {
+  const lage = await seite.evaluate(async () => {
     ich = { name: 'Testkonto', email: 'test@example.invalid' };
     window.fetch = async () => new Response('{"status":"ok","mandanten":[]}',
       { status: 200, headers: { 'Content-Type': 'application/json' } });
     await ladeAlles();
+
+    // Die vier Lagen der Offertenliste, nacheinander erzeugt und abgelesen.
+    // Nicht nachgebaut: Es sind die Funktionen der Seite selbst.
+    const beleg = {
+      id: 1, art: 'offerte', nummer: 'OF-0001', titel: 'Nutzung', status: 'entwurf',
+      datum: '2026-01-15', gueltig_bis: '2026-02-14', total_rappen: 120000,
+      aktiv: 1, kunde_name: 'Musterbetrieb AG', referenz: '', kundennummer: 'K0001',
+    };
+    const ablesen = () => document.getElementById('ofTable').textContent.trim();
+
+    offertenBereit = false;
+    nichtEingerichtet('ofTable', 'Die Offerten');
+    const nichtGebaut = ablesen();
+
+    offertenBereit = true;
+    document.getElementById('ofQ').value = '';
+    document.getElementById('ofStatus').innerHTML = '<option value="">Alle Status</option>';
+    belege = [];
+    renderOfferten();
+    const nichtsDa = ablesen();
+
+    belege = [beleg];
+    document.getElementById('ofQ').value = 'gibtesnicht';
+    renderOfferten();
+    const keinTreffer = ablesen();
+
+    document.getElementById('ofQ').value = '';
+    renderOfferten();
+    const bestand = ablesen();
+
     return {
-      offerten:   document.getElementById('of-inhalt').textContent,
       rechnungen: document.getElementById('re-inhalt').textContent,
+      offertenGeruestWeg: document.getElementById('of-inhalt') === null,
+      nichtGebaut, nichtsDa, keinTreffer, bestand,
     };
   });
   await seite.close();
 
-  for (const [wo, t] of Object.entries(texte)) {
-    check(`${wo}: das Gerüst sagt, dass es noch nicht gebaut ist`,
-      /noch nicht gebaut/i.test(t));
-    check(`KRITISCH ${wo}: es behauptet NICHT, es sei bloss nichts vorhanden`,
-      !/(keine|nichts|noch nichts)\s+(offerten|rechnungen|vorhanden|erfasst|angelegt)/i.test(t));
-    check(`${wo}: es steht da, worauf es wartet`, t.length > 80);
-  }
-  check('Die beiden Gerüste sagen es nicht mit demselben Satz',
-    texte.offerten !== texte.rechnungen);
+  check('KRITISCH: Offerten sind gebaut -- das Gerüst dort ist weg',
+    lage.offertenGeruestWeg);
+  check('rechnungen: das Gerüst sagt, dass es noch nicht gebaut ist',
+    /noch nicht gebaut/i.test(lage.rechnungen));
+  check('KRITISCH rechnungen: es behauptet NICHT, es sei bloss nichts vorhanden',
+    !/(keine|nichts|noch nichts)\s+(rechnungen|vorhanden|erfasst|angelegt)/i.test(lage.rechnungen));
+  check('rechnungen: es steht da, worauf es wartet', lage.rechnungen.length > 80);
+
+  // Die vier Lagen der Liste. Das ist dieselbe Hausregel eine Ebene
+  // tiefer: "nicht eingerichtet", "nichts erfasst", "kein Treffer" und
+  // "hier ist die Liste" sind vier Aussagen und brauchen vier Texte.
+  check('KRITISCH: die Offertenliste sagt "nicht eingerichtet" eigens',
+    /noch nicht eingerichtet/i.test(lage.nichtGebaut));
+  check('KRITISCH: "nicht eingerichtet" sieht nicht aus wie "keine Offerten"',
+    !/keine offerten/i.test(lage.nichtGebaut));
+  check('KRITISCH: ein leerer Bestand und ein leerer Filter sagen Verschiedenes',
+    lage.nichtsDa !== lage.keinTreffer
+    && /noch keine offerten/i.test(lage.nichtsDa)
+    && /keine treffer/i.test(lage.keinTreffer));
+  check('KRITISCH: die vier Lagen sagen vier verschiedene Dinge',
+    new Set([lage.nichtGebaut, lage.nichtsDa, lage.keinTreffer, lage.bestand]).size === 4);
+  check('Mit Bestand steht die Offerte wirklich da',
+    lage.bestand.includes('OF-0001') && lage.bestand.includes('Musterbetrieb AG'));
 }
 
 // ── Eine abgelaufene Sitzung ist kein Ladefehler ─────────────────────

@@ -927,6 +927,15 @@ const OHNE_ANMELDUNG = [
   // Konto. Bis ENT-501 standen diese beiden nirgends benannt.
   'beleg_oeffentlich.php',
   'beleg_entscheidung.php',
+  // Dasselbe eine Ebene hoeher (ENT-605): die Offerte der BETREIBERIN an
+  // einen Betrieb, der diese Plattform noch nicht nutzt. Er hat kein Konto
+  // und soll fuer eine Offerte auch keines anlegen muessen; Ausweis ist
+  // wieder der versand_token. Die Entscheidung nimmt nur POST an, damit die
+  // Vorschau eines Mailprogramms nichts ausloest. Zusaetzlich eingehegt in
+  // test_betreiber.mjs (Liste OEFFENTLICH, mit der Gegenprobe, dass der
+  // Ausweis tatsaechlich der versand_token ist).
+  'betreiber_beleg_oeffentlich.php',
+  'betreiber_beleg_entscheidung.php',
   // Demo-Selbstbedienung (ENT-601): Ein Interessent hat noch kein Konto,
   // kann also keine Sitzung mitbringen -- dieselbe Begruendung wie bei
   // login.php. Eigene Bremsen (IP und E-Mail-Adresse), Honigtopf,

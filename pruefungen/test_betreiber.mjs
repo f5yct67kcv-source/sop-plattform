@@ -64,11 +64,24 @@ const EINSTIEG = {
   // darum an der Verwaltung dieses Betriebs.
   'betreiber_einrichten.php': 'Einrichtung, abgesichert ueber require_verwaltung',
 };
+// Zweite, ausdruecklich andere Kategorie (ENT-605): Seiten, die ein
+// EMPFAENGER aufruft, nicht die Betreiberin. Sie koennen keine Anmeldung
+// verlangen, weil der Empfaenger ein Betrieb ist, der diese Plattform noch
+// gar nicht nutzt -- er hat kein Konto und soll fuer eine Offerte auch
+// keines anlegen muessen. Ausweis ist ein versand_token mit 256 Bit.
+// Getrennt von EINSTIEG gefuehrt, weil die Begruendung eine andere ist:
+// Ein Einstieg erzeugt die Sitzung, die er nicht verlangen kann; diese
+// beiden haben ueberhaupt keine. Beide stehen zusaetzlich in
+// OHNE_ANMELDUNG in test_php.mjs.
+const OEFFENTLICH = {
+  'betreiber_beleg_oeffentlich.php': 'Ansicht der Offerte am Link, Ausweis ist der versand_token',
+  'betreiber_beleg_entscheidung.php': 'Annehmen/Ablehnen am selben Link, nur POST',
+};
 // Beide Formen zaehlen: require_betreiber() weist aus, wer jemand ist,
 // require_betreiber_voll() zusaetzlich, dass sein zweiter Faktor steht.
 const WACHE = /require_betreiber(?:_voll)?\s*\(/;
 const ohneWache = endpunkte.filter(f =>
-  !EINSTIEG[f] && !WACHE.test(nurCode(lies(`backend/api/${f}`))));
+  !EINSTIEG[f] && !OEFFENTLICH[f] && !WACHE.test(nurCode(lies(`backend/api/${f}`))));
 check('KRITISCH: jeder betreiber_*-Endpunkt ruft require_betreiber() oder steht namentlich da',
   ohneWache.length === 0);
 if (ohneWache.length) { bad.push('ohne Wache: ' + ohneWache.join(', ')); }
@@ -82,10 +95,19 @@ if (ohneWache.length) { bad.push('ohne Wache: ' + ohneWache.join(', ')); }
 // dagegen ohne Bedingung ruft, ist kein Einstiegspunkt mehr und gehoert
 // aus der Liste.
 const WACHE_IMMER = /^require_betreiber(?:_voll)?\s*\(/m;
-const unnoetigBefreit = Object.keys(EINSTIEG).filter(f =>
+const unnoetigBefreit = [...Object.keys(EINSTIEG), ...Object.keys(OEFFENTLICH)].filter(f =>
   endpunkte.includes(f) && WACHE_IMMER.test(nurCode(lies(`backend/api/${f}`))));
 check('kein Einstiegspunkt steht unnoetig in der Ausnahmeliste',
   unnoetigBefreit.length === 0);
+// Und die eigentliche Aussage hinter der Ausnahme: Eine oeffentliche Seite
+// ist nur so lange vertretbar, wie ihr Ausweis tatsaechlich der
+// versand_token ist. Faende sich dort etwas anderes -- eine Kennung aus der
+// URL, ein Name, eine laufende Nummer --, waere die Begruendung hinfaellig.
+const ohneVersandToken = Object.keys(OEFFENTLICH).filter(f =>
+  endpunkte.includes(f) && !nurCode(lies(`backend/api/${f}`)).includes('versand_token'));
+check('KRITISCH: jede oeffentliche Beleg-Seite weist sich ueber versand_token aus',
+  ohneVersandToken.length === 0);
+if (ohneVersandToken.length) { bad.push('ohne versand_token: ' + ohneVersandToken.join(', ')); }
 
 // Die Einrichtung darf nicht ohne JEDE Anmeldung laufen -- ein Endpunkt,
 // der sich selbst freischaltet, solange eine Tabelle leer ist, ist offen,
@@ -114,8 +136,18 @@ check('KRITISCH: wer betreiber_sessions ueber den token anspricht, benutzt sitzu
 if (ohneAbdruck.length) { bad.push('ohne Abdruck: ' + ohneAbdruck.map(([n]) => n).join(', ')); }
 // Zweite, unabhaengige Aussage: Der Rohwert darf nirgends direkt in eine
 // Abfrage wandern. Genau das war der Fehler, den ENT-501 aufgeraeumt hat.
+// Der versand_token eines Belegs ist KEIN Sitzungsausweis und bleibt roh --
+// ENT-501 nimmt ihn ausdruecklich aus: Ein Abdruck liesse sich nicht mehr
+// verschicken. Ausgenommen ist darum nur, wer betreiber_sessions gar nicht
+// anfasst; wer beides tut, faellt weiter durch.
+const ROHTOKEN_LINK = {
+  'betreiber_beleg_oeffentlich.php': 'versand_token, kein Sitzungsausweis (ENT-501)',
+  'betreiber_beleg_entscheidung.php': 'versand_token, kein Sitzungsausweis (ENT-501)',
+  'betreiber_beleg_versenden.php':   'erzeugt den versand_token und legt ihn am Beleg ab',
+};
 const rohDurchgereicht = [['modul', modul], ...endpunkte.map(f => [f, lies(`backend/api/${f}`)])]
-  .filter(([, q]) => /execute\(\s*\[\s*\$token\b/.test(nurCode(q)));
+  .filter(([n, q]) => /execute\(\s*\[\s*\$token\b/.test(nurCode(q))
+    && !(ROHTOKEN_LINK[n] && !nurCode(q).includes('betreiber_sessions')));
 check('KRITISCH: der Rohtoken wird nie direkt in eine Abfrage gegeben',
   rohDurchgereicht.length === 0);
 if (rohDurchgereicht.length) { bad.push('Rohtoken in Abfrage: ' + rohDurchgereicht.map(([n]) => n).join(', ')); }
@@ -323,7 +355,8 @@ const NUR_EINFACHE_WACHE = {
   'betreiber_abmelden.php':       'abmelden muss immer moeglich sein',
 };
 const VOLLWACHE = /require_betreiber_voll\s*\(/;
-const brauchtVoll = endpunkte.filter(f => !EINSTIEG[f] && !NUR_EINFACHE_WACHE[f]);
+const brauchtVoll = endpunkte.filter(f =>
+  !EINSTIEG[f] && !OEFFENTLICH[f] && !NUR_EINFACHE_WACHE[f]);
 const ohneVoll = brauchtVoll.filter(f => !VOLLWACHE.test(nurCode(lies(`backend/api/${f}`))));
 check('KRITISCH: jeder Betreiber-Endpunkt verlangt den zweiten Faktor oder steht namentlich da',
   ohneVoll.length === 0);

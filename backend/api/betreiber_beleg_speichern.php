@@ -1,0 +1,148 @@
+<?php
+// Beleg der Betreiberin anlegen oder aendern, samt Positionen (ENT-605).
+//
+// EIN Endpunkt fuer beides. Alles laeuft in EINER Transaktion: Kopfdaten,
+// Positionen und die daraus gerechneten Summen gehoeren zusammen -- ein
+// Beleg mit neuen Positionen und alten Summen waere schlimmer als gar kein
+// Beleg.
+//
+// DIE SUMMEN AUS DER EINGABE WERDEN IGNORIERT. Der Browser schickt sie mit,
+// weil er sie fuer die Live-Anzeige ohnehin gerechnet hat -- gespeichert
+// wird ausschliesslich, was beleg_summen_schreiben() aus den tatsaechlich
+// abgelegten Positionen ermittelt. Was auf ein Kundendokument geht, rechnet
+// der Server, und zwar mit derselben Funktion wie beim Mandanten.
+declare(strict_types=1);
+require __DIR__ . '/../db.php';
+require_once __DIR__ . '/../betreiber.php';
+require_once __DIR__ . '/../belege.php';
+
+require_betreiber_voll();
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    json_response(['status' => 'error', 'message' => 'nur POST'], 405);
+}
+
+$pdo = betreiber_db();
+if (!hat_tabelle($pdo, 'be_belege')) {
+    json_response(['status' => 'error',
+        'message' => 'Der Offertenteil ist noch nicht eingerichtet.'], 503);
+}
+
+$in  = json_decode(file_get_contents('php://input'), true) ?? [];
+$id  = (int)($in['id'] ?? 0);
+$art = (string)($in['art'] ?? 'offerte');
+if (!beleg_art_gueltig($art)) {
+    json_response(['status' => 'error', 'message' => 'Unbekannte Belegart'], 400);
+}
+
+$status = (string)($in['status'] ?? 'entwurf');
+if (!beleg_status_gueltig($status)) {
+    json_response(['status' => 'error', 'message' => 'Unbekannter Status'], 400);
+}
+
+$datum = (string)($in['datum'] ?? '');
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $datum)) {
+    json_response(['status' => 'error', 'message' => 'Ein Datum ist erforderlich.'], 400);
+}
+$gueltigBis = (string)($in['gueltig_bis'] ?? '');
+$gueltigBis = preg_match('/^\d{4}-\d{2}-\d{2}$/', $gueltigBis) ? $gueltigBis : null;
+// Ein Ablaufdatum VOR dem Offertendatum ist keine Frist, sondern ein
+// Tippfehler -- und eine Offerte, die schon abgelaufen ist, bevor sie
+// geschrieben wurde, stuende in jeder Liste falsch einsortiert.
+if ($gueltigBis !== null && $gueltigBis < $datum) {
+    json_response(['status' => 'error',
+        'message' => '„Gültig bis" liegt vor dem Offertendatum.'], 400);
+}
+$faelligBis = (string)($in['faellig_bis'] ?? '');
+$faelligBis = preg_match('/^\d{4}-\d{2}-\d{2}$/', $faelligBis) ? $faelligBis : null;
+if ($faelligBis !== null && $faelligBis < $datum) {
+    json_response(['status' => 'error',
+        'message' => '„Fällig am" liegt vor dem Rechnungsdatum.'], 400);
+}
+
+// Der Empfaenger muss aus dem eigenen Adressbestand kommen. Geprueft wird
+// das hier und nicht in der Oberflaeche: Eine kunde_id, die auf nichts
+// zeigt, ergaebe eine Offerte ohne Empfaenger, und der Versand liefe ins
+// Leere.
+$kundeId = ($in['kunde_id'] ?? null) ? (int)$in['kunde_id'] : null;
+if ($kundeId !== null) {
+    $chk = $pdo->prepare('SELECT id FROM be_kunden WHERE id = ?');
+    $chk->execute([$kundeId]);
+    if (!$chk->fetch()) {
+        json_response(['status' => 'error', 'message' => 'Empfänger nicht gefunden'], 400);
+    }
+}
+$personId = ($in['person_id'] ?? null) ? (int)$in['person_id'] : null;
+if ($personId !== null) {
+    $chk = $pdo->prepare('SELECT id FROM be_kunden_person WHERE id = ? AND kunde_id = ?');
+    $chk->execute([$personId, (int)$kundeId]);
+    if (!$chk->fetch()) { $personId = null; }
+}
+
+$kopf = [
+    'kunde_id'    => $kundeId,
+    'person_id'   => $personId,
+    'titel'       => mb_substr(trim((string)($in['titel'] ?? '')), 0, 200),
+    'referenz'    => mb_substr(trim((string)($in['referenz'] ?? '')), 0, 100),
+    'datum'       => $datum,
+    'gueltig_bis' => $gueltigBis,
+    'faellig_bis' => $faelligBis,
+    'status'      => $status,
+    'bemerkung'   => trim((string)($in['bemerkung'] ?? '')),
+    'ist_vorlage' => !empty($in['ist_vorlage']) ? 1 : 0,
+    'unterschriftsseite'   => !empty($in['unterschriftsseite']) ? 1 : 0,
+    'oeffentliche_notizen' => trim((string)($in['oeffentliche_notizen'] ?? '')),
+    'bedingungen'          => trim((string)($in['bedingungen'] ?? '')),
+    'fusszeile_text'       => trim((string)($in['fusszeile_text'] ?? '')),
+];
+$rabattBp = max(0, min(10000, (int)round((float)($in['rabatt_bp'] ?? 0))));
+
+// Leere Zeilen fallen weg. Eine Zeile gilt als leer, wenn sie weder Namen
+// noch Beschreibung noch Preis traegt -- ein reiner Textblock (Preis 0, aber
+// mit Text) muss bleiben, den gibt es auf jeder zweiten Offerte.
+$positionen = [];
+foreach ((array)($in['positionen'] ?? []) as $p) {
+    $z = beleg_position_lesen((array)$p);
+    if ($z['produkt_name'] === '' && $z['beschreibung'] === '' && $z['einzelpreis_rappen'] === 0) {
+        continue;
+    }
+    $positionen[] = $z;
+}
+
+$pdo->beginTransaction();
+try {
+    if ($id > 0) {
+        $chk = $pdo->prepare('SELECT id FROM be_belege WHERE id = ?');
+        $chk->execute([$id]);
+        if (!$chk->fetch()) {
+            $pdo->rollBack();
+            json_response(['status' => 'error', 'message' => 'Beleg nicht gefunden'], 404);
+        }
+        $satz = implode(', ', array_map(fn($f) => "$f = ?", array_keys($kopf)));
+        $pdo->prepare("UPDATE be_belege SET $satz WHERE id = ?")
+            ->execute(array_merge(array_values($kopf), [$id]));
+        $nummer = null;
+    } else {
+        // Die Nummer vergibt ausschliesslich der Server, fortlaufend und
+        // danach unveraenderlich -- ein mitgeschicktes Feld wird bewusst
+        // nicht gelesen.
+        $nummer  = beleg_naechste_nummer($pdo, $art, 'be_');
+        $spalten = array_merge(['art', 'nummer'], array_keys($kopf));
+        $werte   = array_merge([$art, $nummer], array_values($kopf));
+        $pdo->prepare(
+            'INSERT INTO be_belege (' . implode(', ', $spalten) . ') VALUES (?'
+            . str_repeat(', ?', count($spalten) - 1) . ')'
+        )->execute($werte);
+        $id = (int)$pdo->lastInsertId();
+    }
+
+    beleg_positionen_schreiben($pdo, $id, $positionen, 'be_');
+    $summen = beleg_summen_schreiben($pdo, $id, $rabattBp, 'be_');
+    $pdo->commit();
+} catch (Throwable $e) {
+    $pdo->rollBack();
+    throw $e;
+}
+
+$antwort = ['status' => 'ok', 'id' => $id, 'summen' => $summen];
+if ($nummer !== null) { $antwort['nummer'] = $nummer; }
+json_response($antwort);
