@@ -424,7 +424,17 @@ function db_fehlermeldung(Throwable $e): string {
 // Haeufigster Fall im Alltag ist eine noch nicht ausgefuehrte Schemadatei --
 // darauf wird ausdruecklich hingewiesen, statt den Fehler zu verschlucken.
 set_exception_handler(function (Throwable $e): void {
-    // Bewusst ohne technische Einzelheiten: die Meldung geht an den Browser.
+    // INS PROTOKOLL, bevor die Meldung entschaerft wird. Die Meldung an den
+    // Browser bleibt bewusst ohne technische Einzelheiten -- fuer einen
+    // Fehler ausserhalb der Datenbank ist das aber nur "Unerwarteter
+    // Serverfehler", also gar keine Aussage. Genau daran ist der
+    // oeffentliche Demo-Zugang am 2026-09-18 sieben Anlaeufe lang
+    // haengengeblieben: Die Ursache (eine nicht geladene Funktion) stand
+    // nirgends, weil sie hier verworfen wurde, und jeder Anlauf musste
+    // erraten werden. Was der Browser nicht sehen darf, gehoert ins
+    // Serverprotokoll -- nicht in den Papierkorb.
+    error_log(get_class($e) . ' in ' . $e->getFile() . ':' . $e->getLine()
+        . ' -- ' . $e->getMessage());
     json_response(['status' => 'error', 'message' => db_fehlermeldung($e)], 500);
 });
 
