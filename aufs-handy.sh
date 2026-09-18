@@ -138,41 +138,43 @@ if [ "$SAUBER" = "sauber" ]; then
 fi
 
 echo "── 4/5  iPhone suchen"
-# Alles ab "== Simulators ==" wird abgeschnitten: Sonst gewinnt ein
-# Simulator das Rennen, und die App landet wieder nicht auf dem Geraet.
-GERAET="$(xcrun xctrace list devices 2>/dev/null \
+# ACHTUNG, hier liegt eine Falle: Apples zwei Werkzeuge fuehren DASSELBE
+# Geraet unter ZWEI verschiedenen Kennungen.
+#
+#   xctrace / xcodebuild : 00008130-000974693AF3803A  (UDID der Hardware)
+#   devicectl            : F0778C89-7B3B-...-...      (CoreDevice-Kennung)
+#
+# Beide werden gebraucht, jede an ihrer Stelle. Wer die eine dem anderen
+# Werkzeug gibt, bekommt "Invalid target ID" oder findet das Geraet
+# scheinbar nicht -- obwohl es angeschlossen und freigegeben ist.
+
+# Fuer xcodebuild. Alles ab "== Simulators ==" wird abgeschnitten, sonst
+# gewinnt ein Simulator das Rennen und die App landet nicht auf dem Geraet.
+UDID="$(xcrun xctrace list devices 2>/dev/null \
   | sed -n '1,/== Simulators ==/p' \
   | grep -i "iPhone" | head -1 \
   | sed -E 's/.*\(([0-9A-Fa-f-]{25,})\).*/\1/' || true)"
 
-if [ -z "$GERAET" ]; then
-  echo ""
-  echo "  Kein iPhone gefunden. Das hat fast immer einen dieser Gruende:"
-  echo "    - Kabel steckt nicht, oder es ist ein reines Ladekabel"
-  echo "    - iPhone ist gesperrt (entsperren und angesteckt lassen)"
-  echo "    - 'Diesem Computer vertrauen?' wurde noch nicht bestaetigt"
-  echo ""
-  echo "  Angeschlossen ist laut System:"
-  xcrun xctrace list devices 2>/dev/null | sed -n '1,/== Simulators ==/p' | sed 's/^/    /'
-  exit 1
-fi
-echo "        $GERAET"
+# Fuer devicectl. Die Kopfzeile der Tabelle traegt das Wort "Identifier"
+# und wird darum ausgelassen; der Hostname enthaelt ebenfalls "iPhone",
+# stoert aber nicht, weil nur das UUID-Muster gelesen wird.
+DEVCTL="$(xcrun devicectl list devices 2>/dev/null \
+  | grep -i "iPhone" | grep -v "Identifier" | head -1 \
+  | grep -oE '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}' \
+  | head -1 || true)"
 
-# Vor dem Bauen nachsehen, ob Apples eigenes Werkzeug das Geraet auch
-# kennt -- sonst laeuft ein mehrminuetiger Bau durch und scheitert erst
-# beim Installieren.
-if ! xcrun devicectl list devices 2>/dev/null | grep -q "$GERAET"; then
+if [ -z "$UDID" ] || [ -z "$DEVCTL" ]; then
   echo ""
-  echo "  Das iPhone taucht in der Liste, aber nicht bei devicectl auf."
-  echo "  Meist fehlt die Freigabe auf dem Geraet selbst:"
-  echo "    - iPhone entsperren und 'Diesem Computer vertrauen' bestaetigen"
-  echo "    - Einstellungen > Datenschutz & Sicherheit > Entwicklermodus: ein"
-  echo "      (danach startet das iPhone neu)"
+  echo "  Kein einsatzbereites iPhone gefunden."
+  [ -z "$UDID" ]   && echo "    - xcodebuild sieht keines (Kabel, Sperre, Vertrauensfrage?)"
+  [ -z "$DEVCTL" ] && echo "    - devicectl sieht keines (Entwicklermodus eingeschaltet?)"
   echo ""
-  echo "  devicectl sieht derzeit:"
+  echo "  Was die beiden Werkzeuge melden:"
+  xcrun xctrace list devices 2>/dev/null | sed -n '1,/== Simulators ==/p' | sed 's/^/    /'
   xcrun devicectl list devices 2>&1 | sed 's/^/    /'
   exit 1
 fi
+echo "        gefunden (Bau: ${UDID}, Installation: ${DEVCTL})"
 
 echo "── 5/5  Bauen, installieren, starten"
 # Bewusst NICHT "npx cap run ios": Dessen Hilfsprogramm native-run kennt
@@ -191,7 +193,7 @@ xcodebuild \
   -workspace ios/App/App.xcworkspace \
   -scheme App \
   -configuration Debug \
-  -destination "id=$GERAET" \
+  -destination "id=$UDID" \
   -derivedDataPath "$DD" \
   -allowProvisioningUpdates \
   build
@@ -209,9 +211,9 @@ fi
 APPID="$(python3 -c "import json;print(json.load(open('capacitor.config.json'))['appId'])")"
 
 echo "        installieren"
-xcrun devicectl device install app --device "$GERAET" "$APP"
+xcrun devicectl device install app --device "$DEVCTL" "$APP"
 echo "        starten"
-xcrun devicectl device process launch --device "$GERAET" "$APPID"
+xcrun devicectl device process launch --device "$DEVCTL" "$APPID"
 
 echo ""
 echo "Fertig. Die App laeuft auf dem iPhone."
