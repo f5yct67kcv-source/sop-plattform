@@ -1,1 +1,18 @@
 CAPACITOR_DEBUG = true
+
+// Persoenliche Signier-Einstellungen, allen voran DEVELOPMENT_TEAM.
+// Die Team-Kennung gehoert zum Apple-Entwicklerkonto einer Person und
+// steht darum nicht im Repository -- wie APNS_TEAM_ID, die ebenfalls als
+// Secret liegt. lokal.xcconfig steht in .gitignore; aufs-handy.sh legt
+// sie beim ersten Lauf selbst an.
+//
+// Das Fragezeichen macht die Zeile ungefaehrlich: Fehlt die Datei,
+// ueberliest Xcode sie wortlos, statt den Bau abzubrechen.
+//
+// Warum ueberhaupt hier und nicht im Projekt: Traegt man das Team in
+// Xcode ueber die Oberflaeche ein, landet es in project.pbxproj -- einer
+// versionierten Datei. Die Einstellung ist dann eine dauerhafte lokale
+// Aenderung, die jedem "git pull" im Weg steht und beim Wegraeumen still
+// verschwindet. Genau so ging sie beim ersten Lauf von aufs-handy.sh
+// verloren, und der Bau brach mit "requires a development team" ab.
+#include? "lokal.xcconfig"

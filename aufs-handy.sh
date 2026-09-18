@@ -22,6 +22,53 @@ SAUBER="${2:-}"
 
 cd "$(dirname "$0")"
 
+# ── Signier-Team ──────────────────────────────────────────────────────
+# Ohne DEVELOPMENT_TEAM bricht der Bau ab ("Signing for App requires a
+# development team"). Die Kennung gehoert zum Apple-Konto einer Person und
+# steht nicht im Repository; sie landet in mobile/ios/lokal.xcconfig, die
+# debug.xcconfig optional einbindet.
+#
+# Gesucht wird in vier Quellen, weil die Kennung je nach Vorgeschichte
+# woanders liegt -- beim ersten Lauf typischerweise im Stash, wo die
+# frueher in Xcode gesetzte Projektaenderung gelandet ist.
+team_finden() {
+  local t=""
+
+  # 1. Schon eingerichtet.
+  if [ -f mobile/ios/lokal.xcconfig ]; then
+    t="$(sed -n 's/^[[:space:]]*DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*\([A-Z0-9]\{8,\}\).*/\1/p' mobile/ios/lokal.xcconfig | head -1 || true)"
+    [ -n "$t" ] && { echo "$t"; return; }
+  fi
+
+  # 2. Von Hand hinterlegt.
+  if [ -f mobile/.team-id ]; then
+    t="$(tr -dc 'A-Z0-9' < mobile/.team-id || true)"
+    [ -n "$t" ] && { echo "$t"; return; }
+  fi
+
+  # 3. Aus einem Stash: Dort liegt die Einstellung, wenn sie frueher ueber
+  #    Xcode ins Projekt geschrieben und spaeter weggeraeumt wurde.
+  local s
+  for s in $(git stash list --format='%gd' 2>/dev/null); do
+    t="$(git stash show -p "$s" 2>/dev/null \
+      | sed -n 's/^+.*DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*\([A-Z0-9]\{8,\}\).*/\1/p' | head -1 || true)"
+    [ -n "$t" ] && { echo "$t"; return; }
+  done
+
+  # 4. Aus einem installierten Bereitstellungsprofil. Zuverlaessiger als
+  #    der Name des Zertifikats, in dem die Klammer nicht immer die
+  #    Team-Kennung traegt.
+  local p
+  for p in "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision; do
+    [ -f "$p" ] || continue
+    t="$(security cms -D -i "$p" 2>/dev/null \
+      | plutil -extract TeamIdentifier.0 raw -o - - 2>/dev/null || true)"
+    [ -n "$t" ] && { echo "$t"; return; }
+  done
+
+  echo ""
+}
+
 echo "── 1/5  Stand holen ($ZWEIG)"
 # Angefangene Arbeit wird beiseitegelegt, nicht weggeworfen: Ohne das
 # bricht "git pull" ab, sobald irgendetwas geaendert ist -- auch der
@@ -34,6 +81,33 @@ fi
 git fetch origin "$ZWEIG"
 git checkout "$ZWEIG"
 git pull origin "$ZWEIG"
+
+echo "── 1b/5 Signier-Team pruefen"
+# Nach dem Stash oben, damit eine gerade weggeraeumte Einstellung noch
+# gefunden wird.
+# Nicht nur "Datei da?": Eine vorhandene Datei ohne gueltige Kennung
+# haette der Bau erst beim Signieren bemerkt. team_finden() liest sie als
+# erste Quelle und geht weiter, wenn nichts Brauchbares drinsteht.
+TEAM="$(team_finden)"
+if [ -z "$TEAM" ]; then
+  echo ""
+  echo "  Kein Signier-Team gefunden. Ohne das kann Xcode die App nicht"
+  echo "  signieren, und der Bau bricht ab."
+  echo ""
+  echo "  Die Kennung steht in Xcode unter:"
+  echo "    Xcode > Settings > Accounts > Apple-ID auswaehlen > Team"
+  echo "  Es sind zehn Zeichen, Grossbuchstaben und Ziffern."
+  echo ""
+  echo "  Danach einmalig ablegen (Kennung einsetzen) und neu starten:"
+  echo "    echo 'DEVELOPMENT_TEAM = DEINEKENNUNG' > mobile/ios/lokal.xcconfig"
+  exit 1
+fi
+if grep -q "DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*$TEAM" mobile/ios/lokal.xcconfig 2>/dev/null; then
+  echo "        vorhanden"
+else
+  printf 'DEVELOPMENT_TEAM = %s\n' "$TEAM" > mobile/ios/lokal.xcconfig
+  echo "        gefunden und in mobile/ios/lokal.xcconfig abgelegt"
+fi
 
 echo "── 2/5  Buendel erzeugen"
 # Muss NACH dem Pull laufen: cap sync kopiert nur, was hier entsteht.
@@ -65,7 +139,7 @@ echo "── 4/5  iPhone suchen"
 GERAET="$(xcrun xctrace list devices 2>/dev/null \
   | sed -n '1,/== Simulators ==/p' \
   | grep -i "iPhone" | head -1 \
-  | sed -E 's/.*\(([0-9A-Fa-f-]{25,})\).*/\1/')"
+  | sed -E 's/.*\(([0-9A-Fa-f-]{25,})\).*/\1/' || true)"
 
 if [ -z "$GERAET" ]; then
   echo ""

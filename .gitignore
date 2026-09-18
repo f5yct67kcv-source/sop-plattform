@@ -45,6 +45,14 @@ mobile/node_modules/
 # darum nie ins Repository.
 mobile/.maps-key
 
+# Persoenliche Signier-Einstellungen fuer Xcode, vor allem
+# DEVELOPMENT_TEAM. Die Kennung gehoert zum Apple-Entwicklerkonto einer
+# Person, nicht zum Projekt -- dieselbe Ueberlegung wie bei APNS_TEAM_ID,
+# das als GitHub Secret liegt. debug.xcconfig bindet die Datei optional
+# ein, aufs-handy.sh legt sie beim ersten Lauf an.
+mobile/ios/lokal.xcconfig
+mobile/.team-id
+
 # Ausgabe von staging-htaccess-bauen.py (ENT-538). Sie traegt den
 # Passwortschutz-Block aus der Staging-.htaccess von Hostpoint -- also
 # fremde Konfiguration und moeglicherweise Pfade, die niemanden etwas
