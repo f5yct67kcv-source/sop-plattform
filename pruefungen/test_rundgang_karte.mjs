@@ -257,6 +257,16 @@ check('Ein offener Punkt trägt seine Listen-Nummer als Zeichen',
     rgKartePunkteZeichnen(rgKarteDaten(rundgangAktiv.kontrollpunkte).zeigbar);
     return document.querySelector('#rgsKarte .gm-mock-marker').dataset.zeichen === '1';
   }));
+  // Gemessen am gezeichneten Zustand, nicht am Objekt: Die Marke traegt
+  // ihr Zeichen im Dokument, und genau das liest der Waechter.
+  check('KRITISCH: die gezeichneten Marken tragen dieselben Zeichen',
+    await page.evaluate(() => {
+      const soll = rgKarteDaten(rundgangAktiv.kontrollpunkte).zeigbar
+        .map(p => rgPunktZustand(p).zeichen).sort().join('|');
+      const ist = [...document.querySelectorAll('#rgsKarte [data-zeichen]')]
+        .map(e => e.dataset.zeichen).sort().join('|');
+      return soll.length > 0 && soll === ist;
+    }));
 // Ein Tipp auf die Marke fuehrt in die Liste: Die Bestaetigung haengt an
 // Standortpruefung, Ersatzscan und Aufgaben-Rueckfrage -- die alle in eine
 // Kartenblase zu holen hiesse, denselben Ablauf ein zweites Mal zu bauen.
@@ -772,6 +782,32 @@ check('KRITISCH: mit der Klasse ist die Kartenhülle gemessen durchsichtig',
   await page.waitForTimeout(250);
   check('KRITISCH: das Verlassen der Runde nimmt die Durchsicht weg',
     (await durchsicht()) === false);
+}
+
+// ══════════ EINE QUELLE FÜR FARBE UND ZEICHEN (ENT-609) ═══════════════
+// Beide Kartenfassungen färben die Kontrollpunkte gleich. Stünde die Regel
+// zweimal da, liefe sie irgendwann auseinander, ohne dass etwas
+// kaputtginge -- die App zeigte dann in der Hülle andere Farben als im
+// Browser.
+{
+  const zustand = (erledigt, nr) => page.evaluate(
+    ([e, n]) => rgPunktZustand({ erledigt: e, nr: n }), [erledigt, nr]);
+
+  const offen = await zustand(null, 3);
+  const fertig = await zustand('bestaetigt', 3);
+  const abweichend = await zustand('ersatz', 3);
+
+  check('KRITISCH: ein offener Punkt trägt seine Nummer',
+    offen.zeichen === '3');
+  check('KRITISCH: ein bestätigter trägt den Haken, nicht die Nummer',
+    fertig.zeichen === '✓');
+  check('KRITISCH: ein abweichend gemeldeter trägt das Ausrufezeichen',
+    abweichend.zeichen === '!');
+  // Drei Zustände, drei Farben -- zwei gleiche wären eine Aussage weniger.
+  check('KRITISCH: die drei Zustände haben drei verschiedene Farben',
+    new Set([offen.farbe, fertig.farbe, abweichend.farbe]).size === 3);
+  // Und die gezeichnete Karte nimmt wirklich diese Quelle, statt die
+  // Regel ein zweites Mal zu führen.
 }
 
 await browser.close();

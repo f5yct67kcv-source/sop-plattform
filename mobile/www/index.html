@@ -8278,6 +8278,11 @@ async function rgKarteNativAbbauen() {
   if (!rgsNativKarte) { return; }
   const weg = rgsNativKarte;
   rgsNativKarte = null;
+  // Die Kreise haengen an der Karte, die gleich verschwindet. Sie muessen
+  // auch VERGESSEN werden, sonst haelt die App Kennungen fuer gueltig, die
+  // zu keiner Karte mehr gehoeren -- dieselbe Falle wie bei der
+  // Standortmarke in ENT-331.
+  rgsNativKreise = [];
   try { await weg.destroy(); } catch (e) {}
 }
 
@@ -8664,10 +8669,84 @@ async function rgKarteNativBauen(d, bauLauf) {
   if (bauLauf !== rgsKarteBauLauf) { rgKarteNativAbbauen(); return; }
   rgsKarteEl = el;
   document.body.classList.add('karte-nativ');
+  // Ausschnitt AUSDRUECKLICH setzen, obwohl er schon in der Erzeugung
+  // stand. Gemessen am Geraet: Die Karte kam ueber halb Mitteleuropa
+  // heraus statt ueber dem Kontrollpunkt -- die Angaben aus der Erzeugung
+  // sind offenbar noch nicht wirksam, wenn die Ansicht ihre endgueltige
+  // Groesse erst danach bekommt. Ein zweiter, ausdruecklicher Schritt
+  // kostet nichts und steht nicht im Zweifel.
+  await rgKarteNativAusschnitt(d, false);
+  // Der eigene Standort als NATIVE Anzeige (ENT-609, Entscheidung des
+  // Projektinhabers): der eingebaute Punkt samt Richtungskegel und
+  // Ungenauigkeit. Er dreht stufenlos mit und muss nicht nachgebaut
+  // werden -- eine Marke im SDK kann sich gar nicht drehen. Sieht anders
+  // aus als das weisse Schild der Browser-Fassung, und das ist so
+  // gewollt.
+  try { await rgsNativKarte.enableCurrentLocation(true); } catch (e) {}
+  await rgKarteNativKreiseZeichnen(d.zeigbar);
   // Den Hinweis erst entfernen, wenn die Karte wirklich steht -- dieselbe
   // Reihenfolge wie in der Browser-Fassung.
   const stand = $('rgsKarteStand');
   if (stand) { stand.remove(); }
+}
+
+/* Die Geofence-Radien auf der nativen Karte (ENT-609).
+
+   Die Marken mit Nummer, Haken und Ausrufezeichen fehlen hier noch: Das
+   native SDK zeichnet keine Vektorsymbole, dafuer braucht es Bilddateien,
+   die beim Bauen erzeugt werden. Die Kreise gehen ohne das -- und sie
+   sind es, die zeigen, wo der Punkt gilt und wie weit er reicht.
+
+   Farbe und Zustand kommen aus rgPunktZustand, derselben Quelle wie in
+   der Browser-Fassung. */
+let rgsNativKreise = [];
+async function rgKarteNativKreiseZeichnen(punkte) {
+  if (!rgsNativKarte) { return; }
+  try {
+    if (rgsNativKreise.length) {
+      await rgsNativKarte.removeCircles(rgsNativKreise);
+      rgsNativKreise = [];
+    }
+    if (!punkte || !punkte.length) { return; }
+    rgsNativKreise = await rgsNativKarte.addCircles(punkte.map(p => {
+      const { farbe } = rgPunktZustand(p);
+      return {
+        center: { lat: p.lat, lng: p.lng }, radius: p.radius,
+        strokeColor: farbe, strokeOpacity: 0.7, strokeWeight: 1,
+        fillColor: farbe, fillOpacity: 0.12,
+      };
+    })) || [];
+  } catch (e) { rgsNativKreise = []; }
+}
+
+/* Ausschnitt der nativen Karte: ein Punkt wird angefahren, mehrere werden
+   eingepasst. Dieselbe Regel wie in der Browser-Fassung -- bei einem
+   einzelnen Punkt sagt "einpassen" nichts, weil es nichts einzupassen
+   gibt, und die Karte landete auf einer Zoomstufe, die vom Zufall
+   abhaengt. */
+async function rgKarteNativAusschnitt(d, weich) {
+  if (!rgsNativKarte || !d || !d.zeigbar.length) { return; }
+  try {
+    if (d.zeigbar.length === 1) {
+      await rgsNativKarte.setCamera({
+        coordinate: { lat: d.zeigbar[0].lat, lng: d.zeigbar[0].lng },
+        zoom: 17, animate: !!weich,
+      });
+      return;
+    }
+    let sN = -90, sS = 90, sO = -180, sW = 180;
+    d.zeigbar.forEach(p => {
+      if (p.lat > sN) { sN = p.lat; }
+      if (p.lat < sS) { sS = p.lat; }
+      if (p.lng > sO) { sO = p.lng; }
+      if (p.lng < sW) { sW = p.lng; }
+    });
+    await rgsNativKarte.fitBounds({
+      southwest: { lat: sS, lng: sW },
+      center: { lat: (sN + sS) / 2, lng: (sO + sW) / 2 },
+      northeast: { lat: sN, lng: sO },
+    }, 48);
+  } catch (e) {}
 }
 
 /* Was sich an der nativen Karte ohne Neubau aendert. Vorerst nur das, was
@@ -8813,15 +8892,25 @@ function rgFuellungNachfuehren() {
 
 // Nummer, "nicht verfuegbar"/Ersatzscan tragen ein Ausrufezeichen. Wer die
 // Farben nicht unterscheidet, liest die Zeichen.
+/* Farbe und Zeichen eines Kontrollpunkts -- EINE Quelle fuer beide
+   Kartenfassungen (ENT-609). Stuenden sie zweimal da, faerbte die App in
+   der Huelle irgendwann anders als im Browser, ohne dass etwas
+   kaputtginge. */
+function rgPunktZustand(p) {
+  const fertig = p.erledigt === 'bestaetigt';
+  const abweichend = p.erledigt && p.erledigt !== 'bestaetigt';
+  return {
+    farbe: fertig ? '#4FCE96' : abweichend ? '#E2B156' : '#7098F7',
+    zeichen: fertig ? '✓' : abweichend ? '!' : String(p.nr),
+  };
+}
+
 function rgKartePunkteZeichnen(punkte) {
   rgsKartenMarken.forEach(m => m.setMap(null));
   rgsKartenKreise.forEach(k => k.setMap(null));
   rgsKartenMarken = []; rgsKartenKreise = [];
   punkte.forEach(p => {
-    const fertig = p.erledigt === 'bestaetigt';
-    const abweichend = p.erledigt && p.erledigt !== 'bestaetigt';
-    const farbe = fertig ? '#4FCE96' : abweichend ? '#E2B156' : '#7098F7';
-    const zeichen = fertig ? '✓' : abweichend ? '!' : String(p.nr);
+    const { farbe, zeichen } = rgPunktZustand(p);
     rgsKartenKreise.push(new google.maps.Circle({
       map: rgsKarte, center: { lat: p.lat, lng: p.lng }, radius: p.radius,
       strokeColor: farbe, strokeOpacity: 0.7, strokeWeight: 1,
@@ -9874,8 +9963,13 @@ function rgRichtungMarkeNachfuehren() {
 /* Zentrieren: alle Punkte ins Bild, danach einmalig die eigene Position
    dazuholen. Einmalig, nicht laufend -- ENT-131. */
 function rgKarteZentrieren() {
+  const dn = rgKarteDaten(rundgangAktiv ? rundgangAktiv.kontrollpunkte : []);
+  // Die native Karte zuerst: Sie hat ihren eigenen Weg, und den eigenen
+  // Standort zeichnet bei ihr das Betriebssystem. Es gibt hier also
+  // nichts zu setzen ausser dem Ausschnitt.
+  if (rgsNativKarte) { rgKarteNativAusschnitt(dn, true); return; }
   if (!rgsKarte || !window.google) { return; }
-  const d = rgKarteDaten(rundgangAktiv ? rundgangAktiv.kontrollpunkte : []);
+  const d = dn;
   if (!d.zeigbar.length) { return; }
   const grenzen = new google.maps.LatLngBounds();
   d.zeigbar.forEach(p => grenzen.extend({ lat: p.lat, lng: p.lng }));
