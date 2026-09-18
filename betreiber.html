@@ -41,6 +41,21 @@
     if (m) { m.setAttribute('content', '#0B0D11'); }
   }
 })();
+/* Liquid Glass (ENT-418, Voreinstellung nach ENT-419). Aus demselben Grund
+   vor dem ersten Zeichnen: Sonst steht die deckende Fassung einen
+   Wimpernschlag lang da und springt dann um. Eigener Block mit eigenem try,
+   damit ein Speicher, der nicht lesbar ist (privates Fenster), nicht auch
+   noch die Hell/Dunkel-Wahl darueber mitreisst.
+   Ohne gespeicherte Wahl: AN. Anders als bei hell/dunkel gibt es hier keine
+   Einstellung des Betriebssystems, die man befragen koennte. Der Vergleich
+   steht darum auf 'aus' und nicht auf 'an': Nur eine ausdrueckliche Abwahl
+   schaltet ab -- ein leerer oder unlesbarer Speicher fuehrt zur neuen
+   Fassung, nicht zur alten. */
+(function () {
+  var g = 'an';
+  try { g = localStorage.getItem('rv3_glas') === 'aus' ? 'aus' : 'an'; } catch (e) { /* egal */ }
+  document.documentElement.setAttribute('data-glas', g);
+})();
 </script>
 <style>
 /* Betreiber-Bereich (ENT-519 bis ENT-521).
@@ -64,6 +79,12 @@
   --shell:#16181D; --shell-hi:#1E2128; --shell-line:#272B33;
   --shell-txt:#9298A5; --shell-txt-hi:#F3F5F8;
   --nix:#D8DCE2;
+  /* Dieselben zwei Flaechen noch einmal in Kanaelen. Das Glas (ENT-418)
+     mischt seine Durchsicht daraus -- rgba(var(--surface-rgb), a) --, und
+     zwar ausdruecklich NICHT ueber color-mix(): Das rechnet in Chrome zu
+     "color(srgb 0.0862745 ...)", und jede Pruefung, die eine Flaechenfarbe
+     als Zahl liest, verglich danach Unsinn. Begruendung im Glas-Block. */
+  --surface-rgb:255,255,255; --shell-rgb:22,24,29;
   /* Seit ENT-605 zusaetzlich: Die aus dem Cockpit uebernommenen Bausteine
      (Karten, Tabellen, Eingabefelder, Dialoge) rechnen mit diesen Marken.
      Gleiche Werte wie dort -- ein eigener Satz hiesse, dass dieselbe Karte
@@ -93,6 +114,7 @@ html[data-thema="dunkel"] {
   --shell:#0B0D11; --shell-hi:#14171C; --shell-line:#23272F;
   --shell-txt:#8A919E; --shell-txt-hi:#F2F4F8;
   --nix:#3B4560;
+  --surface-rgb:22,27,39; --shell-rgb:11,13,17;
   --surface-3:#242C3E;
   --sh-1:none;
   --sh-2:0 8px 28px -8px rgba(0,0,0,.6);
@@ -104,10 +126,12 @@ html[data-thema="dunkel"] {
 /* Randfaelle, die sich nicht ueber einen Wert loesen lassen -- dieselben
    wie im Cockpit. Ein Eingabefeld auf --surface waere im Dunkeln nicht von
    der Karte zu unterscheiden, auf der es liegt. */
-html[data-thema="dunkel"] input,
-html[data-thema="dunkel"] select { background: var(--surface-2); }
+html[data-thema="dunkel"] input:where(:not([type="checkbox"]):not([type="radio"])),
+html[data-thema="dunkel"] select,
+html[data-thema="dunkel"] textarea { background: var(--surface-2); }
 html[data-thema="dunkel"] input:focus,
-html[data-thema="dunkel"] select:focus { background: var(--surface); }
+html[data-thema="dunkel"] select:focus,
+html[data-thema="dunkel"] textarea:focus { background: var(--surface); }
 html[data-thema="dunkel"] button.gefahr { border-color: #4A2823; }
 * { box-sizing: border-box; }
 body {
@@ -132,7 +156,17 @@ body {
    22 px: ueber dem Mindestmass der Fassung ohne Claim (20 px) und knapp
    ueber dem 16-px-Bereichsnamen -- die Marke fuehrt, ohne den Kopf
    aufzublaehen. */
-.kopf-links { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+/* min-width: 0 -- ohne das ist die Mindestbreite einer Rasterspalte der
+   laengste unzerlegbare Inhalt darin, hier die Kontozeile ("name ·
+   lange@adresse"). Bei 390 px schob sie den Kopf um 15 px ueber den
+   Bildschirm hinaus, samt Navigationsband darunter; die Seite scrollte
+   quer, und quer scrollen darf nur das Band (Hausregel). Gemessen
+   aufgefallen ist es erst, als rechts ein zweiter Schalter dazukam --
+   vorher blieb gerade noch Platz. Die Zeile kuerzt jetzt mit Auslassung,
+   statt die Seite zu verbreitern. */
+.kopf-links { display: flex; flex-direction: column; align-items: flex-start; gap: 7px;
+  min-width: 0; }
+.kopf-links .unter { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kopf-marke { height: 22px; width: auto; display: block; color: var(--shell-txt-hi); }
 .kopf .titel { font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
 .kopf .unter { font-size: 12.5px; color: var(--shell-txt); margin-top: 2px; }
@@ -176,7 +210,11 @@ body {
 .leiste h1 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
 .leiste .crumb { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
 
-.huelle { max-width: 1120px; margin: 0 auto; padding: 28px 24px 64px; }
+/* Dieselbe Inhaltsbreite und dasselbe Polster wie .content im Cockpit.
+   Vorher 1120 px: Das Offertformular stand damit schmaler als dasselbe
+   Formular dort, und ein Formular, das bei gleicher Fensterbreite anders
+   umbricht, ist nicht dasselbe Formular. */
+.huelle { max-width: 1440px; margin: 0 auto; padding: 26px 26px 64px; }
 
 /* ── Karten ───────────────────────────────────────────────────────── */
 .karte {
@@ -359,7 +397,17 @@ html[data-thema="dunkel"] .ts-schieber .i-mond  { opacity: 1; }
 }
 
 label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
-input, select {
+/* Ankreuz- und Auswahlknoepfe ausgenommen: Volle Breite, 44 px Hoehe und
+   16 px Schrift sind fuer Text- und Auswahlfelder gemeint. Ein Ankreuzfeld
+   danach zu bemessen ergibt ein 44 px hohes Kaestchen in eigener Zeile --
+   gemessen war genau das der Fall, seit der Offertenteil eines mitbringt.
+
+   Die Ausnahme steht in :where() und nicht als blosses :not(): :not()
+   zaehlt fuer die Eigenspezifitaet mit, und diese Regel haette danach
+   (0,2,1) getragen und die Klasse .inp mit ihren (0,1,0) geschlagen --
+   gemessen war jedes Feld des Offertformulars danach wieder 44 px hoch und
+   16 px gross. :where() zaehlt null, die Regel bleibt eine Element-Regel. */
+input:where(:not([type="checkbox"]):not([type="radio"])), select {
   width: 100%; min-height: 44px; padding: 0 13px;
   border: 1px solid var(--line-hi); border-radius: 9px;
   background: var(--surface); color: var(--ink);
@@ -459,18 +507,21 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
    ganze Breite und scrollen darin waagrecht -- die SEITE selbst scrollt
    nie quer, das ist der Unterschied (Hausregel).
 
-   DIE GRENZE HAENGT AN DER ZAHL DER REITER und ist GEMESSEN, nicht
-   geschaetzt: Sie lag bei fuenf Reitern bei 900 px. Mit "Adressen"
-   (ENT-605) sind es sieben, das Band ist 615 px breit, und die Mitte
-   kippt ab 1085 px nach links -- die rechte Spalte (Zahnrad,
-   Hell/Dunkel, Abmelden) laesst sich nicht weiter schmaelern, die linke
-   schon. Ein Raster 1fr auto 1fr haelt die Mitte nur, solange BEIDE
-   Aussenspalten ihren Inhalt fassen; sonst steht Mittiges zwischen zwei
-   ungleich langen Seiten statt in der Mitte des Containers.
+   DIE GRENZE HAENGT AN DER ZAHL DER REITER UND AM INHALT DER RECHTEN
+   SPALTE und ist GEMESSEN, nicht geschaetzt: Sie lag bei fuenf Reitern
+   bei 900 px, mit "Adressen" (ENT-605) und sieben Reitern bei 1090 px,
+   und seit der Glas-Schalter daneben steht (ENT-607) bei 1210 px. Die
+   rechte Spalte ist damit 256 px breit und laesst sich nicht weiter
+   schmaelern, die linke schon; gemessen haelt die Mitte bis 1208 px und
+   kippt ab 1206 px nach links. Ein Raster 1fr auto 1fr haelt die Mitte
+   nur, solange BEIDE Aussenspalten ihren Inhalt fassen; sonst steht
+   Mittiges zwischen zwei ungleich langen Seiten statt in der Mitte des
+   Containers.
 
-   Wer einen Reiter hinzufuegt oder wegnimmt, misst diese Grenze neu.
-   test_marke_portale.mjs schlaegt an, wenn sie nicht mehr stimmt. */
-@media (max-width: 1090px) {
+   Wer einen Reiter hinzufuegt oder wegnimmt -- oder rechts etwas
+   dazustellt --, misst diese Grenze neu. test_marke_portale.mjs schlaegt
+   an, wenn sie nicht mehr stimmt. */
+@media (max-width: 1210px) {
   .kopf { grid-template-columns: 1fr auto; row-gap: 10px; }
   .kopf-nav {
     grid-row: 2; grid-column: 1 / -1; justify-content: flex-start;
@@ -504,7 +555,13 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
    und .leerblock, nicht .card/.card-hd/.card-bd und .empty. */
 
 /* ── Karten, Flaechen ── */
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-1); }
+/* font-size: 14px, weil der Koerper dieser Seite auf 15 px steht und der
+   des Cockpits auf 14. Alles, was in einer Karte steht und keine eigene
+   Groesse traegt -- Tabellenzellen, Summenzeilen, Beschreibungen --, erbt
+   sie von hier. Ohne diese Zeile waere dieselbe Karte hier eine Spur
+   groesser als dort, ohne dass eine einzelne Regel daran schuld waere. */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+  box-shadow: var(--sh-1); font-size: 14px; }
 .card-hd { display: flex; align-items: center; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid var(--line-soft); }
 .card-hd h2 { font-size: 14px; font-weight: 600; letter-spacing: -.15px; margin: 0; }
 .card-hd .sp { flex: 1; }
@@ -516,21 +573,53 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
 .f { margin-bottom: 14px; }
 .f label { display: block; font-size: 11px; font-weight: 650; color: var(--ink-2);
   letter-spacing: .4px; text-transform: uppercase; margin-bottom: 6px; }
+/* min-height: 0 steht hier und bei jedem Bedienelement weiter unten, weil
+   diese Seite ihren eigenen Bausteinen weiter oben pauschal 44 px gibt
+   (`input, select` und `button, .knopf`). Diese Regeln greifen auch auf die
+   uebernommenen Bausteine durch -- sie sind Element-Regeln, und die
+   Klassenregeln hier setzen keine eigene Mindesthoehe. Gemessen war das
+   Offertformular dadurch ueberall hoeher als dasselbe Formular im Cockpit.
+   Die Hausregel "auf dem Handy mindestens 44 px" bleibt davon unberuehrt:
+   Sie steht am Ende dieses Abschnitts im @media-Block, genau wie im
+   Cockpit, und gilt dort, wo sie gemeint ist. */
 .inp { width: 100%; border: 1px solid var(--line); border-radius: var(--r-sm);
-  background: var(--surface); color: var(--ink); font: inherit; font-size: 13.5px;
-  padding: 9px 11px; }
+  padding: 9px 12px; font: inherit; font-size: 14px; color: var(--ink);
+  background: var(--surface); min-height: 0;
+  transition: border-color .13s, box-shadow .13s;
+  -webkit-appearance: none; appearance: none; }
 .inp::placeholder { color: var(--ink-3); }
 .inp:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .inp[readonly] { background: var(--surface-2); color: var(--ink-3); cursor: default; }
-.inp.num { text-align: right; font-variant-numeric: tabular-nums; }
+/* Eigener Pfeil statt des eingebauten: appearance:none oben nimmt ihn weg,
+   und ohne Ersatz saehe ein Auswahlfeld aus wie ein Textfeld. */
+select.inp { padding-right: 30px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%), linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-position: right 14px center, right 9px center;
+  background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
 textarea.inp { resize: vertical; min-height: 92px; font-family: inherit; line-height: 1.55; }
-.check { display: flex; align-items: center; gap: 9px; cursor: pointer; font-size: 13.5px; }
-.check input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
-.sec { font-size: 11.5px; color: var(--ink-3); line-height: 1.45; }
+/* font-weight ausdruecklich: Die Seite setzt `label` pauschal auf 600, das
+   Cockpit laesst es beim Normalgewicht. */
+.check { display: flex; align-items: center; gap: 9px; cursor: pointer; font-size: 13.5px;
+  font-weight: 400; color: var(--ink); margin-bottom: 0; }
+/* margin: 0 ausdruecklich: Das Cockpit raeumt mit `* { margin: 0 }` alle
+   Browser-Abstaende ab, diese Seite nicht. Der eingebaute 3-px-Rand des
+   Ankreuzfeldes machte die Zeile hier 23 statt 20 px hoch -- gemessen. */
+.check input { width: 17px; height: 17px; min-height: 0; margin: 0;
+  accent-color: var(--accent); cursor: pointer; }
+.msg-err { font-size: 12.5px; color: var(--neg); background: var(--neg-soft);
+  border-radius: var(--r-xs); padding: 8px 11px; margin-bottom: 14px; }
+/* Genau wie im Cockpit nur INNERHALB einer Tabellenzelle klein und matt.
+   Ausserhalb traegt .sec dort keine eigene Regel -- der Hinweis unter dem
+   Ankreuzfeld im Offertformular steht darum in Grundgroesse und
+   Grundfarbe, und das ist die Stelle, an der beide Seiten dasselbe zeigen
+   sollen. Fuer die Hinweise, die es hier zusaetzlich gibt und im Cockpit
+   nicht, steht .of-hinweis daneben. */
+td .sec { font-size: 11.5px; color: var(--ink-3); }
+.of-hinweis { font-size: 11.5px; color: var(--ink-3); line-height: 1.45; }
 
 /* ── Knoepfe ── */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  border: 1px solid transparent; border-radius: var(--r-sm); padding: 9px 15px;
+  border: 1px solid transparent; border-radius: var(--r-sm); padding: 9px 15px; min-height: 0;
   font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
   transition: background .13s, border-color .13s, color .13s; white-space: nowrap; text-decoration: none; }
 .btn-primary { background: var(--accent); color: #fff; }
@@ -542,14 +631,14 @@ textarea.inp { resize: vertical; min-height: 92px; font-family: inherit; line-he
 .btn-danger { background: var(--neg); color: #fff; }
 .btn:disabled { opacity: .55; cursor: default; }
 .btn-sm { padding: 6px 11px; font-size: 12px; }
-svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8;
+svg.i { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.7; fill: none;
   stroke-linecap: round; stroke-linejoin: round; flex: none; }
 svg.i-sm { width: 15px; height: 15px; }
 
 /* ── Reiter und Werkzeugleiste ── */
-.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 18px; overflow-x: auto; }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 22px; overflow-x: auto; }
 .tab { border: none; background: transparent; padding: 10px 14px 9px; font: inherit;
-  font-size: 15px; font-weight: 600; color: var(--ink-3); cursor: pointer;
+  font-size: 16px; font-weight: 600; color: var(--ink-3); cursor: pointer; min-height: 0;
   border-bottom: 2px solid transparent; white-space: nowrap; }
 .tab:hover { color: var(--ink); }
 .tab.on { color: var(--accent); border-bottom-color: var(--accent); }
@@ -595,15 +684,15 @@ tbody tr.aus td { opacity: .55; }
 .empty .ic { width: 40px; height: 40px; border-radius: 11px; background: var(--line-soft);
   color: var(--ink-3); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; }
 .empty h3 { font-size: 14px; font-weight: 650; margin: 0 0 5px; }
-.empty p { font-size: 12.5px; color: var(--ink-3); max-width: 420px; margin: 0 auto; line-height: 1.6; }
+.empty p { font-size: 12.5px; color: var(--ink-3); max-width: 380px; margin: 0 auto; line-height: 1.6; }
 
 /* ── Zeilenmenue ── */
 .rowmenu-btn { color: var(--ink-3); }
-.rowmenu-pop { position: fixed; z-index: 60; min-width: 220px; background: var(--surface);
+.rowmenu-pop { position: fixed; z-index: 60; min-width: 200px; background: var(--surface);
   border: 1px solid var(--line); border-radius: var(--r-sm); box-shadow: var(--sh-3);
   padding: 4px; display: none; }
 .rowmenu-pop.on { display: block; }
-.rowmenu-pop button { display: block; width: 100%; text-align: left; border: none;
+.rowmenu-pop button { display: block; width: 100%; min-height: 0; text-align: left; border: none;
   background: transparent; font: inherit; font-size: 13px; color: var(--ink);
   padding: 8px 11px; border-radius: var(--r-xs); cursor: pointer; }
 .rowmenu-pop button:hover { background: var(--surface-3); }
@@ -623,7 +712,8 @@ tbody tr.aus td { opacity: .55; }
   display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
 .of-dlg-huelle.on { display: flex; }
 .of-dlg { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh-3);
-  width: 100%; max-width: 560px; display: flex; flex-direction: column; max-height: calc(100vh - 80px); }
+  width: 100%; max-width: 560px; display: flex; flex-direction: column; max-height: calc(100vh - 80px);
+  font-size: 14px; }
 .of-dlg.breit { max-width: 900px; }
 .of-dlg-hd { padding: 18px 22px 14px; border-bottom: 1px solid var(--line-soft); }
 .of-dlg-hd h2 { margin: 0; font-size: 16px; }
@@ -641,11 +731,12 @@ tbody tr.aus td { opacity: .55; }
 .of-lbl-zeile { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
 .of-lbl-zeile label { margin-bottom: 0; }
 .of-schnell { border: 1px solid var(--line); background: var(--surface); border-radius: 999px;
-  padding: 1px 9px; font: inherit; font-size: 11px; font-weight: 700; color: var(--ink-3); cursor: pointer; }
+  padding: 1px 9px; min-height: 0; font: inherit; font-size: 11px; font-weight: 700;
+  color: var(--ink-3); cursor: pointer; }
 .of-schnell:hover { border-color: var(--accent); color: var(--accent); }
 .seg2 { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; flex-shrink: 0; }
-.seg2 button { border: none; background: var(--surface); padding: 9px 14px; font: inherit;
-  font-size: 13px; font-weight: 600; color: var(--ink-3); cursor: pointer; }
+.seg2 button { border: none; border-radius: 0; background: var(--surface); padding: 9px 14px;
+  min-height: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-3); cursor: pointer; }
 .seg2 button + button { border-left: 1px solid var(--line); }
 .seg2 button.on { background: var(--accent); color: #fff; }
 /* Eine Positionszeile. Raster statt Tabelle: Die Beschreibung ist
@@ -662,7 +753,12 @@ tbody tr.aus td { opacity: .55; }
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .of-pos-summe { align-self: end; padding-bottom: 9px; font-weight: 650; text-align: right; white-space: nowrap; }
 .of-pos-weg { align-self: end; }
-.of-pos textarea { min-height: 54px; margin-top: 8px; }
+/* 92 px und nicht 54 wie die gleichnamige Regel im Cockpit: Dort steht
+   `textarea.inp { min-height: 92px }` SPAETER in der Datei und gewinnt bei
+   gleicher Eigenspezifitaet -- gemessen sind es dort 92 px, nicht 54. Hier
+   steht textarea.inp frueher, darum steht der wirksame Wert ausgeschrieben
+   statt der, der ohnehin ueberschrieben wuerde. */
+.of-pos textarea { min-height: 92px; margin-top: 8px; }
 .of-summe-z { display: flex; justify-content: space-between; gap: 16px; padding: 5px 0; font-size: 13px; }
 .of-summe-z .wert { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .of-summe-z.matt { color: var(--ink-3); }
@@ -672,12 +768,13 @@ tbody tr.aus td { opacity: .55; }
 .of-detail-hd h2 { font-size: 20px; margin: 0; }
 .of-detail-hd .sub { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
 .of-zurueck { display: inline-flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px; border: 1px solid var(--line); border-radius: var(--r-sm);
+  width: 32px; height: 32px; min-height: 0; padding: 0; font: revert;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
   background: var(--surface); color: var(--ink-2); cursor: pointer; flex: none; }
-.of-zurueck:hover { background: var(--bg); }
+.of-zurueck:hover { background: var(--surface-3); }
 
 /* ── Kontaktzeilen im Adressdialog ── */
-.kw-reihe { display: grid; grid-template-columns: 130px 1fr auto; gap: 8px; margin-bottom: 8px; align-items: center; }
+.kw-reihe { display: grid; grid-template-columns: 170px 1fr auto; gap: 8px; align-items: center; margin-bottom: 8px; }
 .kw-person { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px; margin-bottom: 10px; }
 .kw-person .kopf { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
 .kw-person .kopf .sp { flex: 1; }
@@ -718,6 +815,222 @@ tbody tr.aus td { opacity: .55; }
   .bar-tools .btn { flex: 1 1 auto; }
   .of-dlg-huelle { padding: 0; }
   .of-dlg, .of-dlg.breit { max-width: none; border-radius: 0; height: 100%; max-height: none; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   LIQUID GLASS (ENT-418/ENT-419, hier uebernommen)
+
+   Dieselbe zweite Fassung der Oberflaeche wie im Cockpit: Kacheln und
+   Fenster werden durchscheinend und tragen eine Lichtkante. Der Schalter
+   steht in der Kopfzeile neben hell/dunkel, und er liest und schreibt
+   DENSELBEN Speicherschluessel wie dort (rv3_glas) -- aus demselben Grund
+   wie bei hell/dunkel: Es ist dasselbe Geraet und derselbe Mensch. Wer im
+   Cockpit durchscheinend eingestellt hat, erwartet nicht, dass die Ebene
+   darueber wieder deckend aufgeht.
+
+   Die Werte stehen hier als Kopie und nicht in einer gemeinsamen Datei,
+   weil der Deploy nur namentlich gelistete Dateien kopiert. Dass sie
+   dieselben bleiben, haelt test_glas_betreiber.mjs fest -- gemessen am
+   gerenderten Zustand beider Seiten, nicht im Quelltext nachgelesen.
+
+   Vier Regeln, dieselben wie im Cockpit:
+   1. KEINE ZWEITE FARBWELT -- gemischt wird aus --surface-rgb/--shell-rgb,
+      ueber rgba() und nicht ueber color-mix(): Letzteres rechnet in Chrome
+      zu "color(srgb 0.0862745 ...)", und jede Pruefung, die eine Flaeche
+      als Zahl liest, verglich danach Unsinn.
+   2. UNSCHAERFE NUR DORT, WO WIRKLICH ETWAS DAHINTER DURCHLAEUFT --
+      Fenster und Menues, nicht Kacheln. Hinter einer Kachel liegt nur der
+      weiche Grund; ihn weichzuzeichnen aendert am Bild nichts, kostet aber
+      Rechenzeit, und backdrop-filter oeffnet einen Stapelkontext.
+   3. TABELLENKOERPER BLEIBEN DECKEND.
+   4. NUR MATERIAL, KEIN UMBAU -- keine Zeile hier verschiebt etwas.
+   ══════════════════════════════════════════════════════════════════════ */
+
+html[data-glas="an"] {
+  --glas-kachel:  .54;
+  --glas-fenster: .84;
+
+  --glas-unschaerfe:  20px;
+  --glas-saettigung: 165%;
+
+  /* Die Kante ist das eigentliche Erkennungszeichen, nicht die Durchsicht:
+     Licht bricht am Rand des Glases -- oben hell, unten tief. */
+  --glas-kante-hell: rgba(255,255,255,.90);
+  --glas-kante-tief: rgba(16,18,22,.10);
+  --glas-linie:      rgba(255,255,255,.55);
+  --glas-abheben:    0 10px 30px -14px rgba(16,18,22,.20);
+
+  /* Radien eine Stufe weicher (16 -> 20, 12 -> 15). */
+  --glas-r:    15px;
+  --glas-r-lg: 20px;
+
+  --glas-grund-1: rgba(47,91,215,.22);
+  --glas-grund-2: rgba(107,79,168,.17);
+  --glas-grund-3: rgba(15,122,107,.13);
+}
+
+html[data-glas="an"][data-thema="dunkel"] {
+  --glas-kante-hell: rgba(255,255,255,.15);
+  --glas-kante-tief: rgba(0,0,0,.38);
+  --glas-linie:      rgba(255,255,255,.09);
+  /* Im Dunkeln traegt die Kante, nicht der Schatten. Ein Wert statt
+     "none", weil er in einer Schattenliste steht. */
+  --glas-abheben:    0 0 0 0 rgba(0,0,0,0);
+
+  --glas-grund-1: rgba(112,152,247,.26);
+  --glas-grund-2: rgba(182,160,234,.18);
+  --glas-grund-3: rgba(79,217,195,.13);
+
+  /* Im Hellen toent der Verlauf die Kachel dunkler und der Text gewinnt
+     Kontrast, im Dunkeln hellt er sie auf und der Text verliert. Darum
+     deckt sie im Dunkeln mehr -- gemessen, nicht geschaetzt. */
+  --glas-kachel:  .62;
+}
+
+/* ── Der Grund, auf den das Glas schaut ─────────────────────────────────
+   Ohne ihn gibt es nichts zu brechen: Durchsicht auf einfarbigem Grund
+   sieht genauso aus wie kein Glas. Als eigene, fest stehende Ebene statt
+   background-attachment:fixed am Koerper -- sonst zeichnet der Browser den
+   Verlauf bei jedem Bildaufbau neu. z-index:-1 heisst hier: hinter dem
+   Inhalt, aber VOR der Hintergrundfarbe des Koerpers. */
+html[data-glas="an"] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(1500px 900px at  2% -18%, var(--glas-grund-1), transparent 66%),
+    radial-gradient(1250px 950px at 102%  6%, var(--glas-grund-2), transparent 64%),
+    radial-gradient(1400px 1000px at 46% 118%, var(--glas-grund-3), transparent 68%);
+}
+
+/* ── Kacheln: Durchsicht und Kante, KEINE Unschaerfe (Regel 2) ─────────
+   Beide Kartenfassungen dieser Seite: die uebernommene .card und die
+   eigene .karte. Nur eine von beiden glasig zu machen hiesse, dass die
+   Offerten aussehen wie Glas und die Mandantenliste daneben nicht. */
+html[data-glas="an"] .card,
+html[data-glas="an"] .karte {
+  background: rgba(var(--surface-rgb), var(--glas-kachel));
+  border-color: var(--glas-linie);
+  box-shadow:
+    var(--glas-abheben),
+    inset 0 1px 0 0 var(--glas-kante-hell),
+    inset 0 -1px 0 0 var(--glas-kante-tief);
+}
+html[data-glas="an"] .card  { border-radius: var(--glas-r-lg); }
+html[data-glas="an"] .karte { border-radius: var(--glas-r); }
+
+/* ── Regel 3: der Tabellenkoerper bleibt deckend ───────────────────────
+   Bliebe er durchscheinend, liefe der Verlauf unter den Zeilen durch und
+   die Tabelle stuende auf wanderndem Grund. Der Rahmen der Karte -- Kopf,
+   Kante, Radius, Schatten -- bleibt Glas. */
+html[data-glas="an"] .card-bd.flush { background: var(--surface); }
+html[data-glas="an"] .card > .card-bd.flush:last-child  { border-radius: 0 0 var(--glas-r-lg) var(--glas-r-lg); }
+html[data-glas="an"] .card > .card-bd.flush:first-child { border-radius: var(--glas-r-lg) var(--glas-r-lg) 0 0; }
+/* Gleiche Eigenspezifitaet wie die zwei darueber -- die Reihenfolge
+   entscheidet, darum steht der Sonderfall zuletzt. */
+html[data-glas="an"] .card > .card-bd.flush:only-child  { border-radius: var(--glas-r-lg); }
+
+/* ── Fenster: Glas MIT Unschaerfe, denn hier laeuft Inhalt dahinter ──── */
+html[data-glas="an"] .of-dlg,
+html[data-glas="an"] .dlg,
+html[data-glas="an"] .rowmenu-pop {
+  background: rgba(var(--surface-rgb), var(--glas-fenster));
+  backdrop-filter: saturate(var(--glas-saettigung)) blur(var(--glas-unschaerfe));
+  -webkit-backdrop-filter: saturate(var(--glas-saettigung)) blur(var(--glas-unschaerfe));
+  border: 1px solid var(--glas-linie);
+}
+html[data-glas="an"] .of-dlg,
+html[data-glas="an"] .dlg { border-radius: 22px; }
+html[data-glas="an"] .rowmenu-pop { border-radius: 14px; }
+/* Die Lichtkante der Fenster liegt oben UND an der Innenkante: ein Fenster
+   steht frei im Raum, eine Kachel liegt auf dem Grund. */
+html[data-glas="an"] .of-dlg,
+html[data-glas="an"] .dlg {
+  box-shadow:
+    var(--sh-3),
+    inset 0 1px 0 0 var(--glas-kante-hell),
+    inset 1px 0 0 0 var(--glas-kante-hell),
+    inset 0 -1px 0 0 var(--glas-kante-tief);
+}
+
+/* Die Kopfzeile bleibt deckend, anders als die Kopfleiste im Cockpit. Das
+   ist kein Vergessen: Sie steht hier in BEIDEN Themen auf --shell und ist
+   damit der einzige dunkle Block auf heller Seite. Jedes Prozent Durchsicht
+   hellt ihren Grund in Richtung Verlauf auf, waehrend --shell-txt einen
+   festen Grauwert traegt, der davon nichts weiss -- genau die Messung, die
+   im Cockpit dazu gefuehrt hat, dass die Seitenleiste im Hellen deckend
+   bleibt. Dieselbe Lage, dieselbe Entscheidung. */
+
+/* ── Wenn der Browser kein backdrop-filter kann ────────────────────────
+   Dann bleibt von Glas nur Blaesse uebrig, weil hinter diesen Flaechen
+   wirklich Inhalt durchlaeuft und ihn niemand mehr weichzeichnet. Dann
+   decken sie wieder voll -- lieber gewoehnlich als unlesbar. Die Kacheln
+   brauchen das nicht: Hinter ihnen liegt nur der ruhige Grund. */
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  html[data-glas="an"] .of-dlg,
+  html[data-glas="an"] .dlg,
+  html[data-glas="an"] .rowmenu-pop { background: var(--surface); }
+}
+
+/* Wer am Betriebssystem "weniger Transparenz" eingestellt hat, meint genau
+   das. Die Kante und der Grund bleiben, die Durchsicht geht fast ganz weg. */
+@media (prefers-reduced-transparency: reduce) {
+  html[data-glas="an"] { --glas-kachel: .96; --glas-fenster: .99; }
+}
+
+/* Auf dem Handy weniger Unschaerfe: dieselbe Wirkung, weniger Rechenlast. */
+@media (max-width: 620px) {
+  html[data-glas="an"] { --glas-unschaerfe: 14px; }
+}
+
+/* ── Der Schalter ──────────────────────────────────────────────────────
+   Gleiche Bauart wie der Hell/Dunkel-Schalter daneben: zwei Schalter
+   nebeneinander, die verschieden aussehen, wirken wie zwei verschiedene
+   Dinge. Eigene Klassen statt derselben, weil die dunkle Fassung von
+   .ts-bahn deren Schieber verschiebt -- ein Glas-Schalter, der im Dunkeln
+   von selbst umspringt, behauptete einen Zustand, den er nicht hat.
+   Die Bahn traegt dieselben --shell-tauglichen Farben wie der Nachbar:
+   Diese Kopfzeile ist in beiden Themen dunkel. */
+.glas-schalter {
+  min-height: 44px; width: 52px; padding: 0; border: 0; background: none;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.glas-schalter:hover { border-color: transparent; }
+.gs-bahn {
+  width: 52px; height: 30px; border-radius: 999px; position: relative;
+  border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08);
+  transition: background .18s, border-color .18s;
+}
+.glas-schalter:hover .gs-bahn { border-color: rgba(255,255,255,.34); }
+.gs-schieber {
+  position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%;
+  background: #F3F5F8; display: flex; align-items: center; justify-content: center;
+  transition: transform .2s;
+}
+.gs-schieber svg {
+  width: 14px; height: 14px; fill: none; stroke-width: 2.1;
+  stroke-linecap: round; stroke-linejoin: round; stroke: #8B919D; transition: stroke .16s;
+}
+html[data-glas="an"] .gs-bahn { background: var(--accent-soft); border-color: var(--accent-line); }
+html[data-glas="an"] .gs-schieber { transform: translateX(22px); }
+html[data-glas="an"] .gs-schieber svg { stroke: #2F5BD7; }
+@media (prefers-reduced-motion: reduce) {
+  .gs-bahn, .gs-schieber, .gs-schieber svg { transition: none; }
+}
+/* Auf dem Telefon werden beide Bahnen schmaler -- dieselbe Stufe wie im
+   Cockpit. Nicht aus Geschmack: Mit zwei Schaltern, Zahnrad und
+   Abmelden-Knopf lief die Kopfzeile bei 390 px um sieben Pixel ueber ihre
+   Spalte hinaus, und das Navigationsband darunter sass dadurch 3,4 px
+   neben der Mitte. Der KNOPF bleibt 44 px hoch; schmaler wird nur das
+   Bild darauf. */
+@media (max-width: 620px) {
+  .thema-schalter, .glas-schalter { width: 46px; }
+  .ts-bahn, .gs-bahn { width: 46px; height: 28px; }
+  .ts-schieber, .gs-schieber { width: 22px; height: 22px; }
+  html[data-thema="dunkel"] .ts-schieber { transform: translateX(18px); }
+  html[data-glas="an"] .gs-schieber { transform: translateX(18px); }
 }
 
 /* ── Druck ──
@@ -931,6 +1244,15 @@ tbody tr.aus td { opacity: .55; }
         <span class="ts-bahn"><span class="ts-schieber">
           <svg class="i-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></svg>
           <svg class="i-mond" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
+        </span></span>
+      </button>
+      <!-- Durchscheinende Oberflaeche an/aus (ENT-418/ENT-419), derselbe
+           Schalter und derselbe Speicherschluessel wie im Cockpit. -->
+      <button class="glas-schalter" id="btn-glas" role="switch" aria-checked="true"
+              title="Durchscheinende Oberfläche ausschalten"
+              aria-label="Durchscheinende Oberfläche ein- oder ausschalten">
+        <span class="gs-bahn"><span class="gs-schieber">
+          <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="12" height="12" rx="3"/><rect x="8.5" y="9" width="12" height="10" rx="3"/></svg>
         </span></span>
       </button>
       <button class="klein" id="knopf-abmelden">Abmelden</button>
@@ -1318,7 +1640,7 @@ tbody tr.aus td { opacity: .55; }
             <div class="card-hd">
               <div>
                 <h2>Briefkopf</h2>
-                <div class="sec">Steht als Absender auf jeder Offerte und in der Versandmail</div>
+                <div class="of-hinweis">Steht als Absender auf jeder Offerte und in der Versandmail</div>
               </div>
             </div>
             <div class="card-bd">
@@ -1349,7 +1671,7 @@ tbody tr.aus td { opacity: .55; }
                          style="flex:1;min-width:200px" onchange="bkLogoGewaehlt(this)">
                   <button type="button" class="btn btn-plain btn-sm" onclick="bkLogoWeg()">Logo entfernen</button>
                 </div>
-                <div class="sec" style="margin-top:6px">PNG, JPEG, GIF oder WEBP, höchstens rund 1 MB.</div>
+                <div class="of-hinweis" style="margin-top:6px">PNG, JPEG, GIF oder WEBP, höchstens rund 1 MB.</div>
                 <div id="bkLogoVorschau" style="margin-top:10px"></div>
               </div>
               <div class="knopfzeile">
@@ -1378,26 +1700,27 @@ tbody tr.aus td { opacity: .55; }
                   aria-label="Aktionen" style="display:none">
             <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
           </button>
+          <!-- Vorschau nur als Symbol, Drucken mit Wort, Speichern wieder
+               nur als Symbol -- dieselbe Kopfzeile wie im Cockpit. Das
+               Herunterladen steht hier nicht: Im Cockpit traegt die
+               Kopfzeile diesen Knopf nicht, und ein vierter Knopf waere
+               genau der Unterschied, um den es geht. Er steht im
+               Dreipunkt-Menue daneben. -->
           <button type="button" class="btn btn-plain btn-sm" id="ofFormVorschauBtn" onclick="ofVorschau(ofFormId)"
-                  title="Vorschau" style="display:none">
+                  aria-label="Vorschau" title="Vorschau" style="display:none">
             <svg class="i i-sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            Vorschau
-          </button>
-          <button type="button" class="btn btn-plain btn-sm" id="ofFormLadenBtn" onclick="ofHerunterladen(ofFormId, this)" style="display:none">
-            <svg class="i i-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Herunterladen
           </button>
           <button type="button" class="btn btn-plain btn-sm" id="ofFormDruckBtn" onclick="ofDrucken(ofFormId)" style="display:none">
             <svg class="i i-sm" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             Drucken
           </button>
-          <button type="button" class="btn btn-primary btn-sm" id="ofFormSaveBtn" onclick="ofSpeichern()">
+          <button type="button" class="btn btn-primary btn-sm" id="ofFormSaveBtn" onclick="ofSpeichern()"
+                  aria-label="Speichern" title="Speichern">
             <svg class="i i-sm" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            Speichern
           </button>
         </div>
 
-        <div class="meldung fehler versteckt" id="ofFormErr"></div>
+        <div class="msg-err versteckt" id="ofFormErr"></div>
 
         <div class="of-kopf-zwei">
           <div class="card"><div class="card-bd">
@@ -1413,17 +1736,17 @@ tbody tr.aus td { opacity: .55; }
           </div></div>
 
           <div class="card"><div class="card-bd">
-            <div class="f"><label for="of_datum">Offertendatum *</label>
+            <div class="f"><label for="of_datum" id="ofLblDatum">Offertendatum *</label>
               <input class="inp" type="date" id="of_datum" onchange="ofGueltigNachziehen()"></div>
-            <div class="f"><label for="of_nummer">Offertennummer</label>
+            <div class="f"><label for="of_nummer" id="ofLblNummer">Offertennummer</label>
               <input class="inp" id="of_nummer" readonly tabindex="-1"></div>
             <div class="f">
               <div class="of-lbl-zeile">
-                <label for="of_gueltig">Gültig bis</label>
+                <label for="of_gueltig" id="ofLblGueltig">Gültig bis</label>
                 <span>
-                  <button type="button" class="of-schnell" onclick="ofGueltigSetzen(10)"
+                  <button type="button" class="of-schnell" id="ofBtnPlus10" onclick="ofGueltigSetzen(10)"
                           title="10 Tage ab Offertendatum">+10</button>
-                  <button type="button" class="of-schnell" onclick="ofGueltigSetzen(30)"
+                  <button type="button" class="of-schnell" id="ofBtnPlus30" onclick="ofGueltigSetzen(30)"
                           title="30 Tage ab Offertendatum">+30</button>
                 </span>
               </div>
@@ -1493,7 +1816,7 @@ tbody tr.aus td { opacity: .55; }
               </label>
               <div class="sec" style="margin-top:8px">
                 Setzt Felder für Ort, Datum und Unterschrift ans Ende des Belegs — auf
-                dieselbe Seite, nicht auf ein eigenes Blatt.
+                dieselbe Seite, nicht auf ein eigenes Blatt (ENT-425).
               </div>
             </div></div>
           </div>
@@ -1572,7 +1895,7 @@ tbody tr.aus td { opacity: .55; }
            statt dass man es erraten muss. -->
       <div class="f">
         <label>Kommunikationswege</label>
-        <div class="sec" style="margin-bottom:8px">Die erste E-Mail ist die Adresse, an die eine Offerte verschickt wird.</div>
+        <div class="of-hinweis" style="margin-bottom:8px">Die erste E-Mail ist die Adresse, an die eine Offerte verschickt wird.</div>
         <div id="adWege"></div>
         <button type="button" class="btn btn-plain btn-sm" onclick="adWegHinzu()">Weg hinzufügen</button>
       </div>
@@ -1772,6 +2095,24 @@ function themaSetzen(w) {
 }
 function themaUm() {
   themaSetzen(document.documentElement.getAttribute('data-thema') === 'dunkel' ? 'hell' : 'dunkel');
+}
+
+/* ── Durchscheinend oder deckend (ENT-418/ENT-419) ────────────────
+   Wie oben: Der Wert steht schon im Kopf der Seite am Dokument, hier wird
+   nur umgeschaltet und gespeichert. Kein Eingriff in die Farbe der
+   Systemleiste, anders als bei themaSetzen -- Glas aendert nicht, ob es
+   hell oder dunkel ist, nur wie dicht die Flaechen sind. */
+function glasSetzen(an) {
+  document.documentElement.setAttribute('data-glas', an ? 'an' : 'aus');
+  try { localStorage.setItem('rv3_glas', an ? 'an' : 'aus'); } catch (e) { /* egal */ }
+  const b = $('btn-glas');
+  if (b) {
+    b.setAttribute('aria-checked', an ? 'true' : 'false');
+    b.title = an ? 'Durchscheinende Oberfläche ausschalten' : 'Durchscheinende Oberfläche einschalten';
+  }
+}
+function glasUm() {
+  glasSetzen(document.documentElement.getAttribute('data-glas') !== 'an');
 }
 
 async function ruf(pfad, daten, methode) {
@@ -3291,7 +3632,7 @@ function bkFuellen() {
 function bkLogoZeichnen(datenUrl) {
   $('bkLogoVorschau').innerHTML = datenUrl
     ? `<img src="${esc(datenUrl)}" alt="Logo" style="max-height:90px;max-width:220px;border:1px solid var(--line);border-radius:8px;padding:6px;background:#fff">`
-    : '<div class="sec">Kein Logo hinterlegt.</div>';
+    : '<div class="of-hinweis">Kein Logo hinterlegt.</div>';
 }
 
 function bkLogoGewaehlt(feld) {
@@ -3614,6 +3955,7 @@ function ofFormMenuOeffnen(ev) {
     `<button type="button" onclick="menuSchliessen(); ofStatusSetzen(${id}, '${s.wert}')">Als „${esc(s.text)}" markieren</button>`).join('');
   pop.innerHTML = `
     <button type="button" onclick="menuSchliessen(); ofVersenden(${id})">Per E-Mail versenden</button>
+    <button type="button" onclick="menuSchliessen(); ofHerunterladen(${id}, null)">Herunterladen</button>
     <button type="button" onclick="menuSchliessen(); ofTeilen(${id}, null)">Teilen</button>
     <hr>
     ${statusKnoepfe}
@@ -3718,6 +4060,15 @@ function ofGueltigSetzen(tage) {
   $('of_gueltig').value = ofTagePlus($('of_datum').value || isoTag(), tage);
 }
 
+/* Der Fehlerstreifen des Offertformulars traegt .msg-err wie im Cockpit,
+   nicht .meldung wie der Rest dieser Seite: melde() setzt className neu und
+   stellte ihn dabei auf die Fassung dieser Seite um. */
+function ofFehler(txt) {
+  const el = $('ofFormErr');
+  el.textContent = txt;
+  zeig(el, true);
+}
+
 function ofFormSubZeichnen() {
   $('ofFormSub').textContent = ofStatusInfo(ofFormStatus).text + (ofFormAktiv ? '' : ' · archiviert');
 }
@@ -3783,7 +4134,7 @@ function ofNeu() {
   /* Vorschau, Drucken, Herunterladen und das Dreipunkt-Menue ergeben vor
      dem ersten Speichern keinen Sinn -- es gibt noch keinen Beleg, den der
      Server ausliefern koennte. */
-  ['ofFormVorschauBtn', 'ofFormDruckBtn', 'ofFormLadenBtn', 'ofFormMenuBtn']
+  ['ofFormVorschauBtn', 'ofFormDruckBtn', 'ofFormMenuBtn']
     .forEach(b => { $(b).style.display = 'none'; });
   ofZeilenZeichnen();
   ofFormularZeigen(true);
@@ -4025,7 +4376,7 @@ async function ofOeffnen(id) {
   $('of_datum').dataset.vorher = $('of_datum').value;
   $('of_gueltig').value = leeresDatum(b.gueltig_bis) ? '' : String(b.gueltig_bis).slice(0, 10);
   ofPersonenFuellen(b.person_id);
-  ['ofFormVorschauBtn', 'ofFormDruckBtn', 'ofFormLadenBtn', 'ofFormMenuBtn']
+  ['ofFormVorschauBtn', 'ofFormDruckBtn', 'ofFormMenuBtn']
     .forEach(x => { $(x).style.display = ''; });
   ofZeilenZeichnen();
   ofFormularZeigen(true);
@@ -4034,7 +4385,7 @@ async function ofOeffnen(id) {
 async function ofSpeichern() {
   const datum = $('of_datum').value;
   const zeigeFehler = txt => {
-    melde($('ofFormErr'), 'fehler', txt);
+    ofFehler(txt);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   if (!datum) { zeigeFehler('Ein Offertendatum ist erforderlich.'); return; }
@@ -4071,7 +4422,7 @@ async function ofSpeichern() {
   ofFormId = Number(a.id);
   if (a.nummer) { $('ofFormNummer').textContent = a.nummer; $('of_nummer').value = a.nummer; }
   ofFormSubZeichnen();
-  ['ofFormVorschauBtn', 'ofFormDruckBtn', 'ofFormLadenBtn', 'ofFormMenuBtn']
+  ['ofFormVorschauBtn', 'ofFormDruckBtn', 'ofFormMenuBtn']
     .forEach(x => { $(x).style.display = ''; });
   /* Die Summen aus der SERVERANTWORT uebernehmen, nicht die eigene Vorschau
      stehenlassen: Weichen beide ab, soll das sofort auffallen. */
@@ -4566,6 +4917,7 @@ $('knopf-sv-neu').onclick      = () => { svNurOffen = true;  ladeSupport(); };
 $('knopf-sv-alle').onclick     = () => { svNurOffen = false; ladeSupport(); };
 $('knopf-abmelden').onclick   = abmelden;
 $('btn-thema').onclick        = themaUm;
+$('btn-glas').onclick         = glasUm;
 document.querySelectorAll('#kopf-nav .nav-item').forEach(b => {
   b.onclick = () => bereichZeigen(b.dataset.bereich);
 });
@@ -4575,8 +4927,9 @@ document.querySelectorAll('#kopf-nav .nav-item').forEach(b => {
 document.querySelectorAll('[data-springe]').forEach(b => {
   b.onclick = () => bereichZeigen(b.dataset.springe);
 });
-// Den Schalter auf den Stand bringen, den das Vorab-Skript gesetzt hat.
+// Die Schalter auf den Stand bringen, den die Vorab-Skripte gesetzt haben.
 themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell');
+glasSetzen(document.documentElement.getAttribute('data-glas') !== 'aus');
 
 /* Beim Laden: Liegt ein Token in dieser Registerkarte, wird er benutzt.
    Traegt er nicht mehr, faellt die Seite auf die Anmeldung zurueck --

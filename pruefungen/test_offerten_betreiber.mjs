@@ -152,7 +152,16 @@ if (fehlend.length) { bad.push('fehlt im Buendel: ' + fehlend.join(', ')); }
 {
   const stil = [...seite.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n');
   const ohneKommentar = stil.replace(/\/\*[\s\S]*?\*\//g, '');
-  const zaehler = new Map();
+  // Gezaehlt wird nicht, WIE OFT ein Selektor vorkommt, sondern WIE WEIT
+  // die Vorkommen auseinanderliegen. Der Unterschied ist der ganze Punkt:
+  // Zwei Regeln fuer denselben Selektor ein paar Zeilen untereinander sind
+  // gewoehnliches CSS -- erst die Flaeche, dann der Radius. Gefaehrlich ist
+  // der Fall, den es hier tatsaechlich gab: zwei Bloecke in verschiedenen
+  // Teilen der Datei, die nichts voneinander wissen, weil sie aus zwei
+  // Sitzungen stammen. Die Grenze von 60 Zeilen ist gemessen an genau dem
+  // Fall: .dlg lag damals rund 400 Zeilen auseinander.
+  const NAHE = 60;
+  const zeilen = new Map();
   let tiefe = 0, i = 0;
   while (i < ohneKommentar.length) {
     const auf = ohneKommentar.indexOf('{', i);
@@ -161,13 +170,17 @@ if (fehlend.length) { bad.push('fehlt im Buendel: ' + fehlend.join(', ')); }
     if (zu !== -1 && (auf === -1 || zu < auf)) { tiefe = Math.max(0, tiefe - 1); i = zu + 1; continue; }
     const kopf = ohneKommentar.slice(i, auf).trim();
     if (tiefe === 0 && kopf && !kopf.startsWith('@')) {
+      const zeile = ohneKommentar.slice(0, auf).split('\n').length;
       kopf.split(',').map(t => t.trim()).filter(Boolean)
-        .forEach(t => zaehler.set(t, (zaehler.get(t) || 0) + 1));
+        .forEach(t => { if (!zeilen.has(t)) { zeilen.set(t, []); } zeilen.get(t).push(zeile); });
     }
     tiefe += 1;
     i = auf + 1;
   }
-  const doppelt = [...zaehler.entries()].filter(([, n]) => n > 1).map(([t]) => t);
+  const zaehler = zeilen;
+  const doppelt = [...zeilen.entries()]
+    .filter(([, z]) => z.some((n, k) => k > 0 && n - z[k - 1] > NAHE))
+    .map(([t, z]) => `${t} (Zeilen ${z.join(', ')})`);
   check('es wurden ueberhaupt Selektoren gefunden', zaehler.size > 60);
   check('KRITISCH: kein Selektor ist in betreiber.html zweimal auf oberster Ebene definiert',
     doppelt.length === 0);
