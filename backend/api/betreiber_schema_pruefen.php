@@ -36,6 +36,19 @@ $getan  = [...$tabellenErgebnis['getan'],  ...$spaltenErgebnis['getan']];
 $offen  = [...$tabellenErgebnis['offen'],  ...$spaltenErgebnis['offen']];
 $fehler = [...$tabellenErgebnis['fehler'], ...$spaltenErgebnis['fehler']];
 
+// ── Der Bestandsmandant ─────────────────────────────────────────────
+// Dieselbe Ergaenzung wie in api/betreiber_einrichten.php: traegt weder
+// nur eine frisch angelegte Tabelle mit dem ersten Betrieb ein, sondern
+// auch die Subdomain nach, wenn die Spalte erst nachtraeglich entstanden
+// ist (be_bestandsmandant_eintragen() deckt beide Faelle ab).
+if (!$nurPruefen) {
+    $name = be_bestandsmandant_eintragen($pdo, db());
+    if ($name !== null) { $getan[] = 'Bestandsbetrieb als Mandant 1 eingetragen'; }
+} elseif (hat_tabelle($pdo, 'mandant')
+       && (int)$pdo->query('SELECT COUNT(*) FROM mandant')->fetchColumn() === 0) {
+    $offen[] = 'Bestandsbetrieb als Mandant 1';
+}
+
 json_response([
     'status' => $fehler ? 'error' : 'ok',
     'modus'  => $nurPruefen ? 'pruefung' : 'ausgefuehrt',
