@@ -684,6 +684,75 @@ check('Ort und Ende kommen mit',
   (await ev(() => document.getElementById('mtlOrt')?.value)) === 'Aufenthaltsraum'
   && (await ev(() => document.getElementById('mtlEnde')?.value)) === '2029-09-24T19:00');
 
+// ══════════════ 8. EIN TERMIN, DESSEN TAG VORBEI IST ══════════════════
+// Er laeuft am Ende seines eigenen Tages ab (mitteilung_save.php) -- ein
+// nachgetragener Termin von gestern waere also im selben Moment abgelaufen,
+// in dem er gespeichert wird, und niemand saehe ihn je. Vorher ging das
+// kommentarlos durch, samt "Termin veroeffentlicht.".
+//
+// Die Zeitpunkte werden RELATIV zum heutigen Tag gebildet (Projektregel:
+// kein festes Datum in der Naehe) -- hier geht es gerade um den Vergleich
+// mit heute, ein fester Wert waere beim naechsten Datumswechsel falsch.
+const tagVersetzt = (n) => {
+  const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+    + '-' + String(d.getDate()).padStart(2, '0');
+};
+
+async function terminFormular(beginnTag, endeTag, bis) {
+  await klick('#mtlAbbrechen');
+  await page.waitForTimeout(200);
+  await klick('#nav-admin-mitteilungen');
+  await page.waitForTimeout(400);
+  await klick('#mtlArtTermin');
+  await page.waitForTimeout(200);
+  await page.fill('#mtlTitel', 'Nachgetragen');
+  await page.fill('#mtlText', 'Zur Ablage.');
+  await page.fill('#mtlBeginn', beginnTag + 'T17:00');
+  await page.fill('#mtlEnde', endeTag ? endeTag + 'T19:00' : '');
+  await page.fill('#mtlBis', bis || '');
+  gesendet = null; dialogText = '';
+}
+
+dialogAnnehmen = false;
+await terminFormular(tagVersetzt(-1), null, null);
+await klick('#mtlSpeichern');
+await page.waitForTimeout(500);
+check('KRITISCH: bei einem Termin von gestern wird zurueckgefragt', dialogText.length > 20);
+check('Die Rueckfrage sagt, WARUM -- dass ihn niemand mehr sieht',
+  /Vergangenheit/i.test(dialogText) && /erscheint/i.test(dialogText));
+check('Sie nennt den Ausweg: "sichtbar bis" von Hand', /sichtbar bis/i.test(dialogText));
+check('KRITISCH: wer abbricht, speichert nicht', gesendet === null);
+
+dialogAnnehmen = true;
+await terminFormular(tagVersetzt(-1), null, null);
+await klick('#mtlSpeichern');
+await page.waitForTimeout(500);
+check('KRITISCH: wer bestaetigt, speichert trotzdem -- die Rueckfrage ist keine Sperre',
+  gesendet !== null && gesendet.art === 'termin');
+
+// Die drei Faelle, in denen NICHT gefragt werden darf. Ohne sie waere die
+// Rueckfrage eine Gewohnheit, die man wegklickt.
+dialogAnnehmen = false;
+await terminFormular(tagVersetzt(0), null, null);
+await klick('#mtlSpeichern');
+await page.waitForTimeout(500);
+check('KRITISCH: ein Termin von HEUTE wird ohne Rueckfrage gespeichert',
+  dialogText === '' && gesendet !== null);
+
+await terminFormular(tagVersetzt(-1), tagVersetzt(1), null);
+await klick('#mtlSpeichern');
+await page.waitForTimeout(500);
+check('KRITISCH: ein mehrtaegiger Termin ist nicht vorbei, nur weil er gestern begann',
+  dialogText === '' && gesendet !== null);
+
+await terminFormular(tagVersetzt(-1), null, tagVersetzt(7) + 'T23:59');
+await klick('#mtlSpeichern');
+await page.waitForTimeout(500);
+check('KRITISCH: mit eigenem "sichtbar bis" entfaellt die Rueckfrage -- die Regel greift dann nicht',
+  dialogText === '' && gesendet !== null);
+dialogAnnehmen = true;
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden`);
 if (bad.length) { console.log('\n✗ ' + bad.length + ' FEHLGESCHLAGEN:'); bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

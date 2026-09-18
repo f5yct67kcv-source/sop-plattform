@@ -320,5 +320,42 @@ pruef('KRITISCH: ohne die Revier-Spalte ist der Kreis UNBEKANNT (null), nicht le
     mitteilung_empfaenger_wo($pdo, 'revier') === null);
 $GLOBALS['spalteDa'] = true;
 
+// ══════════════ WIE LANGE EIN TERMIN STEHEN BLEIBT
+// Der Tag entscheidet, nicht die Uhrzeit. Geprueft wird nicht die
+// Zeichenkette, die termin_sichtbar_bis liefert, sondern was sie bewirkt:
+// Ihr Ergebnis wandert in einen Datensatz und geht durch
+// mitteilung_sichtbar_fuer -- denselben Weg, den die App geht.
+$terminKarte = function (string $beginn, ?string $ende): array {
+    return ['zielgruppe' => 'alle', 'art' => 'termin',
+        'beginn' => $beginn, 'ende' => $ende,
+        'sichtbar_ab' => null,
+        'sichtbar_bis' => termin_sichtbar_bis($beginn, $ende)];
+};
+// $jetzt ist der 15.06.2031 um 12:00.
+$heuteFrueh  = '2031-06-15 08:00:00';
+$heuteSpaet  = '2031-06-15 22:00:00';
+$gestern     = '2031-06-14 08:00:00';
+$morgen      = '2031-06-16 08:00:00';
+
+pruef('KRITISCH: ein Termin von heute morgen steht mittags noch da',
+    mitteilung_sichtbar_fuer($terminKarte($heuteFrueh, null), true, $jetzt));
+// Die Gegenprobe zur alten Regel: Liefe der Termin zu seiner eigenen
+// Uhrzeit ab, waere er mittags weg. Genau das war der Fehler.
+pruef('KRITISCH: mit Ablauf zur Terminzeit waere er mittags weg (alte Regel)',
+    !mitteilung_sichtbar_fuer(['zielgruppe' => 'alle', 'art' => 'termin',
+        'sichtbar_bis' => $heuteFrueh], true, $jetzt));
+pruef('Auch ein Termin mit eigenem Ende von heute morgen bleibt bis abends',
+    mitteilung_sichtbar_fuer($terminKarte($heuteFrueh, '2031-06-15 10:00:00'), true, $jetzt));
+pruef('Ein Termin von heute abend steht mittags schon da',
+    mitteilung_sichtbar_fuer($terminKarte($heuteSpaet, null), true, $jetzt));
+pruef('KRITISCH: ein Termin von gestern ist weg',
+    !mitteilung_sichtbar_fuer($terminKarte($gestern, null), true, $jetzt));
+pruef('Ein mehrtaegiger Termin ist nicht vorbei, nur weil er gestern begann',
+    mitteilung_sichtbar_fuer($terminKarte($gestern, $morgen), true, $jetzt));
+pruef('Ein leeres Ende zaehlt wie gar keines',
+    termin_sichtbar_bis($heuteFrueh, '') === termin_sichtbar_bis($heuteFrueh, null));
+pruef('Das Ende ist das Tagesende, nicht der Tagesbeginn',
+    termin_sichtbar_bis($heuteFrueh, null) === '2031-06-15 23:59:59');
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }
