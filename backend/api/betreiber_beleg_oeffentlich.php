@@ -191,6 +191,8 @@ try {
     }
 
     $titel = BELEG_ARTEN[$b['art']]['titel'] ?? 'Beleg';
+    $datumLabel  = BELEG_ARTEN[$b['art']]['datum_label'] ?? 'Datum';
+    $nummerLabel = BELEG_ARTEN[$b['art']]['nummer_label'] ?? 'Nummer';
 
     $empfaenger = array_values(array_filter([
         $kunde['name'] ?? '',
@@ -267,7 +269,7 @@ try {
         . '<div style="line-height:1.5;font-size:13px">' . portal_esc($firma !== '' ? $firma : 'Absender') . '</div>'
         . '<div class="zf-label">Details</div>'
         . '<div style="line-height:1.7;font-size:13px">'
-        . portal_esc($titel) . 'datum<br><span style="color:#6B7280">' . portal_dmy($b['datum']) . '</span>'
+        . portal_esc($datumLabel) . '<br><span style="color:#6B7280">' . portal_dmy($b['datum']) . '</span>'
         . (!portal_leeres_datum($b['gueltig_bis']) ? '<br><br>Gültig bis<br><span style="color:#6B7280">' . portal_dmy($b['gueltig_bis']) . '</span>' : '')
         . '</div>'
         . '<div class="zf-label">Total</div>'
@@ -318,6 +320,10 @@ try {
         . '<table style="line-height:1.5;width:auto"><tr><td style="' . $spalte . '">' . portal_esc($titel) . 'nummer</td><td style="padding:2px 0;font-size:12px">' . portal_esc($b['nummer']) . '</td></tr>'
         . '<tr><td style="' . $spalte . '">Datum</td><td style="padding:2px 0;font-size:12px">' . portal_dmy($b['datum']) . '</td></tr>'
         . (!portal_leeres_datum($b['gueltig_bis']) ? '<tr><td style="' . $spalte . '">Gültig bis</td><td style="padding:2px 0;font-size:12px">' . portal_dmy($b['gueltig_bis']) . '</td></tr>' : '')
+        // Die Frist einer Rechnung. Sie stand auf dem Blatt der Mandantin
+        // schon, auf diesem nicht -- ein Beleg, der eine Zahlung verlangt
+        // und nicht sagt bis wann, ist keine Rechnung.
+        . (!portal_leeres_datum($b['faellig_bis'] ?? null) ? '<tr><td style="' . $spalte . '">Fällig bis</td><td style="padding:2px 0;font-size:12px">' . portal_dmy($b['faellig_bis']) . '</td></tr>' : '')
         . '</table>'
         . '<div style="line-height:1.5;font-size:12px;min-width:200px;text-align:right;margin-left:auto">' . implode('<br>', array_map('portal_esc', $empfaenger)) . '</div>'
         . '</div>'

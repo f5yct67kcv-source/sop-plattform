@@ -29,9 +29,16 @@ const BELEG_MENGE_FAKTOR = 100;
 // hier, weil die Nummernvergabe und die Summenrechnung von Anfang an fuer
 // beide gelten sollen (ENT-181) -- nicht als Ankuendigung, dass es sie schon
 // gaebe.
+// datum_label steht hier und wird nicht aus dem Titel zusammengesetzt:
+// "Offerte" + "datum" ergibt "Offertedatum", "Rechnung" + "datum" ergibt
+// "Rechnungdatum" -- beides falsch, und beides stand so auf den
+// oeffentlichen Seiten, die der Empfaenger am Link sieht. Das Fugen-n
+// laesst sich nicht rechnen, also steht das Wort da.
 const BELEG_ARTEN = [
-    'offerte'  => ['praefix' => 'OF', 'titel' => 'Offerte'],
-    'rechnung' => ['praefix' => 'RE', 'titel' => 'Rechnung'],
+    'offerte'  => ['praefix' => 'OF', 'titel' => 'Offerte',
+                   'datum_label' => 'Offertendatum', 'nummer_label' => 'Offertennummer'],
+    'rechnung' => ['praefix' => 'RE', 'titel' => 'Rechnung',
+                   'datum_label' => 'Rechnungsdatum', 'nummer_label' => 'Rechnungsnummer'],
 ];
 
 // Die Status einer Offerte. Bewusst von Hand gesetzt, auch 'angeschaut':
