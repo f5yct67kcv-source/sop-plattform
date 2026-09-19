@@ -22,6 +22,9 @@ require_once __DIR__ . '/demo_zugang.php';
 // unten ruft sie auf. Kein stiller Vertrag: Wer diese Datei laedt, bekommt
 // alles mit, was sie braucht (Lehre aus dem Fehlschlag vom 2026-09-19).
 require_once __DIR__ . '/demo_daten.php';
+// Fuer kern_schema_fehlend() in der Platzwahl: Der Sollstand des Schemas
+// steht dort, wo die Einrichtung ihn selbst benutzt.
+require_once __DIR__ . '/planung_einrichten_kern.php';
 
 // Leert die Instanz eines Platzes und sät die Systemrollen neu.
 //
@@ -215,9 +218,33 @@ function demo_zugang_einrichten(PDO $pdo, string $firma, string $person,
             $uebersprungen[] = "$kandidat (nicht verbunden: $lage)";
             continue;
         }
-        $stand = mandant_stand($kandidatM);
-        if (!$stand['erreichbar'] || !empty($stand['fehlend'])) {
-            $uebersprungen[] = "$kandidat (Datenbank noch nicht eingerichtet)";
+        // SPALTEN, NICHT NUR TABELLEN (2026-09-19). Bis hierher fragte
+        // mandant_stand(), ob fuenf Kerntabellen existieren. Demo-Platz 6
+        // und 8 hatten alle Tabellen und trotzdem ein halbes Schema: Die
+        // nachtraeglichen Spalten fehlten, weil ihr ALTER TABLE
+        // uebersprungen worden war. Beide galten damit als "eingerichtet",
+        // waeren geleert worden und erst danach gescheitert -- der
+        // Interessent haette einen 503 bekommen und seine Eingabe
+        // verloren, und der Platz waere kaputter zurueckgeblieben als
+        // vorher.
+        //
+        // kern_schema_fehlend() prueft den ganzen Bauplan (67 Tabellen,
+        // 190 nachtraegliche Spalten) mit EINER Abfrage -- guenstiger als
+        // die fuenf Einzelabfragen davor und aus derselben Quelle, aus der
+        // die Einrichtung selbst baut.
+        try {
+            $kandidatPdo = mandant_db($kandidatM);
+        } catch (Throwable $e) {
+            $uebersprungen[] = "$kandidat (Verbindung fehlgeschlagen)";
+            continue;
+        }
+        $luecken = kern_schema_fehlend($kandidatPdo);
+        if ($luecken !== []) {
+            // Mit Zahl UND Beispielen: "unvollstaendig" allein sagt
+            // niemandem, ob eine Spalte fehlt oder die halbe Anlage.
+            $uebersprungen[] = "$kandidat (Schema unvollstaendig, " . count($luecken)
+                . ' fehlend: ' . implode(', ', array_slice($luecken, 0, 5))
+                . (count($luecken) > 5 ? ', ...' : '') . ')';
             continue;
         }
         $platz = $kandidat;
@@ -252,6 +279,18 @@ function demo_zugang_einrichten(PDO $pdo, string $firma, string $person,
         demo_daten_erzeugen($instanz);
     } catch (Throwable $e) {
         error_log('demo_zugang_einrichten: ' . $e->getMessage());
+        return $misslungen('fehlschlag', 503, $fehlschlag);
+    }
+
+    // Und nach dem Befuellen: Sind die Systemrollen da? Das Leeren
+    // loescht sie, demo_reset_systemrollen_saeen() legt sie neu an. Bleibt
+    // das aus, entsteht ein Zugang, in dem niemand ein Recht hat -- die
+    // Oberflaeche steht, und nichts laesst sich oeffnen. Das gehoert
+    // hierher und nicht in die Vorpruefung: Vorher sind die Rollen
+    // ohnehin gleich wieder weg.
+    $rollen = (int)$instanz->query('SELECT COUNT(*) FROM rollen WHERE system = 1')->fetchColumn();
+    if ($rollen === 0) {
+        error_log("demo_zugang_einrichten: $platz ohne Systemrollen nach dem Befuellen");
         return $misslungen('fehlschlag', 503, $fehlschlag);
     }
 
