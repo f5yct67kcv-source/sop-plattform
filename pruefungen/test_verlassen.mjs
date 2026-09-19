@@ -246,8 +246,23 @@ check('KRITISCH: eine abgebrochene Runde lässt sich verlassen',
   await page.evaluate(() => { rundgangAktiv.status = 'abgebrochen'; return !rgLaufOffen(); }));
 check('Eine abgeschlossene ebenso',
   await page.evaluate(() => { rundgangAktiv.status = 'abgeschlossen'; return !rgLaufOffen(); }));
-check('Eine pausierte dagegen nicht — sie steht weiterhin offen im System',
+// Eine pausierte Runde steht weiterhin offen im System -- aber sie haelt
+// seit ENT-631 niemanden mehr auf der Seite fest: Sie IST der
+// dokumentierte Zustand, nach dem die Frage hier fragt. Geprueft wird das
+// dort, wo es hingehoert (test_rundgang_pausieren.mjs).
+check('Eine pausierte gilt weiterhin als offen — sie steht im System',
   await page.evaluate(() => { rundgangAktiv.status = 'pausiert'; return rgLaufOffen(); }));
+check('KRITISCH: der Pfeil fragt dort trotzdem nicht — eine pausierte Runde ist bereits begründet',
+  await page.evaluate(() => {
+    rundgangAktiv.status = 'pausiert';
+    rgSeiteZurueck();
+    return !document.getElementById('rgSeite').classList.contains('on');
+  }));
+// Wieder hinein -- sonst pruefte der naechste Schritt an einer Seite, die
+// schon zu ist, und bliebe gruen, ohne etwas zu messen.
+await page.evaluate(() => rundgangAnzeigen(71));
+await page.waitForTimeout(400);
+check('Die Runde laesst sich danach wieder oeffnen', await page.isVisible('#rgSeite'));
 await page.evaluate(() => { rundgangAktiv.status = 'abgeschlossen'; rgSeiteZurueck(); });
 await page.waitForTimeout(400);
 check('KRITISCH: und der Pfeil führt dann wirklich heraus',
