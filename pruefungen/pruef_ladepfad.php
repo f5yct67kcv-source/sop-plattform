@@ -43,6 +43,7 @@ function kette_des_endpunkts(string $pfad): array
 // angemeldeten Betreiber, der nachfragen kann.
 $endpunkte = [
     'backend/api/demo_anfordern.php',
+    'backend/api/demo_bestaetigen.php',
     'backend/api/demo_erneut_senden.php',
 ];
 

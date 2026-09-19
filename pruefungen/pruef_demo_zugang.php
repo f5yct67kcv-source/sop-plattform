@@ -573,6 +573,96 @@ $pruef('KRITISCH: ein Umbruch in der Adresse wird abgewiesen (Kopfzeilen-Einschl
 $pruef('eine gültige Adresse kommt getrimmt durch',
     demo_zugang_empfaenger_pruefen(' info@guardops.ch ') === 'info@guardops.ch');
 
+// ══ Die offene Anfrage vor der Bestaetigung (ENT-624) ═════════════════
+require_once __DIR__ . '/../backend/demo_bestaetigung.php';
+
+// Der Wert ist ein Schluessel, kein Kennzeichen: Er muss unvorhersehbar
+// sein, sonst raet ihn jemand und richtet fremde Zugaenge ein.
+$w1 = demo_bestaetigung_wert();
+$w2 = demo_bestaetigung_wert();
+$pruef('KRITISCH: der Bestaetigungswert ist 64 Zeichen hexadezimal',
+    preg_match('/^[0-9a-f]{64}$/', $w1) === 1);
+$pruef('KRITISCH: zwei Werte sind nicht derselbe',  $w1 !== $w2);
+
+// In der Datenbank steht nur der Abdruck (gleiche Regel wie bei den
+// Sitzungen, ENT-501) -- ein Blick hinein gibt keinen gueltigen Link her.
+$pruef('KRITISCH: der Abdruck ist nicht der Wert selbst',
+    demo_bestaetigung_abdruck($w1) !== $w1);
+$pruef('KRITISCH: derselbe Wert ergibt immer denselben Abdruck -- sonst findet '
+        . 'das Nachschlagen nie, was das Schreiben abgelegt hat',
+    demo_bestaetigung_abdruck($w1) === demo_bestaetigung_abdruck($w1));
+$pruef('verschiedene Werte ergeben verschiedene Abdruecke',
+    demo_bestaetigung_abdruck($w1) !== demo_bestaetigung_abdruck($w2));
+
+// Die Frist. Auf die Sekunde: Sie gehoert dem Interessenten, nicht uns.
+$t = '2026-09-19 09:00:00';
+$pruef('KRITISCH: kurz nach dem Anlegen gilt die Anfrage',
+    demo_bestaetigung_abgelaufen($t, '2026-09-19 09:00:01') === false);
+$pruef('KRITISCH: genau auf der Frist gilt sie noch',
+    demo_bestaetigung_abgelaufen($t, '2026-09-20 09:00:00') === false);
+$pruef('eine Sekunde danach nicht mehr',
+    demo_bestaetigung_abgelaufen($t, '2026-09-20 09:00:01') === true);
+// Ein unlesbarer Zeitstempel gilt als abgelaufen, nicht als gueltig: Im
+// Zweifel wird kein Zugang eingerichtet, statt einen auf einer Annahme.
+$pruef('KRITISCH: ein unlesbarer Zeitstempel gilt als abgelaufen, nicht als gueltig',
+    demo_bestaetigung_abgelaufen('kein datum', $t) === true);
+
+// Die Adresse kommt aus dem Deploy, nie aus der Anfrage (ENT-501).
+$pruef('KRITISCH: ein nicht ersetzter Platzhalter ist keine Adresse',
+    demo_bestaetigung_basis_pruefen('__GUARDOPS_BASIS_URL__') === null);
+$pruef('KRITISCH: ohne https keine Adresse',
+    demo_bestaetigung_basis_pruefen('http://guardops.ch') === null);
+$pruef('KRITISCH: ein Umbruch in der Adresse wird abgewiesen',
+    demo_bestaetigung_basis_pruefen("https://guardops.ch\r\nX: y") === null);
+$pruef('kein Pfad in der Basis -- er wuerde den Link verdoppeln',
+    demo_bestaetigung_basis_pruefen('https://guardops.ch/irgendwo') === null);
+$pruef('ein Schrägstrich am Ende faellt weg, statt den Link doppelt zu machen',
+    demo_bestaetigung_basis_pruefen('https://guardops.ch/') === 'https://guardops.ch');
+
+// Der Link. Ohne Basis gibt es keinen -- "nicht eingerichtet" ist etwas
+// anderes als eine kaputte Adresse, und der Aufrufer unterscheidet das.
+$pruef('KRITISCH: ohne hinterlegte Adresse entsteht kein Link statt eines kaputten',
+    demo_bestaetigung_link($w1, null) === null || demo_bestaetigung_basis() !== null);
+$link = demo_bestaetigung_link($w1, 'https://guardops.ch');
+$pruef('KRITISCH: der Link fuehrt auf die Bestaetigungsseite und traegt den Wert',
+    $link === 'https://guardops.ch/demo-bestaetigen.html?t=' . $w1);
+// Die Seite, auf die er zeigt, muss es auch geben.
+$pruef('KRITISCH: die Seite, auf die der Link zeigt, liegt im Repository',
+    is_file(dirname(__DIR__) . '/demo-bestaetigen.html'));
+
+// Die Mail mit dem Link.
+$best = demo_bestaetigung_mail('Muster Sicherheit GmbH', 'R. Muster', $link);
+foreach (['text', 'html'] as $teil) {
+    $pruef("die $teil-Fassung traegt den Link", str_contains($best[$teil], $link));
+}
+// Zu diesem Zeitpunkt gibt es weder Konto noch Platz -- es KANN kein
+// Passwort drinstehen, und die Unterschrift der Funktion sagt das auch.
+$pruef('KRITISCH: die Bestaetigungsmail bekommt gar kein Passwort uebergeben',
+    array_filter((new ReflectionFunction('demo_bestaetigung_mail'))->getParameters(),
+        fn($par) => str_contains(mb_strtolower($par->getName()), 'passwort')) === []);
+// Wer die Mail bekommt, ohne sie angefordert zu haben, soll wissen, dass
+// Nichtstun genuegt -- sonst meldet er sich beunruhigt oder klickt doch.
+$pruef('KRITISCH: sie sagt, dass ohne Bestaetigung nichts geschieht',
+    str_contains($best['text'], 'ignorieren Sie diese')
+    && str_contains(strip_tags($best['html']), 'ignorieren Sie diese'));
+$pruef('sie nennt die Gueltigkeitsdauer, statt sie zu verschweigen',
+    str_contains($best['text'], (string)DEMO_BESTAETIGUNG_STUNDEN . ' Stunden'));
+$pruef('sie ist gezeichnet wie die anderen Mails an Interessenten',
+    str_contains($best['html'], 'Mit freundlichen Grüssen'));
+
+// Der Knopf. Ein Mailprogramm, das ihn verschluckt, darf den Empfaenger
+// nicht ohne Weiterweg zuruecklassen -- die Adresse steht darum auch als
+// Text darunter.
+$knopf = mail_knopf('Bestätigen', 'https://guardops.ch/x?t=1');
+$pruef('KRITISCH: der Knopf traegt seine Adresse zusaetzlich als lesbaren Text',
+    substr_count($knopf, 'https://guardops.ch/x?t=1') >= 2);
+$pruef('KRITISCH: der Knopf bringt seine Farben selbst mit, nicht aus dem Stylesheet',
+    str_contains($knopf, 'background:' . MAIL_FARBE_BLAU)
+    && str_contains($knopf, 'color:#FFFFFF'));
+// Auch hier: was hereingereicht wird, bleibt Text.
+$pruef('KRITISCH: eingeschmuggelte Auszeichnung im Knopf bleibt Text',
+    !str_contains(mail_knopf('<b>X</b>', 'https://a.ch'), '<b>X</b>'));
+
 echo "\n$ok bestanden, " . count($bad) . " nicht bestanden\n";
 foreach ($bad as $n) { echo "  x $n\n"; }
 exit(count($bad) ? 1 : 0);

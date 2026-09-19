@@ -74,8 +74,20 @@ check('KRITISCH: demo_anfordern.php prueft die Telefonnummer, bevor ein Platz ve
 check('KRITISCH: demo_anfordern.php prueft die Zustellbarkeit, bevor ein Platz verbraucht wird',
   /demo_zugang_adresse_zustellbar\(\$email\)\s*===\s*false/.test(anfordern)
   && anfordern.indexOf('demo_zugang_adresse_zustellbar') < anfordern.indexOf('demo_platz_waehlen'));
+// Seit ENT-624 laeuft das Einrichten nicht mehr im Endpunkt, sondern in
+// demo_zugang_einrichten() -- zwei Endpunkte brauchen es, und zwei Kopien
+// waeren auseinandergelaufen. Die Aussagen darunter gelten unveraendert,
+// sie werden nur an ihrem neuen Ort geprueft.
+const einrichten = nurCode(lies('backend/demo_instanz.php'));
+// Die Nummer muss BEIDE Stationen ueberstehen: die offene Anfrage und das
+// Register. Faellt sie auf einer der beiden weg, steht im Register eine
+// leere Zelle, und der Vertrieb hat nichts zum Anrufen.
+check('das Telefon wird in der offenen Anfrage gespeichert, nicht verworfen',
+  /INSERT INTO demo_bestaetigung[\s\S]{0,200}telefon/.test(anfordern)
+  && /\$telefon\b/.test(anfordern));
 check('das Telefon wird im Register gespeichert, nicht verworfen',
-  /INSERT INTO demo_zugang[\s\S]{0,120}telefon/.test(anfordern) && /\$telefon\b/.test(anfordern));
+  /INSERT INTO demo_zugang[\s\S]{0,120}telefon/.test(einrichten)
+  && /\$telefon\b/.test(einrichten));
 
 // KRITISCH (gefunden live am 2026-09-18, ENT-612-Nachtrag): Bis hierher
 // rief demo_anfordern.php demo_daten_erzeugen_ausfuehren() -- die Fassung,
@@ -86,14 +98,23 @@ check('das Telefon wird im Register gespeichert, nicht verworfen',
 // Einrichtung selbst reparierte) haette diesen Rest stillschweigend
 // abgeschnitten -- keine Zugangsdaten, keine Mail, obwohl der Musterbetrieb
 // erfolgreich entstand.
-check('KRITISCH: demo_anfordern.php ruft die reine demo_daten_erzeugen() auf, nicht die selbst-antwortende Fassung',
-  /\bdemo_daten_erzeugen\(\$instanz\)/.test(anfordern)
-  && !/\bdemo_daten_erzeugen_ausfuehren\(/.test(anfordern));
+check('KRITISCH: das Einrichten ruft die reine demo_daten_erzeugen() auf, nicht die selbst-antwortende Fassung',
+  /\bdemo_daten_erzeugen\(\$instanz\)/.test(einrichten)
+  && !/\bdemo_daten_erzeugen_ausfuehren\(/.test(einrichten));
+// Und die Falle ist seit ENT-624 dieselbe geblieben, nur eine Ebene
+// tiefer: demo_zugang_einrichten() antwortet ebenfalls nicht selbst --
+// beide Aufrufer machen danach noch weiter (Meldung an den Betreiber,
+// Vermerk am Bestaetigungssatz). Ein json_response() darin schnitte
+// ihnen das stillschweigend ab.
+const rumpf = einrichten.slice(einrichten.indexOf('function demo_zugang_einrichten'));
+check('die Funktion wurde im Quelltext gefunden', rumpf.length > 400);
+check('KRITISCH: demo_zugang_einrichten() antwortet nicht selbst, sondern gibt zurueck',
+  rumpf.length > 400 && !rumpf.includes('json_response('));
 // Kehrseite: Nach diesem Aufruf muss die Anfrage tatsaechlich weitergehen
 // -- sonst waere die Aufteilung selbst zwecklos gewesen.
-check('KRITISCH: nach der Musterbetrieb-Erzeugung legt die Anfrage noch das angeforderte Konto an',
-  anfordern.indexOf('demo_daten_erzeugen($instanz)') <
-  anfordern.indexOf("INSERT INTO mitarbeiter"));
+check('KRITISCH: nach der Musterbetrieb-Erzeugung entsteht noch das angeforderte Konto',
+  einrichten.indexOf('demo_daten_erzeugen($instanz)') <
+  einrichten.indexOf("INSERT INTO mitarbeiter"));
 
 // ── 4. Der Rechenkern geht in JEDES Buendel mit, das betreiber.php hat ─
 // Das ist der Fall, der beim ersten Bau tatsaechlich danebengegangen

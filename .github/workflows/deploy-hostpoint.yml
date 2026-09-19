@@ -778,6 +778,7 @@ jobs:
           # betreiber.php laedt, nicht erst die Demo-Freigabe.
           cp backend/demo_zugang.php dist/demo_zugang.php
           cp backend/mail_vorlage.php dist/mail_vorlage.php
+          cp backend/demo_bestaetigung.php dist/demo_bestaetigung.php
           cp backend/guardops-signatur.png dist/guardops-signatur.png
           cp backend/guardops-signatur-hell.png dist/guardops-signatur-hell.png
           # Support-Freigabe (ENT-526). Wird von BEIDEN Seiten eingebunden --
@@ -951,6 +952,24 @@ jobs:
           # der Platzhalter auch hier ersetzt werden -- ein stehen
           # gebliebener weist den Deploy ab.
           sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist/demo_zugang.php
+
+          # Adresse der Bestaetigungsseite (ENT-624). Sie liegt auf der
+          # Verkaufsseite guardops.ch, und die gibt es AUSSCHLIESSLICH auf
+          # Production (gleiche Begruendung wie bei den guardops-Schritten
+          # weiter oben). In jeder anderen Umgebung bleibt der Wert leer;
+          # demo_bestaetigung_basis_pruefen() erkennt das und liefert null,
+          # der Endpunkt sagt dann "noch nicht eingerichtet" statt einen
+          # Link ins Nichts zu verschicken. Ein Literal, kein Secret --
+          # dieselbe Einordnung wie __APP_BASIS_URL__ darueber.
+          # Zwei ausgeschriebene Zeilen statt einer Variablen: Eine
+          # Zwischenvariable wuerde die Pruefung "jeder eingesetzte Wert
+          # wird weitergereicht" verletzen, und die hat recht -- sie kann
+          # nicht sehen, ob sie im selben Schritt gesetzt wurde.
+          if [ "$UMGEBUNG" = "production" ]; then
+            sed -i "s|__GUARDOPS_BASIS_URL__|https://guardops.ch|g" dist/demo_bestaetigung.php
+          else
+            sed -i "s|__GUARDOPS_BASIS_URL__||g" dist/demo_bestaetigung.php
+          fi
           # Staging-Mailmodus (ENT-341): Ausserhalb der Produktion leitet
           # mailer.php JEDE Mail auf diese Adresse um -- unabhaengig davon,
           # ueber welches Postfach (siehe SMTP_* oben) sie verschickt wird.
@@ -1132,6 +1151,19 @@ jobs:
           # an EINER Adresse stehen, mit einem Stil und einem Deploy-Weg.
           # Der Demobereich verweist absolut darauf (dashboard.html).
           cp datenschutz-demo.html       dist-guardops/datenschutz-demo.html
+          # Nutzungsbedingungen und Bestaetigungsseite (ENT-624). Beide
+          # teilen sich recht.css mit Impressum und Datenschutz -- darum
+          # steht der Stil dort und nicht zweimal inline.
+          #
+          # demo-bestaetigen.html ist die Seite, auf die der Link aus der
+          # Bestaetigungsmail zeigt. Sie liegt hier und nicht im
+          # Buendel des Betreiber-Bereichs, weil der Interessent von dieser
+          # Domain kam;
+          # der Endpunkt dahinter laeuft weiterhin auf
+          # betreiber.guardops.ch (siehe OEFFENTLICHE_DEMO_SKRIPTE in
+          # backend/db.php).
+          cp nutzungsbedingungen.html   dist-guardops/nutzungsbedingungen.html
+          cp demo-bestaetigen.html      dist-guardops/demo-bestaetigen.html
           cp recht.css                   dist-guardops/recht.css
           cp htaccess-guardops           dist-guardops/.htaccess
           cp robots-guardops.txt         dist-guardops/robots.txt
@@ -1295,6 +1327,7 @@ jobs:
           cp backend/demo_zugang.php   dist-betreiber/demo_zugang.php
           # Die gemeinsame Mailgestaltung -- demo_zugang.php bindet sie selbst ein.
           cp backend/mail_vorlage.php  dist-betreiber/mail_vorlage.php
+          cp backend/demo_bestaetigung.php dist-betreiber/demo_bestaetigung.php
           # Das Logo der Signatur -- flach neben die Vorlage, die es von dort liest.
           cp backend/guardops-signatur.png     dist-betreiber/guardops-signatur.png
           # Die helle Fassung fuer den Dunkelmodus -- ohne sie stuende das Logo
@@ -1419,6 +1452,24 @@ jobs:
           # entfaellt still -- der Demo-Zugang des Interessenten haengt
           # ausdruecklich NICHT daran.
           sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist-betreiber/demo_zugang.php
+
+          # Adresse der Bestaetigungsseite (ENT-624). Sie liegt auf der
+          # Verkaufsseite guardops.ch, und die gibt es AUSSCHLIESSLICH auf
+          # Production (gleiche Begruendung wie bei den guardops-Schritten
+          # weiter oben). In jeder anderen Umgebung bleibt der Wert leer;
+          # demo_bestaetigung_basis_pruefen() erkennt das und liefert null,
+          # der Endpunkt sagt dann "noch nicht eingerichtet" statt einen
+          # Link ins Nichts zu verschicken. Ein Literal, kein Secret --
+          # dieselbe Einordnung wie __APP_BASIS_URL__ darueber.
+          # Zwei ausgeschriebene Zeilen statt einer Variablen: Eine
+          # Zwischenvariable wuerde die Pruefung "jeder eingesetzte Wert
+          # wird weitergereicht" verletzen, und die hat recht -- sie kann
+          # nicht sehen, ob sie im selben Schritt gesetzt wurde.
+          if [ "$UMGEBUNG" = "production" ]; then
+            sed -i "s|__GUARDOPS_BASIS_URL__|https://guardops.ch|g" dist-betreiber/demo_bestaetigung.php
+          else
+            sed -i "s|__GUARDOPS_BASIS_URL__||g" dist-betreiber/demo_bestaetigung.php
+          fi
 
           # SMTP fuer die Zugangsdaten-Mail an Demo-Interessenten (ENT-600).
           # Dasselbe Postfach wie das Kundenportal, aus demselben Grund wie
@@ -1741,6 +1792,7 @@ jobs:
           # Siehe dist/: betreiber.php braucht diesen Rechenkern (ENT-600).
           cp backend/demo_zugang.php dist-cupi24/demo_zugang.php
           cp backend/mail_vorlage.php dist-cupi24/mail_vorlage.php
+          cp backend/demo_bestaetigung.php dist-cupi24/demo_bestaetigung.php
           cp backend/guardops-signatur.png dist-cupi24/guardops-signatur.png
           cp backend/guardops-signatur-hell.png dist-cupi24/guardops-signatur-hell.png
           cp backend/support.php dist-cupi24/support.php
@@ -1842,6 +1894,24 @@ jobs:
           # der Platzhalter auch hier ersetzt werden -- ein stehen
           # gebliebener weist den Deploy ab.
           sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist-cupi24/demo_zugang.php
+
+          # Adresse der Bestaetigungsseite (ENT-624). Sie liegt auf der
+          # Verkaufsseite guardops.ch, und die gibt es AUSSCHLIESSLICH auf
+          # Production (gleiche Begruendung wie bei den guardops-Schritten
+          # weiter oben). In jeder anderen Umgebung bleibt der Wert leer;
+          # demo_bestaetigung_basis_pruefen() erkennt das und liefert null,
+          # der Endpunkt sagt dann "noch nicht eingerichtet" statt einen
+          # Link ins Nichts zu verschicken. Ein Literal, kein Secret --
+          # dieselbe Einordnung wie __APP_BASIS_URL__ darueber.
+          # Zwei ausgeschriebene Zeilen statt einer Variablen: Eine
+          # Zwischenvariable wuerde die Pruefung "jeder eingesetzte Wert
+          # wird weitergereicht" verletzen, und die hat recht -- sie kann
+          # nicht sehen, ob sie im selben Schritt gesetzt wurde.
+          if [ "$UMGEBUNG" = "production" ]; then
+            sed -i "s|__GUARDOPS_BASIS_URL__|https://guardops.ch|g" dist-cupi24/demo_bestaetigung.php
+          else
+            sed -i "s|__GUARDOPS_BASIS_URL__||g" dist-cupi24/demo_bestaetigung.php
+          fi
           # Dieser Schritt laeuft ausschliesslich in Production (siehe
           # Bedingung oben) -- EFF_STAGING_TESTMAIL und EFF_DEMO_TESTMAIL
           # sind dort immer leer, dieselbe Bauart wie beim Hauptschritt.

@@ -45,6 +45,7 @@ require_once __DIR__ . '/db.php';
 // Rechenkern der Demo-Zugaenge (ENT-600) -- liefert die Tabellendefinition
 // fuer be_tabellen() und die Ablauflogik fuer die Endpunkte.
 require_once __DIR__ . '/demo_zugang.php';
+require_once __DIR__ . '/demo_bestaetigung.php';
 require_once __DIR__ . '/logbuch.php';
 
 // ── Logbuch der Betreiber-Ebene (ENT-614) ────────────────────────────
@@ -1089,6 +1090,11 @@ function be_tabellen(): array
 // naechtliche Reset (ENT-523) leert generisch JEDE Tabelle der verbundenen
 // Datenbank. Ein Register in der Demo waere am naechsten Morgen weg.
 'demo_zugang' => demo_zugang_tabelle(),
+
+// Die offene Anfrage vor der Bestaetigung (ENT-624). Liegt aus demselben
+// Grund hier wie das Register darueber -- und traegt zusaetzlich den
+// Abdruck der Zustimmung, der auch nach dem Einloesen stehen bleibt.
+'demo_bestaetigung' => demo_bestaetigung_tabelle(),
 
 'support_nachricht' => "CREATE TABLE IF NOT EXISTS support_nachricht (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
