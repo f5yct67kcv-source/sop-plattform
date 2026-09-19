@@ -39,10 +39,14 @@ frage() {  # frage <Variable> <Text> [Vorgabe]
   printf -v "$__var" '%s' "$__eingabe"
 }
 
+# Fuer alles, was geheim ist: keine Anzeige, kein Terminal-Verlauf, keine
+# Schulter, die mitliest. Bestaetigt wird nur die LAENGE -- das faengt die
+# beiden Faelle, die hier wirklich passieren (leer geblieben, halb
+# eingefuegt), ohne den Wert preiszugeben.
 frage_still() {  # frage_still <Variable> <Text>
   local __var="$1" __text="$2" __eingabe
   read -r -s -p "$__text: " __eingabe
-  echo
+  echo " (${#__eingabe} Zeichen)"
   printf -v "$__var" '%s' "$__eingabe"
 }
 
@@ -117,8 +121,12 @@ echo
 
 # ── Die gemeinsamen Werte ────────────────────────────────────────────
 echo "Gemeinsame Werte aller zehn Plätze:"
-frage MAPS  "  Google-Maps-Schlüssel (der bestehende Demo-Schlüssel)"
-frage KI    "  Anthropic-API-Schlüssel"
+# BEIDE still, nicht nur einer: Der Anthropic-Schlüssel ist ein Geheimnis
+# wie ein Passwort. Der Maps-Schlüssel steht zwar ohnehin im Quelltext
+# jeder Seite, die eine Karte zeichnet -- aber er gehört trotzdem nicht in
+# den Terminal-Verlauf, wo er beim nächsten Bildschirmfoto mitfährt.
+frage_still MAPS "  Google-Maps-Schlüssel (der bestehende Demo-Schlüssel)"
+frage_still KI   "  Anthropic-API-Schlüssel"
 frage TMAIL "  Testadresse -- JEDE Mail aus der Demo geht dorthin"
 echo
 echo "Postfach, über das die Demo verschickt:"
