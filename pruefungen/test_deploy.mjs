@@ -2090,6 +2090,38 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
     !istIgnoriert('mobile/www/index.html'));
   check('KRITISCH: die iOS-Kopie des Bündels ist dagegen ignoriert — dort darf der Schlüssel liegen bleiben',
     istIgnoriert('mobile/ios/App/App/public/index.html'));
+
+  // Der Ordner, den Xcode beim Bauen anlegt (Swift-Package-Aufloesung),
+  // gehoert ebenfalls nicht ins Repository -- er tauchte nach dem ersten
+  // Geraetelauf als unversioniert auf.
+  check('KRITISCH: der von Xcode erzeugte swiftpm-Ordner ist ignoriert',
+    istIgnoriert('mobile/ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/x'));
+
+  /* Das Skript aktualisiert sich selbst -- und muss danach neu starten
+     (2026-09-19, am Geraet gemessen).
+
+     bash fuehrt die Fassung aus, die es beim Start geoeffnet hat. Holt
+     "git pull" eine neue, wirkt sie erst beim uebernaechsten Lauf --
+     genau so lief das Zuruecksetzen des Buendels oben ins Leere. Und weil
+     bash sich die BYTE-Position merkt, kann es nach einer
+     Laengenaenderung mitten in einer Zeile weiterlesen.
+
+     Geprueft wird die AUSSAGE: Nach dem Pull wird der eigene Stand mit
+     dem von vorher verglichen, und bei Abweichung wird das Skript per
+     exec ersetzt -- vor allem, was danach kommt. */
+  {
+    const beiPull = skript.search(/^\s*git pull origin/m);
+    const beiExec = skript.search(/^\s*exec "\$0" "\$@"/m);
+    const beiSichern = skript.search(/^buendel_sichern$/m);
+    check('KRITISCH: nach dem Pull startet sich das Skript neu, wenn es sich selbst erneuert hat',
+      beiPull !== -1 && beiExec !== -1 && beiPull < beiExec);
+    check('KRITISCH: der Neustart passiert VOR allem, was das Skript sonst noch tut',
+      beiExec !== -1 && beiSichern !== -1 && beiExec < beiSichern);
+    // Und er darf sich nicht endlos wiederholen.
+    check('KRITISCH: der Neustart geschieht höchstens einmal, keine Schleife',
+      /AUFS_HANDY_NEUSTART/.test(skript)
+      && /export AUFS_HANDY_NEUSTART=1/.test(skript));
+  }
 }
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

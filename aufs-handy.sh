@@ -110,10 +110,39 @@ lokale_aenderungen_sichern() {
 }
 
 echo "── 1/5  Stand holen ($ZWEIG)"
+# Der eigene Fingerabdruck VOR dem Holen -- siehe den Neustart unten.
+# cksum statt sha256sum/shasum: Die beiden heissen auf macOS und Linux
+# verschieden, cksum gibt es ueberall. Es geht hier nur um "gleich oder
+# nicht", nicht um Faelschungssicherheit.
+SKRIPT_VORHER="$(cksum < "$0")"
 lokale_aenderungen_sichern
 git fetch origin "$ZWEIG"
 git checkout "$ZWEIG"
 git pull origin "$ZWEIG"
+
+# Sich selbst neu starten, wenn der Pull dieses Skript geaendert hat.
+#
+# ANLASS (2026-09-19, vom Projektinhaber am Geraet gemessen): Das Skript
+# aktualisiert sich hier selbst -- aber bash fuehrt bereits die ALTE
+# Fassung aus, die es beim Start geoeffnet hat. Eine Aenderung am Skript
+# wirkte darum erst beim UEBERNAECHSTEN Lauf. Genau so ging das
+# Zuruecksetzen des Buendels (OP-608) ins Leere: Der Lauf holte die
+# Behebung und lief danach ohne sie weiter.
+#
+# Schlimmer als wirkungslos ist der zweite Teil: bash liest ein Skript
+# haeppchenweise und merkt sich dabei die BYTE-Position. Wird die Datei
+# unter ihm laenger oder kuerzer, liest es an der alten Position im neuen
+# Text weiter -- mitten in einer Zeile. Was dann ausgefuehrt wird, steht
+# so nirgends.
+#
+# Der Neustart passiert nur, wenn sich wirklich etwas geaendert hat, und
+# nur einmal: AUFS_HANDY_NEUSTART verhindert eine Schleife, falls zwei
+# Faelle zugleich zutreffen.
+if [ "$(cksum < "$0")" != "$SKRIPT_VORHER" ] && [ "${AUFS_HANDY_NEUSTART:-}" != "1" ]; then
+  echo "        Das Skript selbst wurde erneuert -- Neustart mit der neuen Fassung"
+  export AUFS_HANDY_NEUSTART=1
+  exec "$0" "$@"
+fi
 
 echo "── 1b/5 Signier-Team pruefen"
 # Nach dem Stash oben, damit eine gerade weggeraeumte Einstellung noch
