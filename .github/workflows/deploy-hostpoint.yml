@@ -1432,11 +1432,24 @@ jobs:
           # die Datei neben der Seite liegt.
           cp qrcode.js                 dist-betreiber/qrcode.js
           cp backend/api/betreiber_*.php dist-betreiber/api/
-          # Die oeffentliche Selbstbedienung (ENT-601): kein betreiber_-
-          # Praefix, weil sie ausdruecklich OHNE Anmeldung laeuft -- der
-          # Wildcard zwei Zeilen darueber faengt sie darum nicht ein.
+          # Die oeffentliche Selbstbedienung (ENT-601, ENT-624): kein
+          # betreiber_-Praefix, weil sie ausdruecklich OHNE Anmeldung
+          # laeuft -- der Wildcard zwei Zeilen darueber faengt sie darum
+          # nicht ein. Massgeblich ist OEFFENTLICHE_DEMO_SKRIPTE in
+          # backend/db.php: Was dort steht, wird hier kopiert, und
+          # test_deploy.mjs gleicht genau das ab.
           cp backend/api/demo_anfordern.php     dist-betreiber/api/demo_anfordern.php
           cp backend/api/demo_erneut_senden.php dist-betreiber/api/demo_erneut_senden.php
+          # Das Einloesen des Bestaetigungslinks (ENT-624). BESTANDSFEHLER,
+          # gefunden am 2026-09-19 live: Die Datei fehlte hier, seit die
+          # Bestaetigung eingefuehrt wurde. Der Knopf auf
+          # demo-bestaetigen.html schickte seinen POST an eine Adresse, die
+          # es nicht gab; die 404-Seite von Apache traegt keine
+          # CORS-Kopfzeile, und darum brach die Anfrage schon im Browser ab
+          # -- sichtbar nur als "Die Verbindung ist abgebrochen", der
+          # Sammelfall der Seite. Kein Interessent konnte seinen Zugang
+          # einloesen.
+          cp backend/api/demo_bestaetigen.php   dist-betreiber/api/demo_bestaetigen.php
           cp htaccess-betreiber        dist-betreiber/.htaccess
           cp robots-betreiber.txt      dist-betreiber/robots.txt
 
