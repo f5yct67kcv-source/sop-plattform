@@ -153,7 +153,21 @@ const tagVersatz = n => {
 
 const ANTWORTEN = {
   'betreiber_zf_status.php': { status: 'ok', eingerichtet: true },
-  'betreiber_mandant_list.php': { status: 'ok', mandanten: [], anzahl: 0 },
+  /* Ein echter Mandant und zwei Demo-Plaetze im selben Stamm (ENT-627).
+     demo3 fehlt ABSICHTLICH: Ein Platz ohne Mandanten-Zeile kommt an
+     keine Datenbank, und das muss in der Platztabelle als eigene Aussage
+     dastehen statt als fehlender Knopf. */
+  'betreiber_mandant_list.php': { status: 'ok', anzahl: 3, mandanten: [
+    { id: 1, name: 'Beispiel Betrieb AG', subdomain: 'beispiel', status: 'aktiv',
+      kanton: 'SO', gav_lage: 'bestaetigt', verbindung_lage: 'vollstaendig',
+      db_host: '', db_name: '', db_user: '', secret_name: '', ist_demo: false },
+    { id: 2, name: 'Demo-Platz 1', subdomain: 'demo1', status: 'aktiv',
+      kanton: null, gav_lage: 'unbestaetigt', verbindung_lage: 'vollstaendig',
+      db_host: 'h', db_name: 'd1', db_user: 'u', secret_name: 'S1', ist_demo: true },
+    { id: 3, name: 'Demo-Platz 2', subdomain: 'demo2', status: 'aktiv',
+      kanton: null, gav_lage: 'unbestaetigt', verbindung_lage: 'vollstaendig',
+      db_host: 'h', db_name: 'd2', db_user: 'u', secret_name: 'S2', ist_demo: true },
+  ] },
   'betreiber_demo_list.php': {
     status: 'ok', laufzeit_tage: 14, plaetze_frei: 1, plaetze_total: 3, aktive: 2,
     plaetze: [
@@ -220,6 +234,39 @@ check('KRITISCH: unter "Mandanten" stehen die Demo-Plätze nicht mehr daneben (E
 check('die Unterzeile im Kopf sagt, welcher Reiter offen ist',
   /Betriebe/.test(getrennt.unterzeile));
 
+/* ── Die Demo-Plaetze sind keine Mandanten (ENT-627) ──────────────────
+   Sie STEHEN im Mandantenstamm -- ihre Datenbankverbindung haengt an
+   dieser Zeile -- aber sie sind kein Betrieb, der die Plattform nutzt.
+   Geprueft wird, was in der Liste landet, nicht wie gefiltert wird. */
+const stamm = await seite.evaluate(() => {
+  const zeilen = [...document.querySelectorAll('#m-inhalt tbody tr')]
+    .map(r => r.querySelector('td strong')?.textContent.trim() || '');
+  return {
+    zeilen,
+    hinweis: document.querySelector('#m-inhalt + .hinweis, #m-inhalt .hinweis')?.textContent.trim()
+      || (document.getElementById('m-inhalt').parentElement.querySelector('.hinweis')?.textContent.trim() || ''),
+    text: document.getElementById('mv-mandanten').innerText,
+    /* textContent und nicht innerText: Die Kennzahlen stehen im Bereich
+       "Uebersicht", der gerade verborgen ist -- innerText liefert dort
+       nichts, und die Pruefung waere gruen, weil sie nichts gelesen hat. */
+    mandantenZahl: (() => {
+      const b = [...document.querySelectorAll('#u-zahlen .zahl')]
+        .find(z => z.querySelector('.lab')?.textContent.trim() === 'Mandanten');
+      return b ? b.querySelector('.wert').textContent.trim() : null;
+    })(),
+  };
+});
+check('KRITISCH: die Mandantenliste zeigt nur echte Betriebe, keine Demo-Plätze',
+  stamm.zeilen.length === 1 && stamm.zeilen[0] === 'Beispiel Betrieb AG');
+// Eine gefilterte Zahl ohne Bezug sieht aus wie die Gesamtzahl (Hausregel).
+// "1 Mandant" allein saehe aus, als laufe hier genau eine Instanz.
+check('KRITISCH: die ausgeblendeten Demo-Plätze stehen mit Zahl und Ort da',
+  /2 Demo-Plätze stehen im Reiter Demo/.test(stamm.text));
+// Die Kopfzahlen zaehlen dasselbe wie die Liste -- sonst stehen oben vier
+// Mandanten und unten einer.
+check('KRITISCH: der Kopfzähler zählt echte Mandanten, nicht die Demo-Plätze',
+  stamm.mandantenZahl === '1');
+
 /* Ab hier die Demo-Ansicht. Geklickt wird der Reiter, den ein Mensch
    hier sieht: Ueber 1210 px hebt unterreiterZeichnen() die Leiste in die
    Werkzeugleiste (dieselbe Mechanik wie im Cockpit), darunter bleibt sie
@@ -246,6 +293,48 @@ check('KRITISCH: der Reiter "Demo" zeigt die Demo-Ansicht und blendet den Stamm 
 // Reiter. Sonst stuende ueber der Demo-Ansicht, sie zeige Betriebe.
 check('KRITISCH: die Unterzeile wechselt mit dem Reiter, die Überschrift nicht',
   demoReiter.titel === 'Mandanten' && /Demo/.test(demoReiter.unterzeile));
+
+/* ── Der Zustand eines Platzes steht als Wort da (ENT-627) ────────────
+   Vorher trug nur der freie Platz einen Merker, und der stand in der
+   Spalte "Belegt durch" -- "frei" ist aber keine Antwort darauf, WER
+   darauf sitzt. Geprueft werden die Woerter je Zeile, nicht die Klassen. */
+const platzTabelle = await seite.evaluate(() => {
+  const kopf = [...document.querySelectorAll('#demo-plaetze thead th')]
+    .map(t => t.textContent.trim());
+  const zeilen = [...document.querySelectorAll('#demo-plaetze tbody tr')].map(r => {
+    const td = [...r.querySelectorAll('td')];
+    return {
+      platz:  td[0]?.querySelector('strong')?.textContent.trim() || '',
+      status: td[1]?.querySelector('.merker')?.textContent.trim() || '',
+      wer:    td[2]?.textContent.trim() || '',
+      knoepfe: [...(td[4]?.querySelectorAll('button') || [])].map(b => b.textContent.trim()),
+      statusFarbe: td[1]?.querySelector('.merker')?.className || '',
+      ohneZeile: (td[4]?.textContent || '').trim(),
+    };
+  });
+  return { kopf, zeilen };
+});
+check('die Platztabelle hat eine eigene Spalte für den Zustand',
+  platzTabelle.kopf[1] === 'Status' && platzTabelle.kopf[2] === 'Belegt durch');
+check('KRITISCH: ein belegter Platz sagt "besetzt", ein freier "frei"',
+  platzTabelle.zeilen.map(z => z.status).join('|') === 'besetzt|besetzt|frei');
+// Die Farbe hebt hervor, was noch zu haben ist -- besetzt bleibt ruhig.
+check('nur der freie Platz ist farbig hervorgehoben',
+  /m-pos/.test(platzTabelle.zeilen[2].statusFarbe)
+  && !/m-pos/.test(platzTabelle.zeilen[0].statusFarbe));
+// "Belegt durch" traegt nur noch den Namen -- oder einen Strich.
+check('KRITISCH: in "Belegt durch" steht der Name, nicht der Zustand',
+  !/frei|besetzt/.test(platzTabelle.zeilen.map(z => z.wer).join(' '))
+  && platzTabelle.zeilen[0].wer.length > 0);
+// Seit die Plaetze aus der Mandantenliste heraus sind, ist das hier der
+// einzige Weg zu ihrer Datenbankverbindung.
+check('KRITISCH: jeder Platz mit Mandanten-Zeile trägt seine Knöpfe',
+  platzTabelle.zeilen[0].knoepfe.join('|') === 'Ändern|Support'
+  && platzTabelle.zeilen[1].knoepfe.join('|') === 'Ändern|Support');
+// "Kein Knopf" und "gibt es nicht" sind verschiedene Aussagen (Hausregel).
+check('KRITISCH: ein Platz ohne Mandanten-Zeile sagt das, statt still ohne Knöpfe dazustehen',
+  platzTabelle.zeilen[2].knoepfe.length === 0
+  && /nicht im Mandantenstamm/.test(platzTabelle.zeilen[2].ohneZeile));
 
 const sicht = await seite.evaluate(() => {
   const zellen = sel => [...document.querySelectorAll(sel)].map(e => e.textContent.trim());

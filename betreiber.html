@@ -1646,6 +1646,48 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <div id="m-inhalt"></div>
     </div>
 
+    </div>
+
+    <!-- ── Reiter: Demo ──────────────────────────────────────────
+         Eigener Unterreiter seit ENT-626, vorher untereinander auf
+         derselben Seite wie der Mandantenstamm. KEIN eigener oberster
+         Reiter: Ein Demo-Zugang bleibt ein vorlaeufiger Mandant und keine
+         eigene Ebene des Betreiber-Bereichs -- der Kern von ENT-600 gilt
+         weiter, nur die Vermischung auf einer Seite endet.
+         Seit ENT-601 nur noch Uebersicht und Not-Aus: Ein Interessent
+         bekommt seinen Zugang ueber die Anmeldemaske selbst, automatisch
+         und sofort. Kein Betreiber schaltet mehr frei -- wer bei
+         Werbe-Anfragen auf einen freien Menschen wartet, ist zu spaet. -->
+    <div class="m-tab" id="mv-demo">
+    <div class="karte">
+      <div class="karte-kopf">
+        <div>
+          <h2>Demo — Plätze</h2>
+          <div class="sub">Zuteilung läuft automatisch über die Anmeldemaske</div>
+        </div>
+      </div>
+      <div id="demo-plaetze"></div>
+    </div>
+
+    <div class="karte">
+      <div class="karte-kopf">
+        <div>
+          <h2>Demo — Zugänge</h2>
+          <div class="sub">Laufende und beendete, neuste zuerst</div>
+        </div>
+        <button class="klein" id="knopf-demo-ablauf">Abgelaufene schliessen</button>
+      </div>
+      <div id="demo-inhalt"></div>
+    </div>
+    </div>
+
+    <!-- Formular und Supportzugriff liegen NEBEN den Reitern, nicht in
+         einem davon (ENT-627): Seit die Demo-Plaetze ihre eigenen Knoepfe
+         "Aendern" und "Support" haben, werden beide Karten aus beiden
+         Reitern heraus geoeffnet. Dieselbe Bauart wie #of-formular, das
+         aus demselben Grund neben den Bereichen liegt und zwei Belegarten
+         dient. Ganz unten, damit die Karte unter dem steht, woraus man sie
+         geoeffnet hat -- und nicht darueber. -->
     <!-- Formular -->
     <div class="karte versteckt" id="m-form-karte">
       <div class="karte-kopf">
@@ -1750,40 +1792,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <div id="sup-freigabe"></div>
         <div id="sup-inhalt"></div>
       </div>
-    </div>
-    </div>
-
-    <!-- ── Reiter: Demo ──────────────────────────────────────────
-         Eigener Unterreiter seit ENT-626, vorher untereinander auf
-         derselben Seite wie der Mandantenstamm. KEIN eigener oberster
-         Reiter: Ein Demo-Zugang bleibt ein vorlaeufiger Mandant und keine
-         eigene Ebene des Betreiber-Bereichs -- der Kern von ENT-600 gilt
-         weiter, nur die Vermischung auf einer Seite endet.
-         Seit ENT-601 nur noch Uebersicht und Not-Aus: Ein Interessent
-         bekommt seinen Zugang ueber die Anmeldemaske selbst, automatisch
-         und sofort. Kein Betreiber schaltet mehr frei -- wer bei
-         Werbe-Anfragen auf einen freien Menschen wartet, ist zu spaet. -->
-    <div class="m-tab" id="mv-demo">
-    <div class="karte">
-      <div class="karte-kopf">
-        <div>
-          <h2>Demo — Plätze</h2>
-          <div class="sub">Zuteilung läuft automatisch über die Anmeldemaske</div>
-        </div>
-      </div>
-      <div id="demo-plaetze"></div>
-    </div>
-
-    <div class="karte">
-      <div class="karte-kopf">
-        <div>
-          <h2>Demo — Zugänge</h2>
-          <div class="sub">Laufende und beendete, neuste zuerst</div>
-        </div>
-        <button class="klein" id="knopf-demo-ablauf">Abgelaufene schliessen</button>
-      </div>
-      <div id="demo-inhalt"></div>
-    </div>
     </div>
     </section>
 
@@ -2664,14 +2672,12 @@ function mandGo(t) {
     $('mtab-' + k).classList.toggle('on', k === t);
   });
   $('leiste-unter').textContent = MANDANTEN_REITER[t];
-  /* Ein halb ausgefuelltes Anlegeformular gehoert zum Reiter Mandanten.
-     Es steht zwar in dessen Container und waere ohnehin verborgen --
-     aber wer von Demo zurueckkommt, soll die Liste sehen und nicht ein
-     Formular, dessen Herkunft nirgends mehr steht. */
-  if (t !== 'mandanten') {
-    zeig($('m-form-karte'), false);
-    zeig($('sup-karte'), false);
-  }
+  /* Beide Karten liegen NEBEN den Reitern und werden aus beiden heraus
+     geoeffnet (ENT-627). Beim Reiterwechsel gehen sie darum immer zu: Ein
+     halb ausgefuelltes Formular, das unter dem anderen Reiter weiter
+     dasteht, ist eines, dessen Herkunft nirgends mehr steht. */
+  zeig($('m-form-karte'), false);
+  zeig($('sup-karte'), false);
   /* Die Reiter stehen ueber 1210 px oben in der Werkzeugleiste. Wird hier
      umgeschaltet, muss die Kopie dort mitkommen. */
   unterreiterZeichnen();
@@ -3014,6 +3020,12 @@ function groesseZelle(g) {
        + '<div class="zweit">' + text(zweit) + '</div>';
 }
 
+/* Der volle Mandantenstamm, EINSCHLIESSLICH der Demo-Plaetze. Die
+   Platztabelle im Demo-Reiter braucht ihn, um zu einem Platz die Zeile zu
+   finden, an der seine Datenbankverbindung haengt (ENT-627). Die Liste
+   selbst zeigt ihn gefiltert -- siehe unten. */
+let mandantenAlle = [];
+
 async function ladeMandanten() {
   const a = await ruf('betreiber_mandant_list.php');
   const inhalt = $('m-inhalt');
@@ -3032,7 +3044,16 @@ async function ladeMandanten() {
     return;
   }
 
-  const liste = a.mandanten || [];
+  const alle = a.mandanten || [];
+  mandantenAlle = alle;
+  /* Die Demo-Plaetze sind Mandanten-Zeilen, weil ihre Datenbankverbindung
+     nirgends sonst steht -- aber kein Betrieb, der diese Plattform nutzt
+     (ENT-627). Sie stehen im Reiter Demo, samt ihren Knoepfen.
+     `ist_demo` kommt vom Server (DEMO_PLAETZE); fehlt das Feld, weil der
+     Server noch aelter ist, bleibt die Liste vollstaendig statt still
+     halb leer. */
+  const liste = alle.filter(m => !m.ist_demo);
+  const demoZeilen = alle.length - liste.length;
   /* Der Einrichtungsstand kommt aus einem eigenen Endpunkt, weil er
      Verbindungen zu fremden Datenbanken aufbaut -- das darf die Liste
      nicht bei jedem Aufruf mitschleppen. Schlaegt er fehl, bleibt die
@@ -3105,8 +3126,16 @@ async function ladeMandanten() {
     + zahlBlock('Nicht erreichbar', kaputt, kaputt ? 'Einrichtung prüfen' : 'alle erreichbar'));
 
   if (!liste.length) {
-    inhalt.innerHTML = leerBlock('◇', 'Noch kein Mandant eingetragen',
-      'Sobald ein Betrieb angelegt ist, erscheint er hier.');
+    /* "Nur Demo-Plaetze" ist etwas anderes als "gar nichts eingetragen"
+       (Hausregel). Wer den zweiten Text liest, obwohl zehn Instanzen
+       laufen, sucht den Fehler an der falschen Stelle. */
+    inhalt.innerHTML = demoZeilen
+      ? leerBlock('◇', 'Nur Demo-Plätze eingetragen',
+          'Der Mandantenstamm enthält bisher ' + demoZeilen + ' Demo-'
+          + (demoZeilen === 1 ? 'Platz' : 'Plätze') + ' und sonst nichts. '
+          + 'Sie stehen im Reiter Demo.')
+      : leerBlock('◇', 'Noch kein Mandant eingetragen',
+          'Sobald ein Betrieb angelegt ist, erscheint er hier.');
     return;
   }
 
@@ -3131,7 +3160,16 @@ async function ladeMandanten() {
           + '<button class="klein" data-support="' + m.id + '">Support</button>'
           + '</td>'
       + '</tr>').join('')
-    + '</tbody></table></div>';
+    + '</tbody></table></div>'
+    /* Keine Zahl ohne Bezug, sobald ein Filter greift (Hausregel): Eine
+       Liste mit einem Eintrag saehe sonst aus, als laufe auf dieser Anlage
+       genau eine Instanz. */
+    + (demoZeilen
+        ? '<div class="hinweis" style="margin-top:10px">' + text(demoZeilen
+            + ' Demo-' + (demoZeilen === 1 ? 'Platz steht' : 'Plätze stehen')
+            + ' im Reiter Demo und ' + (demoZeilen === 1 ? 'ist' : 'sind')
+            + ' hier nicht mitgezählt.') + '</div>'
+        : '');
 
   inhalt.querySelectorAll('[data-bearbeiten]').forEach(b =>
     b.onclick = () => formularOeffnen(liste.find(m => m.id === +b.dataset.bearbeiten)));
@@ -3879,6 +3917,36 @@ function demoRestZelle(z) {
        + '<div class="zweit">bis ' + text(String(z.laeuft_ab_am).slice(0, 10)) + '</div>';
 }
 
+/* Die Knoepfe eines Demo-Platzes (ENT-627).
+
+   Seit die Demo-Plaetze aus der Mandantenliste heraus sind, ist dies der
+   Weg zu der Zeile, an der ihre Datenbankverbindung haengt. Gefunden wird
+   sie ueber die Subdomain -- dieselbe Zeichenfolge, unter der der Platz
+   erreichbar ist.
+
+   DREI AUSSAGEN, DREI TEXTE (Hausregel): Knoepfe, wenn die Zeile da ist;
+   "noch nicht geladen", solange der Stamm nicht abgerufen wurde; "nicht im
+   Mandantenstamm", wenn es sie wirklich nicht gibt. Das Letzte ist ein
+   Befund -- ohne diese Zeile kommt der Platz an keine Datenbank.
+
+   KEIN GAV-Knopf: Ein Demo-Platz hat keinen Gesamtarbeitsvertrag zu
+   bestaetigen, dort arbeitet niemand. */
+function demoPlatzMandant(platz) {
+  return mandantenAlle.find(m => m.subdomain === platz) || null;
+}
+function demoPlatzKnoepfe(platz) {
+  if (!mandantenAlle.length) { return '<span class="zweit">noch nicht geladen</span>'; }
+  if (!demoPlatzMandant(platz)) { return '<span class="zweit">nicht im Mandantenstamm</span>'; }
+  return '<button class="klein" data-platz-aendern="' + text(platz) + '">Ändern</button> '
+       + '<button class="klein" data-platz-support="' + text(platz) + '">Support</button>';
+}
+function demoPlatzKnoepfeVerdrahten(wurzel) {
+  wurzel.querySelectorAll('[data-platz-aendern]').forEach(b =>
+    b.onclick = () => formularOeffnen(demoPlatzMandant(b.dataset.platzAendern)));
+  wurzel.querySelectorAll('[data-platz-support]').forEach(b =>
+    b.onclick = () => supportHolen(demoPlatzMandant(b.dataset.platzSupport)));
+}
+
 async function ladeDemo() {
   const a = await ruf('betreiber_demo_list.php');
   const inhalt = $('demo-inhalt');
@@ -3903,23 +3971,33 @@ async function ladeDemo() {
      Interessenten. Auf einem Platz liegt höchstens ein Zugang, aber die
      beiden Zahlen sind trotzdem nicht dasselbe -- beendete Zugänge zählen
      bei den Zugängen mit und bei den Plätzen nicht. */
+  /* Eigene Spalte fuer den Zustand (ENT-627). Vorher stand "frei" als
+     Merker in der Spalte "Belegt durch" -- und "frei" ist keine Antwort
+     auf die Frage, WER darauf sitzt. Jetzt sagt jede Spalte eine Sache,
+     und die Ordnung ist dieselbe wie in der Mandantentabelle.
+     Farbe nur auf "frei": Die Frage an diese Tabelle lautet, ob noch ein
+     Platz zu haben ist, wenn eine Anfrage hereinkommt. */
   plaetze.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
-    + '<th>Platz</th><th>Belegt durch</th><th>Bis</th>'
+    + '<th>Platz</th><th>Status</th><th>Belegt durch</th><th>Bis</th><th></th>'
     + '</tr></thead><tbody>'
     + (a.plaetze || []).map(p => '<tr>'
         + '<td><strong>' + text(p.platz) + '</strong>'
           + '<div class="zweit">' + text(p.adresse || 'keine Adresse') + '</div></td>'
         + '<td>' + (p.frei
             ? '<span class="merker m-pos">frei</span>'
+            : '<span class="merker m-ruhe">besetzt</span>') + '</td>'
+        + '<td>' + (p.frei ? '<span class="zweit">—</span>'
             : '<strong>' + text(p.firma || '') + '</strong>') + '</td>'
         + '<td>' + (p.frei ? '<span class="zweit">—</span>'
             : text(String(p.laeuft_ab_am || '').slice(0, 10))) + '</td>'
+        + '<td style="text-align:right;white-space:nowrap">' + demoPlatzKnoepfe(p.platz) + '</td>'
       + '</tr>').join('')
     + '</tbody></table></div>'
     + '<div class="hinweis" style="margin-top:10px">'
     + text(a.plaetze_frei + ' von ' + a.plaetze_total + ' Plätzen frei · '
          + 'Laufzeit ' + a.laufzeit_tage + ' Tage · '
          + a.aktive + ' laufende Zugänge') + '</div>';
+  demoPlatzKnoepfeVerdrahten(plaetze);
 
   const liste = a.zugaenge || [];
   const kenntNachfassen = a.kennt_nachfassen === true;
