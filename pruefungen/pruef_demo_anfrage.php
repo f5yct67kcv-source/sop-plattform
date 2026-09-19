@@ -28,16 +28,22 @@ pruef('KRITISCH: ohne Firma, Name, E-Mail und Telefon wird abgewiesen -- alle vi
 // Telefon: geprueft werden die ZIFFERN, nicht die Schreibweise. Alle drei
 // Formen unten sind dieselbe Nummer und muessen durchkommen; eine zu kurze
 // Eingabe darf es nicht.
-foreach (['079 123 45 67', '+41 79 123 45 67', '0041 79/123 45 67', '(079) 123-45-67'] as $form) {
+foreach (['079 123 45 67', '+41 79 123 45 67', '0041 79/123 45 67', '(079) 123-45-67',
+          '+49 151 12345678', '0049 30 1234567', '+43 664 1234567', '+43 1 1234567'] as $form) {
     pruef("Die Telefonschreibweise \"$form\" wird angenommen",
         demo_anfrage_pruefen(array_merge($gut, ['telefon' => $form]))['fehler'] === []);
 }
-foreach (['', '  ', '12345', 'ruf mich an', '079 12'] as $murks) {
+foreach (['', '  ', '12345', 'ruf mich an', '079 12', '123456789', '079 123 45 678',
+          '+41 09 123 45 67', '+33 6 12 34 56 78'] as $murks) {
     pruef("KRITISCH: \"$murks\" wird als Telefonnummer abgewiesen",
         isset(demo_anfrage_pruefen(array_merge($gut, ['telefon' => $murks]))['fehler']['telefon']));
 }
-pruef('KRITISCH: gezaehlt werden nur Ziffern, Trennzeichen zaehlen nicht mit',
-    demo_telefon_ziffern('+41 79/123 45 67') === 11 && demo_telefon_ziffern('----') === 0);
+// "Fehlt" und "so geschrieben ergibt das keine Nummer" sind zwei Aussagen.
+pruef('ein leeres Feld und eine falsch geschriebene Nummer melden Verschiedenes',
+    demo_anfrage_pruefen(array_merge($gut, ['telefon' => '']))['fehler']['telefon']
+    !== demo_anfrage_pruefen(array_merge($gut, ['telefon' => '123456789']))['fehler']['telefon']);
+pruef('KRITISCH: die Demo-Anfrage nutzt dieselbe Regel wie der Demo-Zugang',
+    demo_telefon_gueltig('+41 79 123 45 67') && !demo_telefon_gueltig('123456789'));
 
 $falscheMail = demo_anfrage_pruefen(array_merge($gut, ['email' => 'keine adresse']));
 pruef('KRITISCH: eine ungueltige E-Mail-Adresse wird abgewiesen', isset($falscheMail['fehler']['email']));

@@ -82,10 +82,8 @@ const DEMO_ZUGANG_MAX_TELEFON  = 40;
 const DEMO_ZUGANG_FALLE        = 'website';
 // Telefon ist der Preis fuer den Sofort-Zugang (Entscheidung des
 // Projektinhabers): Wer in einer Minute eine eigene Instanz bekommt, gibt
-// dafuer eine erreichbare Nummer an. Dieselbe Grenze wie beim
-// Kontaktformular (demo_anfrage.php) -- neun Ziffern sind die Untergrenze,
-// unter der keine erreichbare Schweizer Nummer mehr liegt.
-const DEMO_ZUGANG_TELEFON_MIN_ZIFFERN = 9;
+// dafuer eine erreichbare Nummer an. Wie eine solche Nummer aussieht,
+// steht bei demo_zugang_telefon_gueltig() weiter unten.
 
 function demo_zugang_ist_falle(array $in): bool
 {
@@ -98,9 +96,50 @@ function demo_zugang_einzeilig(mixed $wert, int $max): string
     return mb_substr(trim($s), 0, $max);
 }
 
-function demo_zugang_telefon_ziffern(string $wert): int
+// Ziffern zaehlen allein reicht nicht: "123456789" hat neun Ziffern und ist
+// trotzdem keine Nummer, unter der jemand erreichbar ist (Befund des
+// Projektinhabers, 2026-09-18). Geprueft wird darum die Form der Nummer.
+//
+// ZUGELASSEN SIND DREI LAENDER -- Schweiz, Deutschland, Oesterreich
+// (Entscheidung des Projektinhabers, 2026-09-18). Alles andere braucht
+// eine eigene Entscheidung, keine stille Lockerung hier.
+//
+//   Schweiz       +41 / 0041 + neun Ziffern, die erste davon 2-9
+//                 (0 und 1 sind Vorwahl- und Kurznummernraum, keine
+//                 Anschlussbereiche), oder national mit fuehrender Null:
+//                 079 123 45 67 -- genau zehn Ziffern.
+//   Deutschland   +49 / 0049 + sechs bis dreizehn Ziffern, die erste
+//                 nicht 0 (die nationale Verkehrsausscheidungsziffer
+//                 faellt mit der Landesvorwahl weg). Laengen sind dort
+//                 nicht einheitlich festgelegt.
+//   Oesterreich   +43 / 0043 + vier bis dreizehn Ziffern, dieselbe Regel.
+//                 Vier ist keine Schludrigkeit: Wien ist "1" plus sieben
+//                 Ziffern, kleine Ortsnetze sind kuerzer.
+//
+// OHNE LANDESVORWAHL GILT DIE SCHWEIZ: Eine fuehrende Null ist in allen
+// drei Laendern dieselbe Ziffer -- 079... koennte ueberall stehen. Die
+// Betreiberin sitzt in der Schweiz, also wird die nationale Schreibweise
+// als schweizerisch gelesen. Wer eine deutsche oder oesterreichische
+// Nummer angibt, schreibt die Vorwahl dazu; die Meldung im Formular sagt
+// das auch.
+//
+// Trennzeichen -- Leerschlag, Schraegstrich, Bindestrich, Punkt, Klammern
+// -- sind dem Menschen ueberlassen und werden vorher entfernt.
+function demo_zugang_telefon_gueltig(string $wert): bool
 {
-    return strlen((string)preg_replace('/\D+/', '', $wert));
+    $roh = (string)preg_replace('/[\s\/\-\.\(\)]+/u', '', $wert);
+    $muster = [
+        '/^(?:\+41|0041)[2-9]\d{8}$/',   // Schweiz, international
+        '/^(?:\+49|0049)[1-9]\d{5,12}$/', // Deutschland
+        '/^(?:\+43|0043)[1-9]\d{3,12}$/', // Oesterreich
+        '/^0[2-9]\d{8}$/',               // Schweiz, national
+    ];
+    foreach ($muster as $m) {
+        if (preg_match($m, $roh) === 1) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // ── Ist die angegebene Adresse ueberhaupt zustellbar? ─────────────────

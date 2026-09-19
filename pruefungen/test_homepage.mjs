@@ -204,6 +204,20 @@ await fuell(desktop, '[name="telefon"]', '079 12');
 await klick(desktop, '#demoKnopf');
 await desktop.waitForTimeout(200);
 check('KRITISCH: eine zu kurze Telefonnummer geht ebenfalls nicht durch', aufrufe.length === 0);
+// Neun beliebige Ziffern sind keine Nummer (Befund des Projektinhabers,
+// 2026-09-18): geprueft wird die Schweizer Form, nicht die Anzahl Ziffern.
+await fuell(desktop, '[name="telefon"]', '123456789');
+await klick(desktop, '#demoKnopf');
+await desktop.waitForTimeout(200);
+check('KRITISCH: neun beliebige Ziffern gehen nicht als Telefonnummer durch', aufrufe.length === 0);
+check('die Meldung sagt, wie eine Schweizer Nummer aussieht -- nicht nur "fehlt"',
+  /\+41|079/.test(await desktop.textContent('#demoMeldung')));
+// Zugelassen sind Schweiz, Deutschland und Oesterreich (Entscheidung
+// 2026-09-18) -- ein viertes Land nicht.
+await fuell(desktop, '[name="telefon"]', '+33 6 12 34 56 78');
+await klick(desktop, '#demoKnopf');
+await desktop.waitForTimeout(200);
+check('KRITISCH: eine Nummer ausserhalb von CH/DE/AT geht nicht durch', aufrufe.length === 0);
 
 await fuell(desktop, '[name="telefon"]', '079 123 45 67');
 await klick(desktop, '#demoKnopf');
@@ -229,9 +243,15 @@ antwort = { status: 503, body: { status: 'error', message: 'Der Empfang von Anfr
 await fuell(desktop, '[name="firma"]', 'Muster Sicherheitsdienst AG');
 await fuell(desktop, '[name="name"]', 'A. Beispielperson');
 await fuell(desktop, '[name="email"]', 'a.beispiel@example.invalid');
-await fuell(desktop, '[name="telefon"]', '079 123 45 67');
+// Hier bewusst eine deutsche Nummer: Der Durchlauf zeigt zugleich, dass
+// eine DE-Nummer den Browser passiert (die Antwort ist ohnehin ein Fehler,
+// das Formular bleibt also stehen).
+await fuell(desktop, '[name="telefon"]', '+49 151 12345678');
 await klick(desktop, '#demoKnopf');
 await desktop.waitForTimeout(400);
+check('eine deutsche Nummer mit Landesvorwahl geht zum Server',
+  aufrufe.length === 2 && (aufrufe[1] || {}).daten
+  && aufrufe[1].daten.telefon === '+49 151 12345678');
 check('KRITISCH: die Fehlermeldung des Servers erscheint woertlich ("nicht eingerichtet"), als Fehler gekennzeichnet',
   (await desktop.textContent('#demoMeldung')).includes('noch nicht eingerichtet')
   && await desktop.evaluate(() => document.getElementById('demoMeldung').classList.contains('fehler'))

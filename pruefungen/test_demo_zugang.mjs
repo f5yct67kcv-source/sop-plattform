@@ -69,8 +69,8 @@ check('KRITISCH: im Register steht kein Passwort und kein Hash',
 // die reine Logik dahinter laeuft in pruef_demo_zugang.php.
 const anfordern = nurCode(lies('backend/api/demo_anfordern.php'));
 check('KRITISCH: demo_anfordern.php prueft die Telefonnummer, bevor ein Platz verbraucht wird',
-  /demo_zugang_telefon_ziffern\(\$telefon\)\s*<\s*DEMO_ZUGANG_TELEFON_MIN_ZIFFERN/.test(anfordern)
-  && anfordern.indexOf('demo_zugang_telefon_ziffern') < anfordern.indexOf('demo_platz_waehlen'));
+  /!\s*demo_zugang_telefon_gueltig\(\$telefon\)/.test(anfordern)
+  && anfordern.indexOf('demo_zugang_telefon_gueltig') < anfordern.indexOf('demo_platz_waehlen'));
 check('KRITISCH: demo_anfordern.php prueft die Zustellbarkeit, bevor ein Platz verbraucht wird',
   /demo_zugang_adresse_zustellbar\(\$email\)\s*===\s*false/.test(anfordern)
   && anfordern.indexOf('demo_zugang_adresse_zustellbar') < anfordern.indexOf('demo_platz_waehlen'));
