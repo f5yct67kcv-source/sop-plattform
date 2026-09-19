@@ -980,8 +980,8 @@ tbody tr.aus td { opacity: .55; }
 .ku-detail-info dt { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--ink-3); margin-top: 12px; }
 .ku-detail-info dt:first-child { margin-top: 0; }
 .ku-detail-info dd { margin: 2px 0 0; font-size: 13.5px; }
-.k-tab, .kd-tab { display: none; }
-.k-tab.on, .kd-tab.on { display: block; }
+.k-tab, .kd-tab, .m-tab { display: none; }
+.k-tab.on, .kd-tab.on, .m-tab.on { display: block; }
 .md-tabs { display: flex; align-items: center; gap: 4px; }
 .md-tabs .btn { margin-left: 4px; }
 /* Die Karten der Uebersicht nebeneinander, solange Platz ist. Kein festes
@@ -1621,6 +1621,19 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     </section>
     <!-- ══ Mandanten ══════════════════════════════════════════ -->
     <section class="bereich versteckt" id="b-mandanten">
+    <!-- Reiterleiste (ENT-626). Dieselbe Bauart wie #kontenTabs und
+         #ofHauptTabs: ".tabs haupt", damit unterreiterZeichnen() sie ab
+         1211 px in die Werkzeugleiste hebt -- genau die Leiste, die das
+         Cockpit ueber "Kunden" zeigt. Der Mandantenstamm und die
+         Demo-Plaetze standen bis hierher untereinander auf einer Seite;
+         das ist zweierlei Arbeit an einem Ort. -->
+    <div class="tabs haupt" id="mandTabs" style="margin-bottom:10px">
+      <button type="button" class="tab on" id="mtab-mandanten" onclick="mandGo('mandanten')">Mandanten</button>
+      <button type="button" class="tab" id="mtab-demo" onclick="mandGo('demo')">Demo</button>
+    </div>
+
+    <!-- ── Reiter: Mandanten ── -->
+    <div class="m-tab on" id="mv-mandanten">
     <!-- Mandanten -->
     <div class="karte">
       <div class="karte-kopf">
@@ -1738,14 +1751,19 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <div id="sup-inhalt"></div>
       </div>
     </div>
+    </div>
 
-    <!-- Demo-Zugaenge (ENT-600) -- eigener Abschnitt, aber innerhalb von
-         Mandanten statt eines eigenen obersten Reiters: Ein Demo-Zugang ist
-         ein vorlaeufiger Mandant, keine eigene Ebene des Betreiber-Bereichs.
+    <!-- ── Reiter: Demo ──────────────────────────────────────────
+         Eigener Unterreiter seit ENT-626, vorher untereinander auf
+         derselben Seite wie der Mandantenstamm. KEIN eigener oberster
+         Reiter: Ein Demo-Zugang bleibt ein vorlaeufiger Mandant und keine
+         eigene Ebene des Betreiber-Bereichs -- der Kern von ENT-600 gilt
+         weiter, nur die Vermischung auf einer Seite endet.
          Seit ENT-601 nur noch Uebersicht und Not-Aus: Ein Interessent
          bekommt seinen Zugang ueber die Anmeldemaske selbst, automatisch
          und sofort. Kein Betreiber schaltet mehr frei -- wer bei
          Werbe-Anfragen auf einen freien Menschen wartet, ist zu spaet. -->
+    <div class="m-tab" id="mv-demo">
     <div class="karte">
       <div class="karte-kopf">
         <div>
@@ -1765,6 +1783,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <button class="klein" id="knopf-demo-ablauf">Abgelaufene schliessen</button>
       </div>
       <div id="demo-inhalt"></div>
+    </div>
     </div>
     </section>
 
@@ -2561,7 +2580,7 @@ function stumm(el) { zeig(el, false); }
    Anmeldung. */
 const BEREICHE = {
   uebersicht: ['Übersicht',  'Die Lage über allen Betrieben'],
-  mandanten:  ['Mandanten',  'Betriebe, die diese Plattform nutzen, samt Demo-Zugängen'],
+  mandanten:  ['Mandanten',  'Betriebe, die diese Plattform nutzen'],
   adressen:   ['Adressen',   'Betriebe, an die eine Offerte geht — künftige Mandanten'],
   offerten:   ['Offerten',   'Angebote an künftige Mandanten'],
   rechnungen: ['Rechnungen', 'Was die Mandanten für die Nutzung zahlen'],
@@ -2600,6 +2619,10 @@ function bereichZeigen(welcher) {
      ein Mandant wird angelegt, eine Rechnung als bezahlt markiert. Beim
      Betreten frisch holen ist billiger als ein Stand, der nicht mehr
      stimmt. */
+  /* Der Unterreiter ueberlebt den Bereichswechsel -- wer von Demo nach
+     Support und zurueck geht, landet wieder bei Demo. Gerufen NACH der
+     Unterzeile oben: mandGo() schreibt sie fuer den offenen Reiter. */
+  if (welcher === 'mandanten') { mandGo(mandTab); }
   if (welcher === 'uebersicht') { ladeMandanten(); ladeRechnungen(); }
   if (welcher === 'konten')   { ladeKonten(); }
   if (welcher === 'adressen') { ladeAdressen(); }
@@ -2613,6 +2636,45 @@ function bereichZeigen(welcher) {
   // waere ein Raetsel.
   if (welcher !== 'support') { zeig($('sv-karte'), false); }
   window.scrollTo({ top: 0 });
+}
+
+/* ── Unterreiter von Mandanten (ENT-626) ─────────────────────────
+   Mandantenstamm und Demo-Plaetze standen untereinander auf einer Seite.
+   Getrennt wird mit derselben Reiterleiste wie in Konten und Offerten --
+   und die hebt unterreiterZeichnen() ab 1211 px nach oben, wo das Cockpit
+   seine Unterreiter ebenfalls zeigt.
+
+   Die Unterzeile im Kopf wechselt mit dem Reiter, die Ueberschrift nicht.
+   Genau so macht es das Cockpit (kuGoTab schreibt pgCrumb, nicht pgTitle):
+   Der Bereich bleibt derselbe, der Ausschnitt wechselt.
+
+   Nichts wird hier nachgeladen: ladeDemo() laeuft ohnehin beim Start,
+   weil das Abzeichen am Reiter seine Zahl braucht. */
+const MANDANTEN_REITER = {
+  mandanten: 'Betriebe, die diese Plattform nutzen',
+  demo:      'Plätze der Demo-Anlage und ihre Zugänge',
+};
+let mandTab = 'mandanten';
+
+function mandGo(t) {
+  if (!MANDANTEN_REITER[t]) { t = 'mandanten'; }
+  mandTab = t;
+  Object.keys(MANDANTEN_REITER).forEach(k => {
+    $('mv-' + k).classList.toggle('on', k === t);
+    $('mtab-' + k).classList.toggle('on', k === t);
+  });
+  $('leiste-unter').textContent = MANDANTEN_REITER[t];
+  /* Ein halb ausgefuelltes Anlegeformular gehoert zum Reiter Mandanten.
+     Es steht zwar in dessen Container und waere ohnehin verborgen --
+     aber wer von Demo zurueckkommt, soll die Liste sehen und nicht ein
+     Formular, dessen Herkunft nirgends mehr steht. */
+  if (t !== 'mandanten') {
+    zeig($('m-form-karte'), false);
+    zeig($('sup-karte'), false);
+  }
+  /* Die Reiter stehen ueber 1210 px oben in der Werkzeugleiste. Wird hier
+     umgeschaltet, muss die Kopie dort mitkommen. */
+  unterreiterZeichnen();
 }
 
 /* ── Unterreiter in der Werkzeugleiste (ENT-611) ─────────────────
