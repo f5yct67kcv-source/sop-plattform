@@ -207,6 +207,46 @@ await seite.waitForTimeout(600);
 await seite.click('#kopf-nav .nav-item[data-bereich="mandanten"]');
 await seite.waitForTimeout(350);
 
+/* Getrennte Reiter seit ENT-626: Der Mandantenstamm und die Demo-Plaetze
+   stehen nicht mehr untereinander auf einer Seite. Gemessen statt
+   nachgelesen -- die Hoehe sagt, ob die Karte wirklich da ist. */
+const getrennt = await seite.evaluate(() => ({
+  demoVersteckt: document.getElementById('mv-demo').offsetHeight === 0,
+  stammDa:       document.getElementById('mv-mandanten').offsetHeight > 0,
+  unterzeile:    document.getElementById('leiste-unter').textContent.trim(),
+}));
+check('KRITISCH: unter "Mandanten" stehen die Demo-Plätze nicht mehr daneben (ENT-626)',
+  getrennt.demoVersteckt && getrennt.stammDa);
+check('die Unterzeile im Kopf sagt, welcher Reiter offen ist',
+  /Betriebe/.test(getrennt.unterzeile));
+
+/* Ab hier die Demo-Ansicht. Geklickt wird der Reiter, den ein Mensch
+   hier sieht: Ueber 1210 px hebt unterreiterZeichnen() die Leiste in die
+   Werkzeugleiste (dieselbe Mechanik wie im Cockpit), darunter bleibt sie
+   im Inhalt. Beide Wege muessen zum selben Ergebnis fuehren. */
+const obenSichtbar = await seite.evaluate(() => {
+  const leiste = document.getElementById('topSub');
+  return !!leiste && leiste.offsetHeight > 0
+    && [...leiste.querySelectorAll('button')].map(b => b.textContent.trim()).join('|') === 'Mandanten|Demo';
+});
+check('KRITISCH: am breiten Bildschirm stehen die Reiter in der Werkzeugleiste, wie im Cockpit',
+  obenSichtbar);
+await seite.click(obenSichtbar ? '#topSub button:nth-child(2)' : '#mtab-demo');
+await seite.waitForTimeout(250);
+
+const demoReiter = await seite.evaluate(() => ({
+  demoDa:        document.getElementById('mv-demo').offsetHeight > 0,
+  stammVersteckt: document.getElementById('mv-mandanten').offsetHeight === 0,
+  unterzeile:    document.getElementById('leiste-unter').textContent.trim(),
+  titel:         document.getElementById('leiste-titel').textContent.trim(),
+}));
+check('KRITISCH: der Reiter "Demo" zeigt die Demo-Ansicht und blendet den Stamm aus',
+  demoReiter.demoDa && demoReiter.stammVersteckt);
+// Wie im Cockpit: die Ueberschrift bleibt, die Unterzeile wechselt mit dem
+// Reiter. Sonst stuende ueber der Demo-Ansicht, sie zeige Betriebe.
+check('KRITISCH: die Unterzeile wechselt mit dem Reiter, die Überschrift nicht',
+  demoReiter.titel === 'Mandanten' && /Demo/.test(demoReiter.unterzeile));
+
 const sicht = await seite.evaluate(() => {
   const zellen = sel => [...document.querySelectorAll(sel)].map(e => e.textContent.trim());
   /* Nur der erste Merker der Zelle: Seit ENT-622 steht darunter noch der
@@ -242,7 +282,7 @@ const sicht = await seite.evaluate(() => {
   };
 });
 
-check('die Ansicht heisst "Mandanten" -- Demo ist ein Abschnitt darin, kein eigener Reiter',
+check('die Ansicht heisst weiterhin "Mandanten" -- Demo ist ein Unterreiter darin, kein eigener oberster Reiter (ENT-600/ENT-626)',
   sicht.titel === 'Mandanten');
 check('der Vorrat zeigt alle gemeldeten Plätze', sicht.plaetze === 3);
 check('die Liste zeigt alle Zugänge', sicht.zugaenge === 3);
