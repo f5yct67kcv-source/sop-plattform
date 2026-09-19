@@ -61,23 +61,37 @@ function plaetzeAusWorkflow(text) {
 // passiert.)
 function offenePlatzhalter(text) {
   const b = platzBlock(text);
-  const quellen = [...text.matchAll(/^\s*cp\s+(\S+)\s+dist\/\S*\s*$/gm)].map(m => m[1]);
+  // Quelle UND Ziel aus derselben cp-Zeile: Der Deploy flacht backend/ in
+  // dist/ ab, api/ bleibt ein Unterordner. Wer das nachbaut statt es
+  // abzulesen, liegt beim naechsten Sonderfall daneben.
+  const zeilen = [...text.matchAll(/^\s*cp\s+(\S+)\s+(dist\/\S*)\s*$/gm)]
+    .map(m => ({ quelle: m[1], ziel: m[2] }));
   const offen = new Set();
-  for (const q of quellen) {
+  for (const { quelle, ziel } of zeilen) {
     // Glob-Zeilen (backend/api/*.php) und fehlende Dateien uebergehen --
     // die deckt die Wache im Deploy ab; hier geht es um die benannten.
-    if (q.includes('*')) { continue; }
+    if (quelle.includes('*') || ziel.endsWith('/')) { continue; }
     let inhalt;
-    try { inhalt = readFileSync(`${WURZEL}/${q}`, 'utf8'); } catch { continue; }
+    try { inhalt = readFileSync(`${WURZEL}/${quelle}`, 'utf8'); } catch { continue; }
+    // JE DATEI, nicht je Platzhalter: Derselbe Platzhalter kann in
+    // mehreren Dateien stehen (seit ENT-622 etwa __DEMO_EMPFAENGER__ in
+    // demo_anfrage.php UND demo_zugang.php). Eine Pruefung, die nur
+    // fragt, ob er irgendwo ersetzt wird, laesst die zweite Datei durch
+    // -- genau daran ist der Lauf vom 2026-09-19 gescheitert, obwohl
+    // diese Suite gruen war.
+    const zielImPlatz = ziel.replace(/^dist\//, 'dist-demo/$PLATZ/');
     for (const t of inhalt.match(/__[A-Z0-9_]{3,}__/g) || []) {
       // PHPs eigene Konstante und der Schluessel der NATIVEN Karte
       // (ENT-609, gehoert ins App-Buendel) -- dieselben zwei Ausnahmen
       // wie im Waechter des Deploys.
       if (t === '__DIR__' || t === '__MAPS_IOS_KEY__') { continue; }
-      if (!b.includes(`ersetze ${t} `)) { offen.add(t); }
+      if (!b.includes(`ersetze ${t} "`) || !b.includes(`"${zielImPlatz}"`)
+          || !new RegExp(`ersetze ${t} "[^\n]*" "${zielImPlatz.replace(/[$/.]/g, '\\$&')}"`).test(b)) {
+        offen.add(`${t} in ${ziel}`);
+      }
     }
   }
-  return { offen: [...offen], quellen: quellen.length };
+  return { offen: [...offen], quellen: zeilen.length };
 }
 
 const PRUEFUNGEN = {

@@ -2344,6 +2344,12 @@ jobs:
             # Empfaenger der Demo-ANFRAGEN: Das Kontaktformular steht auf
             # guardops.ch, nicht auf einem Platz.
             ersetze __DEMO_EMPFAENGER__ "" "dist-demo/$PLATZ/demo_anfrage.php"
+            # Seit ENT-622 steht derselbe Platzhalter auch in
+            # demo_zugang.php (Meldung an den Betreiber ueber jeden neuen
+            # Zugang). Auf einem Platz entsteht kein Zugang -- die
+            # Selbstbedienung laeuft auf guardops.ch --, also bleibt er
+            # auch hier leer.
+            ersetze __DEMO_EMPFAENGER__ "" "dist-demo/$PLATZ/demo_zugang.php"
             # Die Adresse der Verkaufsseite fuer den Bestaetigungslink
             # (ENT-624). Auf einem Platz leer: Die Bestaetigung laeuft auf
             # guardops.ch und im Betreiber-Bereich, nie auf einer
