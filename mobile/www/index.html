@@ -1559,6 +1559,31 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
    Prüfung: "Verstanden" stand neben den Termin-Knöpfen. */
 .mit-dlg-fuss .btn[hidden] { display: none; }
 
+/* ══ Offener Rundgang beim App-Start (ENT-628) ════════════════════════
+   Dieselbe Huelle wie die wichtige Mitteilung -- ein zweiter Dialog, der
+   anders aussieht als der erste, waere fuer denselben Zweck eine zweite
+   Sprache. Geaendert wird nur, was sich inhaltlich unterscheidet. */
+/* Orange statt Rot: Eine offene Runde ist eine Warnung, kein Notfall. Rot
+   ist hier fuer den Abbruch-Knopf reserviert, und zwei Rot im selben
+   Fenster nehmen einander die Bedeutung. */
+.ro-lb { color: var(--warn); }
+/* Die Einleitung steht zwischen Beschriftung und Namen: Sie erklaert, was
+   der grosse Text darunter IST. */
+.ro-frage { font-size: 14px; color: var(--ink-2); line-height: 1.5; margin-top: 8px; }
+.mit-dlg-kopf .ro-frage + h3 { margin-top: 4px; }
+/* Drei Knoepfe untereinander statt nebeneinander: Sie tragen Unterzeilen
+   und sind verschieden folgenreich -- nebeneinander waeren sie gleich
+   gross und gleich laut. Der harmlose zuerst, der endgueltige zuletzt. */
+.ro-fuss { flex-direction: column; align-items: stretch; gap: 10px; justify-content: flex-start; }
+/* Ueberschrift oben, Wert darunter (CLAUDE.md) -- dasselbe Muster wie
+   ueberall sonst in der App. */
+.ro-meta { color: var(--ink-2); }
+.ro-z { margin-top: 12px; }
+.ro-z:first-child { margin-top: 0; }
+.ro-z b { display: block; font-size: 11px; font-weight: 640; letter-spacing: .6px;
+  text-transform: uppercase; color: var(--ink-3); }
+.ro-z span { display: block; font-size: 14.5px; color: var(--ink); margin-top: 2px; }
+
 @media (min-width: 700px) {
   .md-paar-sh { grid-template-columns: 3fr 1fr; }
   .md-paar-po { grid-template-columns: 1fr 3fr; }
@@ -2197,6 +2222,28 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
   <div class="blatt-ft" id="blFuss"></div>
 </div>
 
+<!-- Offener Rundgang beim App-Start (ENT-628). Bewusst dieselbe Huelle wie
+     die wichtige Mitteilung (.mit-dlg): fest ueber allem, kein Kreuz, kein
+     Klick daneben. Wer die App oeffnet und eine Runde offen hat, waehlt
+     einen der drei Wege -- es gibt keinen vierten. Die drei Knoepfe tragen
+     dieselben Beschriftungen und Unterzeilen wie im „Beenden"-Dialog; es
+     ist dieselbe Entscheidung, nur ungefragt gestellt. -->
+<div class="mit-dlg" id="roDlg" role="dialog" aria-modal="true" aria-labelledby="roName">
+  <div class="mit-dlg-box">
+    <div class="mit-dlg-kopf">
+      <div class="mit-dlg-lb ro-lb" id="roLb">–</div>
+      <div class="ro-frage" id="roFrage">–</div>
+      <h3 id="roName">–</h3>
+    </div>
+    <div class="mit-dlg-meta ro-meta" id="roMeta"></div>
+    <div class="mit-dlg-fuss ro-fuss">
+      <button class="btn btn-primary btn-wide" id="roBtnWeiter" onclick="roFortsetzen()">–</button>
+      <button class="btn btn-plain btn-wide" id="roBtnPause" onclick="roPausieren()">–</button>
+      <button class="btn btn-neg btn-wide" id="roBtnAb" onclick="roAbbrechen()">–</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="gav.js"></script>
@@ -2516,6 +2563,31 @@ const W = {
     rundgangPauseWiederaufnehmen: 'Fortsetzen',
     rundgangPausiertHinweis: 'Der Rundgang ist pausiert. Kontrollpunkte lassen sich erst nach dem Fortsetzen wieder melden.',
     rundgangPausiertSeit: 'pausiert seit',
+    // ══ Wiedereinstieg nach App-Neustart (ENT-628) ══════════════════
+    // Der Chip aus ENT-234 lebt nur im Arbeitsspeicher der Sitzung. Wer die
+    // App schliesst, sieht die offene Runde danach nirgends mehr -- sie
+    // laeuft aber weiter und steht in der Auswertung als unbeendet. Darum
+    // fragt die App beim Start beim Server nach und stellt dieselbe Frage
+    // wie „Beenden", nur ungefragt.
+    roLb: 'Nicht beendet',
+    roFrage: 'Folgender Rundgang ist noch in Bearbeitung:',
+    roAngefangen: 'Angefangen',
+    roRunde: 'Kontrollrunde',
+    roFortschritt: 'Kontrollpunkte',
+    // Nicht „nie angefangen“, sondern „die Zeit steht nicht in den Daten“.
+    roZeitUnbekannt: 'Zeitpunkt nicht vermerkt',
+    // Ohne gewaehlte Kontrollrunde umfasst die Runde alle aktiven Punkte des
+    // Objekts. Das ist etwas anderes als „keine Runde gewaehlt" und steht
+    // darum ausgeschrieben da.
+    roAllePunkte: 'Alle Kontrollpunkte des Objekts',
+    roFortsetzenKnopf: 'Fortsetzen',
+    roFortsetzenUnter: 'Weiter im Rundgang',
+    roPausiertLassenKnopf: 'Pausiert lassen',
+    roPausiertLassenUnter: 'Der Rundgang bleibt offen und lässt sich später fortsetzen',
+    // Die Schicht zum Rundgang liegt ausserhalb des geladenen Zeitraums und
+    // liess sich auch einzeln nicht nachladen. Kein „nichts gefunden": Die
+    // Runde gibt es, nur der Weg hinein fehlt -- und Abbrechen bleibt offen.
+    roSchichtFehlt: 'Die Schicht zu diesem Rundgang lässt sich gerade nicht laden. Abbrechen ist trotzdem möglich.',
     rundgangAbbrechenTitel: 'Rundgang abbrechen',
     rundgangAbbrechenHinweis: 'Ein Abbruch ist endgültig und lässt sich nicht rückgängig machen. Bereits erfasste Kontrollpunkte bleiben erhalten.',
     rundgangAbbrechenGrund: 'Grund', rundgangAbbrechenGrundPflicht: 'Bitte einen Grund auswählen.',
@@ -3052,6 +3124,10 @@ function starten() {
   // am 2026-09-11 eine Meldung samt Foto haengengeblieben, ohne dass es
   // jemandem auffiel.
   evWarteschlangeSenden();
+  // Steht eine Runde vom letzten Mal noch offen, wird jetzt gefragt
+  // (ENT-628). Bewusst hier und nicht in allesLaden(): Es ist eine Frage an
+  // den Menschen, kein Nachladen von Daten.
+  roPruefen();
   // Den Service Worker registrieren (ENT-424). Er traegt die
   // Benachrichtigungen und macht die App auf Android installierbar.
   // Bewusst OHNE Erlaubnisfrage: Die kommt erst, wenn jemand den Schalter
@@ -3565,17 +3641,269 @@ function schichtKarte(e, mitDatum) {
 // desselben App-Aufenthalts, kein zusaetzlicher Serveraufruf bei jedem Laden.
 function rundgangChipHtml() {
   if (!rundgangAktiv || rundgangAktiv.status === 'abgebrochen' || rundgangAktiv.status === 'abgeschlossen') return '';
+  /* Kam die Runde aus der Rueckfrage beim App-Start (ENT-628), kennt die
+     App nur die ZAHLEN, nicht die einzelnen Punkte -- geholt wird die
+     volle Liste erst beim Einstieg. Ohne diese Fallunterscheidung stuende
+     hier "0 von 0 erledigt", und das sieht aus wie eine leere Runde
+     statt wie eine noch nicht geladene ("unbekannt" darf nie wie "keine"
+     aussehen). */
   const kps = rundgangAktiv.kontrollpunkte || [];
-  const erledigt = kps.filter(k => k.erledigt).length;
+  const stumpf = !!rundgangAktiv.nurStumpf;
+  const gesamt = stumpf ? Number(rundgangAktiv.punkte_anzahl || 0) : kps.length;
+  const erledigt = stumpf ? Number(rundgangAktiv.erledigt_anzahl || 0)
+    : kps.filter(k => k.erledigt).length;
   const pausiert = rundgangAktiv.status === 'pausiert';
-  return `<button type="button" class="rd-chip" onclick="rundgangAnzeigen(${Number(rundgangAktiv.einsatz_id)})">
+  return `<button type="button" class="rd-chip" onclick="rundgangChipOeffnen()">
     <span class="rd-chip-ic"><svg class="i i-sm" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/></svg></span>
     <span class="rd-chip-txt">
       <b>${esc(pausiert ? w('rundgangChipPausiert') : w('rundgangChipLaeuft'))}</b>
-      <span>${erledigt} ${esc(w('von'))} ${kps.length} ${esc(w('erledigt'))}</span>
+      <span>${erledigt} ${esc(w('von'))} ${gesamt} ${esc(w('erledigt'))}</span>
     </span>
     <svg class="chev" viewBox="0 0 24 24"><polyline points="9 5 16 12 9 19"/></svg>
   </button>`;
+}
+
+/* ══ OFFENER RUNDGANG BEIM APP-START (ENT-628) ════════════════════════
+
+   Vom Projektinhaber verlangt: Wer eine Runde pausiert und die App
+   verlaesst, soll beim naechsten Oeffnen gefragt werden, ob er
+   fortsetzen, pausiert lassen oder abbrechen will.
+
+   WARUM ES BIS HIERHER NICHT FUNKTIONIERTE, obwohl alle drei Wege lange
+   existieren: Der Hinweis-Chip aus ENT-234 haengt an `rundgangAktiv`, und
+   das lebt ausschliesslich im Arbeitsspeicher der Sitzung. App zu, App
+   auf -- und die Runde ist unsichtbar. Sie laeuft trotzdem weiter: In der
+   Auswertung steht sie als unbeendet, die Pausenminuten zaehlen mit, und
+   `mein_rundgang_starten.php` lehnt einen zweiten Start zu Recht mit 409
+   ab. Sichtbar war das nur, wer zufaellig denselben Einsatz wieder
+   oeffnete -- `mein_rundgang_offen.php` braucht eine einsatz_id, man muss
+   also schon wissen, wo man suchen soll. Genau diese Vorbedingung faellt
+   mit `mein_rundgang_laeuft.php` weg.
+
+   DREI WEGE, KEIN VIERTER (Entscheidung des Projektinhabers, 2026-09-19):
+   Der Dialog laesst sich nicht wegtippen -- kein Kreuz, kein Klick
+   daneben. Wer die App oeffnet und eine Runde offen hat, entscheidet.
+   Und er kommt, solange die Runde offen ist: auch am naechsten Tag, auch
+   wenn die Schicht laengst vorbei ist. Gerade die vergessene Runde aus
+   der Nachtschicht ist der Anlass.
+
+   WARUM ER TROTZDEM NICHT STAENDIG IM WEG STEHT: Gefragt wird nur, wenn
+   die App die Runde NICHT schon kennt. Waehrend einer laufenden Runde
+   verlaesst man die App dauernd -- fuer jedes Foto an einem
+   Kontrollpunkt. Ohne diese Bedingung stuende der Dialog nach jeder
+   Rueckkehr wieder da, und die Funktion waere binnen einer Schicht
+   verhasst. */
+
+// Die Runde, die der Dialog gerade zeigt. Sie ueberlebt das Schliessen:
+// Der Abbruch-Weg fuehrt durch die Grundabfrage und kann von dort
+// zurueckkommen.
+let roOffen = null;
+let roAbrufLaeuft = false;
+
+function roPruefen() {
+  // Vor der Anmeldung gibt es nichts zu fragen -- und `visibilitychange`
+  // feuert auch auf der Anmeldemaske.
+  if (!$('app').classList.contains('on')) { return; }
+  if (roAbrufLaeuft || $('roDlg').classList.contains('on')) { return; }
+  if (roAppKenntRunde()) { return; }
+  roAbrufLaeuft = true;
+  api('mein_rundgang_laeuft.php').then(({ ok, data }) => {
+    roAbrufLaeuft = false;
+    // Ohne Netz oder bei einem Serverfehler geschieht NICHTS. Ein Dialog
+    // auf Verdacht waere schlimmer als keiner: Er behauptete eine offene
+    // Runde, ohne eine zu kennen.
+    if (!ok || data.status !== 'ok' || !data.rundgang) { return; }
+    // Zwischen Absenden und Antwort kann die App die Runde selbst geoeffnet
+    // haben (Chip, Einsatzmodus). Dann ist die Frage beantwortet.
+    if (roAppKenntRunde()) { return; }
+    roZeigen(data.rundgang);
+  });
+}
+
+function roAppKenntRunde() {
+  return !!rundgangAktiv && !rundgangAktiv.nurStumpf
+    && RUNDGANG_OFFENE_STATUS.includes(rundgangAktiv.status);
+}
+
+function roZeigen(r) {
+  roOffen = r;
+  const pausiert = r.status === 'pausiert';
+  $('roLb').textContent = w('roLb');
+  $('roFrage').textContent = w('roFrage');
+  // Der Ort identifiziert die Runde, nicht ihre Nummer -- wer nachts
+  // unterwegs war, erinnert sich an das Objekt.
+  $('roName').textContent = r.objekt_name || w('rgsLaufTitel');
+
+  const zeilen = [];
+  const start = r.vorbereitet_am || r.rohzeit_start;
+  zeilen.push([w('roAngefangen'), start
+    ? dmy(start) + ' – ' + String(start).slice(11, 16)
+    : w('roZeitUnbekannt')]);
+  // Ohne gewaehlte Kontrollrunde umfasst die Runde alle aktiven Punkte des
+  // Objekts. Das ist eine Aussage und keine Luecke, und sie steht
+  // ausgeschrieben da statt als leere Zeile.
+  zeilen.push([w('roRunde'), r.vorlage_name || w('roAllePunkte')]);
+  zeilen.push([w('roFortschritt'),
+    Number(r.erledigt_anzahl || 0) + ' ' + w('von') + ' ' + Number(r.punkte_anzahl || 0)
+      + ' ' + w('erledigt')]);
+  if (pausiert && r.pausiert_seit) {
+    zeilen.push([w('rundgangPausiertSeit'),
+      dmy(r.pausiert_seit) + ' – ' + String(r.pausiert_seit).slice(11, 16)]);
+  }
+  $('roMeta').innerHTML = zeilen.map(([lb, wert]) =>
+    `<div class="ro-z"><b>${esc(lb)}</b><span>${esc(wert)}</span></div>`).join('');
+
+  $('roBtnWeiter').innerHTML = `${esc(w('roFortsetzenKnopf'))}<span class="btn-unter">${esc(w('roFortsetzenUnter'))}</span>`;
+  // Eine bereits pausierte Runde laesst sich nicht noch einmal pausieren --
+  // das waere eine Pause in der Pause, und der Server zaehlte sie doppelt.
+  // Der mittlere Weg heisst dann, was er tut: nichts aendern.
+  $('roBtnPause').innerHTML = pausiert
+    ? `${esc(w('roPausiertLassenKnopf'))}<span class="btn-unter">${esc(w('roPausiertLassenUnter'))}</span>`
+    : `${esc(w('rundgangPausierenKnopf'))}<span class="btn-unter">${esc(w('rundgangPausierenUnter'))}</span>`;
+  $('roBtnAb').innerHTML = `${esc(w('rundgangAbbrechenKnopf'))}<span class="btn-unter">${esc(w('rundgangAbbrechenUnter'))}</span>`;
+  ['roBtnWeiter', 'roBtnPause', 'roBtnAb'].forEach(i => { $(i).disabled = false; });
+  $('roDlg').classList.add('on');
+  $('roDlg').setAttribute('aria-hidden', 'false');
+  $('roBtnWeiter').focus();
+}
+
+// Schliessen heisst hier nur verbergen: Der Abbruch-Weg fuehrt durch die
+// Grundabfrage und kann von dort zurueckkommen.
+function roZu() {
+  $('roDlg').classList.remove('on');
+  $('roDlg').setAttribute('aria-hidden', 'true');
+}
+
+function roFertig() { roZu(); roOffen = null; }
+
+/* Was die App nach „Pausieren" von der Runde weiss: die Zahlen, nicht die
+   Punkte. Genug fuer den Chip auf „Heute" und genug, um die Rueckfrage
+   nicht bei jeder Rueckkehr erneut zu stellen -- aber ausdruecklich als
+   Stumpf markiert, damit niemand die leere Punkteliste fuer die Wahrheit
+   haelt. Wer den Chip antippt, laedt die volle Runde nach. */
+function roStumpfSetzen(r, status) {
+  rundgangAktiv = {
+    id: r.id, einsatz_id: r.einsatz_id, status,
+    nurStumpf: true,
+    einsatz_datum: r.einsatz_datum || null,
+    vorbereitet_am: r.vorbereitet_am || null,
+    pausiert_seit: status === 'pausiert' ? (r.pausiert_seit || jetztDatetime()) : null,
+    pause_minuten: Number(r.pause_minuten || 0),
+    kontrollpunkte: [],
+    punkte_anzahl: Number(r.punkte_anzahl || 0),
+    erledigt_anzahl: Number(r.erledigt_anzahl || 0),
+  };
+}
+
+/* Der Einstieg in die Runde laeuft ueber `schichten` -- rundgangAnzeigen()
+   sucht den Einsatz dort und tut sonst stillschweigend nichts. Das geladene
+   Fenster reicht von Monatsanfang bis +90 Tage (meine_schichten.php); eine
+   vergessene Runde vom Vormonat faellt heraus. Darum wird die Schicht
+   notfalls einzeln nachgeladen -- und wenn auch das nicht gelingt, sagt die
+   App das, statt auf einen Knopfdruck hin nichts zu tun. */
+function roSchichtSichern(einsatzId, datum, weiter, fehler) {
+  if (schichten.some(x => Number(x.id) === Number(einsatzId))) { weiter(); return; }
+  if (!datum) { fehler(); return; }
+  api('meine_schichten.php?von=' + encodeURIComponent(datum) + '&bis=' + encodeURIComponent(datum))
+    .then(({ ok, data }) => {
+      const treffer = ok && data.status === 'ok'
+        && (data.schichten || []).find(x => Number(x.id) === Number(einsatzId));
+      if (!treffer) { fehler(); return; }
+      schichten = schichten.concat([treffer]);
+      weiter();
+    });
+}
+
+function roFortsetzen() {
+  const r = roOffen;
+  if (!r) { return; }
+  const btn = $('roBtnWeiter');
+  btn.disabled = true;
+  const hinein = () => roSchichtSichern(r.einsatz_id, r.einsatz_datum,
+    () => { roFertig(); rundgangFortsetzen(r.einsatz_id); },
+    () => { btn.disabled = false; toast(w('roSchichtFehlt')); });
+  if (r.status !== 'pausiert') { hinein(); return; }
+  // Erst die Sperre am Server aufmachen, dann laden: Sonst zeigte die
+  // Checkliste eine Runde, die weiterhin keine Kontrollpunkte annimmt.
+  api('mein_rundgang_fortsetzen.php', { method: 'POST', body: { rundgang_id: r.id } })
+    .then(({ ok, data }) => {
+      if (!ok || data.status !== 'ok') {
+        btn.disabled = false; toast(data.message || w('netzfehler')); return;
+      }
+      r.status = data.rundgang_status || 'laeuft';
+      r.pausiert_seit = null;
+      hinein();
+    });
+}
+
+function roPausieren() {
+  const r = roOffen;
+  if (!r) { return; }
+  // blattZu(): Kam die Rueckfrage aus einer abgelehnten Startanfrage
+  // (ENT-629), steht die Startschublade noch offen -- sie gehoert zu einem
+  // Schritt, der jetzt vorbei ist.
+  if (r.status === 'pausiert') { roStumpfSetzen(r, 'pausiert'); roFertig(); blattZu(); zeichneHeute(); return; }
+  const btn = $('roBtnPause');
+  btn.disabled = true;
+  api('mein_rundgang_pausieren.php', { method: 'POST', body: { rundgang_id: r.id } })
+    .then(({ ok, data }) => {
+      btn.disabled = false;
+      if (!ok || data.status !== 'ok') { toast(data.message || w('netzfehler')); return; }
+      r.status = 'pausiert';
+      roStumpfSetzen(r, 'pausiert');
+      roFertig();
+      blattZu();
+      // Der Chip auf „Heute" ist ab jetzt der Weg zurueck (ENT-234).
+      zeichneHeute();
+    });
+}
+
+function roAbbrechen() {
+  const r = roOffen;
+  if (!r) { return; }
+  // Die Grundabfrage arbeitet mit `rundgangAktiv` -- ohne diesen Stumpf
+  // wuesste sie nicht, welche Runde sie abbricht. Ein Einsatz in
+  // `schichten` ist dafuer NICHT noetig: Abbrechen braucht nur die
+  // rundgang_id, und gerade die vergessene Runde aus einer nicht mehr
+  // geladenen Schicht muss sich loswerden lassen.
+  roStumpfSetzen(r, r.status);
+  roZu();
+  rundgangAbbrechenAnzeigen(r.einsatz_id, 'offen', true);
+}
+
+// Zurueck aus der Grundabfrage: Die Entscheidung ist noch offen, also steht
+// die Frage wieder da. Ein Rueckweg ins Nichts waere hier besonders
+// aergerlich -- der Dialog laesst sich ja sonst nicht schliessen.
+function roZurueckAusAbbruch() {
+  blattZu();
+  if (roOffen) { roZeigen(roOffen); }
+}
+
+/* Der Start ist abgelehnt worden, weil noch eine Runde offen ist
+   (ENT-629). Statt eines roten Satzes kommt dieselbe Rueckfrage wie beim
+   App-Start: fortsetzen, pausieren, abbrechen mit Grund. Eine Sperre ohne
+   Ausweg waere hier wertlos -- der Waechter steht vor dem Objekt und kann
+   nicht erst suchen gehen, wo die alte Runde liegt.
+
+   Gibt der Server die offene Runde ausnahmsweise nicht mit, bleibt es beim
+   Satz: lieber eine magere Auskunft als eine erfundene Rueckfrage. */
+function rgStartAbgelehntOffeneRunde(data) {
+  if (!data || data.code !== 'runde_offen') { return false; }
+  if (!data.offen) { toast(data.message || w('netzfehler')); return true; }
+  roZeigen(data.offen);
+  return true;
+}
+
+function rundgangChipOeffnen() {
+  if (!rundgangAktiv) { return; }
+  const id = Number(rundgangAktiv.einsatz_id);
+  // Kennt die App nur die Zahlen, wird die volle Runde erst jetzt geholt.
+  if (rundgangAktiv.nurStumpf) {
+    roSchichtSichern(id, rundgangAktiv.einsatz_datum,
+      () => rundgangFortsetzen(id), () => toast(w('roSchichtFehlt')));
+    return;
+  }
+  rundgangAnzeigen(id);
 }
 
 // ══════════════════════════════════════════ HEUTE
@@ -6392,6 +6720,8 @@ function rundgangSpontanStarten(vorlageId, ausnahmeGrund, trotzDoppel) {
     }
     if (!ok || data.status !== 'ok') {
       document.querySelectorAll('#blBody button, #rfsBtn').forEach(b => b.disabled = false);
+      // Noch eine Runde offen (ENT-629): Die Rueckfrage traegt den Ausweg.
+      if (rgStartAbgelehntOffeneRunde(data)) { return; }
       toast(data.message || w('netzfehler'));
       return;
     }
@@ -7644,6 +7974,8 @@ function rundgangStartenMitVorlage(einsatzId, vorlageId, ausnahmeGrund) {
   api('mein_rundgang_starten.php', { method: 'POST', body }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') {
       document.querySelectorAll('#blRundgang button, #rdVorlageListe button, #rfBtn').forEach(b => b.disabled = false);
+      // Noch eine Runde offen (ENT-629): Die Rueckfrage traegt den Ausweg.
+      if (rgStartAbgelehntOffeneRunde(data)) { return; }
       toast(data.message || w('netzfehler'));
       return;
     }
@@ -8571,7 +8903,14 @@ function rgWachUm() {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') { rgWachAnfordern(); }
+  if (document.visibilityState !== 'visible') { return; }
+  rgWachAnfordern();
+  /* Auf dem iPhone wird die App beim Wechsel nicht neu geladen -- sie
+     bleibt im Speicher stehen. Ohne diese Zeile kaeme die Rueckfrage nach
+     einer offenen Runde (ENT-628) erst nach einem echten Kaltstart, und
+     genau den erzwingt niemand. roPruefen() schweigt, wenn die App die
+     Runde bereits kennt. */
+  roPruefen();
 });
 
 function rgKarteZeichnen() {
@@ -11279,7 +11618,8 @@ function rundgangAbbrechenAnzeigen(einsatzId, woher, raus) {
   // Funktionen der Vollseite fuehrt er zurueck auf die Seite, aus dem alten
   // Beenden-Dialog dorthin.
   $('blFuss').innerHTML = `
-    <button class="btn btn-plain" onclick="${woher === 'beenden' || rgsModus !== 'lauf'
+    <button class="btn btn-plain" onclick="${woher === 'offen' ? 'roZurueckAusAbbruch()'
+      : woher === 'beenden' || rgsModus !== 'lauf'
       ? `rundgangBeendenAnzeigen(${Number(einsatzId)})` : 'blattZu()'}">${esc(w('zurueck'))}</button>
     <button class="btn btn-neg" id="raBtn" onclick="rundgangAbbrechenSenden(${Number(einsatzId)}${raus ? ', true' : ''})">${esc(w('rundgangAbbrechenBestaetigen'))}</button>`;
   // Selbst oeffnen: Bis ENT-306 kam dieser Dialog immer aus einer bereits

@@ -46,8 +46,12 @@ check('KRITISCH: die Wachsperre wird beim Beenden der Ortung wieder freigegeben'
 check('Die Vorgabe ist AUS -- gespeichert wird nur ein ausdrueckliches "an"',
   /function rgWachAn\(\)[\s\S]{0,200}?getItem\(RG_WACH_SCHLUESSEL\) === 'an'/.test(APP)
   && /catch \(e\) \{ return false; \}/.test(APP));
-check('Beim Zurueckkommen aus dem Hintergrund wird die Sperre neu angefordert',
-  /visibilitychange[\s\S]{0,200}?visibilityState === 'visible'[\s\S]{0,80}?rgWachAnfordern\(\)/.test(APP));
+// Das Zurueckkommen aus dem Hintergrund wird weiter unten GEMESSEN, nicht
+// hier im Quelltext gesucht. Der fruehere Suchausdruck verlangte woertlich
+// "visibilityState === 'visible'" und wurde rot, als die Bedingung bei
+// gleichem Verhalten zu einem frueh abbrechenden "!== 'visible'" umgebaut
+// wurde -- genau der Fall, vor dem CLAUDE.md warnt: geprueft wird die
+// Aussage, nicht der Wortlaut.
 
 const RUNDE = { status: 'laeuft', einsatz_id: 71, rundgang_id: 5, name: 'Musterrunde',
   vorbereitet_am: tag(0) + ' 20:00:00', kontrollpunkte: [
@@ -78,10 +82,23 @@ async function seite(hoehe) {
     // navigator.wakeLock selbst mit, als Nur-Lese-Eigenschaft am Prototyp.
     // Eine schlichte Zuweisung geht dort lautlos ins Leere -- die Pruefung
     // haette dann die ECHTE Sperre benutzt und nichts gezaehlt.
+    // Die Nachbildung MELDET ihre Freigabe auch -- wie das echte Geraet,
+    // das die Sperre beim Bildschirmschlaf von sich aus loslaesst. Ohne
+    // dieses Ereignis bliebe rgsWachSperre in der App stehen, und das
+    // Zurueckkommen aus dem Hintergrund liesse sich gar nicht messen: Die
+    // Anforderung bricht dann ab, weil scheinbar noch eine Sperre haelt.
     Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request: async () => {
       window.__wach.anfragen++; window.__wach.offen++;
-      return { release: async () => { window.__wach.freigaben++; window.__wach.offen--; },
-               addEventListener: () => {} };
+      const horcher = [];
+      const sperre = {
+        release: async () => {
+          window.__wach.freigaben++; window.__wach.offen--;
+          horcher.forEach(f => f());
+        },
+        addEventListener: (name, f) => { if (name === 'release') { horcher.push(f); } },
+      };
+      window.__wach.letzte = sperre;
+      return sperre;
     } } });
   });
   page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
@@ -267,6 +284,25 @@ check('Der Schalter zeigt danach EIN -- mit Wort, nicht nur mit Farbe',
   && await page.getAttribute('#rgsLaufWach', 'aria-pressed') === 'true');
 check('Die Wahl bleibt auf dem Geraet',
   await page.evaluate(() => localStorage.getItem('sop_rundgang_wachhalten')) === 'an');
+
+/* Der Bildschirm sperrt sich, das Geraet gibt die Wachsperre selbst frei.
+   Kommt die App zurueck, muss sie neu angefordert werden -- sonst schliefe
+   der Bildschirm ab dem ersten Wegschauen wieder ein, obwohl der Schalter
+   auf EIN steht. Gemessen am Zaehler, nicht am Quelltext. */
+{
+  // Wie es das Geraet tut: Es laesst die Sperre beim Bildschirmschlaf von
+  // sich aus los und sagt es der Seite.
+  await page.evaluate(() => window.__wach.letzte.release());
+  await page.waitForTimeout(150);
+  const vorher = await page.evaluate(() => window.__wach.anfragen);
+  check('Vorbedingung: das Geraet hat die Sperre losgelassen',
+    await page.evaluate(() => window.__wach.offen) === 0);
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await page.waitForTimeout(400);
+  check('KRITISCH: beim Zurueckkommen aus dem Hintergrund wird die Sperre neu angefordert',
+    await page.evaluate(() => window.__wach.anfragen) > vorher
+    && await page.evaluate(() => window.__wach.offen) === 1);
+}
 
 await page.click('#rgsLaufWach'); await page.waitForTimeout(500);
 check('KRITISCH: Ausschalten gibt die Sperre wieder frei',

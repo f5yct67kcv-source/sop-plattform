@@ -551,6 +551,8 @@ for (const [datei, titel] of [
   ['pruef_ereignisse.php', 'KRITISCH: die Ereignis-Arten und ihre Abhakbarkeit stimmen (ENT-090/ENT-197)'],
   ['pruef_ereignis_bezug.php',
    'KRITISCH: der Bezug einer Meldung auf die Aufgabe wird gegen das Objekt geprüft (ENT-621)'],
+  ['pruef_offene_runde.php',
+   'KRITISCH: die offene Runde wird über alle Einsätze und nur für die eigene Person gefunden (ENT-628/629)'],
   ['pruef_revierdienst_berechtigung.php', 'KRITISCH: die Weichen von ohneRevierdienstBerechtigung() stimmen (ENT-284)'],
   ['pruef_aufgaben.php', 'KRITISCH: eine fremde oder entfernte Aufgabe laesst sich nicht an einen Kontrollpunkt haengen (ENT-302)'],
   ['pruef_mitteilungen.php', 'KRITISCH: Sichtbarkeit und Lesestand der Mitteilungen stimmen -- SQL und PHP sagen dasselbe (ENT-421)'],
@@ -840,6 +842,11 @@ const NUR_EIGENE_DATEN = [
   // darum bewusst NICHT in dieser Liste.
   'mein_rundgang_position.php',
   'mein_rundgang_offen.php',   // eigenen offenen Rundgang zu einem Einsatz abfragen (Wiedereinstieg)
+  // Dasselbe ohne einsatz_id: "habe ich UEBERHAUPT noch eine offene Runde"
+  // (ENT-628). Liest ausschliesslich Runden mit der eigenen
+  // mitarbeiter_id aus der Sitzung -- ein Recht waere hier falsch, denn
+  // jede eingeteilte Person geht Runden, nicht nur die Verwaltung.
+  'mein_rundgang_laeuft.php',
   'mein_rundgang_pausieren.php',  // eigenen Rundgang pausieren (ENT-146)
   'mein_rundgang_fortsetzen.php', // eigenen pausierten Rundgang fortsetzen (ENT-146)
   'mein_rundgang_abbrechen.php',  // eigenen Rundgang endgueltig abbrechen (ENT-146)
