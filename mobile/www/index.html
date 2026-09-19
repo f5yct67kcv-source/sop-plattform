@@ -8282,6 +8282,19 @@ const RG_NACHT_STIL_NATIV = [
 
 let rgsNativKarte = null;       // die native Karte, solange sie steht
 let rgsNativVersprechen = null; // das einmal geladene Kartenplugin
+/* Der noch laufende Abbau der VORIGEN Karte (OP-610).
+
+   rgKarteNativAbbauen() ist asynchron -- destroy() geht an die native
+   Seite und braucht seine Zeit. Zwei Aufrufer bauen unmittelbar danach
+   neu: der Nachtsicht-Schalter und rgKarteZeichnen() vor dem Ersetzen des
+   Rumpfs. Beide Karten tragen dieselbe Kennung 'rgs-karte' -- Abbau und
+   Aufbau ueberlappten also.
+
+   Die Aufrufer zu Warteten zu machen hiesse, async durch die halbe Datei
+   zu ziehen. Stattdessen merkt sich der Abbau sein eigenes Versprechen,
+   und NUR der Aufbau wartet darauf -- an der einen Stelle, an der es
+   darauf ankommt. */
+let rgsNativAbbau = Promise.resolve();
 
 function rgKarteNativMoeglich() {
   return nativeAppHuelle() && mapsSchluesselTauglich(RGS_MAPS_IOS_SCHLUESSEL);
@@ -8321,6 +8334,16 @@ function rgsNativLaden() {
    auch auf dem Reiter mit der Liste. Darum wird sie ausdruecklich
    abgebaut, und zwar vor jedem Ersetzen des Rumpfs. */
 async function rgKarteNativAbbauen() {
+  /* Jeden noch laufenden Aufbau fuer ueberholt erklaeren (OP-609).
+
+     rgsKarteBauLauf ist der Zaehler, an dem ein Aufbau erkennt, dass er
+     nicht mehr gebraucht wird. Bis hierher wurde er NUR beim Bauen
+     hochgezaehlt -- der Abbau beim Reiterwechsel liess ihn stehen. Lief
+     GoogleMap.create() gerade noch, kam der Aufbau danach durch seine
+     eigene Pruefung, setzte die Klasse 'karte-nativ' wieder auf den
+     Koerper und blendete damit die Bedienoberflaeche aus, obwohl der
+     Waechter laengst auf der Liste stand. */
+  rgsKarteBauLauf++;
   // Die Durchsicht gilt nur, solange die Karte steht -- sonst bliebe die
   // App auf den anderen Reitern unsichtbar.
   document.body.classList.remove('karte-nativ');
@@ -8334,7 +8357,11 @@ async function rgKarteNativAbbauen() {
   rgsNativKreise = [];
   rgsNativGrenzen = null;
   rgFuellungNativAus();
-  try { await weg.destroy(); } catch (e) {}
+  // Das Versprechen festhalten, damit ein Aufbau darauf warten kann
+  // (OP-610) -- und selbst warten, damit dieser Aufruf sich weiterhin
+  // abwarten laesst.
+  rgsNativAbbau = (async () => { try { await weg.destroy(); } catch (e) {} })();
+  await rgsNativAbbau;
 }
 
 function rgsMapsLaden() {
@@ -8713,6 +8740,10 @@ async function rgKarteNativBauen(d, bauLauf) {
     return;
   }
   if (bauLauf !== rgsKarteBauLauf || $('rgsKarte') !== el) { return; }
+  // Die Vorgaengerin muss ganz weg sein, bevor eine Karte mit derselben
+  // Kennung entsteht (OP-610).
+  try { await rgsNativAbbau; } catch (e) {}
+  if (bauLauf !== rgsKarteBauLauf || $('rgsKarte') !== el) { return; }
   try {
     rgsNativKarte = await window.KarteNativ.GoogleMap.create({
       id: 'rgs-karte',
@@ -8732,10 +8763,18 @@ async function rgKarteNativBauen(d, bauLauf) {
     if (bauLauf === rgsKarteBauLauf) { zeigen('rgsKarteFehler'); }
     return;
   }
-  // Ein noch neuerer Aufbau hat waehrenddessen uebernommen: Diese Karte
-  // gehoert nicht mehr dorthin und muss wieder weg, sonst liegen zwei
-  // native Ansichten uebereinander.
-  if (bauLauf !== rgsKarteBauLauf) { rgKarteNativAbbauen(); return; }
+  // Ein noch neuerer Aufbau hat waehrenddessen uebernommen, oder der
+  // Reiter wurde gewechselt und der Rumpf ersetzt: Diese Karte gehoert
+  // nicht mehr dorthin und muss wieder weg, sonst liegen zwei native
+  // Ansichten uebereinander -- und die Durchsicht bliebe an, obwohl gar
+  // keine Karte mehr zu sehen ist (OP-609). Die Frage nach dem Element
+  // steht zusaetzlich zum Zaehler: Sie faengt auch den Fall ab, in dem
+  // ein Abbau den Zaehler schon hochgesetzt und ein neuer Aufbau ihn
+  // danach erneut vergeben hat.
+  if (bauLauf !== rgsKarteBauLauf || $('rgsKarte') !== el || !el.isConnected) {
+    rgKarteNativAbbauen();
+    return;
+  }
   rgsKarteEl = el;
   document.body.classList.add('karte-nativ');
   // Ausschnitt AUSDRUECKLICH setzen, obwohl er schon in der Erzeugung
@@ -8753,6 +8792,10 @@ async function rgKarteNativBauen(d, bauLauf) {
   // gewollt.
   try { await rgsNativKarte.enableCurrentLocation(true); } catch (e) {}
   await rgKarteNativKreiseZeichnen(d.zeigbar);
+  // Den Stand merken, an dem spaetere Durchlaeufe erkennen, ob sich an
+  // den Punkten etwas geaendert hat (OP-607) -- dieselbe Signatur und
+  // dieselbe Variable wie in der Browser-Fassung.
+  rgsKartenSignatur = rgKartenSignatur(d.zeigbar);
   // Die Kartengrenzen brauchen wir, um den Kontrollpunkt auf den
   // Bildschirm zu rechnen (Fuellung waehrend der Verweilzeit). Sie aendern
   // sich beim Verschieben und Zoomen -- darum einmal jetzt und danach bei
@@ -8929,8 +8972,11 @@ async function rgKarteNativAusschnitt(d, weich) {
   } catch (e) {}
 }
 
-/* Was sich an der nativen Karte ohne Neubau aendert. Vorerst nur das, was
-   NEBEN der Karte steht -- die Marken kommen mit dem naechsten Schritt. */
+/* Was sich an der nativen Karte ohne Neubau aendert.
+
+   Die Marken mit Nummer und Haken fehlen hier weiterhin -- dafuer braucht
+   es vorerzeugte Bilddateien, siehe rgKarteNativKreiseZeichnen. Die
+   RADIEN tragen die Farbe aber schon heute, und die haengt am Zustand. */
 function rgKarteNativAktualisieren(d, ortungHinweis, hinweis) {
   const huelle = $('rgsBody') ? $('rgsBody').querySelector('.rgs-karte-huelle') : null;
   if (huelle) {
@@ -8944,6 +8990,26 @@ function rgKarteNativAktualisieren(d, ortungHinweis, hinweis) {
     $('rgsZentrieren').insertAdjacentHTML('beforebegin', chipNeu);
   }
   rgOrtChipZeichnen();
+  /* Die Radien neu zeichnen, wenn sich an den Punkten etwas geaendert hat
+     (OP-607).
+
+     Bis hierher geschah das NUR beim Aufbau. Steht die Karte, laeuft jeder
+     weitere Durchlauf durch diese Funktion -- ein erfasster Kontrollpunkt
+     behielt darum die Farbe "offen", bis die Karte aus einem anderen
+     Grund neu entstand (Nachtsicht, Reiterwechsel). Der Nachweis haengt
+     nicht daran, der laeuft ueber rgBereichPruefen() und den Server; die
+     Karte sagte dem Waechter aber etwas Falsches ueber seinen eigenen
+     Fortschritt.
+
+     Mit Signaturvergleich statt bei jedem Aufruf: Jede Positionsmeldung
+     landet hier, und die Radien bei jeder neu zu zeichnen hiesse, sie im
+     Sekundentakt zu loeschen und wieder anzulegen. Dieselbe Ueberlegung
+     und dieselbe Signatur wie in der Browser-Fassung. */
+  const sig = rgKartenSignatur(d.zeigbar);
+  if (sig !== rgsKartenSignatur) {
+    rgsKartenSignatur = sig;
+    rgKarteNativKreiseZeichnen(d.zeigbar);
+  }
 }
 
 /* Was sich ohne Neubau aendern kann (ENT-543).

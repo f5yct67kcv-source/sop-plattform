@@ -1999,6 +1999,99 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
   }
 }
 
+// ── Der Maps-Schluessel darf nach dem Lauf nicht im Arbeitsbaum liegen
+// ── bleiben (OP-608) ─────────────────────────────────────────────────────
+//
+// aufs-handy.sh setzt zwei echte Google-Schluessel in
+// mobile/www/index.html ein. Diese Datei ist VERSIONIERT -- die Kopien
+// unter mobile/ios/.../public/ und mobile/android/.../public/ stehen
+// dagegen in .gitignore. Bleibt sie mit dem Schluessel liegen, traegt ein
+// "git add -A" ihn ins Repository, und test_php.mjs (das sie Zeichen fuer
+// Zeichen mit app.html vergleicht) ist nach jedem Geraetelauf rot.
+//
+// Geprueft wird durch AUSFUEHREN, nicht am Quelltext: Die beiden
+// Funktionen werden aus dem Skript geschnitten und an einer Wegwerf-Datei
+// laufen gelassen. Eine Pruefung, die nach dem Wort "trap" sucht, bliebe
+// gruen, sobald jemand dasselbe anders schreibt.
+{
+  const { mkdtempSync, writeFileSync, readFileSync: lies, rmSync } = await import('fs');
+  const { execFileSync } = await import('child_process');
+  const { tmpdir } = await import('os');
+  const { join } = await import('path');
+
+  const skript = readFileSync(`${WURZEL}/aufs-handy.sh`, 'utf8');
+  const stueck = (name) => {
+    const von = skript.indexOf(`${name}() {`);
+    if (von === -1) { return null; }
+    const bis = skript.indexOf('\n}\n', von);
+    return bis === -1 ? null : skript.slice(von, bis + 3);
+  };
+  const sichern = stueck('buendel_sichern');
+  const zurueck = stueck('buendel_zuruecksetzen');
+  check('KRITISCH: Sichern und Zurücksetzen des Bündels stehen als eigene, prüfbare Funktionen da',
+    sichern !== null && zurueck !== null);
+
+  // Das Zurücksetzen muss ARMIERT sein, bevor der erste Schlüssel
+  // eingesetzt wird -- sonst bliebe er liegen, wenn der Lauf dazwischen
+  // abbricht. Die Reihenfolge ist die Aussage, nicht das Wort.
+  const beiTrap = skript.search(/^\s*trap\s+buendel_zuruecksetzen\b/m);
+  const beiErstemSchluessel = skript.search(/^\s*maps_schluessel_einsetzen\s+mobile\/www\/index\.html/m);
+  check('KRITISCH: das Zurücksetzen ist scharf, BEVOR der erste Schlüssel eingesetzt wird',
+    beiTrap !== -1 && beiErstemSchluessel !== -1 && beiTrap < beiErstemSchluessel);
+
+  // Und es muss auch bei einem Abbruch greifen, nicht nur am regulären
+  // Ende: Strg-C mitten im Bau ist der Normalfall, nicht die Ausnahme.
+  check('KRITISCH: das Zurücksetzen greift auch bei Abbruch (INT/TERM), nicht nur bei EXIT',
+    /^\s*trap\s+buendel_zuruecksetzen\s+.*\bEXIT\b.*\bINT\b.*\bTERM\b/m.test(skript));
+
+  if (sichern && zurueck) {
+    const ordner = mkdtempSync(join(tmpdir(), 'buendel-'));
+    try {
+      const datei = join(ordner, 'index.html');
+      writeFileSync(datei, 'vorher key=__MAPS_IOS_KEY__ ende\n');
+      // Genau der Ablauf aus dem Skript: sichern, Schlüssel einsetzen,
+      // zurücksetzen.
+      execFileSync('bash', ['-c', [
+        `BUENDEL_DATEI=${JSON.stringify(datei)}`,
+        'BUENDEL_KOPIE=""',
+        sichern, zurueck,
+        'buendel_sichern',
+        `sed -i 's|__MAPS_IOS_KEY__|AIzaSyGEHEIMGEHEIMGEHEIMGEHEIMGEHEIM|g' ${JSON.stringify(datei)}`,
+        'buendel_zuruecksetzen',
+      ].join('\n')], { encoding: 'utf8' });
+      const danach = lies(datei, 'utf8');
+      check('KRITISCH: nach dem Lauf steht kein Schlüssel mehr im versionierten Bündel',
+        !/AIza/.test(danach));
+      check('KRITISCH: und der Platzhalter ist wieder da, das Bündel also unverändert',
+        danach === 'vorher key=__MAPS_IOS_KEY__ ende\n');
+    } finally { rmSync(ordner, { recursive: true, force: true }); }
+  } else {
+    ['KRITISCH: nach dem Lauf steht kein Schlüssel mehr im versionierten Bündel',
+     'KRITISCH: und der Platzhalter ist wieder da, das Bündel also unverändert',
+    ].forEach(n => check(n + ' (nicht prüfbar: Funktion nicht gefunden)', false));
+  }
+
+  // Die Gegenrichtung, damit die Prüfung nicht an der falschen Datei
+  // hängt: mobile/www/index.html MUSS versioniert sein (sonst wäre der
+  // ganze Aufwand unnötig), die iOS-Kopie MUSS ignoriert sein.
+  //
+  // Gefragt wird GIT selbst, nicht eine bestimmte .gitignore: Die Regel
+  // für die iOS-Kopie steht in mobile/ios/.gitignore, nicht in der
+  // obersten -- eine Prüfung, die nur dort nachsieht, ginge an der Sache
+  // vorbei und wäre beim ersten Verschieben der Zeile rot.
+  const istIgnoriert = (pfad) => {
+    try {
+      execFileSync('git', ['check-ignore', '-q', pfad],
+        { cwd: WURZEL, stdio: 'ignore' });
+      return true;
+    } catch (e) { return false; }
+  };
+  check('KRITISCH: mobile/www/index.html ist versioniert — nur darum muss es überhaupt zurückgesetzt werden',
+    !istIgnoriert('mobile/www/index.html'));
+  check('KRITISCH: die iOS-Kopie des Bündels ist dagegen ignoriert — dort darf der Schlüssel liegen bleiben',
+    istIgnoriert('mobile/ios/App/App/public/index.html'));
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

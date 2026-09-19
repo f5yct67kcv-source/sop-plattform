@@ -236,6 +236,43 @@ maps_schluessel_einsetzen() {
   echo "        Maps-Schluessel eingesetzt ($PLATZ)"
 }
 
+# Das Buendel VOR dem ersten Schluessel absichern (OP-608).
+#
+# mobile/www/index.html ist versioniert -- anders als die Kopien unter
+# mobile/ios/.../public/ und mobile/android/.../public/, die in
+# .gitignore stehen. Gleich werden zwei echte Google-Schluessel
+# hineingeschrieben. Bliebe die Datei so liegen, stuende der Schluessel
+# danach im Arbeitsbaum: Ein "git add -A" traegt ihn ins Repository, und
+# test_php.mjs vergleicht die Datei Zeichen fuer Zeichen mit app.html --
+# die Regression waere nach jedem Geraetelauf rot.
+#
+# Darum wird sie am Ende des Laufs zurueckgesetzt, und zwar per trap:
+# auch dann, wenn der Bau dazwischen abbricht oder jemand Strg-C drueckt.
+# Was zurueckgesetzt wird, ist nur die Schluessel-Ersetzung --
+# mobile-buendel-erstellen.py hat die Datei kurz davor ohnehin frisch aus
+# app.html erzeugt.
+# Zurueckgesetzt wird aus einer KOPIE, die hier entsteht -- nicht per
+# "git checkout" und nicht durch erneutes Erzeugen. Beides waere ungenau:
+# Ein checkout verwuerfe auch eine berechtigte Neuerzeugung (etwa wenn
+# app.html geaendert wurde), ein zweiter Lauf des Erzeugers braeuchte
+# ihn erst recht. Die Kopie gibt genau den Stand zurueck, der vor der
+# Ersetzung da war, und sonst nichts.
+BUENDEL_DATEI="$PWD/mobile/www/index.html"
+BUENDEL_KOPIE=""
+buendel_sichern() {
+  BUENDEL_KOPIE="$(mktemp)"
+  cp "$BUENDEL_DATEI" "$BUENDEL_KOPIE"
+}
+buendel_zuruecksetzen() {
+  if [ -n "$BUENDEL_KOPIE" ] && [ -f "$BUENDEL_KOPIE" ]; then
+    cp "$BUENDEL_KOPIE" "$BUENDEL_DATEI"
+    rm -f "$BUENDEL_KOPIE"
+    BUENDEL_KOPIE=""
+  fi
+}
+buendel_sichern
+trap buendel_zuruecksetzen EXIT INT TERM
+
 maps_schluessel_einsetzen mobile/www/index.html
 
 # Der zweite Schluessel, fuer die NATIVE Karte (ENT-609). Bewusst ein
@@ -279,6 +316,13 @@ if ! npx --no-install esbuild karte-nativ-eingang.js \
 fi
 
 npx cap sync ios
+
+# Der Schluessel ist jetzt in den (ignorierten) Kopien unter ios/ --
+# im versionierten Buendel wird er nicht mehr gebraucht (OP-608). Der
+# trap oben bleibt trotzdem stehen: Er faengt die Abbrueche VOR dieser
+# Zeile ab.
+buendel_zuruecksetzen
+echo "        Buendel zurueckgesetzt (Schluessel nur noch im iOS-Bau)"
 
 # Nachsehen, ob jedes native Plugin auch wirklich im Bau landet. Geprueft
 # wird die Aussage, nicht ein Name: Jedes Paket unter node_modules/@capacitor/
