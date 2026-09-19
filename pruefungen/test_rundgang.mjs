@@ -326,6 +326,16 @@ await page.click('#rgsDlgJa');
 await page.waitForTimeout(400);
 check('KRITISCH: Pausieren ruft mein_rundgang_pausieren.php mit der richtigen rundgang_id',
   !!rufe.find(r => r.p.includes('mein_rundgang_pausieren') && r.body.rundgang_id === serverRundgang.id));
+// Seit ENT-631 fuehrt das Pausieren aus der Runde heraus: Auf der
+// pausierten Seite ist nichts mehr zu tun. Zurueck fuehrt der Chip auf
+// "Heute" (ENT-234) -- und alles Weitere hier prueft genau das, was nach
+// diesem Wiedereinstieg dasteht.
+check('KRITISCH: das Pausieren verlaesst die Runde', !(await page.isVisible('#rgSeite')));
+await page.click('.rd-chip');
+await page.waitForTimeout(700);
+check('Der Chip fuehrt in dieselbe, pausierte Runde zurueck',
+  await page.isVisible('#rgSeite')
+  && await page.evaluate(() => rundgangAktiv && rundgangAktiv.status === 'pausiert'));
 await page.click('#rgsRt-punkte');
 await page.waitForTimeout(200);
 check('KRITISCH: der Pausiert-Hinweis erscheint', (await page.textContent('#rdBanner')).includes('pausiert'));
@@ -524,7 +534,14 @@ await page.waitForTimeout(200);
 await page.click('#rgsLaufPause');
 await page.waitForTimeout(200);
 await page.click('#rgsDlgJa');
-await page.waitForTimeout(400);
+await page.waitForTimeout(500);
+// Wieder hinein (ENT-631: Pausieren fuehrt hinaus) -- geprueft wird hier,
+// was in der PAUSIERTEN Runde zur Wahl steht, nicht der Ausgang.
+check('Auch hier verlaesst das Pausieren die Runde', !(await page.isVisible('#rgSeite')));
+await page.click('.rd-chip');
+await page.waitForTimeout(700);
+await page.click('#rgsRt-funktionen');
+await page.waitForTimeout(250);
 // Der gemeldete Fehler aus ENT-290: Ein pausierter Rundgang liess sich nur
 // fortsetzen, nie abbrechen. Als Reiter stehen beide Wege nebeneinander --
 // die Weiche entfaellt damit ganz.
