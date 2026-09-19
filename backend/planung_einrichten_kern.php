@@ -83,20 +83,25 @@ function schritt(PDO $pdo, string $sql, string $was, array &$getan, array &$fehl
 }
 }
 
-if (!function_exists('planung_einrichten_ausfuehren')) {
-function planung_einrichten_ausfuehren(PDO $pdo, bool $nurPruefen, bool $mitBetreiberEbene = true): array {
-$getan = [];
-$schon = [];
-// Was nicht durchging. Bis hierher riss der erste fehlgeschlagene Schritt den
-// ganzen Lauf mit: Die Ausnahme lief in den Handler in db.php, der Endpunkt
-// antwortete mit 500, und im Dialog stand "Einrichtung fehlgeschlagen." ohne
-// jeden Grund -- waehrend die vorher gelaufenen Schritte bereits gewirkt
-// hatten. Jeder Schritt steht jetzt fuer sich; was scheitert, wird namentlich
-// gemeldet, statt den Rest zu verhindern.
-$fehler = [];
-
-// ── 1. Tabellen. Reihenfolge zaehlt: worauf verwiesen wird, muss zuerst da sein.
-$tabellen = [
+// Der Sollstand des Schemas, als eigene Quelle.
+//
+// ANLASS (2026-09-19): Die beiden Listen lagen bis hierher als lokale
+// Variablen IM Lauf. Wer wissen wollte, ob ein Schema vollstaendig ist,
+// kam nur an sie heran, indem er den ganzen Lauf startete -- mit allem,
+// was dazugehoert: Betriebsdaten lesen, Startbestaende pruefen, die
+// Betreiber-Ebene anfassen. Darum zaehlte jede Pruefung im System
+// stattdessen Tabellen und keine Spalten, und ein Platz mit halbem
+// Schema galt ueberall als eingerichtet (Demo-Platz 6 und 8).
+//
+// Herausgeloest, nicht abgeschrieben: Der Lauf unten benutzt dieselben
+// Funktionen. Eine zweite Liste an einem zweiten Ort waere genau die
+// Sorte Doppelwahrheit, die ENT-077 fuer darf() abgeschafft hat.
+//
+// Tabellenname => CREATE-Befehl. Die Reihenfolge zaehlt: worauf
+// verwiesen wird, muss zuerst dastehen.
+if (!function_exists('kern_tabellen')) {
+function kern_tabellen(): array {
+    return [
 
 // Die vier aeltesten Tabellen (ENT-010), bis zum 2026-09-18 einzeln von
 // Hand in phpMyAdmin angelegt (siehe schema.sql, Kopfkommentar: "Ausfuehren
@@ -2024,153 +2029,17 @@ CREATE TABLE IF NOT EXISTS lohnlauf_zeile (
   KEY idx_support_zugriff_freigabe (freigabe_id, zeitpunkt)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-];
-
-foreach ($tabellen as $name => $sql) {
-    if (hat_tabelle_jetzt($pdo, $name)) {
-        $schon[] = "Tabelle $name war bereits vorhanden";
-        continue;
-    }
-    if ($nurPruefen) { $getan[] = "Tabelle $name fehlt noch"; continue; }
-    try {
-        $pdo->exec($sql);
-        $getan[] = "Tabelle $name angelegt";
-    } catch (Throwable $e) {
-        $fehler[] = "Tabelle $name — " . $e->getMessage();
-    }
+    ];
+}
 }
 
-// ── 1b. Startbestand der Ereignisarten (ENT-295; bestaetigt den Katalog,
-// den ENT-164 als Vorschlag offen gelassen hatte). Nur wenn die Tabelle
-// LEER ist -- sonst kaeme eine bewusst geloeschte Art beim naechsten
-// Einrichten wieder zurueck. Die Verwaltung darf den Katalog danach frei
-// erweitern und kuerzen (ENT-164: "manuell erweiterbar, kein starres Set").
-if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'ereignisart')) {
-    try {
-        if ((int)$pdo->query('SELECT COUNT(*) FROM ereignisart')->fetchColumn() === 0) {
-            $arten = [
-                'Diebstahl / Einbruch(-versuch)',
-                'Vandalismus / Sachbeschädigung',
-                'Brandgefahr',
-                'Wasseraustritt',
-                'Fenster / Tür nicht verschlossen',
-                'Alarmanlage ausgelöst',
-                'Verdächtige Person / verdächtiges Fahrzeug',
-                'Technischer Defekt',
-                'Sonstiges',
-            ];
-            $ein = $pdo->prepare('INSERT INTO ereignisart (bezeichnung, sortierung) VALUES (?, ?)');
-            foreach ($arten as $i => $bez) { $ein->execute([$bez, ($i + 1) * 10]); }
-            $getan[] = 'Ereignisarten: Startbestand angelegt (' . count($arten) . ')';
-        }
-        // Ausserhalb der Startbestands-Bedingung (ENT-311): Der Startbestand
-        // entsteht nur, solange die Tabelle LEER ist -- bei jedem Betrieb,
-        // der schon Ereignisse erfasst hat, liefe diese Zeile sonst nie.
-        // Die eindeutige Bezeichnung macht den Aufruf beliebig oft
-        // wiederholbar.
-        $ein2 = $pdo->prepare('INSERT IGNORE INTO ereignisart (bezeichnung, sortierung) VALUES (?, ?)');
-        $ein2->execute([EREIGNISART_AUFGABE, 95]);
-        if ($ein2->rowCount() === 1) {
-            $getan[] = 'Ereignisart „' . EREIGNISART_AUFGABE . '" angelegt (ENT-311)';
-        }
-        // Dasselbe fuer den Rundgang-Abbruch (ENT-324), aus demselben Grund
-        // ausserhalb der Startbestands-Bedingung.
-        $ein3 = $pdo->prepare('INSERT IGNORE INTO ereignisart (bezeichnung, sortierung) VALUES (?, ?)');
-        $ein3->execute([EREIGNISART_ABBRUCH, 96]);
-        if ($ein3->rowCount() === 1) {
-            $getan[] = 'Ereignisart „' . EREIGNISART_ABBRUCH . '" angelegt (ENT-324)';
-        }
-        // Und fuer die Runde trotz anderer Einteilung (ENT-342), aus
-        // demselben Grund ausserhalb der Startbestands-Bedingung.
-        $ein4 = $pdo->prepare('INSERT IGNORE INTO ereignisart (bezeichnung, sortierung) VALUES (?, ?)');
-        $ein4->execute([EREIGNISART_PARALLELRUNDE, 97]);
-        if ($ein4->rowCount() === 1) {
-            $getan[] = 'Ereignisart „' . EREIGNISART_PARALLELRUNDE . '" angelegt (ENT-342)';
-        }
-    } catch (Throwable $e) {
-        $fehler[] = 'Ereignisarten-Startbestand — ' . $e->getMessage();
-    }
-}
-
-// ── 1c. Startbestand des Lohnartenkatalogs (ENT-451). Nur wenn die Tabelle
-// LEER ist -- sonst kaeme eine bewusst geloeschte Lohnart beim naechsten
-// Einrichten zurueck. Dasselbe Muster wie bei den Ereignisarten.
-//
-// Angelegt werden ausschliesslich Lohnarten, die auf einem erfassten
-// GAV-Artikel beruhen oder strukturell noetig sind. Sie tragen system=1 und
-// lassen sich nicht loeschen -- wer den Grundlohn loescht, haette eine
-// Abrechnung ohne Lohn. Betriebliche Zulagen legt die Verwaltung selbst an.
-//
-// Die sechs *_pflichtig-Kennzeichen sind je Zeile einzeln gesetzt, nicht
-// ueber eine Voreinstellung: Wer eine Lohnart anlegt, entscheidet jedes
-// bewusst. Reihenfolge der Werte:
-//   ahv, ferien, ml13, bvg, uvg, qst
-if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'lohnart')) {
-    try {
-        if ((int)$pdo->query('SELECT COUNT(*) FROM lohnart')->fetchColumn() === 0) {
-            // Der Katalog steht in backend/lohn.php als lohnart_startbestand().
-            // Er stand frueher hier als Literal -- und weil ihn dort keine
-            // Pruefung erreichte, fehlten zwei Schluessel unbemerkt, die der
-            // Lohnlauf erzeugt. Einer davon traegt den gesamten
-            // AHV-pflichtigen Lohn.
-            $lohnarten = lohnart_startbestand();
-            $ein = $pdo->prepare(
-                // REIHENFOLGE UND ANZAHL muessen zu lohnart_startbestand()
-                // passen. Sie taten es nicht: Mit der Spalte 'bemessung'
-                // bekam jede Zeile ein 14. Feld, die Platzhalterliste blieb
-                // bei 13 -- SQLSTATE[HY093], und der ganze Schritt brach ab.
-                // Der Katalog entstand dadurch gar nicht. pruef_lohn.php
-                // vergleicht die beiden jetzt gegeneinander.
-                'INSERT IGNORE INTO lohnart
-                 (schluessel, bezeichnung, art, basis_schluessel, satz_bp,
-                  ahv_pflichtig, ferien_pflichtig, ml13_pflichtig,
-                  bvg_pflichtig, uvg_pflichtig, qst_pflichtig,
-                  gav_grundlage, system, sortierung, bemessung)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)'
-            );
-            $n = 0;
-            foreach ($lohnarten as $la) { $ein->execute($la); $n += $ein->rowCount(); }
-            if ($n > 0) { $getan[] = "Lohnartenkatalog angelegt ($n Lohnarten, ENT-451)"; }
-        }
-    } catch (Throwable $e) {
-        $fehler[] = 'Lohnarten-Startbestand — ' . $e->getMessage();
-    }
-}
-
-// ── 1d. lohn_abzug bekommt BEWUSST keinen Startbestand (ENT-451).
-//
-// NBU-, KTG- und BVG-Saetze sind vertragliche Werte, die jaehrlich aendern
-// und nirgends im Projekt als Quelle erfasst sind. Ein vorbelegter Satz
-// saehe aus wie eine gepruefte Zahl und wuerde weiterrechnen, wenn er
-// veraltet -- ohne dass etwas kaputtginge. Er muss darum einmal von Hand
-// erfasst werden, mit Angabe der Quelle.
-//
-// AHV UND ALV STEHEN NICHT IN DIESER TABELLE (korrigiert 2026-09-09). Ihr
-// Satz gilt fuer jeden Betrieb gleich und lebt versioniert in LOHN_SV und
-// LOHN_ALV. Dieser Hinweis hat sie frueher mit aufgezaehlt und damit zu
-// einer Eingabe aufgefordert, die nichts bewirkt haette.
-//
-// Die Ausnahme ist der PaKo-Beitrag: Er steht woertlich im GAV (Art. 6
-// Ziff. 2, CHF 0.015 je Stunde bzw. CHF 2.50 pro Monat) und lebt darum als
-// versionierte Konstante in backend/lohn.php -- dieselbe Stelle und
-// dieselbe Bauart wie die Mindestloehne aus Anhang 1.
-//
-// Fehlt ein Satz, wird NICHT mit 0 gerechnet, sondern gesperrt. Das ist der
-// Unterschied zwischen "kein Abzug" und "Abzug unbekannt".
-if (hat_tabelle_jetzt($pdo, 'lohn_abzug')) {
-    try {
-        if ((int)$pdo->query('SELECT COUNT(*) FROM lohn_abzug')->fetchColumn() === 0) {
-            $getan[] = 'Abzugssätze (lohn_abzug) sind noch nicht erfasst — '
-                     . 'NBU, KTG und BVG einmalig unter Lohn → Sätze und Regelwerk '
-                     . 'eintragen. AHV und ALV nicht: die stehen im Regelwerk.';
-        }
-    } catch (Throwable $e) {
-        $fehler[] = 'Abzugssätze prüfen — ' . $e->getMessage();
-    }
-}
-
-// ── 2. Spalten nachtragen, falls die erste Fassung schon lief
-$spalten = [
+// Die Spalten, die NACHTRAEGLICH dazukommen -- je Eintrag Tabelle,
+// Spalte und der ALTER-Befehl. Spalten, die im CREATE oben schon
+// stehen, fehlen hier bewusst: Sie entstehen zusammen mit ihrer
+// Tabelle und koennen nicht einzeln fehlen.
+if (!function_exists('kern_spalten')) {
+function kern_spalten(): array {
+    return [
     // Kundenportal: eigenes Passwort statt Einmal-Code bei jeder Anmeldung
     // (ENT-444). Bestehende Zugaenge bleiben NULL und gehen weiter ueber den
     // Code -- er verlangt beim naechsten Mal ein Passwort.
@@ -2734,7 +2603,222 @@ $spalten = [
     // waffentragberechtigt: eine bewusst gesetzte Berechtigung statt einer
     // Vermutung aus vergangenen Einsaetzen.
     ['mitarbeiter', 'revierdienst_berechtigt', 'ALTER TABLE mitarbeiter ADD COLUMN revierdienst_berechtigt TINYINT(1) NOT NULL DEFAULT 0'],
-];
+    ];
+}
+}
+
+// Was einer Anlage zum vollstaendigen Schema fehlt -- mit EINER Abfrage.
+//
+// ANLASS (2026-09-19): Jede Pruefung im System zaehlte Tabellen. Ein
+// Platz mit allen Tabellen, aber fehlenden Spalten galt darum ueberall
+// als eingerichtet. Genau in diesem Zustand waren Demo-Platz 6 und 8:
+// 68 Tabellen, aber die nachtraeglichen Spalten fehlten, und die
+// Einrichtung brach mitten im Lauf ab.
+//
+// WARUM NICHT DER PRUEFMODUS von planung_einrichten_ausfuehren(): Der
+// liest Betriebsdaten (Kunden-IDs, den Ort eines Mitarbeitenden), fasst
+// die Betreiber-Ebene an und braucht ueber 500 Abfragen an
+// information_schema je Anlage. Hier ist es EINE, und sie liest nichts
+// als den Bauplan -- damit bleibt die Grenze aus ENT-519 unberuehrt
+// ("zaehlt, liest keine Betriebsdaten").
+//
+// Startbestaende (Rollen, Ereignisarten, Lohnarten) stehen bewusst
+// NICHT darin: Sie gehoeren nicht zum Schema, und beim Demo-Platz
+// loescht das Leeren sie ohnehin, bevor sie neu gesaet werden. Wer sie
+// braucht, prueft sie NACH dem Befuellen.
+//
+// Gibt eine Liste in Klartext zurueck; leer heisst vollstaendig.
+if (!function_exists('kern_schema_fehlend')) {
+function kern_schema_fehlend(PDO $pdo): array {
+    $ist = [];
+    $s = $pdo->query(
+        'SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()'
+    );
+    foreach ($s->fetchAll(PDO::FETCH_NUM) as $zeile) {
+        // Kleingeschrieben verglichen: Auf manchen Servern kommen
+        // Tabellennamen anders zurueck, als sie angelegt wurden.
+        $ist[strtolower((string)$zeile[0])][strtolower((string)$zeile[1])] = true;
+    }
+
+    $fehlend = [];
+    foreach (array_keys(kern_tabellen()) as $tabelle) {
+        if (!isset($ist[strtolower($tabelle)])) { $fehlend[] = 'Tabelle ' . $tabelle; }
+    }
+    foreach (kern_spalten() as $eintrag) {
+        [$tabelle, $spalte] = $eintrag;
+        $t = strtolower($tabelle);
+        // Fehlt schon die Tabelle, steht sie oben. Ihre Spalten noch
+        // einmal aufzuzaehlen macht die Liste lang und nicht klarer.
+        if (!isset($ist[$t])) { continue; }
+        if (!isset($ist[$t][strtolower($spalte)])) {
+            $fehlend[] = 'Spalte ' . $tabelle . '.' . $spalte;
+        }
+    }
+    return $fehlend;
+}
+}
+
+if (!function_exists('planung_einrichten_ausfuehren')) {
+function planung_einrichten_ausfuehren(PDO $pdo, bool $nurPruefen, bool $mitBetreiberEbene = true): array {
+$getan = [];
+$schon = [];
+// Was nicht durchging. Bis hierher riss der erste fehlgeschlagene Schritt den
+// ganzen Lauf mit: Die Ausnahme lief in den Handler in db.php, der Endpunkt
+// antwortete mit 500, und im Dialog stand "Einrichtung fehlgeschlagen." ohne
+// jeden Grund -- waehrend die vorher gelaufenen Schritte bereits gewirkt
+// hatten. Jeder Schritt steht jetzt fuer sich; was scheitert, wird namentlich
+// gemeldet, statt den Rest zu verhindern.
+$fehler = [];
+
+// ── 1. Tabellen. Reihenfolge zaehlt: worauf verwiesen wird, muss zuerst da sein.
+$tabellen = kern_tabellen();
+
+foreach ($tabellen as $name => $sql) {
+    if (hat_tabelle_jetzt($pdo, $name)) {
+        $schon[] = "Tabelle $name war bereits vorhanden";
+        continue;
+    }
+    if ($nurPruefen) { $getan[] = "Tabelle $name fehlt noch"; continue; }
+    try {
+        $pdo->exec($sql);
+        $getan[] = "Tabelle $name angelegt";
+    } catch (Throwable $e) {
+        $fehler[] = "Tabelle $name — " . $e->getMessage();
+    }
+}
+
+// ── 1b. Startbestand der Ereignisarten (ENT-295; bestaetigt den Katalog,
+// den ENT-164 als Vorschlag offen gelassen hatte). Nur wenn die Tabelle
+// LEER ist -- sonst kaeme eine bewusst geloeschte Art beim naechsten
+// Einrichten wieder zurueck. Die Verwaltung darf den Katalog danach frei
+// erweitern und kuerzen (ENT-164: "manuell erweiterbar, kein starres Set").
+if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'ereignisart')) {
+    try {
+        if ((int)$pdo->query('SELECT COUNT(*) FROM ereignisart')->fetchColumn() === 0) {
+            $arten = [
+                'Diebstahl / Einbruch(-versuch)',
+                'Vandalismus / Sachbeschädigung',
+                'Brandgefahr',
+                'Wasseraustritt',
+                'Fenster / Tür nicht verschlossen',
+                'Alarmanlage ausgelöst',
+                'Verdächtige Person / verdächtiges Fahrzeug',
+                'Technischer Defekt',
+                'Sonstiges',
+            ];
+            $ein = $pdo->prepare('INSERT INTO ereignisart (bezeichnung, sortierung) VALUES (?, ?)');
+            foreach ($arten as $i => $bez) { $ein->execute([$bez, ($i + 1) * 10]); }
+            $getan[] = 'Ereignisarten: Startbestand angelegt (' . count($arten) . ')';
+        }
+        // Ausserhalb der Startbestands-Bedingung (ENT-311): Der Startbestand
+        // entsteht nur, solange die Tabelle LEER ist -- bei jedem Betrieb,
+        // der schon Ereignisse erfasst hat, liefe diese Zeile sonst nie.
+        // Die eindeutige Bezeichnung macht den Aufruf beliebig oft
+        // wiederholbar.
+        $ein2 = $pdo->prepare('INSERT IGNORE INTO ereignisart (bezeichnung, sortierung) VALUES (?, ?)');
+        $ein2->execute([EREIGNISART_AUFGABE, 95]);
+        if ($ein2->rowCount() === 1) {
+            $getan[] = 'Ereignisart „' . EREIGNISART_AUFGABE . '" angelegt (ENT-311)';
+        }
+        // Dasselbe fuer den Rundgang-Abbruch (ENT-324), aus demselben Grund
+        // ausserhalb der Startbestands-Bedingung.
+        $ein3 = $pdo->prepare('INSERT IGNORE INTO ereignisart (bezeichnung, sortierung) VALUES (?, ?)');
+        $ein3->execute([EREIGNISART_ABBRUCH, 96]);
+        if ($ein3->rowCount() === 1) {
+            $getan[] = 'Ereignisart „' . EREIGNISART_ABBRUCH . '" angelegt (ENT-324)';
+        }
+        // Und fuer die Runde trotz anderer Einteilung (ENT-342), aus
+        // demselben Grund ausserhalb der Startbestands-Bedingung.
+        $ein4 = $pdo->prepare('INSERT IGNORE INTO ereignisart (bezeichnung, sortierung) VALUES (?, ?)');
+        $ein4->execute([EREIGNISART_PARALLELRUNDE, 97]);
+        if ($ein4->rowCount() === 1) {
+            $getan[] = 'Ereignisart „' . EREIGNISART_PARALLELRUNDE . '" angelegt (ENT-342)';
+        }
+    } catch (Throwable $e) {
+        $fehler[] = 'Ereignisarten-Startbestand — ' . $e->getMessage();
+    }
+}
+
+// ── 1c. Startbestand des Lohnartenkatalogs (ENT-451). Nur wenn die Tabelle
+// LEER ist -- sonst kaeme eine bewusst geloeschte Lohnart beim naechsten
+// Einrichten zurueck. Dasselbe Muster wie bei den Ereignisarten.
+//
+// Angelegt werden ausschliesslich Lohnarten, die auf einem erfassten
+// GAV-Artikel beruhen oder strukturell noetig sind. Sie tragen system=1 und
+// lassen sich nicht loeschen -- wer den Grundlohn loescht, haette eine
+// Abrechnung ohne Lohn. Betriebliche Zulagen legt die Verwaltung selbst an.
+//
+// Die sechs *_pflichtig-Kennzeichen sind je Zeile einzeln gesetzt, nicht
+// ueber eine Voreinstellung: Wer eine Lohnart anlegt, entscheidet jedes
+// bewusst. Reihenfolge der Werte:
+//   ahv, ferien, ml13, bvg, uvg, qst
+if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'lohnart')) {
+    try {
+        if ((int)$pdo->query('SELECT COUNT(*) FROM lohnart')->fetchColumn() === 0) {
+            // Der Katalog steht in backend/lohn.php als lohnart_startbestand().
+            // Er stand frueher hier als Literal -- und weil ihn dort keine
+            // Pruefung erreichte, fehlten zwei Schluessel unbemerkt, die der
+            // Lohnlauf erzeugt. Einer davon traegt den gesamten
+            // AHV-pflichtigen Lohn.
+            $lohnarten = lohnart_startbestand();
+            $ein = $pdo->prepare(
+                // REIHENFOLGE UND ANZAHL muessen zu lohnart_startbestand()
+                // passen. Sie taten es nicht: Mit der Spalte 'bemessung'
+                // bekam jede Zeile ein 14. Feld, die Platzhalterliste blieb
+                // bei 13 -- SQLSTATE[HY093], und der ganze Schritt brach ab.
+                // Der Katalog entstand dadurch gar nicht. pruef_lohn.php
+                // vergleicht die beiden jetzt gegeneinander.
+                'INSERT IGNORE INTO lohnart
+                 (schluessel, bezeichnung, art, basis_schluessel, satz_bp,
+                  ahv_pflichtig, ferien_pflichtig, ml13_pflichtig,
+                  bvg_pflichtig, uvg_pflichtig, qst_pflichtig,
+                  gav_grundlage, system, sortierung, bemessung)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)'
+            );
+            $n = 0;
+            foreach ($lohnarten as $la) { $ein->execute($la); $n += $ein->rowCount(); }
+            if ($n > 0) { $getan[] = "Lohnartenkatalog angelegt ($n Lohnarten, ENT-451)"; }
+        }
+    } catch (Throwable $e) {
+        $fehler[] = 'Lohnarten-Startbestand — ' . $e->getMessage();
+    }
+}
+
+// ── 1d. lohn_abzug bekommt BEWUSST keinen Startbestand (ENT-451).
+//
+// NBU-, KTG- und BVG-Saetze sind vertragliche Werte, die jaehrlich aendern
+// und nirgends im Projekt als Quelle erfasst sind. Ein vorbelegter Satz
+// saehe aus wie eine gepruefte Zahl und wuerde weiterrechnen, wenn er
+// veraltet -- ohne dass etwas kaputtginge. Er muss darum einmal von Hand
+// erfasst werden, mit Angabe der Quelle.
+//
+// AHV UND ALV STEHEN NICHT IN DIESER TABELLE (korrigiert 2026-09-09). Ihr
+// Satz gilt fuer jeden Betrieb gleich und lebt versioniert in LOHN_SV und
+// LOHN_ALV. Dieser Hinweis hat sie frueher mit aufgezaehlt und damit zu
+// einer Eingabe aufgefordert, die nichts bewirkt haette.
+//
+// Die Ausnahme ist der PaKo-Beitrag: Er steht woertlich im GAV (Art. 6
+// Ziff. 2, CHF 0.015 je Stunde bzw. CHF 2.50 pro Monat) und lebt darum als
+// versionierte Konstante in backend/lohn.php -- dieselbe Stelle und
+// dieselbe Bauart wie die Mindestloehne aus Anhang 1.
+//
+// Fehlt ein Satz, wird NICHT mit 0 gerechnet, sondern gesperrt. Das ist der
+// Unterschied zwischen "kein Abzug" und "Abzug unbekannt".
+if (hat_tabelle_jetzt($pdo, 'lohn_abzug')) {
+    try {
+        if ((int)$pdo->query('SELECT COUNT(*) FROM lohn_abzug')->fetchColumn() === 0) {
+            $getan[] = 'Abzugssätze (lohn_abzug) sind noch nicht erfasst — '
+                     . 'NBU, KTG und BVG einmalig unter Lohn → Sätze und Regelwerk '
+                     . 'eintragen. AHV und ALV nicht: die stehen im Regelwerk.';
+        }
+    } catch (Throwable $e) {
+        $fehler[] = 'Abzugssätze prüfen — ' . $e->getMessage();
+    }
+}
+
+// ── 2. Spalten nachtragen, falls die erste Fassung schon lief
+$spalten = kern_spalten();
 // Vor dem Loop merken, ob die neue Berechtigungs-Spalte schon da war -- nur
 // wenn sie JETZT, in diesem Lauf, neu entsteht, darf der Nachtrag weiter
 // unten einmalig laufen. Anders als die "beliebig oft wiederholbar"-
