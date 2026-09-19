@@ -1188,7 +1188,7 @@ jobs:
           cp nutzungsbedingungen.html   dist-guardops/nutzungsbedingungen.html
           cp demo-bestaetigen.html      dist-guardops/demo-bestaetigen.html
           # demo-weiter.html ist die Seite, auf die der Knopf aus der
-          # Abschiedsmail zeigt (ENT-628). Sie liegt aus demselben Grund
+          # Abschiedsmail zeigt (ENT-634). Sie liegt aus demselben Grund
           # hier wie demo-bestaetigen.html: Der Interessent kam von dieser
           # Domain, der Endpunkt dahinter laeuft auf betreiber.guardops.ch.
           cp demo-weiter.html           dist-guardops/demo-weiter.html
@@ -1455,7 +1455,7 @@ jobs:
           # Sammelfall der Seite. Kein Interessent konnte seinen Zugang
           # einloesen.
           cp backend/api/demo_bestaetigen.php   dist-betreiber/api/demo_bestaetigen.php
-          # Der Knopf aus der Abschiedsmail (ENT-628). Dieselbe Falle wie
+          # Der Knopf aus der Abschiedsmail (ENT-634). Dieselbe Falle wie
           # oben bei demo_bestaetigen.php: Fehlt die Datei hier, schickt
           # demo-weiter.html seinen POST auf eine 404-Seite ohne
           # CORS-Kopfzeile, und der Interessent sieht nur "Die Verbindung

@@ -745,7 +745,7 @@ function demo_warnung_faellig_und_vermerken(?string $datei = null, ?int $jetzt =
     return true;
 }
 
-// ══ Der Weg zurueck nach dem Ablauf (ENT-628) ════════════════════════
+// ══ Der Weg zurueck nach dem Ablauf (ENT-634) ════════════════════════
 //
 // Nach vierzehn Tagen ist der Zugang weg und die Instanz geleert. Bis
 // hierher endete es dort: kein Wort mehr, und ein Interessent, der weiter
@@ -950,7 +950,7 @@ function demo_zugang_tabelle(): string
   -- die Behauptung, es sei am 1.1.1970 erledigt worden.
   nachgefasst_am DATETIME NULL,
   nachgefasst_von VARCHAR(200) NOT NULL DEFAULT '',
-  -- Die Abschiedsmail nach dem Ablauf und der Weg zurueck (ENT-628).
+  -- Die Abschiedsmail nach dem Ablauf und der Weg zurueck (ENT-634).
   --
   -- ende_abdruck ist der SHA-256-Abdruck des Werts aus dem Link, NICHT der
   -- Wert selbst -- gleiche Regel wie bei den Sitzungen (ENT-501) und beim

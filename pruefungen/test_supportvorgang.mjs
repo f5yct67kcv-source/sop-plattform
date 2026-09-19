@@ -136,7 +136,7 @@ const BETREIBER_EBENE_ERLAUBT = [
   // brauchen dieselbe Datenbank aus demselben Grund.
   'demo_bestaetigen.php',
   'demo_erneut_senden.php',
-  // Der Weg zurueck nach dem Ablauf (ENT-628): Der Knopf aus der
+  // Der Weg zurueck nach dem Ablauf (ENT-634): Der Knopf aus der
   // Abschiedsmail traegt seinen Vermerk an genau derselben Zeile in
   // demo_zugang ein, die auch demo_bestaetigen.php angelegt hat. Er
   // schreibt nichts als zwei Felder daran und liest nichts sonst aus der

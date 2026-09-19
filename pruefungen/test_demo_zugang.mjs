@@ -64,7 +64,7 @@ check('die Tabellendefinition laesst sich erzeugen', sql.includes('create table'
 check('KRITISCH: im Register steht kein Passwort und kein Hash',
   sql.includes('create table') && !sql.includes('passwort') && !sql.includes('hash'));
 
-// ── 3a. Der Weg zurueck nach dem Ablauf (ENT-628) ─────────────────────
+// ── 3a. Der Weg zurueck nach dem Ablauf (ENT-634) ─────────────────────
 //
 // Strukturell geprueft, weil ein echter Aufruf eine Datenbank und einen
 // Mailserver braucht. Die reine Logik (Mailtexte, Klassen, Abdruck) laeuft
@@ -247,7 +247,7 @@ const ANTWORTEN = {
     // Der Nachfass-Stand (ENT-622). Zwei offene, einer erledigt -- damit
     // beide Darstellungen und beide Knoepfe in derselben Liste vorkommen.
     kennt_nachfassen: true, nachfassen_offen: 2,
-    // Der Weg zurueck (ENT-628): Einer der drei hat nach dem Ablauf
+    // Der Weg zurueck (ENT-634): Einer der drei hat nach dem Ablauf
     // geklickt und seine Betriebsgroesse angegeben.
     kennt_weiter: true, weiter_offen: 1,
     zugaenge: [
@@ -496,7 +496,7 @@ check('der erledigte nennt Datum und Konto, statt bloss zu verschwinden',
   /nachgefasst \d{4}-\d{2}-\d{2}/.test(sicht.erledigteZeile)
   && sicht.erledigteZeile.includes('A. Betreiber'));
 
-/* ── Der Weg zurueck steht im Betreiber-Bereich (ENT-628) ─────────────
+/* ── Der Weg zurueck steht im Betreiber-Bereich (ENT-634) ─────────────
    Eine Anfrage, die nur im Postfach liegt, geht unter. Sie muss dort
    stehen, wo der Vertrieb ohnehin hinsieht -- und zwar beim NAMEN, nicht
    in der Statusspalte zwischen Ablauf und Nachfass-Stand. */
@@ -525,7 +525,7 @@ check('KRITISCH: wer nicht geklickt hat, trägt den Merker nicht', weiterSicht.o
 check('die Zahl derer, die weitermachen wollen, steht mit eigenem Wort da',
   /1 will weitermachen/.test(weiterSicht.fuss));
 
-/* ══ Die Landeseite nach der Abschiedsmail (ENT-628) ═════════════════
+/* ══ Die Landeseite nach der Abschiedsmail (ENT-634) ═════════════════
 
    DIE WICHTIGSTE PRUEFUNG HIER IST DIE ERSTE: Beim Laden darf NICHTS an
    den Server gehen. Outlook Safe Links und Virenscanner rufen jede Adresse

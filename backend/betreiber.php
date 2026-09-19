@@ -1450,7 +1450,7 @@ function be_spalten(): array
         // wuerde behaupten, was nicht geprueft wurde.
         ['demo_zugang', 'nachgefasst_am',  "ALTER TABLE demo_zugang ADD COLUMN nachgefasst_am DATETIME NULL AFTER beendet_am"],
         ['demo_zugang', 'nachgefasst_von', "ALTER TABLE demo_zugang ADD COLUMN nachgefasst_von VARCHAR(200) NOT NULL DEFAULT '' AFTER nachgefasst_am"],
-        // Die Abschiedsmail und der Weg zurueck (ENT-628). Vier Spalten,
+        // Die Abschiedsmail und der Weg zurueck (ENT-634). Vier Spalten,
         // die es auf Anlagen von vor diesem Eintrag noch nicht gibt --
         // ohne den Nachtrag faellt die Demo-Liste aus, weil EIN Feld
         // fehlt.

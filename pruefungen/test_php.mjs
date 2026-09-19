@@ -984,7 +984,7 @@ const OHNE_ANMELDUNG = [
   // aus einer Mail an genau die Adresse, um die es geht; eine Anmeldung
   // gaebe es zu diesem Zeitpunkt gar nicht.
   'demo_bestaetigen.php',
-  // Der Knopf aus der Abschiedsmail (ENT-628). Der Zugang ist zu diesem
+  // Der Knopf aus der Abschiedsmail (ENT-634). Der Zugang ist zu diesem
   // Zeitpunkt abgelaufen und das Konto geloescht -- eine Anmeldung gibt es
   // also nicht einmal mehr theoretisch. Ausweis ist derselbe wie bei
   // demo_bestaetigen.php: ein 256-Bit-Wert aus einer Mail an genau die

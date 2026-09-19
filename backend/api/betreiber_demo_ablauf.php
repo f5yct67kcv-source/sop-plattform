@@ -18,7 +18,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../demo_instanz.php';
-// Fuer die Abschiedsmail (ENT-628). Der Rechenkern der Mail liegt in
+// Fuer die Abschiedsmail (ENT-634). Der Rechenkern der Mail liegt in
 // demo_zugang.php, das betreiber.php bereits mitbringt; der Versand
 // braucht diese Datei.
 require_once __DIR__ . '/../mailer.php';
@@ -51,7 +51,7 @@ if (!hat_tabelle($pdo, 'demo_zugang')) {
 }
 
 $jetzt = date('Y-m-d H:i:s');
-// Person und Adresse kommen mit, weil der Lauf seit ENT-628 eine
+// Person und Adresse kommen mit, weil der Lauf seit ENT-634 eine
 // Abschiedsmail verschickt. Ob die Spalten dafuer schon stehen, entscheidet
 // sich weiter unten -- der Ablauf selbst darf daran nicht haengen.
 $offen = $pdo->prepare(
@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     ]);
 }
 
-/* Die Abschiedsmail (ENT-628).
+/* Die Abschiedsmail (ENT-634).
 
    ERST NACH DEM LEEREN UND NACH DEM EINTRAG, nicht davor: Die Mail sagt,
    dass die Daten geloescht sind. Ginge sie vorher raus und das Leeren

@@ -1,6 +1,6 @@
 <?php
 // „GuardOpS weiter nutzen" aus der Abschiedsmail -- öffentlich, ohne
-// Anmeldung (ENT-628).
+// Anmeldung (ENT-634).
 //
 // Nach vierzehn Tagen ist der Demo-Zugang weg. Die Abschiedsmail gibt dem
 // Interessenten einen Knopf zurück; dieser Endpunkt nimmt den Klick

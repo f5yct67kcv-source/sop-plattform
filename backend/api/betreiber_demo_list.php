@@ -27,7 +27,7 @@ $jetzt = date('Y-m-d H:i:s');
 // nicht nachgeruestet" statt „noch nie nachgefasst". Das sind zwei
 // verschiedene Aussagen (Hausregel).
 $kenntNachfassen = hat_spalte($pdo, 'demo_zugang', 'nachgefasst_am');
-// Dasselbe fuer den Weg zurueck (ENT-628). Steht die Spalte noch nicht,
+// Dasselbe fuer den Weg zurueck (ENT-634). Steht die Spalte noch nicht,
 // sagt die Oberflaeche nichts ueber Weitermachen -- und nicht "niemand
 // will weitermachen". Das sind zwei verschiedene Aussagen.
 $kenntWeiter = hat_spalte($pdo, 'demo_zugang', 'weiter_am')
@@ -107,7 +107,7 @@ json_response([
     // Abzeichens, das immer null zeigt.
     'kennt_nachfassen' => $kenntNachfassen,
     // Wie kennt_nachfassen: Sagt der Oberflaeche, ob die Frage ueberhaupt
-    // beantwortbar ist (ENT-628).
+    // beantwortbar ist (ENT-634).
     'kennt_weiter' => $kenntWeiter,
     // Die Zahl fuer die Uebersicht: Wie viele Interessenten nach dem Ablauf
     // gesagt haben, dass es weitergehen soll.

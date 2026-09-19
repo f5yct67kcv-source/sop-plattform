@@ -710,7 +710,7 @@ $pruef('KRITISCH: der Knopf bringt seine Farben selbst mit, nicht aus dem Styles
 $pruef('KRITISCH: eingeschmuggelte Auszeichnung im Knopf bleibt Text',
     !str_contains(mail_knopf('<b>X</b>', 'https://a.ch'), '<b>X</b>'));
 
-// ══ Die Abschiedsmail nach dem Ablauf (ENT-628) ══════════════════════
+// ══ Die Abschiedsmail nach dem Ablauf (ENT-634) ══════════════════════
 //
 // Geprueft wird die AUSSAGE der Mail, nicht ihr Wortlaut: dass sie den
 // Weg zurueck anbietet, dass sie ohne Link trotzdem brauchbar bleibt, und
