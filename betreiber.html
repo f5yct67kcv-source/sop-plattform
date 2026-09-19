@@ -3996,11 +3996,17 @@ async function ladeDemo() {
     + '<div class="hinweis" style="margin-top:10px">'
     + text(a.plaetze_frei + ' von ' + a.plaetze_total + ' Plätzen frei · '
          + 'Laufzeit ' + a.laufzeit_tage + ' Tage · '
-         + a.aktive + ' laufende Zugänge') + '</div>';
+         + a.aktive + ' laufende Zugänge'
+         /* Einheiten nicht vermischen: "Zugänge" zählt Interessenten mit
+            offenem Zugang, "will weitermachen" zählt die, die nach dem
+            Ablauf geklickt haben -- auch längst geschlossene. */
+         + (a.kennt_weiter && a.weiter_offen
+             ? ' · ' + a.weiter_offen + ' will weitermachen' : '')) + '</div>';
   demoPlatzKnoepfeVerdrahten(plaetze);
 
   const liste = a.zugaenge || [];
   const kenntNachfassen = a.kennt_nachfassen === true;
+  const kenntWeiter = a.kennt_weiter === true;
   demoAbzeichenSetzen(a.nachfassen_offen || 0);
   if (!liste.length) {
     inhalt.innerHTML = leerBlock('◇', 'Noch kein Zugang vergeben',
@@ -4014,7 +4020,8 @@ async function ladeDemo() {
     + liste.map(z => '<tr>'
         + '<td><strong>' + text(z.firma) + '</strong>'
           + '<div class="zweit">' + text(z.person) + ' · ' + text(z.email)
-            + (z.telefon ? ' · ' + text(z.telefon) : '') + '</div></td>'
+            + (z.telefon ? ' · ' + text(z.telefon) : '') + '</div>'
+          + demoWeiterZelle(z, kenntWeiter) + '</td>'
         + '<td>' + text(z.platz) + '</td>'
         + '<td>' + text(z.login) + '</td>'
         + '<td>' + merker(DEMO_STATUS_TEXT, z.status)
@@ -4040,6 +4047,25 @@ async function ladeDemo() {
     b.onclick = () => demoNachgefasst(+b.dataset.demoNachgefasst, true));
   inhalt.querySelectorAll('[data-demo-offen]').forEach(b =>
     b.onclick = () => demoNachgefasst(+b.dataset.demoOffen, false));
+}
+
+/* Der Weg zurueck nach dem Ablauf (ENT-634).
+
+   Wer nach der Abschiedsmail auf "GuardOpS weiter nutzen" geklickt hat,
+   ist der wichtigste Eintrag in dieser Liste -- darum steht es beim Namen
+   und nicht in der Statusspalte, wo es zwischen Ablauf und Nachfass-Stand
+   verschwaende.
+
+   DREI AUSSAGEN, DREI TEXTE (Hausregel): hat geklickt (mit Datum und
+   Groesse), hat nicht geklickt (nichts) und "koennen wir nicht wissen",
+   weil die Spalten auf dieser Anlage noch nicht stehen. Das Letzte wird
+   NICHT als "hat nicht geklickt" ausgegeben. */
+function demoWeiterZelle(z, kennt) {
+  if (!kennt) { return '<div class="zweit">Weitermachen nicht eingerichtet</div>'; }
+  if (!z.weiter_am) { return ''; }
+  const groesse = z.weiter_groesse_text ? ' · ' + text(z.weiter_groesse_text) : '';
+  return '<div style="margin-top:4px"><span class="merker m-pos">will weitermachen</span>'
+    + '<span class="zweit"> ' + text(String(z.weiter_am).slice(0, 10)) + groesse + '</span></div>';
 }
 
 /* Nachgefasst vermerken oder zuruecknehmen (ENT-622).

@@ -51,7 +51,7 @@ const WEB_HERKUNFT_OEFFENTLICHE_DEMO = 'https://guardops.ch';
 // Ohne diesen Eintrag blockt der Browser die Antwort, und der Knopf tut
 // sichtbar nichts.
 const OEFFENTLICHE_DEMO_SKRIPTE = ['demo_anfordern.php', 'demo_erneut_senden.php',
-    'demo_bestaetigen.php'];
+    'demo_bestaetigen.php', 'demo_weiter.php'];
 
 // Reine Funktion -- pruefbar mit frei gewaehlten Werten, ohne echten
 // Request (gleiche Ueberlegung wie bei basis_url_pruefen()). $skript ist

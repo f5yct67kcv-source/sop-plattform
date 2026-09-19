@@ -27,20 +27,35 @@ $jetzt = date('Y-m-d H:i:s');
 // nicht nachgeruestet" statt „noch nie nachgefasst". Das sind zwei
 // verschiedene Aussagen (Hausregel).
 $kenntNachfassen = hat_spalte($pdo, 'demo_zugang', 'nachgefasst_am');
+// Dasselbe fuer den Weg zurueck (ENT-634). Steht die Spalte noch nicht,
+// sagt die Oberflaeche nichts ueber Weitermachen -- und nicht "niemand
+// will weitermachen". Das sind zwei verschiedene Aussagen.
+$kenntWeiter = hat_spalte($pdo, 'demo_zugang', 'weiter_am')
+    && hat_spalte($pdo, 'demo_zugang', 'weiter_groesse');
 $felder = 'id, platz, firma, person, email, telefon, login, status,
            freigegeben_am, freigegeben_von, laeuft_ab_am, beendet_am'
-        . ($kenntNachfassen ? ', nachgefasst_am, nachgefasst_von' : '');
+        . ($kenntNachfassen ? ', nachgefasst_am, nachgefasst_von' : '')
+        . ($kenntWeiter ? ', weiter_am, weiter_groesse' : '');
 
 $zeilen = $pdo->query("SELECT $felder FROM demo_zugang ORDER BY id DESC")
               ->fetchAll(PDO::FETCH_ASSOC);
 
-$liste = array_map(static function (array $z) use ($jetzt, $kenntNachfassen): array {
+$liste = array_map(static function (array $z) use ($jetzt, $kenntNachfassen, $kenntWeiter): array {
     $z['id'] = (int)$z['id'];
     // Drei Zustaende, nicht zwei: nachgefasst, noch nicht nachgefasst, und
     // „wir koennen es nicht wissen" (Spalte fehlt). Der dritte wird nicht
     // als der zweite ausgegeben.
     $z['nachgefasst_am']  = $kenntNachfassen ? ($z['nachgefasst_am'] ?? null) : null;
     $z['nachgefasst_von'] = $kenntNachfassen ? (string)($z['nachgefasst_von'] ?? '') : '';
+    // Drei Zustaende, wieder: hat geklickt (mit Datum), hat nicht geklickt
+    // (null) und "koennen wir nicht wissen" (Spalte fehlt, dann ebenfalls
+    // null -- unterschieden wird es an kennt_weiter in der Antwort).
+    $z['weiter_am'] = $kenntWeiter ? ($z['weiter_am'] ?? null) : null;
+    // Der Text der Groessenklasse kommt vom Server: Welche Klassen es gibt,
+    // steht in DEMO_GROESSE_KLASSEN und nicht zweimal.
+    $z['weiter_groesse'] = $kenntWeiter ? (string)($z['weiter_groesse'] ?? '') : '';
+    $z['weiter_groesse_text'] = ($z['weiter_groesse'] === '')
+        ? '' : demo_groesse_text((string)$z['weiter_groesse']);
     // Der Zustand wird HIER benannt und nicht in der Oberfläche gerechnet:
     // Ein Zugang, dessen Frist um ist, den der Zeitgeber aber noch nicht
     // angefasst hat, steht in der Datenbank auf "aktiv" und ist trotzdem
@@ -91,6 +106,14 @@ json_response([
     // ohne die Spalte gibt es kein Abzeichen und keinen Knopf, statt eines
     // Abzeichens, das immer null zeigt.
     'kennt_nachfassen' => $kenntNachfassen,
+    // Wie kennt_nachfassen: Sagt der Oberflaeche, ob die Frage ueberhaupt
+    // beantwortbar ist (ENT-634).
+    'kennt_weiter' => $kenntWeiter,
+    // Die Zahl fuer die Uebersicht: Wie viele Interessenten nach dem Ablauf
+    // gesagt haben, dass es weitergehen soll.
+    'weiter_offen' => $kenntWeiter
+        ? count(array_filter($liste, static fn (array $z): bool => $z['weiter_am'] !== null))
+        : 0,
     // Die Zahl fuer das Abzeichen am Reiter. Sie zaehlt Interessenten, bei
     // denen noch niemand nachgefasst hat -- laufende UND beendete: Wer sich
     // den Zugang geholt hat und nie angesprochen wurde, bleibt eine
