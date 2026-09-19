@@ -789,12 +789,72 @@ function mandant_groesse(array $m): ?array
             $s->execute([date('Y-m-01'), date('Y-m-t')]);
             $imEinsatz = (int)$s->fetchColumn();
         }
-        return ['gesamt' => $gesamt, 'aktiv' => $aktiv, 'im_einsatz' => $imEinsatz];
+        // ── Wird die Anlage ueberhaupt benutzt (ENT-619) ──────────────
+        //
+        // ZWEI SIGNALE, weil sie auseinanderliegen koennen und genau das die
+        // Aussage ist: Wer sich noch anmeldet, aber nichts mehr erfasst, ist
+        // auf dem Absprung.
+        //
+        // ZUSAMMENGEFASST UEBER ALLE PERSONEN, nie je Person. Die Grenze
+        // dieser Ebene ist seit ENT-519 dieselbe: Die Betreiberin sieht
+        // ZAHLEN ueber einen Mandanten, nie dessen Inhalte und nie, wer dort
+        // wann gearbeitet hat. Ein MAX() ueber die ganze Belegschaft sagt
+        // "die Anlage lebt", ohne jemanden einzeln zu beobachten.
+        //
+        // Fehlt eine Spalte oder eine Tabelle, bleibt der Wert NULL --
+        // "nicht feststellbar" ist etwas anderes als "seit nie benutzt"
+        // (Hausregel), und die Oberflaeche haelt die beiden auseinander.
+        $letzterZugriff = null;
+        if (hat_spalte($pdo, 'mitarbeiter', 'letzter_zugriff')) {
+            $letzterZugriff = $pdo->query('SELECT MAX(letzter_zugriff) FROM mitarbeiter')->fetchColumn();
+            $letzterZugriff = $letzterZugriff ?: null;
+        }
+        $letzterRapport = null;
+        if (hat_tabelle($pdo, 'rapporte')) {
+            $letzterRapport = $pdo->query('SELECT MAX(erfasst_am) FROM rapporte')->fetchColumn();
+            $letzterRapport = $letzterRapport ?: null;
+        }
+
+        return ['gesamt' => $gesamt, 'aktiv' => $aktiv, 'im_einsatz' => $imEinsatz,
+                'letzter_zugriff' => $letzterZugriff, 'letzter_rapport' => $letzterRapport];
     } catch (Throwable $e) {
         // Wie bei mandant_stand(): Der Treibertext kann Host und Benutzer
         // tragen und geht nicht nach aussen.
         return null;
     }
+}
+
+// Wie lange ist es her, dass in dieser Anlage etwas geschah (ENT-619)?
+//
+// Gibt die Zahl der Tage seit dem juengeren der beiden Signale zurueck, oder
+// null, wenn KEINES feststellbar ist. Die Unterscheidung traegt die ganze
+// Aussage: null heisst "wir wissen es nicht" -- etwa weil die Anlage gerade
+// nicht erreichbar ist oder die Spalte fehlt --, und das darf nie wie "seit
+// Ewigkeiten still" aussehen.
+//
+// Eine Anlage, die erreichbar ist, aber weder Zugriff noch Rapport kennt,
+// ist ein dritter Fall: frisch eingerichtet und noch nie benutzt. Er kommt
+// als 'nie' zurueck, nicht als eine erfundene Zahl.
+function mandant_stille(?array $zahlen, ?string $heute = null)
+{
+    if ($zahlen === null) { return null; }
+    $hatSpalten = array_key_exists('letzter_zugriff', $zahlen)
+               || array_key_exists('letzter_rapport', $zahlen);
+    if (!$hatSpalten) { return null; }
+
+    $stempel = array_values(array_filter([
+        $zahlen['letzter_zugriff'] ?? null,
+        $zahlen['letzter_rapport'] ?? null,
+    ], static fn($w) => $w !== null && $w !== '' && substr((string)$w, 0, 10) !== '0000-00-00'));
+
+    if (!$stempel) { return 'nie'; }
+
+    $juengster = max(array_map(static fn($w) => substr((string)$w, 0, 10), $stempel));
+    $heute = $heute ?: date('Y-m-d');
+    $tage = (int)floor((strtotime($heute) - strtotime($juengster)) / 86400);
+    // Ein Stempel aus der Zukunft (falsch gestellte Uhr) ist kein negativer
+    // Abstand, sondern "heute".
+    return max(0, $tage);
 }
 
 // Den Stand eines Monats festhalten -- höchstens einmal je Mandant und

@@ -2021,6 +2021,192 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
   }
 }
 
+// ── Der Maps-Schluessel darf nach dem Lauf nicht im Arbeitsbaum liegen
+// ── bleiben (OP-608) ─────────────────────────────────────────────────────
+//
+// aufs-handy.sh setzt zwei echte Google-Schluessel in
+// mobile/www/index.html ein. Diese Datei ist VERSIONIERT -- die Kopien
+// unter mobile/ios/.../public/ und mobile/android/.../public/ stehen
+// dagegen in .gitignore. Bleibt sie mit dem Schluessel liegen, traegt ein
+// "git add -A" ihn ins Repository, und test_php.mjs (das sie Zeichen fuer
+// Zeichen mit app.html vergleicht) ist nach jedem Geraetelauf rot.
+//
+// Geprueft wird durch AUSFUEHREN, nicht am Quelltext: Die beiden
+// Funktionen werden aus dem Skript geschnitten und an einer Wegwerf-Datei
+// laufen gelassen. Eine Pruefung, die nach dem Wort "trap" sucht, bliebe
+// gruen, sobald jemand dasselbe anders schreibt.
+{
+  const { mkdtempSync, writeFileSync, readFileSync: lies, rmSync } = await import('fs');
+  const { execFileSync } = await import('child_process');
+  const { tmpdir } = await import('os');
+  const { join } = await import('path');
+
+  const skript = readFileSync(`${WURZEL}/aufs-handy.sh`, 'utf8');
+  const stueck = (name) => {
+    const von = skript.indexOf(`${name}() {`);
+    if (von === -1) { return null; }
+    const bis = skript.indexOf('\n}\n', von);
+    return bis === -1 ? null : skript.slice(von, bis + 3);
+  };
+  const sichern = stueck('buendel_sichern');
+  const zurueck = stueck('buendel_zuruecksetzen');
+  check('KRITISCH: Sichern und Zurücksetzen des Bündels stehen als eigene, prüfbare Funktionen da',
+    sichern !== null && zurueck !== null);
+
+  // Das Zurücksetzen muss ARMIERT sein, bevor der erste Schlüssel
+  // eingesetzt wird -- sonst bliebe er liegen, wenn der Lauf dazwischen
+  // abbricht. Die Reihenfolge ist die Aussage, nicht das Wort.
+  const beiTrap = skript.search(/^\s*trap\s+buendel_zuruecksetzen\b/m);
+  const beiErstemSchluessel = skript.search(/^\s*maps_schluessel_einsetzen\s+mobile\/www\/index\.html/m);
+  check('KRITISCH: das Zurücksetzen ist scharf, BEVOR der erste Schlüssel eingesetzt wird',
+    beiTrap !== -1 && beiErstemSchluessel !== -1 && beiTrap < beiErstemSchluessel);
+
+  // Und es muss auch bei einem Abbruch greifen, nicht nur am regulären
+  // Ende: Strg-C mitten im Bau ist der Normalfall, nicht die Ausnahme.
+  check('KRITISCH: das Zurücksetzen greift auch bei Abbruch (INT/TERM), nicht nur bei EXIT',
+    /^\s*trap\s+buendel_zuruecksetzen\s+.*\bEXIT\b.*\bINT\b.*\bTERM\b/m.test(skript));
+
+  if (sichern && zurueck) {
+    const ordner = mkdtempSync(join(tmpdir(), 'buendel-'));
+    try {
+      const datei = join(ordner, 'index.html');
+      writeFileSync(datei, 'vorher key=__MAPS_IOS_KEY__ ende\n');
+      // Genau der Ablauf aus dem Skript: sichern, Schlüssel einsetzen,
+      // zurücksetzen.
+      execFileSync('bash', ['-c', [
+        `BUENDEL_DATEI=${JSON.stringify(datei)}`,
+        'BUENDEL_KOPIE=""',
+        sichern, zurueck,
+        'buendel_sichern',
+        `sed -i 's|__MAPS_IOS_KEY__|AIzaSyGEHEIMGEHEIMGEHEIMGEHEIMGEHEIM|g' ${JSON.stringify(datei)}`,
+        'buendel_zuruecksetzen',
+      ].join('\n')], { encoding: 'utf8' });
+      const danach = lies(datei, 'utf8');
+      check('KRITISCH: nach dem Lauf steht kein Schlüssel mehr im versionierten Bündel',
+        !/AIza/.test(danach));
+      check('KRITISCH: und der Platzhalter ist wieder da, das Bündel also unverändert',
+        danach === 'vorher key=__MAPS_IOS_KEY__ ende\n');
+    } finally { rmSync(ordner, { recursive: true, force: true }); }
+  } else {
+    ['KRITISCH: nach dem Lauf steht kein Schlüssel mehr im versionierten Bündel',
+     'KRITISCH: und der Platzhalter ist wieder da, das Bündel also unverändert',
+    ].forEach(n => check(n + ' (nicht prüfbar: Funktion nicht gefunden)', false));
+  }
+
+  // Die Gegenrichtung, damit die Prüfung nicht an der falschen Datei
+  // hängt: mobile/www/index.html MUSS versioniert sein (sonst wäre der
+  // ganze Aufwand unnötig), die iOS-Kopie MUSS ignoriert sein.
+  //
+  // Gefragt wird GIT selbst, nicht eine bestimmte .gitignore: Die Regel
+  // für die iOS-Kopie steht in mobile/ios/.gitignore, nicht in der
+  // obersten -- eine Prüfung, die nur dort nachsieht, ginge an der Sache
+  // vorbei und wäre beim ersten Verschieben der Zeile rot.
+  const istIgnoriert = (pfad) => {
+    try {
+      execFileSync('git', ['check-ignore', '-q', pfad],
+        { cwd: WURZEL, stdio: 'ignore' });
+      return true;
+    } catch (e) { return false; }
+  };
+  check('KRITISCH: mobile/www/index.html ist versioniert — nur darum muss es überhaupt zurückgesetzt werden',
+    !istIgnoriert('mobile/www/index.html'));
+  check('KRITISCH: die iOS-Kopie des Bündels ist dagegen ignoriert — dort darf der Schlüssel liegen bleiben',
+    istIgnoriert('mobile/ios/App/App/public/index.html'));
+
+  // Der Ordner, den Xcode beim Bauen anlegt (Swift-Package-Aufloesung),
+  // gehoert ebenfalls nicht ins Repository -- er tauchte nach dem ersten
+  // Geraetelauf als unversioniert auf.
+  check('KRITISCH: der von Xcode erzeugte swiftpm-Ordner ist ignoriert',
+    istIgnoriert('mobile/ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/x'));
+
+  /* Das Skript aktualisiert sich selbst -- und muss danach neu starten.
+     Vom Projektinhaber am Geraet gemessen; das Datum steht in der
+     Commit-Nachricht und nicht hier, weil test_datumsfest.mjs jedes feste
+     Datum nahe beim heutigen Tag anschlaegt -- auch in einem
+     Blockkommentar, dessen Folgezeilen nicht mit "//" oder "*" beginnen.
+     Genau daran ist diese Datei einmal rot geworden.
+
+     bash fuehrt die Fassung aus, die es beim Start geoeffnet hat. Holt
+     "git pull" eine neue, wirkt sie erst beim uebernaechsten Lauf --
+     genau so lief das Zuruecksetzen des Buendels oben ins Leere. Und weil
+     bash sich die BYTE-Position merkt, kann es nach einer
+     Laengenaenderung mitten in einer Zeile weiterlesen.
+
+     Geprueft wird die AUSSAGE: Nach dem Pull wird der eigene Stand mit
+     dem von vorher verglichen, und bei Abweichung wird das Skript per
+     exec ersetzt -- vor allem, was danach kommt. */
+  {
+    const beiPull = skript.search(/^\s*git pull origin/m);
+    const beiExec = skript.search(/^\s*exec "\$0" "\$@"/m);
+    const beiSichern = skript.search(/^buendel_sichern$/m);
+    check('KRITISCH: nach dem Pull startet sich das Skript neu, wenn es sich selbst erneuert hat',
+      beiPull !== -1 && beiExec !== -1 && beiPull < beiExec);
+    check('KRITISCH: der Neustart passiert VOR allem, was das Skript sonst noch tut',
+      beiExec !== -1 && beiSichern !== -1 && beiExec < beiSichern);
+    // Und er darf sich nicht endlos wiederholen.
+    check('KRITISCH: der Neustart geschieht höchstens einmal, keine Schleife',
+      /AUFS_HANDY_NEUSTART/.test(skript)
+      && /export AUFS_HANDY_NEUSTART=1/.test(skript));
+  }
+}
+
+// ── Die Marken der nativen Karte (ENT-609) ───────────────────────────────
+//
+// Drei PNG-Dateien, weil das native Maps-SDK keine Vektorsymbole zeichnet.
+// Sie entstehen in marken-erzeugen.py und liegen mitversioniert in icons/.
+//
+// Zwei Wege koennen sie verlieren: Jemand aendert das Skript und vergisst,
+// es laufen zu lassen (dann zeigt die App etwas anderes als der Quelltext
+// sagt), oder die Dateien kommen nicht ins Buendel (dann bleibt die Marke
+// auf dem Geraet leer, ohne Fehlermeldung).
+{
+  const { execFileSync } = await import('child_process');
+  const { mkdtempSync, readFileSync: lies, existsSync: da, rmSync } = await import('fs');
+  const { tmpdir } = await import('os');
+  const { join } = await import('path');
+
+  const MARKEN = ['icons/kp-offen.png', 'icons/kp-erledigt.png', 'icons/kp-abweichend.png'];
+
+  check('KRITISCH: die drei Marken-Bilder der nativen Karte liegen im Repository',
+    MARKEN.every(m => da(`${WURZEL}/${m}`)));
+
+  // Skript und Ergebnis duerfen nicht auseinanderlaufen -- dieselbe Regel
+  // wie bei skizze.js/skizze-einbetten.py. Erzeugt wird in einen
+  // Wegwerf-Ordner; die echten Dateien werden nicht angefasst.
+  {
+    const ordner = mkdtempSync(join(tmpdir(), 'marken-'));
+    let gelaufen = true;
+    try {
+      execFileSync('python3', [`${WURZEL}/marken-erzeugen.py`, ordner],
+        { encoding: 'utf8', stdio: 'ignore' });
+    } catch (e) { gelaufen = false; }
+    check('KRITISCH: marken-erzeugen.py läuft durch', gelaufen);
+    if (gelaufen) {
+      const abweichend = MARKEN.filter(m =>
+        !da(join(ordner, m)) || !lies(`${WURZEL}/${m}`).equals(lies(join(ordner, m))));
+      check('KRITISCH: die abgelegten Marken sind genau das, was marken-erzeugen.py erzeugt'
+          + ' (sonst "python3 marken-erzeugen.py" ausführen)',
+        abweichend.length === 0);
+      if (abweichend.length) { bad.push('Marke läuft auseinander: ' + abweichend.join(', ')); }
+    }
+    rmSync(ordner, { recursive: true, force: true });
+  }
+
+  // Und sie muessen dort ankommen, wo die App sie sucht: Der iconUrl-Pfad
+  // ist relativ zum Web-Verzeichnis des Buendels.
+  const buendel = readFileSync(`${WURZEL}/mobile-buendel-erstellen.py`, 'utf8');
+  check('KRITISCH: das App-Bündel nimmt den ganzen icons-Ordner mit — dort liegen die Marken',
+    /for\s+ordner_name\s+in\s+\([^)]*'icons'/.test(buendel));
+
+  // Die Web-Bündel ebenfalls: dist/ und dist-cupi24/ liefern app.html aus,
+  // und ein fehlendes Bild faellt dort nicht auf, weil die Web-Fassung
+  // weiterhin Vektorsymbole zeichnet -- es waere erst in der App zu sehen.
+  for (const ziel of ['dist', 'dist-cupi24']) {
+    check(`KRITISCH: die Marken-Bilder kommen ins ${ziel}-Bündel`,
+      new RegExp(`cp\\s+icons/\\*\\.png\\s+${ziel}/icons/`).test(workflow));
+  }
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

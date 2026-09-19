@@ -406,6 +406,43 @@ $pruef('KRITISCH: die Terminsuche endet auch bei einer Verlaengerung von 0',
         'kuendigungsfrist_monate' => 0, 'verlaengerung_monate' => 0], '2040-09-18')['lage'],
         ['laeuft_aus'], true));
 
+// ══════════════ WIRD DIE ANLAGE BENUTZT (ENT-619)
+//
+// Vier Antworten, und drei davon wuerden sich ohne diese Pruefung frueher
+// oder spaeter vermischen: "nicht feststellbar", "noch nie benutzt" und
+// "seit langem still" sehen in einer Tabelle gleich leer aus, meinen aber
+// voellig Verschiedenes -- ein Netzausfall gegen einen Kunden auf dem
+// Absprung.
+$pruef('KRITISCH: eine nicht erreichbare Anlage ist unbekannt, nicht still',
+    mandant_stille(null) === null);
+$pruef('KRITISCH: fehlen die Spalten, ist es ebenfalls unbekannt',
+    mandant_stille(['gesamt' => 5, 'aktiv' => 5]) === null);
+$pruef('KRITISCH: erreichbar, aber ohne jede Spur heisst "nie" -- keine erfundene Zahl',
+    mandant_stille(['letzter_zugriff' => null, 'letzter_rapport' => null]) === 'nie');
+$pruef('Ein Nulldatum zaehlt nicht als Spur',
+    mandant_stille(['letzter_zugriff' => '0000-00-00 00:00:00', 'letzter_rapport' => null]) === 'nie');
+
+$pruef('KRITISCH: gezaehlt wird ab dem JUENGEREN der beiden Signale',
+    mandant_stille(['letzter_zugriff' => '2040-01-01 08:00:00',
+                    'letzter_rapport' => '2040-01-05 12:00:00'], '2040-01-15') === 10);
+$pruef('Auch wenn das juengere der Zugriff ist',
+    mandant_stille(['letzter_zugriff' => '2040-01-12 08:00:00',
+                    'letzter_rapport' => '2040-01-05 12:00:00'], '2040-01-15') === 3);
+$pruef('Ein einzelnes Signal genuegt',
+    mandant_stille(['letzter_rapport' => '2040-01-14 12:00:00'], '2040-01-15') === 1);
+$pruef('Heute ist null Tage, nicht "nie"',
+    mandant_stille(['letzter_zugriff' => '2040-01-15 07:00:00'], '2040-01-15') === 0);
+$pruef('KRITISCH: ein Stempel aus der Zukunft ergibt keinen negativen Abstand',
+    mandant_stille(['letzter_zugriff' => '2040-02-01 08:00:00'], '2040-01-15') === 0);
+
+// Die Unterscheidung muss auch im TYP tragen: 'nie' und 0 sind beide
+// "falsy"-nah, und eine Oberflaeche, die nur auf Wahrheitswerte schaut,
+// wuerde sie vermischen.
+$pruef('KRITISCH: "nie" und 0 Tage sind unterscheidbar, nicht beide leer',
+    mandant_stille(['letzter_zugriff' => null]) === 'nie'
+    && mandant_stille(['letzter_zugriff' => date('Y-m-d') . ' 07:00:00']) === 0
+    && mandant_stille(['letzter_zugriff' => null]) !== mandant_stille(['letzter_zugriff' => date('Y-m-d') . ' 07:00:00']));
+
 echo count($bad) === 0
     ? "$ok bestanden, 0 nicht bestanden\n"
     : "$ok bestanden, " . count($bad) . " nicht bestanden\n";

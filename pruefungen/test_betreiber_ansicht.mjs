@@ -725,6 +725,77 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
   await seite.close();
 }
 
+// ── Kassenstand in der Uebersicht (ENT-618) ──────────────────────────
+//
+// GERECHNET UND ABGELESEN, nicht im Quelltext nachgesehen: Ob eine
+// archivierte oder eine bezahlte Rechnung mitzaehlt, entscheidet eine
+// Filterkette, und die sieht richtig aus, auch wenn sie es nicht ist.
+//
+// Die Faelligkeiten werden IM BROWSER aus dem heutigen Tag gerechnet, nicht
+// als feste Daten eingesetzt -- ein Fall mit festem Datum kippt beim
+// Datumswechsel (test_datumsfest.mjs achtet darauf).
+{
+  const seite = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  const fehler = [];
+  seite.on('pageerror', e => fehler.push(e.message));
+  await seite.goto(ADRESSE);
+  const m = await seite.evaluate(() => {
+    document.getElementById('tor').classList.add('versteckt');
+    document.getElementById('haus').classList.remove('versteckt');
+    const tag = n => {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + n);
+      return d.toISOString().slice(0, 10);
+    };
+    // Fuenf Faelle, und jeder einzelne ist einer, den man falsch machen kann.
+    rechnungen = [
+      { id: 1, nummer: 'RE-1', aktiv: 1, bezahlt: 0, total_rappen: 10000, faellig_bis: tag(-5) },
+      { id: 2, nummer: 'RE-2', aktiv: 1, bezahlt: 0, total_rappen: 25000, faellig_bis: tag(10) },
+      { id: 3, nummer: 'RE-3', aktiv: 1, bezahlt: 1, total_rappen: 99900, faellig_bis: tag(-30) },
+      { id: 4, nummer: 'RE-4', aktiv: 0, bezahlt: 0, total_rappen: 50000, faellig_bis: tag(-3) },
+      { id: 5, nummer: 'RE-5', aktiv: 1, bezahlt: 0, total_rappen: 5000,  faellig_bis: '0000-00-00' },
+    ];
+    kassenstandZeichnen();
+    // Beschriftung, Zahl und Bezug EINZELN ablesen: Aneinandergehaengt
+    // ergibt "Offene Rechnungen3400.00" -- daraus laesst sich nicht
+    // unterscheiden, ob die 3 die Anzahl ist oder zum Betrag gehoert.
+    return [...document.querySelectorAll('#u-zahlen .zahl')].map(el => ({
+      lab:   (el.querySelector('.lab')   || {}).textContent || '',
+      wert:  (el.querySelector('.wert')  || {}).textContent || '',
+      bezug: (el.querySelector('.bezug') || {}).textContent || '',
+    }));
+  });
+  check('Kassenstand: die Seite rechnet ihn ohne JS-Fehler', fehler.length === 0);
+  if (fehler.length) { bad.push('Kassenstand: ' + fehler[0]); }
+
+  const offen = m.find(b => /Offene Rechnungen/.test(b.lab));
+  const ueber = m.find(b => /überfällig/.test(b.lab));
+  check('Kassenstand: beide Kennzahlen stehen in der Uebersicht', !!offen && !!ueber);
+
+  // Offen sind RE-1, RE-2 und RE-5 -- drei Stueck, zusammen 400.00.
+  // RE-3 ist bezahlt, RE-4 archiviert.
+  check('KRITISCH: bezahlte und archivierte Rechnungen zaehlen nicht als offen',
+    offen && offen.wert.trim() === '3');
+  check('KRITISCH: der offene Betrag ist die Summe der offenen Rechnungen',
+    offen && offen.bezug.includes('400.00'));
+  // Ueberfaellig ist nur RE-1: RE-4 ist archiviert, RE-3 bezahlt, RE-5 ohne
+  // Frist, RE-2 noch nicht faellig.
+  check('KRITISCH: ueberfaellig ist nur, was aktiv, unbezahlt UND ueber der Frist ist',
+    ueber && ueber.wert.trim() === '1' && ueber.bezug.includes('100.00'));
+  check('KRITISCH: eine Rechnung ohne Faelligkeitsdatum gilt nicht als ueberfaellig',
+    ueber && !ueber.bezug.includes('150.00'));
+  check('Die Zahl ist die Anzahl Rechnungen, der Betrag steht als Bezug daneben',
+    offen && !/CHF/.test(offen.wert) && /CHF/.test(offen.bezug));
+  check('ohne offene Rechnung steht ein eigener Text statt einer nackten Null',
+    await seite.evaluate(() => {
+      rechnungen = [];
+      kassenstandZeichnen();
+      return /nichts offen/.test(document.getElementById('u-zahlen').textContent);
+    }));
+  await seite.close();
+}
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

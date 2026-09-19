@@ -110,10 +110,39 @@ lokale_aenderungen_sichern() {
 }
 
 echo "── 1/5  Stand holen ($ZWEIG)"
+# Der eigene Fingerabdruck VOR dem Holen -- siehe den Neustart unten.
+# cksum statt sha256sum/shasum: Die beiden heissen auf macOS und Linux
+# verschieden, cksum gibt es ueberall. Es geht hier nur um "gleich oder
+# nicht", nicht um Faelschungssicherheit.
+SKRIPT_VORHER="$(cksum < "$0")"
 lokale_aenderungen_sichern
 git fetch origin "$ZWEIG"
 git checkout "$ZWEIG"
 git pull origin "$ZWEIG"
+
+# Sich selbst neu starten, wenn der Pull dieses Skript geaendert hat.
+#
+# ANLASS (2026-09-19, vom Projektinhaber am Geraet gemessen): Das Skript
+# aktualisiert sich hier selbst -- aber bash fuehrt bereits die ALTE
+# Fassung aus, die es beim Start geoeffnet hat. Eine Aenderung am Skript
+# wirkte darum erst beim UEBERNAECHSTEN Lauf. Genau so ging das
+# Zuruecksetzen des Buendels (OP-608) ins Leere: Der Lauf holte die
+# Behebung und lief danach ohne sie weiter.
+#
+# Schlimmer als wirkungslos ist der zweite Teil: bash liest ein Skript
+# haeppchenweise und merkt sich dabei die BYTE-Position. Wird die Datei
+# unter ihm laenger oder kuerzer, liest es an der alten Position im neuen
+# Text weiter -- mitten in einer Zeile. Was dann ausgefuehrt wird, steht
+# so nirgends.
+#
+# Der Neustart passiert nur, wenn sich wirklich etwas geaendert hat, und
+# nur einmal: AUFS_HANDY_NEUSTART verhindert eine Schleife, falls zwei
+# Faelle zugleich zutreffen.
+if [ "$(cksum < "$0")" != "$SKRIPT_VORHER" ] && [ "${AUFS_HANDY_NEUSTART:-}" != "1" ]; then
+  echo "        Das Skript selbst wurde erneuert -- Neustart mit der neuen Fassung"
+  export AUFS_HANDY_NEUSTART=1
+  exec "$0" "$@"
+fi
 
 echo "── 1b/5 Signier-Team pruefen"
 # Nach dem Stash oben, damit eine gerade weggeraeumte Einstellung noch
@@ -236,6 +265,43 @@ maps_schluessel_einsetzen() {
   echo "        Maps-Schluessel eingesetzt ($PLATZ)"
 }
 
+# Das Buendel VOR dem ersten Schluessel absichern (OP-608).
+#
+# mobile/www/index.html ist versioniert -- anders als die Kopien unter
+# mobile/ios/.../public/ und mobile/android/.../public/, die in
+# .gitignore stehen. Gleich werden zwei echte Google-Schluessel
+# hineingeschrieben. Bliebe die Datei so liegen, stuende der Schluessel
+# danach im Arbeitsbaum: Ein "git add -A" traegt ihn ins Repository, und
+# test_php.mjs vergleicht die Datei Zeichen fuer Zeichen mit app.html --
+# die Regression waere nach jedem Geraetelauf rot.
+#
+# Darum wird sie am Ende des Laufs zurueckgesetzt, und zwar per trap:
+# auch dann, wenn der Bau dazwischen abbricht oder jemand Strg-C drueckt.
+# Was zurueckgesetzt wird, ist nur die Schluessel-Ersetzung --
+# mobile-buendel-erstellen.py hat die Datei kurz davor ohnehin frisch aus
+# app.html erzeugt.
+# Zurueckgesetzt wird aus einer KOPIE, die hier entsteht -- nicht per
+# "git checkout" und nicht durch erneutes Erzeugen. Beides waere ungenau:
+# Ein checkout verwuerfe auch eine berechtigte Neuerzeugung (etwa wenn
+# app.html geaendert wurde), ein zweiter Lauf des Erzeugers braeuchte
+# ihn erst recht. Die Kopie gibt genau den Stand zurueck, der vor der
+# Ersetzung da war, und sonst nichts.
+BUENDEL_DATEI="$PWD/mobile/www/index.html"
+BUENDEL_KOPIE=""
+buendel_sichern() {
+  BUENDEL_KOPIE="$(mktemp)"
+  cp "$BUENDEL_DATEI" "$BUENDEL_KOPIE"
+}
+buendel_zuruecksetzen() {
+  if [ -n "$BUENDEL_KOPIE" ] && [ -f "$BUENDEL_KOPIE" ]; then
+    cp "$BUENDEL_KOPIE" "$BUENDEL_DATEI"
+    rm -f "$BUENDEL_KOPIE"
+    BUENDEL_KOPIE=""
+  fi
+}
+buendel_sichern
+trap buendel_zuruecksetzen EXIT INT TERM
+
 maps_schluessel_einsetzen mobile/www/index.html
 
 # Der zweite Schluessel, fuer die NATIVE Karte (ENT-609). Bewusst ein
@@ -279,6 +345,13 @@ if ! npx --no-install esbuild karte-nativ-eingang.js \
 fi
 
 npx cap sync ios
+
+# Der Schluessel ist jetzt in den (ignorierten) Kopien unter ios/ --
+# im versionierten Buendel wird er nicht mehr gebraucht (OP-608). Der
+# trap oben bleibt trotzdem stehen: Er faengt die Abbrueche VOR dieser
+# Zeile ab.
+buendel_zuruecksetzen
+echo "        Buendel zurueckgesetzt (Schluessel nur noch im iOS-Bau)"
 
 # Nachsehen, ob jedes native Plugin auch wirklich im Bau landet. Geprueft
 # wird die Aussage, nicht ein Name: Jedes Paket unter node_modules/@capacitor/

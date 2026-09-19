@@ -101,6 +101,7 @@ const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, de
 const page = await ctx.newPage();
 page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
 
+let gemeldet = [];
 await page.route('**/api/**', route => {
   const req = route.request();
   const url = new URL(req.url());
@@ -118,6 +119,17 @@ await page.route('**/api/**', route => {
   }
   if (p.includes('mein_rundgang_starten')) {
     return send({ status: 'ok', rundgang_id: 951, kontrollpunkte: JSON.parse(JSON.stringify(KP)) });
+  }
+  // Fuer ENT-621: Aus der unmoeglichen Aufgabe heraus wird ein Ereignis
+  // gemeldet. Ohne eine Ereignisart liesse sich das Formular gar nicht
+  // abschicken, und die Pruefung endete vor der eigentlichen Frage.
+  if (p.includes('ereignisart_liste')) {
+    return send({ status: 'ok', arten: [{ id: 5, bezeichnung: 'Schaden' }] });
+  }
+  if (p.includes('mein_ereignis_melden')) {
+    (body.meldungen || []).forEach(m => gemeldet.push(m));
+    return send({ status: 'ok', ergebnisse: (body.meldungen || [])
+      .map(m => ({ lokal_id: m.lokal_id, status: 'ok', id: 777 })) });
   }
   if (p.includes('mein_rundgang_scan')) {
     gesendet.push(body);
@@ -259,6 +271,99 @@ await page.waitForTimeout(300);
 check('KRITISCH: ein Tipp öffnet die Frage erneut',
   await page.isVisible('#blatt.on') && (await page.textContent('#blBody')).includes('Rolltor prüfen'));
 await page.screenshot({ path: `${OUT}/abaufg-02-offen.png` });
+
+// ══════════ ENT-621: aus der unmöglichen Aufgabe heraus melden ═════════
+//
+// Der Wächter steht vor einer klemmenden Tür. "Nicht möglich" plus Text
+// sagt dem Kunden nicht, was los ist -- ein Foto schon. Statt eines
+// zweiten Fotowegs wird der bestehende Ereignisweg benutzt, und die
+// Meldung merkt sich, zu welcher Aufgabe sie gehört.
+await page.click('#abK21 .ab-btn[data-wert="nicht_moeglich"]');
+await page.waitForTimeout(200);
+const melderKnopf = '#abG21 button';
+check('KRITISCH: bei "nicht möglich" steht der Melde-Knopf bereit',
+  await page.isVisible(melderKnopf)
+  && (await page.textContent(melderKnopf)).includes('Foto'));
+// Und er gehört NICHT zu "erledigt": Wer die Aufgabe erledigt hat, hat
+// nichts zu melden -- der Knopf steckt im Grundblock und verschwindet mit
+// ihm. Gemessen an der Sichtbarkeit, nicht an der CSS-Regel.
+await page.click('#abK21 .ab-btn[data-wert="erledigt"]');
+await page.waitForTimeout(200);
+check('KRITISCH: bei "erledigt" ist er weg -- dort gibt es nichts zu melden',
+  !(await page.isVisible(melderKnopf)));
+await page.click('#abK21 .ab-btn[data-wert="nicht_moeglich"]');
+await page.waitForTimeout(200);
+
+// Ohne Grund darf er GAR NICHTS tun: weder die Antwort speichern noch das
+// Formular öffnen. Sonst stünde der Wächter im Ereignisformular, und
+// seine Antwort auf die Aufgabe wäre still verloren.
+gesendet = []; gemeldet = [];
+await page.click(melderKnopf);
+await page.waitForTimeout(300);
+// Gemessen wird beides einzeln -- dass nichts gespeichert wurde UND dass
+// das Formular zu blieb. Eine Prüfung, die nur nach der offenen Schublade
+// sieht, bleibt grün, wenn das Ereignisformular daneben trotzdem aufgeht:
+// Die Schublade liegt auf einer eigenen Ebene und bleibt dabei stehen.
+// Genau daran ist diese Prüfung in ihrer eigenen Gegenprobe aufgefallen.
+check('KRITISCH: ohne Grund wird die Antwort nicht gespeichert',
+  !gesendet.some(b => (b.aufgaben || []).length)
+  && (await page.textContent('#abErr')).includes('Grund'));
+check('KRITISCH: und das Ereignisformular geht dabei gar nicht erst auf',
+  !(await page.isVisible('#evSpeichern')) && await page.isVisible('#blatt.on'));
+
+// Mit Grund: Die Antwort geht raus, UND das Formular geht auf.
+await page.fill('#abT21', 'Türe klemmt, lässt sich nicht schliessen.');
+gesendet = [];
+await page.click(melderKnopf);
+await page.waitForTimeout(700);
+const mitBezug = gesendet.find(b => (b.aufgaben || []).length);
+check('KRITISCH: die Antwort auf die Aufgabe wird dabei gespeichert, nicht übersprungen',
+  !!mitBezug && mitBezug.aufgaben.some(a => Number(a.aufgabe_id) === 21
+    && a.status === 'nicht_moeglich' && String(a.grund).includes('klemmt')));
+check('KRITISCH: danach steht das Ereignisformular offen',
+  await page.isVisible('#evSpeichern'));
+// Der Wächter muss SEHEN, worauf sich die Meldung bezieht -- sonst weiss
+// er nicht, ob er den Kontrollpunkt noch einmal nennen muss.
+const bezugText = await page.textContent('#rgsBody');
+check('KRITISCH: das Formular nennt Aufgabe und Kontrollpunkt, auf die es sich bezieht',
+  bezugText.includes('Rolltor prüfen') && bezugText.includes('Nicht möglich') === false
+  && bezugText.includes('nicht möglich'));
+check('KRITISCH: der bereits getippte Grund steht als Bemerkung drin — niemand tippt ihn zweimal',
+  (await page.inputValue('#evText')).includes('klemmt'));
+
+// Und jetzt die eigentliche Frage: Trägt die Meldung den Bezug mit?
+await page.selectOption('#evArt', '5');
+await page.click('#evSpeichern');
+// Das Melden holt einmalig den Standort und laesst sich dafuer bis zu
+// vier Sekunden Zeit (ENT-131). Wer kuerzer wartet, misst zwar "nichts
+// gesendet" -- aber aus dem falschen Grund.
+await page.waitForTimeout(5200);
+const meldung = gemeldet[0];
+check('KRITISCH: die Meldung geht raus und trägt Kontrollpunkt UND Aufgabe',
+  !!meldung && Number(meldung.kontrollpunkt_id) === 2 && Number(meldung.aufgabe_id) === 21);
+check('KRITISCH: sie hängt am selben Rundgang wie die Aufgabe',
+  !!meldung && Number(meldung.rundgang_id) === 951);
+
+// Die Gegenrichtung: Eine frei gemeldete Meldung darf den Bezug der
+// vorigen NICHT mitschleppen. Ohne das Zurücksetzen hinge die nächste
+// Meldung an einer Aufgabe, mit der sie nichts zu tun hat.
+gemeldet = [];
+await page.evaluate(() => { evOeffnen(); });
+await page.waitForTimeout(600);
+await page.selectOption('#evArt', '5');
+await page.fill('#evText', 'Freie Meldung ohne Bezug.');
+await page.click('#evSpeichern');
+await page.waitForTimeout(5200);
+const frei = gemeldet[0];
+check('KRITISCH: eine frei gemeldete Meldung schleppt keinen Bezug mit',
+  !!frei && !frei.kontrollpunkt_id && !frei.aufgabe_id);
+check('Und sie zeigt auch keinen Bezug an',
+  !(await page.textContent('#rgsBody')).includes('Rolltor prüfen'));
+
+// Zurück auf die Runde, damit die Prüfungen danach ihre Ausgangslage
+// vorfinden.
+await page.evaluate(() => { rgsAnsicht = null; rundgangAnzeigen(rundgangAktiv.einsatz_id); });
+await page.waitForTimeout(400);
 
 // ── Punkt OHNE Aufgabe: keine Schublade ───────────────────────────────
 await page.evaluate(() => { blattZu(); });
