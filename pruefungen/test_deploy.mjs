@@ -1074,14 +1074,37 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     && liegtImBuendel('dist-betreiber/betreiber.php'));
   if (fehlendeModule.length) { bad.push('Einbindung fehlt im betreiber-Bündel: ' + fehlendeModule.join(', ')); }
 
-  // Die zwei öffentlichen Selbstbedienungs-Endpunkte (ENT-601) tragen kein
-  // betreiber_-Präfix -- absichtlich, sie laufen ohne Anmeldung -- und
-  // fallen darum durch die Prüfung zwei Blöcke oben. Eigene, schmale
+  // Die öffentlichen Selbstbedienungs-Endpunkte (ENT-601, ENT-624) tragen
+  // kein betreiber_-Präfix -- absichtlich, sie laufen ohne Anmeldung --
+  // und fallen darum durch die Prüfung zwei Blöcke oben. Eigene, schmale
   // Prüfung mit derselben Aussage: mitgeliefert, und jede ihrer
   // Einbindungen liegt ebenfalls im Bündel.
-  const OEFFENTLICHE_DEMO_ENDPUNKTE = ['demo_anfordern.php', 'demo_erneut_senden.php'];
-  check('KRITISCH: die öffentlichen Demo-Endpunkte (ENT-601) werden ins betreiber-Bündel kopiert',
-    OEFFENTLICHE_DEMO_ENDPUNKTE.every(e => wirdKopiert(`backend/api/${e}`)));
+  //
+  // DIE LISTE WIRD NICHT ABGESCHRIEBEN, SONDERN AUS backend/db.php
+  // GELESEN. Eine hier von Hand gepflegte Kopie war genau der Grund,
+  // warum api/demo_bestaetigen.php (ENT-624) monatelang im Bündel fehlte,
+  // ohne dass etwas rot wurde: Der Endpunkt stand in
+  // OEFFENTLICHE_DEMO_SKRIPTE, durfte also cross-origin angesprochen
+  // werden, wurde aber nie kopiert. Live antwortete Apache mit 404 -- und
+  // eine 404-Seite trägt keine CORS-Kopfzeile, weshalb der Browser die
+  // Antwort verwarf und die Bestätigungsseite nur ihren Sammelfall zeigte.
+  // Wer die Liste in db.php erweitert, bekommt die fehlende cp-Zeile ab
+  // jetzt hier gemeldet.
+  const OEFFENTLICHE_DEMO_ENDPUNKTE = (() => {
+    const db = readFileSync(`${WURZEL}/backend/db.php`, 'utf8');
+    const block = db.match(/const OEFFENTLICHE_DEMO_SKRIPTE\s*=\s*\[([^\]]*)\]/);
+    return block ? [...block[1].matchAll(/'([a-z_]+\.php)'/g)].map(m => m[1]) : [];
+  })();
+  check('KRITISCH: jeder Endpunkt aus OEFFENTLICHE_DEMO_SKRIPTE (backend/db.php) wird ins betreiber-Bündel kopiert',
+    OEFFENTLICHE_DEMO_ENDPUNKTE.length >= 3
+    && OEFFENTLICHE_DEMO_ENDPUNKTE.every(e => existsSync(`${WURZEL}/backend/api/${e}`))
+    && OEFFENTLICHE_DEMO_ENDPUNKTE.every(e => wirdKopiert(`backend/api/${e}`)));
+  {
+    const nichtKopiert = OEFFENTLICHE_DEMO_ENDPUNKTE.filter(e => !wirdKopiert(`backend/api/${e}`));
+    if (nichtKopiert.length) {
+      bad.push('öffentlicher Demo-Endpunkt fehlt im betreiber-Bündel: ' + nichtKopiert.join(', '));
+    }
+  }
   const oeffentlicheModule = transitiveModule(OEFFENTLICHE_DEMO_ENDPUNKTE.map(e => `api/${e}`));
   const fehlendeOeffentlicheModule = [...oeffentlicheModule].filter(m => !liegtImBuendel(`dist-betreiber/${m}`));
   check('KRITISCH: jede Datei, die ein öffentlicher Demo-Endpunkt transitiv einbindet, liegt im betreiber-Bündel',
@@ -1999,6 +2022,72 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
     check(`KRITISCH: jede Datei, die ein Endpunkt transitiv einbindet, liegt im ${name}`,
       noetigeModule.length >= 20 && fehlend.length === 0);
     if (fehlend.length) { bad.push(`Einbindung fehlt im ${name}: ` + fehlend.join(', ')); }
+  }
+
+  // ── Ein Endpunkt, den eine Seite ANRUFT, muss auch dort liegen ────────
+  //
+  // ANLASS (2026-09-19, live): demo-bestaetigen.html auf guardops.ch postet
+  // an https://betreiber.guardops.ch/api/demo_bestaetigen.php. Diese Datei
+  // hat der Deploy nie in das Betreiber-Buendel kopiert -- das Modul
+  // demo_bestaetigung.php lag in allen drei Buendeln, der Endpunkt in
+  // keinem. Der Knopf lief gegen 404, und niemand konnte einen Zugang
+  // bekommen: Anfrage durch, Mail da, Ende.
+  //
+  // Die Pruefung darueber traegt das nicht: Sie gilt fuer dist und
+  // dist-cupi24, und die liefern OHNEHIN jeden Endpunkt aus. Die schlanken
+  // Buendel waehlen einzeln aus, und genau dort faellt ein vergessener
+  // Endpunkt niemandem auf.
+  //
+  // Ausgangspunkt ist die Seite, nicht die Liste im Deploy: Was eine
+  // ausgelieferte Seite aufruft, ist die Aussage -- was im Buendel steht,
+  // ist nur die Behauptung.
+  {
+    const NACH_BUENDEL = {
+      'betreiber.guardops.ch': { ordner: 'dist-betreiber', schritt: 'Betreiber-Buendel fuer betreiber.guardops.ch bauen' },
+      'portal.guardops.ch':    { ordner: 'dist-portal',    schritt: 'Portal-Buendel fuer portal.guardops.ch bauen' },
+      'guardops.ch':           { ordner: 'dist-guardops',  schritt: 'Homepage-Buendel fuer guardops.ch bauen' },
+    };
+    // Kopiert der Schritt diese Datei nach <ordner>/api/? Auch ueber einen
+    // Platzhalter wie "backend/api/betreiber_*.php".
+    const wirdKopiert = (text, ordner, datei) => {
+      for (const m of text.matchAll(/^\s*cp\s+backend\/api\/(\S+)\s+(\S+)\s*$/gm)) {
+        const [, quelle, ziel] = m;
+        if (!ziel.startsWith(`${ordner}/api/`)) { continue; }
+        if (quelle === datei) { return true; }
+        if (quelle.includes('*')
+            && new RegExp('^' + quelle.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$').test(datei)) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    const aufrufe = [];
+    for (const seite of readdirSync(WURZEL).filter(f => f.endsWith('.html'))) {
+      const inhalt = readFileSync(`${WURZEL}/${seite}`, 'utf8');
+      for (const m of inhalt.matchAll(/https:\/\/([a-z0-9.]*guardops\.ch)\/api\/([a-z0-9_]+\.php)/g)) {
+        aufrufe.push({ seite, host: m[1], datei: m[2] });
+      }
+    }
+
+    const fehlend = [];
+    for (const { seite, host, datei } of aufrufe) {
+      const ziel = NACH_BUENDEL[host];
+      if (!ziel) { fehlend.push(`${seite}: unbekannter Server ${host}`); continue; }
+      if (!existsSync(`${WURZEL}/backend/api/${datei}`)) {
+        fehlend.push(`${seite}: ${datei} gibt es gar nicht`); continue;
+      }
+      if (!wirdKopiert(schritt(ziel.schritt), ziel.ordner, datei)) {
+        fehlend.push(`${seite} ruft ${host}/api/${datei} -- fehlt in ${ziel.ordner}`);
+      }
+    }
+    // Findet die Suche gar nichts, prueft sie nichts. Dann ist die Aussage
+    // nicht "alles gut", sondern "die Suche greift nicht mehr".
+    check('die Suche nach aufgerufenen Endpunkten findet ueberhaupt welche',
+      aufrufe.length > 0);
+    check('KRITISCH: jeder Endpunkt, den eine ausgelieferte Seite aufruft, liegt in ihrem Buendel',
+      fehlend.length === 0);
+    fehlend.forEach(f => bad.push(f));
   }
 
   // Und was neu mitgeliefert wird, muss auch gegen den direkten Abruf
