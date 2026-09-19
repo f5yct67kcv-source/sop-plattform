@@ -46,7 +46,12 @@ const APP_NATIVE_HERKUENFTE = ['capacitor://localhost', 'http://localhost'];
 // selbst auf. Nur DIESE eine Herkunft und nur fuer DIESE zwei Skripte:
 // jeder andere Endpunkt bleibt same-origin-only, genau wie zuvor.
 const WEB_HERKUNFT_OEFFENTLICHE_DEMO = 'https://guardops.ch';
-const OEFFENTLICHE_DEMO_SKRIPTE = ['demo_anfordern.php', 'demo_erneut_senden.php'];
+// demo_bestaetigen.php kam mit ENT-624 dazu: Die Bestaetigungsseite liegt
+// auf guardops.ch und schickt den Wert von dort an den Betreiber-Bereich.
+// Ohne diesen Eintrag blockt der Browser die Antwort, und der Knopf tut
+// sichtbar nichts.
+const OEFFENTLICHE_DEMO_SKRIPTE = ['demo_anfordern.php', 'demo_erneut_senden.php',
+    'demo_bestaetigen.php'];
 
 // Reine Funktion -- pruefbar mit frei gewaehlten Werten, ohne echten
 // Request (gleiche Ueberlegung wie bei basis_url_pruefen()). $skript ist

@@ -971,6 +971,12 @@ const OHNE_ANMELDUNG = [
   // test_demo_zugang.mjs, und die enge Einhegung in test_betreiber.mjs
   // ("Die Ausnahme fuer die Demo bleibt eng").
   'demo_anfordern.php',
+  // Die zweite Haelfte derselben Sache (ENT-624): Das Formular legt nur
+  // noch eine offene Anfrage an, eingerichtet wird erst hier -- nach einem
+  // Klick auf den Knopf der Bestaetigungsseite. Wer den Wert hat, hat ihn
+  // aus einer Mail an genau die Adresse, um die es geht; eine Anmeldung
+  // gaebe es zu diesem Zeitpunkt gar nicht.
+  'demo_bestaetigen.php',
   // Gegenstueck fuer "Zugangsdaten erneut senden" -- dieselbe Begruendung,
   // dieselbe gleichlautende Antwort in jedem Fall (wie passwort_vergessen.php).
   'demo_erneut_senden.php',

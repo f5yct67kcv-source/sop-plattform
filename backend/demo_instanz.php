@@ -18,6 +18,10 @@ declare(strict_types=1);
 require_once __DIR__ . '/betreiber.php';
 require_once __DIR__ . '/demo_reset.php';
 require_once __DIR__ . '/demo_zugang.php';
+// Die Beispieldaten der frischen Instanz -- demo_zugang_einrichten() weiter
+// unten ruft sie auf. Kein stiller Vertrag: Wer diese Datei laedt, bekommt
+// alles mit, was sie braucht (Lehre aus dem Fehlschlag vom 2026-09-19).
+require_once __DIR__ . '/demo_daten.php';
 
 // Leert die Instanz eines Platzes und sät die Systemrollen neu.
 //
@@ -139,4 +143,113 @@ function demo_zugang_neues_passwort(PDO $betreiber, array $zugang,
             $passwort,
             (string)$zugang['laeuft_ab_am']);
     return ['fehler' => null, 'mail' => $mail];
+}
+
+// ══ Einen Demo-Zugang wirklich einrichten (ENT-624) ═══════════════════
+//
+// Bis ENT-624 stand dieser Ablauf inline in api/demo_anfordern.php. Seit
+// der Bestaetigungspflicht braucht ihn ein zweiter Endpunkt
+// (api/demo_bestaetigen.php), und zwei Kopien waeren beim naechsten Umbau
+// auseinandergelaufen -- dieselbe Ueberlegung wie bei
+// demo_zugang_neues_passwort() darueber.
+//
+// SIE ANTWORTET NICHT SELBST. Kein json_response() hier drin: Die beiden
+// Aufrufer machen danach noch weiter (Meldung an den Betreiber, Vermerk am
+// Bestaetigungssatz), und eine selbst-antwortende Funktion schnitte ihnen
+// das stillschweigend ab -- genau der Fallstrick, vor dem der Kopf von
+// demo_daten.php warnt.
+//
+// Rueckgabe:
+//   ['platz' => …, 'adresse' => …, 'laeuft_ab' => …, 'mail' => […],
+//    'fehler' => null]                      -- eingerichtet
+//   ['fehler' => 'kein_platz',   'code' => 409, 'meldung' => …]
+//   ['fehler' => 'nicht_bereit', 'code' => 503, 'meldung' => …]
+//   ['fehler' => 'fehlschlag',   'code' => 503, 'meldung' => …]
+// Der Grund steht als Wort da, nicht nur als Zahl: "kein Platz frei" und
+// "nicht eingerichtet" sind verschiedene Aussagen, und der Aufrufer muss
+// sie auseinanderhalten koennen (Hausregel).
+function demo_zugang_einrichten(PDO $pdo, string $firma, string $person,
+                                string $email, string $telefon): array
+{
+    $misslungen = static fn (string $fehler, int $code, string $meldung): array
+        => ['fehler' => $fehler, 'code' => $code, 'meldung' => $meldung];
+    $nichtBereit = 'Der Demo-Bereich ist noch nicht vollständig eingerichtet. '
+        . 'Bitte in Kürze erneut versuchen.';
+    $fehlschlag = 'Der Demo-Zugang konnte gerade nicht eingerichtet werden. '
+        . 'Bitte in Kürze erneut versuchen.';
+
+    // ── Freien Platz waehlen ──
+    $belegt = $pdo->query("SELECT platz FROM demo_zugang WHERE status = 'aktiv'")
+                  ->fetchAll(PDO::FETCH_COLUMN);
+    $platz = demo_platz_waehlen(array_map('strval', $belegt));
+    if ($platz === null) {
+        return $misslungen('kein_platz', 409,
+            'Aktuell sind alle Demo-Plätze belegt. Bitte in Kürze erneut versuchen.');
+    }
+
+    $stmt = $pdo->prepare('SELECT * FROM mandant WHERE subdomain = ? LIMIT 1');
+    $stmt->execute([$platz]);
+    $m = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$m) {
+        error_log("demo_zugang_einrichten: Platz „$platz“ ist im Mandantenstamm nicht eingetragen.");
+        return $misslungen('nicht_bereit', 503, $nichtBereit);
+    }
+    $lage = mandant_verbindung_bereit($m);
+    if ($lage !== 'bereit') {
+        error_log("demo_zugang_einrichten: Platz „$platz“ nicht verbunden ($lage).");
+        return $misslungen('nicht_bereit', 503, $nichtBereit);
+    }
+    $stand = mandant_stand($m);
+    if (!$stand['erreichbar'] || !empty($stand['fehlend'])) {
+        error_log("demo_zugang_einrichten: Platz „$platz“ noch nicht eingerichtet.");
+        return $misslungen('nicht_bereit', 503, $nichtBereit);
+    }
+
+    // ── Instanz leeren, befuellen, Konto anlegen ──
+    $fehler = demo_instanz_leeren($pdo, $platz);
+    if ($fehler !== null) {
+        error_log('demo_zugang_einrichten: ' . $fehler);
+        return $misslungen('fehlschlag', 503, $fehlschlag);
+    }
+    $instanz = mandant_db($m);
+    // demo_daten_erzeugen() und NICHT die selbst-antwortende
+    // demo_daten_erzeugen_ausfuehren(): Nach diesem Aufruf kommt noch
+    // Konto, Register und Mail.
+    try {
+        demo_daten_erzeugen($instanz);
+    } catch (Throwable $e) {
+        error_log('demo_zugang_einrichten: ' . $e->getMessage());
+        return $misslungen('fehlschlag', 503, $fehlschlag);
+    }
+
+    $vergeben = $instanz->query('SELECT name FROM mitarbeiter')->fetchAll(PDO::FETCH_COLUMN);
+    $login    = demo_login_bilden($firma, array_map('strval', $vergeben));
+    $passwort = demo_passwort_erzeugen();
+
+    $teile    = preg_split('/\s+/', $person) ?: [$person];
+    $nachname = count($teile) > 1 ? array_pop($teile) : $person;
+    $vorname  = count($teile) > 0 ? implode(' ', $teile) : '';
+    $instanz->prepare(
+        'INSERT INTO mitarbeiter (name, password_hash, ist_admin, vorname, nachname, aktiv)
+         VALUES (?, ?, 1, ?, ?, 1)'
+    )->execute([$login, password_hash($passwort, PASSWORD_DEFAULT), $vorname, $nachname]);
+
+    // ── Register ──
+    $start    = date('Y-m-d H:i:s');
+    $laeuftAb = demo_zugang_ablauf($start);
+    $pdo->prepare(
+        'INSERT INTO demo_zugang (platz, firma, person, email, telefon, login, status,
+                                  freigegeben_am, freigegeben_von, laeuft_ab_am)
+         VALUES (?, ?, ?, ?, ?, ?, \'aktiv\', ?, ?, ?)'
+    )->execute([$platz, $firma, $person, $email, $telefon, $login, $start,
+        DEMO_FREIGEGEBEN_AUTOMATISCH, $laeuftAb]);
+
+    $adresse = (string)demo_platz_adresse($platz);
+    return [
+        'fehler'    => null,
+        'platz'     => $platz,
+        'adresse'   => $adresse,
+        'laeuft_ab' => $laeuftAb,
+        'mail'      => demo_zugang_mail($firma, $person, $adresse, $login, $passwort, $laeuftAb),
+    ];
 }

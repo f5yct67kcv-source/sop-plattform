@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<!--
+  BESTAETIGUNGSSEITE FUER DEN DEMO-ZUGANG (ENT-624).
+
+  WARUM ES DIESE SEITE GIBT UND NICHT NUR EINEN LINK: Outlook Safe Links,
+  Virenscanner in Firmennetzen und Vorschaudienste rufen JEDE Adresse aus
+  einer Mail auf, bevor ein Mensch sie sieht. Loeste der blosse Aufruf die
+  Anfrage ein, faende der Interessent einen verbrauchten Link vor --
+  ausgerechnet bei Firmen mit ordentlicher IT, also genau der Zielgruppe.
+  Ein Scanner ruft auf, aber er drueckt keinen Knopf. Darum passiert hier
+  beim Laden NICHTS; erst der Knopf schickt den Wert an den Server, und
+  api/demo_bestaetigen.php antwortet ausschliesslich auf POST.
+
+  SIE LIEGT AUF guardops.ch, nicht im Betreiber-Bereich: Der Interessent
+  kam von dieser Domain, und eine Adresse mit "betreiber" darin geht ihn
+  nichts an. Der Endpunkt selbst laeuft weiterhin auf
+  betreiber.guardops.ch -- er braucht die Mandanten-Datenbank, die diese
+  Seite bewusst nicht hat. Die Herkunft steht dafuer in
+  OEFFENTLICHE_DEMO_SKRIPTE (backend/db.php).
+
+  FUENF ZUSTAENDE, FUENF TEXTE (Hausregel: "unbekannt" darf nie wie "keine"
+  aussehen). Abgelaufen, schon benutzt, unbekannt, kein Platz frei und
+  eingerichtet sind fuenf verschiedene Sachverhalte. Wer sie zu einem
+  "hat nicht geklappt" zusammenzieht, schickt Leute auf die Suche nach
+  einem Fehler, den sie nicht haben.
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo-Zugang bestätigen – GuardOpS</title>
+<meta name="description" content="Bestätigen Sie Ihre Anfrage, dann richten wir den Demo-Zugang ein.">
+<!-- Diese Seite gehoert nicht in den Index: Sie ist ohne den Wert aus der
+     Mail sinnlos, und ein Treffer bei einer Suchmaschine waere fuer jeden
+     eine Sackgasse. -->
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="icons/guardops-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icons/guardops-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="icons/guardops-180.png">
+<link rel="stylesheet" href="recht.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="marke" viewBox="0 0 460 593">
+    <path fill="currentColor" d="M230 0 460 79 460 154 416 154 416 109.9 230 46 44 109.9 44 364.4 230 535 416 364.4 416 308 206 308 233 264 460 264 460 382 230 593 0 382 0 79Z"/>
+  </symbol>
+</svg>
+
+<header class="kopf">
+  <div class="innen">
+    <a class="marke" href="index.html">
+      <svg aria-hidden="true"><use href="#marke"></use></svg>
+      <span class="wortmarke" data-brand>GuardOpS</span>
+    </a>
+    <a class="zurueck" href="index.html">Zurück zur Startseite</a>
+  </div>
+</header>
+
+<main>
+  <p class="vorzeile">Demo-Zugang</p>
+
+  <!-- Vor dem Klick -->
+  <div class="zustand an" id="z-bereit">
+    <h1>Noch ein Klick</h1>
+    <p class="stand">Danach richten wir Ihren Demo-Zugang ein.</p>
+    <div class="karte">
+      <p>Wir richten den Zugang erst auf Ihre Bestätigung hin ein. So bleiben die
+         Demo-Plätze denen erhalten, die sie wirklich nutzen möchten.</p>
+      <p style="margin-bottom:0"><button class="knopf" type="button" id="knopf">Demo-Zugang jetzt einrichten</button></p>
+    </div>
+    <p class="stand" style="margin-top:22px">Die Zugangsdaten gehen anschliessend an
+       die E-Mail-Adresse, mit der Sie angefragt haben.</p>
+  </div>
+
+  <!-- Während der Server arbeitet. Das Einrichten leert eine Instanz und
+       befüllt sie neu -- das dauert spürbar, und ohne diesen Zustand
+       drückt jemand ein zweites Mal. -->
+  <div class="zustand" id="z-laeuft">
+    <h1>Einen Moment</h1>
+    <p class="stand">Wir richten Ihren Demo-Zugang gerade ein. Bitte diese Seite nicht schliessen.</p>
+  </div>
+
+  <!-- Eingerichtet -->
+  <div class="zustand" id="z-fertig">
+    <h1>Ihr Demo-Zugang steht</h1>
+    <p class="stand">Die Zugangsdaten sind unterwegs zu Ihnen.</p>
+    <div class="karte">
+      <p>Anmeldename und Passwort haben wir Ihnen soeben per E-Mail geschickt —
+         aus Sicherheitsgründen stehen sie nicht auf dieser Seite.</p>
+      <p style="margin-bottom:0">Ihre Demo erreichen Sie unter
+         <a id="adresse" href="#">Ihrer Demo-Adresse</a>.</p>
+    </div>
+  </div>
+
+  <!-- Es gab schon einen Zugang für diese Adresse -->
+  <div class="zustand" id="z-besteht">
+    <h1>Der Zugang bestand schon</h1>
+    <p class="stand">Wir haben Ihnen neue Zugangsdaten geschickt.</p>
+    <div class="karte">
+      <p>Für Ihre E-Mail-Adresse war bereits ein Demo-Zugang eingerichtet. Einen
+         zweiten legen wir nicht an — stattdessen haben wir das Passwort neu
+         gesetzt und Ihnen geschickt.</p>
+      <p style="margin-bottom:0">Ihre Demo erreichen Sie unter
+         <a id="adresse2" href="#">Ihrer Demo-Adresse</a>.</p>
+    </div>
+  </div>
+
+  <!-- Schon benutzt -->
+  <div class="zustand" id="z-benutzt">
+    <h1>Das haben Sie bereits bestätigt</h1>
+    <p class="stand">Der Zugang ist eingerichtet.</p>
+    <div class="karte">
+      <p style="margin-bottom:0">Ihre Zugangsdaten liegen in Ihrem Postfach. Suchen
+         Sie nach einer E-Mail von <b>GuardOpS</b> mit dem Betreff „Ihr Demo-Zugang
+         zu GuardOpS“.</p>
+    </div>
+  </div>
+
+  <!-- Abgelaufen -->
+  <div class="zustand" id="z-abgelaufen">
+    <h1>Der Link ist abgelaufen</h1>
+    <p class="stand">Bestätigungslinks gelten 24 Stunden.</p>
+    <div class="karte">
+      <p>Das ist kein Problem — fordern Sie den Zugang einfach noch einmal an, dann
+         schicken wir Ihnen einen neuen Link.</p>
+      <p style="margin-bottom:0"><a class="knopf" href="index.html#demo">Neu anfragen</a></p>
+    </div>
+  </div>
+
+  <!-- Unbekannt -->
+  <div class="zustand" id="z-unbekannt">
+    <h1>Diesen Link kennen wir nicht</h1>
+    <p class="stand">Möglicherweise wurde er durch eine neuere Anfrage ersetzt.</p>
+    <div class="karte">
+      <p>Wenn Sie mehrmals angefragt haben, gilt nur der Link aus der neuesten
+         E-Mail. Sehen Sie in Ihrem Postfach nach — oder fragen Sie neu an.</p>
+      <p style="margin-bottom:0"><a class="knopf" href="index.html#demo">Neu anfragen</a></p>
+    </div>
+  </div>
+
+  <!-- Kein Platz frei -->
+  <div class="zustand" id="z-kein-platz">
+    <h1>Gerade ist kein Platz frei</h1>
+    <p class="stand">Alle Demo-Plätze sind belegt.</p>
+    <div class="karte">
+      <p>Wir halten nur eine begrenzte Zahl von Demo-Umgebungen bereit, und im
+         Moment sind alle vergeben. <b>Ihr Link bleibt gültig</b> — versuchen Sie
+         es in ein paar Stunden noch einmal.</p>
+      <p style="margin-bottom:0">Eilt es? Schreiben Sie an
+         <a href="mailto:info@guardops.ch">info@guardops.ch</a>, dann machen wir
+         einen Platz frei.</p>
+    </div>
+  </div>
+
+  <!-- Alles andere -->
+  <div class="zustand" id="z-fehler">
+    <h1>Das hat gerade nicht geklappt</h1>
+    <p class="stand" id="fehlertext">Bitte versuchen Sie es in Kürze noch einmal.</p>
+    <div class="karte">
+      <p style="margin-bottom:0">Bleibt es dabei, schreiben Sie uns an
+         <a href="mailto:info@guardops.ch">info@guardops.ch</a> — wir richten den
+         Zugang dann von Hand ein.</p>
+    </div>
+  </div>
+</main>
+
+<footer class="fuss">
+  <div class="innen">
+    <span>© 2026 <span data-brand>GuardOpS</span></span>
+    <a href="impressum.html">Impressum</a>
+    <a href="nutzungsbedingungen.html">Nutzungsbedingungen</a>
+    <a href="datenschutz.html">Datenschutz</a>
+  </div>
+</footer>
+
+<script>
+(function(){
+  'use strict';
+  // Der Endpunkt liegt im Betreiber-Bereich, weil er die
+  // Mandanten-Datenbank braucht; diese Seite traegt bewusst keine
+  // Zugangsdaten. Feste Adresse, kein zusammengebauter Host.
+  var ZIEL = 'https://betreiber.guardops.ch/api/demo_bestaetigen.php';
+
+  function zeig(id) {
+    var alle = document.querySelectorAll('.zustand');
+    for (var i = 0; i < alle.length; i++) { alle[i].classList.remove('an'); }
+    var el = document.getElementById(id);
+    if (el) { el.classList.add('an'); }
+    window.scrollTo(0, 0);
+  }
+
+  // Der Wert steht in der Adresse. Fehlt er, ist die Seite direkt
+  // aufgerufen worden -- dann gibt es nichts zu bestaetigen, und das ist
+  // etwas anderes als ein ungueltiger Wert.
+  var wert = new URLSearchParams(window.location.search).get('t') || '';
+  if (!/^[0-9a-f]{64}$/.test(wert)) {
+    zeig('z-unbekannt');
+    return;
+  }
+
+  var knopf = document.getElementById('knopf');
+  knopf.addEventListener('click', function () {
+    knopf.disabled = true;
+    zeig('z-laeuft');
+    fetch(ZIEL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ t: wert })
+    }).then(function (a) {
+      return a.json().catch(function () { return { status: 'error', grund: 'netz' }; });
+    }).then(function (a) {
+      var adresse = a.adresse || '';
+      if (a.status === 'ok' && a.grund === 'eingerichtet') {
+        if (adresse) {
+          var l = document.getElementById('adresse');
+          l.href = adresse; l.textContent = adresse;
+        }
+        zeig('z-fertig');
+        return;
+      }
+      if (a.status === 'ok' && a.grund === 'besteht_bereits') {
+        if (adresse) {
+          var l2 = document.getElementById('adresse2');
+          l2.href = adresse; l2.textContent = adresse;
+        }
+        zeig('z-besteht');
+        return;
+      }
+      // Jeder Grund bekommt seinen eigenen Zustand. Was der Server nicht
+      // benennt, landet im Sammelfall -- mit SEINEM Text, nicht mit einem
+      // erfundenen.
+      var karte = {
+        schon_benutzt: 'z-benutzt',
+        abgelaufen:    'z-abgelaufen',
+        unbekannt:     'z-unbekannt',
+        kein_platz:    'z-kein-platz'
+      };
+      if (karte[a.grund]) { zeig(karte[a.grund]); return; }
+      if (a.message) { document.getElementById('fehlertext').textContent = a.message; }
+      zeig('z-fehler');
+      knopf.disabled = false;
+    }).catch(function () {
+      // Netzfehler: Der Server hat vielleicht trotzdem eingerichtet. Darum
+      // kein "hat nicht geklappt", sondern ein Text, der beides abdeckt.
+      document.getElementById('fehlertext').textContent =
+        'Die Verbindung ist abgebrochen. Sehen Sie bitte in Ihrem Postfach nach — '
+        + 'möglicherweise sind die Zugangsdaten schon unterwegs.';
+      zeig('z-fehler');
+      knopf.disabled = false;
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -62,7 +62,12 @@ const DEMO_FREIGEGEBEN_AUTOMATISCH = 'automatisch (Selbstbedienung, ENT-601)';
 // Kapazitaetsgrenze ist keine sicherheitsrelevante Tatsache, die man
 // verschleiern muesste, und ein Interessent soll nicht auf eine Zusage
 // warten, die nicht kommt.
-const DEMO_ANFORDERN_DANKE = 'Vielen Dank. Sie erhalten in Kürze eine E-Mail mit Ihren Zugangsdaten.';
+// EIN TEXT FUER JEDEN FALL (ENT-624): Er passt auf die neue Anfrage, auf
+// die bereits bekannte Adresse und auf den Honigtopf. Stuende hier, was
+// wirklich geschah, liesse sich am Formular durchprobieren, welche
+// Adressen einen Zugang haben.
+const DEMO_ANFORDERN_DANKE = 'Vielen Dank. Wir haben Ihnen eine E-Mail geschickt — '
+    . 'bitte folgen Sie den Anweisungen darin.';
 
 // ── Kleine Formhelfer fuer api/demo_anfordern.php und
 // api/demo_erneut_senden.php ─────────────────────────────────────────

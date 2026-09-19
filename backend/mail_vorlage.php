@@ -104,6 +104,32 @@ function mail_absatz(string $html): string
         . MAIL_FARBE_TEXT . ';">' . $html . '</p>';
 }
 
+// Ein Knopf in der Mail (ENT-624). Erste Mail, die einen braucht: Der
+// Bestaetigungslink soll man treffen koennen, auch mit dem Daumen.
+//
+// ALS TABELLE, NICHT ALS GESTALTETES <a>: Outlook rendert ueber Word und
+// gibt einem <a> weder Innenabstand noch Hintergrund zuverlaessig. Eine
+// einzelne Tabellenzelle mit Hintergrundfarbe kommt ueberall an.
+//
+// DIE ADRESSE STEHT ZUSAETZLICH ALS TEXT DARUNTER. Ein Mailprogramm, das
+// Knoepfe verschluckt oder Bilder blockt, laesst den Empfaenger sonst vor
+// einer Mail ohne Weiterweg sitzen -- und die reine Textfassung hat den
+// Knopf ohnehin nie.
+function mail_knopf(string $beschriftung, string $ziel): string
+{
+    return '<table role="presentation" cellpadding="0" cellspacing="0" border="0"'
+        . ' style="margin:0 0 18px 0;"><tr>'
+        . '<td style="background:' . MAIL_FARBE_BLAU . ';border-radius:6px;">'
+        . '<a href="' . mail_e($ziel) . '" style="display:inline-block;'
+        . 'padding:13px 24px;font-size:15px;font-weight:600;line-height:1.2;'
+        . 'color:#FFFFFF;text-decoration:none;">' . mail_e($beschriftung) . '</a>'
+        . '</td></tr></table>'
+        . '<p class="d-leise" style="margin:0 0 18px 0;font-size:13px;line-height:1.6;'
+        . 'color:' . MAIL_FARBE_LEISE . ';">Falls der Knopf nicht funktioniert, '
+        . 'kopieren Sie diese Adresse in Ihren Browser:<br>'
+        . '<span style="word-break:break-all;">' . mail_e($ziel) . '</span></p>';
+}
+
 // Die Signatur kommt als fertige Zeilenliste herein und NICHT aus dieser
 // Datei: Ein Personenname gehoert nicht ins Repository (Vertraulichkeits-
 // regel in CLAUDE.md; im Impressum ist aus demselben Grund bewusst keiner
