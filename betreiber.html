@@ -1672,6 +1672,41 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             <div class="hinweis">Nur der Name. Der Wert liegt in den Deploy-Secrets.</div>
           </div>
         </div>
+        <!-- Vertrag (ENT-617). Eigener Block unter den technischen Feldern:
+             Das eine ist die Anlage, das andere die Abmachung. Alle Felder
+             dürfen leer bleiben — leer heisst dann „unbekannt", nicht
+             „null Monate". -->
+        <h3 style="margin:22px 0 4px;font-size:13.5px;font-weight:650">Vertrag</h3>
+        <div class="hinweis" style="margin-bottom:10px">
+          Daraus rechnet der Betreiber-Bereich, bis wann gekündigt werden kann.
+          Was leer bleibt, gilt als nicht erfasst.
+        </div>
+        <div class="raster2">
+          <div class="feld">
+            <label for="m-beginn">Vertragsbeginn</label>
+            <input id="m-beginn" type="date">
+          </div>
+          <div class="feld">
+            <label for="m-mindest">Mindestlaufzeit (Monate)</label>
+            <input id="m-mindest" type="number" min="0" max="600" inputmode="numeric">
+            <div class="hinweis">Leer heisst unbefristet.</div>
+          </div>
+          <div class="feld">
+            <label for="m-frist">Kündigungsfrist (Monate)</label>
+            <input id="m-frist" type="number" min="0" max="600" inputmode="numeric">
+          </div>
+          <div class="feld">
+            <label for="m-verlaengerung">Verlängerung (Monate)</label>
+            <input id="m-verlaengerung" type="number" min="0" max="600" inputmode="numeric">
+            <div class="hinweis">Leer oder 0 heisst: keine automatische Verlängerung.</div>
+          </div>
+          <div class="feld">
+            <label for="m-gekuendigt">Gekündigt per</label>
+            <input id="m-gekuendigt" type="date">
+            <div class="hinweis">Nur setzen, wenn die Kündigung vorliegt. Sie schlägt jede Rechnung.</div>
+          </div>
+        </div>
+
         <div class="meldung m-ruhe" style="background:var(--surface-2);color:var(--ink-2)">
           Bleiben Server, Datenbankname und Benutzer leer, nutzt der Mandant die
           Standardverbindung. Das ist der Bestandsbetrieb.
@@ -1987,6 +2022,32 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                   <input class="inp" id="bk_mwst"></div>
                 <div class="f"><label for="bk_iban">IBAN</label>
                   <input class="inp" id="bk_iban"></div>
+              </div>
+
+              <!-- Zahlteil (ENT-616). Eigener Block mit eigener Überschrift,
+                   nicht unter die Briefkopf-Felder gemischt: Diese fünf
+                   Angaben stehen nicht auf dem Blatt, sie stecken im
+                   Einzahlungsschein und werden von der Bank geprüft. Wer
+                   sie für Gestaltung hält, wundert sich, warum ein Umbruch
+                   im Adressblock die Zahlung verhindert. -->
+              <h3 style="margin:22px 0 4px;font-size:13.5px;font-weight:650">Zahlteil der Rechnung</h3>
+              <div class="of-hinweis" style="margin-bottom:10px">
+                Daraus entsteht der QR-Einzahlungsschein auf jeder offenen Rechnung.
+                Die Adresse gehört hier einzeln hin — die Bank weist einen Zahlteil zurück,
+                dessen Adressblock nicht passt.
+              </div>
+              <div class="f"><label for="bk_qr_iban">IBAN für den Zahlteil</label>
+                <input class="inp" id="bk_qr_iban" placeholder="CH.. oder LI..">
+                <div class="of-hinweis" id="bkZahlteilLage" style="margin-top:6px"></div></div>
+              <div class="raster2">
+                <div class="f"><label for="bk_qr_strasse">Strasse</label>
+                  <input class="inp" id="bk_qr_strasse"></div>
+                <div class="f"><label for="bk_qr_hausnummer">Nummer</label>
+                  <input class="inp" id="bk_qr_hausnummer"></div>
+                <div class="f"><label for="bk_qr_plz">PLZ</label>
+                  <input class="inp" id="bk_qr_plz"></div>
+                <div class="f"><label for="bk_qr_ort">Ort</label>
+                  <input class="inp" id="bk_qr_ort"></div>
               </div>
               <div class="f">
                 <label for="bk_logo">Logo</label>
@@ -2897,9 +2958,23 @@ async function ladeMandanten() {
   /* Einheiten nicht vermischen: "Mandanten" zaehlt Betriebe, "aktiv" zaehlt
      Betriebe mit Status aktiv, "GAV offen" zaehlt Bestaetigungen. Jede Zahl
      bekommt ihren Bezug, sobald sie eine Teilmenge ist (Hausregel). */
+  /* Verträge, die in den nächsten 90 Tagen anstehen (ENT-617). Gezählt wird
+     der Tag, an dem die Kündigung spätestens da sein muss — nicht das
+     Vertragsende. Wer aufs Ende schaut, merkt die Frist, wenn sie vorbei
+     ist. Die 90 Tage stehen fest: eine Zahl, die niemand je ändert, ist
+     keine Einstellung. */
+  const faellig = liste.filter(m => m.vertrag && m.vertrag.faellig_90).length;
+  /* Ein Vertrag, zu dem nichts erfasst ist, zählt weder als fällig noch als
+     in Ordnung — er ist unbekannt, und das steht als eigener Bezug da. */
+  const ohneVertrag = liste.filter(m =>
+    !m.vertrag || m.vertrag.lage === 'unbekannt').length;
+
   uebersichtSetzen(
       zahlBlock('Mandanten', liste.length, null)
     + zahlBlock('Aktiv', aktiv, liste.length ? aktiv + ' von ' + liste.length : null)
+    + zahlBlock('Verträge', faellig,
+        faellig ? 'in den nächsten 90 Tagen'
+                : (ohneVertrag ? ohneVertrag + ' ohne Angaben' : 'nichts steht an'))
     + zahlBlock('GAV offen', offen, offen ? 'Bestätigung fehlt' : 'alle bestätigt')
     + zahlBlock('Nicht erreichbar', kaputt, kaputt ? 'Einrichtung prüfen' : 'alle erreichbar'));
 
@@ -2910,7 +2985,7 @@ async function ladeMandanten() {
   }
 
   inhalt.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
-    + '<th>Mandant</th><th>Grösse</th><th>Status</th><th>GAV</th><th>Einrichtung</th><th></th>'
+    + '<th>Mandant</th><th>Grösse</th><th>Status</th><th>Vertrag</th><th>GAV</th><th>Einrichtung</th><th></th>'
     + '</tr></thead><tbody>'
     + liste.map(m => '<tr>'
         + '<td><strong>' + text(m.name) + '</strong>'
@@ -2918,6 +2993,7 @@ async function ladeMandanten() {
           + '<div class="zweit">' + (m.kanton ? 'Kanton ' + text(m.kanton) : 'Kanton nicht gesetzt') + '</div></td>'
         + '<td>' + groesseZelle(groesse[m.id]) + '</td>'
         + '<td>' + merker(STATUS_TEXT, m.status) + '</td>'
+        + '<td>' + vertragZelle(m) + '</td>'
         + '<td>' + merker(GAV_TEXT, m.gav_lage)
           + (m.gav_bestaetigt_am ? '<div class="zweit">' + text(m.gav_bestaetigt_am.slice(0, 10)) + '</div>' : '')
           + '</td>'
@@ -2967,6 +3043,40 @@ function leerBlock(zeichen, titel, unter) {
        + '<div class="u">' + text(unter) + '</div></div>';
 }
 
+/* ── Vertragslage (ENT-617) ─────────────────────────────────────────
+   Fünf Lagen, fünf Texte. Gerechnet hat der Server; hier wird nur benannt,
+   was er zurückgibt — die Oberfläche rät nicht an Datumsfeldern herum. */
+const VERTRAG_TEXT = {
+  unbekannt:  ['m-ruhe', 'nicht erfasst'],
+  ohne_ende:  ['m-ruhe', 'unbefristet'],
+  laeuft:     ['m-pos',  'läuft'],
+  laeuft_aus: ['m-warn', 'läuft aus'],
+  gekuendigt: ['m-neg',  'gekündigt'],
+};
+
+function vertragZelle(m) {
+  const v = m.vertrag || { lage: 'unbekannt' };
+  /* "Die Felder gibt es hier noch nicht" ist etwas anderes als "es steht
+     nichts drin" — sonst sieht eine fehlende Nachtragsspalte aus wie ein
+     nicht erfasster Vertrag (Hausregel). */
+  if (m.vertrag_felder_da === false) {
+    return '<span style="color:var(--ink-3)" title="Die Vertragsfelder sind in dieser Anlage noch nicht nachgetragen.">keine Angabe</span>';
+  }
+  const [klasse, wort] = VERTRAG_TEXT[v.lage] || VERTRAG_TEXT.unbekannt;
+  let zweit = '';
+  if (v.lage === 'gekuendigt') {
+    zweit = (v.beendet ? 'beendet am ' : 'endet am ') + text(String(v.ende).slice(0, 10));
+  } else if (v.lage === 'laeuft') {
+    zweit = 'kündbar bis ' + text(String(v.spaetestens).slice(0, 10));
+  } else if (v.lage === 'laeuft_aus') {
+    zweit = (v.beendet ? 'Ende war ' : 'endet am ') + text(String(v.ende).slice(0, 10));
+  } else if (v.lage === 'ohne_ende') {
+    zweit = 'keine Mindestlaufzeit';
+  }
+  return '<span class="merker ' + klasse + '">' + wort + '</span>'
+       + (zweit ? '<div class="zweit">' + zweit + '</div>' : '');
+}
+
 function formularOeffnen(m) {
   $('m-form-titel').textContent = m ? 'Mandant ändern' : 'Mandant anlegen';
   $('m-id').value     = m ? m.id : '';
@@ -2977,6 +3087,14 @@ function formularOeffnen(m) {
   $('m-db').value     = m ? m.db_name : '';
   $('m-user').value   = m ? m.db_user : '';
   $('m-secret').value = m ? m.secret_name : '';
+  /* Leer statt 0: Ein Zahlenfeld mit 0 behauptet "null Monate vereinbart",
+     und das ist etwas anderes als "nicht erfasst" (Hausregel). */
+  const wert = f => (m && m[f] !== null && m[f] !== undefined && m[f] !== '') ? String(m[f]) : '';
+  $('m-beginn').value        = wert('vertrag_beginn').slice(0, 10);
+  $('m-mindest').value       = wert('mindestlaufzeit_monate');
+  $('m-frist').value         = wert('kuendigungsfrist_monate');
+  $('m-verlaengerung').value = wert('verlaengerung_monate');
+  $('m-gekuendigt').value    = wert('gekuendigt_per').slice(0, 10);
   zeig($('m-form-karte'), true);
   $('m-name').focus();
 }
@@ -2993,6 +3111,13 @@ async function mandantSpeichern() {
     db_name: $('m-db').value,
     db_user: $('m-user').value,
     secret_name: $('m-secret').value,
+    /* Leeres Feld -> null, nicht 0. Der Server schreibt dann NULL, und die
+       Lage bleibt "unbekannt" statt "sofort kündbar" zu behaupten. */
+    vertrag_beginn:          $('m-beginn').value || null,
+    mindestlaufzeit_monate:  $('m-mindest').value === '' ? null : $('m-mindest').value,
+    kuendigungsfrist_monate: $('m-frist').value === '' ? null : $('m-frist').value,
+    verlaengerung_monate:    $('m-verlaengerung').value === '' ? null : $('m-verlaengerung').value,
+    gekuendigt_per:          $('m-gekuendigt').value || null,
   });
   if (a.status !== 'ok') { melde($('haus-meldung'), 'fehler', a.message); return; }
   zeig($('m-form-karte'), false);
@@ -4966,8 +5091,11 @@ async function pdArchivKlick(id, aktiv) {
 let bkLogoNeu = null;    // data:-URL, solange nicht gespeichert
 let bkLogoWegSetzen = false;
 
+const BK_FELDER = ['firma', 'absender', 'telefon', 'email', 'webseite', 'uid', 'iban',
+                   'qr_iban', 'qr_strasse', 'qr_hausnummer', 'qr_plz', 'qr_ort'];
+
 function bkFuellen() {
-  ['firma', 'absender', 'telefon', 'email', 'webseite', 'uid', 'iban'].forEach(f => {
+  BK_FELDER.forEach(f => {
     const el = $('bk_' + f);
     if (el) { el.value = briefkopf[f] || ''; }
   });
@@ -4975,6 +5103,36 @@ function bkFuellen() {
   bkLogoNeu = null;
   bkLogoWegSetzen = false;
   bkLogoZeichnen(briefkopf.logo || null);
+  bkZahlteilLage();
+}
+
+/* Vier Lagen, vier Texte -- und keine davon darf wie eine andere aussehen
+   (Hausregel). Die Auskunft kommt aus dem Server: Ob eine IBAN eine QR-IBAN
+   ist, entscheidet ihre Bankleitzahl, und das gehoert nicht in den Browser
+   nachgebaut. */
+const BK_ZAHLTEIL_TEXT = {
+  ohne_iban: ['', 'Ohne IBAN trägt die Rechnung keinen Einzahlungsschein. '
+    + 'Der Empfänger muss die Angaben von Hand abtippen.'],
+  iban_ungueltig: ['var(--neg)', 'Diese IBAN ist keine gültige Schweizer oder '
+    + 'Liechtensteiner IBAN — gespeichert wird sie so nicht.'],
+  adresse_fehlt: ['var(--warn)', 'Die IBAN ist gültig, aber Strasse, PLZ oder Ort fehlen. '
+    + 'Ohne vollständige Adresse weist die Bank den Zahlteil zurück, darum bleibt er weg.'],
+  bereit_QRR: ['var(--pos)', 'QR-IBAN erkannt. Jede Rechnung bekommt eine eigene '
+    + 'Referenznummer aus ihrer Belegnummer — die Bank meldet den Zahlungseingang damit zurück.'],
+  bereit_NON: ['var(--pos)', 'Normale IBAN. Der Einzahlungsschein ist gültig; '
+    + 'die Rechnungsnummer steht in der Mitteilung, nicht als Referenz. '
+    + 'Den Zahlungseingang ordnest du damit von Hand zu.'],
+};
+
+function bkZahlteilLage() {
+  const el = $('bkZahlteilLage');
+  if (!el) { return; }
+  const z = (briefkopf && briefkopf.zahlteil) || null;
+  if (!z) { el.textContent = ''; return; }
+  const schluessel = z.lage === 'bereit' ? 'bereit_' + z.art : z.lage;
+  const [farbe, text] = BK_ZAHLTEIL_TEXT[schluessel] || ['', ''];
+  el.textContent = text;
+  el.style.color = farbe || '';
 }
 
 function bkLogoZeichnen(datenUrl) {
@@ -5018,6 +5176,11 @@ async function bkSpeichern() {
     uid: ($('bk_uid').value || '').trim(),
     mwst_nr: ($('bk_mwst').value || '').trim(),
     iban: ($('bk_iban').value || '').trim(),
+    qr_iban: ($('bk_qr_iban').value || '').trim(),
+    qr_strasse: ($('bk_qr_strasse').value || '').trim(),
+    qr_hausnummer: ($('bk_qr_hausnummer').value || '').trim(),
+    qr_plz: ($('bk_qr_plz').value || '').trim(),
+    qr_ort: ($('bk_qr_ort').value || '').trim(),
   };
   if (bkLogoNeu) { koerper.logo = bkLogoNeu; }
   if (bkLogoWegSetzen) { koerper.logo_weg = true; }

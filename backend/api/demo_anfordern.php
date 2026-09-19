@@ -128,7 +128,8 @@ if ($bestehend) {
     } else {
         try {
             smtp_senden($email, $person, $ergebnis['mail']['betreff'],
-                $ergebnis['mail']['html'], $ergebnis['mail']['text']);
+                $ergebnis['mail']['html'], $ergebnis['mail']['text'],
+                [], $ergebnis['mail']['bilder'] ?? []);
         } catch (Throwable $e) {
             error_log('demo_anfordern (bestehender Zugang): Versand fehlgeschlagen -- ' . $e->getMessage());
         }
@@ -218,7 +219,8 @@ $ein->execute([$platz, $firma, $person, $email, $telefon, $login, $start, DEMO_F
 $adresse = (string)demo_platz_adresse($platz);
 $mail    = demo_zugang_mail($firma, $person, $adresse, $login, $passwort, $laeuftAb);
 try {
-    smtp_senden($email, $person, $mail['betreff'], $mail['html'], $mail['text']);
+    smtp_senden($email, $person, $mail['betreff'], $mail['html'], $mail['text'],
+        [], $mail['bilder'] ?? []);
 } catch (Throwable $e) {
     error_log('demo_anfordern: Versand fehlgeschlagen -- ' . $e->getMessage());
 }

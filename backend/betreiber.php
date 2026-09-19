@@ -317,6 +317,103 @@ function be_gav_bestaetigen(PDO $pdo, int $mandantId, bool $unterstellt, string 
 // Alle drei Felder leer = Bestandsmandant auf der Standardverbindung, das
 // ist vollstaendig. Teilweise gefuellt = jemand hat angefangen und nicht
 // zu Ende gebracht.
+// ── Vertragslage eines Mandanten (ENT-617) ──────────────────────────
+//
+// GERECHNET, NIE GESPEICHERT. Der naechste moegliche Kuendigungstermin ist
+// eine Folge aus Beginn, Mindestlaufzeit, Verlaengerung und Frist. Ein
+// gespeicherter Wert stuende ab dem Tag falsch da, an dem der Termin
+// verstreicht -- und niemand wuesste, wann er zuletzt gerechnet wurde.
+//
+// MONATSARITHMETIK MIT KLEMMUNG: Der 31. Januar plus einen Monat ist der
+// 28. Februar, nicht der 3. Maerz. PHPs eigenes "+1 month" laeuft ueber, und
+// bei einer Kuendigungsfrist waeren das zwei bis drei Tage in die falsche
+// Richtung -- genau die, auf die es ankommt.
+function be_monate_dazu(string $datum, int $monate): string
+{
+    $d = DateTimeImmutable::createFromFormat('!Y-m-d', substr($datum, 0, 10));
+    if (!$d) { return $datum; }
+    $tag = (int)$d->format('j');
+    $erster = $d->modify('first day of this month')->modify('+' . $monate . ' months');
+    $letzterImZiel = (int)$erster->format('t');
+    return $erster->setDate((int)$erster->format('Y'), (int)$erster->format('n'),
+                            min($tag, $letzterImZiel))->format('Y-m-d');
+}
+
+// FUENF LAGEN, FUENF AUSSAGEN -- und keine davon darf wie eine andere
+// aussehen (Hausregel):
+//
+//   unbekannt   Es ist nichts eingetragen. NICHT "unbefristet" und nicht
+//               "sofort kuendbar" -- wir wissen es schlicht nicht.
+//   gekuendigt  Ein Enddatum steht fest. Ob es in der Zukunft oder in der
+//               Vergangenheit liegt, sagt `beendet`.
+//   laeuft      Es gibt einen naechsten Termin: `ende` ist der Tag, auf den
+//               gekuendigt wuerde, `spaetestens` der Tag, an dem die
+//               Kuendigung dafuer da sein muss.
+//   ohne_ende   Beginn und Frist stehen, aber keine Mindestlaufzeit -- ein
+//               unbefristeter Vertrag. Kuendbar ist er jederzeit, wirksam
+//               nach Ablauf der Frist.
+//   laeuft_aus  Keine Verlaengerung vereinbart, und die Frist fuer das
+//               einzige Ende ist verstrichen. Der Vertrag laeuft noch, aber
+//               er endet an `ende`, und daran ist nichts mehr zu tun.
+//               NICHT "ausgelaufen" -- solange `ende` in der Zukunft liegt,
+//               ist er in Kraft, und `beendet` sagt, ob das noch gilt.
+function be_vertrag_lage(array $m, ?string $heute = null): array
+{
+    $heute  = $heute ?: date('Y-m-d');
+    $beginn = substr((string)($m['vertrag_beginn'] ?? ''), 0, 10);
+    $leer   = ['', '0000-00-00'];
+
+    $gek = substr((string)($m['gekuendigt_per'] ?? ''), 0, 10);
+    if (!in_array($gek, $leer, true)) {
+        return ['lage' => 'gekuendigt', 'ende' => $gek, 'spaetestens' => null,
+                'beendet' => $gek < $heute];
+    }
+    if (in_array($beginn, $leer, true)) {
+        return ['lage' => 'unbekannt', 'ende' => null, 'spaetestens' => null, 'beendet' => false];
+    }
+
+    // Eine fehlende Frist ist nicht dasselbe wie eine Frist von null. Sie
+    // wird als 0 GERECHNET, aber die Lage sagt es weiter unten nicht als
+    // Tatsache -- die Oberflaeche zeigt das fehlende Feld an.
+    $frist  = max(0, (int)($m['kuendigungsfrist_monate'] ?? 0));
+    $mindest = (int)($m['mindestlaufzeit_monate'] ?? 0);
+    $verlaengerung = (int)($m['verlaengerung_monate'] ?? 0);
+
+    if ($mindest <= 0) {
+        return ['lage' => 'ohne_ende', 'ende' => null,
+                'spaetestens' => null, 'beendet' => false];
+    }
+
+    // Das erste Ende, danach Schritt um Schritt die Verlaengerungen. Die
+    // Obergrenze ist kein Schoenheitsfehler, sondern die Zusicherung, dass
+    // diese Schleife endet -- auch bei einer Verlaengerung von 0, die sonst
+    // ewig auf der Stelle traete.
+    $ende = be_monate_dazu($beginn, $mindest);
+    $schritte = 0;
+    while (be_monate_dazu($ende, -$frist) < $heute) {
+        if ($verlaengerung <= 0 || ++$schritte > 600) {
+            return ['lage' => 'laeuft_aus', 'ende' => $ende,
+                    'spaetestens' => be_monate_dazu($ende, -$frist), 'beendet' => $ende < $heute];
+        }
+        $ende = be_monate_dazu($ende, $verlaengerung);
+    }
+
+    return ['lage' => 'laeuft', 'ende' => $ende,
+            'spaetestens' => be_monate_dazu($ende, -$frist), 'beendet' => false];
+}
+
+// Steht dieser Vertrag in den naechsten $tage Tagen an? Gemeint ist der Tag,
+// an dem die Kuendigung spaetestens da sein muss -- nicht das Vertragsende.
+// Wer auf das Ende schaut, merkt die Frist, wenn sie vorbei ist.
+function be_vertrag_faellig(array $lage, int $tage, ?string $heute = null): bool
+{
+    $heute = $heute ?: date('Y-m-d');
+    $stichtag = $lage['lage'] === 'gekuendigt' ? ($lage['ende'] ?? null) : ($lage['spaetestens'] ?? null);
+    if (!$stichtag) { return false; }
+    $grenze = date('Y-m-d', strtotime($heute . ' +' . $tage . ' days'));
+    return $stichtag >= $heute && $stichtag <= $grenze;
+}
+
 function be_verbindung_lage(array $m): string
 {
     $teile = [trim((string)($m['db_host'] ?? '')),
@@ -846,6 +943,11 @@ function be_tabellen(): array
   subdomain VARCHAR(100) NOT NULL DEFAULT '',
   status ENUM('aktiv','gesperrt','gekuendigt') NOT NULL DEFAULT 'aktiv',
   kanton CHAR(2) NULL,
+  vertrag_beginn DATE NULL,
+  mindestlaufzeit_monate INT NULL,
+  kuendigungsfrist_monate INT NULL,
+  verlaengerung_monate INT NULL,
+  gekuendigt_per DATE NULL,
   gav_unterstellt TINYINT(1) NULL,
   gav_bestaetigt_am DATETIME NULL,
   gav_bestaetigt_von VARCHAR(200) NULL,
@@ -1159,6 +1261,11 @@ function be_tabellen(): array
   uid VARCHAR(40) NOT NULL DEFAULT '',
   mwst_nr VARCHAR(40) NOT NULL DEFAULT '',
   iban VARCHAR(40) NOT NULL DEFAULT '',
+  qr_iban VARCHAR(40) NOT NULL DEFAULT '',
+  qr_strasse VARCHAR(200) NOT NULL DEFAULT '',
+  qr_hausnummer VARCHAR(20) NOT NULL DEFAULT '',
+  qr_plz VARCHAR(20) NOT NULL DEFAULT '',
+  qr_ort VARCHAR(100) NOT NULL DEFAULT '',
   email VARCHAR(200) NOT NULL DEFAULT '',
   telefon VARCHAR(60) NOT NULL DEFAULT '',
   webseite VARCHAR(200) NOT NULL DEFAULT '',
@@ -1213,6 +1320,28 @@ function be_spalten(): array
         ['betreiber', 'anrede',   "ALTER TABLE betreiber ADD COLUMN anrede VARCHAR(20) NOT NULL DEFAULT '' AFTER name"],
         ['betreiber', 'nachname', "ALTER TABLE betreiber ADD COLUMN nachname VARCHAR(100) NOT NULL DEFAULT '' AFTER anrede"],
         ['betreiber', 'vorname',  "ALTER TABLE betreiber ADD COLUMN vorname VARCHAR(100) NOT NULL DEFAULT '' AFTER anrede"],
+        // Zahlungsteil der Rechnung (ENT-616). Die Adresse des
+        // Zahlungsempfaengers steht hier ein zweites Mal, obwohl `absender`
+        // schon einen Adressblock traegt: Der ist ein Freitext fuer den
+        // Briefkopf, mit Zeilenumbruechen und beliebigem Aufbau. Der
+        // Zahlteil braucht Strasse, PLZ und Ort EINZELN, in eigenen Feldern
+        // mit eigenen Laengengrenzen -- die Bank weist einen Code zurueck,
+        // dessen Adressblock nicht passt. Dieselbe Trennung wie in der
+        // Tabelle `betrieb` auf der Mandantenseite.
+        ['be_briefkopf', 'qr_iban',       "ALTER TABLE be_briefkopf ADD COLUMN qr_iban VARCHAR(40) NOT NULL DEFAULT '' AFTER iban"],
+        ['be_briefkopf', 'qr_strasse',    "ALTER TABLE be_briefkopf ADD COLUMN qr_strasse VARCHAR(200) NOT NULL DEFAULT '' AFTER qr_iban"],
+        ['be_briefkopf', 'qr_hausnummer', "ALTER TABLE be_briefkopf ADD COLUMN qr_hausnummer VARCHAR(20) NOT NULL DEFAULT '' AFTER qr_strasse"],
+        ['be_briefkopf', 'qr_plz',        "ALTER TABLE be_briefkopf ADD COLUMN qr_plz VARCHAR(20) NOT NULL DEFAULT '' AFTER qr_hausnummer"],
+        ['be_briefkopf', 'qr_ort',        "ALTER TABLE be_briefkopf ADD COLUMN qr_ort VARCHAR(100) NOT NULL DEFAULT '' AFTER qr_plz"],
+        // Vertragsangaben am Mandanten (ENT-617). ALLE fuenf sind NULL-bar,
+        // und das ist eine Aussage: Ein Vertrag, zu dem nichts eingetragen
+        // ist, hat keine Laufzeit von null Monaten -- er ist unbekannt. Eine
+        // 0 als Vorgabewert wuerde "sofort kuendbar" behaupten.
+        ['mandant', 'vertrag_beginn',          "ALTER TABLE mandant ADD COLUMN vertrag_beginn DATE NULL AFTER kanton"],
+        ['mandant', 'mindestlaufzeit_monate',  "ALTER TABLE mandant ADD COLUMN mindestlaufzeit_monate INT NULL AFTER vertrag_beginn"],
+        ['mandant', 'kuendigungsfrist_monate', "ALTER TABLE mandant ADD COLUMN kuendigungsfrist_monate INT NULL AFTER mindestlaufzeit_monate"],
+        ['mandant', 'verlaengerung_monate',    "ALTER TABLE mandant ADD COLUMN verlaengerung_monate INT NULL AFTER kuendigungsfrist_monate"],
+        ['mandant', 'gekuendigt_per',          "ALTER TABLE mandant ADD COLUMN gekuendigt_per DATE NULL AFTER verlaengerung_monate"],
     ];
 }
 

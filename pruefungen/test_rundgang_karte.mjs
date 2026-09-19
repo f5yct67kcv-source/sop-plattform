@@ -257,6 +257,136 @@ check('Ein offener Punkt trägt seine Listen-Nummer als Zeichen',
     rgKartePunkteZeichnen(rgKarteDaten(rundgangAktiv.kontrollpunkte).zeigbar);
     return document.querySelector('#rgsKarte .gm-mock-marker').dataset.zeichen === '1';
   }));
+  // Gemessen am gezeichneten Zustand, nicht am Objekt: Die Marke traegt
+  // ihr Zeichen im Dokument, und genau das liest der Waechter.
+  check('KRITISCH: die gezeichneten Marken tragen dieselben Zeichen',
+    await page.evaluate(() => {
+      const soll = rgKarteDaten(rundgangAktiv.kontrollpunkte).zeigbar
+        .map(p => rgPunktZustand(p).zeichen).sort().join('|');
+      const ist = [...document.querySelectorAll('#rgsKarte [data-zeichen]')]
+        .map(e => e.dataset.zeichen).sort().join('|');
+      return soll.length > 0 && soll === ist;
+    }));
+
+// Die Durchsicht, die die native Karte sichtbar macht, darf NICHT die
+// Seite darunter freilegen. Zweimal am Gerät danebengegriffen: einmal
+// schienen die Revierdienst-Kacheln durch, einmal war gar keine Karte
+// mehr da. Gemessen statt nachgelesen -- eine CSS-Regel kann wirkungslos
+// bleiben, ohne dass etwas kaputtgeht (CLAUDE.md).
+const gemessen = await page.evaluate(() => {
+  const huelle = document.querySelector('.rgs-karte-huelle');
+  const rgs = document.getElementById('rgSeite');
+  const app = document.querySelector('.app');
+  if (!huelle || !rgs || !app) { return null; }
+  const lies = () => ({
+    huelle: getComputedStyle(huelle).backgroundColor,
+    rgs: getComputedStyle(rgs).backgroundColor,
+    app: getComputedStyle(app).visibility,
+  });
+  const ohne = lies();
+  document.body.classList.add('karte-nativ');
+  const mit = lies();
+  document.body.classList.remove('karte-nativ');
+  return { ohne, mit };
+});
+const durchsichtig = (f) => f === 'transparent' || /rgba\(0, 0, 0, 0\)/.test(f);
+check('KRITISCH: mit Durchsicht ist die Kartenhülle gemessen durchsichtig',
+  !!gemessen && !durchsichtig(gemessen.ohne.huelle) && durchsichtig(gemessen.mit.huelle));
+check('KRITISCH: und die Rundgang-Ebene ebenfalls -- sonst bleibt die Karte unsichtbar',
+  !!gemessen && !durchsichtig(gemessen.ohne.rgs) && durchsichtig(gemessen.mit.rgs));
+check('KRITISCH: dafür wird die App-Ebene ausgeblendet, sonst scheint sie durch',
+  !!gemessen && gemessen.ohne.app !== 'hidden' && gemessen.mit.app === 'hidden');
+
+// Und der Aufbau muss die Durchsicht auch wirklich einschalten. Die native
+// Karte gibt es hier nicht -- also eine Attrappe an ihrer Stelle. Ohne
+// diese Pruefung blieb das Weglassen unbemerkt: Die Regeln standen im
+// Stilblock, nur setzte sie niemand.
+// Erst die Grösse, dann die Karte. Die native Ansicht wird an die Stelle
+// des Elements gelegt, und ihre Masse werden beim Erzeugen EINMAL
+// abgelesen -- wer sie abliest, bevor die Seite fertig umgebrochen hat,
+// bekommt eine Ansicht der Grösse Null. Vom Projektinhaber gemeldet: Beim
+// Start der Runde blieb der Bildschirm schwarz, erst das Umschalten der
+// Nachtsicht brachte die Karte.
+check('KRITISCH: ein Element mit Grösse gilt als bereit',
+  await page.evaluate(async () => {
+    const el = document.getElementById('rgsKarte');
+    return el ? await rgsElementBereit(el, 300) : false;
+  }));
+check('KRITISCH: ein Element OHNE Grösse gilt nicht als bereit',
+  await page.evaluate(async () => {
+    const h = document.createElement('div');
+    document.body.appendChild(h);
+    const r = await rgsElementBereit(h, 120);
+    h.remove();
+    return r === false;
+  }));
+check('Ein Element, das gar nicht im Dokument steht, ebenfalls nicht',
+  await page.evaluate(async () => {
+    const weg = document.createElement('div');
+    return (await rgsElementBereit(weg, 120)) === false;
+  }));
+// Und der Aufbau fragt wirklich danach: Mit einem Element ohne Grösse darf
+// keine Karte entstehen, sonst waere die Prüfung oben folgenlos.
+check('KRITISCH: ohne Grösse wird gar keine native Karte gebaut',
+  await page.evaluate(async () => {
+    const merkN = window.KarteNativ, merkK = rgsNativKarte, merkE = rgsKarteEl;
+    let gebaut = false;
+    window.KarteNativ = { GoogleMap: { create: async () => { gebaut = true; return {}; } } };
+    const el = document.getElementById('rgsKarte');
+    const breite = el.style.width, hoehe = el.style.height, anz = el.style.display;
+    el.style.display = 'none';
+    rgsNativKarte = null;
+    await rgKarteNativBauen(rgKarteDaten(rundgangAktiv.kontrollpunkte), rgsKarteBauLauf);
+    el.style.display = anz; el.style.width = breite; el.style.height = hoehe;
+    window.KarteNativ = merkN; rgsNativKarte = merkK; rgsKarteEl = merkE;
+    document.body.classList.remove('karte-nativ');
+    return gebaut === false;
+  }));
+
+check('KRITISCH: der Aufbau der nativen Karte schaltet die Durchsicht ein',
+  await page.evaluate(async () => {
+    const merkN = window.KarteNativ, merkK = rgsNativKarte, merkE = rgsKarteEl;
+    const attrappe = {
+      setCamera: async () => {}, fitBounds: async () => {},
+      enableCurrentLocation: async () => {}, addCircles: async () => [],
+      removeCircles: async () => {}, destroy: async () => {},
+    };
+    window.KarteNativ = { GoogleMap: { create: async () => attrappe } };
+    document.body.classList.remove('karte-nativ');
+    const d = rgKarteDaten(rundgangAktiv.kontrollpunkte);
+    await rgKarteNativBauen(d, rgsKarteBauLauf);
+    const an = document.body.classList.contains('karte-nativ');
+    // Und der Abbau nimmt sie wieder weg -- sonst bliebe die App auf den
+    // anderen Reitern unsichtbar.
+    await rgKarteNativAbbauen();
+    const aus = !document.body.classList.contains('karte-nativ');
+    window.KarteNativ = merkN; rgsNativKarte = merkK; rgsKarteEl = merkE;
+    return an && aus;
+  }));
+
+  // Der Aufbau muss genau den Zustand herstellen, in dem der Knopf sonst
+  // wirkungslos bliebe: Die Karte gilt als STEHEND (das Element ist
+  // dasselbe wie im Dokument). Ohne das lief die Prüfung an der Sache
+  // vorbei und blieb auch dann grün, wenn der Abbau fehlte -- sie ist an
+  // ihrer eigenen Gegenprobe aufgefallen.
+  check('KRITISCH: der Schalter baut eine STEHENDE native Karte ab, damit sie neu entsteht',
+    await page.evaluate(async () => {
+      let abgebaut = false;
+      const merkK = rgsNativKarte, merkE = rgsKarteEl;
+      // Die Wahl selbst gehoert nicht dieser Pruefung: rgNachtUm schreibt
+      // sie um, und die Pruefungen danach lesen sie. Sie wird darum
+      // zurueckgestellt -- ohne das faerbte diese Pruefung der naechsten
+      // die Ausgangslage um, und die waere ohne eigenes Zutun rot.
+      const merkW = localStorage.getItem(RG_NACHT_SCHLUESSEL);
+      rgsNativKarte = { destroy: async () => { abgebaut = true; } };
+      rgsKarteEl = document.getElementById('rgsKarte');
+      try { rgNachtUm(); } catch (e) {}
+      await new Promise(r => setTimeout(r, 50));
+      rgsNativKarte = merkK; rgsKarteEl = merkE;
+      if (merkW === null) { localStorage.removeItem(RG_NACHT_SCHLUESSEL); }
+      else { localStorage.setItem(RG_NACHT_SCHLUESSEL, merkW); }
+      return abgebaut;
+    }));
 // Ein Tipp auf die Marke fuehrt in die Liste: Die Bestaetigung haengt an
 // Standortpruefung, Ersatzscan und Aufgaben-Rueckfrage -- die alle in eine
 // Kartenblase zu holen hiesse, denselben Ablauf ein zweites Mal zu bauen.
@@ -489,6 +619,11 @@ await page.waitForTimeout(700);
 const rueckrufDa = await page.evaluate(() => typeof window.gm_authFailure === 'function');
 check('KRITISCH: es gibt überhaupt einen Rückruf für den abgelehnten Schlüssel (gm_authFailure)', rueckrufDa);
 if (rueckrufDa) {
+// In der Datei auf der Platte steht immer der Platzhalter -- ersetzt wird
+// er erst beim Ausliefern. Hier geht es um die AUSGELIEFERTE Fassung mit
+// gueltigem Schluessel, bei der die Ablehnung wirklich eine Sache der
+// Freigabe beim Anbieter ist. Der andere Fall steht weiter unten.
+await page.evaluate(() => { rgsMapsSchluesselDa = true; });
 await page.evaluate(() => window.gm_authFailure());
 await page.waitForTimeout(300);
 // STEHT die Karte, wird sie NICHT zugedeckt (ENT-312). Vom Projektinhaber
@@ -612,7 +747,7 @@ check('KRITISCH: am Desktop kein waagrechter Seiten-Scroll', await page.evaluate
 // waere hier zu wenig: Es gibt nichts, worunter er stehen koennte.
 // Hier ist die Maps-Attrappe abgewiesen, es existiert also keine Karte.
 if (rueckrufDa) {
-  await page.evaluate(() => { rgsKarte = null; window.gm_authFailure(); });
+  await page.evaluate(() => { rgsMapsSchluesselDa = true; rgsKarte = null; window.gm_authFailure(); });
   await page.waitForTimeout(250);
   check('KRITISCH: ohne stehende Karte erscheint weiterhin die volle Erklärung (ENT-309)',
     await page.isVisible('#rgsKarteStand')
@@ -624,6 +759,176 @@ if (rueckrufDa) {
   ['KRITISCH: ohne stehende Karte erscheint weiterhin die volle Erklärung (ENT-309)',
    'Und der Zentrieren-Knopf verschwindet, weil es nichts zu zentrieren gibt',
   ].forEach(n => check(n + ' (nicht prüfbar: kein gm_authFailure)', false));
+}
+
+// ══════════ ABGELEHNT, WEIL GAR KEIN SCHLÜSSEL DRIN IST ═══════════════
+// Vom Projektinhaber am Geraet gemeldet: In der laufenden Runde stand die
+// graue Tafel des Anbieters, darunter unsere Meldung, die Seite sei nicht
+// freigegeben. Das stimmte nicht. Im Buendel stand noch der Platzhalter
+// __MAPS_JS_KEY__ statt eines Schluessels -- das Einsetzen beim Bauen war
+// uebersprungen worden, weil mobile/.maps-key fehlte.
+//
+// Der Anbieter meldet beides ueber denselben Rueckruf und nennt keinen
+// Grund. Unterscheiden laesst es sich nur am Schluessel selbst. Und es
+// MUSS unterschieden werden: Wer liest, die Seite sei nicht freigegeben,
+// meldet der Verwaltung eine Einstellung, die es gar nicht gibt --
+// waehrend in Wahrheit ein Schritt beim Ausliefern fehlt.
+check('KRITISCH: der Platzhalter gilt nicht als Schlüssel',
+  await page.evaluate(() => mapsSchluesselTauglich('__MAPS_JS_KEY__') === false));
+check('Ein leerer Schlüssel auch nicht',
+  await page.evaluate(() => mapsSchluesselTauglich('') === false
+    && mapsSchluesselTauglich(null) === false));
+check('KRITISCH: ein echter Schlüssel gilt',
+  await page.evaluate(() => mapsSchluesselTauglich('AIzaSyD-Beispiel_ohne_Bedeutung_123') === true));
+// Der Fall, an dem es tatsächlich gescheitert ist: Beim Einrichten landete
+// der Beispieltext aus der Anleitung im Bündel. Für die frühere Fassung
+// dieser Funktion war das ein Schlüssel -- die App baute die Karte auf,
+// Google lieferte nichts, und der Wächter las "nicht freigegeben", obwohl
+// schlicht keiner da war.
+check('KRITISCH: ein Platzhaltertext aus einer Anleitung gilt NICHT als Schlüssel',
+  await page.evaluate(() => mapsSchluesselTauglich('DER_NEUE_SCHLUESSEL') === false
+    && mapsSchluesselTauglich('HIER_DEINEN_ECHTEN_SCHLUESSEL_EINSETZEN') === false
+    && mapsSchluesselTauglich('DEINEKENNUNG') === false));
+check('Ein abgeschnittener Schlüssel gilt auch nicht',
+  await page.evaluate(() => mapsSchluesselTauglich('AIzaSyD') === false));
+
+if (rueckrufDa) {
+  await page.evaluate(() => {
+    rgsMapsSchluesselDa = false;
+    rgsKarte = null;
+    const w = document.getElementById('rgsKarteWarnung'); if (w) { w.remove(); }
+    window.gm_authFailure();
+  });
+  await page.waitForTimeout(250);
+  const t = await txt(page, '#rgsKarteStand');
+  check('KRITISCH: ohne eingesetzten Schlüssel sagt die App, dass die Karte nicht eingerichtet ist',
+    !!t && t.includes('nicht eingerichtet'));
+  check('KRITISCH: und behauptet NICHT, es sei eine Freigabe-Einstellung',
+    !!t && !t.includes('nicht freigegeben') && !t.includes('kein Fehler an deinem Gerät'));
+  check('Sie sagt trotzdem, wie es weitergeht -- Punkte im Reiter daneben, Runde läuft',
+    !!t && t.includes('Reiter daneben') && t.includes('läuft normal weiter'));
+} else {
+  ['KRITISCH: ohne eingesetzten Schlüssel sagt die App, dass die Karte nicht eingerichtet ist',
+   'KRITISCH: und behauptet NICHT, es sei eine Freigabe-Einstellung',
+   'Sie sagt trotzdem, wie es weitergeht -- Punkte im Reiter daneben, Runde läuft',
+  ].forEach(n => check(n + ' (nicht prüfbar: kein gm_authFailure)', false));
+}
+
+// ══════════ NATIVE KARTE NUR IN DER APP (ENT-609) ═════════════════════
+// In der App zeichnet das native Maps-SDK, im Browser weiterhin die
+// JavaScript-Karte. Geprüft wird die ENTSCHEIDUNG, nicht das Zeichnen --
+// die native Ansicht gibt es hier nicht, und genau darum muss sicher sein,
+// dass sie im Browser nie gewählt wird. Ein Browser, der in den nativen
+// Zweig liefe, bekäme gar keine Karte mehr.
+check('KRITISCH: im Browser wird NICHT der native Weg gewählt',
+  await page.evaluate(() => rgKarteNativMoeglich() === false));
+check('KRITISCH: und die Karte steht als gewöhnliches Element da, nicht als natives',
+  await page.evaluate(() => {
+    const el = document.getElementById('rgsKarte');
+    return !!el && el.tagName.toLowerCase() !== 'capacitor-google-map';
+  }));
+// Beide Bedingungen zählen einzeln. Nur die Hülle genügt nicht: Ohne
+// eingesetzten Schlüssel käme eine leere Karte statt einer Auskunft.
+check('KRITISCH: native Hülle allein genügt nicht -- ohne Schlüssel kein nativer Weg',
+  await page.evaluate(() => {
+    const merk = window.Capacitor;
+    window.Capacitor = { isNativePlatform: () => true };
+    try { return rgKarteNativMoeglich() === false; }
+    finally { window.Capacitor = merk; }
+  }));
+check('KRITISCH: mit Hülle UND Schlüssel wird der native Weg gewählt',
+  await page.evaluate(() => {
+    const merkC = window.Capacitor, merkP = window.mapsSchluesselTauglich;
+    window.Capacitor = { isNativePlatform: () => true };
+    window.mapsSchluesselTauglich = () => true;
+    try { return rgKarteNativMoeglich() === true; }
+    finally { window.Capacitor = merkC; window.mapsSchluesselTauglich = merkP; }
+  }));
+
+// ══════════ DIE NATIVE KARTE DARF NICHT KLEBEN ════════════════════════
+// Sie liegt nicht im Dokument: Sie verschwindet NICHT, wenn der Rumpf
+// ersetzt wird. Wer sie beim Reiterwechsel stehen lässt, hat danach eine
+// Kartenansicht über der Kontrollpunkt-Liste. Abgebaut werden muss sie an
+// jeder Stelle, durch die man die Karte verlässt.
+//
+// Hier stand vorher dasselbe für eine CSS-Klasse ("Durchsicht"). Die ist
+// entfallen -- sie war als Vermutung eingebaut worden und hat selbst einen
+// Fehler verursacht (die Seite darunter schien durch). Die Sache, um die
+// es geht, bleibt dieselbe.
+{
+  const abbauProbe = async (was) => await page.evaluate(async (w) => {
+    let abgebaut = false;
+    const merk = rgsNativKarte;
+    rgsNativKarte = { destroy: async () => { abgebaut = true; } };
+    if (w === 'raus') { rgSeiteZu(); }
+    else { rgsReiter = w; rgLaufZeichnen(); }
+    await new Promise(r => setTimeout(r, 60));
+    if (rgsNativKarte) { rgsNativKarte = merk; }
+    return abgebaut;
+  }, was);
+
+  check('KRITISCH: der Wechsel auf einen anderen Reiter baut die native Karte ab',
+    await abbauProbe('punkte'));
+  check('KRITISCH: auch der Wechsel auf die Funktionen baut sie ab',
+    await abbauProbe('funktionen'));
+  // Der Weg hinaus ist der wichtigste: Bleibt sie hier stehen, liegt sie
+  // danach über der ganzen App, nicht nur über der Runde.
+  check('KRITISCH: das Verlassen der Runde baut sie ab',
+    await abbauProbe('raus'));
+
+}
+
+// ══════════ DIE FÜLLUNG AUF DER NATIVEN KARTE (ENT-609) ═══════════════
+// Vom Projektinhaber verlangt: Der Radiuskreis füllt sich grün, bis die
+// Verweilzeit durch ist (ENT-579). Im Browser wächst ein echter
+// Kartenkreis; das native SDK kann einen bestehenden Kreis nicht ändern,
+// darum liegt die Füllung dort als Element ÜBER der Karte. Dafür muss der
+// Kontrollpunkt auf den Bildschirm gerechnet werden.
+//
+// Die Rechnung ist eine reine Funktion und wird hier gegen bekannte Werte
+// geprüft -- ohne Karte, ohne Gerät.
+{
+  // Ein Ausschnitt von genau einem Zehntelgrad in beide Richtungen auf
+  // einer Fläche von 1000 x 1000 Punkten: Dann ist die Rechnung von Hand
+  // nachvollziehbar.
+  const grenzen = { southwest: { lat: 47.0, lng: 8.0 }, northeast: { lat: 47.1, lng: 8.1 } };
+  const masse = { width: 1000, height: 1000 };
+  const mitte = await page.evaluate(([g, m]) =>
+    rgKarteNativAufSchirm(g, m, 47.05, 8.05), [grenzen, masse]);
+  check('KRITISCH: die Mitte des Ausschnitts liegt in der Mitte der Fläche',
+    !!mitte && Math.abs(mitte.x - 500) < 1 && Math.abs(mitte.y - 500) < 1);
+
+  const nordwest = await page.evaluate(([g, m]) =>
+    rgKarteNativAufSchirm(g, m, 47.1, 8.0), [grenzen, masse]);
+  // Norden ist OBEN: Die grösste Breite gehört an den oberen Rand, nicht
+  // an den unteren. Ein Vorzeichenfehler hier legte die Füllung
+  // spiegelverkehrt auf die Karte, ohne dass etwas kaputtginge.
+  check('KRITISCH: Norden liegt oben, nicht unten',
+    !!nordwest && Math.abs(nordwest.x - 0) < 1 && Math.abs(nordwest.y - 0) < 1);
+
+  const suedost = await page.evaluate(([g, m]) =>
+    rgKarteNativAufSchirm(g, m, 47.0, 8.1), [grenzen, masse]);
+  check('Und Südost in der unteren rechten Ecke',
+    !!suedost && Math.abs(suedost.x - 1000) < 1 && Math.abs(suedost.y - 1000) < 1);
+
+  // 0,1 Grad Breite sind rund 11 132 m auf 1000 Punkten -- 20 m sind also
+  // knapp zwei Punkte.
+  const zwanzig = await page.evaluate(([g, m]) =>
+    rgKarteNativMeterInPixel(g, m, 20), [grenzen, masse]);
+  check('KRITISCH: 20 Meter ergeben eine plausible Pixelgrösse',
+    zwanzig > 1.5 && zwanzig < 2.2);
+  check('Doppelte Strecke, doppelte Grösse',
+    Math.abs((await page.evaluate(([g, m]) =>
+      rgKarteNativMeterInPixel(g, m, 40), [grenzen, masse])) - 2 * zwanzig) < 0.01);
+
+  // Ohne Grenzen wird NICHTS gezeichnet: Lieber keine Füllung als eine an
+  // der falschen Stelle -- sie sagt dem Wächter, wo er stehen muss.
+  check('KRITISCH: ohne Kartengrenzen wird nichts gezeichnet',
+    await page.evaluate(() => rgKarteNativAufSchirm(null, { width: 100, height: 100 }, 47, 8) === null));
+  check('Und ein Ausschnitt ohne Ausdehnung ergibt ebenfalls nichts',
+    await page.evaluate(() => rgKarteNativAufSchirm(
+      { southwest: { lat: 47, lng: 8 }, northeast: { lat: 47, lng: 8 } },
+      { width: 100, height: 100 }, 47, 8) === null));
 }
 
 await browser.close();

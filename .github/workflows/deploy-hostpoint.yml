@@ -111,6 +111,13 @@ jobs:
           # smtp_konfiguriert() erkennt das und das Formular sagt "noch
           # nicht eingerichtet" (503), statt lautlos ueber das falsche
           # Postfach zu senden.
+          # Zeilen der persoenlichen Signatur unter Mails der Betreiberin,
+          # mit Strichpunkt getrennt (Name; Funktion; Telefon). Aus dem
+          # Deploy, weil ein Personenname nicht ins Repository gehoert
+          # (Vertraulichkeitsregel; im Impressum steht aus demselben Grund
+          # keiner). NICHT erforderlich -- fehlt der Wert, zeichnet die
+          # Firma, siehe mail_signatur() in backend/mail_vorlage.php.
+          P_MAIL_SIGNATUR: ${{ secrets.MAIL_SIGNATUR }}
           P_GUARDOPS_SMTP_HOST: ${{ secrets.GUARDOPS_SMTP_HOST }}
           P_GUARDOPS_SMTP_PORT: ${{ secrets.GUARDOPS_SMTP_PORT }}
           P_GUARDOPS_SMTP_VERSCHLUESSELUNG: ${{ secrets.GUARDOPS_SMTP_VERSCHLUESSELUNG }}
@@ -273,6 +280,7 @@ jobs:
             EFF_SMTP_VERSCHLUESSELUNG="$P_SMTP_VERSCHLUESSELUNG"
             EFF_SMTP_USER="$P_SMTP_USER"; EFF_SMTP_PASSWORD="$P_SMTP_PASSWORD"
             EFF_SMTP_ABSENDER="$P_SMTP_ABSENDER"; EFF_SMTP_ABSENDER_NAME="$P_SMTP_ABSENDER_NAME"
+            EFF_MAIL_SIGNATUR="$P_MAIL_SIGNATUR"
             EFF_ANTHROPIC_API_KEY="$P_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$P_MAPS_JS_KEY"
             EFF_STAGING_TESTMAIL=""
             EFF_DEMO_TESTMAIL=""
@@ -352,6 +360,7 @@ jobs:
             EFF_SMTP_VERSCHLUESSELUNG="$D_SMTP_VERSCHLUESSELUNG"
             EFF_SMTP_USER="$D_SMTP_USER"; EFF_SMTP_PASSWORD="$D_SMTP_PASSWORD"
             EFF_SMTP_ABSENDER="$D_SMTP_ABSENDER"; EFF_SMTP_ABSENDER_NAME="$D_SMTP_ABSENDER_NAME"
+            EFF_MAIL_SIGNATUR=""
             EFF_ANTHROPIC_API_KEY="$D_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$D_MAPS_JS_KEY"
             # KEIN Rueckfall auf die Staging-Testadresse -- eigene Demo-
             # Testadresse, eigenes Secret (siehe smtp_ziel() in mailer.php).
@@ -448,6 +457,7 @@ jobs:
             EFF_SMTP_VERSCHLUESSELUNG="$S_SMTP_VERSCHLUESSELUNG"
             EFF_SMTP_USER="$S_SMTP_USER"; EFF_SMTP_PASSWORD="$S_SMTP_PASSWORD"
             EFF_SMTP_ABSENDER="$S_SMTP_ABSENDER"; EFF_SMTP_ABSENDER_NAME="$S_SMTP_ABSENDER_NAME"
+            EFF_MAIL_SIGNATUR=""
             EFF_ANTHROPIC_API_KEY="$S_ANTHROPIC_API_KEY"; EFF_MAPS_JS_KEY="$S_MAPS_JS_KEY"
             EFF_STAGING_TESTMAIL="$S_STAGING_TESTMAIL"
             # Kein Rueckfall auf die Demo-Testadresse -- Staging und Demo
@@ -611,6 +621,7 @@ jobs:
             echo "EFF_SMTP_PASSWORD=$EFF_SMTP_PASSWORD"
             echo "EFF_SMTP_ABSENDER=$EFF_SMTP_ABSENDER"
             echo "EFF_SMTP_ABSENDER_NAME=$EFF_SMTP_ABSENDER_NAME"
+            echo "EFF_MAIL_SIGNATUR=$EFF_MAIL_SIGNATUR"
             echo "EFF_ANTHROPIC_API_KEY=$EFF_ANTHROPIC_API_KEY"
             echo "EFF_MAPS_JS_KEY=$EFF_MAPS_JS_KEY"
             echo "EFF_STAGING_TESTMAIL=$EFF_STAGING_TESTMAIL"
@@ -766,6 +777,9 @@ jobs:
           # ihn per require_once ein. Fehlt er, stirbt jeder Aufruf, der
           # betreiber.php laedt, nicht erst die Demo-Freigabe.
           cp backend/demo_zugang.php dist/demo_zugang.php
+          cp backend/mail_vorlage.php dist/mail_vorlage.php
+          cp backend/guardops-signatur.png dist/guardops-signatur.png
+          cp backend/guardops-signatur-hell.png dist/guardops-signatur-hell.png
           # Support-Freigabe (ENT-526). Wird von BEIDEN Seiten eingebunden --
           # von den support_*-Endpunkten des Betriebs und von
           # api/betreiber_support.php -- und nie direkt aufgerufen; steht
@@ -819,6 +833,20 @@ jobs:
           cp backend/lohnlauf.php dist/lohnlauf.php
           cp backend/mitteilungen.php dist/mitteilungen.php
           cp backend/push.php dist/push.php
+          # Zwei Rechenkerne, die kein Endpunkt ist und die darum leicht
+          # vergessen gehen: Sie werden nur per require_once aus
+          # backend/api/*.php gezogen. Die Endpunkte selbst kommen unten
+          # pauschal mit ("cp backend/api/*.php"), die Module hier einzeln --
+          # fehlt eines, liegt der Endpunkt live da und bricht beim
+          # require_once mit einem PHP-Fatal ab, also mit HTTP 500 und ohne
+          # verwertbare Meldung. Genau das ist mit
+          # planung_einrichten_kern.php passiert (ENT-612 lagerte den Kern
+          # aus und trug nur die betreiber-Zeile nach): Das Cockpit rief
+          # api/planung_einrichten.php bei jedem Laden still im Hintergrund
+          # auf, bekam 500, und der Einrichtungs-Punkt blieb dauerhaft grau
+          # -- "unbekannt" sah aus wie "nichts nachzutragen".
+          cp backend/planung_einrichten_kern.php dist/planung_einrichten_kern.php
+          cp backend/demo_instanz.php dist/demo_instanz.php
           # Schutzeinstellungen (ENT-075). Im Repository heisst die Datei
           # bewusst ohne fuehrenden Punkt -- sonst uebersieht man sie. Wird
           # trotzdem fuer ALLE Umgebungen hier erzeugt (auch wenn der
@@ -910,6 +938,7 @@ jobs:
           sed -i "s|__SMTP_USER__|$EFF_SMTP_USER|g" dist/mailer.php
           sed -i "s|__SMTP_PASSWORD__|$EFF_SMTP_PASSWORD|g" dist/mailer.php
           sed -i "s|__SMTP_ABSENDER__|$EFF_SMTP_ABSENDER|g" dist/mailer.php
+          sed -i "s|__MAIL_SIGNATUR__|$EFF_MAIL_SIGNATUR|g" dist/mailer.php
           sed -i "s|__SMTP_ABSENDER_NAME__|$EFF_SMTP_ABSENDER_NAME|g" dist/mailer.php
           # Empfaenger der Demo-Anfragen. Fehlt das Secret, bleibt der
           # Platzhalter stehen -- demo_empfaenger_pruefen() erkennt ihn und
@@ -1136,6 +1165,7 @@ jobs:
           sed -i "s|__SMTP_USER__|$EFF_GUARDOPS_SMTP_USER|g"               dist-guardops/mailer.php
           sed -i "s|__SMTP_PASSWORD__|$EFF_GUARDOPS_SMTP_PASSWORD|g"       dist-guardops/mailer.php
           sed -i "s|__SMTP_ABSENDER__|info@guardops.ch|g"                 dist-guardops/mailer.php
+          sed -i "s|__MAIL_SIGNATUR__||g"                 dist-guardops/mailer.php
           sed -i "s|__SMTP_ABSENDER_NAME__|GuardOpS|g"                    dist-guardops/mailer.php
           sed -i "s|__STAGING_TESTMAIL__||g"                              dist-guardops/mailer.php
           # Dieselbe Ueberlegung wie bei __STAGING_TESTMAIL__ direkt darueber:
@@ -1258,6 +1288,13 @@ jobs:
           # Betreiber-Bereich beim ersten Aufruf, nicht erst bei der
           # Demo-Freigabe.
           cp backend/demo_zugang.php   dist-betreiber/demo_zugang.php
+          # Die gemeinsame Mailgestaltung -- demo_zugang.php bindet sie selbst ein.
+          cp backend/mail_vorlage.php  dist-betreiber/mail_vorlage.php
+          # Das Logo der Signatur -- flach neben die Vorlage, die es von dort liest.
+          cp backend/guardops-signatur.png     dist-betreiber/guardops-signatur.png
+          # Die helle Fassung fuer den Dunkelmodus -- ohne sie stuende das Logo
+          # dort dunkel auf dunkel (ENT-619).
+          cp backend/guardops-signatur-hell.png dist-betreiber/guardops-signatur-hell.png
           # Der Griff in eine Demo-Instanz (ENT-600) und was er braucht.
           # demo_instanz.php bindet demo_reset.php ein, demo_reset.php
           # erwartet system_rollen() aus rechte.php (oben schon dabei), und
@@ -1311,6 +1348,12 @@ jobs:
           cp backend/belege.php        dist-betreiber/belege.php
           cp backend/kunden.php        dist-betreiber/kunden.php
           cp backend/produkte.php      dist-betreiber/produkte.php
+          # Der Zahlteil der Rechnung (ENT-616) -- derselbe Rechenkern wie
+          # auf der Mandantenseite, aus demselben Grund wie die drei oben:
+          # Eine zweite Kopie der Pruefziffern und des SPC-Aufbaus waere die
+          # Stelle, an der die beiden Seiten auseinanderlaufen, und zwar
+          # unbemerkt bis zu dem Tag, an dem eine Bank einen Code abweist.
+          cp backend/qrrechnung.php    dist-betreiber/qrrechnung.php
           # html2pdf erzeugt die PDF-Fassung einer Offerte -- im
           # Betreiber-Bereich selbst (Herunterladen/Teilen) und auf der
           # oeffentlichen Seite, die der Empfaenger am Link sieht. Beide
@@ -1401,6 +1444,7 @@ jobs:
             sed -i "s|__SMTP_USER__|$EFF_GUARDOPS_SMTP_USER|g" dist-betreiber/mailer.php
             sed -i "s|__SMTP_PASSWORD__|$EFF_GUARDOPS_SMTP_PASSWORD|g" dist-betreiber/mailer.php
             sed -i "s|__SMTP_ABSENDER__|info@guardops.ch|g" dist-betreiber/mailer.php
+            sed -i "s|__MAIL_SIGNATUR__|$EFF_MAIL_SIGNATUR|g" dist-betreiber/mailer.php
             sed -i "s|__SMTP_ABSENDER_NAME__|GuardOpS|g" dist-betreiber/mailer.php
             echo "Betreiber-Bereich: Versand ueber das eigene Postfach info@guardops.ch, Absendername GuardOpS."
           else
@@ -1561,6 +1605,7 @@ jobs:
           sed -i "s|__SMTP_USER__|$EFF_SMTP_USER|g" dist-portal/mailer.php
           sed -i "s|__SMTP_PASSWORD__|$EFF_SMTP_PASSWORD|g" dist-portal/mailer.php
           sed -i "s|__SMTP_ABSENDER__|$EFF_SMTP_ABSENDER|g" dist-portal/mailer.php
+          sed -i "s|__MAIL_SIGNATUR__||g" dist-portal/mailer.php
           sed -i "s|__SMTP_ABSENDER_NAME__|$EFF_SMTP_ABSENDER_NAME|g" dist-portal/mailer.php
           sed -i "s|__STAGING_TESTMAIL__||g" dist-portal/mailer.php
           sed -i "s|__DEMO_TESTMAIL__||g" dist-portal/mailer.php
@@ -1680,6 +1725,9 @@ jobs:
           cp backend/betreiber.php dist-cupi24/betreiber.php
           # Siehe dist/: betreiber.php braucht diesen Rechenkern (ENT-600).
           cp backend/demo_zugang.php dist-cupi24/demo_zugang.php
+          cp backend/mail_vorlage.php dist-cupi24/mail_vorlage.php
+          cp backend/guardops-signatur.png dist-cupi24/guardops-signatur.png
+          cp backend/guardops-signatur-hell.png dist-cupi24/guardops-signatur-hell.png
           cp backend/support.php dist-cupi24/support.php
           cp backend/supportvorgang.php dist-cupi24/supportvorgang.php
           cp backend/demo_anfrage.php dist-cupi24/demo_anfrage.php
@@ -1710,6 +1758,20 @@ jobs:
           cp backend/lohnlauf.php dist-cupi24/lohnlauf.php
           cp backend/mitteilungen.php dist-cupi24/mitteilungen.php
           cp backend/push.php dist-cupi24/push.php
+          # Zwei Rechenkerne, die kein Endpunkt ist und die darum leicht
+          # vergessen gehen: Sie werden nur per require_once aus
+          # backend/api/*.php gezogen. Die Endpunkte selbst kommen unten
+          # pauschal mit ("cp backend/api/*.php"), die Module hier einzeln --
+          # fehlt eines, liegt der Endpunkt live da und bricht beim
+          # require_once mit einem PHP-Fatal ab, also mit HTTP 500 und ohne
+          # verwertbare Meldung. Genau das ist mit
+          # planung_einrichten_kern.php passiert (ENT-612 lagerte den Kern
+          # aus und trug nur die betreiber-Zeile nach): Das Cockpit rief
+          # api/planung_einrichten.php bei jedem Laden still im Hintergrund
+          # auf, bekam 500, und der Einrichtungs-Punkt blieb dauerhaft grau
+          # -- "unbekannt" sah aus wie "nichts nachzutragen".
+          cp backend/planung_einrichten_kern.php dist-cupi24/planung_einrichten_kern.php
+          cp backend/demo_instanz.php dist-cupi24/demo_instanz.php
           cp htaccess-cupi24 dist-cupi24/.htaccess
           cp backend/api/*.php dist-cupi24/api/
           cp handbuch/*.php dist-cupi24/handbuch/
@@ -1757,6 +1819,7 @@ jobs:
           sed -i "s|__SMTP_USER__|$EFF_SMTP_USER|g" dist-cupi24/mailer.php
           sed -i "s|__SMTP_PASSWORD__|$EFF_SMTP_PASSWORD|g" dist-cupi24/mailer.php
           sed -i "s|__SMTP_ABSENDER__|$EFF_SMTP_ABSENDER|g" dist-cupi24/mailer.php
+          sed -i "s|__MAIL_SIGNATUR__||g" dist-cupi24/mailer.php
           sed -i "s|__SMTP_ABSENDER_NAME__|$EFF_SMTP_ABSENDER_NAME|g" dist-cupi24/mailer.php
           sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist-cupi24/demo_anfrage.php
           # Dieser Schritt laeuft ausschliesslich in Production (siehe
@@ -1835,9 +1898,17 @@ jobs:
           # mit einer leeren Zeichenkette, solange die Secrets noch nicht
           # gesetzt sind; betreiber_db() und mandant_secret() fallen dann
           # bewusst auf ihren jeweiligen Normalfall zurueck. Die Liste unten
-          # traegt darum nur noch PHPs eigene Konstante __DIR__.
+          # traegt darum PHPs eigene Konstante __DIR__ und den Schluessel der
+          # NATIVEN Karte: __MAPS_IOS_KEY__ gehoert ins App-Buendel und wird
+          # dort von aufs-handy.sh eingesetzt (ENT-609). Die Web-Fassung
+          # nimmt ihn nie in die Hand und zeichnet weiterhin mit der
+          # JavaScript-Karte; ihn hier einzusetzen hiesse, einen Schluessel
+          # zu veroeffentlichen, den die Seite gar nicht braucht. Dass der
+          # Platzhalter stehen bleibt, ist im Code abgefangen --
+          # mapsSchluesselTauglich() erkennt ihn und meldet "nicht
+          # eingerichtet" statt "nicht freigegeben".
           UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' dist-cupi24/ \
-                   | grep -v -e '^__DIR__$' \
+                   | grep -v -e '^__DIR__$' -e '^__MAPS_IOS_KEY__$' \
                    | sort -u || true)
           if [ -n "$UEBRIG" ]; then
             echo "::error::Nicht ersetzte Platzhalter im cupi24-Buendel: $UEBRIG"

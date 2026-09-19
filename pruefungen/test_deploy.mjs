@@ -858,6 +858,28 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     /__SMTP_ABSENDER__\|info@guardops\.ch\|g"\s+dist-guardops\/mailer\.php/.test(bauen)
     && /__SMTP_ABSENDER_NAME__\|GuardOpS\|g"\s+dist-guardops\/mailer\.php/.test(bauen));
 
+  // Jede Bilddatei, die die Mailvorlage LIEST, muss in jedem Bündel liegen,
+  // das die Vorlage mitnimmt. Sonst liefert mail_logo() dort null und das
+  // Logo fehlt in der Mail — sichtbar erst beim Empfänger. Dieselbe
+  // Fehlerklasse, die am 2026-09-18 den Demo-Zugang blockiert hat: eine
+  // Datei, die der Code braucht und der Deploy nicht mitnimmt.
+  //
+  // Die Dateinamen kommen aus der Vorlage selbst, nicht aus einer zweiten
+  // Liste hier — sonst liefen die beiden auseinander.
+  const vorlage = readFileSync(`${WURZEL}/backend/mail_vorlage.php`, 'utf8');
+  const bilddateien = [...vorlage.matchAll(/const MAIL_LOGO_DATEI[A-Z_]* *= *'([^']+)'/g)]
+    .map(m => m[1]);
+  check('KRITISCH: die Mailvorlage nennt ihre Bilddateien über Konstanten (sonst greift die Prüfung darunter ins Leere)',
+    bilddateien.length >= 2);
+  for (const bundle of ['dist', 'dist-betreiber', 'dist-cupi24']) {
+    const nimmtVorlage = new RegExp(`cp backend/mail_vorlage\\.php\\s+${bundle}/`).test(workflow);
+    if (!nimmtVorlage) { continue; }
+    const fehlend = bilddateien.filter(d =>
+      !new RegExp(`cp backend/${d.replace('.', '\\.')}\\s+${bundle}/`).test(workflow));
+    check(`KRITISCH: jedes Logo der Mailvorlage liegt im ${bundle}-Bündel`, fehlend.length === 0);
+    if (fehlend.length) { bad.push(`fehlt in ${bundle}: ${fehlend.join(', ')}`); }
+  }
+
   // Der Betreiber-Bereich verschickt eigene Kommunikation der Betreiberin
   // (Demo-Zugaenge, Offerten, Rechnungen) und darf dafuer nie den Absender
   // der Mandantin tragen (ENT-568/ENT-569). Genau das ist am 2026-09-18
@@ -1480,8 +1502,18 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
       ersetztJeZiel.get(ziel).add(platzhalter);
     }
     // __MANDANT_SECRETS__ wird seit OP-526 auch hier per sed ersetzt (siehe
-    // Kommentar beim betreiber-Bündel oben) -- nur noch __DIR__ bleibt aus.
-    const absichtlichCupi = /^__DIR__$/;
+    // Kommentar beim betreiber-Bündel oben). Zwei bleiben aus:
+    //   __DIR__          PHPs eigene Konstante, kein Platzhalter.
+    //   __MAPS_IOS_KEY__ der Schlüssel der NATIVEN Karte (ENT-609). Er
+    //                    gehört ins App-Bündel und wird dort von
+    //                    aufs-handy.sh eingesetzt; die Web-Fassung nimmt
+    //                    ihn nie in die Hand und zeichnet weiterhin mit
+    //                    der JavaScript-Karte. Ihn hier einzusetzen hiesse,
+    //                    einen Schlüssel zu veröffentlichen, den die Seite
+    //                    gar nicht braucht. Dass der Platzhalter stehen
+    //                    bleibt, ist im Code abgefangen:
+    //                    mapsSchluesselTauglich() erkennt ihn.
+    const absichtlichCupi = /^(__DIR__|__MAPS_IOS_KEY__)$/;
 
     const offenCupi = [];
     for (const { quelle, ziel } of textDateienCupi) {
@@ -1494,6 +1526,22 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     }
     check('KRITISCH: jeder Platzhalter in jeder Datei des cupi24-Bündels (auch über Wildcards kopierte) wird GENAU IN DIESER DATEI ersetzt oder bleibt mit Grund stehen',
       textDateienCupi.length >= 40 && offenCupi.length === 0);
+
+    // Der Deploy führt dieselbe Liste NOCH EINMAL, als eigene Prüfung im
+    // Arbeitsablauf. Das ist Absicht -- sie hält an, bevor etwas
+    // hochgeladen wird. Nur: Wer hier eine Ausnahme einträgt und dort
+    // nicht, bekommt eine grüne Regression und einen abgebrochenen Deploy.
+    // Genau so geschehen: __MAPS_IOS_KEY__ stand hier, nicht dort, und der
+    // Deploy brach nach dem Hauptbündel ab -- cupi24.guardops.ch blieb auf
+    // dem alten Stand, während alles andere schon live war.
+    {
+      const zeile = bauen.match(/dist-cupi24\/ \\\n\s*\| grep -v ([^\\\n]*)/);
+      const imDeploy = new Set(
+        [...(zeile ? zeile[1] : '').matchAll(/'\^?(__[A-Z0-9_]+__)\$?'/g)].map(m => m[1]));
+      const hier = ['__DIR__', '__MAPS_IOS_KEY__'].filter(p => absichtlichCupi.test(p));
+      check('KRITISCH: der Deploy selbst kennt dieselben Ausnahmen wie diese Prüfung',
+        !!zeile && hier.length > 0 && hier.every(p => imDeploy.has(p)));
+    }
     if (offenCupi.length) { bad.push('bricht den cupi24-Deploy: ' + offenCupi.join(', ')); }
   }
 
@@ -1596,6 +1644,380 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     const laenge = abschnitt.length - runStart;
     check(`KRITISCH: run-Block "${name}" bleibt unter ${GRENZE} Zeichen (GitHub weist zu grosse Bloecke komplett ab) -- ${laenge}`,
       laenge < GRENZE);
+  }
+}
+
+// ══════════ DER SCHLÜSSEL FÜRS HANDY (aufs-handy.sh) ══════════════════
+// Fürs Web setzt der Deploy den Schlüssel ein (oben geprüft). Fürs Handy
+// macht das aufs-handy.sh -- und das ging still durch, wenn die Datei mit
+// dem Schlüssel fehlte. Auf dem Gerät stand dann in der laufenden Runde
+// statt der Karte die graue Tafel von Google; vom Projektinhaber gemeldet.
+//
+// Geprüft wird durch AUSFÜHREN, nicht durch Lesen: Die Funktion wird aus
+// dem Skript herausgeschnitten und in einem Wegwerf-Verzeichnis auf eine
+// Kopie losgelassen. Eine Prüfung, die nur nach dem Wort "else" sucht,
+// bliebe grün, wenn der Zweig irgendwann nichts mehr sagt.
+{
+  const { mkdtempSync, writeFileSync, readFileSync: lies, rmSync } = await import('fs');
+  const { execFileSync } = await import('child_process');
+  const { tmpdir } = await import('os');
+  const { join } = await import('path');
+
+  const skript = lies(`${WURZEL}/aufs-handy.sh`, 'utf8');
+  const von = skript.indexOf('maps_schluessel_einsetzen() {');
+  const bis = skript.indexOf('\n}\n', von);
+  check('KRITISCH: das Einsetzen des Maps-Schlüssels steht als eigene, prüfbare Funktion da',
+    von !== -1 && bis !== -1);
+
+  if (von !== -1 && bis !== -1) {
+    // Die Funktion meldet über warnen() -- die gehört mit dazu, sonst
+    // prüfte man sie in einer Umgebung, die es so nie gibt.
+    const vonW = skript.indexOf('warnen() {');
+    const bisW = skript.indexOf('\n}\n', vonW);
+    check('KRITISCH: das Sammeln der Warnungen steht ebenfalls als Funktion da',
+      vonW !== -1 && bisW !== -1);
+    const fn = skript.slice(vonW, bisW + 3) + '\n' + skript.slice(von, bis + 3);
+    const lauf = (schluesselInhalt) => {
+      const ordner = mkdtempSync(join(tmpdir(), 'mapskey-'));
+      try {
+        writeFileSync(join(ordner, 'seite.html'), 'key=__MAPS_JS_KEY__ ende');
+        if (schluesselInhalt !== null) { writeFileSync(join(ordner, 'schluessel'), schluesselInhalt); }
+        const ausgabe = execFileSync('bash', ['-c',
+          fn + '\nmaps_schluessel_einsetzen "$1" "$2"', '--',
+          join(ordner, 'seite.html'), join(ordner, 'schluessel')],
+          { encoding: 'utf8' });
+        return { ausgabe, seite: lies(join(ordner, 'seite.html'), 'utf8') };
+      } finally { rmSync(ordner, { recursive: true, force: true }); }
+    };
+
+    const mit = lauf('AIzaSyD-Beispiel_ohne_Bedeutung_123\n');
+    check('KRITISCH: mit hinterlegtem Schlüssel steht er danach wirklich in der Seite',
+      mit.seite.includes('AIzaSyD-Beispiel_ohne_Bedeutung_123')
+      && !mit.seite.includes('__MAPS_JS_KEY__'));
+
+    const ohne = lauf(null);
+    check('KRITISCH: ohne hinterlegten Schlüssel bleibt der Platzhalter stehen',
+      ohne.seite.includes('__MAPS_JS_KEY__'));
+    // Der eigentliche Befund: Es darf nicht still durchgehen.
+    check('KRITISCH: und das Skript sagt es, statt stillschweigend weiterzumachen',
+      ohne.ausgabe.trim().length > 40);
+    check('Es sagt auch, WAS ausfällt -- die Karte, nicht die ganze App',
+      /Karte/i.test(ohne.ausgabe));
+    check('Und wie man es behebt',
+      ohne.ausgabe.includes('.maps-key') || /schluessel/i.test(ohne.ausgabe));
+    check('KRITISCH: die beiden Fälle sagen nicht dasselbe',
+      ohne.ausgabe.trim() !== mit.ausgabe.trim());
+
+    const leer = lauf('   \n');
+    check('KRITISCH: eine leere Schlüsseldatei gilt nicht als Schlüssel',
+      leer.seite.includes('__MAPS_JS_KEY__') && /KEINE Karte/i.test(leer.ausgabe));
+
+    // Der Fall, an dem es tatsächlich gescheitert ist: In der Anleitung
+    // stand eine fertige Befehlszeile mit einem erfundenen Wert, und genau
+    // der landete im Bündel. Weder Skript noch App sagten etwas -- für
+    // beide war "ein Schlüssel da".
+    const platzhalter = lauf('DER_NEUE_SCHLUESSEL\n');
+    check('KRITISCH: ein Platzhaltertext wird NICHT als Schlüssel eingesetzt',
+      platzhalter.seite.includes('__MAPS_JS_KEY__'));
+    check('KRITISCH: und das Skript sagt, dass es keiner ist',
+      /KEINE Karte/i.test(platzhalter.ausgabe) && /AIza/.test(platzhalter.ausgabe));
+    const zuKurz = lauf('AIzaKurz\n');
+    check('Ein abgeschnittener Schlüssel wird ebenfalls abgewiesen',
+      zuKurz.seite.includes('__MAPS_JS_KEY__') && /KEINE Karte/i.test(zuKurz.ausgabe));
+  } else {
+    ['KRITISCH: mit hinterlegtem Schlüssel steht er danach wirklich in der Seite',
+     'KRITISCH: ohne hinterlegten Schlüssel bleibt der Platzhalter stehen',
+     'KRITISCH: und das Skript sagt es, statt stillschweigend weiterzumachen',
+     'Es sagt auch, WAS ausfällt -- die Karte, nicht die ganze App',
+     'Und wie man es behebt',
+     'KRITISCH: die beiden Fälle sagen nicht dasselbe',
+     'KRITISCH: eine leere Schlüsseldatei gilt nicht als Schlüssel',
+    ].forEach(n => check(n + ' (nicht prüfbar: Funktion nicht gefunden)', false));
+  }
+}
+
+// ══════════ FÜR WELCHES ZIEL GEBAUT WIRD (aufs-handy.sh) ══════════════
+// Vom Projektinhaber gemeldet: Der Lauf brach mit "Unable to find a
+// destination matching { id:... }" ab und listete nur Simulatoren auf --
+// obwohl das iPhone angeschlossen war und Schritt 4 es eben noch gefunden
+// hatte. Apples zwei Werkzeuge führen getrennte Gerätelisten: devicectl
+// sah es, xcodebuild nicht.
+//
+// Wieder durch AUSFÜHREN geprüft, nicht durch Lesen: xcodebuild wird für
+// den Test durch ein Skript ersetzt, das einmal mit und einmal ohne das
+// Gerät antwortet.
+{
+  const { mkdtempSync, writeFileSync, chmodSync, rmSync } = await import('fs');
+  const { execFileSync } = await import('child_process');
+  const { tmpdir } = await import('os');
+  const { join } = await import('path');
+
+  const skript = readFileSync(`${WURZEL}/aufs-handy.sh`, 'utf8');
+  const von = skript.indexOf('bau_ziel_waehlen() {');
+  const bis = skript.indexOf('\n}\n', von);
+  check('KRITISCH: die Wahl des Bauziels steht als eigene, prüfbare Funktion da',
+    von !== -1 && bis !== -1);
+
+  if (von !== -1 && bis !== -1) {
+    const fn = skript.slice(von, bis + 3);
+    const KENNUNG = '00008130-000000000000000A';
+    // Was xcodebuild -showdestinations ausgibt, wenn es das Gerät NICHT
+    // sieht: nur Simulatoren und die beiden Platzhalter.
+    const OHNE = [
+      '{ platform:macOS, arch:arm64, id:00006034-000000000000001C, name:My Mac }',
+      '{ platform:iOS, id:dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder, name:Any iOS Device }',
+      '{ platform:iOS Simulator, arch:arm64, id:D30B9AE4-0000-0000-0000-000000000000, OS:26.5, name:iPhone 17 }',
+    ].join('\n');
+    const MIT = OHNE + `\n{ platform:iOS, arch:arm64, id:${KENNUNG}, name:Diensthandy }`;
+    // Der Fall, an dem der Ausweichweg beim ersten Versuch vorbeilief:
+    // xcodebuild KENNT das Gerät, kann es aber nicht bedienen und führt es
+    // darum in einer zweiten Liste unter "Ineligible destinations". Wer
+    // beide zusammen durchsucht, findet es -- und baut trotzdem ins Leere.
+    const UNBRAUCHBAR = OHNE
+      + '\n\nIneligible destinations for the "App" scheme:'
+      + `\n{ platform:iOS, id:${KENNUNG}, name:Diensthandy, error:Diensthandy is busy }`;
+
+    const lauf = (liste, kennung) => {
+      const ordner = mkdtempSync(join(tmpdir(), 'bauziel-'));
+      try {
+        const stub = join(ordner, 'xcodebuild');
+        writeFileSync(stub, `#!/bin/sh\ncat <<'ENDE'\n${liste}\nENDE\n`);
+        chmodSync(stub, 0o755);
+        return execFileSync('bash', ['-c',
+          fn + '\nbau_ziel_waehlen "$1" -project irgendwas -scheme App', '--', kennung],
+          { encoding: 'utf8', env: { ...process.env, PATH: `${ordner}:${process.env.PATH}` } }).trim();
+      } finally { rmSync(ordner, { recursive: true, force: true }); }
+    };
+
+    check('KRITISCH: sieht xcodebuild das Gerät, wird für genau dieses gebaut',
+      lauf(MIT, KENNUNG) === `id=${KENNUNG}`);
+    // Der eigentliche Befund: Vorher stand hier fest "id=<UDID>", und der
+    // Lauf brach ab, statt auszuweichen.
+    check('KRITISCH: sieht es xcodebuild NICHT, wird allgemein für iOS gebaut statt abgebrochen',
+      lauf(OHNE, KENNUNG) === 'generic/platform=iOS');
+    check('KRITISCH: ohne bekannte Gerätekennung ebenfalls allgemein für iOS',
+      lauf(MIT, '') === 'generic/platform=iOS');
+    // Ein Simulator darf die Wahl nie gewinnen -- sonst landet die App
+    // nicht auf dem Telefon, und das fiele erst beim Installieren auf.
+    check('KRITISCH: ein Gerät unter "Ineligible destinations" gilt NICHT als brauchbar',
+      lauf(UNBRAUCHBAR, KENNUNG) === 'generic/platform=iOS');
+    check('KRITISCH: das Ergebnis ist nie ein Simulator',
+      !lauf(OHNE, KENNUNG).includes('Simulator') && !lauf(MIT, KENNUNG).includes('Simulator'));
+  } else {
+    ['KRITISCH: sieht xcodebuild das Gerät, wird für genau dieses gebaut',
+     'KRITISCH: sieht es xcodebuild NICHT, wird allgemein für iOS gebaut statt abgebrochen',
+     'KRITISCH: ohne bekannte Gerätekennung ebenfalls allgemein für iOS',
+     'KRITISCH: ein Gerät unter "Ineligible destinations" gilt NICHT als brauchbar',
+     'KRITISCH: das Ergebnis ist nie ein Simulator',
+    ].forEach(n => check(n + ' (nicht prüfbar: Funktion nicht gefunden)', false));
+  }
+}
+
+// ══════════ WELCHES iPHONE GENOMMEN WIRD (aufs-handy.sh) ══════════════
+// devicectl führt eine Spalte "State": "connected" heisst erreichbar,
+// "available (paired)" heisst nur bekannt -- das Telefon war schon einmal
+// da. Vom Projektinhaber gemeldet: Der Bau lief durch, und erst das
+// Installieren fiel um mit "CoreDeviceService was unable to locate a
+// device". Die Zeile stand in der Liste, erreichbar war das Gerät nicht.
+//
+// Auch hier durch AUSFÜHREN geprüft: die Funktion bekommt echte
+// Tabellenausgaben zu lesen.
+{
+  const { execFileSync } = await import('child_process');
+  const skript = readFileSync(`${WURZEL}/aufs-handy.sh`, 'utf8');
+  const von = skript.indexOf('geraet_waehlen() {');
+  const bis = skript.indexOf('\n}\n', von);
+  check('KRITISCH: die Wahl des iPhones steht als eigene, prüfbare Funktion da',
+    von !== -1 && bis !== -1);
+
+  if (von !== -1 && bis !== -1) {
+    const fn = skript.slice(von, bis + 3);
+    const KOPF = 'Name  Hostname  Identifier  State  Model';
+    const lauf = (tabelle) => execFileSync('bash',
+      ['-c', fn + '\ngeraet_waehlen'],
+      { encoding: 'utf8', input: tabelle }).trim();
+
+    const NUR_BEKANNT = `${KOPF}
+iPhone A  a.coredevice.local  AAAAAAAA-0000-0000-0000-000000000001  available (paired)  iPhone17,1`;
+    const BEIDE = `${KOPF}
+iPhone A  a.coredevice.local  AAAAAAAA-0000-0000-0000-000000000001  available (paired)  iPhone14,2
+iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  iPhone17,1`;
+
+    // Der eigentliche Befund: Vorher gewann schlicht die erste Zeile.
+    check('KRITISCH: steht ein verbundenes Gerät weiter unten, gewinnt trotzdem es',
+      lauf(BEIDE).startsWith('BBBBBBBB-0000-0000-0000-000000000002'));
+    check('KRITISCH: und sein Zustand wird mitgeführt, nicht weggeworfen',
+      lauf(BEIDE).includes('connected'));
+    // Ein nur bekanntes Gerät bleibt brauchbar -- es kann inzwischen
+    // wieder angesteckt sein. Aber der Zustand muss mitkommen, sonst
+    // sieht "bekannt" wie "verbunden" aus (CLAUDE.md).
+    check('KRITISCH: ist keines verbunden, wird das bekannte genommen -- mit seinem Zustand',
+      lauf(NUR_BEKANNT).startsWith('AAAAAAAA-0000-0000-0000-000000000001')
+      && lauf(NUR_BEKANNT).includes('available (paired)'));
+    check('KRITISCH: die Kopfzeile der Tabelle gilt nicht als Gerät',
+      lauf(KOPF) === '');
+    check('Eine leere Liste ergibt nichts, statt etwas zu erfinden',
+      lauf('') === '');
+  } else {
+    ['KRITISCH: steht ein verbundenes Gerät weiter unten, gewinnt trotzdem es',
+     'KRITISCH: und sein Zustand wird mitgeführt, nicht weggeworfen',
+     'KRITISCH: ist keines verbunden, wird das bekannte genommen -- mit seinem Zustand',
+     'KRITISCH: die Kopfzeile der Tabelle gilt nicht als Gerät',
+     'Eine leere Liste ergibt nichts, statt etwas zu erfinden',
+    ].forEach(n => check(n + ' (nicht prüfbar: Funktion nicht gefunden)', false));
+  }
+}
+
+// ══════════ WAS GIT NICHT KENNT, BLEIBT LIEGEN (aufs-handy.sh) ════════
+// Zweimal echten Schaden angerichtet: Das Skript legte vor dem Pull alles
+// in den Stash, auch unversionierte Dateien ("git stash push -u"). Damit
+// verschwanden die Xcode-Team-Einstellung des Projektinhabers und später
+// seine frisch angelegte Datei mit dem Maps-Schlüssel. Beide standen in
+// .gitignore -- aber der Eintrag kam erst mit dem Stand, der gerade geholt
+// werden sollte. Vor dem Pull waren sie für Git gewöhnliche unversionierte
+// Dateien.
+//
+// Geprüft in einem echten Wegwerf-Repository, nicht am Quelltext: Eine
+// Prüfung, die nach "-u" sucht, bliebe grün, sobald jemand dasselbe anders
+// schreibt.
+{
+  const { mkdtempSync, writeFileSync, existsSync: da, rmSync } = await import('fs');
+  const { execFileSync } = await import('child_process');
+  const { tmpdir } = await import('os');
+  const { join } = await import('path');
+
+  const skript = readFileSync(`${WURZEL}/aufs-handy.sh`, 'utf8');
+  const von = skript.indexOf('lokale_aenderungen_sichern() {');
+  const bis = skript.indexOf('\n}\n', von);
+  check('KRITISCH: das Beiseitelegen steht als eigene, prüfbare Funktion da',
+    von !== -1 && bis !== -1);
+
+  if (von !== -1 && bis !== -1) {
+    const fn = skript.slice(von, bis + 3);
+    const ordner = mkdtempSync(join(tmpdir(), 'stash-'));
+    try {
+      const sh = (befehl) => execFileSync('bash', ['-c', befehl],
+        { cwd: ordner, encoding: 'utf8', env: { ...process.env,
+          GIT_AUTHOR_NAME: 'p', GIT_AUTHOR_EMAIL: 'p@example.invalid',
+          GIT_COMMITTER_NAME: 'p', GIT_COMMITTER_EMAIL: 'p@example.invalid' } });
+      sh('git init -q . && git commit -q --allow-empty -m start');
+      writeFileSync(join(ordner, 'verwaltet.txt'), 'eins\n');
+      sh('git add verwaltet.txt && git commit -q -m dazu');
+      // Eine geänderte verwaltete Datei -- die SOLL beiseite.
+      writeFileSync(join(ordner, 'verwaltet.txt'), 'zwei\n');
+      // Und eine von Hand angelegte, die Git noch nicht kennt -- wie der
+      // Schlüssel, bevor der Eintrag in .gitignore da war.
+      writeFileSync(join(ordner, '.maps-ios-key'), 'GEHEIM\n');
+
+      sh(fn + '\nlokale_aenderungen_sichern');
+
+      check('KRITISCH: eine von Hand angelegte Datei überlebt das Beiseitelegen',
+        da(join(ordner, '.maps-ios-key')));
+      // Die eigentliche Aufgabe muss trotzdem erledigt sein, sonst hätte
+      // man den Fehler nur gegen einen anderen getauscht.
+      check('KRITISCH: die geänderte verwaltete Datei liegt trotzdem im Stash',
+        sh('git stash list').trim().length > 0
+        && sh('cat verwaltet.txt').trim() === 'eins');
+      check('Und sie lässt sich zurückholen',
+        (sh('git stash pop >/dev/null 2>&1; cat verwaltet.txt')).trim() === 'zwei');
+    } finally { rmSync(ordner, { recursive: true, force: true }); }
+  } else {
+    ['KRITISCH: eine von Hand angelegte Datei überlebt das Beiseitelegen',
+     'KRITISCH: die geänderte verwaltete Datei liegt trotzdem im Stash',
+     'Und sie lässt sich zurückholen',
+    ].forEach(n => check(n + ' (nicht prüfbar: Funktion nicht gefunden)', false));
+  }
+}
+
+// ── Rapport-Tool (dist/) und cupi24 (dist-cupi24/): jede eingebundene
+// Backend-Datei muss mit ─────────────────────────────────────────────────
+//
+// ANLASS (2026-09-18, live auf cupi24.guardops.ch): api/planung_einrichten.php
+// zieht seit ENT-612 planung_einrichten_kern.php nach. Die cp-Zeile dafuer
+// entstand nur fuer dist-betreiber/. Auf cupi24 lag der Endpunkt also da,
+// das Modul nicht -- require_once brach mit einem PHP-Fatal ab, also HTTP
+// 500. Das Cockpit ruft den Endpunkt bei jedem Laden still im Hintergrund
+// auf (pruefeUpdate), fing den Fehler mit einem leeren catch ab, und der
+// Einrichtungs-Punkt blieb dauerhaft grau: "unbekannt" sah aus wie "nichts
+// nachzutragen".
+//
+// Dieselbe Pruefung gibt es fuer dist-guardops, dist-betreiber und
+// dist-portal bereits -- ausgerechnet fuer diese beiden Buendel nicht.
+// Dabei sind sie die gefaehrdetsten: Sie liefern ALLE Endpunkte pauschal
+// aus ("cp backend/api/*.php"), die Module dagegen namentlich. Jede neue
+// Backend-Datei faellt hier also von selbst durchs Raster, waehrend ihr
+// Aufrufer live geht.
+//
+// Geprueft wird die AUSSAGE (das Modul liegt im Buendel), nicht der
+// Wortlaut einer bestimmten cp-Zeile: Die noetigen Module werden aus den
+// require-Zeilen der Endpunkte gelesen, transitiv, nicht aufgezaehlt.
+{
+  const schritt = (name) => {
+    const i = workflow.indexOf(`- name: ${name}`);
+    if (i < 0) { return ''; }
+    const j = workflow.indexOf('\n      - name:', i + 10);
+    return workflow.slice(i, j < 0 ? undefined : j);
+  };
+
+  // Transitiv, nicht nur die direkten Einbindungen: db.php zieht
+  // seinerseits weiter, und genau solche Ketten sind hier schon einmal
+  // gerissen. Ein Modul, das es gar nicht gibt, wird uebersprungen -- das
+  // faengt eine andere Pruefung ab, nicht diese.
+  const transitiveModule = (startPfade) => {
+    const gefunden = new Set();
+    const zuLesen = [...startPfade];
+    const gelesen = new Set();
+    while (zuLesen.length) {
+      const pfad = zuLesen.shift();
+      if (gelesen.has(pfad)) { continue; }
+      gelesen.add(pfad);
+      const voll = `${WURZEL}/backend/${pfad}`;
+      if (!existsSync(voll)) { continue; }
+      for (const m of readFileSync(voll, 'utf8')
+        .matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g)) {
+        gefunden.add(m[1]);
+        zuLesen.push(m[1]);
+      }
+    }
+    return gefunden;
+  };
+
+  // Beide Buendel liefern JEDEN Endpunkt aus -- darum ist hier auch jeder
+  // Endpunkt der Ausgangspunkt, nicht nur eine Praefix-Auswahl wie in den
+  // schlanken Buendeln oben.
+  const alleEndpunkte = readdirSync(`${WURZEL}/backend/api`).filter(f => f.endsWith('.php'));
+  const noetigeModule = [...transitiveModule(alleEndpunkte.map(e => `api/${e}`))];
+
+  const BUENDEL = [
+    { ordner: 'dist',        text: schritt('Platzhalter durch echte Werte ersetzen'),                    name: 'Rapport-Tool-Bündel' },
+    { ordner: 'dist-cupi24', text: schritt('Rapport-Tool-Buendel fuer cupi24.guardops.ch bauen'),        name: 'cupi24-Bündel' },
+  ];
+
+  for (const { ordner, text, name } of BUENDEL) {
+    const ziele = new Set([...text.matchAll(/^\s*cp\s+\S+\s+(\S+\.php)\s*$/gm)].map(m => m[1]));
+    const fehlend = noetigeModule.filter(m => !ziele.has(`${ordner}/${m}`));
+    check(`KRITISCH: jede Datei, die ein Endpunkt transitiv einbindet, liegt im ${name}`,
+      noetigeModule.length >= 20 && fehlend.length === 0);
+    if (fehlend.length) { bad.push(`Einbindung fehlt im ${name}: ` + fehlend.join(', ')); }
+  }
+
+  // Und was neu mitgeliefert wird, muss auch gegen den direkten Abruf
+  // gesperrt sein. Fuer cupi24 und die schlanken Buendel gibt es diese
+  // Pruefung schon; fuer dist/ (htaccess-hostpoint) fehlte sie -- dieselbe
+  // Luecke wie oben, nur an der anderen Datei. Ein Modul, das man per URL
+  // aufrufen kann, ist keine Sperre, sondern eine Einladung.
+  {
+    const bauen = schritt('Platzhalter durch echte Werte ersetzen');
+    const ht = readFileSync(`${WURZEL}/htaccess-hostpoint`, 'utf8');
+    const gesperrt = new Set((ht.match(/<FilesMatch "\^\(([a-z_|]+)\)\\\.php\$">/) || [])[1]?.split('|') ?? []);
+    const mitgeliefertePhp = [...bauen.matchAll(/^\s*cp\s+\S+\s+(dist\/\S+\.php)\s*$/gm)]
+      .map(m => m[1])
+      .filter(z => !z.startsWith('dist/api/'))
+      .map(z => z.replace('dist/', '').replace(/\.php$/, ''));
+    const ungeschuetzt = mitgeliefertePhp.filter(m => !gesperrt.has(m));
+    check('KRITISCH: die .htaccess des Rapport-Tools sperrt jede mitgelieferte Backend-Hilfsdatei gegen direkten Abruf',
+      mitgeliefertePhp.length >= 15 && ungeschuetzt.length === 0);
+    if (ungeschuetzt.length) { bad.push('ungeschützt im Rapport-Tool-Bündel: ' + ungeschuetzt.join(', ')); }
   }
 }
 

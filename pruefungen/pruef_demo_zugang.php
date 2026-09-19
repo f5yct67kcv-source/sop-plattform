@@ -176,6 +176,103 @@ $boes = demo_zugang_mail('<b>Muster</b>', 'X', 'https://demo1.guardops.ch',
 $pruef('KRITISCH: ein Firmenname wird im HTML-Teil maskiert, nicht eingebaut',
     !str_contains($boes['html'], '<b>Muster</b>') && str_contains($boes['html'], '&lt;b&gt;'));
 
+// ── Die Signatur (ENT-569, Nachtrag 2026-09-18) ──────────────────────
+//
+// KEIN PERSONENNAME IM REPOSITORY (Vertraulichkeitsregel in CLAUDE.md; im
+// Impressum steht aus demselben Grund bewusst keiner). Die Zeilen kommen
+// aus dem Deploy. Geprueft wird die Aussage, nicht der Wortlaut: Was
+// hereingereicht wird, steht in der Mail -- und ist nichts hinterlegt,
+// zeichnet die Firma, statt dass ein leerer Gruss oder ein Platzhalter
+// beim Interessenten ankommt.
+$mitName = mail_signatur(['A. Beispiel', 'Funktion', '+41 00 000 00 00']);
+$pruef('KRITISCH: die uebergebene Signatur steht in der Mail',
+    str_contains($mitName, 'A. Beispiel') && str_contains($mitName, 'Funktion')
+    && str_contains($mitName, '+41 00 000 00 00'));
+$ohneName = mail_signatur([]);
+$pruef('KRITISCH: ohne hinterlegte Signatur zeichnet die Firma, nicht niemand',
+    str_contains($ohneName, 'pzu consulting gmbh')
+    && str_contains($ohneName, 'Mit freundlichen Grüssen'));
+$pruef('leere Zeilen fallen weg, statt als Luecke zu erscheinen',
+    !str_contains(mail_signatur(['A. Beispiel', '', '  ']), '<br>'));
+// Der Grussblock der Mail darf den Namen NICHT selbst mitbringen.
+$quelle = (string)file_get_contents(dirname(__DIR__) . '/backend/demo_zugang.php');
+$pruef('KRITISCH: die Mail holt die Signatur aus dem Deploy, statt sie im Quelltext zu fuehren',
+    str_contains($quelle, 'mail_signatur_zeilen()'));
+
+// ── Das Logo in der Signatur (ENT-619) ───────────────────────────────
+//
+// Eingebettet, nicht verlinkt: Outlook und die meisten Programme laden ein
+// extern verlinktes Bild erst auf Erlaubnis -- bis dahin stuende unter der
+// Unterschrift ein leerer Rahmen.
+$pruef('KRITISCH: jedes Logo wird als Bild MITGEGEBEN, nicht von aussen nachgeladen',
+    count($mail['bilder']) === 2
+    && array_filter($mail['bilder'], fn($b) => ($b['inhalt'] ?? '') === '') === []
+    && !preg_match('/<img[^>]+src="https?:/', $mail['html']));
+$pruef('KRITISCH: das HTML spricht jede mitgegebene Kennung an',
+    array_filter($mail['bilder'],
+        fn($b) => !str_contains($mail['html'], 'cid:' . $b['cid'])) === []);
+// Zwei Fassungen, damit im Dunkelmodus nicht Dunkel auf Dunkel steht.
+// Genau so kam die Mail beim Projektinhaber an (2026-09-19).
+$pruef('KRITISCH: es gibt eine helle und eine dunkle Fassung, nicht zweimal dieselbe',
+    ($mail['bilder'][0]['inhalt'] ?? '') !== ($mail['bilder'][1]['inhalt'] ?? ''));
+// Sichtbar ist immer genau eine: die helle steht auf display:none und
+// wird erst im Dunkelmodus eingeblendet.
+$pruef('KRITISCH: im hellen Modus ist nur die dunkle Fassung sichtbar',
+    preg_match('/class="logo-hell"[^>]*style="display:none/', $mail['html']) === 1
+    && preg_match('/class="logo-dunkel"[^>]*style="display:block/', $mail['html']) === 1);
+$pruef('KRITISCH: der Dunkelmodus tauscht beide Fassungen wirklich gegeneinander',
+    preg_match('/@media \(prefers-color-scheme: dark\)[\s\S]*'
+        . '\.logo-dunkel \{ display:none/', $mail['html']) === 1
+    && preg_match('/@media \(prefers-color-scheme: dark\)[\s\S]*'
+        . '\.logo-hell \{ display:block/', $mail['html']) === 1);
+// Ein cid-Verweis ohne Bild dahinter zeigt ein zerbrochenes Bild.
+$pruef('KRITISCH: ohne Bilddatei steht auch kein Verweis darauf in der Mail',
+    (mail_logo() === null) === (!str_contains($mail['html'], 'cid:')));
+// Die Klartextfassung hat kein Bild und darf es auch nicht vortaeuschen.
+$pruef('die Klartextfassung traegt keinen Bildverweis',
+    !str_contains($mail['text'], 'cid:') && !str_contains($mail['text'], '<img'));
+
+// ── Die gemeinsame Gestaltung ────────────────────────────────────────
+$pruef('KRITISCH: die Mail traegt Marke und Angaben der Betreiberin, nicht die der Mandantin',
+    str_contains($mail['html'], 'GuardOpS')
+    && str_contains($mail['html'], 'pzu consulting gmbh')
+    && str_contains($mail['html'], 'info@guardops.ch'));
+// Die Marke steht EINMAL da. Mit dem Logo in der Signatur waere ein
+// getippter Schriftzug im Kopf eine zweite, schlechtere Fassung derselben
+// Marke -- eine Geschaeftsmail aus Outlook hat darum keinen Briefkopf.
+$pruef('KRITISCH: kein Briefkopf-Balken neben dem Logo -- die Marke steht nicht zweimal da',
+    !str_contains($mail['html'], 'background:#14161A'));
+// Hausregel: Ueberschrift oben, Wert darunter -- auch hier, nicht nur in
+// der Oberflaeche. Geprueft ueber die Reihenfolge im Quelltext, weil genau
+// das die Aussage ist.
+// (Die Versalien entstehen per text-transform, im Quelltext steht
+// "Passwort" -- darum wird hier danach gesucht und nicht nach "PASSWORT".)
+$pruef('KRITISCH: die Beschriftung steht vor ihrem Wert, nicht daneben oder darunter',
+    strpos($mail['html'], '>Passwort<') !== false
+    && strpos($mail['html'], '>Passwort<') < strpos($mail['html'], 'AbcDefGhiJkm'));
+// Ein Stylesheet im Kopf wird von Mailprogrammen regelmaessig entfernt.
+// Es gibt genau einen, und er traegt AUSSCHLIESSLICH den Dunkelmodus --
+// faellt er weg, bleibt die Mail vollstaendig gestaltet, nur eben hell.
+$stil = (string)(preg_match('/<style>(.*?)<\/style>/s', $mail['html'], $t) ? $t[1] : '');
+$pruef('KRITISCH: die Gestaltung haengt an Inline-Styles, nicht am Stylesheet',
+    str_contains($mail['html'], 'style="')
+    && substr_count($mail['html'], '<style') === 1
+    && str_starts_with(trim($stil), '@media (prefers-color-scheme: dark)'));
+// Gegenprobe im Kleinen: Ohne den Block darf keine Farbe und keine
+// Flaeche verschwinden -- alles Sichtbare steht auch inline.
+$ohneStil = (string)preg_replace('/<style>.*?<\/style>/s', '', $mail['html']);
+// Geprueft wird jedes gefaerbte Element einzeln, nicht ob eine Farbe
+// irgendwo noch vorkommt: Ein Link ohne eigene Farbe faellt sonst auf das
+// Standardblau des Mailprogramms zurueck, und im Dunkelmodus auf eine
+// Farbe, die auf dunklem Grund kaum lesbar ist.
+preg_match_all('/<a [^>]*>/', $ohneStil, $links);
+$ohneFarbe = array_values(array_filter($links[0],
+    fn($a) => !preg_match('/style="[^"]*color:#/', $a)));
+$pruef('KRITISCH: ohne den Stylesheet-Block traegt jeder Link seine Farbe selbst',
+    $links[0] !== [] && $ohneFarbe === []);
+$pruef('KRITISCH: ohne den Stylesheet-Block bleiben Textfarbe und Flaeche erhalten',
+    str_contains($ohneStil, MAIL_FARBE_TEXT) && str_contains($ohneStil, MAIL_FARBE_FLAECHE));
+
 // ── Formhelfer der Selbstbedienung (ENT-601) ─────────────────────────
 $pruef('das Fallenfeld erkennt eine gefuellte Falle',
     demo_zugang_ist_falle(['website' => 'irgendwas']));
