@@ -61,53 +61,37 @@ function plaetzeAusWorkflow(text) {
 // passiert.)
 function offenePlatzhalter(text) {
   const b = platzBlock(text);
-  const quellen = [...text.matchAll(/^\s*cp\s+(\S+)\s+dist\/\S*\s*$/gm)].map(m => m[1]);
+  // Quelle UND Ziel aus derselben cp-Zeile: Der Deploy flacht backend/ in
+  // dist/ ab, api/ bleibt ein Unterordner. Wer das nachbaut statt es
+  // abzulesen, liegt beim naechsten Sonderfall daneben.
+  const zeilen = [...text.matchAll(/^\s*cp\s+(\S+)\s+(dist\/\S*)\s*$/gm)]
+    .map(m => ({ quelle: m[1], ziel: m[2] }));
   const offen = new Set();
-  for (const q of quellen) {
+  for (const { quelle, ziel } of zeilen) {
     // Glob-Zeilen (backend/api/*.php) und fehlende Dateien uebergehen --
     // die deckt die Wache im Deploy ab; hier geht es um die benannten.
-    if (q.includes('*')) { continue; }
+    if (quelle.includes('*') || ziel.endsWith('/')) { continue; }
     let inhalt;
-    try { inhalt = readFileSync(`${WURZEL}/${q}`, 'utf8'); } catch { continue; }
+    try { inhalt = readFileSync(`${WURZEL}/${quelle}`, 'utf8'); } catch { continue; }
+    // JE DATEI, nicht je Platzhalter: Derselbe Platzhalter kann in
+    // mehreren Dateien stehen (seit ENT-622 etwa __DEMO_EMPFAENGER__ in
+    // demo_anfrage.php UND demo_zugang.php). Eine Pruefung, die nur
+    // fragt, ob er irgendwo ersetzt wird, laesst die zweite Datei durch
+    // -- genau daran ist der Lauf vom 2026-09-19 gescheitert, obwohl
+    // diese Suite gruen war.
+    const zielImPlatz = ziel.replace(/^dist\//, 'dist-demo/$PLATZ/');
     for (const t of inhalt.match(/__[A-Z0-9_]{3,}__/g) || []) {
       // PHPs eigene Konstante und der Schluessel der NATIVEN Karte
       // (ENT-609, gehoert ins App-Buendel) -- dieselben zwei Ausnahmen
       // wie im Waechter des Deploys.
       if (t === '__DIR__' || t === '__MAPS_IOS_KEY__') { continue; }
-      if (!b.includes(`ersetze ${t} `)) { offen.add(t); }
+      if (!b.includes(`ersetze ${t} "`) || !b.includes(`"${zielImPlatz}"`)
+          || !new RegExp(`ersetze ${t} "[^\n]*" "${zielImPlatz.replace(/[$/.]/g, '\\$&')}"`).test(b)) {
+        offen.add(`${t} in ${ziel}`);
+      }
     }
   }
-  return { offen: [...offen], quellen: quellen.length };
-}
-
-// Dieselbe Frage, aber JE DATEI (Befund am Deploy-Lauf 590, 2026-09-19).
-//
-// Die Pruefung darueber fragt nur, ob ein Platzhalter IRGENDWO im Block
-// ersetzt wird. __DEMO_EMPFAENGER__ wurde das -- fuer demo_anfrage.php --,
-// und demo_zugang.php behielt ihn trotzdem. Die Suite blieb gruen, der
-// Deploy fiel um. Eine Ersetzung gilt nur fuer die Datei, die dahinter
-// steht; also wird auch so geprueft.
-function offenePaare(text) {
-  const b = platzBlock(text);
-  // "ersetze <TOKEN> <wert> "dist-demo/$PLATZ/<ziel>"" -- der Wert kann
-  // leer, in Anfuehrungszeichen oder eine Variable sein.
-  const ersetzt = new Set();
-  for (const m of b.matchAll(
-      /ersetze\s+(__[A-Z0-9_]+__)\s+(?:"[^"]*"|\S+)\s+"dist-demo\/\$PLATZ\/([^"]+)"/g)) {
-    ersetzt.add(`${m[1]}|${m[2]}`);
-  }
-  const offen = [];
-  for (const m of text.matchAll(/^\s*cp\s+(\S+)\s+dist\/(\S+)\s*$/gm)) {
-    const [, quelle, ziel] = m;
-    if (quelle.includes('*') || ziel.includes('*')) { continue; }
-    let inhalt;
-    try { inhalt = readFileSync(`${WURZEL}/${quelle}`, 'utf8'); } catch { continue; }
-    for (const t of new Set(inhalt.match(/__[A-Z0-9_]{3,}__/g) || [])) {
-      if (t === '__DIR__' || t === '__MAPS_IOS_KEY__') { continue; }
-      if (!ersetzt.has(`${t}|${ziel}`)) { offen.push(`${ziel}: ${t}`); }
-    }
-  }
-  return offen;
+  return { offen: [...offen], quellen: zeilen.length };
 }
 
 const PRUEFUNGEN = {
@@ -259,15 +243,6 @@ const PRUEFUNGEN = {
   jeder_platzhalter_eingesetzt(text) {
     const { offen, quellen } = offenePlatzhalter(text);
     return offen.length === 0 && quellen > 20;
-  },
-
-  // Und dieselbe Frage JE DATEI. Die Pruefung darueber blieb gruen,
-  // waehrend der Deploy-Lauf 590 an genau diesem Loch zerbrach:
-  // __DEMO_EMPFAENGER__ wurde fuer demo_anfrage.php ersetzt, und
-  // demo_zugang.php -- das ihn seit ENT-622 ebenfalls traegt -- behielt
-  // ihn. Eine Ersetzung gilt nur fuer die Datei, die dahinter steht.
-  jede_datei_einzeln_ersetzt(text) {
-    return offenePaare(text).length === 0;
   },
 
   // Kein uebersehener Platzhalter geht hoch -- dieselbe Wache wie bei den
