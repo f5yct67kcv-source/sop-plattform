@@ -2665,6 +2665,11 @@ const W = {
     abGrundHinweis: 'Ohne Grund bleibt in der Auswertung „nicht möglich“ stehen — und niemand weiss, was zu tun ist.',
     abGrundPflicht: 'Bitte einen Grund angeben.',
     abSenden: 'Bestätigen',
+    // Aus der unmoeglichen Aufgabe heraus melden (ENT-621)
+    abMitFoto: 'Mit Foto melden',
+    abMitFotoHinweis: 'Zeigt dem Kunden, was los ist — die Antwort wird dabei gespeichert.',
+    evBezugTitel: 'Bezug',
+    evBezugAufgabe: 'Aufgabe „{a}“ am Kontrollpunkt „{k}“ war nicht möglich.',
     abOffen: 'Aufgabe offen',
     abOffenMehr: 'Aufgaben offen',
     abFertig: 'Alle Aufgaben beantwortet',
@@ -5930,6 +5935,11 @@ let evFoto = null;      // komprimiertes Foto (data: URL), bis gemeldet wird
    beim Zeichnen eines neuen Formulars und nach dem Erfolg. */
 let evLetzteKennung = null;
 let evObjekt = null;    // { id, name } des Objekts, zu dem gemeldet wird
+/* Worauf sich die Meldung bezieht (ENT-621) -- gesetzt, wenn sie aus einer
+   Aufgabe heraus entsteht, die nicht erledigt werden konnte. Sonst null,
+   und das ist der Normalfall: Die meisten Meldungen haengen an keiner
+   Aufgabe. */
+let evBezug = null;
 
 function evWarteschlangeLesen() {
   try { return JSON.parse(localStorage.getItem(EV_WARTESCHLANGE) || '[]'); } catch { return []; }
@@ -6077,11 +6087,14 @@ function afOeffnen() {
     }).join('')}`;
 }
 
-function evOeffnen() {
+function evOeffnen(bezug) {
   if (!$('rgSeite').classList.contains('on')) return;
   rgsAnsicht = 'ereignis';
   rgUnterseiteAn();
   evFoto = null;
+  // Ohne Angabe ausdruecklich zuruecksetzen: Sonst truege die naechste,
+  // frei gemeldete Meldung den Bezug der vorigen mit sich (ENT-621).
+  evBezug = bezug || null;
   $('rgsTitel').textContent = w('evTitel');
   $('rgsBody').innerHTML = `<div class="sk" style="height:120px"></div>`;
   $('rgsFuss').innerHTML = '';
@@ -6102,8 +6115,23 @@ function evFormularZeichnen() {
   // Ein neu gezeichnetes Formular ist ein neuer Vorgang: Die Kennung des
   // letzten Anlaufs gilt nicht mehr weiter.
   evLetzteKennung = null;
+  /* Der Bezug wird ANGEZEIGT, nicht nur mitgeschickt (ENT-621).
+
+     Wer aus einer Aufgabe heraus meldet, muss sehen, dass die Meldung
+     daran haengt -- sonst weiss er nicht, ob er den Kontrollpunkt noch
+     einmal nennen muss. Und der bereits getippte Grund steht als
+     Bemerkung schon drin: Ihn ein zweites Mal zu verlangen waere eine
+     Zumutung. Ueberschreiben darf er ihn jederzeit. */
+  const bezugBlock = evBezug ? `
+    <div class="f">
+      <label>${esc(w('evBezugTitel'))}</label>
+      <div class="rgs-leer" style="padding:2px 2px 0">${esc(
+        w('evBezugAufgabe').replace('{a}', evBezug.aufgabe || '—')
+                           .replace('{k}', evBezug.kontrollpunkt || '—'))}</div>
+    </div>` : '';
   $('rgsBody').innerHTML = `
     <div id="evWartend"></div>
+    ${bezugBlock}
     <div class="f">
       <label for="evArt">${esc(w('evArt'))}</label>
       ${evArten.length ? `<select class="inp" id="evArt">
@@ -6114,7 +6142,8 @@ function evFormularZeichnen() {
 
     <div class="f">
       <label for="evText">${esc(w('evBemerkung'))}</label>
-      <textarea class="inp" id="evText" rows="4" placeholder="${esc(w('evBemerkungHinweis'))}"></textarea>
+      <textarea class="inp" id="evText" rows="4" placeholder="${esc(w('evBemerkungHinweis'))}">${
+        evBezug && evBezug.grund ? esc(evBezug.grund) : ''}</textarea>
     </div>
 
     <div class="f">
@@ -6230,6 +6259,11 @@ function evSenden() {
       vorfall_am: vorfallAm,
       bemerkung: ($('evText') && $('evText').value.trim()) || '',
       foto: evFoto ? evFoto.split(',')[1] : null,
+      // Der Bezug auf die Aufgabe (ENT-621). Der Server prueft ihn gegen
+      // das Objekt und laesst ihn notfalls weg -- die Meldung selbst geht
+      // immer durch.
+      kontrollpunkt_id: evBezug ? evBezug.kontrollpunktId : null,
+      aufgabe_id: evBezug ? evBezug.aufgabeId : null,
       lat: ort.lat !== undefined ? ort.lat : null,
       lng: ort.lng !== undefined ? ort.lng : null,
     };
@@ -10911,6 +10945,14 @@ function rdAufgabenOeffnen(kontrollpunktId) {
         <label for="abT${Number(a.id)}">${esc(w('abGrund'))}</label>
         <textarea class="inp" id="abT${Number(a.id)}" rows="2"></textarea>
         <div class="rgs-leer" style="padding:6px 2px 0">${esc(w('abGrundHinweis'))}</div>
+        <!-- Aus der Aufgabe heraus melden (ENT-621). Der Knopf steht HIER
+             und nicht auf dem Reiter "Funktionen": Wer um drei Uhr nachts
+             im Regen vor einer klemmenden Tuer steht, sucht keinen zweiten
+             Weg durch die App. Er speichert die Antworten mit und oeffnet
+             dann das Ereignisformular -- so geht nichts verloren. -->
+        <button type="button" class="btn btn-plain btn-wide" style="margin-top:10px"
+                onclick="rdAufgabeEreignis(${Number(a.id)})">${esc(w('abMitFoto'))}</button>
+        <div class="rgs-leer" style="padding:6px 2px 0">${esc(w('abMitFotoHinweis'))}</div>
       </div>
     </div>`).join('')}`;
   $('blFuss').innerHTML =
@@ -10933,9 +10975,17 @@ function rdAufgabeWahl(aufgabeId, wert) {
   if (grund) { grund.style.display = wert === 'nicht_moeglich' ? '' : 'none'; }
 }
 
+/* Gibt zurueck, OB gesendet wurde (ENT-621).
+
+   Bis hierher war das Ergebnis niemanden interessant -- der einzige
+   Aufrufer war der Bestaetigen-Knopf. Seit man aus der Aufgabe heraus ein
+   Ereignis melden kann, haengt daran eine zweite Handlung: Das
+   Ereignisformular darf nur aufgehen, wenn die Antworten wirklich
+   gespeichert sind. Sonst stuende der Waechter im Formular, und seine
+   Antwort auf die Aufgabe waere still verloren. */
 function rdAufgabenSenden() {
   const k = rundgangAktiv && rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === Number(abPunktId));
-  if (!k) return;
+  if (!k) return false;
   const err = $('abErr'); if (err) err.style.display = 'none';
   const karten = [...document.querySelectorAll('#blBody .ab-karte')];
   const eintraege = [];
@@ -10945,14 +10995,14 @@ function rdAufgabenSenden() {
     if (!wahl) {
       if (err) { err.textContent = w('abHinweis'); err.style.display = ''; }
       karte.scrollIntoView({ block: 'center' });
-      return;
+      return false;
     }
     const feld = $('abT' + id);
     const grund = feld ? feld.value.trim() : '';
     if (wahl === 'nicht_moeglich' && !grund) {
       if (err) { err.textContent = w('abGrundPflicht'); err.style.display = ''; }
       if (feld) feld.focus();
-      return;
+      return false;
     }
     eintraege.push({ rundgang_id: rundgangAktiv.id, kontrollpunkt_id: k.id,
       aufgabe_id: id, status: wahl, grund: grund || null, erfasst_am: jetztDatetime() });
@@ -10969,6 +11019,37 @@ function rdAufgabenSenden() {
   abPunktId = null;
   rundgangAnzeigen(rundgangAktiv.einsatz_id);
   rdWarteschlangeSenden();
+  return true;
+}
+
+/* Aus einer unmoeglichen Aufgabe heraus ein Ereignis mit Foto melden
+   (ENT-621).
+
+   Zuerst werden die Antworten gespeichert -- mit derselben Pruefung wie
+   beim Bestaetigen, also vollstaendig und mit Grund. Erst danach geht das
+   Ereignisformular auf, mit dem Bezug auf Kontrollpunkt und Aufgabe und
+   dem bereits getippten Grund als Bemerkung.
+
+   Freiwillig, nicht automatisch (ENT-621): Nicht jede unmoegliche Aufgabe
+   ist eine Meldung wert. Landete jede ungefragt im Wachbuch, waere es
+   bald unlesbar. */
+function rdAufgabeEreignis(aufgabeId) {
+  const k = rundgangAktiv && rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === Number(abPunktId));
+  if (!k) { return; }
+  const a = (k.aufgaben || []).find(x => Number(x.id) === Number(aufgabeId));
+  const feld = $('abT' + Number(aufgabeId));
+  const grund = feld ? feld.value.trim() : '';
+  // Der Bezug wird VOR dem Senden gelesen: rdAufgabenSenden() schliesst das
+  // Blatt und wirft die Felder weg.
+  const bezug = {
+    kontrollpunktId: Number(k.id),
+    aufgabeId: Number(aufgabeId),
+    kontrollpunkt: k.bezeichnung || '',
+    aufgabe: a ? (a.bezeichnung || '') : '',
+    grund,
+  };
+  if (!rdAufgabenSenden()) { return; }
+  evOeffnen(bezug);
 }
 
 // ── Ersatzscan (Q-22 in sop-projekt): Fotobeleg statt technischer Pruefung,
