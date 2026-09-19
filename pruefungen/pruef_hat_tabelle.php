@@ -92,6 +92,51 @@ pruef('KRITISCH: hat_spalte() hat denselben Fehler nicht -- Verbindung E hat die
 pruef('KRITISCH: Verbindung F bleibt bei ihrem eigenen (fehlenden) Stand',
     hat_spalte($f, 'mandant', 'subdomain') === false);
 
+// ── Die Verbindung wird FREIGEGEBEN, dann kommt die naechste ───────────
+//
+// ANLASS: Live gefunden am 2026-09-19 an Demo-Platz 6 und 8. Der Nachtrag
+// oben (Verbindung im Schluessel) war nur die halbe Behebung, und diese
+// Datei hat das nicht bemerkt -- weil sie alle Verbindungen GLEICHZEITIG
+// am Leben haelt ($a bis $f stehen bis zum Schluss in ihren Variablen).
+// Genau das tut die Wirklichkeit nicht: betreiber_schema_pruefen.php
+// schreibt in der Mandantenschleife "$mpdo = mandant_db($m)" und gibt die
+// vorige Verbindung damit frei, bevor die naechste entsteht. Nur in
+// dieser Reihenfolge kann PHP die Nummer aus spl_object_id() erneut
+// vergeben -- und dann erbt der naechste Mandant das Gedaechtnis des
+// vorigen. Bei hat_spalte() hiess das: kein ALTER TABLE, und die Abfrage
+// danach lief trotzdem; die Einrichtung brach mitten im Lauf ab und
+// meldete das als "Verbindung fehlgeschlagen".
+//
+// Die Schleife unten stellt genau das nach. Sie prueft nicht, WIE das
+// Gedaechtnis geschluesselt ist -- sie prueft, dass eine neue Verbindung
+// nichts von einer vorigen erbt, egal welcher Bauart das Gedaechtnis ist.
+$geerbt = [];
+$nummern = [];
+for ($runde = 1; $runde <= 8; $runde++) {
+    // Kein Feld, keine zweite Variable: Die vorige Verbindung muss hier
+    // wirklich sterben, sonst stellt die Schleife den Fall nicht nach.
+    $mpdo = new PruefHatTabellePdo('runde' . $runde);
+    $nummern[] = spl_object_id($mpdo);
+    // Runde 1 hat die Spalte, alle spaeteren nicht. Erbt eine spaetere
+    // Runde, bekommt sie faelschlich "true" -- der Live-Fehler.
+    PruefHatTabellePdo::$antworten['runde' . $runde . ':kunden|kundennummer'] = ($runde === 1);
+    PruefHatTabellePdo::$antworten['runde' . $runde . ':kunden'] = ($runde === 1);
+    if (hat_spalte($mpdo, 'kunden', 'kundennummer') !== ($runde === 1)) {
+        $geerbt[] = 'hat_spalte in Runde ' . $runde;
+    }
+    if (hat_tabelle($mpdo, 'kunden') !== ($runde === 1)) {
+        $geerbt[] = 'hat_tabelle in Runde ' . $runde;
+    }
+}
+// Erst nachweisen, dass die Schleife den Fall ueberhaupt herstellt: Wird
+// keine Nummer wiederverwendet, kann sie nichts finden und waere gruen,
+// ohne etwas geprueft zu haben -- genau der Fehler dieser Datei bis heute.
+pruef('die Schleife stellt den Fall her: PHP vergibt eine Objektnummer erneut',
+    count(array_unique($nummern)) < count($nummern));
+pruef('KRITISCH: eine neue Verbindung erbt das Gedaechtnis der freigegebenen nicht -- '
+    . ($geerbt ? implode(', ', $geerbt) : 'keine Vererbung'),
+    $geerbt === []);
+
 echo "\n" . $ok . ' bestanden, ' . count($bad) . " nicht bestanden\n";
 if ($bad) { foreach ($bad as $b) { echo '  x ' . $b . "\n"; } exit(1); }
 echo "Alle Pruefungen bestanden.\n";
