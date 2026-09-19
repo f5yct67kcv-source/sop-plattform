@@ -80,6 +80,36 @@ function offenePlatzhalter(text) {
   return { offen: [...offen], quellen: quellen.length };
 }
 
+// Dieselbe Frage, aber JE DATEI (Befund am Deploy-Lauf 590, 2026-09-19).
+//
+// Die Pruefung darueber fragt nur, ob ein Platzhalter IRGENDWO im Block
+// ersetzt wird. __DEMO_EMPFAENGER__ wurde das -- fuer demo_anfrage.php --,
+// und demo_zugang.php behielt ihn trotzdem. Die Suite blieb gruen, der
+// Deploy fiel um. Eine Ersetzung gilt nur fuer die Datei, die dahinter
+// steht; also wird auch so geprueft.
+function offenePaare(text) {
+  const b = platzBlock(text);
+  // "ersetze <TOKEN> <wert> "dist-demo/$PLATZ/<ziel>"" -- der Wert kann
+  // leer, in Anfuehrungszeichen oder eine Variable sein.
+  const ersetzt = new Set();
+  for (const m of b.matchAll(
+      /ersetze\s+(__[A-Z0-9_]+__)\s+(?:"[^"]*"|\S+)\s+"dist-demo\/\$PLATZ\/([^"]+)"/g)) {
+    ersetzt.add(`${m[1]}|${m[2]}`);
+  }
+  const offen = [];
+  for (const m of text.matchAll(/^\s*cp\s+(\S+)\s+dist\/(\S+)\s*$/gm)) {
+    const [, quelle, ziel] = m;
+    if (quelle.includes('*') || ziel.includes('*')) { continue; }
+    let inhalt;
+    try { inhalt = readFileSync(`${WURZEL}/${quelle}`, 'utf8'); } catch { continue; }
+    for (const t of new Set(inhalt.match(/__[A-Z0-9_]{3,}__/g) || [])) {
+      if (t === '__DIR__' || t === '__MAPS_IOS_KEY__') { continue; }
+      if (!ersetzt.has(`${t}|${ziel}`)) { offen.push(`${ziel}: ${t}`); }
+    }
+  }
+  return offen;
+}
+
 const PRUEFUNGEN = {
 
   // Beide Listen muessen dasselbe sagen. Laufen sie auseinander, entsteht
@@ -229,6 +259,15 @@ const PRUEFUNGEN = {
   jeder_platzhalter_eingesetzt(text) {
     const { offen, quellen } = offenePlatzhalter(text);
     return offen.length === 0 && quellen > 20;
+  },
+
+  // Und dieselbe Frage JE DATEI. Die Pruefung darueber blieb gruen,
+  // waehrend der Deploy-Lauf 590 an genau diesem Loch zerbrach:
+  // __DEMO_EMPFAENGER__ wurde fuer demo_anfrage.php ersetzt, und
+  // demo_zugang.php -- das ihn seit ENT-622 ebenfalls traegt -- behielt
+  // ihn. Eine Ersetzung gilt nur fuer die Datei, die dahinter steht.
+  jede_datei_einzeln_ersetzt(text) {
+    return offenePaare(text).length === 0;
   },
 
   // Kein uebersehener Platzhalter geht hoch -- dieselbe Wache wie bei den
