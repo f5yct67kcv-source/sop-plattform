@@ -322,12 +322,34 @@ STARTFEHLER = { status: 'error', code: 'runde_offen',
     vorbereitet_am: tag(-1) + ' 21:14:00', rohzeit_start: null, pausiert_seit: null,
     pause_minuten: 0, objekt_name: 'Musterobjekt Nord', kunde_name: 'Musterliegenschaften AG',
     vorlage_name: 'Patrouille Nord', punkte_anzahl: 3, erledigt_anzahl: 1 } };
+/* Der Start geht ueber das Blatt "Ausserhalb der ueblichen Zeit" und
+   dessen Knopf -- nicht ueber einen direkten Aufruf der Startfunktion.
+   Der Unterschied ist nicht theoretisch: Der Projektinhaber meldete genau
+   aus diesem Blatt heraus, dass nur der Satz kam und nicht die
+   Rueckfrage. Der direkte Aufruf haette das nie gezeigt, weil er das
+   Blatt gar nicht oeffnet. (Ursache war dort ein alter Bau auf dem
+   Geraet; der Weg selbst stimmte. Geprueft wird er trotzdem ab jetzt so,
+   wie er benutzt wird.)
+
+   KEIN DATUM in diesem Kommentar: test_datumsfest.mjs ueberspringt nur
+   Zeilen, die mit // oder einem Stern beginnen -- eine eingerueckte Zeile
+   in einem Blockkommentar wird gelesen wie Testdaten. Diese Falle hat am
+   selben Tag schon einmal zugeschlagen (test_deploy.mjs). */
+const startVersuch = async () => {
+  await page.evaluate(() => { blattZu(); rundgangSpontanAusnahmeGrundWahl(30); });
+  await page.waitForTimeout(300);
+  await page.selectOption('#rfsGrund', { index: 1 });
+  await page.click('#rfsBtn');
+  await page.waitForTimeout(700);
+};
+
 await anmelden();
 check('Vorbedingung: ohne offene Runde steht die Rückfrage NICHT da',
   !(await page.isVisible('#roDlg')));
 rufe = [];
-await page.evaluate(() => rundgangSpontanStarten(30));
-await page.waitForTimeout(600);
+await startVersuch();
+check('Vorbedingung: der Start lief wirklich über den Knopf im Blatt',
+  rufe.some(r => r.p.includes('starten') && r.body && r.body.ausnahme_grund));
 check('KRITISCH: der abgelehnte Start öffnet die Rückfrage statt eines roten Satzes',
   await page.isVisible('#roDlg'));
 check('Sie nennt die Runde, die im Weg steht -- und zwar deren Objekt',
@@ -349,16 +371,14 @@ check('KRITISCH: und der Abbruch führt wirklich in die Grundabfrage',
 // offene Runde, die es nicht gibt.
 await anmelden();
 STARTFEHLER = { status: 'error', message: 'Ausserhalb des Zeitfensters dieser Kontrollrunde.' };
-await page.evaluate(() => rundgangSpontanStarten(30));
-await page.waitForTimeout(600);
+await startVersuch();
 check('KRITISCH: ein anderer Startfehler öffnet die Rückfrage NICHT',
   !(await page.isVisible('#roDlg')));
 
 // Und der Fall, in dem der Server den Code schickt, die Runde aber nicht:
 // lieber eine magere Auskunft als eine erfundene Rückfrage.
 STARTFEHLER = { status: 'error', code: 'runde_offen', message: 'Es ist noch ein Rundgang offen.' };
-await page.evaluate(() => rundgangSpontanStarten(30));
-await page.waitForTimeout(600);
+await startVersuch();
 check('KRITISCH: ohne mitgelieferte Runde erscheint keine leere Rückfrage',
   !(await page.isVisible('#roDlg')));
 STARTFEHLER = null;
