@@ -573,6 +573,53 @@ $pruef('KRITISCH: ein Umbruch in der Adresse wird abgewiesen (Kopfzeilen-Einschl
 $pruef('eine gültige Adresse kommt getrimmt durch',
     demo_zugang_empfaenger_pruefen(' info@guardops.ch ') === 'info@guardops.ch');
 
+// ══ Freie Plaetze, nicht nur der erste (Befund 2026-09-19) ═══════════
+//
+// ANLASS: Beim Einrichten zeigte sich, dass zwei der zehn Plaetze im
+// Mandantenstamm stehen, ihre Datenbanken aber nicht erreichbar sind.
+// Solange nur EIN Platz gewaehlt wurde, sperrte ein kaputter Platz den
+// ganzen Rest hinter sich.
+$alle = ['demo1', 'demo2', 'demo3', 'demo4', 'demo5'];
+$pruef('KRITISCH: bei nichts Belegtem sind alle Plaetze frei, in der Reihenfolge des Vorrats',
+    demo_plaetze_frei([], $alle) === $alle);
+// DER Punkt: Eine Luecke in der Mitte darf nicht das Ende der Liste sein.
+$pruef('KRITISCH: ein belegter Platz in der Mitte verdeckt die dahinter nicht',
+    demo_plaetze_frei(['demo1', 'demo3'], $alle) === ['demo2', 'demo4', 'demo5']);
+$pruef('ist alles belegt, bleibt nichts uebrig -- und das ist eine leere Liste, kein Platz',
+    demo_plaetze_frei($alle, $alle) === []);
+// Die alte Funktion bleibt und muss dasselbe sagen wie vorher: Sie wird
+// weiterhin fuer die schnelle Frage "ist ueberhaupt etwas frei" benutzt.
+$pruef('KRITISCH: die Wahl des ersten Platzes liefert weiterhin denselben wie zuvor',
+    demo_platz_waehlen(['demo1', 'demo2'], $alle) === 'demo3');
+$pruef('und null, wenn nichts frei ist', demo_platz_waehlen($alle, $alle) === null);
+$pruef('KRITISCH: die Wahl nimmt immer den ersten der freien, nie einen anderen',
+    demo_platz_waehlen(['demo2'], $alle) === demo_plaetze_frei(['demo2'], $alle)[0]);
+
+// Und der Einrichtungsablauf muss sie ALLE durchgehen, nicht nur die
+// erste: Ein kaputter Platz darf kein Abbruch sein, sondern ein
+// uebersprungener. Geprueft am Quelltext der Funktion, weil ein echter
+// Durchlauf zehn Datenbanken braeuchte -- geprueft wird aber die Aussage
+// (sie iteriert und bricht nicht beim ersten Fehlschlag ab), nicht ein
+// Wortlaut.
+$einrichten = (string)file_get_contents(dirname(__DIR__) . '/backend/demo_instanz.php');
+$rumpf = substr($einrichten, strpos($einrichten, 'function demo_zugang_einrichten'));
+$rumpf = substr($rumpf, 0, strpos($rumpf, "\n}\n") ?: strlen($rumpf));
+$pruef('KRITISCH: das Einrichten geht alle freien Plaetze durch, statt beim ersten aufzugeben',
+    str_contains($rumpf, 'demo_plaetze_frei(')
+    && preg_match('/foreach \(\$frei as /', $rumpf) === 1
+    && substr_count($rumpf, 'continue;') >= 3);
+// Uebersprungen wird nicht still -- ein Vorrat, der lautlos schrumpft,
+// faellt erst auf, wenn er leer ist.
+// Gezielt: Die Liste der uebergangenen Plaetze muss SELBST protokolliert
+// werden. Auf ein blosses error_log( zu pruefen genuegt nicht -- davon
+// stehen mehrere im Rumpf, und die Pruefung bliebe gruen, wenn genau
+// diese eine Zeile verschwindet.
+$pruef('KRITISCH: ein uebergangener Platz landet im Fehlerprotokoll',
+    preg_match('/error_log\([^;]*\$uebersprungen/s', $rumpf) === 1);
+// "Frei war keiner" und "frei schon, bereit keiner" sind zwei Aussagen.
+$pruef('KRITISCH: "alle belegt" und "keiner bereit" bleiben zwei verschiedene Gruende',
+    str_contains($rumpf, "'kein_platz'") && str_contains($rumpf, "'nicht_bereit'"));
+
 // ══ Die offene Anfrage vor der Bestaetigung (ENT-624) ═════════════════
 require_once __DIR__ . '/../backend/demo_bestaetigung.php';
 

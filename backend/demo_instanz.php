@@ -178,30 +178,63 @@ function demo_zugang_einrichten(PDO $pdo, string $firma, string $person,
     $fehlschlag = 'Der Demo-Zugang konnte gerade nicht eingerichtet werden. '
         . 'Bitte in Kürze erneut versuchen.';
 
-    // ── Freien Platz waehlen ──
+    // ── Einen freien Platz waehlen, der auch WIRKLICH bereit ist ──
+    //
+    // ALLE freien Plaetze durchgehen, nicht nur den ersten (Befund
+    // 2026-09-19): Zwei der zehn Plaetze standen im Mandantenstamm, ihre
+    // Datenbanken waren aber nicht erreichbar. Mit nur einem Versuch
+    // sperrte ein kaputter Platz den ganzen Rest -- sind demo1 bis demo5
+    // belegt, faellt die Wahl auf demo6, und der Interessent bekommt
+    // "noch nicht eingerichtet", obwohl demo7, demo9 und demo10
+    // bereitstehen.
+    //
+    // UEBERSPRUNGEN WIRD NICHT STILL. Jeder uebergangene Platz geht ins
+    // Fehlerprotokoll: Ein Vorrat, der lautlos schrumpft, faellt erst auf,
+    // wenn er leer ist.
     $belegt = $pdo->query("SELECT platz FROM demo_zugang WHERE status = 'aktiv'")
                   ->fetchAll(PDO::FETCH_COLUMN);
-    $platz = demo_platz_waehlen(array_map('strval', $belegt));
-    if ($platz === null) {
+    $frei = demo_plaetze_frei(array_map('strval', $belegt));
+    if ($frei === []) {
         return $misslungen('kein_platz', 409,
             'Aktuell sind alle Demo-Plätze belegt. Bitte in Kürze erneut versuchen.');
     }
 
-    $stmt = $pdo->prepare('SELECT * FROM mandant WHERE subdomain = ? LIMIT 1');
-    $stmt->execute([$platz]);
-    $m = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$m) {
-        error_log("demo_zugang_einrichten: Platz „$platz“ ist im Mandantenstamm nicht eingetragen.");
-        return $misslungen('nicht_bereit', 503, $nichtBereit);
+    $platz = null;
+    $m = null;
+    $uebersprungen = [];
+    foreach ($frei as $kandidat) {
+        $stmt = $pdo->prepare('SELECT * FROM mandant WHERE subdomain = ? LIMIT 1');
+        $stmt->execute([$kandidat]);
+        $kandidatM = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$kandidatM) {
+            $uebersprungen[] = "$kandidat (im Mandantenstamm nicht eingetragen)";
+            continue;
+        }
+        $lage = mandant_verbindung_bereit($kandidatM);
+        if ($lage !== 'bereit') {
+            $uebersprungen[] = "$kandidat (nicht verbunden: $lage)";
+            continue;
+        }
+        $stand = mandant_stand($kandidatM);
+        if (!$stand['erreichbar'] || !empty($stand['fehlend'])) {
+            $uebersprungen[] = "$kandidat (Datenbank noch nicht eingerichtet)";
+            continue;
+        }
+        $platz = $kandidat;
+        $m = $kandidatM;
+        break;
     }
-    $lage = mandant_verbindung_bereit($m);
-    if ($lage !== 'bereit') {
-        error_log("demo_zugang_einrichten: Platz „$platz“ nicht verbunden ($lage).");
-        return $misslungen('nicht_bereit', 503, $nichtBereit);
+    if ($uebersprungen !== []) {
+        error_log('demo_zugang_einrichten: uebergangene Plaetze -- '
+            . implode(', ', $uebersprungen));
     }
-    $stand = mandant_stand($m);
-    if (!$stand['erreichbar'] || !empty($stand['fehlend'])) {
-        error_log("demo_zugang_einrichten: Platz „$platz“ noch nicht eingerichtet.");
+    if ($platz === null || $m === null) {
+        // Frei WAREN Plaetze, bereit war keiner. Das ist etwas anderes als
+        // "alle belegt" und bekommt darum einen eigenen Grund und einen
+        // eigenen Text (Hausregel: "unbekannt" darf nie wie "keine"
+        // aussehen). Fuer den Interessenten liest es sich gleich -- er
+        // kann mit dem Unterschied nichts anfangen --, fuer den Betreiber
+        // steht er im Protokoll.
         return $misslungen('nicht_bereit', 503, $nichtBereit);
     }
 

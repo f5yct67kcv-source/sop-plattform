@@ -263,10 +263,28 @@ function demo_zugang_resttage(string $laeuftAbAm, string $jetzt): int
 // der Vorrat erschoepft ist.
 function demo_platz_waehlen(array $belegt, array $plaetze = DEMO_PLAETZE): ?string
 {
-    foreach ($plaetze as $platz) {
-        if (!in_array($platz, $belegt, true)) { return $platz; }
-    }
-    return null;
+    $frei = demo_plaetze_frei($belegt, $plaetze);
+    return $frei === [] ? null : $frei[0];
+}
+
+// ALLE freien Plaetze, in der Reihenfolge des Vorrats (Befund 2026-09-19).
+//
+// ANLASS: Beim Einrichten zeigte sich, dass zwei der zehn Plaetze im
+// Mandantenstamm stehen, ihre Datenbanken aber nicht erreichbar sind.
+// Solange nur EIN Platz gewaehlt wurde, sperrte ein kaputter Platz den
+// ganzen Rest: Sind demo1 bis demo5 belegt, faellt die Wahl auf demo6 --
+// und wenn der nicht bereit ist, bricht der Vorgang ab, ohne demo7 auch
+// nur anzusehen. Der Interessent bekommt "noch nicht eingerichtet",
+// obwohl drei Plaetze bereitstehen.
+//
+// Die Bereitschaft wird hier NICHT geprueft: Das kostet je Platz eine
+// Datenbankverbindung und gehoert dorthin, wo wirklich eingerichtet wird
+// (demo_zugang_einrichten()). Diese Funktion beantwortet nur, welche
+// Plaetze nicht belegt sind.
+function demo_plaetze_frei(array $belegt, array $plaetze = DEMO_PLAETZE): array
+{
+    return array_values(array_filter($plaetze,
+        static fn (string $platz): bool => !in_array($platz, $belegt, true)));
 }
 
 // Anmeldename aus dem Firmennamen. Kleinbuchstaben, keine Umlaute, kein
