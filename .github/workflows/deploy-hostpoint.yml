@@ -2118,7 +2118,23 @@ jobs:
             feld() { printf '%s' "$VORRAT" | jq -r --arg p "$PLATZ" --arg k "$1" '.plaetze[$p][$k] // ""'; }
             FTP_HOST=$(feld ftp_host); FTP_USER=$(feld ftp_user); FTP_PASS=$(feld ftp_passwort)
             DB_HOST=$(feld db_host);   DB_NAME=$(feld db_name)
-            DB_USER=$(feld db_user);   DB_PASS=$(feld db_passwort)
+            DB_USER=$(feld db_user);   SECRET_NAME=$(feld secret_name)
+
+            # DAS DATENBANK-PASSWORT STEHT NICHT HIER, SONDERN IN
+            # MANDANT_SECRETS -- derselbe Ort, aus dem der Betreiber-Bereich
+            # es holt (mandant_secret() in backend/betreiber.php, OP-526),
+            # und derselbe Vorgang, mit dem die Plaetze 1 bis 5 hinterlegt
+            # worden sind.
+            #
+            # WARUM NICHT EINFACH HIER MIT DAZU: Zwei Orte fuer dasselbe
+            # Passwort heisst, dass eine Aenderung an einem davon vergessen
+            # werden kann. Und der Fall waere still: Der Betreiber-Bereich
+            # kaeme weiter an die Instanz heran (er liest MANDANT_SECRETS),
+            # der Platz selbst nicht mehr (er traegt den alten Wert fest
+            # eingesetzt). Der Betreiber saehe einen gesunden Platz, der
+            # Interessent einen Datenbankfehler.
+            DB_PASS=$(printf '%s' "${EFF_MANDANT_SECRETS:-}" | base64 -d 2>/dev/null \
+                      | jq -r --arg n "$SECRET_NAME" '.[$n] // ""' 2>/dev/null || true)
             for WERT in "$FTP_HOST" "$FTP_USER" "$FTP_PASS" "$DB_HOST" "$DB_NAME" "$DB_USER" "$DB_PASS"; do
               [ -n "$WERT" ] && echo "::add-mask::$WERT"
             done
@@ -2130,12 +2146,19 @@ jobs:
             [ -z "$DB_HOST" ]  && LEER="$LEER db_host"
             [ -z "$DB_NAME" ]  && LEER="$LEER db_name"
             [ -z "$DB_USER" ]  && LEER="$LEER db_user"
-            [ -z "$DB_PASS" ]  && LEER="$LEER db_passwort"
+            [ -z "$SECRET_NAME" ] && LEER="$LEER secret_name"
             if [ -n "$LEER" ]; then
               # Ein Platz, der halb dasteht, ist gefaehrlicher als einer,
               # der gar nicht dasteht: Fehlt die Datenbank, zeigt die
               # Adresse eine Anlage, die auf nichts zeigt.
               echo "::error::Demo-Platz $PLATZ ist in DEMO_PLAETZE unvollstaendig -- es fehlt:$LEER"
+              exit 1
+            fi
+
+            # "Nicht in der Tafel" ist eine andere Aussage als "Feld leer
+            # gelassen" und bekommt darum eine eigene Meldung (Hausregel).
+            if [ -z "$DB_PASS" ]; then
+              echo "::error::Demo-Platz $PLATZ: Zum secret_name \"$SECRET_NAME\" steht in MANDANT_SECRETS kein Passwort. Dort eintragen -- derselbe Weg wie bei den Plaetzen davor."
               exit 1
             fi
 

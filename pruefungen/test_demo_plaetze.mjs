@@ -111,6 +111,18 @@ const PRUEFUNGEN = {
     return ausVorrat && !ausProduktion;
   },
 
+  // Das Datenbank-Passwort steht an EINEM Ort: MANDANT_SECRETS, dort, wo
+  // der Betreiber-Bereich es auch holt (OP-526). Stuende es zusaetzlich in
+  // DEMO_PLAETZE, koennte eine Passwortaenderung an einem der beiden Orte
+  // vergessen werden -- und zwar still: Der Betreiber-Bereich kaeme weiter
+  // an die Instanz, der Platz selbst nicht mehr.
+  passwort_aus_mandant_secrets(text) {
+    const b = platzBlock(text);
+    const ausTafel = /DB_PASS=\$\(printf '%s' "\$\{EFF_MANDANT_SECRETS:-\}"[\s\S]{0,200}\$SECRET_NAME/.test(b);
+    const zweiterOrt = /feld db_passwort/.test(b);
+    return ausTafel && !zweiterOrt;
+  },
+
   // ENT-501: Die eigene Adresse kommt aus dem Deploy -- und je Platz eine
   // andere, sonst verschickt demo3 Links, die auf demo1 fuehren.
   eigene_adresse_je_platz(text) {
@@ -181,6 +193,9 @@ const GEGENPROBEN = [
   ['eigene_datenbank_je_platz', t =>
     t.replace('ersetze __DB_HOST__ "$DB_HOST" "dist-demo/$PLATZ/db.php"',
               'ersetze __DB_HOST__ "$EFF_DB_HOST" "dist-demo/$PLATZ/db.php"')],
+  ['passwort_aus_mandant_secrets', t =>
+    t.replace(/DB_PASS=\$\(printf '%s' "\$\{EFF_MANDANT_SECRETS:-\}"[\s\S]*?\|\| true\)/,
+              'DB_PASS=$(feld db_passwort)')],
   ['eigene_adresse_je_platz', t =>
     t.replace('https://$PLATZ.guardops.ch', 'https://demo1.guardops.ch')],
   ['upload_je_platz', t =>

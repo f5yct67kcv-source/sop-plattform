@@ -516,7 +516,7 @@ Passwort, und eine `KEY=value`-Zeile verträgt keinen Zeilenumbruch.
   "plaetze": {
     "demo1": {
       "ftp_host": "…", "ftp_user": "…", "ftp_passwort": "…",
-      "db_host": "…", "db_name": "…", "db_user": "…", "db_passwort": "…"
+      "db_host": "…", "db_name": "…", "db_user": "…", "secret_name": "…"
     },
     "demo2": { … }
   }
@@ -531,6 +531,14 @@ base64 -w0 demo-plaetze.json      # -w0: eine einzige Zeile
 rm demo-plaetze.json              # die Datei gehört nicht ins Repository
 ```
 
+- **Das Datenbank-Passwort steht hier nicht drin.** Es kommt über
+  `secret_name` aus `MANDANT_SECRETS` — demselben Secret, aus dem der
+  Betreiber-Bereich es holt (OP-526), und demselben Vorgang, mit dem die
+  ersten Plätze hinterlegt worden sind. Zwei Orte für dasselbe Passwort
+  hiessen, dass eine Änderung an einem davon vergessen werden kann, und
+  zwar still: Der Betreiber-Bereich käme weiter an die Instanz heran, der
+  Platz selbst nicht mehr. Steht zum `secret_name` kein Eintrag in
+  `MANDANT_SECRETS`, bricht der Schritt mit genau dieser Auskunft ab.
 - **Nur die Plätze eintragen, die wirklich eingerichtet sind.** Ein Platz
   ohne Eintrag wird schlicht nicht beliefert, und der Lauf sagt am Ende
   namentlich, welche das waren.
@@ -542,9 +550,12 @@ rm demo-plaetze.json              # die Datei gehört nicht ins Repository
     eine echte Adresse schickt.
   - `maps_js_key` — ohne ihn bleiben Kontrollpunkt-Karte,
     Geofence-Auswahl und Objektplan leer, und zwar wortlos. Der Schlüssel
-    ist referrer-beschränkt: **jede** Platz-Domain muss in der Google
-    Cloud Console als Referrer eingetragen sein, sonst zeigt genau der
-    eine Platz keine Karte.
+    ist referrer-beschränkt, und zwar über eine **Liste**: Ein einziger
+    Schlüssel reicht für alle zehn Plätze, aber jede Platz-Adresse muss in
+    der Google Cloud Console in seiner Referrer-Liste stehen
+    (`https://demo1.guardops.ch/*` und so weiter). Fehlt eine, bleibt
+    genau dort die Karte leer. Der bestehende Demo-Schlüssel lässt sich
+    dafür verwenden — es braucht keinen neuen je Platz.
   - `anthropic_api_key` — ENT-523-N1: Die KI-Funktion soll in der Demo
     aktiv sein, nicht als „nicht eingerichtet" dastehen.
 - **Ein halb ausgefüllter Platz bricht den Lauf ab.** Fehlt einem Platz
@@ -558,8 +569,8 @@ rm demo-plaetze.json              # die Datei gehört nicht ins Repository
 
 ### Einen Platz einrichten
 
-Sechs Schritte, die ersten drei bei Hostpoint. Ein Platz ist erst dann
-einsatzbereit, wenn alle sechs erledigt sind — und er steht im
+Sieben Schritte, die ersten drei bei Hostpoint. Ein Platz ist erst dann
+einsatzbereit, wenn alle sieben erledigt sind — und er steht im
 Betreiber-Bereich trotzdem schon vorher im Vorrat.
 
 1. **Subdomain `demoN.guardops.ch`** anlegen, mit eigenem Verzeichnis und
@@ -573,13 +584,22 @@ Betreiber-Bereich trotzdem schon vorher im Vorrat.
    zeigen — bei Hostpoint meist mit `www/` im Pfad. Zeigt er auf einen
    gleichnamigen Pfad ohne `www/`, lädt der Deploy erfolgreich hoch, und
    die Adresse liefert trotzdem 403.
-4. **`DEMO_PLAETZE` ergänzen** (siehe oben) und einmal nach `main` pushen.
-5. **Mandantenzeile im Betreiber-Bereich** anlegen: Name, `subdomain` =
-   `demoN`, `db_host`, `db_name`, `db_user`, `secret_name`. Das
-   DB-Passwort gehört zusätzlich ins Secret `MANDANT_SECRETS` — darüber
-   findet der Betreiber-Bereich die Datenbank des Platzes, wenn er ihn
-   leert oder ein Passwort neu setzt.
-6. **Tabellen anlegen** über die Schema-Prüfung im Betreiber-Bereich
+4. **`MANDANT_SECRETS` ergänzen**: das DB-Passwort des Platzes unter
+   einem `secret_name` eintragen. Das Secret ist ein base64-kodiertes
+   JSON `{"<secret_name>": "<passwort>", …}`, also: bestehenden Wert
+   entschlüsseln, den Eintrag dazuschreiben, neu kodieren, ersetzen.
+   ```
+   # bisherigen Wert aus GitHub kopieren, dann:
+   echo '<bisheriger base64-wert>' | base64 -d > mandant-secrets.json
+   # Eintrag ergänzen, danach:
+   base64 -w0 mandant-secrets.json && rm mandant-secrets.json
+   ```
+5. **`DEMO_PLAETZE` ergänzen** (siehe oben) und einmal nach `main` pushen.
+6. **Mandantenzeile im Betreiber-Bereich** anlegen: Name, `subdomain` =
+   `demoN`, `db_host`, `db_name`, `db_user` und derselbe `secret_name`
+   wie in Schritt 4. Darüber findet der Betreiber-Bereich die Datenbank
+   des Platzes, wenn er ihn leert oder ein Passwort neu setzt.
+7. **Tabellen anlegen** über die Schema-Prüfung im Betreiber-Bereich
    (`api/betreiber_schema_pruefen.php`, ENT-612). Danach zeigt die
    Mandantenliste den Platz als erreichbar mit vollständigem Tabellensatz.
 
