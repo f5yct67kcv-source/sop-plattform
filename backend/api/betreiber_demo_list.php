@@ -20,14 +20,27 @@ if (!hat_tabelle($pdo, 'demo_zugang')) {
 
 $jetzt = date('Y-m-d H:i:s');
 
-$zeilen = $pdo->query(
-    'SELECT id, platz, firma, person, email, telefon, login, status,
-            freigegeben_am, freigegeben_von, laeuft_ab_am, beendet_am
-       FROM demo_zugang ORDER BY id DESC'
-)->fetchAll(PDO::FETCH_ASSOC);
+// Der Vermerk „nachgefasst" (ENT-622) kam nach der Tabelle. Steht die
+// Spalte auf dieser Anlage noch nicht, wird sie nicht abgefragt -- sonst
+// faellt die ganze Liste aus, weil EIN Feld fehlt. Nachgetragen wird sie
+// vom Zahnrad (be_spalten_anlegen()); bis dahin sagt die Oberflaeche „noch
+// nicht nachgeruestet" statt „noch nie nachgefasst". Das sind zwei
+// verschiedene Aussagen (Hausregel).
+$kenntNachfassen = hat_spalte($pdo, 'demo_zugang', 'nachgefasst_am');
+$felder = 'id, platz, firma, person, email, telefon, login, status,
+           freigegeben_am, freigegeben_von, laeuft_ab_am, beendet_am'
+        . ($kenntNachfassen ? ', nachgefasst_am, nachgefasst_von' : '');
 
-$liste = array_map(static function (array $z) use ($jetzt): array {
+$zeilen = $pdo->query("SELECT $felder FROM demo_zugang ORDER BY id DESC")
+              ->fetchAll(PDO::FETCH_ASSOC);
+
+$liste = array_map(static function (array $z) use ($jetzt, $kenntNachfassen): array {
     $z['id'] = (int)$z['id'];
+    // Drei Zustaende, nicht zwei: nachgefasst, noch nicht nachgefasst, und
+    // „wir koennen es nicht wissen" (Spalte fehlt). Der dritte wird nicht
+    // als der zweite ausgegeben.
+    $z['nachgefasst_am']  = $kenntNachfassen ? ($z['nachgefasst_am'] ?? null) : null;
+    $z['nachgefasst_von'] = $kenntNachfassen ? (string)($z['nachgefasst_von'] ?? '') : '';
     // Der Zustand wird HIER benannt und nicht in der Oberfläche gerechnet:
     // Ein Zugang, dessen Frist um ist, den der Zeitgeber aber noch nicht
     // angefasst hat, steht in der Datenbank auf "aktiv" und ist trotzdem
@@ -74,4 +87,15 @@ json_response([
     'plaetze_total' => count(DEMO_PLAETZE),
     'aktive'        => count(array_filter($liste, static fn (array $z): bool => $z['status'] === 'aktiv')),
     'laufzeit_tage' => DEMO_ZUGANG_TAGE,
+    // Sagt der Oberflaeche, ob die Frage ueberhaupt beantwortbar ist --
+    // ohne die Spalte gibt es kein Abzeichen und keinen Knopf, statt eines
+    // Abzeichens, das immer null zeigt.
+    'kennt_nachfassen' => $kenntNachfassen,
+    // Die Zahl fuer das Abzeichen am Reiter. Sie zaehlt Interessenten, bei
+    // denen noch niemand nachgefasst hat -- laufende UND beendete: Wer sich
+    // den Zugang geholt hat und nie angesprochen wurde, bleibt eine
+    // verpasste Gelegenheit, auch wenn die vierzehn Tage um sind.
+    'nachfassen_offen' => $kenntNachfassen
+        ? count(array_filter($liste, static fn (array $z): bool => $z['nachgefasst_am'] === null))
+        : 0,
 ]);

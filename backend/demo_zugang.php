@@ -427,6 +427,187 @@ function demo_zugang_mail(string $firma, string $person, string $adresse,
         'bilder' => $bilder];
 }
 
+// ══ Meldungen an den Betreiber (ENT-622) ═══════════════════════════════
+//
+// Bis hierher lief die Selbstbedienung vollstaendig an uns vorbei: Der
+// Interessent bekommt seinen Zugang, das Register bekommt eine Zeile, und
+// wer nicht von sich aus in den Betreiber-Bereich sieht, erfaehrt nichts.
+// Zwei Ereignisse sind meldenswert, und nur zwei:
+//
+//   1. EIN NEUER ZUGANG. Eine Verkaufschance, bei der jemand nachfassen
+//      soll -- darum traegt das Register seit ENT-622 auch, OB jemand das
+//      getan hat.
+//   2. DER VORRAT IST LEER. Ein Interessent wurde abgewiesen, weil kein
+//      Platz frei war. Das ist die teurere Meldung von beiden: Sie sagt,
+//      dass gerade Interessenten verloren gehen, und sie verlangt eine
+//      Handlung (Plaetze freigeben oder den Vorrat vergroessern).
+//
+// NICHT gemeldet wird die erneute Anforderung durch eine bekannte Adresse.
+// Sie legt keinen Zugang an und stellt keine Frage -- eine Meldung ohne
+// Handlungsbedarf senkt die Aufmerksamkeit fuer die beiden echten.
+
+// Der Empfaenger, aus dem Deploy -- gleiche Regel wie basis_url() (ENT-501).
+//
+// ZWEITE UMSETZUNG DERSELBEN PRUEFUNG, mit Absicht: Dieselbe Pruefung steht
+// als demo_empfaenger_pruefen() in demo_anfrage.php. Die beiden Dateien
+// liegen in VERSCHIEDENEN Buendeln -- demo_anfrage.php auf guardops.ch,
+// diese hier im Betreiber-Bereich --, und der gemeinsame Ort waere
+// mailer.php, die db.php nachzieht. Genau das wuerde demo_anfrage.php die
+// Eigenschaft nehmen, die ihr Kopfkommentar zusagt: ein Rechenkern ohne
+// Datenbank. Damit die beiden Fassungen nicht auseinanderlaufen, gleicht
+// pruef_demo_zugang.php sie Eingabe fuer Eingabe gegeneinander ab.
+function demo_zugang_empfaenger_pruefen(string $wert): ?string
+{
+    $wert = trim($wert);
+    if ($wert === '' || str_contains($wert, '__DEMO_EMPFAENGER')) { return null; }
+    // Kein Steuerzeichen und kein Umbruch: Die Adresse steht in einer
+    // Kopfzeile, ein eingeschmuggeltes "\r\n" waere dort eine zweite.
+    if (preg_match('/[\x00-\x20\x7F]/', $wert)) { return null; }
+    if (filter_var($wert, FILTER_VALIDATE_EMAIL) === false) { return null; }
+    return $wert;
+}
+
+function demo_zugang_empfaenger(): ?string
+{
+    return demo_zugang_empfaenger_pruefen('__DEMO_EMPFAENGER__');
+}
+
+// Die Meldung ueber einen neuen Zugang. Reine Funktion, damit ihr Inhalt
+// pruefbar ist, ohne etwas zu verschicken -- wie demo_zugang_mail().
+//
+// KEIN PASSWORT DARIN. Es steht schon in der Mail an den Interessenten;
+// ein zweites Mal verschickt waere es ein zweites Postfach, aus dem es
+// entwischen kann, ohne dass irgendjemand etwas davon haette. Wer als
+// Betreiber in die Instanz muss, hat den Not-Aus und die Datenbank.
+//
+// KEINE SIGNATUR UND KEIN LOGO: Das ist Hauspost, keine Geschaeftsmail.
+// Ein eingebettetes Bild in jeder dieser Meldungen waere Ballast.
+function demo_melde_mail(string $firma, string $person, string $email,
+                         string $telefon, string $platz, string $adresse,
+                         string $laeuftAbAm): array
+{
+    $ab = date('d.m.Y', strtotime($laeuftAbAm));
+    // Die Firma gehoert in den Betreff: Wer drei Meldungen im Postfach hat,
+    // soll sie auseinanderhalten koennen, ohne sie zu oeffnen.
+    $betreff = 'Neuer Demo-Zugang: ' . $firma;
+
+    $text = "Ein Interessent hat sich selbst einen Demo-Zugang geholt.\n\n"
+          . "Firma:     $firma\n"
+          . "Person:    $person\n"
+          . "E-Mail:    $email\n"
+          . "Telefon:   " . ($telefon !== '' ? $telefon : 'keine Angabe') . "\n"
+          . "Platz:     $platz ($adresse)\n"
+          . "Läuft ab:  $ab\n\n"
+          . "Der Zugang ist bereits eingerichtet und die Zugangsdaten sind "
+          . "unterwegs. Offen ist das Nachfassen: Im Betreiber-Bereich unter "
+          . "Mandanten steht der Zugang als offen, bis ihn dort jemand auf "
+          . "nachgefasst setzt.\n";
+
+    $inhalt = mail_absatz('Ein Interessent hat sich selbst einen Demo-Zugang geholt.')
+        . mail_block(
+            mail_feld('Firma', mail_e($firma))
+            . mail_feld('Person', mail_e($person))
+            . mail_feld('E-Mail', '<a href="mailto:' . mail_e($email) . '" style="color:'
+                . MAIL_FARBE_BLAU . ';text-decoration:none;">' . mail_e($email) . '</a>')
+            . mail_feld('Telefon', $telefon !== ''
+                ? mail_e($telefon)
+                : '<span style="color:' . MAIL_FARBE_LEISE . '">keine Angabe</span>')
+            . mail_feld('Platz', mail_e($platz . ' (' . $adresse . ')'))
+            . mail_feld('Läuft ab', mail_e($ab)))
+        . mail_absatz('Der Zugang ist bereits eingerichtet und die Zugangsdaten sind '
+            . 'unterwegs. Offen ist das Nachfassen: Im Betreiber-Bereich unter '
+            . '<b>Mandanten</b> steht der Zugang als offen, bis ihn dort jemand auf '
+            . 'nachgefasst setzt.');
+
+    return ['betreff' => $betreff, 'text' => $text, 'html' => mail_rahmen($inhalt),
+        'bilder' => []];
+}
+
+// Die Warnung, wenn kein Platz mehr frei ist.
+//
+// Sie nennt die Zahl der Plaetze, nicht nur "voll": Wer sie liest, soll
+// entscheiden koennen, ob er zwei Zugaenge von Hand beendet oder den Vorrat
+// vergroessert -- dafuer muss er wissen, wie gross er ist.
+function demo_vorrat_mail(int $plaetze): array
+{
+    $betreff = 'Demo-Vorrat erschöpft — ein Interessent wurde abgewiesen';
+
+    $text = "Ein Interessent wollte einen Demo-Zugang und hat keinen bekommen: "
+          . "Alle $plaetze Plätze sind belegt.\n\n"
+          . "Er hat die Meldung gesehen, dass gerade alle Plätze belegt sind, "
+          . "und wurde gebeten, es in Kürze erneut zu versuchen. Wer ihn "
+          . "war, wissen wir nicht — abgewiesen wird vor dem Register.\n\n"
+          . "Im Betreiber-Bereich unter Mandanten steht, welcher Platz wann "
+          . "frei wird. Abgelaufene Zugänge lassen sich dort sofort "
+          . "schliessen.\n\n"
+          . "Diese Warnung kommt höchstens einmal pro Stunde, egal wie viele "
+          . "Anfragen in dieser Zeit abgewiesen werden.\n";
+
+    $inhalt = mail_absatz('<b>Ein Interessent wollte einen Demo-Zugang und hat keinen '
+            . 'bekommen:</b> Alle ' . $plaetze . ' Plätze sind belegt.')
+        . mail_absatz('Er hat die Meldung gesehen, dass gerade alle Plätze belegt sind, '
+            . 'und wurde gebeten, es in Kürze erneut zu versuchen. Wer er war, wissen '
+            . 'wir nicht — abgewiesen wird vor dem Register.')
+        . mail_absatz('Im Betreiber-Bereich unter <b>Mandanten</b> steht, welcher Platz '
+            . 'wann frei wird. Abgelaufene Zugänge lassen sich dort sofort schliessen.')
+        . mail_absatz('<span style="color:' . MAIL_FARBE_LEISE . '">Diese Warnung kommt '
+            . 'höchstens einmal pro Stunde, egal wie viele Anfragen in dieser Zeit '
+            . 'abgewiesen werden.</span>');
+
+    return ['betreff' => $betreff, 'text' => $text, 'html' => mail_rahmen($inhalt),
+        'bilder' => []];
+}
+
+// ── Die Bremse fuer die Warnung ───────────────────────────────────────
+//
+// Ist der Vorrat leer, ist er es fuer JEDE Anfrage in dieser Zeit. Ohne
+// Bremse waeren fuenfzig abgewiesene Interessenten fuenfzig gleichlautende
+// Mails -- und das Postfach, das die Warnung lesen soll, waere genau dann
+// unbrauchbar, wenn die Warnung zaehlt.
+//
+// SIE FAELLT AUF, NICHT ZU -- anders herum als demo_bremse.php, und aus dem
+// umgekehrten Grund: Dort schuetzt die Bremse vor Missbrauch, ein
+// unlesbarer Zaehler muss also sperren. Hier schuetzt sie nur vor
+// Doppelpost. Kann der Vermerk nicht gelesen oder geschrieben werden, geht
+// die Warnung raus. Eine Mail zu viel ist harmlos, eine verpasste Warnung
+// kostet Interessenten.
+const DEMO_WARNUNG_PAUSE_MIN = 60;
+
+// Die Entscheidung, ohne Dateizugriff -- damit sie sich echt ausfuehren
+// laesst. Gleiche Trennung wie bei demo_bremse_entscheiden().
+function demo_warnung_faellig(?int $letzte, int $jetzt): bool
+{
+    if ($letzte === null) { return true; }
+    // Ein Vermerk aus der Zukunft (verstellte Uhr, kopierte Datei) darf die
+    // Warnung nicht auf Dauer stilllegen.
+    if ($letzte > $jetzt) { return true; }
+    return ($jetzt - $letzte) >= DEMO_WARNUNG_PAUSE_MIN * 60;
+}
+
+function demo_warnung_datei(): string
+{
+    return sys_get_temp_dir() . '/guardops-demo-vorrat-warnung.txt';
+}
+
+// Liest den Vermerk, entscheidet und traegt sich ein, wenn die Warnung
+// faellig ist. Jeder Fehlschlag laesst sie durch -- siehe oben.
+function demo_warnung_faellig_und_vermerken(?string $datei = null, ?int $jetzt = null): bool
+{
+    $datei ??= demo_warnung_datei();
+    $jetzt ??= time();
+
+    $letzte = null;
+    if (is_file($datei)) {
+        $roh = @file_get_contents($datei);
+        if ($roh !== false && trim($roh) !== '' && ctype_digit(trim($roh))) {
+            $letzte = (int)trim($roh);
+        }
+    }
+    if (!demo_warnung_faellig($letzte, $jetzt)) { return false; }
+    @file_put_contents($datei, (string)$jetzt, LOCK_EX);
+    return true;
+}
+
 // Die Tabelle des Registers. Sie liegt in der BETREIBER-Datenbank, nicht in
 // der Demo-Instanz: Der naechtliche Reset (ENT-523) leert generisch JEDE
 // Tabelle der verbundenen Datenbank -- ein Register in der Demo waere am
@@ -452,6 +633,12 @@ function demo_zugang_tabelle(): string
   freigegeben_von VARCHAR(200) NOT NULL DEFAULT '',
   laeuft_ab_am DATETIME NOT NULL,
   beendet_am DATETIME NULL,
+  -- Hat bei diesem Interessenten schon jemand nachgefasst (ENT-622)?
+  -- NULL heisst „noch nicht“, nicht „nein“ -- der Unterschied traegt das
+  -- Abzeichen am Reiter im Betreiber-Bereich. Ein Datum von null waere
+  -- die Behauptung, es sei am 1.1.1970 erledigt worden.
+  nachgefasst_am DATETIME NULL,
+  nachgefasst_von VARCHAR(200) NOT NULL DEFAULT '',
   -- Ein Platz traegt hoechstens einen aktiven Zugang. Der Index ist nicht
   -- nur fuer die Geschwindigkeit da: Er ist die Spur, auf der die Suche
   -- nach dem freien Platz laeuft.

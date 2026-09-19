@@ -49,6 +49,32 @@ require_once __DIR__ . '/../demo_daten.php';
 require_once __DIR__ . '/../demo_instanz.php';
 require_once __DIR__ . '/../mailer.php';
 
+// Schickt eine Meldung an den Betreiber -- und schweigt, wenn etwas daran
+// scheitert.
+//
+// DIE MELDUNG DARF DEN INTERESSENTEN NIE ETWAS KOSTEN. Sie ist unsere
+// Bequemlichkeit, nicht seine: Ein nicht eingerichteter Empfaenger, ein
+// stummer SMTP-Server oder ein Fehler beim Aufbau duerfen weder seine
+// Antwort veraendern noch seinen Zugang verhindern. Darum ohne Ausnahme
+// nach aussen, nur mit Eintrag ins Fehlerprotokoll -- dieselbe Haltung wie
+// beim Versand an ihn selbst weiter unten.
+function demo_betreiber_melden(array $mail, string $anlass, bool $faellig): void
+{
+    if (!$faellig) { return; }
+    $an = demo_zugang_empfaenger();
+    if ($an === null) {
+        // "Nicht eingerichtet" ist etwas anderes als "fehlgeschlagen" --
+        // im Protokoll steht darum, welcher der beiden Faelle es war.
+        error_log("demo_anfordern ($anlass): kein Empfaenger im Deploy hinterlegt.");
+        return;
+    }
+    try {
+        smtp_senden($an, 'GuardOpS', $mail['betreff'], $mail['html'], $mail['text']);
+    } catch (Throwable $e) {
+        error_log("demo_anfordern ($anlass): Versand fehlgeschlagen -- " . $e->getMessage());
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
@@ -144,6 +170,14 @@ $platz = demo_platz_waehlen(array_map('strval', $belegt));
 if ($platz === null) {
     // "Kein Platz frei" ist ein ehrlicher, sichtbarer Zustand -- kein
     // Interessent soll auf eine Zusage warten, die nicht kommt.
+    //
+    // Und der Betreiber erfaehrt davon (ENT-622): Hier geht gerade ein
+    // Interessent verloren, und das steht sonst nur im Fehlerprotokoll auf
+    // dem Server, das niemand liest. Hoechstens eine Warnung pro Stunde --
+    // der Vorrat ist fuer jede Anfrage in dieser Zeit leer, nicht nur fuer
+    // diese eine.
+    demo_betreiber_melden(demo_vorrat_mail(count(DEMO_PLAETZE)), 'Vorratswarnung',
+        demo_warnung_faellig_und_vermerken());
     json_response(['status' => 'error',
         'message' => 'Aktuell sind alle Demo-Plätze belegt. Bitte in Kürze erneut versuchen.'], 409);
 }
@@ -224,5 +258,12 @@ try {
 } catch (Throwable $e) {
     error_log('demo_anfordern: Versand fehlgeschlagen -- ' . $e->getMessage());
 }
+
+// ── 8. Meldung an den Betreiber (ENT-622) ─────────────────────────────
+// NACH der Mail an den Interessenten: Von den beiden ist seine die
+// wichtigere, und sie soll nicht darauf warten, dass unsere durch ist.
+demo_betreiber_melden(
+    demo_melde_mail($firma, $person, $email, $telefon, $platz, $adresse, $laeuftAb),
+    'Meldung ueber neuen Zugang', true);
 
 json_response(['status' => 'ok', 'message' => DEMO_ANFORDERN_DANKE]);

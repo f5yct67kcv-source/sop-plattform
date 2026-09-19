@@ -1342,6 +1342,13 @@ function be_spalten(): array
         ['mandant', 'kuendigungsfrist_monate', "ALTER TABLE mandant ADD COLUMN kuendigungsfrist_monate INT NULL AFTER mindestlaufzeit_monate"],
         ['mandant', 'verlaengerung_monate',    "ALTER TABLE mandant ADD COLUMN verlaengerung_monate INT NULL AFTER kuendigungsfrist_monate"],
         ['mandant', 'gekuendigt_per',          "ALTER TABLE mandant ADD COLUMN gekuendigt_per DATE NULL AFTER verlaengerung_monate"],
+        // Nachfassen am Demo-Zugang (ENT-622). Beide NULL-bar bzw. leer --
+        // bestehende Zeilen gelten damit als „noch nicht nachgefasst", und
+        // das ist richtig so: Bei keinem von ihnen ist es vermerkt, also
+        // weiss niemand, ob es geschehen ist. Ein Vorgabewert „erledigt"
+        // wuerde behaupten, was nicht geprueft wurde.
+        ['demo_zugang', 'nachgefasst_am',  "ALTER TABLE demo_zugang ADD COLUMN nachgefasst_am DATETIME NULL AFTER beendet_am"],
+        ['demo_zugang', 'nachgefasst_von', "ALTER TABLE demo_zugang ADD COLUMN nachgefasst_von VARCHAR(200) NOT NULL DEFAULT '' AFTER nachgefasst_am"],
     ];
 }
 
