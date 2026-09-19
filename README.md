@@ -502,13 +502,6 @@ Passwort, und eine `KEY=value`-Zeile verträgt keinen Zeilenumbruch.
     "maps_js_key": "…",
     "anthropic_api_key": "…",
     "testmail": "…",
-    "smtp_host": "…",
-    "smtp_port": "587",
-    "smtp_verschluesselung": "tls",
-    "smtp_user": "…",
-    "smtp_passwort": "…",
-    "smtp_absender": "…",
-    "smtp_absender_name": "…",
     "vapid_private_pem_b64": "…",
     "vapid_kontakt": "mailto:…",
     "push_cron_schluessel": "…",
@@ -534,6 +527,11 @@ base64 -w0 demo-plaetze.json      # -w0: eine einzige Zeile
 rm demo-plaetze.json              # die Datei gehört nicht ins Repository
 ```
 
+- **Kein Postfach im Vorrat.** Die Plätze verschicken über dasselbe
+  `info@guardops.ch` wie die Homepage — die Zugangsdaten stehen schon als
+  `GUARDOPS_SMTP_*` im Deploy (ENT-569/ENT-570). Sind die nicht gesetzt,
+  meldet `smtp_konfiguriert()` „nicht eingerichtet", statt mit einem
+  Platzhalter zu verschicken.
 - **Ein FTP-Zugang für alle zehn**, unter `gemeinsam`. Er zeigt auf den
   gemeinsamen Elternordner der zehn Document-Roots, nicht auf einen
   einzelnen Platz — getrennt werden sie über das Zielverzeichnis. Welcher

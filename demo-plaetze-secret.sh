@@ -127,16 +127,13 @@ echo "Gemeinsame Werte aller zehn Plätze:"
 # den Terminal-Verlauf, wo er beim nächsten Bildschirmfoto mitfährt.
 frage_still MAPS "  Google-Maps-Schlüssel (der bestehende Demo-Schlüssel)"
 frage_still KI   "  Anthropic-API-Schlüssel"
-frage TMAIL "  Testadresse -- JEDE Mail aus der Demo geht dorthin"
+frage TMAIL "  Testadresse -- JEDE Mail aus der Demo geht dorthin" "info@guardops.ch"
 echo
-echo "Postfach, über das die Demo verschickt:"
-frage SMTP_HOST   "  SMTP-Server"
-frage SMTP_PORT   "  Port"                       "587"
-frage SMTP_VERSCH "  Verschlüsselung (tls/ssl)"  "tls"
-frage SMTP_USER   "  Benutzer"
-frage_still SMTP_PASS "  Passwort (wird nicht angezeigt)"
-frage SMTP_ABS    "  Absenderadresse"            "$SMTP_USER"
-frage SMTP_ABSN   "  Absendername"               "GuardOpS Demo"
+# Kein Postfach abgefragt: Die Plaetze verschicken ueber dasselbe
+# info@guardops.ch wie die Homepage, und dessen Zugangsdaten stehen schon
+# im Deploy (GUARDOPS_SMTP_*, ENT-569/ENT-570). Zweimal eingetippt waeren
+# es dieselben Werte an zwei Orten -- einer davon irgendwann veraltet.
+echo "Postfach: info@guardops.ch, wie bei der Homepage (nichts einzugeben)."
 echo
 
 # ── Die secret_name-Werte ────────────────────────────────────────────
@@ -192,10 +189,7 @@ echo
 # daran zerbricht selbstgeschriebenes JSON.
 B64=$(
   FTP_HOST="$FTP_HOST" FTP_USER="$FTP_USER" FTP_PASS="$FTP_PASS" \
-  MAPS="$MAPS" KI="$KI" TMAIL="$TMAIL" \
-  SMTP_HOST="$SMTP_HOST" SMTP_PORT="$SMTP_PORT" SMTP_VERSCH="$SMTP_VERSCH" \
-  SMTP_USER="$SMTP_USER" SMTP_PASS="$SMTP_PASS" SMTP_ABS="$SMTP_ABS" \
-  SMTP_ABSN="$SMTP_ABSN" DB_HOST="$DB_HOST" \
+  MAPS="$MAPS" KI="$KI" TMAIL="$TMAIL" DB_HOST="$DB_HOST" \
   PLAETZE="$PLAETZE" SECRET_NAMEN="${SECRET_NAMEN[*]}" \
   python3 -c '
 import json, os
@@ -208,10 +202,6 @@ d = {
     "ftp_passwort": u("FTP_PASS"),
     "maps_js_key": u("MAPS"), "anthropic_api_key": u("KI"),
     "testmail": u("TMAIL"),
-    "smtp_host": u("SMTP_HOST"), "smtp_port": u("SMTP_PORT"),
-    "smtp_verschluesselung": u("SMTP_VERSCH"),
-    "smtp_user": u("SMTP_USER"), "smtp_passwort": u("SMTP_PASS"),
-    "smtp_absender": u("SMTP_ABS"), "smtp_absender_name": u("SMTP_ABSN"),
     # Push bleibt leer: push_konfiguriert() meldet dann "nicht
     # eingerichtet", statt mit einem falschen Schluessel zu signieren.
     "vapid_private_pem_b64": "", "vapid_kontakt": "",

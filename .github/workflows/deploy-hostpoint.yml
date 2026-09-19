@@ -2066,13 +2066,18 @@ jobs:
           G_MAPS=$(hole maps_js_key);            [ -n "$G_MAPS" ] && echo "::add-mask::$G_MAPS"
           G_KI=$(hole anthropic_api_key);        [ -n "$G_KI" ] && echo "::add-mask::$G_KI"
           G_TESTMAIL=$(hole testmail);           [ -n "$G_TESTMAIL" ] && echo "::add-mask::$G_TESTMAIL"
-          G_SMTP_HOST=$(hole smtp_host);         [ -n "$G_SMTP_HOST" ] && echo "::add-mask::$G_SMTP_HOST"
-          G_SMTP_PORT=$(hole smtp_port)
-          G_SMTP_VERSCHL=$(hole smtp_verschluesselung)
-          G_SMTP_USER=$(hole smtp_user);         [ -n "$G_SMTP_USER" ] && echo "::add-mask::$G_SMTP_USER"
-          G_SMTP_PASS=$(hole smtp_passwort);     [ -n "$G_SMTP_PASS" ] && echo "::add-mask::$G_SMTP_PASS"
-          G_SMTP_ABS=$(hole smtp_absender);      [ -n "$G_SMTP_ABS" ] && echo "::add-mask::$G_SMTP_ABS"
-          G_SMTP_ABS_NAME=$(hole smtp_absender_name)
+          # KEIN EIGENES POSTFACH IM VORRAT: Die Plaetze verschicken ueber
+          # dasselbe info@guardops.ch wie die Homepage (GUARDOPS_SMTP_*,
+          # ENT-569/ENT-570) -- es ist das Postfach der Betreiberin, und
+          # die Demo ist ihre Verkaufsflaeche. Ein zweites Mal abgefragt
+          # waeren es dieselben Werte an einem zweiten Ort, mit derselben
+          # stillen Falle wie beim Datenbank-Passwort: Eine Aenderung
+          # koennte an einem der beiden vergessen werden.
+          #
+          # Sind die Secrets nicht gesetzt, bleiben die Werte leer --
+          # smtp_konfiguriert() meldet dann "nicht eingerichtet", statt mit
+          # einem Platzhalter zu verschicken. Kein Pflichtwert, gleiche
+          # Bauart wie bei den uebrigen Buendeln.
           G_VAPID_PEM=$(hole vapid_private_pem_b64); [ -n "$G_VAPID_PEM" ] && echo "::add-mask::$G_VAPID_PEM"
           G_VAPID_KONTAKT=$(hole vapid_kontakt)
           G_PUSH_CRON=$(hole push_cron_schluessel); [ -n "$G_PUSH_CRON" ] && echo "::add-mask::$G_PUSH_CRON"
@@ -2209,13 +2214,13 @@ jobs:
 
             # ── Gemeinsame Werte ─────────────────────────────────────────
             ersetze __ANTHROPIC_API_KEY__ "$G_KI" "dist-demo/$PLATZ/ai.php"
-            ersetze __SMTP_HOST__ "$G_SMTP_HOST" "dist-demo/$PLATZ/mailer.php"
-            ersetze __SMTP_PORT__ "$G_SMTP_PORT" "dist-demo/$PLATZ/mailer.php"
-            ersetze __SMTP_VERSCHLUESSELUNG__ "$G_SMTP_VERSCHL" "dist-demo/$PLATZ/mailer.php"
-            ersetze __SMTP_USER__ "$G_SMTP_USER" "dist-demo/$PLATZ/mailer.php"
-            ersetze __SMTP_PASSWORD__ "$G_SMTP_PASS" "dist-demo/$PLATZ/mailer.php"
-            ersetze __SMTP_ABSENDER__ "$G_SMTP_ABS" "dist-demo/$PLATZ/mailer.php"
-            ersetze __SMTP_ABSENDER_NAME__ "$G_SMTP_ABS_NAME" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_HOST__ "$EFF_GUARDOPS_SMTP_HOST" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_PORT__ "$EFF_GUARDOPS_SMTP_PORT" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_VERSCHLUESSELUNG__ "$EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_USER__ "$EFF_GUARDOPS_SMTP_USER" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_PASSWORD__ "$EFF_GUARDOPS_SMTP_PASSWORD" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_ABSENDER__ "info@guardops.ch" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_ABSENDER_NAME__ "GuardOpS Demo" "dist-demo/$PLATZ/mailer.php"
             ersetze __MAIL_SIGNATUR__ "" "dist-demo/$PLATZ/mailer.php"
             # Die Umleitung ALLER Mails auf die Testadresse (siehe oben).
             ersetze __DEMO_TESTMAIL__ "$G_TESTMAIL" "dist-demo/$PLATZ/mailer.php"
