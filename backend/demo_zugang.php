@@ -745,6 +745,180 @@ function demo_warnung_faellig_und_vermerken(?string $datei = null, ?int $jetzt =
     return true;
 }
 
+// ══ Der Weg zurueck nach dem Ablauf (ENT-628) ════════════════════════
+//
+// Nach vierzehn Tagen ist der Zugang weg und die Instanz geleert. Bis
+// hierher endete es dort: kein Wort mehr, und ein Interessent, der weiter
+// gewollt haette, musste sich selbst melden. Die Abschiedsmail gibt ihm
+// einen Knopf.
+//
+// SIE GEHT NUR BEIM ABLAUF RAUS, nicht beim Not-Aus im Betreiber-Bereich.
+// Wer einen Zugang von Hand beendet, tut das, weil etwas nicht stimmt --
+// eine freundliche Mail mit Verkaufsknopf waere dann das Falsche.
+
+// Die Groessenklassen, nach denen auf der Landeseite gefragt wird.
+//
+// SIE SIND KEINE PREISSTUFEN. Die Preisgestaltung ist offen (ENT-539,
+// ENT-617); hier wird nur erhoben, was sich spaeter nicht nachholen
+// laesst. Die erste Grenze stammt aus der Aussage des Projektinhabers in
+// ENT-539 ("bis 10 dieser Preis, ab 11 dieser Preis").
+//
+// 'keine' ist die AUSDRUECKLICHE Verweigerung und darf nicht wie eine
+// fehlende Angabe aussehen: Wer "lieber nicht sagen" klickt, hat
+// geantwortet. Ein leeres Feld heisst dagegen, dass gar nicht gefragt
+// werden konnte (Hausregel: "unbekannt" darf nie wie "keine" aussehen).
+const DEMO_GROESSE_KLASSEN = [
+    'bis10'    => 'bis 10 Mitarbeitende',
+    'elfbis30' => '11 bis 30 Mitarbeitende',
+    'ueber30'  => 'mehr als 30 Mitarbeitende',
+    'keine'    => 'keine Angabe gemacht',
+];
+
+// Der Wert im Link und sein Abdruck in der Datenbank.
+//
+// EIGENE FUNKTIONEN statt der gleichlautenden aus demo_bestaetigung.php:
+// Das ist ein anderer Schluessel mit einem anderen Lebenslauf -- der
+// Bestaetigungswert gilt 24 Stunden und wird verbraucht, dieser gilt
+// unbefristet und darf mehrfach benutzt werden (siehe unten). Sie hier
+// mitzubenutzen hiesse, zwei Dinge aneinanderzubinden, die sich
+// unabhaengig aendern duerfen.
+function demo_ende_wert(): string
+{
+    return bin2hex(random_bytes(32));
+}
+function demo_ende_abdruck(string $wert): string
+{
+    return hash('sha256', $wert);
+}
+
+// Die Adresse der Landeseite. Die Basis kommt aus dem Deploy und wird
+// UEBERGEBEN, nicht hier geholt: So bleibt diese Datei ohne Abhaengigkeit
+// zu demo_bestaetigung.php und laesst sich echt ausfuehren (Hausregel:
+// die eigene Adresse kommt aus dem Deploy, nie aus der Anfrage).
+function demo_ende_link(string $wert, ?string $basis): ?string
+{
+    if ($basis === null || $basis === '') { return null; }
+    return rtrim($basis, '/') . '/demo-weiter.html?w=' . rawurlencode($wert);
+}
+
+// Ist eine Groessenklasse eine, die wir kennen?
+function demo_groesse_gueltig(string $klasse): bool
+{
+    return array_key_exists($klasse, DEMO_GROESSE_KLASSEN);
+}
+function demo_groesse_text(string $klasse): string
+{
+    // Drei Aussagen, drei Texte: eine bekannte Klasse, die ausdrueckliche
+    // Verweigerung ('keine', steht in der Liste) und "gar nicht gefragt"
+    // (leer oder unbekannt).
+    return DEMO_GROESSE_KLASSEN[$klasse] ?? 'nicht angegeben';
+}
+
+// Die Abschiedsmail an den Interessenten.
+//
+// KEINE SPERRMELDUNG. Der Zugang ist abgelaufen, das ist eine Tatsache und
+// steht im ersten Satz -- aber der Anlass dieser Mail ist nicht die
+// Schliessung, sondern die Frage, ob es weitergeht. Wortlaut vom
+// Projektinhaber am 2026-09-19 festgelegt.
+//
+// DER KNOPF HEISST "GuardOpS weiter nutzen" und nicht "Offerte anfordern":
+// Der Interessent entscheidet ueber die Nutzung, nicht ueber ein
+// Dokument. Damit daraus keine falsche Erwartung wird -- der Zugang ist
+// gelöscht, er geht nicht einfach wieder auf --, steht der Satz "Wir
+// melden uns persönlich bei Ihnen" direkt darueber, und die Landeseite
+// sagt es noch einmal.
+//
+// OHNE LINK KEIN KNOPF: Steht die Basisadresse im Deploy nicht, faellt der
+// Knopf weg und die Mail geht trotzdem raus. Ein Knopf, der ins Leere
+// zeigt, waere schlimmer als keiner.
+function demo_ende_mail(string $firma, string $person, ?string $link): array
+{
+    $betreff = 'Ihre 14 Tage mit GuardOpS sind um';
+
+    $zeilen = mail_signatur_zeilen();
+    $gruss  = $zeilen === [] ? ['pzu consulting gmbh'] : $zeilen;
+    $logo     = mail_logo();
+    $logoHell = mail_logo_hell();
+    $kennung     = $logo === null ? '' : (string)$logo['cid'];
+    $kennungHell = $logoHell === null ? '' : (string)$logoHell['cid'];
+    $bilder = array_values(array_filter([$logo, $logoHell]));
+
+    $text = "Guten Tag $person\n\n"
+          . "Ihre 14 Tage mit GuardOpS sind um. Der Demo-Zugang für $firma wurde "
+          . "geschlossen und die erfassten Testdaten wie angekündigt gelöscht.\n\n"
+          . "Sie konnten GuardOpS nun zwei Wochen im eigenen Betrieb testen und sich "
+          . "ein Bild davon machen, wie Planung, Rapporte und administrative Abläufe "
+          . "zusammenspielen.\n\n"
+          . ($link === null ? '' :
+              "Wenn Sie GuardOpS weiter nutzen möchten, genügt ein Klick. Sie müssen "
+            . "nichts ausfüllen. Wir melden uns persönlich bei Ihnen.\n\n"
+            . "$link\n\n")
+          . "Falls es für Ihren Betrieb nicht gepasst hat, interessiert uns auch "
+          . "weshalb. Antworten Sie einfach direkt auf diese Mail. Auch ein kurzer "
+          . "Satz hilft uns bei der Weiterentwicklung.\n\n"
+          // "Mit freundlichen Gruessen" und nicht "Freundliche Gruesse":
+          // Die HTML-Signatur (mail_signatur) zeichnet fest so, und zwei
+          // Grussformeln in derselben Mail waeren ein Fehler, den niemand
+          // erklaeren kann. Der Entwurf des Projektinhabers sah die kurze
+          // Form vor; sie zu nehmen hiesse, die gemeinsame Signatur fuer
+          // ALLE Mails zu aendern -- eine eigene Entscheidung.
+          . "Mit freundlichen Grüssen\n" . implode("\n", $gruss);
+
+    $inhalt = mail_absatz('Guten Tag ' . mail_e($person))
+        . mail_absatz('Ihre 14 Tage mit GuardOpS sind um. Der Demo-Zugang für '
+            . '<b>' . mail_e($firma) . '</b> wurde geschlossen und die erfassten '
+            . 'Testdaten wie angekündigt gelöscht.')
+        . mail_absatz('Sie konnten GuardOpS nun zwei Wochen im eigenen Betrieb testen '
+            . 'und sich ein Bild davon machen, wie Planung, Rapporte und '
+            . 'administrative Abläufe zusammenspielen.')
+        . ($link === null ? '' :
+            mail_absatz('Wenn Sie GuardOpS weiter nutzen möchten, genügt ein Klick. '
+                . 'Sie müssen nichts ausfüllen. Wir melden uns persönlich bei Ihnen.')
+            . mail_knopf('GuardOpS weiter nutzen', $link))
+        . mail_absatz('Falls es für Ihren Betrieb nicht gepasst hat, interessiert uns '
+            . 'auch weshalb. Antworten Sie einfach direkt auf diese Mail. Auch ein '
+            . 'kurzer Satz hilft uns bei der Weiterentwicklung.')
+        . mail_signatur($zeilen, $kennung, $kennungHell);
+
+    return ['betreff' => $betreff, 'text' => $text, 'html' => mail_rahmen($inhalt),
+        'bilder' => $bilder];
+}
+
+// Die Meldung an uns, wenn jemand den Knopf gedrueckt hat.
+//
+// DIE FIRMA GEHOERT IN DEN BETREFF, gleiche Begruendung wie bei
+// demo_melde_mail(): Wer drei Meldungen im Postfach hat, will nicht drei
+// Mails oeffnen muessen, um zu wissen, um wen es geht.
+//
+// UND DIE GROESSE AUCH: Sie ist der Grund, warum ueberhaupt gefragt wird.
+function demo_weiter_mail(string $firma, string $person, string $email,
+                          string $telefon, string $platz, string $groesse): array
+{
+    $groesseText = demo_groesse_text($groesse);
+    $betreff = 'Will weitermachen: ' . $firma . ' (' . $groesseText . ')';
+
+    $text = "$firma möchte GuardOpS weiter nutzen.\n\n"
+          . "Betriebsgrösse: $groesseText\n"
+          . "Ansprechperson: $person\n"
+          . "E-Mail:         $email\n"
+          . ($telefon === '' ? '' : "Telefon:        $telefon\n")
+          . "Demo-Platz:     $platz\n\n"
+          . "Die Anfrage steht auch im Betreiber-Bereich unter Mandanten, Reiter Demo.";
+
+    $inhalt = mail_absatz('<b>' . mail_e($firma) . '</b> möchte GuardOpS weiter nutzen.')
+        . mail_block(
+            mail_feld('Betriebsgrösse', mail_e($groesseText))
+            . mail_feld('Ansprechperson', mail_e($person))
+            . mail_feld('E-Mail', mail_e($email))
+            . ($telefon === '' ? '' : mail_feld('Telefon', mail_e($telefon)))
+            . mail_feld('Demo-Platz', mail_e($platz)))
+        . mail_absatz('Die Anfrage steht auch im Betreiber-Bereich unter Mandanten, '
+            . 'Reiter Demo.');
+
+    return ['betreff' => $betreff, 'text' => $text, 'html' => mail_rahmen($inhalt),
+        'bilder' => []];
+}
+
 // Die Tabelle des Registers. Sie liegt in der BETREIBER-Datenbank, nicht in
 // der Demo-Instanz: Der naechtliche Reset (ENT-523) leert generisch JEDE
 // Tabelle der verbundenen Datenbank -- ein Register in der Demo waere am
@@ -776,6 +950,23 @@ function demo_zugang_tabelle(): string
   -- die Behauptung, es sei am 1.1.1970 erledigt worden.
   nachgefasst_am DATETIME NULL,
   nachgefasst_von VARCHAR(200) NOT NULL DEFAULT '',
+  -- Die Abschiedsmail nach dem Ablauf und der Weg zurueck (ENT-628).
+  --
+  -- ende_abdruck ist der SHA-256-Abdruck des Werts aus dem Link, NICHT der
+  -- Wert selbst -- gleiche Regel wie bei den Sitzungen (ENT-501) und beim
+  -- Bestaetigungslink: Ein Blick in die Datenbank gibt keinen gueltigen
+  -- Link her.
+  ende_abdruck CHAR(64) NOT NULL DEFAULT '',
+  -- Wann die Abschiedsmail rausging. NULL heisst noch nicht, nicht
+  -- niemals -- ohne das Feld liefe sie bei jedem Ablauf-Lauf erneut raus.
+  ende_mail_am DATETIME NULL,
+  -- Wann der Interessent den Knopf in der Abschiedsmail gedrueckt hat.
+  weiter_am DATETIME NULL,
+  -- Die Groessenklasse, die er dabei angegeben hat. Leer heisst nicht
+  -- gesagt und ist etwas anderes als kein Betrieb -- darum eine
+  -- Klasse 'keine' fuer die ausdrueckliche Verweigerung, siehe
+  -- DEMO_GROESSE_KLASSEN.
+  weiter_groesse VARCHAR(20) NOT NULL DEFAULT '',
   -- Ein Platz traegt hoechstens einen aktiven Zugang. Der Index ist nicht
   -- nur fuer die Geschwindigkeit da: Er ist die Spur, auf der die Suche
   -- nach dem freien Platz laeuft.

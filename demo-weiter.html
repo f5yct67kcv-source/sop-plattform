@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<!--
+  „GUARDOPS WEITER NUTZEN" -- DIE SEITE NACH DER ABSCHIEDSMAIL (ENT-628).
+
+  WARUM ES DIESE SEITE GIBT UND NICHT NUR EINEN LINK: Outlook Safe Links,
+  Virenscanner in Firmennetzen und Vorschaudienste rufen JEDE Adresse aus
+  einer Mail auf, bevor ein Mensch sie sieht. Loeste der blosse Aufruf die
+  Anfrage aus, bekaeme der Betreiber Anfragen von Betrieben, die nie
+  geklickt haben, und riefe Leute an, die nichts wollten. Ein Scanner ruft
+  auf, aber er drueckt keinen Knopf. Darum passiert hier beim Laden NICHTS;
+  erst ein Knopf schickt etwas an den Server, und api/demo_weiter.php
+  antwortet ausschliesslich auf POST. Gleiche Bauart wie
+  demo-bestaetigen.html (ENT-624).
+
+  DIE GROESSENFLAECHEN SIND DER ABSENDEKNOPF. Statt eines neutralen Knopfes
+  und einer Nachfrage danach traegt jede der vier Flaechen die Anfrage
+  selbst. Ein Klick, und Anfrage und Betriebsgroesse sind zusammen da --
+  kein Formular, kein zweiter Schritt. Die vierte Flaeche ("lieber nicht
+  sagen") ist leise gehalten und trotzdem eine vollwertige Antwort: Wer sie
+  klickt, hat geantwortet, und das ist etwas anderes als gar nicht zu
+  klicken (Hausregel: "unbekannt" darf nie wie "keine" aussehen).
+
+  WOZU DIE GROESSE UEBERHAUPT: Die Preisgestaltung ist offen (ENT-539); was
+  sich nicht nachholen laesst, ist die Angabe im Moment des Interesses.
+  Darum steht auf der Seite, WARUM gefragt wird -- eine Frage ohne Grund
+  beantwortet niemand gern.
+
+  SIE LIEGT AUF guardops.ch, nicht im Betreiber-Bereich: Der Interessent
+  kam von dieser Domain, und eine Adresse mit "betreiber" darin geht ihn
+  nichts an. Der Endpunkt laeuft auf betreiber.guardops.ch, weil er die
+  Mandanten-Datenbank braucht, die diese Seite bewusst nicht hat. Die
+  Herkunft steht dafuer in OEFFENTLICHE_DEMO_SKRIPTE (backend/db.php).
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GuardOpS weiter nutzen – GuardOpS</title>
+<meta name="description" content="Sagen Sie uns mit einem Klick, dass Sie GuardOpS weiter nutzen möchten.">
+<!-- Diese Seite gehoert nicht in den Index: Sie ist ohne den Wert aus der
+     Mail sinnlos, und ein Treffer bei einer Suchmaschine waere fuer jeden
+     eine Sackgasse. -->
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="icons/guardops-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icons/guardops-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="icons/guardops-180.png">
+<link rel="stylesheet" href="recht.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="marke" viewBox="0 0 460 593">
+    <path fill="currentColor" d="M230 0 460 79 460 154 416 154 416 109.9 230 46 44 109.9 44 364.4 230 535 416 364.4 416 308 206 308 233 264 460 264 460 382 230 593 0 382 0 79Z"/>
+  </symbol>
+</svg>
+
+<header class="kopf">
+  <div class="innen">
+    <a class="marke" href="index.html">
+      <svg aria-hidden="true"><use href="#marke"></use></svg>
+      <span class="wortmarke" data-brand>GuardOpS</span>
+    </a>
+    <a class="zurueck" href="index.html">Zurück zur Startseite</a>
+  </div>
+</header>
+
+<main>
+  <!-- "Demo-Zugang" und nicht der Markenname: Die Vorzeile setzt in
+       Versalien, und "GUARDOPS" verloere dabei das grosse S der Marke.
+       Dieselbe Vorzeile wie auf demo-bestaetigen.html. -->
+  <p class="vorzeile">Demo-Zugang</p>
+
+  <!-- Vor dem Klick. Die Ueberschrift sagt nicht "Danke": Gedankt wird,
+       wenn etwas geschehen ist, und hier ist noch nichts geschehen. -->
+  <div class="zustand an" id="z-bereit">
+    <h1>Schön, dass Sie weitermachen möchten</h1>
+    <p class="stand">Eine Frage noch, ein Klick genügt.</p>
+    <div class="karte">
+      <p>Damit wir Ihnen gleich etwas Passendes vorschlagen können: Wie viele
+         Mitarbeitende hat Ihr Betrieb?</p>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin:22px 0 0">
+        <button class="knopf" type="button" data-groesse="bis10">bis 10</button>
+        <button class="knopf" type="button" data-groesse="elfbis30">11 bis 30</button>
+        <button class="knopf" type="button" data-groesse="ueber30">mehr als 30</button>
+      </div>
+      <p class="stand" style="margin:18px 0 0">
+        <a href="#" data-groesse="keine">Lieber nicht sagen</a>. Ihre Anfrage geht
+        auch ohne diese Angabe raus.
+      </p>
+    </div>
+  </div>
+
+  <div class="zustand" id="z-laeuft">
+    <h1>Einen Moment</h1>
+    <p class="stand">Wir nehmen Ihre Anfrage auf.</p>
+  </div>
+
+  <!-- Angenommen. Der Text sagt ausdruecklich, dass jemand anruft und der
+       Zugang NICHT wieder aufgeht: "weiter nutzen" koennte sonst als
+       "Zugang ist wieder offen" gelesen werden. -->
+  <div class="zustand" id="z-fertig">
+    <h1>Ihre Anfrage ist raus</h1>
+    <p class="stand">Wir melden uns persönlich bei Ihnen.</p>
+    <div class="karte">
+      <p style="margin-bottom:0">Wir schauen uns an, was zu Ihrem Betrieb passt, und
+         melden uns in den nächsten Arbeitstagen unter der Adresse, mit der Sie den
+         Demo-Zugang angefragt haben. Ihr alter Demo-Zugang bleibt geschlossen. Wie
+         es weitergeht, besprechen wir dann gemeinsam.</p>
+    </div>
+  </div>
+
+  <!-- Zweiter Klick. "Schon notiert" ist etwas anderes als "angenommen",
+       und wer den Knopf zweimal drueckt, soll keinen Fehler sehen. -->
+  <div class="zustand" id="z-erneut">
+    <h1>Das haben wir schon notiert</h1>
+    <p class="stand">Ihre Anfrage lag bereits vor.</p>
+    <div class="karte">
+      <p style="margin-bottom:0">Ihre Angabe haben wir aktualisiert. Wir melden uns
+         in den nächsten Arbeitstagen bei Ihnen.</p>
+    </div>
+  </div>
+
+  <div class="zustand" id="z-unbekannt">
+    <h1>Diesen Link kennen wir nicht</h1>
+    <p class="stand">Vielleicht stammt er aus einer sehr alten E-Mail.</p>
+    <div class="karte">
+      <p style="margin-bottom:0">Schreiben Sie uns einfach an
+         <a href="mailto:info@guardops.ch">info@guardops.ch</a>, dann melden wir uns
+         bei Ihnen. Eine neue Demo können Sie jederzeit
+         <a href="index.html#demo">hier anfragen</a>.</p>
+    </div>
+  </div>
+
+  <div class="zustand" id="z-fehler">
+    <h1>Das hat gerade nicht geklappt</h1>
+    <p class="stand" id="fehlertext">Bitte versuchen Sie es in Kürze noch einmal.</p>
+    <div class="karte">
+      <p style="margin-bottom:0">Bleibt es dabei, schreiben Sie uns an
+         <a href="mailto:info@guardops.ch">info@guardops.ch</a>. Wir melden uns
+         dann von Hand bei Ihnen.</p>
+    </div>
+  </div>
+</main>
+
+<footer class="fuss">
+  <div class="innen">
+    <span>© 2026 <span data-brand>GuardOpS</span></span>
+    <a href="impressum.html">Impressum</a>
+    <a href="nutzungsbedingungen.html">Nutzungsbedingungen</a>
+    <a href="datenschutz.html">Datenschutz</a>
+  </div>
+</footer>
+
+<script>
+(function(){
+  'use strict';
+  // Der Endpunkt liegt im Betreiber-Bereich, weil er die
+  // Mandanten-Datenbank braucht; diese Seite traegt bewusst keine
+  // Zugangsdaten. Feste Adresse, kein zusammengebauter Host.
+  var ZIEL = 'https://betreiber.guardops.ch/api/demo_weiter.php';
+
+  function zeig(id) {
+    var alle = document.querySelectorAll('.zustand');
+    for (var i = 0; i < alle.length; i++) { alle[i].classList.remove('an'); }
+    var el = document.getElementById(id);
+    if (el) { el.classList.add('an'); }
+    window.scrollTo(0, 0);
+  }
+
+  // Der Wert steht in der Adresse. Fehlt er, ist die Seite direkt
+  // aufgerufen worden -- dann gibt es nichts zu melden, und das ist etwas
+  // anderes als ein ungueltiger Wert.
+  var wert = new URLSearchParams(window.location.search).get('w') || '';
+  if (!/^[0-9a-f]{64}$/.test(wert)) {
+    zeig('z-unbekannt');
+    return;
+  }
+
+  var flaechen = document.querySelectorAll('[data-groesse]');
+  // Ein eigenes Merkzeichen statt "disabled" an jedem Element: Die vierte
+  // Flaeche ist ein Link, und ein <a> kennt kein disabled -- ohne das
+  // Merkzeichen liesse sich ausgerechnet die leise Antwort doppelt
+  // abschicken.
+  var laeuft = false;
+
+  function senden(groesse) {
+    if (laeuft) { return; }
+    laeuft = true;
+    for (var i = 0; i < flaechen.length; i++) { flaechen[i].disabled = true; }
+    zeig('z-laeuft');
+    fetch(ZIEL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ w: wert, groesse: groesse })
+    }).then(function (a) {
+      return a.json().catch(function () { return { status: 'error', grund: 'netz' }; });
+    }).then(function (a) {
+      if (a.status === 'ok') { zeig(a.erneut ? 'z-erneut' : 'z-fertig'); return; }
+      if (a.grund === 'unbekannt') { zeig('z-unbekannt'); return; }
+      // Was der Server nicht benennt, landet im Sammelfall -- mit SEINEM
+      // Text, nicht mit einem erfundenen.
+      if (a.message) { document.getElementById('fehlertext').textContent = a.message; }
+      zeig('z-fehler');
+      laeuft = false;
+      for (var j = 0; j < flaechen.length; j++) { flaechen[j].disabled = false; }
+    }).catch(function () {
+      // Netzfehler: Der Server hat die Anfrage vielleicht trotzdem
+      // aufgenommen. Darum kein "hat nicht geklappt", sondern ein Text,
+      // der beides abdeckt.
+      document.getElementById('fehlertext').textContent =
+        'Die Verbindung ist abgebrochen. Möglicherweise ist Ihre Anfrage trotzdem '
+        + 'angekommen. Melden Sie sich im Zweifel kurz bei uns.';
+      zeig('z-fehler');
+      laeuft = false;
+      for (var k = 0; k < flaechen.length; k++) { flaechen[k].disabled = false; }
+    });
+  }
+
+  for (var i = 0; i < flaechen.length; i++) {
+    flaechen[i].addEventListener('click', function (e) {
+      e.preventDefault();
+      senden(e.currentTarget.getAttribute('data-groesse'));
+    });
+  }
+})();
+</script>
+</body>
+</html>

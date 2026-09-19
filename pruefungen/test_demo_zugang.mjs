@@ -64,6 +64,72 @@ check('die Tabellendefinition laesst sich erzeugen', sql.includes('create table'
 check('KRITISCH: im Register steht kein Passwort und kein Hash',
   sql.includes('create table') && !sql.includes('passwort') && !sql.includes('hash'));
 
+// ── 3a. Der Weg zurueck nach dem Ablauf (ENT-628) ─────────────────────
+//
+// Strukturell geprueft, weil ein echter Aufruf eine Datenbank und einen
+// Mailserver braucht. Die reine Logik (Mailtexte, Klassen, Abdruck) laeuft
+// in pruef_demo_zugang.php und ist dort echt ausgefuehrt.
+{
+  const ablauf = nurCode(lies('backend/api/betreiber_demo_ablauf.php'));
+  const weiter = nurCode(lies('backend/api/demo_weiter.php'));
+  const beenden = nurCode(lies('backend/api/betreiber_demo_beenden.php'));
+
+  // Die Mail sagt, dass die Daten geloescht sind. Ginge sie raus, BEVOR
+  // die Instanz geleert ist, und das Leeren scheiterte, waere sie eine
+  // Falschaussage -- und der Platz traegt dann noch die Daten.
+  //
+  // Gemessen wird die Stelle des AUFRUFS, nicht die der Definition: Die
+  // Funktion steht weiter oben in der Datei, und ihr Name allein sagt
+  // nichts ueber die Reihenfolge im Lauf.
+  const aufruf = ablauf.indexOf('demo_ende_mail_senden($pdo');
+  check('KRITISCH: die Abschiedsmail geht erst raus, nachdem der Zugang wirklich geschlossen ist',
+    aufruf > 0
+    && ablauf.indexOf('demo_instanz_leeren') < aufruf
+    && ablauf.indexOf("status = 'abgelaufen'") < aufruf);
+  // Ein Zugang, der geschlossen ist, bleibt geschlossen -- auch wenn der
+  // Mailserver schweigt.
+  check('KRITISCH: ein Fehlschlag beim Versand laesst den Ablauf nicht scheitern',
+    /function demo_ende_mail_senden[\s\S]*?catch \(Throwable/.test(ablauf));
+  // Der Not-Aus ist der Knopf fuer den Fall, dass etwas nicht stimmt.
+  // Eine freundliche Mail mit Verkaufsknopf waere dann das Falsche
+  // (Entscheidung des Projektinhabers, 2026-09-19).
+  check('KRITISCH: beim Beenden von Hand geht KEINE Abschiedsmail raus',
+    !/demo_ende_mail/.test(beenden));
+
+  // Nur POST -- derselbe Scanner-Schutz wie bei demo_bestaetigen.php.
+  check('KRITISCH: der Endpunkt antwortet nur auf POST, damit ein Mailscanner nichts ausloest',
+    /REQUEST_METHOD'\]\s*!==\s*'POST'/.test(weiter) && /405/.test(weiter));
+  // In der Tabelle steht der Abdruck, nicht der Wert (ENT-501). Gesucht
+  // wird entsprechend ueber den Abdruck.
+  check('KRITISCH: gesucht wird ueber den Abdruck, nie ueber den rohen Wert',
+    /ende_abdruck = \?/.test(weiter) && /demo_ende_abdruck\(\$wert\)/.test(weiter)
+    && !/ende_abdruck = '\s*\.\s*\$wert/.test(weiter));
+  // Eine unbekannte Klasse darf nicht stillschweigend zu "keine Angabe"
+  // werden -- dann stuende im Register eine Antwort, die niemand gab.
+  check('KRITISCH: eine unbekannte Groessenangabe wird abgewiesen, nicht umgedeutet',
+    /!\s*demo_groesse_gueltig\(\$groesse\)/.test(weiter) && /400/.test(weiter));
+  // Der Zeitpunkt der ERSTEN Anfrage sagt, wie schnell jemand reagiert
+  // hat. Ein zweiter Klick darf ihn nicht ueberschreiben.
+  check('KRITISCH: ein zweiter Klick ueberschreibt den Zeitpunkt der ersten Anfrage nicht',
+    /COALESCE\(weiter_am, NOW\(\)\)/.test(weiter));
+  // Eine Meldung an den Betreiber darf den Interessenten nie etwas kosten.
+  check('ein Fehlschlag beim Melden kostet den Interessenten nichts',
+    /smtp_senden[\s\S]{0,400}catch \(Throwable/.test(weiter));
+
+  // Beide Dateien muessen im Deploy-Buendel liegen. Genau daran ist der
+  // Bestaetigungsweg schon einmal gescheitert: Der POST lief auf eine
+  // 404-Seite ohne CORS-Kopfzeile, sichtbar nur als abgebrochene
+  // Verbindung.
+  const deploy = lies('.github/workflows/deploy-hostpoint.yml');
+  check('KRITISCH: die Landeseite liegt im guardops-Buendel',
+    /cp demo-weiter\.html\s+dist-guardops\/demo-weiter\.html/.test(deploy));
+  check('KRITISCH: der Endpunkt liegt im Betreiber-Buendel',
+    /cp backend\/api\/demo_weiter\.php\s+dist-betreiber\/api\/demo_weiter\.php/.test(deploy));
+  // Ohne CORS-Freigabe bricht der POST von guardops.ch im Browser ab.
+  check('KRITISCH: die Herkunft guardops.ch ist fuer diesen Endpunkt freigegeben',
+    /OEFFENTLICHE_DEMO_SKRIPTE[\s\S]{0,200}demo_weiter\.php/.test(nurCode(lies('backend/db.php'))));
+}
+
 // ── 3b. Telefon ist Pflicht, die Adresse wird geprueft (ENT-601/ENT-613) ─
 // Strukturell geprueft, weil ein echter Aufruf eine Datenbank braucht --
 // die reine Logik dahinter laeuft in pruef_demo_zugang.php.
@@ -181,6 +247,9 @@ const ANTWORTEN = {
     // Der Nachfass-Stand (ENT-622). Zwei offene, einer erledigt -- damit
     // beide Darstellungen und beide Knoepfe in derselben Liste vorkommen.
     kennt_nachfassen: true, nachfassen_offen: 2,
+    // Der Weg zurueck (ENT-628): Einer der drei hat nach dem Ablauf
+    // geklickt und seine Betriebsgroesse angegeben.
+    kennt_weiter: true, weiter_offen: 1,
     zugaenge: [
       { id: 3, platz: 'demo1', firma: 'Muster Sicherheit GmbH', person: 'R. Muster',
         email: 'r.muster@beispiel.ch', login: 'mustersicherh', status: 'aktiv',
@@ -194,7 +263,9 @@ const ANTWORTEN = {
         email: 't.probe@beispiel.ch', login: 'probesecurity', status: 'abgelaufen',
         laeuft_ab_am: tagVersatz(-7), abgelaufen: false, resttage: null,
         beendet_am: tagVersatz(-7),
-        nachgefasst_am: tagVersatz(-6), nachgefasst_von: 'A. Betreiber' },
+        nachgefasst_am: tagVersatz(-6), nachgefasst_von: 'A. Betreiber',
+        weiter_am: tagVersatz(-6), weiter_groesse: 'elfbis30',
+        weiter_groesse_text: '11 bis 30 Mitarbeitende' },
     ],
   },
 };
@@ -424,6 +495,107 @@ check('KRITISCH: der offene Fall ist als solcher markiert',
 check('der erledigte nennt Datum und Konto, statt bloss zu verschwinden',
   /nachgefasst \d{4}-\d{2}-\d{2}/.test(sicht.erledigteZeile)
   && sicht.erledigteZeile.includes('A. Betreiber'));
+
+/* ── Der Weg zurueck steht im Betreiber-Bereich (ENT-628) ─────────────
+   Eine Anfrage, die nur im Postfach liegt, geht unter. Sie muss dort
+   stehen, wo der Vertrieb ohnehin hinsieht -- und zwar beim NAMEN, nicht
+   in der Statusspalte zwischen Ablauf und Nachfass-Stand. */
+const weiterSicht = await seite.evaluate(() => {
+  const zeilen = [...document.querySelectorAll('#demo-inhalt tbody tr')];
+  const mit = zeilen.find(r => r.textContent.includes('probesecurity'));
+  return {
+    merker: mit ? [...mit.querySelectorAll('td:first-child .merker')]
+      .map(m => m.textContent.trim()) : [],
+    zelle:  mit ? mit.querySelector('td:first-child').textContent : '',
+    ohne:   zeilen.filter(r => !r.textContent.includes('probesecurity'))
+      .every(r => !/will weitermachen/.test(r.textContent)),
+    fuss:   document.querySelector('#demo-plaetze + .hinweis, #demo-plaetze ~ .hinweis')
+      ?.textContent.trim() || document.getElementById('mv-demo').innerText,
+  };
+});
+check('KRITISCH: wer weitermachen will, steht mit Merker beim Namen',
+  weiterSicht.merker.includes('will weitermachen'));
+check('die angegebene Betriebsgrösse steht daneben, nicht nur der Schlüssel',
+  /11 bis 30 Mitarbeitende/.test(weiterSicht.zelle)
+  && !/elfbis30/.test(weiterSicht.zelle));
+check('KRITISCH: wer nicht geklickt hat, trägt den Merker nicht', weiterSicht.ohne);
+// Einheiten nicht vermischen: "Zugänge" zählt Interessenten mit offenem
+// Zugang, "will weitermachen" zählt die, die nach dem Ablauf geklickt
+// haben -- auch längst geschlossene.
+check('die Zahl derer, die weitermachen wollen, steht mit eigenem Wort da',
+  /1 will weitermachen/.test(weiterSicht.fuss));
+
+/* ══ Die Landeseite nach der Abschiedsmail (ENT-628) ═════════════════
+
+   DIE WICHTIGSTE PRUEFUNG HIER IST DIE ERSTE: Beim Laden darf NICHTS an
+   den Server gehen. Outlook Safe Links und Virenscanner rufen jede Adresse
+   aus einer Mail auf; loeste der Aufruf die Anfrage aus, bekaeme der
+   Betreiber Anfragen von Betrieben, die nie geklickt haben. Gemessen wird
+   der Netzverkehr, nicht der Quelltext. */
+const WERT = 'a'.repeat(64);
+const wSeite = await browser.newPage({ viewport: { width: 420, height: 900 } });
+wSeite.on('pageerror', e => bad.push('JS-Fehler auf demo-weiter.html: ' + e.message));
+
+let rufe = [];
+await wSeite.route('**/api/demo_weiter.php', r => {
+  rufe.push(JSON.parse(r.request().postData() || '{}'));
+  r.fulfill({ status: 200, contentType: 'application/json',
+    body: JSON.stringify({ status: 'ok', erneut: false }) });
+});
+
+await wSeite.goto(`file://${WURZEL}/demo-weiter.html?w=${WERT}`);
+await wSeite.waitForTimeout(400);
+check('KRITISCH: beim blossen Aufruf geht nichts an den Server (Mailscanner)',
+  rufe.length === 0);
+
+const flaechen = await wSeite.evaluate(() => {
+  const el = [...document.querySelectorAll('[data-groesse]')];
+  return {
+    klassen: el.map(e => e.getAttribute('data-groesse')),
+    worte:   el.map(e => e.textContent.trim()),
+    hoehen:  el.map(e => Math.round(e.getBoundingClientRect().height)),
+    sichtbar: document.querySelector('.zustand.an')?.id || '',
+  };
+});
+// Vier Antworten, nicht drei: "lieber nicht sagen" IST eine Antwort und
+// darf nicht wie Nichtstun aussehen (Hausregel).
+check('KRITISCH: es gibt drei Grössenklassen und eine ausdrückliche Verweigerung',
+  flaechen.klassen.join('|') === 'bis10|elfbis30|ueber30|keine');
+check('der Ausgangszustand ist die Frage, nicht eine Meldung',
+  flaechen.sichtbar === 'z-bereit');
+// Gemessen, nicht nachgelesen: Bedienelemente am Handy mindestens 44 px.
+check('KRITISCH: die drei Knöpfe sind am Handy mindestens 44 px hoch',
+  flaechen.hoehen.slice(0, 3).every(h => h >= 44));
+
+// Ein Klick sendet Anfrage UND Grösse zusammen -- kein Formular, kein
+// zweiter Schritt.
+await wSeite.click('[data-groesse="elfbis30"]');
+await wSeite.waitForTimeout(300);
+const nachKlick = await wSeite.evaluate(() =>
+  document.querySelector('.zustand.an')?.id || '');
+check('KRITISCH: ein Klick auf eine Grösse schickt Anfrage und Angabe zusammen',
+  rufe.length === 1 && rufe[0].w === WERT && rufe[0].groesse === 'elfbis30');
+check('danach steht da, dass die Anfrage raus ist', nachKlick === 'z-fertig');
+// Der Knopf hiess "weiter nutzen" -- die Seite muss sagen, dass der Zugang
+// NICHT wieder aufgeht, sonst wartet jemand vergeblich auf eine Anmeldung.
+const fertigText = await wSeite.evaluate(() =>
+  document.getElementById('z-fertig').innerText);
+check('KRITISCH: sie verspricht keine Wiederaufnahme, sondern eine Meldung',
+  /melden uns/.test(fertigText) && /geschlossen/.test(fertigText));
+
+// Ohne Wert in der Adresse gibt es nichts zu melden -- und auch dann geht
+// nichts an den Server.
+rufe = [];
+await wSeite.goto(`file://${WURZEL}/demo-weiter.html`);
+await wSeite.waitForTimeout(300);
+const ohneWert = await wSeite.evaluate(() => ({
+  sichtbar: document.querySelector('.zustand.an')?.id || '',
+  flaechen: document.querySelectorAll('[data-groesse]').length,
+}));
+check('KRITISCH: ohne Wert aus der Mail sagt die Seite das, statt zu senden',
+  ohneWert.sichtbar === 'z-unbekannt' && rufe.length === 0);
+
+await wSeite.close();
 
 await browser.close();
 

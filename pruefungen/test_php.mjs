@@ -984,6 +984,15 @@ const OHNE_ANMELDUNG = [
   // aus einer Mail an genau die Adresse, um die es geht; eine Anmeldung
   // gaebe es zu diesem Zeitpunkt gar nicht.
   'demo_bestaetigen.php',
+  // Der Knopf aus der Abschiedsmail (ENT-628). Der Zugang ist zu diesem
+  // Zeitpunkt abgelaufen und das Konto geloescht -- eine Anmeldung gibt es
+  // also nicht einmal mehr theoretisch. Ausweis ist derselbe wie bei
+  // demo_bestaetigen.php: ein 256-Bit-Wert aus einer Mail an genau die
+  // Adresse, um die es geht, in der Tabelle nur als Abdruck (ENT-501).
+  // Nur POST, damit ein Mailscanner nichts ausloest; eigene Bremse
+  // ("-weiter"). Schreibt nichts als zwei Felder am eigenen Zugang und
+  // schickt eine Meldung an den Betreiber.
+  'demo_weiter.php',
   // Gegenstueck fuer "Zugangsdaten erneut senden" -- dieselbe Begruendung,
   // dieselbe gleichlautende Antwort in jedem Fall (wie passwort_vergessen.php).
   'demo_erneut_senden.php',
