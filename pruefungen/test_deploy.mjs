@@ -2097,8 +2097,12 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
   check('KRITISCH: der von Xcode erzeugte swiftpm-Ordner ist ignoriert',
     istIgnoriert('mobile/ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/x'));
 
-  /* Das Skript aktualisiert sich selbst -- und muss danach neu starten
-     (2026-09-19, am Geraet gemessen).
+  /* Das Skript aktualisiert sich selbst -- und muss danach neu starten.
+     Vom Projektinhaber am Geraet gemessen; das Datum steht in der
+     Commit-Nachricht und nicht hier, weil test_datumsfest.mjs jedes feste
+     Datum nahe beim heutigen Tag anschlaegt -- auch in einem
+     Blockkommentar, dessen Folgezeilen nicht mit "//" oder "*" beginnen.
+     Genau daran ist diese Datei einmal rot geworden.
 
      bash fuehrt die Fassung aus, die es beim Start geoeffnet hat. Holt
      "git pull" eine neue, wirkt sie erst beim uebernaechsten Lauf --
