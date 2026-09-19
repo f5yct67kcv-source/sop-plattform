@@ -99,8 +99,15 @@ check('KRITISCH: mit Anhang wird die Nachricht als multipart/mixed gebaut',
   /multipart\/mixed; boundary=/.test(MAILER));
 check('KRITISCH: die Text-/HTML-Auswahl bleibt darin als multipart/alternative erhalten',
   /multipart\/alternative; boundary="' \. \$grenze/.test(MAILER));
-check('KRITISCH: ohne Anhang bleibt der Aufbau wie bisher — der Offert-Versand läuft produktiv',
-  /if \(!\$anhaenge\) \{[\s\S]{0,260}multipart\/alternative/.test(MAILER));
+// Diese Aussage wird seit ENT-619 ECHT geprüft statt am Quelltext
+// gelesen: pruef_mail_aufbau.php ruft smtp_nachricht_bauen() mit und ohne
+// Anhang auf und misst den erzeugten Aufbau nach (test_mail_aufbau.mjs).
+// Hier stand vorher ein Muster über die Zeilenfolge in smtp_senden() —
+// es wurde rot, als der Zusammenbau in eine eigene, prüfbare Funktion
+// wanderte, obwohl die Aussage unverändert galt. Geblieben ist hier nur
+// die Frage, ob der Versand diesen einen Weg auch wirklich benutzt.
+check('KRITISCH: der Versand baut die Nachricht über die eine, echt geprüfte Stelle',
+  /\$nachricht = smtp_nachricht_bauen\(/.test(MAILER));
 check('Der Anhang wird als Anhang gekennzeichnet, nicht als Textteil',
   /Content-Disposition: attachment; filename=/.test(MAILER));
 check('Ein Dateiname mit Umlaut wird kodiert, statt die Nachricht unzustellbar zu machen',

@@ -1,5 +1,12 @@
 <?php
 declare(strict_types=1);
+// Die Mailgestaltung und die Signaturwerte kommen von woanders und
+// werden darum hier selbst geladen, statt sie vom Aufrufer zu erwarten.
+// Ein stiller Vertrag genau dieser Art hat am 2026-09-18 den
+// oeffentlichen Demo-Zugang sieben Anlaeufe lang blockiert
+// (demo_reset.php/system_rollen(), siehe test_ladepfad.mjs).
+require_once __DIR__ . '/mail_vorlage.php';
+require_once __DIR__ . '/mailer.php';
 // Demo-Zugaenge je Interessent (ENT-600).
 //
 // Reiner Rechenkern ohne Datenbank und ohne Netz -- dieselbe Trennung wie
@@ -75,10 +82,8 @@ const DEMO_ZUGANG_MAX_TELEFON  = 40;
 const DEMO_ZUGANG_FALLE        = 'website';
 // Telefon ist der Preis fuer den Sofort-Zugang (Entscheidung des
 // Projektinhabers): Wer in einer Minute eine eigene Instanz bekommt, gibt
-// dafuer eine erreichbare Nummer an. Dieselbe Grenze wie beim
-// Kontaktformular (demo_anfrage.php) -- neun Ziffern sind die Untergrenze,
-// unter der keine erreichbare Schweizer Nummer mehr liegt.
-const DEMO_ZUGANG_TELEFON_MIN_ZIFFERN = 9;
+// dafuer eine erreichbare Nummer an. Wie eine solche Nummer aussieht,
+// steht bei demo_zugang_telefon_gueltig() weiter unten.
 
 function demo_zugang_ist_falle(array $in): bool
 {
@@ -91,9 +96,50 @@ function demo_zugang_einzeilig(mixed $wert, int $max): string
     return mb_substr(trim($s), 0, $max);
 }
 
-function demo_zugang_telefon_ziffern(string $wert): int
+// Ziffern zaehlen allein reicht nicht: "123456789" hat neun Ziffern und ist
+// trotzdem keine Nummer, unter der jemand erreichbar ist (Befund des
+// Projektinhabers, 2026-09-18). Geprueft wird darum die Form der Nummer.
+//
+// ZUGELASSEN SIND DREI LAENDER -- Schweiz, Deutschland, Oesterreich
+// (Entscheidung des Projektinhabers, 2026-09-18). Alles andere braucht
+// eine eigene Entscheidung, keine stille Lockerung hier.
+//
+//   Schweiz       +41 / 0041 + neun Ziffern, die erste davon 2-9
+//                 (0 und 1 sind Vorwahl- und Kurznummernraum, keine
+//                 Anschlussbereiche), oder national mit fuehrender Null:
+//                 079 123 45 67 -- genau zehn Ziffern.
+//   Deutschland   +49 / 0049 + sechs bis dreizehn Ziffern, die erste
+//                 nicht 0 (die nationale Verkehrsausscheidungsziffer
+//                 faellt mit der Landesvorwahl weg). Laengen sind dort
+//                 nicht einheitlich festgelegt.
+//   Oesterreich   +43 / 0043 + vier bis dreizehn Ziffern, dieselbe Regel.
+//                 Vier ist keine Schludrigkeit: Wien ist "1" plus sieben
+//                 Ziffern, kleine Ortsnetze sind kuerzer.
+//
+// OHNE LANDESVORWAHL GILT DIE SCHWEIZ: Eine fuehrende Null ist in allen
+// drei Laendern dieselbe Ziffer -- 079... koennte ueberall stehen. Die
+// Betreiberin sitzt in der Schweiz, also wird die nationale Schreibweise
+// als schweizerisch gelesen. Wer eine deutsche oder oesterreichische
+// Nummer angibt, schreibt die Vorwahl dazu; die Meldung im Formular sagt
+// das auch.
+//
+// Trennzeichen -- Leerschlag, Schraegstrich, Bindestrich, Punkt, Klammern
+// -- sind dem Menschen ueberlassen und werden vorher entfernt.
+function demo_zugang_telefon_gueltig(string $wert): bool
 {
-    return strlen((string)preg_replace('/\D+/', '', $wert));
+    $roh = (string)preg_replace('/[\s\/\-\.\(\)]+/u', '', $wert);
+    $muster = [
+        '/^(?:\+41|0041)[2-9]\d{8}$/',   // Schweiz, international
+        '/^(?:\+49|0049)[1-9]\d{5,12}$/', // Deutschland
+        '/^(?:\+43|0043)[1-9]\d{3,12}$/', // Oesterreich
+        '/^0[2-9]\d{8}$/',               // Schweiz, national
+    ];
+    foreach ($muster as $m) {
+        if (preg_match($m, $roh) === 1) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // ── Ist die angegebene Adresse ueberhaupt zustellbar? ─────────────────
@@ -335,31 +381,50 @@ function demo_zugang_mail(string $firma, string $person, string $adresse,
     $ab = date('d.m.Y', strtotime($laeuftAbAm));
     $betreff = 'Ihr Demo-Zugang zu GuardOpS';
 
+    $zeilen = mail_signatur_zeilen();
+    $gruss  = $zeilen === [] ? ['pzu consulting gmbh'] : $zeilen;
+    // Die Kennung nur setzen, wenn es das Bild wirklich gibt -- ein
+    // cid-Verweis ins Leere zeigt im Mailprogramm ein zerbrochenes Bild.
+    // Zwei Fassungen: die dunkle fuer den hellen Modus, die helle fuer den
+    // Dunkelmodus (ENT-619). Fehlt eine, faellt nur sie weg.
+    $logo     = mail_logo();
+    $logoHell = mail_logo_hell();
+    $kennung     = $logo === null ? '' : (string)$logo['cid'];
+    $kennungHell = $logoHell === null ? '' : (string)$logoHell['cid'];
+    $bilder = array_values(array_filter([$logo, $logoHell]));
+
     $text = "Guten Tag $person\n\n"
-          . "Ihr Demo-Zugang für $firma steht bereit.\n\n"
+          . "vielen Dank für Ihr Interesse an GuardOpS, der Betriebssoftware für "
+          . "Sicherheitsdienste. Mit den folgenden Zugangsdaten können Sie sich im "
+          . "Demobereich anmelden:\n\n"
           . "Adresse:      $adresse\n"
           . "Anmeldename:  $login\n"
           . "Passwort:     $passwort\n\n"
-          . "Der Zugang läuft am $ab ab. Danach wird er gesperrt und alles, "
-          . "was Sie erfasst haben, vollständig gelöscht.\n\n"
-          . "Bitte erfassen Sie keine echten Personendaten — die Demo ist zum "
-          . "Ausprobieren da, nicht für den Betrieb.\n\n"
-          . "Freundliche Grüsse\npzu consulting gmbh";
+          . "Ihr Demozugang ist bis am $ab aktiv. Danach wird er automatisch "
+          . "zurückgesetzt und die erfassten Daten werden gelöscht.\n\n"
+          . "Die Demo ist zum Ausprobieren da. Bitte erfassen Sie darin keine "
+          . "echten Personendaten.\n\n"
+          . "Bei Fragen oder Unklarheiten melden Sie sich jederzeit bei uns.\n\n"
+          . "Mit freundlichen Grüssen\n" . implode("\n", $gruss);
 
-    $e = static fn (string $w): string => htmlspecialchars($w, ENT_QUOTES, 'UTF-8');
-    $html = '<p>Guten Tag ' . $e($person) . '</p>'
-          . '<p>Ihr Demo-Zugang für <b>' . $e($firma) . '</b> steht bereit.</p>'
-          . '<table cellpadding="4"><tr><td>Adresse</td><td><a href="' . $e($adresse) . '">'
-          . $e($adresse) . '</a></td></tr>'
-          . '<tr><td>Anmeldename</td><td><b>' . $e($login) . '</b></td></tr>'
-          . '<tr><td>Passwort</td><td><b>' . $e($passwort) . '</b></td></tr></table>'
-          . '<p>Der Zugang läuft am <b>' . $e($ab) . '</b> ab. Danach wird er gesperrt und '
-          . 'alles, was Sie erfasst haben, vollständig gelöscht.</p>'
-          . '<p>Bitte erfassen Sie keine echten Personendaten — die Demo ist zum '
-          . 'Ausprobieren da, nicht für den Betrieb.</p>'
-          . '<p>Freundliche Grüsse<br>pzu consulting gmbh</p>';
+    $inhalt = mail_absatz('Guten Tag ' . mail_e($person))
+        . mail_absatz('vielen Dank für Ihr Interesse an GuardOpS, der Betriebssoftware für '
+            . 'Sicherheitsdienste. Mit den folgenden Zugangsdaten können Sie sich für '
+            . '<b>' . mail_e($firma) . '</b> im Demobereich anmelden:')
+        . mail_block(
+            mail_feld('Adresse', '<a href="' . mail_e($adresse) . '" style="color:'
+                . MAIL_FARBE_BLAU . ';text-decoration:none;">' . mail_e($adresse) . '</a>')
+            . mail_feld('Anmeldename', mail_e($login), true)
+            . mail_feld('Passwort', mail_e($passwort), true))
+        . mail_absatz('Ihr Demozugang ist bis am <b>' . mail_e($ab) . '</b> aktiv. Danach wird '
+            . 'er automatisch zurückgesetzt und die erfassten Daten werden gelöscht.')
+        . mail_absatz('Die Demo ist zum Ausprobieren da. Bitte erfassen Sie darin keine '
+            . 'echten Personendaten.')
+        . mail_absatz('Bei Fragen oder Unklarheiten melden Sie sich jederzeit bei uns.')
+        . mail_signatur($zeilen, $kennung, $kennungHell);
 
-    return ['betreff' => $betreff, 'text' => $text, 'html' => $html];
+    return ['betreff' => $betreff, 'text' => $text, 'html' => mail_rahmen($inhalt),
+        'bilder' => $bilder];
 }
 
 // Die Tabelle des Registers. Sie liegt in der BETREIBER-Datenbank, nicht in

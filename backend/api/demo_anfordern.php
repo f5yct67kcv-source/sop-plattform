@@ -74,9 +74,9 @@ if ($firma === '' || $person === '' || $email === '' || filter_var($email, FILTE
 }
 // Telefon ist der Preis fuer den Sofort-Zugang (Entscheidung des
 // Projektinhabers, siehe demo_zugang.php) -- Pflichtfeld, nicht optional.
-if (demo_zugang_telefon_ziffern($telefon) < DEMO_ZUGANG_TELEFON_MIN_ZIFFERN) {
-    json_response(['status' => 'error',
-        'message' => 'Bitte eine Telefonnummer angeben, unter der wir Sie erreichen.'], 400);
+if (!demo_zugang_telefon_gueltig($telefon)) {
+    json_response(['status' => 'error', 'felder' => ['telefon' => true],
+        'message' => 'Bitte eine Telefonnummer aus der Schweiz, Deutschland oder Österreich angeben — mit Landesvorwahl, z. B. +41 79 123 45 67.'], 400);
 }
 // Existiert die Domain ueberhaupt? Eine Anfrage verbraucht sofort einen von
 // zehn knappen Plaetzen -- eine Adresse, die es nicht gibt, waere ein
@@ -128,7 +128,8 @@ if ($bestehend) {
     } else {
         try {
             smtp_senden($email, $person, $ergebnis['mail']['betreff'],
-                $ergebnis['mail']['html'], $ergebnis['mail']['text']);
+                $ergebnis['mail']['html'], $ergebnis['mail']['text'],
+                [], $ergebnis['mail']['bilder'] ?? []);
         } catch (Throwable $e) {
             error_log('demo_anfordern (bestehender Zugang): Versand fehlgeschlagen -- ' . $e->getMessage());
         }
@@ -218,7 +219,8 @@ $ein->execute([$platz, $firma, $person, $email, $telefon, $login, $start, DEMO_F
 $adresse = (string)demo_platz_adresse($platz);
 $mail    = demo_zugang_mail($firma, $person, $adresse, $login, $passwort, $laeuftAb);
 try {
-    smtp_senden($email, $person, $mail['betreff'], $mail['html'], $mail['text']);
+    smtp_senden($email, $person, $mail['betreff'], $mail['html'], $mail['text'],
+        [], $mail['bilder'] ?? []);
 } catch (Throwable $e) {
     error_log('demo_anfordern: Versand fehlgeschlagen -- ' . $e->getMessage());
 }

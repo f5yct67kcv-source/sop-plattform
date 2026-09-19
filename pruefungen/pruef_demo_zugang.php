@@ -176,6 +176,153 @@ $boes = demo_zugang_mail('<b>Muster</b>', 'X', 'https://demo1.guardops.ch',
 $pruef('KRITISCH: ein Firmenname wird im HTML-Teil maskiert, nicht eingebaut',
     !str_contains($boes['html'], '<b>Muster</b>') && str_contains($boes['html'], '&lt;b&gt;'));
 
+// ── Die Signatur (ENT-569, Nachtrag 2026-09-18) ──────────────────────
+//
+// KEIN PERSONENNAME IM REPOSITORY (Vertraulichkeitsregel in CLAUDE.md; im
+// Impressum steht aus demselben Grund bewusst keiner). Die Zeilen kommen
+// aus dem Deploy. Geprueft wird die Aussage, nicht der Wortlaut: Was
+// hereingereicht wird, steht in der Mail -- und ist nichts hinterlegt,
+// zeichnet die Firma, statt dass ein leerer Gruss oder ein Platzhalter
+// beim Interessenten ankommt.
+$mitName = mail_signatur(['A. Beispiel', 'Funktion', '+41 00 000 00 00']);
+$pruef('KRITISCH: die uebergebene Signatur steht in der Mail',
+    str_contains($mitName, 'A. Beispiel') && str_contains($mitName, 'Funktion')
+    && str_contains($mitName, '+41 00 000 00 00'));
+$ohneName = mail_signatur([]);
+$pruef('KRITISCH: ohne hinterlegte Signatur zeichnet die Firma, nicht niemand',
+    str_contains($ohneName, 'pzu consulting gmbh')
+    && str_contains($ohneName, 'Mit freundlichen Grüssen'));
+$pruef('leere Zeilen fallen weg, statt als Luecke zu erscheinen',
+    !str_contains(mail_signatur(['A. Beispiel', '', '  ']), '<br>'));
+// Der Grussblock der Mail darf den Namen NICHT selbst mitbringen.
+$quelle = (string)file_get_contents(dirname(__DIR__) . '/backend/demo_zugang.php');
+$pruef('KRITISCH: die Mail holt die Signatur aus dem Deploy, statt sie im Quelltext zu fuehren',
+    str_contains($quelle, 'mail_signatur_zeilen()'));
+
+// ── Die Telefonnummer in der Signatur (Befund 2026-09-19) ────────────
+//
+// Apple Mail und iOS Mail erkennen eine Telefonnummer im Fliesstext selbst
+// und machen daraus einen Waehl-Verweis -- blau und unterstrichen, mitten
+// in einer bewusst grauen Signatur. Wir setzen den Verweis deshalb selbst:
+// antippbar bleibt sie, aussehen tut sie wie geplant. Geprueft wird die
+// Wirkung am erzeugten HTML, nicht der Wortlaut im Quelltext.
+$telZeile = '+41 00 000 00 00';
+$mitTel = mail_signatur(['A. Beispiel', 'Funktion', $telZeile]);
+preg_match('/<a ([^>]*)href="tel:([^"]*)"([^>]*)>/', $mitTel, $telVerweis);
+$pruef('KRITISCH: die Telefonnummer traegt einen eigenen Waehl-Verweis',
+    $telVerweis !== [] && preg_replace('/[^0-9+]/', '', $telZeile) === $telVerweis[2]);
+$telAuf = ($telVerweis[1] ?? '') . ($telVerweis[3] ?? '');
+$pruef('KRITISCH: der Waehl-Verweis bringt seine Farbe selbst mit, statt sie dem Programm zu ueberlassen',
+    str_contains($telAuf, 'color:' . MAIL_FARBE_LEISE));
+$pruef('der Waehl-Verweis ist nicht unterstrichen -- er soll wie die uebrigen Zeilen aussehen',
+    str_contains($telAuf, 'text-decoration:none'));
+$pruef('KRITISCH: im Dunkelmodus faerbt sich der Waehl-Verweis mit',
+    preg_match('/class="[^"]*\bd-leise\b[^"]*"/', $telAuf) === 1
+    && str_contains(mail_dunkelmodus(), '.d-leise'));
+// Nur die Nummer wird verlinkt. Ein Verweis auf dem Namen oder der Funktion
+// waere schlimmer als gar keiner.
+$pruef('KRITISCH: nur die Nummer wird verlinkt, nicht Name oder Funktion',
+    substr_count($mitTel, '<a ') === 1);
+// Zu kurz und zu lang sind beide keine Rufnummer -- eine Referenz- oder
+// Belegnummer in der Signatur darf nicht zum Waehlziel werden.
+foreach (['A. Beispiel', 'Geschäftsführer', 'Hochgasse 7', '4632 Trimbach',
+          'pzu consulting gmbh', 'info@guardops.ch', '2026',
+          '1234-5678', '1234 5678 9012 3456 7890'] as $keineNummer) {
+    $pruef('keine Nummer, kein Waehl-Verweis: ' . $keineNummer,
+        mail_telefon_ziel($keineNummer) === '');
+}
+foreach ([$telZeile, '079 000 00 00', 'Tel. ' . $telZeile, 'Mobil: 079 000 00 00'] as $nummer) {
+    $pruef('als Nummer erkannt: ' . $nummer, mail_telefon_ziel($nummer) !== '');
+}
+// Was das Programm trotzdem selbst erkennt -- eine Ortsangabe im Fuss etwa --
+// soll wenigstens nicht aus der Gestaltung fallen.
+$pruef('KRITISCH: die automatische Einfaerbung von Apple Mail ist ueberschrieben',
+    str_contains($mail['html'], 'x-apple-data-detectors')
+    && preg_match('/x-apple-data-detectors[^}]*color:\s*inherit\s*!important/', $mail['html']) === 1
+    && preg_match('/x-apple-data-detectors[^}]*text-decoration:\s*none\s*!important/', $mail['html']) === 1);
+
+// ── Das Logo in der Signatur (ENT-619) ───────────────────────────────
+//
+// Eingebettet, nicht verlinkt: Outlook und die meisten Programme laden ein
+// extern verlinktes Bild erst auf Erlaubnis -- bis dahin stuende unter der
+// Unterschrift ein leerer Rahmen.
+$pruef('KRITISCH: jedes Logo wird als Bild MITGEGEBEN, nicht von aussen nachgeladen',
+    count($mail['bilder']) === 2
+    && array_filter($mail['bilder'], fn($b) => ($b['inhalt'] ?? '') === '') === []
+    && !preg_match('/<img[^>]+src="https?:/', $mail['html']));
+$pruef('KRITISCH: das HTML spricht jede mitgegebene Kennung an',
+    array_filter($mail['bilder'],
+        fn($b) => !str_contains($mail['html'], 'cid:' . $b['cid'])) === []);
+// Zwei Fassungen, damit im Dunkelmodus nicht Dunkel auf Dunkel steht.
+// Genau so kam die Mail beim Projektinhaber an (2026-09-19).
+$pruef('KRITISCH: es gibt eine helle und eine dunkle Fassung, nicht zweimal dieselbe',
+    ($mail['bilder'][0]['inhalt'] ?? '') !== ($mail['bilder'][1]['inhalt'] ?? ''));
+// Sichtbar ist immer genau eine: die helle steht auf display:none und
+// wird erst im Dunkelmodus eingeblendet.
+$pruef('KRITISCH: im hellen Modus ist nur die dunkle Fassung sichtbar',
+    preg_match('/class="logo-hell"[^>]*style="display:none/', $mail['html']) === 1
+    && preg_match('/class="logo-dunkel"[^>]*style="display:block/', $mail['html']) === 1);
+$pruef('KRITISCH: der Dunkelmodus tauscht beide Fassungen wirklich gegeneinander',
+    preg_match('/@media \(prefers-color-scheme: dark\)[\s\S]*'
+        . '\.logo-dunkel \{ display:none/', $mail['html']) === 1
+    && preg_match('/@media \(prefers-color-scheme: dark\)[\s\S]*'
+        . '\.logo-hell \{ display:block/', $mail['html']) === 1);
+// Ein cid-Verweis ohne Bild dahinter zeigt ein zerbrochenes Bild.
+$pruef('KRITISCH: ohne Bilddatei steht auch kein Verweis darauf in der Mail',
+    (mail_logo() === null) === (!str_contains($mail['html'], 'cid:')));
+// Die Klartextfassung hat kein Bild und darf es auch nicht vortaeuschen.
+$pruef('die Klartextfassung traegt keinen Bildverweis',
+    !str_contains($mail['text'], 'cid:') && !str_contains($mail['text'], '<img'));
+
+// ── Die gemeinsame Gestaltung ────────────────────────────────────────
+$pruef('KRITISCH: die Mail traegt Marke und Angaben der Betreiberin, nicht die der Mandantin',
+    str_contains($mail['html'], 'GuardOpS')
+    && str_contains($mail['html'], 'pzu consulting gmbh')
+    && str_contains($mail['html'], 'info@guardops.ch'));
+// Die Marke steht EINMAL da. Mit dem Logo in der Signatur waere ein
+// getippter Schriftzug im Kopf eine zweite, schlechtere Fassung derselben
+// Marke -- eine Geschaeftsmail aus Outlook hat darum keinen Briefkopf.
+$pruef('KRITISCH: kein Briefkopf-Balken neben dem Logo -- die Marke steht nicht zweimal da',
+    !str_contains($mail['html'], 'background:#14161A'));
+// Hausregel: Ueberschrift oben, Wert darunter -- auch hier, nicht nur in
+// der Oberflaeche. Geprueft ueber die Reihenfolge im Quelltext, weil genau
+// das die Aussage ist.
+// (Die Versalien entstehen per text-transform, im Quelltext steht
+// "Passwort" -- darum wird hier danach gesucht und nicht nach "PASSWORT".)
+$pruef('KRITISCH: die Beschriftung steht vor ihrem Wert, nicht daneben oder darunter',
+    strpos($mail['html'], '>Passwort<') !== false
+    && strpos($mail['html'], '>Passwort<') < strpos($mail['html'], 'AbcDefGhiJkm'));
+// Ein Stylesheet im Kopf wird von Mailprogrammen regelmaessig entfernt.
+// Es gibt genau einen, und er traegt AUSSCHLIESSLICH zwei Korrekturen:
+// den Dunkelmodus und die Ueberschreibung von Apples Datenerkennung.
+// Beide darf man verlieren -- faellt der Block weg, bleibt die Mail
+// vollstaendig gestaltet, nur eben hell. Geprueft wird das, indem genau
+// diese beiden Bloecke herausgeschnitten werden: was uebrig bleibt, waere
+// Gestaltung, die nur hier steht.
+$stil = (string)(preg_match('/<style>(.*?)<\/style>/s', $mail['html'], $t) ? $t[1] : '');
+$rest = trim((string)preg_replace(
+    ['/a\[x-apple-data-detectors\]\s*\{[^}]*\}/',
+     '/@media \(prefers-color-scheme: dark\)\s*\{.*\}/s'],
+    '', $stil));
+$pruef('KRITISCH: die Gestaltung haengt an Inline-Styles, nicht am Stylesheet',
+    str_contains($mail['html'], 'style="')
+    && substr_count($mail['html'], '<style') === 1
+    && $stil !== '' && $rest === '');
+// Gegenprobe im Kleinen: Ohne den Block darf keine Farbe und keine
+// Flaeche verschwinden -- alles Sichtbare steht auch inline.
+$ohneStil = (string)preg_replace('/<style>.*?<\/style>/s', '', $mail['html']);
+// Geprueft wird jedes gefaerbte Element einzeln, nicht ob eine Farbe
+// irgendwo noch vorkommt: Ein Link ohne eigene Farbe faellt sonst auf das
+// Standardblau des Mailprogramms zurueck, und im Dunkelmodus auf eine
+// Farbe, die auf dunklem Grund kaum lesbar ist.
+preg_match_all('/<a [^>]*>/', $ohneStil, $links);
+$ohneFarbe = array_values(array_filter($links[0],
+    fn($a) => !preg_match('/style="[^"]*color:#/', $a)));
+$pruef('KRITISCH: ohne den Stylesheet-Block traegt jeder Link seine Farbe selbst',
+    $links[0] !== [] && $ohneFarbe === []);
+$pruef('KRITISCH: ohne den Stylesheet-Block bleiben Textfarbe und Flaeche erhalten',
+    str_contains($ohneStil, MAIL_FARBE_TEXT) && str_contains($ohneStil, MAIL_FARBE_FLAECHE));
+
 // ── Formhelfer der Selbstbedienung (ENT-601) ─────────────────────────
 $pruef('das Fallenfeld erkennt eine gefuellte Falle',
     demo_zugang_ist_falle(['website' => 'irgendwas']));
@@ -185,12 +332,41 @@ $pruef('demo_zugang_einzeilig ersetzt Umbrueche und kuerzt',
     demo_zugang_einzeilig("Zeile 1\r\nZeile 2\t\tEnde", 100) === 'Zeile 1 Zeile 2 Ende'
     && demo_zugang_einzeilig('123456789', 5) === '12345');
 
-// Telefon ist der Preis fuer den Sofort-Zugang (ENT-601/ENT-613).
-$pruef('KRITISCH: eine Nummer mit weniger als neun Ziffern zaehlt nicht',
-    demo_zugang_telefon_ziffern('079 12') < DEMO_ZUGANG_TELEFON_MIN_ZIFFERN);
-$pruef('eine gueltige Schweizer Nummer in jeder Schreibweise zaehlt',
-    demo_zugang_telefon_ziffern('+41 79 123 45 67') >= DEMO_ZUGANG_TELEFON_MIN_ZIFFERN
-    && demo_zugang_telefon_ziffern('079/123 45 67') >= DEMO_ZUGANG_TELEFON_MIN_ZIFFERN);
+// Telefon ist der Preis fuer den Sofort-Zugang (ENT-601/ENT-613). Geprueft
+// wird die Nummer, nicht nur die Anzahl Ziffern (Befund 2026-09-18).
+$pruef('eine Schweizer Nummer in jeder ueblichen Schreibweise gilt',
+    demo_zugang_telefon_gueltig('+41 79 123 45 67')
+    && demo_zugang_telefon_gueltig('0041 79 123 45 67')
+    && demo_zugang_telefon_gueltig('079 123 45 67')
+    && demo_zugang_telefon_gueltig('079/123 45 67')
+    && demo_zugang_telefon_gueltig('+41-79-123-45-67')
+    && demo_zugang_telefon_gueltig('(044) 123 45 67')
+    && demo_zugang_telefon_gueltig('0791234567'));
+$pruef('KRITISCH: neun beliebige Ziffern sind keine Telefonnummer',
+    !demo_zugang_telefon_gueltig('123456789')
+    && !demo_zugang_telefon_gueltig('111 111 111'));
+$pruef('KRITISCH: zu kurz, zu lang oder gar keine Ziffern wird abgewiesen',
+    !demo_zugang_telefon_gueltig('079 12')
+    && !demo_zugang_telefon_gueltig('079 123 45 678')
+    && !demo_zugang_telefon_gueltig('qwd')
+    && !demo_zugang_telefon_gueltig(''));
+$pruef('KRITISCH: nach der Vorwahl kommt kein 0 und kein 1',
+    !demo_zugang_telefon_gueltig('+41 09 123 45 67')
+    && !demo_zugang_telefon_gueltig('+41 19 123 45 67')
+    && !demo_zugang_telefon_gueltig('009 123 45 67'));
+// Drei Laender sind zugelassen (Entscheidung 2026-09-18), der Rest nicht.
+$pruef('deutsche und oesterreichische Nummern mit Landesvorwahl gelten',
+    demo_zugang_telefon_gueltig('+49 151 12345678')
+    && demo_zugang_telefon_gueltig('0049 30 1234567')
+    && demo_zugang_telefon_gueltig('+43 664 1234567')
+    && demo_zugang_telefon_gueltig('+43 1 1234567'));
+$pruef('KRITISCH: ein viertes Land gilt nicht',
+    !demo_zugang_telefon_gueltig('+33 6 12 34 56 78')
+    && !demo_zugang_telefon_gueltig('+1 415 555 0123')
+    && !demo_zugang_telefon_gueltig('+39 06 1234567'));
+$pruef('KRITISCH: auch bei DE und AT faellt die fuehrende Null der Vorwahl weg',
+    !demo_zugang_telefon_gueltig('+49 0151 12345678')
+    && !demo_zugang_telefon_gueltig('+43 0664 1234567'));
 
 // Zustellbarkeit: dieselbe Absicherung wie beim Kontaktformular, mit
 // einspeisbarem Nachschlag statt echtem DNS (ENT-469-Bauart).
