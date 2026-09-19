@@ -1437,6 +1437,11 @@ jobs:
           # Wildcard zwei Zeilen darueber faengt sie darum nicht ein.
           cp backend/api/demo_anfordern.php     dist-betreiber/api/demo_anfordern.php
           cp backend/api/demo_erneut_senden.php dist-betreiber/api/demo_erneut_senden.php
+          # Die Bestaetigung aus der Mail (ENT-624). demo-bestaetigen.html
+          # auf guardops.ch postet hierher; ohne diese Zeile lief der Knopf
+          # gegen einen 404, und NIEMAND konnte einen Zugang bekommen --
+          # die Anfrage ging durch, die Mail kam, und dann war Schluss.
+          cp backend/api/demo_bestaetigen.php   dist-betreiber/api/demo_bestaetigen.php
           cp htaccess-betreiber        dist-betreiber/.htaccess
           cp robots-betreiber.txt      dist-betreiber/robots.txt
 
