@@ -45,6 +45,16 @@ $liste = array_map(static function (array $m) use ($VERTRAG, $vertragDa, $heute)
         $m['gav_bestaetigt_am']
     );
     $m['verbindung_lage'] = be_verbindung_lage($m);
+    // Ein Demo-Platz ist eine Mandanten-Zeile wie jede andere -- die
+    // Datenbankverbindung des Platzes steht nirgends sonst. Er ist aber
+    // kein Betrieb, der diese Plattform nutzt, und gehoert darum nicht in
+    // dieselbe Liste (ENT-627).
+    //
+    // BENANNT, NICHT ERRATEN: Geprueft wird gegen DEMO_PLAETZE aus
+    // backend/demo_zugang.php -- dieselbe feste Liste, aus der die
+    // Zuteilung schoepft. Ein Namensmuster ("faengt mit demo an") wuerde
+    // einen Mandanten namens "Demolition AG" mit ausblenden.
+    $m['ist_demo'] = in_array((string)$m['subdomain'], DEMO_PLAETZE, true);
     // gav_unterstellt bleibt dreiwertig auch in der Antwort: null heisst
     // "nicht bestaetigt" und darf nicht zu false werden.
     $m['gav_unterstellt'] = $m['gav_unterstellt'] === null ? null : (int)$m['gav_unterstellt'] === 1;
