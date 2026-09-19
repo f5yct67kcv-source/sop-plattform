@@ -5915,8 +5915,37 @@ function rgLaufOffen() {
     && RUNDGANG_OFFENE_STATUS.includes(rundgangAktiv.status);
 }
 
+/* Der eine Weg aus der Rundgang-Vollseite heraus (ENT-631). Vorher stand
+   dieselbe Dreierfolge an drei Stellen; wer eine davon uebersah, liess die
+   Schublade oder die Tagesliste in einem Zustand stehen, der nicht mehr
+   stimmte. */
+function rgLaufVerlassen() {
+  blattZu();
+  rgSeiteZu();
+  zeichneHeute();
+}
+
 function rgSeiteZurueck() {
   if (rgsAnsicht !== 'uebersicht') { rgSeiteZurueckZurUebersicht(); return; }
+  /* Eine PAUSIERTE Runde haelt niemanden fest (ENT-631).
+
+     Vom Projektinhaber gemeldet: „Wenn man innerhalb des Rundgangs
+     pausiert, bleibt man im Rundgangbereich. Klickt man oben auf den
+     Pfeil, kommt man nicht aus dem Bereich heraus. Klickt man auf
+     pausieren, kann nicht pausiert werden (ist ja schon)."
+
+     Er beschreibt eine Sackgasse, und sie war echt: Der Pfeil stellte die
+     Frage aus ENT-324, deren einziger unschaedlicher Ausgang „Pausieren"
+     ist -- und genau der scheiterte am Server, weil die Runde schon
+     pausiert war. Es blieben „Weiter" (bleibt) und „Abbrechen" (Grund und
+     Ende). Wer nur kurz weg wollte, musste seine Runde abbrechen.
+
+     Die Frage aus ENT-324 gibt es, damit keine Runde ohne Pause und ohne
+     Abbruchgrund offen stehenbleibt. Eine pausierte Runde IST der
+     dokumentierte Zustand, nach dem gefragt wird -- es ist nichts mehr zu
+     entscheiden. Der Weg zurueck fuehrt ueber den Chip auf „Heute"
+     (ENT-234). */
+  if (rgLaufOffen() && rundgangAktiv.status === 'pausiert') { rgLaufVerlassen(); return; }
   /* Eine laufende Runde wird NICHT stillschweigend verlassen (ENT-324).
 
      Vom Projektinhaber gemeldet: „Bei einem gestarteten Rundgang darf der
@@ -10835,11 +10864,15 @@ function rgKarteZentrieren() {
 
 // Pausieren aus dem Funktionen-Reiter: dieselbe Rueckfrage wie im
 // Einsatzmodus (ENT-298), damit es nicht zwei verschiedene Pausen gibt.
+/* Pausieren fuehrt aus der Runde heraus (ENT-631) -- dasselbe wie ueber
+   den Pfeil (ENT-324), und aus demselben Grund: Wer pausiert, will weg.
+   Auf der pausierten Seite gibt es nichts zu tun, die Kontrollpunkte sind
+   gesperrt. Zurueck fuehrt der Chip auf „Heute" (ENT-234). */
 function rgLaufPause(einsatzId) {
   if (rundgangAktiv.status === 'pausiert') { rundgangWiederAufnehmen(einsatzId); return; }
   rgsFrage(w('rgsPausierenFrage'), w('rgsPausierenTxt'), w('rgsJa'), () => {
     rgsFrageZu();
-    rundgangPausieren(einsatzId);
+    rundgangPausieren(einsatzId, true);
   });
 }
 
@@ -11636,7 +11669,7 @@ function rundgangPausieren(einsatzId, raus) {
     if (!ok || data.status !== 'ok') { toast(data.message || w('netzfehler')); return; }
     rundgangAktiv.status = 'pausiert';
     rundgangAktiv.pausiert_seit = jetztDatetime();
-    if (raus) { blattZu(); rgSeiteZu(); zeichneHeute(); return; }
+    if (raus) { rgLaufVerlassen(); return; }
     rundgangAnzeigen(einsatzId);
   });
 }
@@ -11715,7 +11748,7 @@ function rundgangAbbrechenSenden(einsatzId, raus) {
       // Weg hinaus die Antwort -- ein Zurueckspringen auf die Seite einer
       // beendeten Runde waere eine Sackgasse.
       if (raus) {
-        blattZu(); rgSeiteZu(); zeichneHeute();
+        rgLaufVerlassen();
         /* Kam die Frage aus einem abgelehnten Start (ENT-630), war der
            Abbruch nur der Weg dorthin -- jetzt geht der Rundgang los, den
            der Waechter eigentlich wollte. Ohne das landet er auf „Heute"
