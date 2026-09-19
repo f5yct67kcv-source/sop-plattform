@@ -83,6 +83,45 @@ const EREIGNIS_FOTO_TAGE = 90;
 
    Der Aufrufer bekommt nichts zurueck und darf nicht scheitern: Das
    Aufraeumen ist Beiwerk seines eigentlichen Auftrags. */
+/* Worauf sich eine Ereignismeldung bezieht (ENT-621).
+
+   Gibt [kontrollpunkt_id, aufgabe_id] zurueck -- jeweils null, wenn nichts
+   angegeben war ODER die Angabe nicht zum Objekt gehoert.
+
+   GEPRUEFT, nicht bloss uebernommen, und zwar GEGEN DAS OBJEKT: Die
+   Kennungen kommen aus der App, also vom Aufrufer, und dem gehoeren sie
+   nicht. Ohne diese Pruefung koennte jemand eine Kennung aus einem fremden
+   Objekt mitschicken, und die Meldung haenge an einem Kontrollpunkt, den
+   sein Betrieb gar nicht sehen darf.
+
+   Passt der Bezug nicht, faellt NUR ER weg -- die Meldung selbst wird
+   trotzdem gespeichert. Der Nachweis, dass jemand etwas gemeldet hat, darf
+   nicht an einem inzwischen geloeschten Kontrollpunkt scheitern; Foto und
+   Text sind das Wesentliche. */
+function ereignis_bezug_pruefen(PDO $pdo, int $objektId, $kpRoh, $aufgRoh): array
+{
+    $kpId = !empty($kpRoh) ? (int)$kpRoh : 0;
+    $aufgId = !empty($aufgRoh) ? (int)$aufgRoh : 0;
+    if ($kpId <= 0 && $aufgId <= 0) { return [null, null]; }
+    // Ein eigener Riegel fuer $objektId <= 0 stand hier einmal und ist
+    // wieder weg: Die Abfragen unten pruefen ohnehin auf objekt_id, und
+    // mit 0 findet keine etwas. Die Zeile liess sich darum entfernen,
+    // ohne dass eine Pruefung anschlug -- und was nie anschlaegt, ist eine
+    // Behauptung, kein Schutz.
+
+    if ($kpId > 0) {
+        $q = $pdo->prepare('SELECT COUNT(*) FROM kontrollpunkt WHERE id = ? AND objekt_id = ?');
+        $q->execute([$kpId, $objektId]);
+        if ((int)$q->fetchColumn() === 0) { $kpId = 0; }
+    }
+    if ($aufgId > 0) {
+        $q = $pdo->prepare('SELECT COUNT(*) FROM objekt_aufgabe WHERE id = ? AND objekt_id = ?');
+        $q->execute([$aufgId, $objektId]);
+        if ((int)$q->fetchColumn() === 0) { $aufgId = 0; }
+    }
+    return [$kpId > 0 ? $kpId : null, $aufgId > 0 ? $aufgId : null];
+}
+
 function ereignis_fotos_aufraeumen(PDO $pdo): void
 {
     try {

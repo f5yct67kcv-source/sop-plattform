@@ -38,3 +38,37 @@ function ladepfad_aufrufe(string $pfad): array
     }
     return array_keys($namen);
 }
+
+// Welche freien Funktionen DEFINIERT eine Datei? Gegenstueck zu
+// ladepfad_aufrufe() -- ohne das meldete die Pruefung jede Funktion, die
+// ein Endpunkt sich selbst schreibt, als fehlend. Sie steht ja nicht in
+// der Kette, sondern in ihm.
+//
+// Methoden zaehlen nicht: Sie stehen hinter function in einer Klasse und
+// sind ueber function_exists() ohnehin nicht zu finden. Hier gibt es
+// keine Klassen; faende sich je eine, waere ein zu grosszuegiges Ergebnis
+// die falsche Richtung -- darum wird der Fall ausgeschlossen, statt
+// stillschweigend mitgezaehlt.
+function ladepfad_definitionen(string $pfad): array
+{
+    if (!is_file($pfad)) { return []; }
+    $tokens = token_get_all((string)file_get_contents($pfad));
+    $namen = [];
+    $anzahl = count($tokens);
+    $leer = [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT];
+    $inKlasse = 0;
+    for ($i = 0; $i < $anzahl; $i++) {
+        if (is_array($tokens[$i])
+            && in_array($tokens[$i][0], [T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM], true)) {
+            $inKlasse++;
+        }
+        if (!is_array($tokens[$i]) || $tokens[$i][0] !== T_FUNCTION) { continue; }
+        if ($inKlasse > 0) { continue; }
+        $j = $i + 1;
+        while ($j < $anzahl && is_array($tokens[$j]) && in_array($tokens[$j][0], $leer, true)) { $j++; }
+        // Anonyme Funktionen und Pfeilfunktionen haben keinen Namen.
+        if ($j >= $anzahl || !is_array($tokens[$j]) || $tokens[$j][0] !== T_STRING) { continue; }
+        $namen[strtolower((string)$tokens[$j][1])] = true;
+    }
+    return array_keys($namen);
+}

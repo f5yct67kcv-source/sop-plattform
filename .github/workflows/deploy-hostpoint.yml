@@ -969,6 +969,11 @@ jobs:
           # (503) statt an eine Unsinn-Adresse zu senden. Gleiche Bauart wie
           # basis_url_pruefen() (ENT-501).
           sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist/demo_anfrage.php
+          # Derselbe Empfaenger fuer die Meldungen aus dem Demo-Zugang
+          # (ENT-622). Diese Buendel bringen demo_zugang.php mit, also muss
+          # der Platzhalter auch hier ersetzt werden -- ein stehen
+          # gebliebener weist den Deploy ab.
+          sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist/demo_zugang.php
           # Staging-Mailmodus (ENT-341): Ausserhalb der Produktion leitet
           # mailer.php JEDE Mail auf diese Adresse um -- unabhaengig davon,
           # ueber welches Postfach (siehe SMTP_* oben) sie verschickt wird.
@@ -1428,6 +1433,16 @@ jobs:
           # Rapport-Tools und bei den GuardOpS-Literalen im guardops-Buendel).
           sed -i "s|__APP_BASIS_URL__|https://betreiber.guardops.ch|g" dist-betreiber/db.php
 
+          # Empfaenger der Meldungen an den Betreiber (ENT-622) -- dasselbe
+          # Secret wie beim Kontaktformular auf guardops.ch: Beide Wege
+          # melden dieselbe Sache an dieselben Leute, und zwei Adressen
+          # waeren zwei Postfaecher, von denen eines irgendwann niemand mehr
+          # liest. Bleibt der Platzhalter stehen (kein Secret hinterlegt),
+          # erkennt demo_zugang_empfaenger_pruefen() ihn und die Meldung
+          # entfaellt still -- der Demo-Zugang des Interessenten haengt
+          # ausdruecklich NICHT daran.
+          sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist-betreiber/demo_zugang.php
+
           # SMTP fuer die Zugangsdaten-Mail an Demo-Interessenten (ENT-600).
           # Dasselbe Postfach wie das Kundenportal, aus demselben Grund wie
           # dort: Es ist Kundenkommunikation der Plattform, keine eigene
@@ -1845,6 +1860,11 @@ jobs:
           sed -i "s|__MAIL_SIGNATUR__||g" dist-cupi24/mailer.php
           sed -i "s|__SMTP_ABSENDER_NAME__|$EFF_SMTP_ABSENDER_NAME|g" dist-cupi24/mailer.php
           sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist-cupi24/demo_anfrage.php
+          # Derselbe Empfaenger fuer die Meldungen aus dem Demo-Zugang
+          # (ENT-622). Diese Buendel bringen demo_zugang.php mit, also muss
+          # der Platzhalter auch hier ersetzt werden -- ein stehen
+          # gebliebener weist den Deploy ab.
+          sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist-cupi24/demo_zugang.php
           # Dieser Schritt laeuft ausschliesslich in Production (siehe
           # Bedingung oben) -- EFF_STAGING_TESTMAIL und EFF_DEMO_TESTMAIL
           # sind dort immer leer, dieselbe Bauart wie beim Hauptschritt.

@@ -49,9 +49,11 @@ $mysqlZeit = static function ($wert): ?string {
 $ins = $pdo->prepare(
     'INSERT INTO ereignis_meldung
        (objekt_id, rundgang_id, einsatz_id, mitarbeiter_id, ereignisart_id,
-        erfasst_am, vorfall_am, bemerkung, foto, foto_mime, lat, lng)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        erfasst_am, vorfall_am, bemerkung, foto, foto_mime,
+        kontrollpunkt_id, aufgabe_id, lat, lng)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
 );
+
 
 $ergebnisse = [];
 foreach ($meldungen as $m) {
@@ -104,6 +106,11 @@ foreach ($meldungen as $m) {
     $lat = isset($m['lat']) && is_numeric($m['lat']) ? (float)$m['lat'] : null;
     $lng = isset($m['lng']) && is_numeric($m['lng']) ? (float)$m['lng'] : null;
 
+    // Bezug auf die Aufgabe (ENT-621) -- geprueft gegen das Objekt, in
+    // rundgang.php, damit es sich ohne Endpunkt pruefen laesst.
+    [$bezugKp, $bezugAufgabe] = ereignis_bezug_pruefen(
+        $pdo, $objektId, $m['kontrollpunkt_id'] ?? null, $m['aufgabe_id'] ?? null);
+
     try {
         $ins->execute([
             $objektId,
@@ -114,7 +121,9 @@ foreach ($meldungen as $m) {
             $erfasst,
             $mysqlZeit($m['vorfall_am'] ?? null),
             $bemerkung !== '' ? $bemerkung : null,
-            $foto, $fotoMime, $lat, $lng,
+            $foto, $fotoMime,
+            $bezugKp, $bezugAufgabe,
+            $lat, $lng,
         ]);
         $ergebnisse[] = ['lokal_id' => $lokal, 'status' => 'ok', 'id' => (int)$pdo->lastInsertId()];
     } catch (Throwable $e) {

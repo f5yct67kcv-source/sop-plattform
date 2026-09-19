@@ -381,6 +381,198 @@ $pruef('KRITISCH: erreichbarer Namensdienst, aber die Domain gibt es wirklich ni
     demo_zugang_adresse_zustellbar('a@nirgends.test', $nurKontrolle) === false);
 $pruef('eine Adresse ohne @ gilt als nicht zustellbar, ohne Absturz',
     demo_zugang_adresse_zustellbar('keine-email', $immerJa) === false);
+// ══ Die bekannte Adresse meldet sich erneut (ENT-623) ═════════════════
+//
+// Bis hierher kam dieselbe Mail heraus wie beim ersten Mal. Kein neuer
+// Zugang wurde angelegt -- das ist die Sperre aus ENT-601 und war nie
+// anders --, aber die Mail sah aus wie ein zweiter Zugang. Der
+// Projektinhaber hat das am 2026-09-19 an der echten Mail beanstandet.
+
+$erst   = demo_zugang_mail('Muster Sicherheit GmbH', 'R. Muster',
+    'https://demo1.guardops.ch', 'mustersicherh', 'AbcDefGhiJkm', '2026-10-03 09:14:00');
+$wieder = demo_zugang_bekannt_mail('Muster Sicherheit GmbH', 'R. Muster',
+    'https://demo1.guardops.ch', 'mustersicherh', 'AbcDefGhiJkm', '2026-10-03 09:14:00');
+
+// DER Punkt: Im Postfach muss man die beiden auseinanderhalten koennen,
+// ohne sie zu oeffnen.
+$pruef('KRITISCH: die zweite Mail traegt einen anderen Betreff als die erste',
+    $wieder['betreff'] !== $erst['betreff']);
+// Und sie sagt die Sache, nicht nur einen anderen Betreff.
+foreach (['text', 'html'] as $teil) {
+    $pruef("die $teil-Fassung sagt, dass der Zugang bereits besteht",
+        str_contains(mb_strtolower(strip_tags($wieder[$teil])), 'bereits'));
+    // Wer die erste Mail verloren hat, muss wieder hineinkommen -- sonst
+    // ist er vierzehn Tage ausgesperrt. "Zugangsdaten erneut senden" gibt
+    // es als Endpunkt, aber auf keiner Seite als Bedienelement.
+    $pruef("die $teil-Fassung bringt Adresse, Anmeldename und Passwort mit",
+        str_contains($wieder[$teil], 'https://demo1.guardops.ch')
+        && str_contains($wieder[$teil], 'mustersicherh')
+        && str_contains($wieder[$teil], 'AbcDefGhiJkm'));
+    // demo_zugang_neues_passwort() wirft die bestehenden Sitzungen weg.
+    // Wer das nicht erfaehrt, haelt seinen Zugang fuer kaputt.
+    $pruef("die $teil-Fassung sagt, dass die alten Zugangsdaten nicht mehr gelten",
+        str_contains(mb_strtolower(strip_tags($wieder[$teil])), 'nicht mehr'));
+    // Das Ablaufdatum des BESTEHENDEN Zugangs, nicht ein neues: Der Zugang
+    // laeuft weiter, er faengt nicht von vorne an.
+    $pruef("die $teil-Fassung nennt das Ablaufdatum des bestehenden Zugangs",
+        str_contains($wieder[$teil], '03.10.2026'));
+}
+// Sie geht an einen Interessenten, nicht an uns -- also mit Unterschrift
+// und Logo, anders als die Meldungen weiter unten.
+$pruef('die Mail an den Interessenten ist gezeichnet wie die erste',
+    str_contains($wieder['html'], 'Mit freundlichen Grüssen'));
+$boesWieder = demo_zugang_bekannt_mail('<b>M</b>', '"><script>x</script>',
+    'https://demo1.guardops.ch', 'l', 'p', '2026-10-03 09:14:00');
+$pruef('KRITISCH: auch hier bleibt eingeschmuggelte Auszeichnung Text',
+    !str_contains($boesWieder['html'], '<script>')
+    && !str_contains($boesWieder['html'], '<b>M</b>'));
+
+// Der Umschalter sitzt in demo_zugang_neues_passwort(). Sein Vorgabewert
+// entscheidet, was "Zugangsdaten erneut senden" verschickt -- dort hat
+// jemand ausdruecklich danach gefragt und bekommt die gewohnte Mail.
+require_once __DIR__ . '/../backend/demo_instanz.php';
+$umschalter = (new ReflectionFunction('demo_zugang_neues_passwort'))->getParameters();
+$dritter = $umschalter[2] ?? null;
+$pruef('KRITISCH: die Unterscheidung ist ein eigener Schalter, nicht zwei Kopien der Funktion',
+    $dritter !== null && $dritter->isOptional());
+$pruef('KRITISCH: ohne Angabe bleibt es die gewohnte Mail -- sonst bekaeme auch '
+        . '"Zugangsdaten erneut senden" den Text "besteht bereits"',
+    $dritter !== null && $dritter->getDefaultValue() === false);
+
+// Die Meldung an uns ueber die erneute Anfrage. Eigener Betreff, damit sie
+// sich im Postfach von einer echten Neuanmeldung unterscheidet.
+$erneut = demo_erneut_mail('Muster Sicherheit GmbH', 'R. Muster', 'r.muster@beispiel.ch',
+    '+41 00 000 00 00', 'demo1', 'https://demo1.guardops.ch', '2026-10-03 09:14:00');
+$pruef('KRITISCH: die erneute Anfrage meldet sich anders als eine Neuanmeldung',
+    $erneut['betreff'] !== demo_melde_mail('Muster Sicherheit GmbH', 'R. Muster',
+        'r.muster@beispiel.ch', '+41 00 000 00 00', 'demo1',
+        'https://demo1.guardops.ch', '2026-10-03 09:14:00')['betreff']);
+// Ohne diesen Satz liest man sie als zweiten Zugang und sucht einen Platz,
+// der gar nicht belegt wurde.
+$pruef('KRITISCH: sie sagt ausdrücklich, dass kein neuer Zugang und kein Platz dazukam',
+    str_contains($erneut['text'], 'KEIN neuer Zugang')
+    && str_contains(strip_tags($erneut['html']), 'kein')
+    && str_contains(mb_strtolower($erneut['text']), 'kein weiterer platz'));
+$pruef('sie nennt Firma, Person und Erreichbarkeit',
+    str_contains($erneut['text'], 'R. Muster')
+    && str_contains($erneut['text'], 'r.muster@beispiel.ch')
+    && str_contains($erneut['text'], '+41 00 000 00 00'));
+$pruef('auch sie ist Hauspost -- kein Logo im Schlepptau',
+    $erneut['bilder'] === [] && !str_contains($erneut['html'], 'cid:'));
+
+// ══ Meldungen an den Betreiber (ENT-622) ══════════════════════════════
+//
+// Bis hierher lief die Selbstbedienung an uns vorbei. Zwei Meldungen
+// schliessen die Luecke -- und beide haben eine Eigenschaft, die man nur
+// am erzeugten Inhalt pruefen kann, nicht am Quelltext.
+
+$melde = demo_melde_mail('Muster Sicherheit GmbH', 'R. Muster', 'r.muster@beispiel.ch',
+    '+41 00 000 00 00', 'demo1', 'https://demo1.guardops.ch', '2026-10-03 09:14:00');
+
+// Wer drei Meldungen im Postfach hat, soll sie auseinanderhalten koennen,
+// OHNE sie zu oeffnen.
+$pruef('KRITISCH: die Firma steht im Betreff, nicht nur im Rumpf',
+    str_contains($melde['betreff'], 'Muster Sicherheit GmbH'));
+// Beide Fassungen tragen dieselbe Auskunft -- eine Textfassung, die weniger
+// sagt als die HTML-Fassung, ist eine zweite, schlechtere Mail.
+foreach (['text', 'html'] as $teil) {
+    $pruef("die $teil-Fassung nennt Firma, Person, Adresse, Platz und Ablauf",
+        str_contains($melde[$teil], 'Muster Sicherheit GmbH')
+        && str_contains($melde[$teil], 'R. Muster')
+        && str_contains($melde[$teil], 'r.muster@beispiel.ch')
+        && str_contains($melde[$teil], '+41 00 000 00 00')
+        && str_contains($melde[$teil], 'demo1')
+        && str_contains($melde[$teil], '03.10.2026'));
+}
+// KEIN PASSWORT. Es steht schon in der Mail an den Interessenten; ein
+// zweites Mal verschickt waere es ein zweites Postfach, aus dem es
+// entwischen kann. Geprueft wird die Aussage: Die Funktion bekommt das
+// Passwort gar nicht erst uebergeben -- ihre Unterschrift kennt es nicht.
+$unterschrift = (new ReflectionFunction('demo_melde_mail'))->getParameters();
+$pruef('KRITISCH: die Meldung kann kein Passwort enthalten -- sie bekommt keines',
+    array_filter($unterschrift,
+        fn($par) => str_contains(mb_strtolower($par->getName()), 'passwort')) === []);
+// Hauspost, keine Geschaeftsmail: kein eingebettetes Logo in jeder Meldung.
+$pruef('die Meldung schleppt kein Logo mit -- sie geht an uns, nicht an einen Kunden',
+    $melde['bilder'] === [] && !str_contains($melde['html'], 'cid:'));
+// "Unbekannt" darf nie wie "keine" aussehen (Hausregel): Eine fehlende
+// Nummer ist etwas anderes als eine leere Zeile.
+$ohneTel = demo_melde_mail('Muster Sicherheit GmbH', 'R. Muster', 'r.muster@beispiel.ch',
+    '', 'demo1', 'https://demo1.guardops.ch', '2026-10-03 09:14:00');
+$pruef('KRITISCH: eine fehlende Telefonnummer wird benannt, nicht weggelassen',
+    str_contains($ohneTel['text'], 'keine Angabe')
+    && str_contains($ohneTel['html'], 'keine Angabe'));
+// Die Angaben kommen aus einem oeffentlichen Formular. Was ein Interessent
+// hineinschreibt, darf in der HTML-Fassung nie Auszeichnung werden.
+$boes = demo_melde_mail('<b>Muster</b>', '"><script>x</script>', 'a@beispiel.ch',
+    '<i>0</i>', 'demo1', 'https://demo1.guardops.ch', '2026-10-03 09:14:00');
+$pruef('KRITISCH: eingeschmuggelte Auszeichnung bleibt Text',
+    !str_contains($boes['html'], '<b>Muster</b>')
+    && !str_contains($boes['html'], '<script>')
+    && str_contains($boes['html'], '&lt;b&gt;'));
+
+// Die Vorratswarnung nennt die Zahl der Plaetze, nicht nur "voll": Wer sie
+// liest, soll entscheiden koennen, ob er Plaetze freiraeumt oder den Vorrat
+// vergroessert -- dafuer muss er wissen, wie gross er ist.
+$vorrat = demo_vorrat_mail(10);
+$pruef('KRITISCH: die Vorratswarnung nennt die Zahl der Plaetze',
+    str_contains($vorrat['text'], '10') && str_contains($vorrat['html'], '10'));
+$pruef('sie sagt im Betreff schon, worum es geht',
+    str_contains(mb_strtolower($vorrat['betreff']), 'vorrat')
+    || str_contains(mb_strtolower($vorrat['betreff']), 'abgewiesen'));
+// Sie beschreibt einen Zustand, keinen Interessenten -- abgewiesen wird
+// VOR dem Register, wir kennen ihn nicht. Eine Meldung, die so tut, als
+// haetten wir einen Namen, schickt jemanden auf eine Suche ins Leere.
+$pruef('sie behauptet nicht, wir wüssten, wer abgewiesen wurde',
+    str_contains($vorrat['text'], 'wissen wir nicht'));
+
+// ── Die Bremse fuer die Warnung ──────────────────────────────────────
+//
+// Sie faellt AUF, nicht zu: Ohne Vermerk geht die Warnung raus. Eine Mail
+// zu viel ist harmlos, eine verpasste Warnung kostet Interessenten.
+$jetzt = 1_800_000_000;
+$pruef('KRITISCH: ohne Vermerk geht die Warnung raus',
+    demo_warnung_faellig(null, $jetzt) === true);
+$pruef('KRITISCH: kurz nach einer Warnung kommt keine zweite',
+    demo_warnung_faellig($jetzt - 60, $jetzt) === false);
+$pruef('genau an der Grenze ist sie wieder fällig',
+    demo_warnung_faellig($jetzt - DEMO_WARNUNG_PAUSE_MIN * 60, $jetzt) === true);
+$pruef('eine Sekunde davor noch nicht',
+    demo_warnung_faellig($jetzt - DEMO_WARNUNG_PAUSE_MIN * 60 + 1, $jetzt) === false);
+// Ein Vermerk aus der Zukunft (verstellte Uhr, kopierte Datei) darf die
+// Warnung nicht auf Dauer stilllegen -- sonst schweigt sie fuer immer.
+$pruef('KRITISCH: ein Vermerk aus der Zukunft legt die Warnung nicht still',
+    demo_warnung_faellig($jetzt + 99999, $jetzt) === true);
+
+// ── Der Empfaenger ───────────────────────────────────────────────────
+//
+// Dieselbe Pruefung steht ein zweites Mal in demo_anfrage.php -- die beiden
+// Dateien liegen in verschiedenen Buendeln, der gemeinsame Ort waere
+// mailer.php und wuerde db.php in einen bewusst datenbankfreien Rechenkern
+// ziehen (Begruendung ueber demo_zugang_empfaenger_pruefen()). Damit die
+// beiden Fassungen nicht auseinanderlaufen, werden sie hier Eingabe fuer
+// Eingabe gegeneinander gehalten.
+require_once __DIR__ . '/../backend/demo_anfrage.php';
+$faelle = ['', '   ', '__DEMO_EMPFAENGER__', 'info@guardops.ch', ' info@guardops.ch ',
+    "a@b.ch\r\nBcc: fremd@example.org", "a@b.ch\nX: y", "a\tb@c.ch", 'kein-email',
+    'a@b', 'a@b.chä', 'Max <max@beispiel.ch>'];
+$abweichung = [];
+foreach ($faelle as $f) {
+    if (demo_zugang_empfaenger_pruefen($f) !== demo_empfaenger_pruefen($f)) {
+        $abweichung[] = $f;
+    }
+}
+$pruef('KRITISCH: die zweite Fassung der Empfaengerpruefung urteilt wie die erste',
+    $abweichung === []);
+// Und sie urteilt richtig -- eine Gleichheit zweier falscher Fassungen
+// waere keine Zusicherung.
+$pruef('KRITISCH: ein nicht ersetzter Platzhalter ist "nicht eingerichtet", nicht eine Adresse',
+    demo_zugang_empfaenger_pruefen('__DEMO_EMPFAENGER__') === null);
+$pruef('KRITISCH: ein Umbruch in der Adresse wird abgewiesen (Kopfzeilen-Einschleusung)',
+    demo_zugang_empfaenger_pruefen("a@b.ch\r\nBcc: fremd@example.org") === null);
+$pruef('eine gültige Adresse kommt getrimmt durch',
+    demo_zugang_empfaenger_pruefen(' info@guardops.ch ') === 'info@guardops.ch');
+
 echo "\n$ok bestanden, " . count($bad) . " nicht bestanden\n";
 foreach ($bad as $n) { echo "  x $n\n"; }
 exit(count($bad) ? 1 : 0);
