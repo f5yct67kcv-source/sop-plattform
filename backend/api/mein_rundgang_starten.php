@@ -83,16 +83,27 @@ if ($fensterVon !== null && $fensterBis !== null) {
     $ausnahmeGrund = null;
 }
 
-// Kein zweiter offener Rundgang fuer denselben Einsatz gleichzeitig --
-// mehrere Rundgaenge NACHEINANDER pro Schicht sind vorgesehen (z.B.
-// stuendliche Kontrollen), aber nicht parallel.
-$offen = $pdo->prepare(
-    "SELECT id FROM rundgang WHERE einsatz_id = ? AND mitarbeiter_id = ?
-      AND status IN ('vorbereitet','laeuft','pausiert')"
-);
-$offen->execute([$einsatzId, (int)$user['id']]);
-if ($offen->fetch()) {
-    json_response(['status' => 'error', 'message' => 'Es laeuft bereits ein Rundgang fuer diesen Einsatz'], 409);
+// Kein zweiter offener Rundgang, solange einer offen ist -- und zwar ueber
+// ALLE Einsaetze hinweg (ENT-625, erweitert die Sperre je Einsatz aus
+// ENT-180). Mehrere Rundgaenge NACHEINANDER pro Schicht bleiben vorgesehen
+// (z.B. stuendliche Kontrollen); parallel gibt es keinen.
+//
+// Der Projektinhaber: „Wenn ein bereits bestehender Rundgang offen ist,
+// muss der andere zuerst begruendet abgeschlossen oder abgebrochen
+// werden." Bis hierher sah diese Pruefung nur denselben Einsatz an -- eine
+// vergessene Runde von gestern und eine neue von heute standen nebeneinander.
+//
+// ABGRENZUNG ZU ENT-342: Dort ist eine Startsperre bewusst GEFALLEN, weil
+// sie den Waechter vor einem Planungsfehler stehen liess, den er draussen
+// gar nicht beheben konnte. Das gilt hier nicht: Diese Sperre haengt an der
+// eigenen offenen Runde, und der Ausweg liegt in derselben Rueckfrage --
+// fortsetzen, pausieren oder mit Grund abbrechen. Deshalb kommt die offene
+// Runde mit der Absage MIT, statt die App auf einen roten Satz zu setzen.
+$offen = rundgang_offener($pdo, (int)$user['id']);
+if ($offen['rundgang']) {
+    json_response(['status' => 'error', 'code' => 'runde_offen',
+        'message' => 'Es ist noch ein Rundgang offen. Er muss zuerst beendet oder abgebrochen werden.',
+        'offen' => $offen['rundgang']], 409);
 }
 
 $ins = $pdo->prepare(

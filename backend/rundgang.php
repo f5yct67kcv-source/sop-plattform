@@ -514,6 +514,80 @@ function rundgang_im_fenster(string $jetztHm, ?string $fensterVonHm, ?string $fe
 // kleine Runde (z.B. "Oeffnungsrunde", 1 Punkt) faelschlich gegen ALLE
 // Punkte des Objekts gezaehlt und saehe nach einer unvollstaendigen Runde
 // aus, obwohl er vollstaendig war.
+/* Der eine, noch offene Rundgang dieser Person -- ueber ALLE Einsaetze
+   hinweg (ENT-624/625).
+
+   Eine Person hat hoechstens EINE offene Runde. Der Projektinhaber dazu:
+   „Ein begonnener Rundgang wird immer zu Ende gefuehrt, weil der
+   Mitarbeiter bei einem Objekt ist." Bis ENT-625 galt die Sperre nur je
+   Einsatz -- eine vergessene Runde von gestern und eine neue von heute
+   konnten nebeneinander stehen, ohne dass jemand etwas falsch gemacht
+   hatte: Die Doppelbelegungspruefung sieht nur Zeitueberschneidungen, und
+   20:00-06:00 von gestern ueberschneidet sich nicht mit heute Nachmittag.
+
+   Die Funktion steht HIER und nicht in einem Endpunkt: Sie wird von drei
+   Endpunkten gebraucht (nachfragen, starten, spontan starten), und
+   Endpunkte binden einander nie ein. Waere sie an einem von ihnen
+   festgemacht, haetten die beiden anderen ihre eigene Fassung -- und
+   damit eine zweite Wahrheit darueber, was „offen" heisst.
+
+   Bewusst MAGER: nur, was eine Rueckfrage anzeigen muss. Die vollstaendige
+   Runde samt Kontrollpunkten holt mein_rundgang_offen.php.
+
+   Rueckgabe: ['rundgang' => array|null, 'weitere' => int]. 'weitere' zaehlt
+   die uebrigen offenen Runden -- normalerweise 0; seit ENT-625 kann es sie
+   nur noch aus der Zeit davor geben. */
+function rundgang_offener(PDO $pdo, int $mitarbeiterId): array
+{
+    $stmt = $pdo->prepare(
+        "SELECT r.id, r.einsatz_id, r.objekt_id, r.rundgang_vorlage_id, r.status,
+                r.vorbereitet_am, r.rohzeit_start, r.pausiert_seit, r.pause_minuten,
+                e.datum AS einsatz_datum,
+                o.name AS objekt_name, o.kunde_name,
+                v.name AS vorlage_name
+           FROM rundgang r
+           JOIN einsaetze e ON e.id = r.einsatz_id
+           JOIN objekte   o ON o.id = r.objekt_id
+      LEFT JOIN rundgang_vorlage v ON v.id = r.rundgang_vorlage_id
+          WHERE r.mitarbeiter_id = ? AND r.status IN ('vorbereitet','laeuft','pausiert')
+          ORDER BY r.id DESC"
+    );
+    $stmt->execute([$mitarbeiterId]);
+    $offene = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if (!$offene) {
+        return ['rundgang' => null, 'weitere' => 0];
+    }
+
+    $r = $offene[0];
+    $vorlageId = $r['rundgang_vorlage_id'] !== null ? (int)$r['rundgang_vorlage_id'] : null;
+    // Dieselbe Zaehlung wie ueberall sonst. Neu gerechnet waere es eine
+    // zweite Wahrheit ueber denselben Fortschritt.
+    $fortschritt = rundgang_fortschritt($pdo, (int)$r['id'], (int)$r['objekt_id'], $vorlageId);
+
+    return ['weitere' => count($offene) - 1, 'rundgang' => [
+        'id'              => (int)$r['id'],
+        'einsatz_id'      => (int)$r['einsatz_id'],
+        'vorlage_id'      => $vorlageId,
+        // Damit die App die Schicht nachladen kann, wenn sie ausserhalb des
+        // geladenen Zeitraums liegt -- genau der Fall einer vergessenen
+        // Runde vom Vormonat.
+        'einsatz_datum'   => $r['einsatz_datum'],
+        'status'          => (string)$r['status'],
+        'vorbereitet_am'  => $r['vorbereitet_am'],
+        'rohzeit_start'   => $r['rohzeit_start'],
+        'pausiert_seit'   => $r['pausiert_seit'],
+        'pause_minuten'   => (int)$r['pause_minuten'],
+        'objekt_name'     => (string)($r['objekt_name'] ?? ''),
+        'kunde_name'      => $r['kunde_name'],
+        // Ohne gewaehlte Kontrollrunde bleibt das null, und die App sagt
+        // dann ausdruecklich "alle Punkte des Objekts" statt die Zeile leer
+        // zu lassen ("unbekannt" darf nie wie "keine" aussehen).
+        'vorlage_name'    => $r['vorlage_name'],
+        'punkte_anzahl'   => (int)$fortschritt['gesamt'],
+        'erledigt_anzahl' => (int)$fortschritt['erledigt'],
+    ]];
+}
+
 function rundgang_fortschritt(PDO $pdo, int $rundgangId, int $objektId, ?int $vorlageId = null): array
 {
     if ($vorlageId !== null) {

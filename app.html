@@ -3839,7 +3839,10 @@ function roFortsetzen() {
 function roPausieren() {
   const r = roOffen;
   if (!r) { return; }
-  if (r.status === 'pausiert') { roStumpfSetzen(r, 'pausiert'); roFertig(); zeichneHeute(); return; }
+  // blattZu(): Kam die Rueckfrage aus einer abgelehnten Startanfrage
+  // (ENT-625), steht die Startschublade noch offen -- sie gehoert zu einem
+  // Schritt, der jetzt vorbei ist.
+  if (r.status === 'pausiert') { roStumpfSetzen(r, 'pausiert'); roFertig(); blattZu(); zeichneHeute(); return; }
   const btn = $('roBtnPause');
   btn.disabled = true;
   api('mein_rundgang_pausieren.php', { method: 'POST', body: { rundgang_id: r.id } })
@@ -3849,6 +3852,7 @@ function roPausieren() {
       r.status = 'pausiert';
       roStumpfSetzen(r, 'pausiert');
       roFertig();
+      blattZu();
       // Der Chip auf „Heute" ist ab jetzt der Weg zurueck (ENT-234).
       zeichneHeute();
     });
@@ -3873,6 +3877,21 @@ function roAbbrechen() {
 function roZurueckAusAbbruch() {
   blattZu();
   if (roOffen) { roZeigen(roOffen); }
+}
+
+/* Der Start ist abgelehnt worden, weil noch eine Runde offen ist
+   (ENT-625). Statt eines roten Satzes kommt dieselbe Rueckfrage wie beim
+   App-Start: fortsetzen, pausieren, abbrechen mit Grund. Eine Sperre ohne
+   Ausweg waere hier wertlos -- der Waechter steht vor dem Objekt und kann
+   nicht erst suchen gehen, wo die alte Runde liegt.
+
+   Gibt der Server die offene Runde ausnahmsweise nicht mit, bleibt es beim
+   Satz: lieber eine magere Auskunft als eine erfundene Rueckfrage. */
+function rgStartAbgelehntOffeneRunde(data) {
+  if (!data || data.code !== 'runde_offen') { return false; }
+  if (!data.offen) { toast(data.message || w('netzfehler')); return true; }
+  roZeigen(data.offen);
+  return true;
 }
 
 function rundgangChipOeffnen() {
@@ -6701,6 +6720,8 @@ function rundgangSpontanStarten(vorlageId, ausnahmeGrund, trotzDoppel) {
     }
     if (!ok || data.status !== 'ok') {
       document.querySelectorAll('#blBody button, #rfsBtn').forEach(b => b.disabled = false);
+      // Noch eine Runde offen (ENT-625): Die Rueckfrage traegt den Ausweg.
+      if (rgStartAbgelehntOffeneRunde(data)) { return; }
       toast(data.message || w('netzfehler'));
       return;
     }
@@ -7953,6 +7974,8 @@ function rundgangStartenMitVorlage(einsatzId, vorlageId, ausnahmeGrund) {
   api('mein_rundgang_starten.php', { method: 'POST', body }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') {
       document.querySelectorAll('#blRundgang button, #rdVorlageListe button, #rfBtn').forEach(b => b.disabled = false);
+      // Noch eine Runde offen (ENT-625): Die Rueckfrage traegt den Ausweg.
+      if (rgStartAbgelehntOffeneRunde(data)) { return; }
       toast(data.message || w('netzfehler'));
       return;
     }

@@ -551,6 +551,8 @@ for (const [datei, titel] of [
   ['pruef_ereignisse.php', 'KRITISCH: die Ereignis-Arten und ihre Abhakbarkeit stimmen (ENT-090/ENT-197)'],
   ['pruef_ereignis_bezug.php',
    'KRITISCH: der Bezug einer Meldung auf die Aufgabe wird gegen das Objekt geprüft (ENT-621)'],
+  ['pruef_offene_runde.php',
+   'KRITISCH: die offene Runde wird über alle Einsätze und nur für die eigene Person gefunden (ENT-624/625)'],
   ['pruef_revierdienst_berechtigung.php', 'KRITISCH: die Weichen von ohneRevierdienstBerechtigung() stimmen (ENT-284)'],
   ['pruef_aufgaben.php', 'KRITISCH: eine fremde oder entfernte Aufgabe laesst sich nicht an einen Kontrollpunkt haengen (ENT-302)'],
   ['pruef_mitteilungen.php', 'KRITISCH: Sichtbarkeit und Lesestand der Mitteilungen stimmen -- SQL und PHP sagen dasselbe (ENT-421)'],

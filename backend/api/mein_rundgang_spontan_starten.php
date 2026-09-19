@@ -66,6 +66,33 @@ if ($v['fenster_von'] !== null && $v['fenster_bis'] !== null) {
     $ausnahmeGrund = null;
 }
 
+/* Keine zweite offene Runde (ENT-625) -- vor allem anderen, und vor allem
+   VOR dem Anlegen von Einsatz und Zuteilung: Ein Abbruch weiter unten
+   hinterliesse sonst genau die Karteileichen im Einsatzplan, die ENT-294
+   losgeworden ist.
+
+   Ist es dieselbe Kontrollrunde, die schon laeuft, ist das kein Konflikt,
+   sondern ein zweites Antippen derselben Kachel (ENT-290): Dann fuehrt die
+   Antwort in die bestehende Runde zurueck, statt sie abbrechen zu lassen.
+   Diese Weiche sass bis hierher INNERHALB der Doppelbelegungspruefung und
+   griff darum nur bei einer Zeitueberschneidung -- eine pausierte Runde von
+   gestern Nacht erreichte sie nie. */
+$offen = rundgang_offener($pdo, (int)$user['id']);
+if ($offen['rundgang']) {
+    if ($offen['rundgang']['vorlage_id'] === $vorlageId) {
+        json_response(['status' => 'laeuft_bereits',
+            'einsatz_id' => (int)$offen['rundgang']['einsatz_id'],
+            'rundgang_id' => (int)$offen['rundgang']['id']]);
+    }
+    // Die offene Runde kommt mit: Die App stellt daraus dieselbe Rueckfrage
+    // wie beim App-Start (ENT-624) -- fortsetzen, pausieren, abbrechen mit
+    // Grund. Eine Sperre ohne Ausweg waere hier wertlos; der Waechter steht
+    // vor dem Objekt.
+    json_response(['status' => 'error', 'code' => 'runde_offen',
+        'message' => 'Es ist noch ein Rundgang offen. Er muss zuerst beendet oder abgebrochen werden.',
+        'offen' => $offen['rundgang']], 409);
+}
+
 $heute = date('Y-m-d');
 $jetzt = date('H:i:s');
 // Reine Platzhalter-Sollzeit fuer Doppelbelegung und Anzeige, bis zum
@@ -79,25 +106,11 @@ $bis = date('H:i:s', strtotime('+30 minutes'));
 // bereits anderswo eingeteilt ist.
 $doppelt = doppelbelegungen(0, $heute, $jetzt, $bis, [(int)$user['id']]);
 if ($doppelt) {
-    // Ist die Kollision ausgerechnet mit der eigenen, noch offenen Runde
-    // DERSELBEN Vorlage (ENT-290, gemeldeter Fehler: zweimal auf dieselbe
-    // Kachel der objektuebergreifenden Uebersicht getippt, z.B. weil der
-    // erste Versuch nur "vorbereitet" blieb)? Dann ist das kein echter
-    // Konflikt, sondern dieselbe Runde, die schon laeuft -- die Oberflaeche
-    // soll sie fortsetzen, statt an der eigenen Sperre zu scheitern und
-    // keinen Weg mehr zurueck zu haben.
+    // Die Weiche fuer "dieselbe Runde laeuft schon" (ENT-290) stand bis
+    // ENT-625 HIER. Sie ist nach oben gewandert, vor diese Pruefung: Dort
+    // greift sie auch ohne Zeitueberschneidung, und hier waere sie seither
+    // unerreichbar -- jede offene Runde ist oben schon beantwortet.
     $konfliktEinsatzId = (int)$doppelt[0]['einsatz_id'];
-    $bestehendStmt = $pdo->prepare(
-        "SELECT id FROM rundgang
-          WHERE einsatz_id = ? AND mitarbeiter_id = ? AND rundgang_vorlage_id = ?
-            AND status NOT IN ('abgeschlossen', 'abgebrochen')"
-    );
-    $bestehendStmt->execute([$konfliktEinsatzId, (int)$user['id'], $vorlageId]);
-    $bestehendeRundgangId = $bestehendStmt->fetchColumn();
-    if ($bestehendeRundgangId !== false) {
-        json_response(['status' => 'laeuft_bereits',
-            'einsatz_id' => $konfliktEinsatzId, 'rundgang_id' => (int)$bestehendeRundgangId]);
-    }
     // KEINE Sperre mehr (ENT-342, revidiert ENT-022 fuer diesen einen Weg).
     // Der Projektinhaber: Der Disponent plant kurzfristig um, der Waechter
     // steht vor dem Objekt -- und genau dann ist der Planer oft nicht

@@ -59,6 +59,8 @@ let LAEUFT = { status: 'ok', weitere: 0, rundgang: {
 let rufe = [];
 // Künstliche Verzögerung der Antwort, in Millisekunden. 0 = sofort.
 let bremse = 0;
+// Antwort auf einen Startversuch. null = der Start gelingt.
+let STARTFEHLER = null;
 
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
@@ -97,6 +99,13 @@ await page.route('**/api/**', route => {
   if (p.includes('mein_rundgang_pausieren')) return send({ status: 'ok' });
   if (p.includes('mein_rundgang_fortsetzen')) return send({ status: 'ok', rundgang_status: 'laeuft' });
   if (p.includes('mein_rundgang_abbrechen')) return send({ status: 'ok' });
+  if (p.includes('mein_rundgang_spontan_starten') || p.includes('mein_rundgang_starten')) {
+    if (STARTFEHLER) {
+      return route.fulfill({ status: 409, contentType: 'application/json',
+        body: JSON.stringify(STARTFEHLER) });
+    }
+    return send({ status: 'ok', rundgang_id: 960, einsatz_id: 778, kontrollpunkte: punkte });
+  }
   return send({ status: 'ok' });
 });
 
@@ -300,6 +309,59 @@ await anmelden();
 check('KRITISCH: ohne offene Runde erscheint die Rückfrage nicht',
   !(await page.isVisible('#roDlg')));
 check('Und auch kein Chip', !(await page.isVisible('.rd-chip')));
+
+// ══════════ ABGELEHNTER START: DIE SPERRE TRÄGT DEN AUSWEG (ENT-625) ══
+// Der Wächter steht vor Objekt B, bei Objekt A läuft noch etwas. Ein roter
+// Satz "Es ist noch ein Rundgang offen" liesse ihn dort stehen -- er müsste
+// erst suchen gehen, wo die alte Runde liegt. Stattdessen kommt dieselbe
+// Rückfrage wie beim App-Start.
+LAEUFT = { status: 'ok', rundgang: null, weitere: 0 };
+STARTFEHLER = { status: 'error', code: 'runde_offen',
+  message: 'Es ist noch ein Rundgang offen. Er muss zuerst beendet oder abgebrochen werden.',
+  offen: { id: 951, einsatz_id: 777, einsatz_datum: tag(-1), status: 'laeuft',
+    vorbereitet_am: tag(-1) + ' 21:14:00', rohzeit_start: null, pausiert_seit: null,
+    pause_minuten: 0, objekt_name: 'Musterobjekt Nord', kunde_name: 'Musterliegenschaften AG',
+    vorlage_name: 'Patrouille Nord', punkte_anzahl: 3, erledigt_anzahl: 1 } };
+await anmelden();
+check('Vorbedingung: ohne offene Runde steht die Rückfrage NICHT da',
+  !(await page.isVisible('#roDlg')));
+rufe = [];
+await page.evaluate(() => rundgangSpontanStarten(30));
+await page.waitForTimeout(600);
+check('KRITISCH: der abgelehnte Start öffnet die Rückfrage statt eines roten Satzes',
+  await page.isVisible('#roDlg'));
+check('Sie nennt die Runde, die im Weg steht -- und zwar deren Objekt',
+  (await page.textContent('#roName')) === 'Musterobjekt Nord');
+check('KRITISCH: sie bietet den Abbruch mit Grund an -- das ist der Ausweg vor Ort',
+  (await page.textContent('#roBtnAb')).includes('Abbrechen'));
+rufe = [];
+// Nur anklicken, wenn es den Knopf gibt: Fehlt die Rückfrage, soll die
+// Suite mit roten Punkten enden statt mit einer Zeitüberschreitung.
+if (await page.isVisible('#roBtnAb')) {
+  await page.click('#roBtnAb');
+  await page.waitForTimeout(400);
+}
+check('KRITISCH: und der Abbruch führt wirklich in die Grundabfrage',
+  await page.isVisible('#raGrund'));
+
+// Gegenstück: Ein Startfehler, der NICHTS mit einer offenen Runde zu tun
+// hat, darf die Rückfrage nicht auslösen -- sonst behauptete sie eine
+// offene Runde, die es nicht gibt.
+await anmelden();
+STARTFEHLER = { status: 'error', message: 'Ausserhalb des Zeitfensters dieser Kontrollrunde.' };
+await page.evaluate(() => rundgangSpontanStarten(30));
+await page.waitForTimeout(600);
+check('KRITISCH: ein anderer Startfehler öffnet die Rückfrage NICHT',
+  !(await page.isVisible('#roDlg')));
+
+// Und der Fall, in dem der Server den Code schickt, die Runde aber nicht:
+// lieber eine magere Auskunft als eine erfundene Rückfrage.
+STARTFEHLER = { status: 'error', code: 'runde_offen', message: 'Es ist noch ein Rundgang offen.' };
+await page.evaluate(() => rundgangSpontanStarten(30));
+await page.waitForTimeout(600);
+check('KRITISCH: ohne mitgelieferte Runde erscheint keine leere Rückfrage',
+  !(await page.isVisible('#roDlg')));
+STARTFEHLER = null;
 
 // ══════════ AM SCHREIBTISCH ═══════════════════════════════════════════
 // Jede Aenderung am Handy-Layout wird zusaetzlich am Desktop geprueft
