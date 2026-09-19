@@ -2029,6 +2029,39 @@ CREATE TABLE IF NOT EXISTS lohnlauf_zeile (
   KEY idx_support_zugriff_freigabe (freigabe_id, zeitpunkt)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Der Einmal-Schluessel, mit dem der Betreiber ins Cockpit wechselt
+// (ENT-631).
+//
+// WARUM DIE TABELLE HIER LIEGT und nicht beim Betreiber: dieselbe
+// Ueberlegung wie bei support_freigabe. Der Schluessel wird in der
+// Datenbank des Betriebs ausgestellt UND dort eingeloest; der Betrieb
+// sieht also in seinen eigenen Daten, dass und wann jemand hereinkam.
+// Laege er beim Betreiber, muesste der Betrieb ihn fragen.
+//
+// GESPEICHERT WIRD NUR DER ABDRUCK (ENT-501): Wer die Tabelle lesen kann,
+// soll damit nicht ins Cockpit kommen. Derselbe Grund wie bei sessions
+// und passwort_reset.
+//
+// EINGELOEST_AM ist der Riegel gegen die zweite Verwendung. Es wird
+// gesetzt, BEVOR eine Sitzung entsteht -- ein Abbruch danach kostet den
+// Schluessel, und das ist die richtige Richtung: lieber einmal neu
+// ausstellen als einen Schluessel, der zweimal gilt.
+'support_sprung' => "CREATE TABLE IF NOT EXISTS support_sprung (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  abdruck VARCHAR(64) NOT NULL,
+  -- Die Freigabe, auf die sich der Sprung stuetzt. NULL bei einem
+  -- Demo-Platz: Dort gibt es keine Freigabe, weil es keinen Kunden gibt,
+  -- der sie erteilen koennte (ENT-631). Der Unterschied bleibt in den
+  -- Daten sichtbar, statt zu verschwinden.
+  freigabe_id INT UNSIGNED NULL,
+  ausgestellt_von VARCHAR(200) NOT NULL,
+  erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  gilt_bis DATETIME NOT NULL,
+  eingeloest_am DATETIME NULL,
+  UNIQUE KEY uq_support_sprung_abdruck (abdruck),
+  KEY idx_support_sprung_lauf (eingeloest_am, gilt_bis)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
     ];
 }
 }
@@ -2049,6 +2082,14 @@ function kern_spalten(): array {
     // KANN -- naemlich dann, wenn die genannte Spalte in der produktiven
     // Tabelle nicht so heisst wie hier erwartet. Ein Nachtrag, der aus
     // kosmetischen Gruenden scheitert, ist ein schlechter Tausch.
+    // Das Support-Konto als solches erkennbar (ENT-631). Ohne diese Spalte
+    // waere es ein Mitarbeiter wie jeder andere: es zaehlte in der
+    // Belegschaft mit, stuende in jeder Auswahlliste und liesse sich per
+    // Passwort-Zuruecksetzung uebernehmen. Die Spalte ist die einzige
+    // Stelle, an der "das ist kein Mensch" steht.
+    ['mitarbeiter', 'support_konto',
+     'ALTER TABLE mitarbeiter ADD COLUMN support_konto TINYINT(1) NOT NULL DEFAULT 0'],
+
     ['kundenzugang', 'password_hash',
      'ALTER TABLE kundenzugang ADD COLUMN password_hash VARCHAR(255) NULL'],
     // Push-Versand je Mitteilung (ENT-424). push_gesendet_am ist zugleich
@@ -3072,6 +3113,30 @@ if (hat_tabelle_jetzt($pdo, 'rollen') && hat_tabelle_jetzt($pdo, 'rollen_rechte'
     if ($neu || $angepasst) {
         $getan[] = ($nurPruefen ? 'Systemrollen: ' : 'Systemrollen gesetzt: ')
                  . $neu . ' neu, ' . $angepasst . ' auf den Stand aus rechte.php nachgefuehrt';
+    }
+}
+
+// ── 2b4c. Das Support-Konto (ENT-631).
+//
+// Der Betreiber arbeitet im Cockpit eines Betriebs unter EIGENEM Namen,
+// nicht unter dem einer echten Person. Darum traegt jeder Betrieb ein
+// Konto "GuardOpS Support". Die Alternative -- eine Sitzung ohne
+// Mitarbeiter -- haette 61 Endpunkte betroffen, die die Id der Sitzung als
+// erstellt_von/geaendert_von weiterschreiben; sie haetten dort eine
+// ungueltige Id hinterlassen.
+//
+// Angelegt wird es von support_konto_sicherstellen() und nicht hier:
+// Dieselbe Funktion braucht demo_instanz.php nach jedem Leeren einer
+// Demo. Zweimal geschrieben liefe es auseinander, sobald sich an dem
+// Konto etwas aendert.
+require_once __DIR__ . '/support.php';
+if (hat_tabelle_jetzt($pdo, 'mitarbeiter') && hat_spalte($pdo, 'mitarbeiter', 'support_konto')) {
+    if ((int)$pdo->query('SELECT COUNT(*) FROM mitarbeiter WHERE support_konto = 1')->fetchColumn() === 0) {
+        if ($nurPruefen) {
+            $offen[] = 'Support-Konto (ENT-631)';
+        } elseif (support_konto_sicherstellen($pdo)) {
+            $getan[] = 'Support-Konto angelegt (ENT-631)';
+        }
     }
 }
 

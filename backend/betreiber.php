@@ -1580,3 +1580,23 @@ function be_bestandsmandant_eintragen(PDO $stamm, PDO $betrieb): ?string
     )->execute([$name]);
     return $name;
 }
+
+// Die Adresse eines Mandanten, oder null.
+//
+// Dieselbe Bauart wie demo_platz_adresse(): aus der Subdomain gebildet,
+// nicht irgendwo abgelegt. Eine zweite Ablage waere eine zweite Wahrheit,
+// die beim Umziehen einer Subdomain stehenbleibt.
+//
+// NULL statt einer geratenen Adresse, wenn die Spalte leer ist: Ein
+// Mandant ohne Subdomain hat keine eigene Adresse -- das ist etwas
+// anderes als eine unbekannte (Hausregel). Der Aufrufer muss den
+// Unterschied benennen koennen.
+function mandant_adresse(?string $subdomain): ?string
+{
+    $s = trim((string)$subdomain);
+    if ($s === '') { return null; }
+    // Dieselbe Zeichenpruefung wie bei einer Subdomain ueblich: Was hier
+    // durchkaeme, landete in einer URL, die der Browser ansteuert.
+    if (!preg_match('/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/', $s)) { return null; }
+    return 'https://' . $s . '.' . DEMO_ADRESSE_BASIS;
+}
