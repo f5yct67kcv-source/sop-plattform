@@ -130,6 +130,11 @@ const BETREIBER_EBENE_ERLAUBT = [
   // Kopfkommentar) -- ohne betreiber_db() faende dieser Weg sein eigenes
   // Register nicht.
   'demo_anfordern.php',
+  // Die zweite Haelfte derselben Selbstbedienung (ENT-624): Seit der
+  // Bestaetigungspflicht legt demo_anfordern.php nur noch eine offene
+  // Anfrage an; Platz, Konto und Registereintrag entstehen hier. Beide
+  // brauchen dieselbe Datenbank aus demselben Grund.
+  'demo_bestaetigen.php',
   'demo_erneut_senden.php',
 ];
 // TRANSITIV, nicht nur der eigene Quelltext: seit ENT-612 ist die

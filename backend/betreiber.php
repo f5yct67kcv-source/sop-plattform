@@ -45,6 +45,7 @@ require_once __DIR__ . '/db.php';
 // Rechenkern der Demo-Zugaenge (ENT-600) -- liefert die Tabellendefinition
 // fuer be_tabellen() und die Ablauflogik fuer die Endpunkte.
 require_once __DIR__ . '/demo_zugang.php';
+require_once __DIR__ . '/demo_bestaetigung.php';
 require_once __DIR__ . '/logbuch.php';
 
 // ── Logbuch der Betreiber-Ebene (ENT-614) ────────────────────────────
@@ -696,6 +697,41 @@ function mandant_verbindung_bereit(array $m): string
 // Wirft statt json_response(), damit der Aufrufer entscheidet, wie ein
 // nicht erreichbarer Mandant gemeldet wird. Ein Verbindungsfehler ist hier
 // ein erwartbarer Zustand, kein Absturz.
+// Warum eine Mandanten-Verbindung scheiterte -- in Worten, die man einem
+// angemeldeten Betreiber zeigen kann (Befund 2026-09-19).
+//
+// ANLASS: Beim Einrichten meldeten zwei Demo-Plaetze "Verbindung
+// fehlgeschlagen", und damit war nicht zu erkennen, ob die Datenbank
+// fehlt, das Passwort nicht stimmt oder der Server nicht antwortet. Das
+// sind drei verschiedene Handgriffe an drei verschiedenen Orten.
+//
+// DER TREIBERTEXT GEHT WEITERHIN NICHT NACH AUSSEN. Er traegt Host,
+// Benutzer und manchmal den Datenbanknamen. Hier wird ausschliesslich der
+// NUMERISCHE Fehlercode gelesen und auf einen festen Satz abgebildet --
+// eine geschlossene Liste, kein durchgereichter Text.
+function be_verbindungsfehler_text(Throwable $e): string
+{
+    // PDO liefert den Treibercode bei Verbindungsfehlern nur im Text der
+    // Ausnahme ("SQLSTATE[HY000] [1049] Unknown database ..."), nicht in
+    // errorInfo -- das ist bei einer fehlgeschlagenen VERBINDUNG leer.
+    $code = preg_match('/\[(\d{4})\]/', $e->getMessage(), $t) ? (int)$t[1] : 0;
+    return [
+        1045 => 'Verbindung fehlgeschlagen: Zugangsdaten abgewiesen '
+              . '(Benutzer oder Passwort stimmen nicht)',
+        1044 => 'Verbindung fehlgeschlagen: Der Benutzer hat keine Rechte an dieser Datenbank',
+        1049 => 'Verbindung fehlgeschlagen: Diese Datenbank gibt es nicht',
+        2002 => 'Verbindung fehlgeschlagen: Der Datenbankserver antwortet nicht',
+        2005 => 'Verbindung fehlgeschlagen: Den Datenbankserver gibt es unter diesem Namen nicht',
+        2006 => 'Verbindung fehlgeschlagen: Der Datenbankserver hat die Verbindung getrennt',
+    ][$code]
+        // Unbekannt ist etwas anderes als eine der sechs Ursachen oben --
+        // und der Code gehoert dazu, sonst steht der naechste wieder ohne
+        // Anhaltspunkt da. Eine Zahl verraet nichts ueber die Anlage.
+        ?? ($code > 0
+            ? "Verbindung fehlgeschlagen (Fehlercode $code)"
+            : 'Verbindung fehlgeschlagen');
+}
+
 function mandant_db(array $m): PDO
 {
     $lage = mandant_verbindung_bereit($m);
@@ -1089,6 +1125,11 @@ function be_tabellen(): array
 // naechtliche Reset (ENT-523) leert generisch JEDE Tabelle der verbundenen
 // Datenbank. Ein Register in der Demo waere am naechsten Morgen weg.
 'demo_zugang' => demo_zugang_tabelle(),
+
+// Die offene Anfrage vor der Bestaetigung (ENT-624). Liegt aus demselben
+// Grund hier wie das Register darueber -- und traegt zusaetzlich den
+// Abdruck der Zustimmung, der auch nach dem Einloesen stehen bleibt.
+'demo_bestaetigung' => demo_bestaetigung_tabelle(),
 
 'support_nachricht' => "CREATE TABLE IF NOT EXISTS support_nachricht (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,

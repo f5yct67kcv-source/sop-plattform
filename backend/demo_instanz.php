@@ -18,6 +18,13 @@ declare(strict_types=1);
 require_once __DIR__ . '/betreiber.php';
 require_once __DIR__ . '/demo_reset.php';
 require_once __DIR__ . '/demo_zugang.php';
+// Die Beispieldaten der frischen Instanz -- demo_zugang_einrichten() weiter
+// unten ruft sie auf. Kein stiller Vertrag: Wer diese Datei laedt, bekommt
+// alles mit, was sie braucht (Lehre aus dem Fehlschlag vom 2026-09-19).
+require_once __DIR__ . '/demo_daten.php';
+// Fuer kern_schema_fehlend() in der Platzwahl: Der Sollstand des Schemas
+// steht dort, wo die Einrichtung ihn selbst benutzt.
+require_once __DIR__ . '/planung_einrichten_kern.php';
 
 // Leert die Instanz eines Platzes und sät die Systemrollen neu.
 //
@@ -139,4 +146,182 @@ function demo_zugang_neues_passwort(PDO $betreiber, array $zugang,
             $passwort,
             (string)$zugang['laeuft_ab_am']);
     return ['fehler' => null, 'mail' => $mail];
+}
+
+// ══ Einen Demo-Zugang wirklich einrichten (ENT-624) ═══════════════════
+//
+// Bis ENT-624 stand dieser Ablauf inline in api/demo_anfordern.php. Seit
+// der Bestaetigungspflicht braucht ihn ein zweiter Endpunkt
+// (api/demo_bestaetigen.php), und zwei Kopien waeren beim naechsten Umbau
+// auseinandergelaufen -- dieselbe Ueberlegung wie bei
+// demo_zugang_neues_passwort() darueber.
+//
+// SIE ANTWORTET NICHT SELBST. Kein json_response() hier drin: Die beiden
+// Aufrufer machen danach noch weiter (Meldung an den Betreiber, Vermerk am
+// Bestaetigungssatz), und eine selbst-antwortende Funktion schnitte ihnen
+// das stillschweigend ab -- genau der Fallstrick, vor dem der Kopf von
+// demo_daten.php warnt.
+//
+// Rueckgabe:
+//   ['platz' => …, 'adresse' => …, 'laeuft_ab' => …, 'mail' => […],
+//    'fehler' => null]                      -- eingerichtet
+//   ['fehler' => 'kein_platz',   'code' => 409, 'meldung' => …]
+//   ['fehler' => 'nicht_bereit', 'code' => 503, 'meldung' => …]
+//   ['fehler' => 'fehlschlag',   'code' => 503, 'meldung' => …]
+// Der Grund steht als Wort da, nicht nur als Zahl: "kein Platz frei" und
+// "nicht eingerichtet" sind verschiedene Aussagen, und der Aufrufer muss
+// sie auseinanderhalten koennen (Hausregel).
+function demo_zugang_einrichten(PDO $pdo, string $firma, string $person,
+                                string $email, string $telefon): array
+{
+    $misslungen = static fn (string $fehler, int $code, string $meldung): array
+        => ['fehler' => $fehler, 'code' => $code, 'meldung' => $meldung];
+    $nichtBereit = 'Der Demo-Bereich ist noch nicht vollständig eingerichtet. '
+        . 'Bitte in Kürze erneut versuchen.';
+    $fehlschlag = 'Der Demo-Zugang konnte gerade nicht eingerichtet werden. '
+        . 'Bitte in Kürze erneut versuchen.';
+
+    // ── Einen freien Platz waehlen, der auch WIRKLICH bereit ist ──
+    //
+    // ALLE freien Plaetze durchgehen, nicht nur den ersten (Befund
+    // 2026-09-19): Zwei der zehn Plaetze standen im Mandantenstamm, ihre
+    // Datenbanken waren aber nicht erreichbar. Mit nur einem Versuch
+    // sperrte ein kaputter Platz den ganzen Rest -- sind demo1 bis demo5
+    // belegt, faellt die Wahl auf demo6, und der Interessent bekommt
+    // "noch nicht eingerichtet", obwohl demo7, demo9 und demo10
+    // bereitstehen.
+    //
+    // UEBERSPRUNGEN WIRD NICHT STILL. Jeder uebergangene Platz geht ins
+    // Fehlerprotokoll: Ein Vorrat, der lautlos schrumpft, faellt erst auf,
+    // wenn er leer ist.
+    $belegt = $pdo->query("SELECT platz FROM demo_zugang WHERE status = 'aktiv'")
+                  ->fetchAll(PDO::FETCH_COLUMN);
+    $frei = demo_plaetze_frei(array_map('strval', $belegt));
+    if ($frei === []) {
+        return $misslungen('kein_platz', 409,
+            'Aktuell sind alle Demo-Plätze belegt. Bitte in Kürze erneut versuchen.');
+    }
+
+    $platz = null;
+    $m = null;
+    $uebersprungen = [];
+    foreach ($frei as $kandidat) {
+        $stmt = $pdo->prepare('SELECT * FROM mandant WHERE subdomain = ? LIMIT 1');
+        $stmt->execute([$kandidat]);
+        $kandidatM = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$kandidatM) {
+            $uebersprungen[] = "$kandidat (im Mandantenstamm nicht eingetragen)";
+            continue;
+        }
+        $lage = mandant_verbindung_bereit($kandidatM);
+        if ($lage !== 'bereit') {
+            $uebersprungen[] = "$kandidat (nicht verbunden: $lage)";
+            continue;
+        }
+        // SPALTEN, NICHT NUR TABELLEN (2026-09-19). Bis hierher fragte
+        // mandant_stand(), ob fuenf Kerntabellen existieren. Demo-Platz 6
+        // und 8 hatten alle Tabellen und trotzdem ein halbes Schema: Die
+        // nachtraeglichen Spalten fehlten, weil ihr ALTER TABLE
+        // uebersprungen worden war. Beide galten damit als "eingerichtet",
+        // waeren geleert worden und erst danach gescheitert -- der
+        // Interessent haette einen 503 bekommen und seine Eingabe
+        // verloren, und der Platz waere kaputter zurueckgeblieben als
+        // vorher.
+        //
+        // kern_schema_fehlend() prueft den ganzen Bauplan (67 Tabellen,
+        // 190 nachtraegliche Spalten) mit EINER Abfrage -- guenstiger als
+        // die fuenf Einzelabfragen davor und aus derselben Quelle, aus der
+        // die Einrichtung selbst baut.
+        try {
+            $kandidatPdo = mandant_db($kandidatM);
+        } catch (Throwable $e) {
+            $uebersprungen[] = "$kandidat (Verbindung fehlgeschlagen)";
+            continue;
+        }
+        $luecken = kern_schema_fehlend($kandidatPdo);
+        if ($luecken !== []) {
+            // Mit Zahl UND Beispielen: "unvollstaendig" allein sagt
+            // niemandem, ob eine Spalte fehlt oder die halbe Anlage.
+            $uebersprungen[] = "$kandidat (Schema unvollstaendig, " . count($luecken)
+                . ' fehlend: ' . implode(', ', array_slice($luecken, 0, 5))
+                . (count($luecken) > 5 ? ', ...' : '') . ')';
+            continue;
+        }
+        $platz = $kandidat;
+        $m = $kandidatM;
+        break;
+    }
+    if ($uebersprungen !== []) {
+        error_log('demo_zugang_einrichten: uebergangene Plaetze -- '
+            . implode(', ', $uebersprungen));
+    }
+    if ($platz === null || $m === null) {
+        // Frei WAREN Plaetze, bereit war keiner. Das ist etwas anderes als
+        // "alle belegt" und bekommt darum einen eigenen Grund und einen
+        // eigenen Text (Hausregel: "unbekannt" darf nie wie "keine"
+        // aussehen). Fuer den Interessenten liest es sich gleich -- er
+        // kann mit dem Unterschied nichts anfangen --, fuer den Betreiber
+        // steht er im Protokoll.
+        return $misslungen('nicht_bereit', 503, $nichtBereit);
+    }
+
+    // ── Instanz leeren, befuellen, Konto anlegen ──
+    $fehler = demo_instanz_leeren($pdo, $platz);
+    if ($fehler !== null) {
+        error_log('demo_zugang_einrichten: ' . $fehler);
+        return $misslungen('fehlschlag', 503, $fehlschlag);
+    }
+    $instanz = mandant_db($m);
+    // demo_daten_erzeugen() und NICHT die selbst-antwortende
+    // demo_daten_erzeugen_ausfuehren(): Nach diesem Aufruf kommt noch
+    // Konto, Register und Mail.
+    try {
+        demo_daten_erzeugen($instanz);
+    } catch (Throwable $e) {
+        error_log('demo_zugang_einrichten: ' . $e->getMessage());
+        return $misslungen('fehlschlag', 503, $fehlschlag);
+    }
+
+    // Und nach dem Befuellen: Sind die Systemrollen da? Das Leeren
+    // loescht sie, demo_reset_systemrollen_saeen() legt sie neu an. Bleibt
+    // das aus, entsteht ein Zugang, in dem niemand ein Recht hat -- die
+    // Oberflaeche steht, und nichts laesst sich oeffnen. Das gehoert
+    // hierher und nicht in die Vorpruefung: Vorher sind die Rollen
+    // ohnehin gleich wieder weg.
+    $rollen = (int)$instanz->query('SELECT COUNT(*) FROM rollen WHERE system = 1')->fetchColumn();
+    if ($rollen === 0) {
+        error_log("demo_zugang_einrichten: $platz ohne Systemrollen nach dem Befuellen");
+        return $misslungen('fehlschlag', 503, $fehlschlag);
+    }
+
+    $vergeben = $instanz->query('SELECT name FROM mitarbeiter')->fetchAll(PDO::FETCH_COLUMN);
+    $login    = demo_login_bilden($firma, array_map('strval', $vergeben));
+    $passwort = demo_passwort_erzeugen();
+
+    $teile    = preg_split('/\s+/', $person) ?: [$person];
+    $nachname = count($teile) > 1 ? array_pop($teile) : $person;
+    $vorname  = count($teile) > 0 ? implode(' ', $teile) : '';
+    $instanz->prepare(
+        'INSERT INTO mitarbeiter (name, password_hash, ist_admin, vorname, nachname, aktiv)
+         VALUES (?, ?, 1, ?, ?, 1)'
+    )->execute([$login, password_hash($passwort, PASSWORD_DEFAULT), $vorname, $nachname]);
+
+    // ── Register ──
+    $start    = date('Y-m-d H:i:s');
+    $laeuftAb = demo_zugang_ablauf($start);
+    $pdo->prepare(
+        'INSERT INTO demo_zugang (platz, firma, person, email, telefon, login, status,
+                                  freigegeben_am, freigegeben_von, laeuft_ab_am)
+         VALUES (?, ?, ?, ?, ?, ?, \'aktiv\', ?, ?, ?)'
+    )->execute([$platz, $firma, $person, $email, $telefon, $login, $start,
+        DEMO_FREIGEGEBEN_AUTOMATISCH, $laeuftAb]);
+
+    $adresse = (string)demo_platz_adresse($platz);
+    return [
+        'fehler'    => null,
+        'platz'     => $platz,
+        'adresse'   => $adresse,
+        'laeuft_ab' => $laeuftAb,
+        'mail'      => demo_zugang_mail($firma, $person, $adresse, $login, $passwort, $laeuftAb),
+    ];
 }

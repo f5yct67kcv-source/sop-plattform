@@ -18,9 +18,18 @@
 //      bestehende Konto bekommt ein neues Passwort zugeschickt -- dasselbe
 //      Verhalten wie "Zugangsdaten erneut senden" (demo_erneut_senden.php),
 //      absichtlich dieselbe Antwort.
-//   3. Ab hier derselbe Ablauf wie vorher bei der Betreiber-Freigabe:
-//      Platz waehlen, Instanz leeren und befuellen, Konto anlegen,
-//      Register schreiben, Mail verschicken.
+//   3. Seit ENT-624 entsteht hier KEIN Zugang mehr. Dieser Endpunkt legt
+//      nur eine offene Anfrage an und verschickt einen Bestaetigungslink;
+//      Platz, Instanz, Konto und Register entstehen erst in
+//      api/demo_bestaetigen.php. Grund: Bis dahin bewies keine der
+//      Pruefungen, dass die Adresse dem Anfragenden gehoert -- ein Skript
+//      mit zehn erreichbaren Wegwerf-Domains raeumte den Vorrat leer.
+//      Ausfuehrlich im Kopf von demo_bestaetigung.php.
+//
+// DIE ZUSTIMMUNG WIRD IM SERVER GEPRUEFT, nicht nur im Formular (ENT-624).
+// Das Haekchen ist Pflicht; der Abdruck -- Zeitpunkt, IP, Fassung des
+// Textes, Rueckruf-Widerspruch -- steht am Bestaetigungssatz und bleibt
+// auch nach dem Einloesen erhalten.
 //
 // KEIN PASSWORT IN DER ANTWORT. Anders als beim Betreiber-Endpunkt (dort
 // als Rueckfall gedacht, falls die Mail nicht ankommt, und nur fuer den
@@ -47,6 +56,7 @@ require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../demo_bremse.php';
 require_once __DIR__ . '/../demo_daten.php';
 require_once __DIR__ . '/../demo_instanz.php';
+require_once __DIR__ . '/../demo_bestaetigung.php';
 require_once __DIR__ . '/../mailer.php';
 
 // Schickt eine Meldung an den Betreiber -- und schweigt, wenn etwas daran
@@ -93,6 +103,15 @@ $firma   = demo_zugang_einzeilig($in['firma'] ?? '', DEMO_ZUGANG_MAX_FIRMA);
 $person  = demo_zugang_einzeilig($in['person'] ?? $in['name'] ?? '', DEMO_ZUGANG_MAX_NAME);
 $email   = demo_zugang_einzeilig($in['email'] ?? '', DEMO_ZUGANG_MAX_EMAIL);
 $telefon = demo_zugang_einzeilig($in['telefon'] ?? '', DEMO_ZUGANG_MAX_TELEFON);
+// Die Zustimmung zu den Nutzungsbedingungen (ENT-624). Pflicht, und zwar
+// im SERVER geprueft: Eine Sperre, die man am Browser vorbei umgehen kann,
+// ist keine (CLAUDE.md). Ohne sie gibt es keinen Abdruck, und ohne Abdruck
+// ist die Zustimmung nichts wert.
+$bedingungen = !empty($in['bedingungen']);
+// Widerspruch, keine Einwilligung: Wer seine Nummer fuer einen Demo-Zugang
+// hinterlaesst, rechnet mit einem Rueckruf (Entscheidung des
+// Projektinhabers am 2026-09-19). Wer keinen will, sagt es hier.
+$keinRueckruf = !empty($in['kein_rueckruf']);
 
 if ($firma === '' || $person === '' || $email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
     json_response(['status' => 'error',
@@ -100,6 +119,10 @@ if ($firma === '' || $person === '' || $email === '' || filter_var($email, FILTE
 }
 // Telefon ist der Preis fuer den Sofort-Zugang (Entscheidung des
 // Projektinhabers, siehe demo_zugang.php) -- Pflichtfeld, nicht optional.
+if (!$bedingungen) {
+    json_response(['status' => 'error', 'felder' => ['bedingungen' => true],
+        'message' => 'Bitte bestätigen Sie die Nutzungsbedingungen und die Datenschutzerklärung.'], 400);
+}
 if (!demo_zugang_telefon_gueltig($telefon)) {
     json_response(['status' => 'error', 'felder' => ['telefon' => true],
         'message' => 'Bitte eine Telefonnummer aus der Schweiz, Deutschland oder Österreich angeben — mit Landesvorwahl, z. B. +41 79 123 45 67.'], 400);
@@ -135,7 +158,8 @@ if ($sperre > 0) {
 }
 
 $pdo = betreiber_db();
-if (!hat_tabelle($pdo, 'demo_zugang') || !hat_tabelle($pdo, 'mandant')) {
+if (!hat_tabelle($pdo, 'demo_zugang') || !hat_tabelle($pdo, 'mandant')
+    || !hat_tabelle($pdo, 'demo_bestaetigung')) {
     json_response(['status' => 'error',
         'message' => 'Der Demo-Bereich ist noch nicht eingerichtet.'], 503);
 }
@@ -183,95 +207,56 @@ if ($bestehend) {
     json_response(['status' => 'ok', 'message' => DEMO_ANFORDERN_DANKE]);
 }
 
-// ── 4. Freien Platz waehlen ────────────────────────────────────────────
+// ── 4. Ist ueberhaupt ein Platz frei? ─────────────────────────────────
+//
+// Geprueft wird das SCHON HIER, obwohl der Platz erst beim Bestaetigen
+// vergeben wird: Jemanden erst eine Mail holen und ihn dann nach dem Klick
+// abweisen zu lassen, waere der unfreundlichste mögliche Ablauf. Reserviert
+// wird trotzdem nichts -- sonst waere die Luecke nur verschoben, und ein
+// Bot koennte den Vorrat mit unbestaetigten Anfragen blockieren. Wer zuerst
+// bestaetigt, bekommt den Platz; demo_bestaetigen.php sagt es notfalls
+// noch einmal.
 $belegt = $pdo->query("SELECT platz FROM demo_zugang WHERE status = 'aktiv'")
               ->fetchAll(PDO::FETCH_COLUMN);
-$platz = demo_platz_waehlen(array_map('strval', $belegt));
-if ($platz === null) {
-    // "Kein Platz frei" ist ein ehrlicher, sichtbarer Zustand -- kein
-    // Interessent soll auf eine Zusage warten, die nicht kommt.
-    //
-    // Und der Betreiber erfaehrt davon (ENT-622): Hier geht gerade ein
-    // Interessent verloren, und das steht sonst nur im Fehlerprotokoll auf
-    // dem Server, das niemand liest. Hoechstens eine Warnung pro Stunde --
-    // der Vorrat ist fuer jede Anfrage in dieser Zeit leer, nicht nur fuer
-    // diese eine.
+if (demo_platz_waehlen(array_map('strval', $belegt)) === null) {
     demo_betreiber_melden(demo_vorrat_mail(count(DEMO_PLAETZE)), 'Vorratswarnung',
         demo_warnung_faellig_und_vermerken());
     json_response(['status' => 'error',
         'message' => 'Aktuell sind alle Demo-Plätze belegt. Bitte in Kürze erneut versuchen.'], 409);
 }
 
-$stmt = $pdo->prepare('SELECT * FROM mandant WHERE subdomain = ? LIMIT 1');
-$stmt->execute([$platz]);
-$m = $stmt->fetch(PDO::FETCH_ASSOC);
-if (!$m) {
-    error_log("demo_anfordern: Platz „$platz“ ist im Mandantenstamm nicht eingetragen.");
-    json_response(['status' => 'error',
-        'message' => 'Der Demo-Bereich ist noch nicht vollständig eingerichtet. Bitte in Kürze erneut versuchen.'], 503);
-}
-$lage = mandant_verbindung_bereit($m);
-if ($lage !== 'bereit') {
-    error_log("demo_anfordern: Platz „$platz“ nicht verbunden ($lage).");
-    json_response(['status' => 'error',
-        'message' => 'Der Demo-Bereich ist noch nicht vollständig eingerichtet. Bitte in Kürze erneut versuchen.'], 503);
-}
-$stand = mandant_stand($m);
-if (!$stand['erreichbar'] || !empty($stand['fehlend'])) {
-    error_log("demo_anfordern: Platz „$platz“ noch nicht eingerichtet.");
-    json_response(['status' => 'error',
-        'message' => 'Der Demo-Bereich ist noch nicht vollständig eingerichtet. Bitte in Kürze erneut versuchen.'], 503);
-}
+// ── 5. Offene Anfrage anlegen und den Link verschicken ───────────────
+//
+// HIER ENTSTEHT NOCH KEIN ZUGANG. Kein Platz, keine Instanz, kein Konto,
+// kein Registereintrag -- nur eine Zeile mit dem Abdruck des
+// Bestaetigungswerts und dem Abdruck der Zustimmung.
+//
+// Aeltere offene Anfragen derselben Adresse werden entwertet: Sonst hat
+// jemand, der dreimal absendet, drei gueltige Links, und der Abdruck sagt
+// nicht mehr, welche Zustimmung zum Zugang gehoert.
+$pdo->prepare('DELETE FROM demo_bestaetigung WHERE email = ? AND eingeloest_am IS NULL')
+    ->execute([$email]);
 
-// ── 5. Instanz leeren, befuellen, Konto anlegen ───────────────────────
-$fehler = demo_instanz_leeren($pdo, $platz);
-if ($fehler !== null) {
-    error_log('demo_anfordern: ' . $fehler);
+$wert = demo_bestaetigung_wert();
+$pdo->prepare(
+    'INSERT INTO demo_bestaetigung (wert_abdruck, firma, person, email, telefon,
+                                    bedingungen_fassung, kein_rueckruf, zustimmung_ip)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+)->execute([demo_bestaetigung_abdruck($wert), $firma, $person, $email, $telefon,
+    DEMO_BEDINGUNGEN_FASSUNG, $keinRueckruf ? 1 : 0, $ip]);
+
+$link = demo_bestaetigung_link($wert);
+if ($link === null) {
+    // Die Adresse der Verkaufsseite steht nicht im Deploy. Dann gibt es
+    // keinen Link, und eine Mail ohne Link waere schlimmer als keine --
+    // "noch nicht eingerichtet" ist etwas anderes als "fehlgeschlagen".
+    error_log('demo_anfordern: keine Basis-Adresse fuer den Bestaetigungslink hinterlegt.');
     json_response(['status' => 'error',
-        'message' => 'Der Demo-Zugang konnte gerade nicht eingerichtet werden. Bitte in Kürze erneut versuchen.'], 503);
-}
-$instanz = mandant_db($m);
-// demo_daten_erzeugen() (nicht die selbst-antwortende
-// demo_daten_erzeugen_ausfuehren()!): Diese Anfrage macht danach noch
-// weiter -- Konto, Register, Mail. Die selbst-antwortende Fassung wuerde
-// den Rest hier STILLSCHWEIGEND abschneiden (json_response() beendet den
-// Prozess), siehe Kopfkommentar in demo_daten.php.
-try {
-    demo_daten_erzeugen($instanz);
-} catch (Throwable $e) {
-    error_log('demo_anfordern: ' . $e->getMessage());
-    json_response(['status' => 'error',
-        'message' => 'Der Demo-Zugang konnte gerade nicht eingerichtet werden. Bitte in Kürze erneut versuchen.'], 503);
+        'message' => 'Der Demo-Bereich ist noch nicht vollständig eingerichtet. '
+            . 'Bitte in Kürze erneut versuchen.'], 503);
 }
 
-$vergeben = $instanz->query('SELECT name FROM mitarbeiter')->fetchAll(PDO::FETCH_COLUMN);
-$login    = demo_login_bilden($firma, array_map('strval', $vergeben));
-$passwort = demo_passwort_erzeugen();
-
-$teile    = preg_split('/\s+/', $person) ?: [$person];
-$nachname = count($teile) > 1 ? array_pop($teile) : $person;
-$vorname  = count($teile) > 0 ? implode(' ', $teile) : '';
-$instanz->prepare(
-    'INSERT INTO mitarbeiter (name, password_hash, ist_admin, vorname, nachname, aktiv)
-     VALUES (?, ?, 1, ?, ?, 1)'
-)->execute([$login, password_hash($passwort, PASSWORD_DEFAULT), $vorname, $nachname]);
-
-// ── 6. Register ────────────────────────────────────────────────────────
-$start    = date('Y-m-d H:i:s');
-$laeuftAb = demo_zugang_ablauf($start);
-$ein = $pdo->prepare(
-    'INSERT INTO demo_zugang (platz, firma, person, email, telefon, login, status,
-                              freigegeben_am, freigegeben_von, laeuft_ab_am)
-     VALUES (?, ?, ?, ?, ?, ?, \'aktiv\', ?, ?, ?)'
-);
-$ein->execute([$platz, $firma, $person, $email, $telefon, $login, $start, DEMO_FREIGEGEBEN_AUTOMATISCH, $laeuftAb]);
-
-// ── 7. Mail ────────────────────────────────────────────────────────────
-// Ein Versandfehler aendert die Antwort nicht (siehe Dateikopf) -- er wird
-// nur protokolliert, damit ihn jemand sehen kann, ohne dass der Interessent
-// je ein Passwort in der HTTP-Antwort zu sehen bekommt.
-$adresse = (string)demo_platz_adresse($platz);
-$mail    = demo_zugang_mail($firma, $person, $adresse, $login, $passwort, $laeuftAb);
+$mail = demo_bestaetigung_mail($firma, $person, $link);
 try {
     smtp_senden($email, $person, $mail['betreff'], $mail['html'], $mail['text'],
         [], $mail['bilder'] ?? []);
@@ -279,11 +264,9 @@ try {
     error_log('demo_anfordern: Versand fehlgeschlagen -- ' . $e->getMessage());
 }
 
-// ── 8. Meldung an den Betreiber (ENT-622) ─────────────────────────────
-// NACH der Mail an den Interessenten: Von den beiden ist seine die
-// wichtigere, und sie soll nicht darauf warten, dass unsere durch ist.
-demo_betreiber_melden(
-    demo_melde_mail($firma, $person, $email, $telefon, $platz, $adresse, $laeuftAb),
-    'Meldung ueber neuen Zugang', true);
+// KEINE Meldung an den Betreiber an dieser Stelle: Eine unbestaetigte
+// Anfrage ist kein Interessent, sondern eine Absichtserklaerung -- und
+// genau die kann ein Bot in Serie erzeugen. Gemeldet wird beim
+// Bestaetigen (demo_bestaetigen.php).
 
 json_response(['status' => 'ok', 'message' => DEMO_ANFORDERN_DANKE]);

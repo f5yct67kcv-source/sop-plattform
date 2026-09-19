@@ -126,7 +126,13 @@ if (stehengeblieben.length) { bad.push('stehengeblieben: ' + stehengeblieben.joi
 // hinzukommendes Skript faellt sonst durch. Fehlt es im Buendel, bleibt der
 // Knopf ohne Wirkung -- und lokal faellt das NICHT auf.
 const werk = lies('.github/workflows/deploy-hostpoint.yml');
-const buendel = (werk.match(/Betreiber-Buendel[\s\S]*?(?=\n      - name:)/) || [''])[0];
+// Am SCHRITTNAMEN verankert, nicht am blossen Wort (Befund 2026-09-19):
+// Ein Kommentar in einem frueheren Schritt, der "Betreiber-Buendel"
+// erwaehnt, verschob den Ausschnitt sonst auf den falschen Block -- und
+// die Pruefung meldete Dateien als fehlend, die sehr wohl kopiert werden.
+// Schlimmer waere der umgekehrte Fall gewesen: ein Ausschnitt, der
+// zufaellig alles enthaelt, und eine Pruefung, die nichts mehr findet.
+const buendel = (werk.match(/- name: Betreiber-Buendel[\s\S]*?(?=\n      - name:)/) || [''])[0];
 check('der Buendel-Abschnitt wurde gefunden', buendel.length > 400);
 const nachgeladen = [...new Set([...nurCode(seite).matchAll(/\.src\s*=\s*'([a-z0-9_.-]+\.js)'/g)]
   .map(m => m[1]))];

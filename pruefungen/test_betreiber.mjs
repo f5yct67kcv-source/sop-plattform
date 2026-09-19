@@ -766,6 +766,22 @@ check('KRITISCH: das Zahnrad faerbt sich, sobald etwas nachzutragen ist -- still
   // "hat-update" faerbt warn --, nicht wo der Knopf gerade haengt.
   && /\.hat-update\s*\{[^}]*color:\s*var\(--warn\)/.test(betreiberHtml));
 
+// ── Demo-Plaetze sind keine Mandanten (ENT-627) ──────────────────────
+//
+// Sie stehen im Mandantenstamm, weil ihre Datenbankverbindung nirgends
+// sonst steht -- aber die Liste der Betriebe zeigt sie nicht. WELCHE Zeile
+// ein Demo-Platz ist, benennt der Server, und zwar gegen die feste
+// Platzliste. Ein Namensmuster ("faengt mit demo an") wuerde einen
+// Mandanten namens "Demolition AG" mit verschwinden lassen -- und niemand
+// wuerde je erfahren, warum er fehlt.
+{
+  const list = nurCode(lies('backend/api/betreiber_mandant_list.php'));
+  check('KRITISCH: der Server benennt die Demo-Zeilen selbst, die Oberflaeche raet nicht',
+    /ist_demo/.test(list) && /DEMO_PLAETZE/.test(list));
+  check('KRITISCH: erkannt wird an der festen Platzliste, nicht an einem Namensmuster',
+    !/(str_starts_with|strpos|preg_match)\s*\([^)]*demo/i.test(list));
+}
+
 // ── Vertragsangaben am Mandanten (ENT-617) ───────────────────────────
 //
 // Die Rechnung selbst laeuft in pruef_betreiber.php. Hier steht die

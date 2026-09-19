@@ -778,6 +778,7 @@ jobs:
           # betreiber.php laedt, nicht erst die Demo-Freigabe.
           cp backend/demo_zugang.php dist/demo_zugang.php
           cp backend/mail_vorlage.php dist/mail_vorlage.php
+          cp backend/demo_bestaetigung.php dist/demo_bestaetigung.php
           cp backend/guardops-signatur.png dist/guardops-signatur.png
           cp backend/guardops-signatur-hell.png dist/guardops-signatur-hell.png
           # Support-Freigabe (ENT-526). Wird von BEIDEN Seiten eingebunden --
@@ -885,6 +886,29 @@ jobs:
           # UMGEBUNG) -- nicht mehr direkt aus "secrets.", damit es nur EINE
           # Stelle gibt, an der Produktion und Staging auseinandergehalten
           # werden.
+          # ── Vorlage fuer die zehn Demo-Plaetze (ENT-600/ENT-613) ────────
+          #
+          # HIER, ZWISCHEN KOPIEREN UND ERSETZEN, und nicht als eigener
+          # Schritt mit eigener Kopierliste: Ein Demo-Platz liefert dieselbe
+          # Anlage aus wie dist/ -- dieselben Seiten, dieselben Endpunkte,
+          # dasselbe Handbuch. Anders sind nur die Datenbank, die Adresse
+          # und die Umgebungskennung, und das sind alles Werte der
+          # Ersetzung, keine Dateien. Eine zweite gepflegte Kopierliste
+          # waere die fuenfte in diesem Workflow, und jede kuenftig neue
+          # Datei muesste an fuenf Stellen eingetragen werden -- genau der
+          # Fallstrick, den test_deploy.mjs fuer die bestehenden vier
+          # Buendel einzeln abfangen muss. Eine Kopie des UNERSETZTEN
+          # Buendels erbt jede cp-Zeile von selbst, heute und kuenftig.
+          #
+          # NUR PRODUCTION: Die Plaetze haengen an main (Festlegung des
+          # Projektinhabers, 2026-09-19). Ein Platz traegt 14 Tage lang
+          # einen echten Interessenten; laeuft er nicht mit, sieht der
+          # aeltere Software als die Homepage bewirbt -- und das faellt
+          # niemandem auf, weil es kein Fehler ist, nur ein alter Stand.
+          if [ "$UMGEBUNG" = "production" ]; then
+            cp -a dist dist-demoplatz-vorlage
+          fi
+
           sed -i "s|__DB_HOST__|$EFF_DB_HOST|g" dist/db.php
           sed -i "s|__DB_NAME__|$EFF_DB_NAME|g" dist/db.php
           sed -i "s|__DB_USER__|$EFF_DB_USER|g" dist/db.php
@@ -951,6 +975,24 @@ jobs:
           # der Platzhalter auch hier ersetzt werden -- ein stehen
           # gebliebener weist den Deploy ab.
           sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist/demo_zugang.php
+
+          # Adresse der Bestaetigungsseite (ENT-624). Sie liegt auf der
+          # Verkaufsseite guardops.ch, und die gibt es AUSSCHLIESSLICH auf
+          # Production (gleiche Begruendung wie bei den guardops-Schritten
+          # weiter oben). In jeder anderen Umgebung bleibt der Wert leer;
+          # demo_bestaetigung_basis_pruefen() erkennt das und liefert null,
+          # der Endpunkt sagt dann "noch nicht eingerichtet" statt einen
+          # Link ins Nichts zu verschicken. Ein Literal, kein Secret --
+          # dieselbe Einordnung wie __APP_BASIS_URL__ darueber.
+          # Zwei ausgeschriebene Zeilen statt einer Variablen: Eine
+          # Zwischenvariable wuerde die Pruefung "jeder eingesetzte Wert
+          # wird weitergereicht" verletzen, und die hat recht -- sie kann
+          # nicht sehen, ob sie im selben Schritt gesetzt wurde.
+          if [ "$UMGEBUNG" = "production" ]; then
+            sed -i "s|__GUARDOPS_BASIS_URL__|https://guardops.ch|g" dist/demo_bestaetigung.php
+          else
+            sed -i "s|__GUARDOPS_BASIS_URL__||g" dist/demo_bestaetigung.php
+          fi
           # Staging-Mailmodus (ENT-341): Ausserhalb der Produktion leitet
           # mailer.php JEDE Mail auf diese Adresse um -- unabhaengig davon,
           # ueber welches Postfach (siehe SMTP_* oben) sie verschickt wird.
@@ -1132,6 +1174,19 @@ jobs:
           # an EINER Adresse stehen, mit einem Stil und einem Deploy-Weg.
           # Der Demobereich verweist absolut darauf (dashboard.html).
           cp datenschutz-demo.html       dist-guardops/datenschutz-demo.html
+          # Nutzungsbedingungen und Bestaetigungsseite (ENT-624). Beide
+          # teilen sich recht.css mit Impressum und Datenschutz -- darum
+          # steht der Stil dort und nicht zweimal inline.
+          #
+          # demo-bestaetigen.html ist die Seite, auf die der Link aus der
+          # Bestaetigungsmail zeigt. Sie liegt hier und nicht im
+          # Buendel des Betreiber-Bereichs, weil der Interessent von dieser
+          # Domain kam;
+          # der Endpunkt dahinter laeuft weiterhin auf
+          # betreiber.guardops.ch (siehe OEFFENTLICHE_DEMO_SKRIPTE in
+          # backend/db.php).
+          cp nutzungsbedingungen.html   dist-guardops/nutzungsbedingungen.html
+          cp demo-bestaetigen.html      dist-guardops/demo-bestaetigen.html
           cp recht.css                   dist-guardops/recht.css
           cp htaccess-guardops           dist-guardops/.htaccess
           cp robots-guardops.txt         dist-guardops/robots.txt
@@ -1295,6 +1350,7 @@ jobs:
           cp backend/demo_zugang.php   dist-betreiber/demo_zugang.php
           # Die gemeinsame Mailgestaltung -- demo_zugang.php bindet sie selbst ein.
           cp backend/mail_vorlage.php  dist-betreiber/mail_vorlage.php
+          cp backend/demo_bestaetigung.php dist-betreiber/demo_bestaetigung.php
           # Das Logo der Signatur -- flach neben die Vorlage, die es von dort liest.
           cp backend/guardops-signatur.png     dist-betreiber/guardops-signatur.png
           # Die helle Fassung fuer den Dunkelmodus -- ohne sie stuende das Logo
@@ -1376,11 +1432,24 @@ jobs:
           # die Datei neben der Seite liegt.
           cp qrcode.js                 dist-betreiber/qrcode.js
           cp backend/api/betreiber_*.php dist-betreiber/api/
-          # Die oeffentliche Selbstbedienung (ENT-601): kein betreiber_-
-          # Praefix, weil sie ausdruecklich OHNE Anmeldung laeuft -- der
-          # Wildcard zwei Zeilen darueber faengt sie darum nicht ein.
+          # Die oeffentliche Selbstbedienung (ENT-601, ENT-624): kein
+          # betreiber_-Praefix, weil sie ausdruecklich OHNE Anmeldung
+          # laeuft -- der Wildcard zwei Zeilen darueber faengt sie darum
+          # nicht ein. Massgeblich ist OEFFENTLICHE_DEMO_SKRIPTE in
+          # backend/db.php: Was dort steht, wird hier kopiert, und
+          # test_deploy.mjs gleicht genau das ab.
           cp backend/api/demo_anfordern.php     dist-betreiber/api/demo_anfordern.php
           cp backend/api/demo_erneut_senden.php dist-betreiber/api/demo_erneut_senden.php
+          # Das Einloesen des Bestaetigungslinks (ENT-624). BESTANDSFEHLER,
+          # gefunden am 2026-09-19 live: Die Datei fehlte hier, seit die
+          # Bestaetigung eingefuehrt wurde. Der Knopf auf
+          # demo-bestaetigen.html schickte seinen POST an eine Adresse, die
+          # es nicht gab; die 404-Seite von Apache traegt keine
+          # CORS-Kopfzeile, und darum brach die Anfrage schon im Browser ab
+          # -- sichtbar nur als "Die Verbindung ist abgebrochen", der
+          # Sammelfall der Seite. Kein Interessent konnte seinen Zugang
+          # einloesen.
+          cp backend/api/demo_bestaetigen.php   dist-betreiber/api/demo_bestaetigen.php
           cp htaccess-betreiber        dist-betreiber/.htaccess
           cp robots-betreiber.txt      dist-betreiber/robots.txt
 
@@ -1419,6 +1488,24 @@ jobs:
           # entfaellt still -- der Demo-Zugang des Interessenten haengt
           # ausdruecklich NICHT daran.
           sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist-betreiber/demo_zugang.php
+
+          # Adresse der Bestaetigungsseite (ENT-624). Sie liegt auf der
+          # Verkaufsseite guardops.ch, und die gibt es AUSSCHLIESSLICH auf
+          # Production (gleiche Begruendung wie bei den guardops-Schritten
+          # weiter oben). In jeder anderen Umgebung bleibt der Wert leer;
+          # demo_bestaetigung_basis_pruefen() erkennt das und liefert null,
+          # der Endpunkt sagt dann "noch nicht eingerichtet" statt einen
+          # Link ins Nichts zu verschicken. Ein Literal, kein Secret --
+          # dieselbe Einordnung wie __APP_BASIS_URL__ darueber.
+          # Zwei ausgeschriebene Zeilen statt einer Variablen: Eine
+          # Zwischenvariable wuerde die Pruefung "jeder eingesetzte Wert
+          # wird weitergereicht" verletzen, und die hat recht -- sie kann
+          # nicht sehen, ob sie im selben Schritt gesetzt wurde.
+          if [ "$UMGEBUNG" = "production" ]; then
+            sed -i "s|__GUARDOPS_BASIS_URL__|https://guardops.ch|g" dist-betreiber/demo_bestaetigung.php
+          else
+            sed -i "s|__GUARDOPS_BASIS_URL__||g" dist-betreiber/demo_bestaetigung.php
+          fi
 
           # SMTP fuer die Zugangsdaten-Mail an Demo-Interessenten (ENT-600).
           # Dasselbe Postfach wie das Kundenportal, aus demselben Grund wie
@@ -1741,6 +1828,7 @@ jobs:
           # Siehe dist/: betreiber.php braucht diesen Rechenkern (ENT-600).
           cp backend/demo_zugang.php dist-cupi24/demo_zugang.php
           cp backend/mail_vorlage.php dist-cupi24/mail_vorlage.php
+          cp backend/demo_bestaetigung.php dist-cupi24/demo_bestaetigung.php
           cp backend/guardops-signatur.png dist-cupi24/guardops-signatur.png
           cp backend/guardops-signatur-hell.png dist-cupi24/guardops-signatur-hell.png
           cp backend/support.php dist-cupi24/support.php
@@ -1842,6 +1930,24 @@ jobs:
           # der Platzhalter auch hier ersetzt werden -- ein stehen
           # gebliebener weist den Deploy ab.
           sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist-cupi24/demo_zugang.php
+
+          # Adresse der Bestaetigungsseite (ENT-624). Sie liegt auf der
+          # Verkaufsseite guardops.ch, und die gibt es AUSSCHLIESSLICH auf
+          # Production (gleiche Begruendung wie bei den guardops-Schritten
+          # weiter oben). In jeder anderen Umgebung bleibt der Wert leer;
+          # demo_bestaetigung_basis_pruefen() erkennt das und liefert null,
+          # der Endpunkt sagt dann "noch nicht eingerichtet" statt einen
+          # Link ins Nichts zu verschicken. Ein Literal, kein Secret --
+          # dieselbe Einordnung wie __APP_BASIS_URL__ darueber.
+          # Zwei ausgeschriebene Zeilen statt einer Variablen: Eine
+          # Zwischenvariable wuerde die Pruefung "jeder eingesetzte Wert
+          # wird weitergereicht" verletzen, und die hat recht -- sie kann
+          # nicht sehen, ob sie im selben Schritt gesetzt wurde.
+          if [ "$UMGEBUNG" = "production" ]; then
+            sed -i "s|__GUARDOPS_BASIS_URL__|https://guardops.ch|g" dist-cupi24/demo_bestaetigung.php
+          else
+            sed -i "s|__GUARDOPS_BASIS_URL__||g" dist-cupi24/demo_bestaetigung.php
+          fi
           # Dieser Schritt laeuft ausschliesslich in Production (siehe
           # Bedingung oben) -- EFF_STAGING_TESTMAIL und EFF_DEMO_TESTMAIL
           # sind dort immer leer, dieselbe Bauart wie beim Hauptschritt.
@@ -1962,6 +2068,506 @@ jobs:
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_CUPI24_FTP_HOST == '' }}
         run: |
           echo "::notice::cupi24.guardops.ch wurde NICHT beliefert -- die Secrets CUPI24_FTP_HOST/USER/PASSWORD fehlen im Environment production. Das Rapport-Tool auf der bisherigen Adresse ist davon nicht betroffen und wurde regulaer ausgeliefert."
+
+      # ══ Die zehn Demo-Plaetze (ENT-600/ENT-601/ENT-613) ═══════════════
+      #
+      # WAS HIER ANDERS IST ALS BEI DER DEMO-UMGEBUNG AUS ENT-523: Jene ist
+      # EINE Instanz, die gegen einen demo-*-Tag beliefert wird und sich
+      # naechtlich selbst zuruecksetzt. Die Plaetze sind ZEHN Instanzen mit
+      # je eigener Datenbank, je einem Interessenten fuer 14 Tage. Beides
+      # existiert nebeneinander und teilt sich nichts -- weder Datenbank
+      # noch Mailziel noch Adresse.
+      #
+      # WARUM AN main UND NICHT AN EINEM TAG (Festlegung des
+      # Projektinhabers, 2026-09-19): siehe Begruendung bei der Vorlage
+      # weiter oben im Ersetzungsschritt.
+      #
+      # EIN SAMMEL-SECRET STATT SIEBZIG EINZELNER (Festlegung des
+      # Projektinhabers, 2026-09-19): Zehn Plaetze mal sieben Werte waeren
+      # siebzig Secret-Namen, die von Hand gleichlautend gepflegt werden
+      # muessten. DEMO_PLAETZE traegt sie in einem base64-JSON -- dieselbe
+      # Bauart und derselbe Grund wie bei MANDANT_SECRETS (OP-526): base64,
+      # weil sed weder "&" noch "|" in einem Passwort vertraegt und die
+      # GITHUB_ENV-Zeile keinen Zeilenumbruch.
+      #
+      # MASKIERT WIRD VON HAND: GitHub maskiert im Log nur den Secret-Wert
+      # selbst -- also die base64-Zeichenkette. Die daraus gelesenen
+      # Einzelwerte kennt es nicht, darum bekommt JEDER von ihnen hier ein
+      # "::add-mask::", bevor er irgendwo hingeschrieben wird.
+      - name: Demo-Plaetze bauen (Vorrat aus DEMO_PLAETZE)
+        if: ${{ env.UMGEBUNG == 'production' }}
+        env:
+          VORRAT_B64: ${{ secrets.DEMO_PLAETZE }}
+        run: |
+          set -euo pipefail
+
+          # DIESELBE FESTE LISTE WIE DEMO_PLAETZE IN backend/demo_zugang.php,
+          # und aus demselben Grund dort keine Zaehlschleife: Ein elfter
+          # Platz entsteht nicht dadurch, dass jemand eine Zahl hochsetzt --
+          # er braucht eine Datenbank, ein Verzeichnis, einen FTP-Zugang und
+          # eine Mandantenzeile. Eine Liste, die man erweitern MUSS, zwingt
+          # zu dem Blick auf das, was sonst noch fehlt. Laufen die beiden
+          # Listen auseinander, faellt es auf: pruefungen/test_demo_plaetze.mjs
+          # vergleicht sie.
+          PLAETZE="demo1 demo2 demo3 demo4 demo5 demo6 demo7 demo8 demo9 demo10"
+
+          if [ -z "${VORRAT_B64:-}" ]; then
+            # KEIN Abbruch: Das Rapport-Tool, die Homepage, der
+            # Betreiber-Bereich, das Portal und die Mandantin sind an dieser
+            # Stelle bereits ausgeliefert. Ein fehlendes Demo-Secret darf
+            # den Lauf nicht nachtraeglich rot faerben -- aber still
+            # uebergangen wird es auch nicht ("nicht eingerichtet" ist nicht
+            # "nichts zu tun", Hausregel).
+            echo "::warning::Kein Demo-Platz beliefert -- das Secret DEMO_PLAETZE fehlt im Environment production. Die zehn Plaetze bleiben ohne Dateien, und wer eine Zugangsmail bekommt, liest unter seiner Adresse 403. Aufbau des Secrets: README.md, Abschnitt \"Demo-Plaetze\"."
+            echo "DEMO_PLAETZE_OHNE=$PLAETZE" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          if ! VORRAT=$(printf '%s' "$VORRAT_B64" | base64 -d 2>/dev/null); then
+            echo "::error::DEMO_PLAETZE laesst sich nicht als base64 lesen. Erzeugen mit: base64 -w0 demo-plaetze.json"
+            exit 1
+          fi
+          if ! printf '%s' "$VORRAT" | jq -e . >/dev/null 2>&1; then
+            echo "::error::DEMO_PLAETZE enthaelt kein gueltiges JSON. Aufbau: README.md, Abschnitt \"Demo-Plaetze\"."
+            exit 1
+          fi
+
+          # sed vertraegt in einem ERSATZWERT weder "|" (hier das
+          # Trennzeichen) noch "&" (die Rueckreferenz auf den Treffer) noch
+          # "\\". Ein Datenbank- oder Postfachpasswort kennt alle drei. Bei
+          # MANDANT_SECRETS ist dasselbe Problem mit base64 umgangen worden
+          # (OP-526) -- das geht dort, weil der ganze Block als EIN Wert in
+          # EINE Datei wandert. Hier gehen einzelne Werte in einzelne
+          # Dateien, also wird maskiert statt kodiert.
+          #
+          # NICHT VORSORGLICH, SONDERN NACH EINEM ABBRUCH: Der Probelauf mit
+          # einem Passwort, das ein "|" enthielt, ist an dieser Stelle
+          # gescheitert ("unknown option to `s'"). Ohne diese Funktion
+          # entscheidet das Passwort darueber, ob der Deploy durchlaeuft.
+          ersetze() {
+            local platzhalter="$1" wert="$2" datei="$3" sicher
+            # Zeilenumbruch im Wert: gezaehlt, nicht gemustert. Ein
+            # Vergleich gegen "$(printf '\n')" sieht richtig aus und ist es
+            # nicht -- die Befehlsersetzung entfernt genau den Umbruch, auf
+            # den er prueft, und das leere Muster passt dann auf JEDEN Wert
+            # (im Probelauf gefangen, sonst waere nie ein Platz gebaut worden).
+            if [ "$(printf '%s' "$wert" | wc -l)" -gt 0 ]; then
+              echo "::error::Ein Wert in DEMO_PLAETZE enthaelt einen Zeilenumbruch ($platzhalter) -- so laesst er sich nicht eintragen."
+              exit 1
+            fi
+            sicher=$(printf '%s' "$wert" | sed -e 's/[\\&|]/\\&/g')
+            sed -i "s|$platzhalter|$sicher|g" "$datei"
+          }
+
+          # ── Die gemeinsamen Werte aller Plaetze ────────────────────────
+          #
+          # Gemeinsam und nicht je Platz: Ein Maps-Schluessel, ein
+          # KI-Schluessel, ein Postfach und eine Testadresse reichen fuer
+          # alle zehn. Was sich je Platz unterscheidet, ist die Datenbank
+          # und die Adresse -- sonst nichts.
+          hole() { printf '%s' "$VORRAT" | jq -r --arg k "$1" '.gemeinsam[$k] // ""'; }
+          G_MAPS=$(hole maps_js_key);            [ -n "$G_MAPS" ] && echo "::add-mask::$G_MAPS"
+          G_KI=$(hole anthropic_api_key);        [ -n "$G_KI" ] && echo "::add-mask::$G_KI"
+          G_TESTMAIL=$(hole testmail);           [ -n "$G_TESTMAIL" ] && echo "::add-mask::$G_TESTMAIL"
+          # KEIN EIGENES POSTFACH IM VORRAT: Die Plaetze verschicken ueber
+          # dasselbe info@guardops.ch wie die Homepage (GUARDOPS_SMTP_*,
+          # ENT-569/ENT-570) -- es ist das Postfach der Betreiberin, und
+          # die Demo ist ihre Verkaufsflaeche. Ein zweites Mal abgefragt
+          # waeren es dieselben Werte an einem zweiten Ort, mit derselben
+          # stillen Falle wie beim Datenbank-Passwort: Eine Aenderung
+          # koennte an einem der beiden vergessen werden.
+          #
+          # Sind die Secrets nicht gesetzt, bleiben die Werte leer --
+          # smtp_konfiguriert() meldet dann "nicht eingerichtet", statt mit
+          # einem Platzhalter zu verschicken. Kein Pflichtwert, gleiche
+          # Bauart wie bei den uebrigen Buendeln.
+          G_VAPID_PEM=$(hole vapid_private_pem_b64); [ -n "$G_VAPID_PEM" ] && echo "::add-mask::$G_VAPID_PEM"
+          G_VAPID_KONTAKT=$(hole vapid_kontakt)
+          G_PUSH_CRON=$(hole push_cron_schluessel); [ -n "$G_PUSH_CRON" ] && echo "::add-mask::$G_PUSH_CRON"
+
+          # EIN FTP-ZUGANG FUER ALLE ZEHN (Festlegung des Projektinhabers,
+          # 2026-09-19). Er zeigt auf den gemeinsamen Elternordner der zehn
+          # Document-Roots; je Platz laedt der Upload in den Unterordner mit
+          # dem Namen des Platzes.
+          #
+          # NICHT AUF /home/itufeden/www: Von dort aus erreichte derselbe
+          # Zugang auch cupi24.guardops.ch, betreiber.guardops.ch,
+          # portal.guardops.ch und guardops.ch -- ein Fehler hier
+          # ueberschriebe die Anlage der Mandantin. Der eigene Elternordner
+          # zieht die Grenze, ohne zehn Zugaenge zu verlangen.
+          G_FTP_HOST=$(hole ftp_host);     [ -n "$G_FTP_HOST" ] && echo "::add-mask::$G_FTP_HOST"
+          G_FTP_USER=$(hole ftp_user);     [ -n "$G_FTP_USER" ] && echo "::add-mask::$G_FTP_USER"
+          G_FTP_PASS=$(hole ftp_passwort); [ -n "$G_FTP_PASS" ] && echo "::add-mask::$G_FTP_PASS"
+
+          # DREI PFLICHTWERTE, und warum genau diese drei:
+          #
+          #   testmail          -- OHNE SIE GEHT KEINE MAIL RAUS (smtp_ziel()
+          #                        in mailer.php leitet in der Demo JEDE Mail
+          #                        auf diese eine Adresse um). Sie ist keine
+          #                        Bequemlichkeit, sondern die Sperre, die
+          #                        verhindert, dass ein Interessent beim
+          #                        Ausprobieren eine Offerte an eine echte
+          #                        Adresse schickt.
+          #   maps_js_key       -- ohne ihn bleiben Kontrollpunkt-Karte,
+          #                        Geofence-Auswahl und Objektplan leer, und
+          #                        zwar wortlos.
+          #   anthropic_api_key -- ENT-523-N1: Der Projektinhaber will die
+          #                        KI-Funktion in der Demo aktiv sehen, nicht
+          #                        als "nicht eingerichtet".
+          #
+          # Abbruch statt Warnung: Ein halb eingerichteter Platz ist eine
+          # LAUFENDE Demo mit einem stillen Loch darin -- das merkt erst der
+          # Interessent, und dann ist es der falsche Zeitpunkt.
+          PFLICHT_FEHLT=""
+          [ -z "$G_TESTMAIL" ] && PFLICHT_FEHLT="$PFLICHT_FEHLT gemeinsam.testmail"
+          [ -z "$G_MAPS" ]     && PFLICHT_FEHLT="$PFLICHT_FEHLT gemeinsam.maps_js_key"
+          [ -z "$G_KI" ]       && PFLICHT_FEHLT="$PFLICHT_FEHLT gemeinsam.anthropic_api_key"
+          # Ohne Zugang wird nichts hochgeladen -- und zwar fuer ALLE zehn
+          # Plaetze nicht. Das ist kein halber Zustand, sondern gar keiner.
+          [ -z "$G_FTP_HOST" ] && PFLICHT_FEHLT="$PFLICHT_FEHLT gemeinsam.ftp_host"
+          [ -z "$G_FTP_USER" ] && PFLICHT_FEHLT="$PFLICHT_FEHLT gemeinsam.ftp_user"
+          [ -z "$G_FTP_PASS" ] && PFLICHT_FEHLT="$PFLICHT_FEHLT gemeinsam.ftp_passwort"
+          if [ -n "$PFLICHT_FEHLT" ]; then
+            echo "::error::DEMO_PLAETZE unvollstaendig -- es fehlt:$PFLICHT_FEHLT. Kein Demo-Platz wurde beliefert. Die uebrigen Adressen dieses Laufs sind davon nicht betroffen und wurden regulaer ausgeliefert."
+            exit 1
+          fi
+
+          {
+            echo "EFF_DEMOPLAETZE_FTP_HOST=$G_FTP_HOST"
+            echo "EFF_DEMOPLAETZE_FTP_USER=$G_FTP_USER"
+            echo "EFF_DEMOPLAETZE_FTP_PASSWORD=$G_FTP_PASS"
+          } >> "$GITHUB_ENV"
+
+          mkdir -p dist-demo
+          OHNE=""
+          GEBAUT=""
+
+          for PLATZ in $PLAETZE; do
+            if ! printf '%s' "$VORRAT" | jq -e --arg p "$PLATZ" '.plaetze[$p]' >/dev/null 2>&1; then
+              OHNE="$OHNE $PLATZ"
+              continue
+            fi
+
+            feld() { printf '%s' "$VORRAT" | jq -r --arg p "$PLATZ" --arg k "$1" '.plaetze[$p][$k] // ""'; }
+            DB_HOST=$(feld db_host);   DB_NAME=$(feld db_name)
+            DB_USER=$(feld db_user);   SECRET_NAME=$(feld secret_name)
+
+            # DAS DATENBANK-PASSWORT STEHT NICHT HIER, SONDERN IN
+            # MANDANT_SECRETS -- derselbe Ort, aus dem der Betreiber-Bereich
+            # es holt (mandant_secret() in backend/betreiber.php, OP-526),
+            # und derselbe Vorgang, mit dem die Plaetze 1 bis 5 hinterlegt
+            # worden sind.
+            #
+            # WARUM NICHT EINFACH HIER MIT DAZU: Zwei Orte fuer dasselbe
+            # Passwort heisst, dass eine Aenderung an einem davon vergessen
+            # werden kann. Und der Fall waere still: Der Betreiber-Bereich
+            # kaeme weiter an die Instanz heran (er liest MANDANT_SECRETS),
+            # der Platz selbst nicht mehr (er traegt den alten Wert fest
+            # eingesetzt). Der Betreiber saehe einen gesunden Platz, der
+            # Interessent einen Datenbankfehler.
+            DB_PASS=$(printf '%s' "${EFF_MANDANT_SECRETS:-}" | base64 -d 2>/dev/null \
+                      | jq -r --arg n "$SECRET_NAME" '.[$n] // ""' 2>/dev/null || true)
+            for WERT in "$DB_HOST" "$DB_NAME" "$DB_USER" "$DB_PASS"; do
+              [ -n "$WERT" ] && echo "::add-mask::$WERT"
+            done
+
+            LEER=""
+            [ -z "$DB_HOST" ]  && LEER="$LEER db_host"
+            [ -z "$DB_NAME" ]  && LEER="$LEER db_name"
+            [ -z "$DB_USER" ]  && LEER="$LEER db_user"
+            [ -z "$SECRET_NAME" ] && LEER="$LEER secret_name"
+            if [ -n "$LEER" ]; then
+              # Ein Platz, der halb dasteht, ist gefaehrlicher als einer,
+              # der gar nicht dasteht: Fehlt die Datenbank, zeigt die
+              # Adresse eine Anlage, die auf nichts zeigt.
+              echo "::error::Demo-Platz $PLATZ ist in DEMO_PLAETZE unvollstaendig -- es fehlt:$LEER"
+              exit 1
+            fi
+
+            # "Nicht in der Tafel" ist eine andere Aussage als "Feld leer
+            # gelassen", und sie hat eine andere Folge (Hausregel: vier
+            # Zustaende, vier Texte).
+            #
+            # Ein leer gelassenes FELD oben ist ein Tippfehler im Vorrat --
+            # laut, sofort, Abbruch. Ein fehlender Eintrag in
+            # MANDANT_SECRETS heisst dagegen schlicht: Dieser Platz ist
+            # noch nicht fertig eingerichtet. Dann wird er UEBERSPRUNGEN
+            # wie ein Platz ohne Eintrag, und die uebrigen werden trotzdem
+            # beliefert. Alles andere waere die falsche Reaktion: Ein
+            # halbfertiger Platz Nummer zehn darf die neun fertigen nicht
+            # ohne Dateien lassen (Befund des Projektinhabers, 2026-09-19).
+            if [ -z "$DB_PASS" ]; then
+              echo "::warning::Demo-Platz $PLATZ uebersprungen -- zum secret_name \"$SECRET_NAME\" steht in MANDANT_SECRETS kein Passwort. Der Platz bleibt ohne Dateien, bis er dort eingetragen ist."
+              OHNE="$OHNE $PLATZ"
+              continue
+            fi
+
+            cp -a dist-demoplatz-vorlage "dist-demo/$PLATZ"
+
+            # ── Die eigene Datenbank des Platzes (ENT-600, Punkt 2) ──────
+            ersetze __DB_HOST__ "$DB_HOST" "dist-demo/$PLATZ/db.php"
+            ersetze __DB_NAME__ "$DB_NAME" "dist-demo/$PLATZ/db.php"
+            ersetze __DB_USER__ "$DB_USER" "dist-demo/$PLATZ/db.php"
+            ersetze __DB_PASS__ "$DB_PASS" "dist-demo/$PLATZ/db.php"
+
+            # ── Umgebungskennung: demo, nicht production ─────────────────
+            #
+            # DER SICHERHEITSKRITISCHE WERT DIESES SCHRITTS. An ihm haengt
+            # ist_demo(), und an ist_demo() haengt nach ENT-587 die Sperre,
+            # die einen Demo-Besucher daran hindert, sich im
+            # Betreiber-Bereich ein Konto auszustellen -- das maechtigste
+            # Konto der ganzen Anlage. Stuende hier "production", waere
+            # jeder der zehn Plaetze ein offener Weg dorthin.
+            ersetze __APP_ENV__ "demo" "dist-demo/$PLATZ/db.php"
+            ersetze __APP_ENV__ "demo" "dist-demo/$PLATZ/testumgebung.js"
+
+            # ── Eigene Adresse (ENT-501) ─────────────────────────────────
+            # Aus dem Deploy, nie aus der Anfrage -- und je Platz eine
+            # andere, sonst verschickte demo3 Links auf demo1.
+            ersetze __APP_BASIS_URL__ "https://$PLATZ.guardops.ch" "dist-demo/$PLATZ/db.php"
+
+            # ── Gemeinsame Werte ─────────────────────────────────────────
+            ersetze __ANTHROPIC_API_KEY__ "$G_KI" "dist-demo/$PLATZ/ai.php"
+            ersetze __SMTP_HOST__ "${EFF_GUARDOPS_SMTP_HOST:-}" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_PORT__ "${EFF_GUARDOPS_SMTP_PORT:-}" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_VERSCHLUESSELUNG__ "${EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG:-}" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_USER__ "${EFF_GUARDOPS_SMTP_USER:-}" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_PASSWORD__ "${EFF_GUARDOPS_SMTP_PASSWORD:-}" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_ABSENDER__ "info@guardops.ch" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_ABSENDER_NAME__ "GuardOpS Demo" "dist-demo/$PLATZ/mailer.php"
+            ersetze __MAIL_SIGNATUR__ "" "dist-demo/$PLATZ/mailer.php"
+            # Die Umleitung ALLER Mails auf die Testadresse (siehe oben).
+            ersetze __DEMO_TESTMAIL__ "$G_TESTMAIL" "dist-demo/$PLATZ/mailer.php"
+            # Staging und Demo teilen kein Mailziel (ENT-523-N1) -- hier leer.
+            ersetze __STAGING_TESTMAIL__ "" "dist-demo/$PLATZ/mailer.php"
+            ersetze __MAPS_JS_KEY__ "$G_MAPS" "dist-demo/$PLATZ/dashboard.html"
+            ersetze __MAPS_JS_KEY__ "$G_MAPS" "dist-demo/$PLATZ/portal.html"
+            ersetze __MAPS_JS_KEY__ "$G_MAPS" "dist-demo/$PLATZ/app.html"
+            ersetze __VAPID_PRIVATE_PEM_B64__ "$G_VAPID_PEM" "dist-demo/$PLATZ/push.php"
+            ersetze __VAPID_KONTAKT__ "$G_VAPID_KONTAKT" "dist-demo/$PLATZ/push.php"
+            ersetze __PUSH_CRON_SCHLUESSEL__ "$G_PUSH_CRON" "dist-demo/$PLATZ/api/push_versand.php"
+            # Natives Push (ENT-604) bleibt leer: Die App im Store spricht
+            # mit der Anlage der Mandantin, nicht mit einer Demo-Instanz.
+            ersetze __APNS_KEY_P8_B64__ "" "dist-demo/$PLATZ/push.php"
+            ersetze __APNS_KEY_ID__ "" "dist-demo/$PLATZ/push.php"
+            ersetze __APNS_TEAM_ID__ "" "dist-demo/$PLATZ/push.php"
+
+            # ── Werte, die hier absichtlich LEER bleiben ─────────────────
+            #
+            # Empfaenger der Demo-ANFRAGEN: Das Kontaktformular steht auf
+            # guardops.ch, nicht auf einem Platz.
+            ersetze __DEMO_EMPFAENGER__ "" "dist-demo/$PLATZ/demo_anfrage.php"
+            # Seit ENT-622 steht derselbe Platzhalter auch in
+            # demo_zugang.php (Meldung an den Betreiber ueber jeden neuen
+            # Zugang). Auf einem Platz entsteht kein Zugang -- die
+            # Selbstbedienung laeuft auf guardops.ch --, also bleibt er
+            # auch hier leer. Beim Bau dieses Buendels uebersehen, was den
+            # Deploy-Lauf 590 rot gefaerbt hat -- gefunden von der Pruefung
+            # auf uebersehene Platzhalter am Ende dieses Schrittes.
+            ersetze __DEMO_EMPFAENGER__ "" "dist-demo/$PLATZ/demo_zugang.php"
+            # Die Adresse der Verkaufsseite fuer den Bestaetigungslink
+            # (ENT-624). Auf einem Platz leer: Die Bestaetigung laeuft auf
+            # guardops.ch und im Betreiber-Bereich, nie auf einer
+            # Demo-Instanz. demo_bestaetigung_basis_pruefen() liefert bei
+            # leerem Wert null, und der Endpunkt sagt "noch nicht
+            # eingerichtet", statt einen Link ins Nichts zu verschicken.
+            ersetze __GUARDOPS_BASIS_URL__ "" "dist-demo/$PLATZ/demo_bestaetigung.php"
+            # Der Zeitgeber-Schluessel des naechtlichen Resets (ENT-523)
+            # gehoert der EINEN Demo-Umgebung. Ein Platz wird nicht
+            # naechtlich zurueckgesetzt, sondern wenn er zugeteilt wird und
+            # wenn seine Frist ablaeuft (demo_instanz_leeren()). Leer ist
+            # hier kein Loch: demo_reset_zeitgeber_lage() antwortet bei
+            # leerem Schluessel "nicht_eingerichtet" und laesst niemanden
+            # durch -- auch den nicht, der gar keinen Schluessel mitschickt.
+            ersetze __DEMO_RESET_TOKEN__ "" "dist-demo/$PLATZ/api/demo_reset_ausfuehren.php"
+            # Betreiber-Ebene: Der Betreiber-Bereich laeuft auf
+            # betreiber.guardops.ch, nicht auf einem Platz -- und ist dort
+            # nach ENT-587 ohnehin gesperrt. betreiber.php faehrt hier als
+            # tote Einbindung mit (betreiber_db() faellt auf db() zurueck),
+            # genau wie im cupi24-Buendel.
+            ersetze __BETREIBER_DB_HOST__ "" "dist-demo/$PLATZ/betreiber.php"
+            ersetze __BETREIBER_DB_NAME__ "" "dist-demo/$PLATZ/betreiber.php"
+            ersetze __BETREIBER_DB_USER__ "" "dist-demo/$PLATZ/betreiber.php"
+            ersetze __BETREIBER_DB_PASS__ "" "dist-demo/$PLATZ/betreiber.php"
+            ersetze __MANDANT_SECRETS__ "" "dist-demo/$PLATZ/betreiber.php"
+
+            # ── Kein Suchmaschinen-Eintrag (ENT-523) ─────────────────────
+            #
+            # Die Vorlage traegt die .htaccess von Production. Ein
+            # Demo-Platz gehoert nicht in einen Index: Was ein Interessent
+            # darin erfasst, ist seine Sache, und eine Demo-Instanz unter
+            # dem Firmennamen eines Interessenten bei Google ist ein
+            # Datenschutzvorfall mit Ansage. Dieselben zwei Dateien wie bei
+            # der Demo-Umgebung, hier bloss unbedingt statt an eine
+            # Bedingung geknuepft.
+            cp htaccess-hostpoint "dist-demo/$PLATZ/.htaccess"
+            cat htaccess-demo-zusatz >> "dist-demo/$PLATZ/.htaccess"
+            cp robots-demo.txt "dist-demo/$PLATZ/robots.txt"
+
+            # ── Kein uebersehener Platzhalter ────────────────────────────
+            # Dieselbe Pruefung und dieselben zwei Ausnahmen wie bei den
+            # Buendeln oben (__DIR__ ist PHPs eigene Konstante,
+            # __MAPS_IOS_KEY__ gehoert ins App-Buendel, ENT-609).
+            UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' "dist-demo/$PLATZ/" \
+                     | grep -v -e '^__DIR__$' -e '^__MAPS_IOS_KEY__$' \
+                     | sort -u || true)
+            if [ -n "$UEBRIG" ]; then
+              echo "::error::Nicht ersetzte Platzhalter im Buendel fuer $PLATZ: $UEBRIG"
+              exit 1
+            fi
+
+            # Das Ziel des Uploads, und zugleich das Zeichen dafuer, dass
+            # dieser Platz gebaut wurde: Der Upload-Schritt unten laeuft nur,
+            # wenn hier etwas steht. Ein Platz ohne Eintrag in DEMO_PLAETZE
+            # kommt gar nicht bis hierher.
+            #
+            # Der Unterordner heisst wie der Platz -- ohne Ausweichfeld im
+            # Vorrat, damit es nicht zwei Wahrheiten gibt. Der
+            # Document-Root von demoN.guardops.ch muss bei Hostpoint also
+            # auf <Elternordner>/demoN zeigen (siehe README).
+            GROSS=$(printf '%s' "$PLATZ" | tr 'a-z' 'A-Z')
+            echo "EFF_${GROSS}_ZIEL=/$PLATZ/" >> "$GITHUB_ENV"
+            GEBAUT="$GEBAUT $PLATZ"
+          done
+
+          echo "DEMO_PLAETZE_OHNE=$OHNE" >> "$GITHUB_ENV"
+          echo "Gebaute Demo-Plaetze:$GEBAUT"
+
+      # ZEHN EINZELNE UPLOAD-SCHRITTE UND KEINE SCHLEIFE: Die
+      # FTP-Deploy-Action ist ein Schritt, kein Kommando -- sie laesst sich
+      # in einem "run"-Block nicht aufrufen. Ein eigener lftp-Aufruf
+      # daneben waere ein zweiter, ungepruefter Uploadweg fuer dieselbe
+      # Sache. Zehn Zeilenbloecke sind laenger, aber sie benutzen denselben
+      # erprobten Weg wie die fuenf Adressen oben, und jeder Platz steht
+      # namentlich da -- wie in DEMO_PLAETZE in backend/demo_zugang.php.
+      #
+      # ALLE ZEHN teilen sich EINEN Zugang, der auf den gemeinsamen
+      # Elternordner zeigt; getrennt werden sie ueber das Zielverzeichnis
+      # (server-dir), nicht ueber eigene Zugangsdaten. ACHTUNG (Lehre aus
+      # dem Portal-Umzug, ENT-580): Der Document-Root der Subdomain muss
+      # WIRKLICH auf <Elternordner>/demoN zeigen. Stimmt das nicht, laedt
+      # der Upload erfolgreich an eine unbediente Stelle, und die Adresse
+      # bleibt bei 403 -- ohne dass der Lauf etwas meldet.
+      - name: demo1.guardops.ch beliefern (FTPS)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO1_ZIEL != '' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist-demo/demo1/
+          server-dir: ${{ env.EFF_DEMO1_ZIEL }}
+
+      - name: demo2.guardops.ch beliefern (FTPS)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO2_ZIEL != '' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist-demo/demo2/
+          server-dir: ${{ env.EFF_DEMO2_ZIEL }}
+
+      - name: demo3.guardops.ch beliefern (FTPS)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO3_ZIEL != '' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist-demo/demo3/
+          server-dir: ${{ env.EFF_DEMO3_ZIEL }}
+
+      - name: demo4.guardops.ch beliefern (FTPS)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO4_ZIEL != '' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist-demo/demo4/
+          server-dir: ${{ env.EFF_DEMO4_ZIEL }}
+
+      - name: demo5.guardops.ch beliefern (FTPS)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO5_ZIEL != '' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist-demo/demo5/
+          server-dir: ${{ env.EFF_DEMO5_ZIEL }}
+
+      - name: demo6.guardops.ch beliefern (FTPS)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO6_ZIEL != '' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist-demo/demo6/
+          server-dir: ${{ env.EFF_DEMO6_ZIEL }}
+
+      - name: demo7.guardops.ch beliefern (FTPS)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO7_ZIEL != '' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist-demo/demo7/
+          server-dir: ${{ env.EFF_DEMO7_ZIEL }}
+
+      - name: demo8.guardops.ch beliefern (FTPS)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO8_ZIEL != '' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist-demo/demo8/
+          server-dir: ${{ env.EFF_DEMO8_ZIEL }}
+
+      - name: demo9.guardops.ch beliefern (FTPS)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO9_ZIEL != '' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist-demo/demo9/
+          server-dir: ${{ env.EFF_DEMO9_ZIEL }}
+
+      - name: demo10.guardops.ch beliefern (FTPS)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO10_ZIEL != '' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist-demo/demo10/
+          server-dir: ${{ env.EFF_DEMO10_ZIEL }}
+
+      # "NICHT EINGERICHTET" DARF NICHT WIE "NICHTS ZU TUN" AUSSEHEN, genau
+      # wie bei den Adressen oben -- hier aber als WARNUNG und nicht als
+      # blosser Hinweis: Ein Platz ohne Dateien ist kein aufgeschobener
+      # Ausbau, sondern eine Adresse, die im Betreiber-Bereich als "frei"
+      # dasteht und die ein Interessent zugeteilt bekommen kann. Dann
+      # bekommt er eine Mail mit Zugangsdaten und liest unter dem Link 403.
+      - name: Hinweis auf Demo-Plaetze ohne Dateien
+        if: ${{ env.UMGEBUNG == 'production' && env.DEMO_PLAETZE_OHNE != '' }}
+        run: |
+          echo "::warning::Diese Demo-Plaetze wurden NICHT beliefert (kein Eintrag in DEMO_PLAETZE):${{ env.DEMO_PLAETZE_OHNE }}. Sie stehen im Betreiber-Bereich trotzdem im Vorrat und koennen zugeteilt werden -- wer sie zugeteilt bekommt, liest unter seiner Adresse 403. Einrichtungsweg je Platz: README.md, Abschnitt \"Demo-Plaetze\"."
 
       - name: Staging-Passwortschutz verifizieren
         if: ${{ env.UMGEBUNG == 'staging' }}

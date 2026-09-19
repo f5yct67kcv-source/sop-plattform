@@ -978,6 +978,12 @@ const OHNE_ANMELDUNG = [
   // test_demo_zugang.mjs, und die enge Einhegung in test_betreiber.mjs
   // ("Die Ausnahme fuer die Demo bleibt eng").
   'demo_anfordern.php',
+  // Die zweite Haelfte derselben Sache (ENT-624): Das Formular legt nur
+  // noch eine offene Anfrage an, eingerichtet wird erst hier -- nach einem
+  // Klick auf den Knopf der Bestaetigungsseite. Wer den Wert hat, hat ihn
+  // aus einer Mail an genau die Adresse, um die es geht; eine Anmeldung
+  // gaebe es zu diesem Zeitpunkt gar nicht.
+  'demo_bestaetigen.php',
   // Gegenstueck fuer "Zugangsdaten erneut senden" -- dieselbe Begruendung,
   // dieselbe gleichlautende Antwort in jedem Fall (wie passwort_vergessen.php).
   'demo_erneut_senden.php',
@@ -1281,9 +1287,18 @@ if (zugangOhnePortalrecht.length) {
 {
   // Seit ENT-612 steckt die eigentliche Einrichtung im Rechenkern, nicht
   // mehr im Endpunkt selbst (siehe backend/planung_einrichten_kern.php).
-  const einrichtung = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
-  const spaltenBlock = (einrichtung.match(/\$spalten = \[[\s\S]*?\n\];/) || [''])[0];
-  const nachtraege = [...spaltenBlock.matchAll(/\['kundenzugang',\s*'(\w+)'/g)].map(m => m[1]);
+  // PHP GEFRAGT, NICHT DEN QUELLTEXT GELESEN. Bis zum 2026-09-19 schnitt
+  // diese Stelle das Literal "$spalten = [...]" per reguleraerem Ausdruck
+  // aus der Datei. Als die Liste in kern_spalten() umzog, fand der
+  // Ausdruck nichts mehr -- und eine leere Liste haette die Schleife
+  // unten lautlos zu einer Pruefung ohne Gegenstand gemacht. Nur weil
+  // eine Zeile darunter auf "mehr als null" besteht, fiel es auf.
+  // Jetzt liefert die Quelle selbst die Antwort.
+  const nachtraege = JSON.parse(execFileSync('php', ['-r',
+    `require '${WURZEL}/backend/planung_einrichten_kern.php';`
+    + ' echo json_encode(array_values(array_map(fn($e) => $e[1],'
+    + " array_filter(kern_spalten(), fn($e) => $e[0] === 'kundenzugang'))));",
+  ], { encoding: 'utf8' }));
   check('Die Nachtragsliste nennt Spalten der Kundenzugaenge', nachtraege.length > 0);
   const ungeschuetzt = [];
   for (const datei of portalDateien.concat(zugangDateien)) {

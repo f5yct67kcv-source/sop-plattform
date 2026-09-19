@@ -262,7 +262,42 @@ check('KRITISCH: mit +49 sind es hoechstens 13 Ziffern',
   (await desktop.inputValue('[name="telefon"]')).replace(/\D+/g, '').length === 13);
 await desktop.selectOption('[name="vorwahl"]', '+41');
 
+// ── Die Zustimmung (ENT-624) ─────────────────────────────────────────
+//
+// Sie ist Pflicht, und zwar BEVOR irgendetwas den Rechner verlaesst: Ohne
+// Haken darf keine Anfrage hinausgehen -- sonst waere der Abdruck, den sie
+// belegen soll, eine Behauptung.
 await fuell(desktop, '[name="telefon"]', '79 123 45 67');
+await klick(desktop, '#demoKnopf');
+await desktop.waitForTimeout(250);
+check('KRITISCH: ohne Zustimmung geht kein Aufruf zum Server', aufrufe.length === 0);
+// Ein eigener Text: "Bitte Firma, Name ... angeben" hilft niemandem, dem
+// nur das Haekchen fehlt (Hausregel: vier Aussagen, vier Texte).
+check('die Meldung nennt die Zustimmung und nicht die Pflichtfelder',
+  /Nutzungsbedingungen/.test(await desktop.textContent('#demoMeldung')));
+// Der ganze Block faerbt sich, nicht nur das Kaestchen -- ein rotes
+// Quadrat von 20 px uebersieht man.
+check('KRITISCH: der fehlende Haken ist am Block erkennbar, nicht nur am Kaestchen',
+  await desktop.getAttribute('#hakenBedingungen', 'aria-invalid') === 'true');
+// Die beiden Verweise muessen dorthin zeigen, wo der Text steht --
+// geprueft wird das Ziel, nicht die Beschriftung.
+check('KRITISCH: die Zustimmung verweist auf Nutzungsbedingungen und Datenschutz',
+  await desktop.evaluate(() => {
+    const z = [...document.querySelectorAll('#hakenBedingungen a')].map(a => a.getAttribute('href'));
+    return z.includes('nutzungsbedingungen.html') && z.includes('datenschutz.html');
+  }));
+// Trefferflaeche: Auf dem Handy sind 20 px Kaestchen zu wenig, der ganze
+// Beschriftungsbereich muss treffen (Hausregel 44 px -- hier gemessen am
+// anklickbaren Label, nicht am Kaestchen).
+check('die Zustimmung laesst sich als Ganzes treffen, nicht nur das Kaestchen',
+  await desktop.evaluate(() =>
+    document.getElementById('hakenBedingungen').getBoundingClientRect().height >= 30));
+// Der Rueckruf-Widerspruch ist NICHT vorangekreuzt: Ein vorgesetzter Haken
+// waere eine Voreinstellung, die niemand getroffen hat.
+check('KRITISCH: der Rueckruf-Widerspruch steht offen und ist nicht vorangekreuzt',
+  await desktop.isChecked('#f-kein-rueckruf') === false);
+
+await desktop.check('#f-bedingungen');
 await klick(desktop, '#demoKnopf');
 await desktop.waitForTimeout(400);
 check('KRITISCH: mit Pflichtangaben geht genau EIN Aufruf zum Server', aufrufe.length === 1);
@@ -273,6 +308,15 @@ check('KRITISCH: der Aufruf ist ein POST mit JSON und traegt die Felder',
   && a.daten.telefon === '+41 79 123 45 67');
 check('KRITISCH: das Fallenfeld wird leer mitgeschickt (ein Mensch fuellt es nicht)',
   a.daten && a.daten.website === '');
+// Die Zustimmung muss beim Server ankommen, sonst kann er sie nicht
+// festhalten -- und ein Abdruck, der nur im Browser entstand, ist keiner.
+check('KRITISCH: die Zustimmung geht zum Server mit',
+  a.daten && a.daten.bedingungen === true);
+// Der Widerspruch geht in JEDEM Fall mit, auch ungesetzt: Sonst liesse
+// sich hinterher nicht unterscheiden, ob jemand keinen Rueckruf wollte
+// oder ob die Frage gar nicht gestellt wurde.
+check('KRITISCH: der Rueckruf-Widerspruch geht auch dann mit, wenn er nicht gesetzt ist',
+  a.daten && a.daten.kein_rueckruf === false);
 check('Nach dem Erfolg steht die Antwort des Servers da und die Felder sind weg',
   await desktop.isVisible('#demoDanke')
   && (await desktop.textContent('#demoDankeText')).includes('Zugangsdaten')
@@ -291,6 +335,10 @@ await fuell(desktop, '[name="email"]', 'a.beispiel@example.invalid');
 // das Formular bleibt also stehen).
 await desktop.selectOption('[name="vorwahl"]', '+49');
 await fuell(desktop, '[name="telefon"]', '151 12345678');
+// Nach dem Neuladen steht der Haken wieder offen (ENT-624) -- das ist
+// richtig so: Eine Zustimmung, die der Browser wiederherstellt, hat
+// niemand gegeben.
+await desktop.check('#f-bedingungen');
 await klick(desktop, '#demoKnopf');
 await desktop.waitForTimeout(400);
 check('eine deutsche Nummer mit Landesvorwahl geht zum Server',

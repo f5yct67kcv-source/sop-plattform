@@ -500,6 +500,21 @@ p{margin:0 0 1em}
    nebeneinander: eine Beschriftung, ein Rahmen, ein Fokusring. Die Breite
    der Auswahl ist fest, damit das Zahlenfeld auch auf dem Handy den Rest
    bekommt. Hoehe bleibt 48 px -- ueber den 44 px, die fuers Handy gelten. */
+/* Die beiden Haken vor dem Absenden (ENT-624). Eigenes Raster statt der
+   Formularlabel-Regel darueber: Dort steht die Beschriftung UEBER dem
+   Feld, hier daneben -- ein Kaestchen mit dem Text darunter liest sich
+   nicht. Mindestens 44 px Trefferflaeche (Hausregel), darum der
+   Innenabstand statt eines groesseren Kaestchens. */
+.formular .zustimmung{margin:4px 0 18px}
+.formular .haken{display:grid;grid-template-columns:auto 1fr;gap:11px;
+  align-items:start;margin:0 0 10px;padding:7px 0;min-height:30px;
+  font-size:13.5px;line-height:1.55;color:var(--stahl);cursor:pointer}
+.formular .haken input{width:20px;height:20px;margin:1px 0 0;padding:0;
+  accent-color:var(--blau);cursor:pointer;flex:none}
+.formular .haken a{color:var(--stahl-hi);text-decoration:underline;text-underline-offset:2px}
+/* Fehlt die Pflichtzustimmung, faerbt sich der ganze Block -- nicht nur
+   das Kaestchen: Ein rotes Quadrat von 20 px uebersieht man. */
+.formular .haken[aria-invalid="true"]{color:var(--warnrot,#F09090)}
 .formular .telefonfeld{display:grid;grid-template-columns:86px 1fr;align-items:stretch;height:48px;border:1px solid var(--nacht-linie);background:var(--nacht-3);border-radius:6px}
 .formular .telefonfeld:focus-within{border-color:var(--blau)}
 /* background-color, NICHT die Kurzform background: die wuerde das
@@ -1164,11 +1179,28 @@ p{margin:0 0 1em}
             <input type="tel" name="telefon" required autocomplete="tel" inputmode="numeric" maxlength="17" placeholder="79 123 45 67">
           </span></label>
         </div>
+        <div class="zustimmung">
+          <label class="haken" id="hakenBedingungen">
+            <input type="checkbox" name="bedingungen" id="f-bedingungen">
+            <span>Ich habe die <a href="nutzungsbedingungen.html" target="_blank" rel="noopener">Nutzungsbedingungen</a>
+              und die <a href="datenschutz.html" target="_blank" rel="noopener">Datenschutzerklärung</a>
+              gelesen und bin einverstanden. <abbr class="pflicht" title="Pflichtfeld">*</abbr></span>
+          </label>
+          <!-- Widerspruch, keine Einwilligung: Wer seine Nummer für einen
+               Demo-Zugang hinterlässt, rechnet mit einem Rückruf
+               (Entscheidung des Projektinhabers, ENT-624). Das Kästchen
+               steht sichtbar und nicht versteckt -- sonst wäre der
+               Abdruck der Zustimmung nichts wert. -->
+          <label class="haken">
+            <input type="checkbox" name="kein_rueckruf" id="f-kein-rueckruf">
+            <span>Ich wünsche keinen Rückruf.</span>
+          </label>
+        </div>
         <button class="btn primaer" type="submit" id="demoKnopf">Zugang jetzt erhalten <svg><use href="#i-pfeil"/></svg></button>
-        <p class="hinweis"><abbr class="pflicht" title="Pflichtfeld">*</abbr> Pflichtfeld. Die Zugangsdaten gehen ausschliesslich an die angegebene E-Mail-Adresse. Keine Newsletter, keine Weitergabe. Bitte keine echten Personendaten in der Demo erfassen – sie wird nach 14 Tagen vollständig gelöscht.</p>
+        <p class="hinweis"><abbr class="pflicht" title="Pflichtfeld">*</abbr> Pflichtfeld. Sie erhalten zuerst eine E-Mail zum Bestätigen; die Zugangsdaten folgen danach und gehen ausschliesslich an die angegebene Adresse. Keine Newsletter, keine Weitergabe. Bitte keine echten Personendaten in der Demo erfassen – sie wird nach 14 Tagen vollständig gelöscht.</p>
         <div class="meldung" id="demoMeldung" role="status" aria-live="polite"></div>
         </div>
-        <div class="danke" id="demoDanke" role="status"><b>Fast geschafft.</b><p id="demoDankeText">Vielen Dank. Sie erhalten in Kürze eine E-Mail mit Ihren Zugangsdaten.</p></div>
+        <div class="danke" id="demoDanke" role="status"><b>Fast geschafft.</b><p id="demoDankeText">Vielen Dank. Wir haben Ihnen eine E-Mail geschickt — bitte bestätigen Sie darin Ihre Anfrage.</p></div>
       </form>
     </div>
   </div>
@@ -1298,7 +1330,11 @@ p{margin:0 0 1em}
       firma: feld('firma').value.trim(), name: feld('name').value.trim(),
       email: feld('email').value.trim(),
       telefon: nummer === '' ? '' : vorwahlFeld.value + ' ' + telefonFeld.value.trim(),
-      website: feld('website').value
+      website: feld('website').value,
+      // Die Zustimmung wird zusaetzlich im Server geprueft -- eine Sperre,
+      // die man am Browser vorbei umgehen kann, ist keine (CLAUDE.md).
+      bedingungen: feld('f-bedingungen').checked,
+      kein_rueckruf: feld('f-kein-rueckruf').checked
     };
     // Dieselben Regeln wie im Rechenkern (demo_zugang_telefon_gueltig() in
     // backend/demo_zugang.php, Begruendung der Laengen steht dort). Die
@@ -1320,6 +1356,15 @@ p{margin:0 0 1em}
       (n === 'telefon' ? telefonHuelle : feld(n)).setAttribute('aria-invalid', fehlt ? 'true' : 'false');
       if (fehlt) fehlend.push(n);
     });
+    var hakenBed = document.getElementById('hakenBedingungen');
+    hakenBed.setAttribute('aria-invalid', daten.bedingungen ? 'false' : 'true');
+    if (!daten.bedingungen && !fehlend.length) {
+      // Eigener Text: "Bitte Firma, Name ... angeben" hilft niemandem
+      // weiter, dem nur das Haekchen fehlt.
+      melde('Bitte bestätigen Sie die Nutzungsbedingungen und die Datenschutzerklärung.', true);
+      feld('f-bedingungen').focus();
+      return;
+    }
     if (fehlend.length) {
       // Ein leeres Feld und eine falsch geschriebene Nummer sind zwei
       // verschiedene Aussagen und bekommen zwei verschiedene Texte.

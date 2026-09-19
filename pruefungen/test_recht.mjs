@@ -90,9 +90,26 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
   // dieses Formular, siehe cors_erlaubte_herkunft() in backend/db.php).
   check('KRITISCH: das Formular fuehrt tatsaechlich zu diesem Endpunkt',
     /action="https:\/\/betreiber\.guardops\.ch\/api\/demo_anfordern\.php"/.test(homepage));
+  // Seit ENT-624 schreibt der Endpunkt selbst in demo_bestaetigung; der
+  // Eintrag im Register entsteht erst beim Bestaetigen, in
+  // demo_zugang_einrichten(). Geprueft wird die AUSSAGE -- irgendwo wird
+  // gespeichert --, nicht mehr eine bestimmte Zeile in einer bestimmten
+  // Datei. Verschwaende der letzte INSERT, waere die Erklaerung falsch.
+  const einrichten = lies('backend/demo_instanz.php');
   check('KRITISCH: die Behauptung "wird in einer Datenbank gespeichert" stimmt mit dem Code ueberein',
-    /INSERT INTO demo_zugang/i.test(endpunkt)
+    /INSERT INTO demo_bestaetigung/i.test(endpunkt)
+    && /INSERT INTO demo_zugang/i.test(einrichten)
     && /werden dafür in\s*\n?\s*einer Datenbank gespeichert/i.test(datenschutz.replace(/\s+/g, ' ')));
+  // Der Zwischenschritt selbst muss dastehen: Wer liest, sie bekomme
+  // sofort einen Zugang, wartet sonst auf Zugangsdaten, die erst nach
+  // seiner Bestaetigung kommen.
+  check('KRITISCH: die Erklaerung nennt den Bestaetigungsschritt',
+    /Bestätigungslink/i.test(datenschutz) && /Erst wenn Sie darin bestätigen/i.test(datenschutz));
+  // Und den Abdruck der Zustimmung -- er ist selbst eine Datenbearbeitung
+  // und darf nicht unerwaehnt bleiben.
+  check('KRITISCH: die Erklaerung nennt, was beim Abdruck der Zustimmung festgehalten wird',
+    /Abdruck Ihrer Zustimmung/i.test(datenschutz)
+    && /welche Fassung/i.test(datenschutz.replace(/<[^>]+>/g, '')));
   check('KRITISCH: die Seite behauptet NICHT mehr, nichts werde gespeichert',
     !/nicht in\s*\n?\s*einer Datenbank gespeichert/i.test(datenschutz.replace(/\s+/g, ' ')));
 
@@ -121,9 +138,17 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
   // "vorwahl" ist kein eigenes Datum: Die Auswahl (seit 2026-09-19) traegt
   // die Landesvorwahl der Telefonnummer, mehr erhebt sie nicht. Sie steht
   // darum unter demselben Wort in der Erklaerung.
+  // Die beiden Haken (ENT-624) erheben keine Stammdaten, sondern eine
+  // Zustimmung und einen Widerspruch -- beides steht in der Erklaerung
+  // unter eigenen Ueberschriften, und beides ist eine Bearbeitung.
   const WORT_ZUM_FELD = { firma: 'Firma', name: 'Name', email: 'E-Mail-Adresse',
-    telefon: 'Telefonnummer', vorwahl: 'Telefonnummer' };
-  const erhoben = [...homepage.matchAll(/<(?:input|select|textarea)[^>]*\bname="([a-zA-Z]+)"/g)]
+    telefon: 'Telefonnummer', vorwahl: 'Telefonnummer',
+    bedingungen: 'Abdruck Ihrer Zustimmung', kein_rueckruf: 'Rückruf' };
+  // Unterstrich MIT (Befund 2026-09-19): Das Muster kannte vorher nur
+  // Buchstaben und uebersah damit jedes Feld mit einem Unterstrich im
+  // Namen -- kein_rueckruf waere still durchgerutscht, und die Pruefung
+  // haette grun behauptet, alle Felder stuenden in der Erklaerung.
+  const erhoben = [...homepage.matchAll(/<(?:input|select|textarea)[^>]*\bname="([a-zA-Z_]+)"/g)]
     .map(m => m[1])
     .filter(n => n !== 'website');   // Das Fallenfeld erhebt nichts, es faengt Skripte.
   const ohneZuordnung = erhoben.filter(n => !WORT_ZUM_FELD[n]);
@@ -134,9 +159,52 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
   // besteht -- die feste Zahl haelt fest, dass ein weiteres Feld nicht
   // stillschweigend dazukommt.
   check('KRITISCH: jedes Feld, das das Formular erhebt, steht in der Datenschutzerklaerung',
-    erhoben.length === 5 && ohneZuordnung.length === 0 && ungenannt.length === 0);
+    erhoben.length === 7 && ohneZuordnung.length === 0 && ungenannt.length === 0);
   if (ohneZuordnung.length) { bad.push('Feld ohne Zuordnung in dieser Pruefung: ' + ohneZuordnung.join(', ')); }
   if (ungenannt.length) { bad.push('Feld fehlt in der Datenschutzerklaerung: ' + ungenannt.join(', ')); }
+}
+
+// ══════════ DIE FASSUNG DER NUTZUNGSBEDINGUNGEN ══════════════════════
+//
+// Sie steht an zwei Orten: sichtbar auf der Seite und als Konstante im
+// Backend, die in den Abdruck der Zustimmung geschrieben wird. Laufen die
+// beiden auseinander, hält der Abdruck eine Fassung fest, die niemand
+// gesehen hat -- und genau das soll er beweisen. Geprueft wird die
+// Uebereinstimmung, nicht der Wortlaut der Konstante.
+{
+  const seite = lies('nutzungsbedingungen.html');
+  const kern  = lies('backend/demo_bestaetigung.php');
+  const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli',
+    'August','September','Oktober','November','Dezember'];
+  const t = seite.match(/<p class="stand">Fassung vom (\d{1,2})\. (\p{L}+) (\d{4})<\/p>/u);
+  const k = kern.match(/const DEMO_BEDINGUNGEN_FASSUNG = '(\d{4})-(\d{2})-(\d{2})'/);
+  const ausSeite = t
+    ? `${t[3]}-${String(MONATE.indexOf(t[2]) + 1).padStart(2, '0')}-${t[1].padStart(2, '0')}`
+    : null;
+  check('KRITISCH: die Fassung auf der Seite und die im Abdruck sind dieselbe',
+    t !== null && k !== null && ausSeite === `${k[1]}-${k[2]}-${k[3]}`);
+  // Die Seite muss auch wirklich sagen, worauf sich jemand einlaesst --
+  // die vier Punkte, die der Projektinhaber ausdruecklich abgedeckt haben
+  // wollte (ENT-624).
+  // Zeilenumbrueche zu Leerzeichen: Ein Satz, der im Quelltext ueber zwei
+  // Zeilen laeuft, ist derselbe Satz -- eine Pruefung, die daran
+  // scheitert, prueft die Formatierung statt der Aussage.
+  const nurText = seite.replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  for (const [was, muster] of [
+    ['Haftung', /Haftung/i],
+    ['keine Verfügbarkeitszusage', /keine Verfügbarkeit zu|sagen aber keine Verfügbarkeit/i],
+    ['Löschung nach 14 Tagen', /14\s*<?\/?b?>?\s*Tage/i],
+    ['keine echten Personendaten', /keine echten Personendaten/i],
+    ['Rückruf', /Rückruf/i],
+    ['Auswertung der Nutzung', /Auswertung der Nutzung/i],
+  ]) {
+    check('die Nutzungsbedingungen decken ab: ' + was, muster.test(nurText));
+  }
+  // Der Verweis muss vom Formular aus erreichbar sein, sonst hat niemand
+  // gelesen, dem etwas zur Kenntnis gebracht werden sollte.
+  check('KRITISCH: das Formular verweist auf die Nutzungsbedingungen',
+    /href="nutzungsbedingungen\.html"/.test(lies('homepage.html')));
 }
 
 // ══════════ DIE DEMO-ERKLAERUNG GEGEN DEN CODE ═══════════════════════

@@ -99,3 +99,19 @@ a:hover{text-decoration-thickness:2px}
   .karte{padding:22px 20px}
   .kopf .innen,.fuss .innen{padding-left:20px;padding-right:20px}
 }
+
+/* Knopf fuer die Bestaetigungsseite (ENT-624). Er steht hier und nicht
+   inline in demo-bestaetigen.html: Die drei Rechtsseiten teilen sich diesen
+   Stil schon fuer alles andere, und ein zweiter Ort waere beim naechsten
+   Farbwechsel der vergessene. Mindestens 44 px hoch (Hausregel). */
+.knopf{display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  min-height:48px;padding:0 26px;border:0;border-radius:10px;cursor:pointer;
+  background:var(--blau-tief);color:var(--weiss);text-decoration:none;
+  font-family:var(--display);font-size:16px;font-weight:600;font-stretch:103%}
+.knopf:hover{filter:brightness(1.08)}
+.knopf[disabled]{opacity:.55;cursor:default;filter:none}
+/* Der Zustand vor dem Klick und die vier danach. Nur einer ist je
+   sichtbar -- welcher, entscheidet das Skript nach der Antwort des
+   Servers, nicht die Seite selbst. */
+.zustand{display:none}
+.zustand.an{display:block}

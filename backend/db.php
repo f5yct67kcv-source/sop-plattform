@@ -46,7 +46,12 @@ const APP_NATIVE_HERKUENFTE = ['capacitor://localhost', 'http://localhost'];
 // selbst auf. Nur DIESE eine Herkunft und nur fuer DIESE zwei Skripte:
 // jeder andere Endpunkt bleibt same-origin-only, genau wie zuvor.
 const WEB_HERKUNFT_OEFFENTLICHE_DEMO = 'https://guardops.ch';
-const OEFFENTLICHE_DEMO_SKRIPTE = ['demo_anfordern.php', 'demo_erneut_senden.php'];
+// demo_bestaetigen.php kam mit ENT-624 dazu: Die Bestaetigungsseite liegt
+// auf guardops.ch und schickt den Wert von dort an den Betreiber-Bereich.
+// Ohne diesen Eintrag blockt der Browser die Antwort, und der Knopf tut
+// sichtbar nichts.
+const OEFFENTLICHE_DEMO_SKRIPTE = ['demo_anfordern.php', 'demo_erneut_senden.php',
+    'demo_bestaetigen.php'];
 
 // Reine Funktion -- pruefbar mit frei gewaehlten Werten, ohne echten
 // Request (gleiche Ueberlegung wie bei basis_url_pruefen()). $skript ist
@@ -494,17 +499,38 @@ if (!function_exists('hat_tabelle')) {
         // fuer JEDE andere -- ein Mandant mit vollstaendigem Schema machte
         // jeden leeren Demo-Platz in derselben Anfrage faelschlich "5 von 5
         // Tabellen", waehrend seine Datenbank tatsaechlich leer war.
-        static $bekannt = [];
-        $schluessel = spl_object_id($pdo) . ':' . $tabelle;
-        if ($ohneGedaechtnis || !array_key_exists($schluessel, $bekannt)) {
+        // NACHTRAG (2026-09-19, live gefunden an Demo-Platz 6 und 8): Die
+        // Verbindung im Schluessel mitzufuehren genuegte nicht, solange sie
+        // als spl_object_id() darin stand. Diese Nummer ist der Platz im
+        // Objektspeicher, nicht die Identitaet des Objekts -- PHP vergibt
+        // sie sofort wieder, sobald das Objekt weg ist. Genau das tut die
+        // Mandantenschleife: "$mpdo = mandant_db($m)" gibt die Verbindung
+        // des vorigen Mandanten in dem Augenblick frei, in dem die naechste
+        // entsteht. Die neue Verbindung erbte damit das Gedaechtnis der
+        // alten. Nachgemessen: zwei nacheinander erzeugte Objekte tragen
+        // dieselbe Nummer. Welcher Mandant es trifft, haengt davon ab, wie
+        // viele Objekte der vorige Lauf dazwischen verbraucht hat -- darum
+        // traf es nicht alle, sondern zwei.
+        //
+        // Die WeakMap loest das an der Wurzel, statt einen besseren
+        // Schluessel zu suchen: Sie merkt sich das Objekt selbst. Stirbt die
+        // Verbindung, verschwindet ihr Eintrag mit ihr, und eine neue
+        // Verbindung auf demselben Platz ist ein anderes Objekt und findet
+        // nichts vor. Ein Schluessel, der sich wiederverwenden laesst, kann
+        // hier gar nicht mehr entstehen.
+        static $bekannt = null;
+        $bekannt ??= new WeakMap();
+        $merk = $bekannt[$pdo] ?? [];
+        if ($ohneGedaechtnis || !array_key_exists($tabelle, $merk)) {
             $s = $pdo->prepare(
                 'SELECT 1 FROM information_schema.TABLES
                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?'
             );
             $s->execute([$tabelle]);
-            $bekannt[$schluessel] = (bool)$s->fetchColumn();
+            $merk[$tabelle] = (bool)$s->fetchColumn();
+            $bekannt[$pdo] = $merk;
         }
-        return $bekannt[$schluessel];
+        return $merk[$tabelle];
     }
 }
 
@@ -558,18 +584,25 @@ if (!function_exists('hat_spalte')) {
     // beim Pruefen der Sitzung danach, und information_schema ist keine
     // Abfrage, die man ein Dutzend Mal pro Seitenaufruf stellen will.
     function hat_spalte(PDO $pdo, string $tabelle, string $spalte): bool {
-        // Derselbe Fehler wie bei hat_tabelle() oben, dieselbe Korrektur:
-        // die Verbindung gehoert in den Schluessel.
-        static $bekannt = [];
-        $schluessel = spl_object_id($pdo) . ':' . $tabelle . '.' . $spalte;
-        if (!array_key_exists($schluessel, $bekannt)) {
+        // Derselbe Fehler wie bei hat_tabelle() oben, dieselbe Korrektur --
+        // einschliesslich des Nachtrags vom 2026-09-19: die Verbindung wird
+        // als Objekt gemerkt, nicht als Nummer. Hier richtete die Nummer den
+        // groesseren Schaden an: Erbte ein Platz das "Spalte ist vorhanden"
+        // eines anderen, unterblieb das ALTER TABLE, und die Abfrage danach
+        // lief trotzdem -- die Einrichtung brach mitten im Lauf ab.
+        static $bekannt = null;
+        $bekannt ??= new WeakMap();
+        $merk = $bekannt[$pdo] ?? [];
+        $schluessel = $tabelle . '.' . $spalte;
+        if (!array_key_exists($schluessel, $merk)) {
             $s = $pdo->prepare(
                 'SELECT 1 FROM information_schema.COLUMNS
                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
             );
             $s->execute([$tabelle, $spalte]);
-            $bekannt[$schluessel] = (bool)$s->fetchColumn();
+            $merk[$schluessel] = (bool)$s->fetchColumn();
+            $bekannt[$pdo] = $merk;
         }
-        return $bekannt[$schluessel];
+        return $merk[$schluessel];
     }
 }

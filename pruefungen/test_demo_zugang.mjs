@@ -74,8 +74,20 @@ check('KRITISCH: demo_anfordern.php prueft die Telefonnummer, bevor ein Platz ve
 check('KRITISCH: demo_anfordern.php prueft die Zustellbarkeit, bevor ein Platz verbraucht wird',
   /demo_zugang_adresse_zustellbar\(\$email\)\s*===\s*false/.test(anfordern)
   && anfordern.indexOf('demo_zugang_adresse_zustellbar') < anfordern.indexOf('demo_platz_waehlen'));
+// Seit ENT-624 laeuft das Einrichten nicht mehr im Endpunkt, sondern in
+// demo_zugang_einrichten() -- zwei Endpunkte brauchen es, und zwei Kopien
+// waeren auseinandergelaufen. Die Aussagen darunter gelten unveraendert,
+// sie werden nur an ihrem neuen Ort geprueft.
+const einrichten = nurCode(lies('backend/demo_instanz.php'));
+// Die Nummer muss BEIDE Stationen ueberstehen: die offene Anfrage und das
+// Register. Faellt sie auf einer der beiden weg, steht im Register eine
+// leere Zelle, und der Vertrieb hat nichts zum Anrufen.
+check('das Telefon wird in der offenen Anfrage gespeichert, nicht verworfen',
+  /INSERT INTO demo_bestaetigung[\s\S]{0,200}telefon/.test(anfordern)
+  && /\$telefon\b/.test(anfordern));
 check('das Telefon wird im Register gespeichert, nicht verworfen',
-  /INSERT INTO demo_zugang[\s\S]{0,120}telefon/.test(anfordern) && /\$telefon\b/.test(anfordern));
+  /INSERT INTO demo_zugang[\s\S]{0,120}telefon/.test(einrichten)
+  && /\$telefon\b/.test(einrichten));
 
 // KRITISCH (gefunden live am 2026-09-18, ENT-612-Nachtrag): Bis hierher
 // rief demo_anfordern.php demo_daten_erzeugen_ausfuehren() -- die Fassung,
@@ -86,14 +98,23 @@ check('das Telefon wird im Register gespeichert, nicht verworfen',
 // Einrichtung selbst reparierte) haette diesen Rest stillschweigend
 // abgeschnitten -- keine Zugangsdaten, keine Mail, obwohl der Musterbetrieb
 // erfolgreich entstand.
-check('KRITISCH: demo_anfordern.php ruft die reine demo_daten_erzeugen() auf, nicht die selbst-antwortende Fassung',
-  /\bdemo_daten_erzeugen\(\$instanz\)/.test(anfordern)
-  && !/\bdemo_daten_erzeugen_ausfuehren\(/.test(anfordern));
+check('KRITISCH: das Einrichten ruft die reine demo_daten_erzeugen() auf, nicht die selbst-antwortende Fassung',
+  /\bdemo_daten_erzeugen\(\$instanz\)/.test(einrichten)
+  && !/\bdemo_daten_erzeugen_ausfuehren\(/.test(einrichten));
+// Und die Falle ist seit ENT-624 dieselbe geblieben, nur eine Ebene
+// tiefer: demo_zugang_einrichten() antwortet ebenfalls nicht selbst --
+// beide Aufrufer machen danach noch weiter (Meldung an den Betreiber,
+// Vermerk am Bestaetigungssatz). Ein json_response() darin schnitte
+// ihnen das stillschweigend ab.
+const rumpf = einrichten.slice(einrichten.indexOf('function demo_zugang_einrichten'));
+check('die Funktion wurde im Quelltext gefunden', rumpf.length > 400);
+check('KRITISCH: demo_zugang_einrichten() antwortet nicht selbst, sondern gibt zurueck',
+  rumpf.length > 400 && !rumpf.includes('json_response('));
 // Kehrseite: Nach diesem Aufruf muss die Anfrage tatsaechlich weitergehen
 // -- sonst waere die Aufteilung selbst zwecklos gewesen.
-check('KRITISCH: nach der Musterbetrieb-Erzeugung legt die Anfrage noch das angeforderte Konto an',
-  anfordern.indexOf('demo_daten_erzeugen($instanz)') <
-  anfordern.indexOf("INSERT INTO mitarbeiter"));
+check('KRITISCH: nach der Musterbetrieb-Erzeugung entsteht noch das angeforderte Konto',
+  einrichten.indexOf('demo_daten_erzeugen($instanz)') <
+  einrichten.indexOf("INSERT INTO mitarbeiter"));
 
 // ── 4. Der Rechenkern geht in JEDES Buendel mit, das betreiber.php hat ─
 // Das ist der Fall, der beim ersten Bau tatsaechlich danebengegangen
@@ -132,7 +153,21 @@ const tagVersatz = n => {
 
 const ANTWORTEN = {
   'betreiber_zf_status.php': { status: 'ok', eingerichtet: true },
-  'betreiber_mandant_list.php': { status: 'ok', mandanten: [], anzahl: 0 },
+  /* Ein echter Mandant und zwei Demo-Plaetze im selben Stamm (ENT-627).
+     demo3 fehlt ABSICHTLICH: Ein Platz ohne Mandanten-Zeile kommt an
+     keine Datenbank, und das muss in der Platztabelle als eigene Aussage
+     dastehen statt als fehlender Knopf. */
+  'betreiber_mandant_list.php': { status: 'ok', anzahl: 3, mandanten: [
+    { id: 1, name: 'Beispiel Betrieb AG', subdomain: 'beispiel', status: 'aktiv',
+      kanton: 'SO', gav_lage: 'bestaetigt', verbindung_lage: 'vollstaendig',
+      db_host: '', db_name: '', db_user: '', secret_name: '', ist_demo: false },
+    { id: 2, name: 'Demo-Platz 1', subdomain: 'demo1', status: 'aktiv',
+      kanton: null, gav_lage: 'unbestaetigt', verbindung_lage: 'vollstaendig',
+      db_host: 'h', db_name: 'd1', db_user: 'u', secret_name: 'S1', ist_demo: true },
+    { id: 3, name: 'Demo-Platz 2', subdomain: 'demo2', status: 'aktiv',
+      kanton: null, gav_lage: 'unbestaetigt', verbindung_lage: 'vollstaendig',
+      db_host: 'h', db_name: 'd2', db_user: 'u', secret_name: 'S2', ist_demo: true },
+  ] },
   'betreiber_demo_list.php': {
     status: 'ok', laufzeit_tage: 14, plaetze_frei: 1, plaetze_total: 3, aktive: 2,
     plaetze: [
@@ -186,6 +221,121 @@ await seite.waitForTimeout(600);
 await seite.click('#kopf-nav .nav-item[data-bereich="mandanten"]');
 await seite.waitForTimeout(350);
 
+/* Getrennte Reiter seit ENT-626: Der Mandantenstamm und die Demo-Plaetze
+   stehen nicht mehr untereinander auf einer Seite. Gemessen statt
+   nachgelesen -- die Hoehe sagt, ob die Karte wirklich da ist. */
+const getrennt = await seite.evaluate(() => ({
+  demoVersteckt: document.getElementById('mv-demo').offsetHeight === 0,
+  stammDa:       document.getElementById('mv-mandanten').offsetHeight > 0,
+  unterzeile:    document.getElementById('leiste-unter').textContent.trim(),
+}));
+check('KRITISCH: unter "Mandanten" stehen die Demo-Plätze nicht mehr daneben (ENT-626)',
+  getrennt.demoVersteckt && getrennt.stammDa);
+check('die Unterzeile im Kopf sagt, welcher Reiter offen ist',
+  /Betriebe/.test(getrennt.unterzeile));
+
+/* ── Die Demo-Plaetze sind keine Mandanten (ENT-627) ──────────────────
+   Sie STEHEN im Mandantenstamm -- ihre Datenbankverbindung haengt an
+   dieser Zeile -- aber sie sind kein Betrieb, der die Plattform nutzt.
+   Geprueft wird, was in der Liste landet, nicht wie gefiltert wird. */
+const stamm = await seite.evaluate(() => {
+  const zeilen = [...document.querySelectorAll('#m-inhalt tbody tr')]
+    .map(r => r.querySelector('td strong')?.textContent.trim() || '');
+  return {
+    zeilen,
+    hinweis: document.querySelector('#m-inhalt + .hinweis, #m-inhalt .hinweis')?.textContent.trim()
+      || (document.getElementById('m-inhalt').parentElement.querySelector('.hinweis')?.textContent.trim() || ''),
+    text: document.getElementById('mv-mandanten').innerText,
+    /* textContent und nicht innerText: Die Kennzahlen stehen im Bereich
+       "Uebersicht", der gerade verborgen ist -- innerText liefert dort
+       nichts, und die Pruefung waere gruen, weil sie nichts gelesen hat. */
+    mandantenZahl: (() => {
+      const b = [...document.querySelectorAll('#u-zahlen .zahl')]
+        .find(z => z.querySelector('.lab')?.textContent.trim() === 'Mandanten');
+      return b ? b.querySelector('.wert').textContent.trim() : null;
+    })(),
+  };
+});
+check('KRITISCH: die Mandantenliste zeigt nur echte Betriebe, keine Demo-Plätze',
+  stamm.zeilen.length === 1 && stamm.zeilen[0] === 'Beispiel Betrieb AG');
+// Eine gefilterte Zahl ohne Bezug sieht aus wie die Gesamtzahl (Hausregel).
+// "1 Mandant" allein saehe aus, als laufe hier genau eine Instanz.
+check('KRITISCH: die ausgeblendeten Demo-Plätze stehen mit Zahl und Ort da',
+  /2 Demo-Plätze stehen im Reiter Demo/.test(stamm.text));
+// Die Kopfzahlen zaehlen dasselbe wie die Liste -- sonst stehen oben vier
+// Mandanten und unten einer.
+check('KRITISCH: der Kopfzähler zählt echte Mandanten, nicht die Demo-Plätze',
+  stamm.mandantenZahl === '1');
+
+/* Ab hier die Demo-Ansicht. Geklickt wird der Reiter, den ein Mensch
+   hier sieht: Ueber 1210 px hebt unterreiterZeichnen() die Leiste in die
+   Werkzeugleiste (dieselbe Mechanik wie im Cockpit), darunter bleibt sie
+   im Inhalt. Beide Wege muessen zum selben Ergebnis fuehren. */
+const obenSichtbar = await seite.evaluate(() => {
+  const leiste = document.getElementById('topSub');
+  return !!leiste && leiste.offsetHeight > 0
+    && [...leiste.querySelectorAll('button')].map(b => b.textContent.trim()).join('|') === 'Mandanten|Demo';
+});
+check('KRITISCH: am breiten Bildschirm stehen die Reiter in der Werkzeugleiste, wie im Cockpit',
+  obenSichtbar);
+await seite.click(obenSichtbar ? '#topSub button:nth-child(2)' : '#mtab-demo');
+await seite.waitForTimeout(250);
+
+const demoReiter = await seite.evaluate(() => ({
+  demoDa:        document.getElementById('mv-demo').offsetHeight > 0,
+  stammVersteckt: document.getElementById('mv-mandanten').offsetHeight === 0,
+  unterzeile:    document.getElementById('leiste-unter').textContent.trim(),
+  titel:         document.getElementById('leiste-titel').textContent.trim(),
+}));
+check('KRITISCH: der Reiter "Demo" zeigt die Demo-Ansicht und blendet den Stamm aus',
+  demoReiter.demoDa && demoReiter.stammVersteckt);
+// Wie im Cockpit: die Ueberschrift bleibt, die Unterzeile wechselt mit dem
+// Reiter. Sonst stuende ueber der Demo-Ansicht, sie zeige Betriebe.
+check('KRITISCH: die Unterzeile wechselt mit dem Reiter, die Überschrift nicht',
+  demoReiter.titel === 'Mandanten' && /Demo/.test(demoReiter.unterzeile));
+
+/* ── Der Zustand eines Platzes steht als Wort da (ENT-627) ────────────
+   Vorher trug nur der freie Platz einen Merker, und der stand in der
+   Spalte "Belegt durch" -- "frei" ist aber keine Antwort darauf, WER
+   darauf sitzt. Geprueft werden die Woerter je Zeile, nicht die Klassen. */
+const platzTabelle = await seite.evaluate(() => {
+  const kopf = [...document.querySelectorAll('#demo-plaetze thead th')]
+    .map(t => t.textContent.trim());
+  const zeilen = [...document.querySelectorAll('#demo-plaetze tbody tr')].map(r => {
+    const td = [...r.querySelectorAll('td')];
+    return {
+      platz:  td[0]?.querySelector('strong')?.textContent.trim() || '',
+      status: td[1]?.querySelector('.merker')?.textContent.trim() || '',
+      wer:    td[2]?.textContent.trim() || '',
+      knoepfe: [...(td[4]?.querySelectorAll('button') || [])].map(b => b.textContent.trim()),
+      statusFarbe: td[1]?.querySelector('.merker')?.className || '',
+      ohneZeile: (td[4]?.textContent || '').trim(),
+    };
+  });
+  return { kopf, zeilen };
+});
+check('die Platztabelle hat eine eigene Spalte für den Zustand',
+  platzTabelle.kopf[1] === 'Status' && platzTabelle.kopf[2] === 'Belegt durch');
+check('KRITISCH: ein belegter Platz sagt "besetzt", ein freier "frei"',
+  platzTabelle.zeilen.map(z => z.status).join('|') === 'besetzt|besetzt|frei');
+// Die Farbe hebt hervor, was noch zu haben ist -- besetzt bleibt ruhig.
+check('nur der freie Platz ist farbig hervorgehoben',
+  /m-pos/.test(platzTabelle.zeilen[2].statusFarbe)
+  && !/m-pos/.test(platzTabelle.zeilen[0].statusFarbe));
+// "Belegt durch" traegt nur noch den Namen -- oder einen Strich.
+check('KRITISCH: in "Belegt durch" steht der Name, nicht der Zustand',
+  !/frei|besetzt/.test(platzTabelle.zeilen.map(z => z.wer).join(' '))
+  && platzTabelle.zeilen[0].wer.length > 0);
+// Seit die Plaetze aus der Mandantenliste heraus sind, ist das hier der
+// einzige Weg zu ihrer Datenbankverbindung.
+check('KRITISCH: jeder Platz mit Mandanten-Zeile trägt seine Knöpfe',
+  platzTabelle.zeilen[0].knoepfe.join('|') === 'Ändern|Support'
+  && platzTabelle.zeilen[1].knoepfe.join('|') === 'Ändern|Support');
+// "Kein Knopf" und "gibt es nicht" sind verschiedene Aussagen (Hausregel).
+check('KRITISCH: ein Platz ohne Mandanten-Zeile sagt das, statt still ohne Knöpfe dazustehen',
+  platzTabelle.zeilen[2].knoepfe.length === 0
+  && /nicht im Mandantenstamm/.test(platzTabelle.zeilen[2].ohneZeile));
+
 const sicht = await seite.evaluate(() => {
   const zellen = sel => [...document.querySelectorAll(sel)].map(e => e.textContent.trim());
   /* Nur der erste Merker der Zelle: Seit ENT-622 steht darunter noch der
@@ -221,7 +371,7 @@ const sicht = await seite.evaluate(() => {
   };
 });
 
-check('die Ansicht heisst "Mandanten" -- Demo ist ein Abschnitt darin, kein eigener Reiter',
+check('die Ansicht heisst weiterhin "Mandanten" -- Demo ist ein Unterreiter darin, kein eigener oberster Reiter (ENT-600/ENT-626)',
   sicht.titel === 'Mandanten');
 check('der Vorrat zeigt alle gemeldeten Plätze', sicht.plaetze === 3);
 check('die Liste zeigt alle Zugänge', sicht.zugaenge === 3);
