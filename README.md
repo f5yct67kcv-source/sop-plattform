@@ -166,6 +166,7 @@ unten).
 | `VAPID_PRIVATE_PEM_B64` | `STAGING_VAPID_PRIVATE_PEM_B64` | `DEMO_VAPID_PRIVATE_PEM_B64` | Signierschluessel fuer Push-Benachrichtigungen (ENT-424) | selbst erzeugen, siehe unten — je Umgebung ein **eigener**, sonst klingeln Testversande auf den echten Telefonen |
 | `VAPID_KONTAKT` | `STAGING_VAPID_KONTAKT` | `DEMO_VAPID_KONTAKT` | Absenderkontakt im Push-JWT, `mailto:…` oder `https://…` (RFC 8292 verlangt ihn) | frei waehlbar, muss erreichbar sein |
 | `PUSH_CRON_SCHLUESSEL` | `STAGING_PUSH_CRON_SCHLUESSEL` | `DEMO_PUSH_CRON_SCHLUESSEL` | Schluessel, mit dem der Hostpoint-Zeitgeber den Nachzuegler-Versand aufruft | selbst erzeugen: `openssl rand -hex 24` |
+| `DEMO_PLAETZE` | — | — | FTP- und Datenbankzugaenge der zehn Demo-Plaetze (ENT-600), base64-kodiertes JSON in EINEM Secret statt siebzig einzelner Namen | selbst zusammenstellen, Aufbau und Einrichtungsweg im Abschnitt „Demo-Plaetze" weiter unten. Nur Production — die Plaetze haengen an `main`, nicht an einem `demo-*`-Tag |
 
 ### Environment-Variablen (keine Secrets)
 
@@ -464,6 +465,205 @@ Code betrifft.
   (langer, zufaelliger Wert) und einmal deployen. Laesst sich unter
   Actions → „Demo naechtlich zuruecksetzen" → „Run workflow" auch von Hand
   ausloesen, etwa zwischen zwei Interessenten am selben Tag.
+
+## Demo-Plätze (ENT-600/ENT-601/ENT-613)
+
+Etwas anderes als die Demo-Umgebung darüber, auch wenn der Name ähnlich
+klingt. Die Demo-Umgebung (ENT-523) ist **eine** Instanz, die gegen einen
+`demo-*`-Tag beliefert wird und sich nächtlich selbst zurücksetzt. Die
+Demo-Plätze sind **zehn** Instanzen mit je eigener Datenbank, von denen
+jede 14 Tage lang einem einzelnen Interessenten gehört. Beides läuft
+nebeneinander und teilt sich nichts — weder Datenbank noch Mailziel noch
+Adresse.
+
+Ein Interessent trägt sich auf guardops.ch ein, `api/demo_anfordern.php`
+sucht den ersten freien Platz, leert dessen Instanz, füllt sie mit dem
+Musterbetrieb, legt ein Konto an und verschickt die Zugangsdaten. Damit
+unter `https://demoN.guardops.ch` dann etwas steht, müssen die Dateien
+dort liegen — genau das ist der Teil, den dieser Abschnitt beschreibt.
+
+**Beliefert wird bei jedem Push auf `main`** (Festlegung des
+Projektinhabers, 2026-09-19), nicht über einen Tag. Ein Platz trägt zwei
+Wochen lang einen echten Interessenten; liefe er nicht mit, sähe der
+ältere Software als die Homepage bewirbt — und das fällt niemandem auf,
+weil es kein Fehler ist, sondern nur ein alter Stand.
+
+### Das Secret `DEMO_PLAETZE`
+
+Ein einziges Secret statt siebzig einzelner Namen (zehn Plätze mal sieben
+Werte). Es steht im GitHub-Environment **production** und trägt ein
+base64-kodiertes JSON — kodiert aus demselben Grund wie
+`MANDANT_SECRETS` (OP-526): `sed` verträgt weder `&` noch `|` in einem
+Passwort, und eine `KEY=value`-Zeile verträgt keinen Zeilenumbruch.
+
+```json
+{
+  "gemeinsam": {
+    "maps_js_key": "…",
+    "anthropic_api_key": "…",
+    "testmail": "…",
+    "vapid_private_pem_b64": "…",
+    "vapid_kontakt": "mailto:…",
+    "push_cron_schluessel": "…",
+    "ftp_host": "…", "ftp_user": "…", "ftp_passwort": "…"
+  },
+  "plaetze": {
+    "demo1": {
+      "db_host": "itufeden.mysql.db.internal",
+      "db_name": "itufeden_demo1",
+      "db_user": "itufeden_demo1",
+      "secret_name": "…"
+    },
+    "demo2": { … }
+  }
+}
+```
+
+Erzeugen und eintragen:
+
+```
+base64 -w0 demo-plaetze.json      # -w0: eine einzige Zeile
+# Ausgabe als Secret DEMO_PLAETZE unter Settings → Environments → production
+rm demo-plaetze.json              # die Datei gehört nicht ins Repository
+```
+
+- **Kein Postfach im Vorrat.** Die Plätze verschicken über dasselbe
+  `info@guardops.ch` wie die Homepage — die Zugangsdaten stehen schon als
+  `GUARDOPS_SMTP_*` im Deploy (ENT-569/ENT-570). Sind die nicht gesetzt,
+  meldet `smtp_konfiguriert()` „nicht eingerichtet", statt mit einem
+  Platzhalter zu verschicken.
+- **Ein FTP-Zugang für alle zehn**, unter `gemeinsam`. Er zeigt auf den
+  gemeinsamen Elternordner der zehn Document-Roots, nicht auf einen
+  einzelnen Platz — getrennt werden sie über das Zielverzeichnis. Welcher
+  Platz wohin geht, ist nicht einstellbar: Der Unterordner heisst wie der
+  Platz.
+- **Das Datenbank-Passwort steht hier nicht drin.** Es kommt über
+  `secret_name` aus `MANDANT_SECRETS` — demselben Secret, aus dem der
+  Betreiber-Bereich es holt (OP-526), und demselben Vorgang, mit dem die
+  ersten Plätze hinterlegt worden sind. Zwei Orte für dasselbe Passwort
+  hiessen, dass eine Änderung an einem davon vergessen werden kann, und
+  zwar still: Der Betreiber-Bereich käme weiter an die Instanz heran, der
+  Platz selbst nicht mehr. Steht zum `secret_name` kein Eintrag in
+  `MANDANT_SECRETS`, bricht der Schritt mit genau dieser Auskunft ab.
+- **Nur die Plätze eintragen, die wirklich eingerichtet sind.** Ein Platz
+  ohne Eintrag wird schlicht nicht beliefert, und der Lauf sagt am Ende
+  namentlich, welche das waren.
+- **Drei Werte unter `gemeinsam` sind Pflicht**, sonst bricht der Schritt
+  ab und kein Platz wird beliefert:
+  - `testmail` — in der Demo leitet `smtp_ziel()` **jede** Mail auf diese
+    eine Adresse um. Das ist keine Bequemlichkeit, sondern die Sperre, die
+    verhindert, dass ein Interessent beim Ausprobieren eine Offerte an
+    eine echte Adresse schickt.
+  - `maps_js_key` — ohne ihn bleiben Kontrollpunkt-Karte,
+    Geofence-Auswahl und Objektplan leer, und zwar wortlos. Der Schlüssel
+    ist referrer-beschränkt, und zwar über eine **Liste**: Ein einziger
+    Schlüssel reicht für alle zehn Plätze, aber jede Platz-Adresse muss in
+    der Google Cloud Console in seiner Referrer-Liste stehen
+    (`https://demo1.guardops.ch/*` und so weiter). Fehlt eine, bleibt
+    genau dort die Karte leer. Der bestehende Demo-Schlüssel lässt sich
+    dafür verwenden — es braucht keinen neuen je Platz.
+  - `anthropic_api_key` — ENT-523-N1: Die KI-Funktion soll in der Demo
+    aktiv sein, nicht als „nicht eingerichtet" dastehen.
+- **Ein halb ausgefüllter Platz bricht den Lauf ab.** Fehlt einem Platz
+  eines der sieben Felder, ist das ein Fehler und keine Warnung: Eine
+  Adresse, die läuft, aber auf keine Datenbank zeigt, merkt erst der
+  Interessent.
+- Das Rapport-Tool, die Homepage, der Betreiber-Bereich, das Portal und
+  die Adresse der Mandantin sind zu diesem Zeitpunkt bereits ausgeliefert.
+  Ein Fehler in `DEMO_PLAETZE` färbt den Lauf rot, hält aber keine der
+  anderen Adressen auf.
+
+### Einen Platz einrichten
+
+Sieben Schritte, die ersten drei bei Hostpoint. Ein Platz ist erst dann
+einsatzbereit, wenn alle sieben erledigt sind — und er steht im
+Betreiber-Bereich trotzdem schon vorher im Vorrat.
+
+1. **Subdomain `demoN.guardops.ch`** anlegen, mit SSL-Zertifikat (die
+   Zugangsmail verschickt `https://`-Links) und — das ist der Punkt, an
+   dem alles hängt — mit dem Document-Root im **gemeinsamen
+   Elternordner**:
+
+   ```
+   /home/itufeden/www/demos/demo1     ← Document-Root von demo1.guardops.ch
+   /home/itufeden/www/demos/demo2     ← Document-Root von demo2.guardops.ch
+   …
+   ```
+
+   Der Ordnername **muss** der Platzname sein; der Deploy lädt in
+   `/demoN/` unterhalb des Zugangs und kennt kein Ausweichfeld dafür.
+2. **Datenbank und Datenbankbenutzer** anlegen — eine eigene je Platz.
+   Die Trennung der Interessenten läuft über die Datenbank und nicht über
+   eine Spalte in jeder Tabelle (ENT-600, Punkt 2). Und nicht über ein
+   geteiltes Verzeichnis: In der `db.php` jedes Platzes stehen seine
+   Datenbank und seine Adresse fest eingetragen, darum braucht jeder Platz
+   ein eigenes Verzeichnis und kann nicht als Alias auf ein gemeinsames
+   zeigen.
+3. **Einen FTP-Zugang** auf den Elternordner anlegen — einen für alle
+   zehn, nicht einen je Platz (Festlegung des Projektinhabers,
+   2026-09-19). **Nicht** auf `/home/itufeden/www`: Von dort erreichte
+   derselbe Zugang auch `cupi24.guardops.ch`, `betreiber.guardops.ch`,
+   `portal.guardops.ch` und `guardops.ch`, und ein Fehler im Deploy
+   überschriebe die Anlage der Mandantin.
+   **Achtung, das ist hier schon einmal schiefgegangen** (ENT-580,
+   Portal-Umzug): Der Document-Root der Subdomain muss wirklich auf
+   `<Elternordner>/demoN` zeigen. Stimmt das nicht, lädt der Deploy
+   erfolgreich an eine unbediente Stelle hoch, und die Adresse liefert
+   trotzdem 403 — ohne dass der Lauf etwas meldet.
+4. **`MANDANT_SECRETS` ergänzen**: das DB-Passwort des Platzes unter
+   einem `secret_name` eintragen. Das Secret ist ein base64-kodiertes
+   JSON `{"<secret_name>": "<passwort>", …}`, also: bestehenden Wert
+   entschlüsseln, den Eintrag dazuschreiben, neu kodieren, ersetzen.
+   ```
+   # bisherigen Wert aus GitHub kopieren, dann:
+   echo '<bisheriger base64-wert>' | base64 -d > mandant-secrets.json
+   # Eintrag ergänzen, danach:
+   base64 -w0 mandant-secrets.json && rm mandant-secrets.json
+   ```
+5. **`DEMO_PLAETZE` ergänzen** (siehe oben) und einmal nach `main` pushen.
+6. **Mandantenzeile im Betreiber-Bereich** anlegen: Name, `subdomain` =
+   `demoN`, `db_host`, `db_name`, `db_user` und derselbe `secret_name`
+   wie in Schritt 4. Darüber findet der Betreiber-Bereich die Datenbank
+   des Platzes, wenn er ihn leert oder ein Passwort neu setzt.
+7. **Tabellen anlegen** über die Schema-Prüfung im Betreiber-Bereich
+   (`api/betreiber_schema_pruefen.php`, ENT-612). Danach zeigt die
+   Mandantenliste den Platz als erreichbar mit vollständigem Tabellensatz.
+
+### Was der Deploy je Platz einträgt
+
+- **Eigene Datenbank** aus dem Vorrat — nie die produktive. Die Vorlage
+  für die Platz-Bündel wird **vor** der Platzhalter-Ersetzung aus `dist/`
+  gezogen; rutschte diese Zeile dahinter, trügen alle zehn Plätze die
+  Zugangsdaten der Anlage der Mandantin. `test_demo_plaetze.mjs` wacht
+  darüber.
+- **Eigene Adresse** `https://demoN.guardops.ch` (ENT-501: aus dem Deploy,
+  nie aus der Anfrage).
+- **`APP_ENV=demo`.** Daran hängt `ist_demo()`, und daran hängt nach
+  ENT-587 die Sperre, die einen Demo-Besucher daran hindert, sich im
+  Betreiber-Bereich ein Konto auszustellen.
+- **Kein Suchmaschinen-Eintrag**: `htaccess-demo-zusatz` und
+  `robots-demo.txt`, dieselben zwei Dateien wie bei der Demo-Umgebung.
+  Eine Demo-Instanz unter dem Firmennamen eines Interessenten bei Google
+  wäre ein Datenschutzvorfall mit Ansage.
+- **Das Ziel ist der Unterordner des Platzes**, nie der Elternordner. Der
+  Upload räumt sein Zielverzeichnis auf; ginge ein Platz versehentlich in
+  den Elternordner, verschwänden dabei die Verzeichnisse der neun
+  anderen. `test_demo_plaetze.mjs` wacht auch darüber.
+- **Leer bleiben** der Empfänger des Kontaktformulars (das steht auf
+  guardops.ch), der Zeitgeber-Schlüssel des nächtlichen Resets (ein Platz
+  wird beim Zuteilen und beim Ablauf geleert, nicht nächtlich) und die
+  Zugangsdaten der Betreiber-Ebene.
+
+### Keine Dateien, trotzdem im Vorrat
+
+Ein Platz, der in `DEMO_PLAETZE` fehlt, steht im Betreiber-Bereich
+weiterhin als **frei** — die Anzeige rechnet nur die Belegung, nicht die
+Einrichtung. Wird er zugeteilt, bekommt der Interessent eine Mail mit
+Zugangsdaten und liest unter dem Link 403. Der Deploy warnt darum am Ende
+jedes Laufs namentlich, welche Plätze ohne Dateien geblieben sind.
+`api/demo_anfordern.php` fängt den Fall serverseitig ab, wenn der Platz
+auch im Mandantenstamm fehlt; steht er dort und hat nur keine Dateien,
+greift diese Sperre **nicht**.
 
 ## Betreiber-Bereich in Betrieb nehmen (ENT-519 bis ENT-526)
 
