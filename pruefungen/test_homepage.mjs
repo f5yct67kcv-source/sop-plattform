@@ -169,7 +169,7 @@ check('Die leeren Pflichtfelder sind als ungueltig markiert und eine Meldung ste
   await desktop.evaluate(() =>
     document.querySelector('[name="firma"]').getAttribute('aria-invalid') === 'true'
     && document.querySelector('[name="email"]').getAttribute('aria-invalid') === 'true'
-    && document.querySelector('[name="telefon"]').getAttribute('aria-invalid') === 'true'
+    && document.querySelector('[name="telefon"]').closest('.telefonfeld').getAttribute('aria-invalid') === 'true'
     && document.getElementById('demoMeldung').classList.contains('zeigen')));
 
 // Pflicht heisst auch: man sieht es VOR dem Absenden. Gemessen wird der
@@ -199,13 +199,70 @@ await fuell(desktop, '[name="email"]', 'a.beispiel@example.invalid');
 await klick(desktop, '#demoKnopf');
 await desktop.waitForTimeout(200);
 check('KRITISCH: ohne Telefonnummer geht kein Aufruf zum Server', aufrufe.length === 0);
+// Buchstaben kommen gar nicht erst ins Feld (Befund 2026-09-19): frueher
+// liessen sie sich tippen und wurden erst beim Absenden beanstandet.
+await desktop.fill('[name="telefon"]', '');
+await desktop.type('[name="telefon"]', 'abc79x123');
+check('KRITISCH: Buchstaben lassen sich im Telefonfeld nicht tippen',
+  await desktop.inputValue('[name="telefon"]') === '79123');
+
+// Das Feld liess sich frueher beliebig lang fuellen. Jetzt endet es beim
+// Hoechstmass des gewaehlten Landes -- Schweiz: neun Ziffern.
+await desktop.fill('[name="telefon"]', '');
+await desktop.type('[name="telefon"]', '79123456789999');
+check('KRITISCH: mehr Ziffern als das Land kennt lassen sich nicht eingeben',
+  (await desktop.inputValue('[name="telefon"]')).replace(/\D+/g, '').length === 9);
+
 // Eine zu kurze Nummer ist so wenig eine Nummer wie gar keine.
-await fuell(desktop, '[name="telefon"]', '079 12');
+await fuell(desktop, '[name="telefon"]', '79 12');
 await klick(desktop, '#demoKnopf');
 await desktop.waitForTimeout(200);
 check('KRITISCH: eine zu kurze Telefonnummer geht ebenfalls nicht durch', aufrufe.length === 0);
-
+// Neun beliebige Ziffern sind keine Nummer (Befund des Projektinhabers,
+// 2026-09-18): nach der Vorwahl steht keine 0 und keine 1.
+await fuell(desktop, '[name="telefon"]', '123456789');
+await klick(desktop, '#demoKnopf');
+await desktop.waitForTimeout(200);
+check('KRITISCH: neun beliebige Ziffern gehen nicht als Telefonnummer durch', aufrufe.length === 0);
+check('die Meldung sagt, wie viele Ziffern die gewaehlte Vorwahl braucht',
+  /\+41/.test(await desktop.textContent('#demoMeldung'))
+  && /9 Ziffern/.test(await desktop.textContent('#demoMeldung')));
+// Die fuehrende Null faellt mit der Vorwahl weg -- also auch hier.
 await fuell(desktop, '[name="telefon"]', '079 123 45 67');
+await klick(desktop, '#demoKnopf');
+await desktop.waitForTimeout(200);
+check('KRITISCH: mit gewaehlter Vorwahl geht die nationale Null nicht durch', aufrufe.length === 0);
+
+// Die Vorwahl ist eine Auswahl, kein Tippfeld: drei Laender, CH zuerst.
+check('KRITISCH: die Vorwahl bietet genau +41, +49 und +43',
+  JSON.stringify(await desktop.evaluate(() =>
+    [...document.querySelector('[name="vorwahl"]').options].map(o => o.value)))
+  === JSON.stringify(['+41', '+49', '+43']));
+check('Die Schweiz ist voreingestellt',
+  await desktop.inputValue('[name="vorwahl"]') === '+41');
+// Vorwahl und Nummer sollen wie EIN Feld wirken: gleiche Hoehe und gleiche
+// Oberkante wie die anderen Felder, und die Auswahl zeigt ihren Pfeil.
+// Gemessen am gerenderten Zustand -- der Pfeil war beim ersten Anlauf
+// unsichtbar, weil eine Kurzform-Regel das Bild geloescht hatte.
+check('Das Telefonfeld steht auf gleicher Hoehe wie die anderen Felder',
+  await desktop.evaluate(() => {
+    const h = document.querySelector('.telefonfeld').getBoundingClientRect();
+    const e = document.querySelector('[name="email"]').getBoundingClientRect();
+    return Math.abs(h.height - e.height) < 1 && Math.abs(h.top - e.top) < 1;
+  }));
+check('KRITISCH: die Vorwahl-Auswahl zeigt, dass sie eine Auswahl ist',
+  await desktop.evaluate(() =>
+    getComputedStyle(document.querySelector('.telefonfeld select')).backgroundImage !== 'none'));
+
+// Mit deutscher Vorwahl gilt ein anderes Hoechstmass (13 statt 9).
+await desktop.selectOption('[name="vorwahl"]', '+49');
+await desktop.fill('[name="telefon"]', '');
+await desktop.type('[name="telefon"]', '15112345678999999');
+check('KRITISCH: mit +49 sind es hoechstens 13 Ziffern',
+  (await desktop.inputValue('[name="telefon"]')).replace(/\D+/g, '').length === 13);
+await desktop.selectOption('[name="vorwahl"]', '+41');
+
+await fuell(desktop, '[name="telefon"]', '79 123 45 67');
 await klick(desktop, '#demoKnopf');
 await desktop.waitForTimeout(400);
 check('KRITISCH: mit Pflichtangaben geht genau EIN Aufruf zum Server', aufrufe.length === 1);
@@ -213,7 +270,7 @@ const a = aufrufe[0] || {};
 check('KRITISCH: der Aufruf ist ein POST mit JSON und traegt die Felder',
   a.methode === 'POST' && /application\/json/.test(a.typ) && a.daten
   && a.daten.firma === 'Muster Sicherheitsdienst AG' && a.daten.email === 'a.beispiel@example.invalid'
-  && a.daten.telefon === '079 123 45 67');
+  && a.daten.telefon === '+41 79 123 45 67');
 check('KRITISCH: das Fallenfeld wird leer mitgeschickt (ein Mensch fuellt es nicht)',
   a.daten && a.daten.website === '');
 check('Nach dem Erfolg steht die Antwort des Servers da und die Felder sind weg',
@@ -229,9 +286,16 @@ antwort = { status: 503, body: { status: 'error', message: 'Der Empfang von Anfr
 await fuell(desktop, '[name="firma"]', 'Muster Sicherheitsdienst AG');
 await fuell(desktop, '[name="name"]', 'A. Beispielperson');
 await fuell(desktop, '[name="email"]', 'a.beispiel@example.invalid');
-await fuell(desktop, '[name="telefon"]', '079 123 45 67');
+// Hier bewusst eine deutsche Nummer: Der Durchlauf zeigt zugleich, dass
+// eine DE-Nummer den Browser passiert (die Antwort ist ohnehin ein Fehler,
+// das Formular bleibt also stehen).
+await desktop.selectOption('[name="vorwahl"]', '+49');
+await fuell(desktop, '[name="telefon"]', '151 12345678');
 await klick(desktop, '#demoKnopf');
 await desktop.waitForTimeout(400);
+check('eine deutsche Nummer mit Landesvorwahl geht zum Server',
+  aufrufe.length === 2 && (aufrufe[1] || {}).daten
+  && aufrufe[1].daten.telefon === '+49 151 12345678');
 check('KRITISCH: die Fehlermeldung des Servers erscheint woertlich ("nicht eingerichtet"), als Fehler gekennzeichnet',
   (await desktop.textContent('#demoMeldung')).includes('noch nicht eingerichtet')
   && await desktop.evaluate(() => document.getElementById('demoMeldung').classList.contains('fehler'))

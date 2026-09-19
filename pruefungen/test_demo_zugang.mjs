@@ -69,8 +69,8 @@ check('KRITISCH: im Register steht kein Passwort und kein Hash',
 // die reine Logik dahinter laeuft in pruef_demo_zugang.php.
 const anfordern = nurCode(lies('backend/api/demo_anfordern.php'));
 check('KRITISCH: demo_anfordern.php prueft die Telefonnummer, bevor ein Platz verbraucht wird',
-  /demo_zugang_telefon_ziffern\(\$telefon\)\s*<\s*DEMO_ZUGANG_TELEFON_MIN_ZIFFERN/.test(anfordern)
-  && anfordern.indexOf('demo_zugang_telefon_ziffern') < anfordern.indexOf('demo_platz_waehlen'));
+  /!\s*demo_zugang_telefon_gueltig\(\$telefon\)/.test(anfordern)
+  && anfordern.indexOf('demo_zugang_telefon_gueltig') < anfordern.indexOf('demo_platz_waehlen'));
 check('KRITISCH: demo_anfordern.php prueft die Zustellbarkeit, bevor ein Platz verbraucht wird',
   /demo_zugang_adresse_zustellbar\(\$email\)\s*===\s*false/.test(anfordern)
   && anfordern.indexOf('demo_zugang_adresse_zustellbar') < anfordern.indexOf('demo_platz_waehlen'));
@@ -143,17 +143,23 @@ const ANTWORTEN = {
       { platz: 'demo3', adresse: 'https://demo3.guardops.ch', frei: true,
         firma: null, laeuft_ab_am: null },
     ],
+    // Der Nachfass-Stand (ENT-622). Zwei offene, einer erledigt -- damit
+    // beide Darstellungen und beide Knoepfe in derselben Liste vorkommen.
+    kennt_nachfassen: true, nachfassen_offen: 2,
     zugaenge: [
       { id: 3, platz: 'demo1', firma: 'Muster Sicherheit GmbH', person: 'R. Muster',
         email: 'r.muster@beispiel.ch', login: 'mustersicherh', status: 'aktiv',
-        laeuft_ab_am: tagVersatz(11), abgelaufen: false, resttage: 11, beendet_am: null },
+        laeuft_ab_am: tagVersatz(11), abgelaufen: false, resttage: 11, beendet_am: null,
+        nachgefasst_am: null, nachgefasst_von: '' },
       { id: 2, platz: 'demo2', firma: 'Beispiel Wachdienst AG', person: 'S. Beispiel',
         email: 's.beispiel@beispiel.ch', login: 'beispielwachd', status: 'aktiv',
-        laeuft_ab_am: tagVersatz(0), abgelaufen: true, resttage: 0, beendet_am: null },
+        laeuft_ab_am: tagVersatz(0), abgelaufen: true, resttage: 0, beendet_am: null,
+        nachgefasst_am: null, nachgefasst_von: '' },
       { id: 1, platz: 'demo3', firma: 'Probe Security GmbH', person: 'T. Probe',
         email: 't.probe@beispiel.ch', login: 'probesecurity', status: 'abgelaufen',
         laeuft_ab_am: tagVersatz(-7), abgelaufen: false, resttage: null,
-        beendet_am: tagVersatz(-7) },
+        beendet_am: tagVersatz(-7),
+        nachgefasst_am: tagVersatz(-6), nachgefasst_von: 'A. Betreiber' },
     ],
   },
 };
@@ -182,7 +188,11 @@ await seite.waitForTimeout(350);
 
 const sicht = await seite.evaluate(() => {
   const zellen = sel => [...document.querySelectorAll(sel)].map(e => e.textContent.trim());
-  const merkerWorte = zellen('#demo-inhalt tbody tr td:nth-child(4)');
+  /* Nur der erste Merker der Zelle: Seit ENT-622 steht darunter noch der
+     Nachfass-Stand. Die ganze Zelle zu lesen hiesse, zwei Aussagen zu
+     einer zu verruehren -- genau das, wogegen diese Pruefung da ist. */
+  const merkerWorte = [...document.querySelectorAll('#demo-inhalt tbody tr td:nth-child(4)')]
+    .map(e => (e.querySelector('.merker') || e).textContent.trim());
   return {
     titel: document.getElementById('leiste-titel').textContent.trim(),
     plaetze: document.querySelectorAll('#demo-plaetze tbody tr').length,
@@ -193,6 +203,21 @@ const sicht = await seite.evaluate(() => {
     // laeuft automatisch. Das Fehlen dieses Elements ist die Aussage, nicht
     // eine seiner Masse.
     freigebenKnopfWeg: document.getElementById('knopf-demo-neu') === null,
+    // ── Nachfassen (ENT-622) ──
+    abzeichen: (() => {
+      const el = document.getElementById('nav-demo-abz');
+      if (!el) { return null; }
+      const knopf = el.closest('.nav-item');
+      return { versteckt: el.hidden, wort: el.textContent.trim(),
+        angesagt: knopf ? knopf.getAttribute('aria-label') : '',
+        bereich: knopf ? knopf.dataset.bereich : '' };
+    })(),
+    nachfassKnoepfe: document.querySelectorAll('[data-demo-nachgefasst]').length,
+    zurueckKnoepfe:  document.querySelectorAll('[data-demo-offen]').length,
+    // Die Zeile des erledigten Zugangs -- sie darf keinen offenen Merker
+    // tragen und muss sagen, wer wann nachgefasst hat.
+    erledigteZeile: [...document.querySelectorAll('#demo-inhalt tbody tr')]
+      .map(r => r.textContent).find(t => t.includes('probesecurity')) || '',
   };
 });
 
@@ -219,6 +244,36 @@ check('KRITISCH: die freien Plätze stehen mit Bezug da, nicht als nackte Zahl',
 // Interessenten -- beide Zahlen stehen mit ihrem eigenen Wort da.
 check('Plätze und Zugänge stehen als zwei verschiedene Zahlen da',
   /Plätzen frei/.test(sicht.text) && /laufende Zugänge/.test(sicht.text));
+
+// ── Nachfassen (ENT-622) ──────────────────────────────────────────────
+//
+// Der Melder ist das Abzeichen am Reiter -- es steht in JEDEM Bereich im
+// Blick, nicht nur in dieser Ansicht. Geprueft wird die Aussage: Es traegt
+// die Zahl der offenen, sitzt an dem Reiter, unter dem die Demo-Zugaenge
+// liegen, und sagt vorgelesen, WAS es zaehlt.
+check('KRITISCH: das Abzeichen trägt die Zahl der Zugänge ohne Nachfassen',
+  sicht.abzeichen !== null && sicht.abzeichen.versteckt === false
+  && sicht.abzeichen.wort === '2');
+check('es sitzt am Reiter, unter dem die Demo-Zugänge liegen (ENT-600)',
+  sicht.abzeichen !== null && sicht.abzeichen.bereich === 'mandanten');
+// Eine rote Scheibe mit einer 2 daran sagt einem Reiter namens "Mandanten"
+// nichts. Wer die Seite hoert statt sieht, braucht das Wort dazu.
+check('KRITISCH: vorgelesen sagt das Abzeichen, was es zählt -- nicht nur die Zahl',
+  sicht.abzeichen !== null && /Demo/.test(sicht.abzeichen.angesagt)
+  && /Nachfassen/.test(sicht.abzeichen.angesagt));
+
+// Zwei offene, einer erledigt -- also zwei Knoepfe "Nachgefasst" und einer
+// zum Zuruecknehmen. Ein Fehlklick darf eine Verkaufschance nicht dauerhaft
+// aus dem Blick nehmen.
+check('KRITISCH: jeder offene Zugang hat seinen Knopf, der erledigte den Weg zurück',
+  sicht.nachfassKnoepfe === 2 && sicht.zurueckKnoepfe === 1);
+// Der offene Fall ist farbig markiert, der erledigte sagt wer und wann --
+// zwei verschiedene Aussagen, zwei verschiedene Darstellungen.
+check('KRITISCH: der offene Fall ist als solcher markiert',
+  sicht.text.includes('nachfassen'));
+check('der erledigte nennt Datum und Konto, statt bloss zu verschwinden',
+  /nachgefasst \d{4}-\d{2}-\d{2}/.test(sicht.erledigteZeile)
+  && sicht.erledigteZeile.includes('A. Betreiber'));
 
 await browser.close();
 

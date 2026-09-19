@@ -32,13 +32,10 @@ const DEMO_MAX_NAME      = 120;
 const DEMO_MAX_EMAIL     = 200;
 const DEMO_MAX_TELEFON   = 40;
 const DEMO_MAX_NACHRICHT = 2000;
-// Telefon bewusst grosszuegig: +41 79 123 45 67, 079/123 45 67 und
-// 0041791234567 sind dieselbe Nummer, alle drei richtig geschrieben. Geprueft
-// werden darum nur die ZIFFERN, nicht das Format -- eine strenge Formregel
-// wiese vor allem gueltige Nummern ab. Neun ist die Untergrenze, unter der
-// keine erreichbare Nummer mehr liegt (Schweizer Nummern haben zehn; mit
-// Landesvorwahl und ohne die fuehrende Null sind es neun).
-const DEMO_TELEFON_MIN_ZIFFERN = 9;
+// Telefon: Schreibweisen bleiben frei (+41 79 123 45 67, 079/123 45 67 und
+// 0041791234567 sind dieselbe Nummer), die FORM wird aber geprueft -- neun
+// beliebige Ziffern sind keine Telefonnummer. Wie eine gueltige Nummer
+// aussieht, steht bei demo_telefon_gueltig() weiter unten.
 // Feste Liste wie im Formular -- eine andere Angabe wird nicht abgewiesen,
 // sondern als "keine Angabe" behandelt: Die Groesse ist Zusatzinformation,
 // keine Bedingung fuer ein Gespraech.
@@ -63,11 +60,31 @@ function demo_einzeilig(mixed $wert, int $max): string
     return mb_substr(trim($s), 0, $max);
 }
 
-// Wie viele Ziffern stecken in der Eingabe? Alles andere -- Pluszeichen,
-// Leerschlaege, Schraegstriche, Klammern, Bindestriche -- faellt weg.
-function demo_telefon_ziffern(string $wert): int
+// Ist das eine Nummer, unter der jemand erreichbar ist? Ziffern zaehlen
+// allein reichte nicht: "123456789" ging bis 2026-09-18 durch.
+//
+// DIESELBE REGEL WIE BEIM DEMO-ZUGANG (demo_zugang_telefon_gueltig() in
+// demo_zugang.php -- die beiden Dateien sind bewusst getrennt, siehe den
+// Kommentar dort). Zugelassen sind Schweiz, Deutschland und Oesterreich
+// (Entscheidung des Projektinhabers, 2026-09-18); ohne Landesvorwahl gilt
+// die Schweiz, weil eine fuehrende Null in allen drei Laendern dieselbe
+// Ziffer ist. Die Begruendung zu den Laengen steht bei der Schwester-
+// funktion.
+function demo_telefon_gueltig(string $wert): bool
 {
-    return strlen((string)preg_replace('/\D+/', '', $wert));
+    $roh = (string)preg_replace('/[\s\/\-\.\(\)]+/u', '', $wert);
+    $muster = [
+        '/^(?:\+41|0041)[2-9]\d{8}$/',   // Schweiz, international
+        '/^(?:\+49|0049)[1-9]\d{5,12}$/', // Deutschland
+        '/^(?:\+43|0043)[1-9]\d{3,12}$/', // Oesterreich
+        '/^0[2-9]\d{8}$/',               // Schweiz, national
+    ];
+    foreach ($muster as $m) {
+        if (preg_match($m, $roh) === 1) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // Prueft und bereinigt die Eingabe. Gibt ['fehler' => [feld => text],
@@ -93,8 +110,12 @@ function demo_anfrage_pruefen(array $in): array
     if ($werte['email'] === '' || filter_var($werte['email'], FILTER_VALIDATE_EMAIL) === false) {
         $fehler['email'] = 'Bitte eine gültige E-Mail-Adresse angeben.';
     }
-    if (demo_telefon_ziffern($werte['telefon']) < DEMO_TELEFON_MIN_ZIFFERN) {
-        $fehler['telefon'] = 'Bitte eine Telefonnummer angeben, unter der wir Sie erreichen.';
+    if (!demo_telefon_gueltig($werte['telefon'])) {
+        // "Fehlt" und "so geschrieben ergibt das keine Nummer" sind zwei
+        // verschiedene Aussagen und bekommen zwei verschiedene Texte.
+        $fehler['telefon'] = $werte['telefon'] === ''
+            ? 'Bitte eine Telefonnummer angeben, unter der wir Sie erreichen.'
+            : 'Bitte eine Telefonnummer aus der Schweiz, Deutschland oder Österreich angeben — mit Landesvorwahl, z. B. +41 79 123 45 67.';
     }
     if (!in_array($werte['groesse'], DEMO_GROESSEN, true)) {
         $werte['groesse'] = '';

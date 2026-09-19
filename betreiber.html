@@ -1425,6 +1425,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <button type="button" class="nav-item" data-bereich="mandanten" aria-current="false">
         <svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-5h6v5"/><path d="M9 10h.01"/><path d="M15 10h.01"/></svg>
         <span class="lbl">Mandanten</span>
+        <!-- Demo-Zugaenge, bei denen noch niemand nachgefasst hat (ENT-622).
+             Es sitzt am Mandanten-Reiter, weil die Demo-Zugaenge dort liegen:
+             Ein Demo-Zugang ist ein vorlaeufiger Mandant, keine eigene Ebene
+             (ENT-600). Die Zahl allein waere an diesem Reiter mehrdeutig --
+             darum sagt das aria-label, WAS sie zaehlt. -->
+        <span class="abz" id="nav-demo-abz" hidden>0</span>
       </button>
       <button type="button" class="nav-item" data-bereich="adressen" aria-current="false">
         <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -2590,6 +2596,11 @@ function bereichZeigen(welcher) {
      veraendern (eine neue Adresse, eine neue Offerte). Beim Betreten frisch
      holen ist billiger als ein Stand, der nicht mehr stimmt. */
   unterreiterZeichnen();
+  /* Die Übersicht lebt von zwei Listen, die sich anderswo ändern können --
+     ein Mandant wird angelegt, eine Rechnung als bezahlt markiert. Beim
+     Betreten frisch holen ist billiger als ein Stand, der nicht mehr
+     stimmt. */
+  if (welcher === 'uebersicht') { ladeMandanten(); ladeRechnungen(); }
   if (welcher === 'konten')   { ladeKonten(); }
   if (welcher === 'adressen') { ladeAdressen(); }
   if (welcher === 'offerten') { ladeBelege(); ladeProdukte(); }
@@ -2888,6 +2899,45 @@ function merker(karte, schluessel) {
      - eine Zahl       : der Normalfall
    "Nicht feststellbar" als "0" auszugeben waere die schlimmste Variante:
    Sie sieht aus wie eine Auskunft und ist eine Erfindung. */
+/* ── Wird die Anlage benutzt (ENT-619) ──────────────────────────────
+   Vier Antworten, vier Texte. "Nicht erhoben", "nicht feststellbar", "noch
+   nie benutzt" und "seit X Tagen still" sind verschiedene Aussagen, und
+   keine darf wie eine andere aussehen (Hausregel). Die Tage rechnet der
+   Server; hier wird nur benannt. */
+const STILL_AB_TAGEN = 30;
+
+function nutzungZelle(eintrag) {
+  if (eintrag === undefined) { return '<span class="merker m-ruhe">nicht erhoben</span>'; }
+  const st = eintrag.stille;
+  if (st === null || st === undefined) {
+    return '<span class="merker m-warn">nicht feststellbar</span>';
+  }
+  if (st === 'nie') {
+    return '<span class="merker m-ruhe">noch nie benutzt</span>'
+         + '<div class="zweit">eingerichtet, aber nichts erfasst</div>';
+  }
+  const tage = Number(st);
+  const klasse = tage >= STILL_AB_TAGEN ? 'm-warn' : 'm-pos';
+  const wort = tage === 0 ? 'heute' : tage === 1 ? 'gestern' : 'vor ' + tage + ' Tagen';
+
+  /* Die zweite Zeile nennt BEIDE Signale, wenn sie auseinanderliegen --
+     genau die Differenz ist die Aussage: Wer sich noch anmeldet, aber
+     nichts mehr erfasst, ist auf dem Absprung. */
+  const z = eintrag.zahlen || {};
+  const kurz = w => (w ? String(w).slice(0, 10) : null);
+  const zug = kurz(z.letzter_zugriff), rap = kurz(z.letzter_rapport);
+  let zweit = '';
+  if (zug && rap && zug !== rap) {
+    zweit = 'Zugriff ' + zug + ' · Rapport ' + rap;
+  } else if (zug && !rap) {
+    zweit = 'angemeldet, aber kein Rapport erfasst';
+  } else if (rap && !zug) {
+    zweit = 'letzter Rapport ' + rap;
+  }
+  return '<span class="merker ' + klasse + '">' + text(wort) + '</span>'
+       + (zweit ? '<div class="zweit">' + text(zweit) + '</div>' : '');
+}
+
 function groesseZelle(g) {
   if (g === undefined) { return '<span class="merker m-ruhe">nicht erhoben</span>'; }
   if (g === null)      { return '<span class="merker m-warn">nicht feststellbar</span>'; }
@@ -2908,14 +2958,14 @@ async function ladeMandanten() {
 
   if (a.code === 503) {
     // Nicht eingerichtet ist etwas anderes als "keine vorhanden".
-    uebersichtSetzen('');
+    uebersichtSetzen('mandanten', '');
     inhalt.innerHTML = leerBlock('⚙', 'Noch nicht eingerichtet',
       'Der Mandantenstamm ist auf diesem Server noch nicht angelegt. '
       + 'Die Einrichtung läuft einmalig über das Cockpit.');
     return;
   }
   if (a.status !== 'ok') {
-    uebersichtSetzen('');
+    uebersichtSetzen('mandanten', '');
     inhalt.innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
     return;
   }
@@ -2945,7 +2995,10 @@ async function ladeMandanten() {
   let groesse = {};
   try {
     const gr = await ruf('betreiber_zaehlstand.php', null, 'POST');
-    if (gr.status === 'ok') { (gr.heute || []).forEach(m => { groesse[m.id] = m.zahlen; }); }
+    /* Der ganze Eintrag, nicht nur die Zahlen: Seit ENT-619 haengt die
+       Nutzungsauskunft daran, und zwei Sammlungen mit verschiedenen
+       Ausschnitten derselben Antwort laufen irgendwann auseinander. */
+    if (gr.status === 'ok') { (gr.heute || []).forEach(m => { groesse[m.id] = m; }); }
   } catch (e) { /* Groesse bleibt unbekannt */ }
 
   const aktiv = liste.filter(m => m.status === 'aktiv').length;
@@ -2963,18 +3016,29 @@ async function ladeMandanten() {
      Vertragsende. Wer aufs Ende schaut, merkt die Frist, wenn sie vorbei
      ist. Die 90 Tage stehen fest: eine Zahl, die niemand je ändert, ist
      keine Einstellung. */
+  /* Stille Mandanten (ENT-619). Gezaehlt wird nur, was WIRKLICH still ist:
+     Eine Anlage, die gerade nicht erreichbar war, ist unbekannt und darf die
+     Zahl nicht aufblaehen -- sonst sieht ein Netzausfall aus wie ein Kunde
+     auf dem Absprung. Sie steht stattdessen im Bezug. */
+  const stilleWerte = liste.map(m => (groesse[m.id] || {}).stille);
+  const still = stilleWerte.filter(w => w === 'nie' || (typeof w === 'number' && w >= STILL_AB_TAGEN)).length;
+  const stillUnbekannt = stilleWerte.filter(w => w === null || w === undefined).length;
+
   const faellig = liste.filter(m => m.vertrag && m.vertrag.faellig_90).length;
   /* Ein Vertrag, zu dem nichts erfasst ist, zählt weder als fällig noch als
      in Ordnung — er ist unbekannt, und das steht als eigener Bezug da. */
   const ohneVertrag = liste.filter(m =>
     !m.vertrag || m.vertrag.lage === 'unbekannt').length;
 
-  uebersichtSetzen(
+  uebersichtSetzen('mandanten',
       zahlBlock('Mandanten', liste.length, null)
     + zahlBlock('Aktiv', aktiv, liste.length ? aktiv + ' von ' + liste.length : null)
     + zahlBlock('Verträge', faellig,
         faellig ? 'in den nächsten 90 Tagen'
                 : (ohneVertrag ? ohneVertrag + ' ohne Angaben' : 'nichts steht an'))
+    + zahlBlock('Still', still,
+        still ? 'seit ' + STILL_AB_TAGEN + ' Tagen ohne Nutzung'
+              : (stillUnbekannt ? stillUnbekannt + ' nicht feststellbar' : 'alle in Betrieb'))
     + zahlBlock('GAV offen', offen, offen ? 'Bestätigung fehlt' : 'alle bestätigt')
     + zahlBlock('Nicht erreichbar', kaputt, kaputt ? 'Einrichtung prüfen' : 'alle erreichbar'));
 
@@ -2985,13 +3049,14 @@ async function ladeMandanten() {
   }
 
   inhalt.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
-    + '<th>Mandant</th><th>Grösse</th><th>Status</th><th>Vertrag</th><th>GAV</th><th>Einrichtung</th><th></th>'
+    + '<th>Mandant</th><th>Grösse</th><th>Nutzung</th><th>Status</th><th>Vertrag</th><th>GAV</th><th>Einrichtung</th><th></th>'
     + '</tr></thead><tbody>'
     + liste.map(m => '<tr>'
         + '<td><strong>' + text(m.name) + '</strong>'
           + '<div class="zweit">' + (m.subdomain ? text(m.subdomain) + '.guardops.ch' : 'Keine Subdomain gesetzt') + '</div>'
           + '<div class="zweit">' + (m.kanton ? 'Kanton ' + text(m.kanton) : 'Kanton nicht gesetzt') + '</div></td>'
-        + '<td>' + groesseZelle(groesse[m.id]) + '</td>'
+        + '<td>' + groesseZelle(groesse[m.id] === undefined ? undefined : groesse[m.id].zahlen) + '</td>'
+        + '<td>' + nutzungZelle(groesse[m.id]) + '</td>'
         + '<td>' + merker(STATUS_TEXT, m.status) + '</td>'
         + '<td>' + vertragZelle(m) + '</td>'
         + '<td>' + merker(GAV_TEXT, m.gav_lage)
@@ -3699,6 +3764,41 @@ const DEMO_STATUS_TEXT = {
   beendet:    ['m-ruhe', 'beendet'],
 };
 
+/* Das Abzeichen am Mandanten-Reiter. Gleiche Bauart wie svAbzeichenSetzen()
+   fuer den Support -- und aus demselben Grund angesagt statt nur eingefaerbt:
+   Wer die Seite hoert statt sieht, erfaehrt aus einer roten Scheibe nichts. */
+function demoAbzeichenSetzen(offen) {
+  const el = $('nav-demo-abz');
+  if (!el) { return; }
+  el.hidden = !offen;
+  el.textContent = offen > 99 ? '99+' : String(offen);
+  const knopf = el.closest('.nav-item');
+  if (knopf) {
+    knopf.setAttribute('aria-label', offen
+      ? 'Mandanten — ' + offen + ' Demo-' + (offen === 1 ? 'Zugang' : 'Zugänge')
+        + ' ohne Nachfassen'
+      : 'Mandanten');
+  }
+}
+
+/* Der Nachfass-Stand, unter dem Status derselben Zelle.
+
+   DREI AUSSAGEN, DREI TEXTE (Hausregel) -- und die dritte ist die, die man
+   am leichtesten verschluckt:
+     - nachgefasst        : mit Datum, damit man sieht, wie lange es her ist
+     - noch offen         : eine Handlung wartet, farbig
+     - nicht nachgeruestet: die Spalte steht auf dieser Anlage noch nicht.
+       Das als "noch offen" auszugeben hiesse behaupten, niemand habe
+       nachgefasst -- gewusst haben wir es bloss nicht. */
+function demoNachfassZelle(z, kennt) {
+  if (!kennt) { return '<div class="zweit">Vermerk nicht eingerichtet</div>'; }
+  if (z.nachgefasst_am) {
+    return '<div class="zweit">nachgefasst ' + text(String(z.nachgefasst_am).slice(0, 10))
+      + (z.nachgefasst_von ? ' · ' + text(z.nachgefasst_von) : '') + '</div>';
+  }
+  return '<div style="margin-top:4px"><span class="merker m-warn">nachfassen</span></div>';
+}
+
 function demoRestZelle(z) {
   if (z.status !== 'aktiv') {
     return '<span class="zweit">' + text((z.beendet_am || '').slice(0, 10)) + '</span>';
@@ -3727,11 +3827,13 @@ async function ladeDemo() {
     plaetze.innerHTML = '';
     inhalt.innerHTML = leerBlock('⚙', 'Noch nicht eingerichtet',
       'Das Register der Demo-Zugänge ist auf diesem Server noch nicht angelegt.');
+    demoAbzeichenSetzen(0);
     return;
   }
   if (a.status !== 'ok') {
     plaetze.innerHTML = '';
     inhalt.innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
+    demoAbzeichenSetzen(0);
     return;
   }
 
@@ -3758,6 +3860,8 @@ async function ladeDemo() {
          + a.aktive + ' laufende Zugänge') + '</div>';
 
   const liste = a.zugaenge || [];
+  const kenntNachfassen = a.kennt_nachfassen === true;
+  demoAbzeichenSetzen(a.nachfassen_offen || 0);
   if (!liste.length) {
     inhalt.innerHTML = leerBlock('◇', 'Noch kein Zugang vergeben',
       'Sobald ein Interessent sich über die Anmeldemaske einen Demo-Zugang holt, steht er hier.');
@@ -3773,9 +3877,17 @@ async function ladeDemo() {
             + (z.telefon ? ' · ' + text(z.telefon) : '') + '</div></td>'
         + '<td>' + text(z.platz) + '</td>'
         + '<td>' + text(z.login) + '</td>'
-        + '<td>' + merker(DEMO_STATUS_TEXT, z.status) + '</td>'
+        + '<td>' + merker(DEMO_STATUS_TEXT, z.status)
+              + demoNachfassZelle(z, kenntNachfassen) + '</td>'
         + '<td>' + demoRestZelle(z) + '</td>'
         + '<td style="text-align:right;white-space:nowrap">'
+          /* Der Nachfass-Knopf steht VOR dem Not-Aus: Er ist der, den man
+             oft drueckt, und der andere loescht eine Instanz. */
+          + (kenntNachfassen
+              ? (z.nachgefasst_am
+                  ? '<button class="klein" data-demo-offen="' + z.id + '" title="Den Vermerk zurücknehmen — der Zugang gilt danach wieder als offen">Zurücknehmen</button> '
+                  : '<button class="klein" data-demo-nachgefasst="' + z.id + '" title="Vermerken, dass bei diesem Interessenten jemand nachgefasst hat">Nachgefasst</button> ')
+              : '')
           + (z.status === 'aktiv'
               ? '<button class="klein" data-demo-beenden="' + z.id + '" title="Not-Aus: leert die Instanz sofort und gibt den Platz frei">Beenden</button>'
               : '') + '</td>'
@@ -3784,6 +3896,24 @@ async function ladeDemo() {
 
   inhalt.querySelectorAll('[data-demo-beenden]').forEach(b =>
     b.onclick = () => demoBeenden(liste.find(z => z.id === +b.dataset.demoBeenden)));
+  inhalt.querySelectorAll('[data-demo-nachgefasst]').forEach(b =>
+    b.onclick = () => demoNachgefasst(+b.dataset.demoNachgefasst, true));
+  inhalt.querySelectorAll('[data-demo-offen]').forEach(b =>
+    b.onclick = () => demoNachgefasst(+b.dataset.demoOffen, false));
+}
+
+/* Nachgefasst vermerken oder zuruecknehmen (ENT-622).
+
+   OHNE RUECKFRAGE, anders als beim Beenden: Der Vermerk loescht nichts und
+   laesst sich mit dem Knopf daneben sofort wieder aufheben. Eine Rueckfrage
+   vor etwas Folgenlosem macht die Rueckfrage vor dem Not-Aus wertlos. */
+async function demoNachgefasst(id, setzen) {
+  const a = await ruf('betreiber_demo_nachgefasst.php', { id, nachgefasst: setzen }, 'POST');
+  if (a.status !== 'ok') {
+    melde($('haus-meldung'), 'fehler', a.message || 'Der Vermerk liess sich nicht setzen.');
+    return;
+  }
+  await ladeDemo();
 }
 
 /* Beenden heisst hier dasselbe wie Ablaufen: Konto weg, Instanz geleert.
@@ -3830,9 +3960,19 @@ async function demoAblauf() {
   ladeDemo();
 }
 
-function uebersichtSetzen(zahlenHtml) {
+/* ZWEI QUELLEN, EINE ZEILE (ENT-618). Bis hierher schrieb nur
+   ladeMandanten() die Kennzahlen. Seit die Rechnungen mitzaehlen, schreiben
+   zwei Stellen -- und wer das mit innerHTML tut, loescht die Zahlen der
+   jeweils anderen, je nachdem welche zuletzt fertig wird. Darum merkt sich
+   jede Quelle ihr Stueck, und gezeichnet wird immer beides in fester
+   Reihenfolge. */
+const uebersichtTeile = { mandanten: '', rechnungen: '' };
+function uebersichtSetzen(teil, zahlenHtml) {
+  if (Object.prototype.hasOwnProperty.call(uebersichtTeile, teil)) {
+    uebersichtTeile[teil] = zahlenHtml || '';
+  }
   const el = $('u-zahlen');
-  if (el) { el.innerHTML = zahlenHtml; }
+  if (el) { el.innerHTML = uebersichtTeile.mandanten + uebersichtTeile.rechnungen; }
 }
 
 
@@ -4384,6 +4524,37 @@ async function ladeRechnungenRoh() {
   rechnungen = a.belege || [];
   reNaechsteNummer = a.naechste_nummer || '';
   renderRechnungen();
+  kassenstandZeichnen();
+}
+
+/* ── Was liegt beim Geld (ENT-618) ──────────────────────────────────
+   Gerechnet aus DERSELBEN Liste und denselben Funktionen wie der Bereich
+   selbst: reOffenRappen() sagt, was offen ist, reFaelligTage() sagt, ob es
+   überfällig ist. Eine zweite Definition von "überfällig" -- hier im
+   Browser, dort im Server -- liefe irgendwann auseinander, und es fiele
+   erst auf, wenn zwei Zahlen nebeneinander stehen. */
+function kassenstandZeichnen() {
+  /* Archivierte zählen nicht mit: Sie sind aus dem Verkehr gezogen, und
+     eine archivierte Rechnung im offenen Betrag wäre eine Forderung, die
+     niemand mehr stellt. */
+  const offen = (rechnungen || []).filter(b =>
+    Number(b.aktiv ?? 1) === 1 && !Number(b.bezahlt));
+  const ueber = offen.filter(b => {
+    const t = reFaelligTage(b);
+    return t !== null && t < 0;
+  });
+  const summe = offen.reduce((s, b) => s + reOffenRappen(b), 0);
+  const summeUeber = ueber.reduce((s, b) => s + reOffenRappen(b), 0);
+
+  /* Die Zahl ist die Anzahl Rechnungen, der Bezug der Betrag -- Einheiten
+     nicht vermischen (Hausregel). Und "überfällig" bekommt seinen eigenen
+     Block statt einer Klammer hinter der ersten Zahl: Es ist eine andere
+     Aussage, keine Verfeinerung derselben. */
+  uebersichtSetzen('rechnungen',
+      zahlBlock('Offene Rechnungen', offen.length,
+        offen.length ? chf(summe) + ' CHF' : 'nichts offen')
+    + zahlBlock('Davon überfällig', ueber.length,
+        ueber.length ? chf(summeUeber) + ' CHF' : 'nichts überfällig'));
 }
 
 async function ladeBriefkopfRoh() {

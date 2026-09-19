@@ -118,17 +118,23 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
   // Wort steht hier: Kommt ein Feld dazu, das hier fehlt, faellt die Pruefung
   // ebenfalls. Ein neues Feld laesst sich damit nicht stillschweigend
   // ergaenzen, ohne dass jemand die Erklaerung anfasst.
+  // "vorwahl" ist kein eigenes Datum: Die Auswahl (seit 2026-09-19) traegt
+  // die Landesvorwahl der Telefonnummer, mehr erhebt sie nicht. Sie steht
+  // darum unter demselben Wort in der Erklaerung.
   const WORT_ZUM_FELD = { firma: 'Firma', name: 'Name', email: 'E-Mail-Adresse',
-    telefon: 'Telefonnummer' };
+    telefon: 'Telefonnummer', vorwahl: 'Telefonnummer' };
   const erhoben = [...homepage.matchAll(/<(?:input|select|textarea)[^>]*\bname="([a-zA-Z]+)"/g)]
     .map(m => m[1])
     .filter(n => n !== 'website');   // Das Fallenfeld erhebt nichts, es faengt Skripte.
   const ohneZuordnung = erhoben.filter(n => !WORT_ZUM_FELD[n]);
   const ungenannt = erhoben.filter(n => WORT_ZUM_FELD[n] && !datenschutz.includes(WORT_ZUM_FELD[n]));
-  // Seit ENT-601 sind es vier Pflichtfelder, keine optionalen mehr
+  // Seit ENT-601 sind es vier Pflichtangaben, keine optionalen mehr
   // (Mitarbeitende/Nachricht sind mit dem Kontaktformular weggefallen).
+  // Fuenf Bedienelemente, weil die Telefonnummer aus Vorwahl und Nummer
+  // besteht -- die feste Zahl haelt fest, dass ein weiteres Feld nicht
+  // stillschweigend dazukommt.
   check('KRITISCH: jedes Feld, das das Formular erhebt, steht in der Datenschutzerklaerung',
-    erhoben.length === 4 && ohneZuordnung.length === 0 && ungenannt.length === 0);
+    erhoben.length === 5 && ohneZuordnung.length === 0 && ungenannt.length === 0);
   if (ohneZuordnung.length) { bad.push('Feld ohne Zuordnung in dieser Pruefung: ' + ohneZuordnung.join(', ')); }
   if (ungenannt.length) { bad.push('Feld fehlt in der Datenschutzerklaerung: ' + ungenannt.join(', ')); }
 }

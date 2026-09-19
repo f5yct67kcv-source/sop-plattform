@@ -50,6 +50,12 @@ foreach ($mandanten as $m) {
         'id'    => (int)$m['id'],
         'name'  => $m['name'],
         'zahlen' => $g,   // null = nicht feststellbar
+        // Wie lange in dieser Anlage nichts geschah (ENT-619). Drei
+        // Antworten, drei Bedeutungen: eine Zahl in Tagen, 'nie' fuer eine
+        // erreichbare, aber noch nie benutzte Anlage, und null fuer "nicht
+        // feststellbar". Gerechnet im Server, damit Liste und Kennzahl
+        // dieselbe Auskunft bekommen.
+        'stille' => mandant_stille($g),
     ];
 }
 

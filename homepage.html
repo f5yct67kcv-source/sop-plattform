@@ -496,6 +496,19 @@ p{margin:0 0 1em}
 .formular input:focus,.formular select:focus,.formular textarea:focus{border-color:var(--blau);outline:none}
 .formular textarea{height:96px;padding:12px;resize:vertical}
 .formular select{appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--stahl) 50%),linear-gradient(135deg,var(--stahl) 50%,transparent 50%);background-position:calc(100% - 18px) 21px,calc(100% - 13px) 21px;background-size:5px 5px;background-repeat:no-repeat}
+/* Vorwahl und Nummer sind EIN Feld mit Trennlinie, nicht zwei Kaesten
+   nebeneinander: eine Beschriftung, ein Rahmen, ein Fokusring. Die Breite
+   der Auswahl ist fest, damit das Zahlenfeld auch auf dem Handy den Rest
+   bekommt. Hoehe bleibt 48 px -- ueber den 44 px, die fuers Handy gelten. */
+.formular .telefonfeld{display:grid;grid-template-columns:86px 1fr;align-items:stretch;height:48px;border:1px solid var(--nacht-linie);background:var(--nacht-3);border-radius:6px}
+.formular .telefonfeld:focus-within{border-color:var(--blau)}
+/* background-color, NICHT die Kurzform background: die wuerde das
+   Pfeil-Bild der Grundregel fuer select mitloeschen -- ohne dass etwas
+   kaputtginge, nur der Pfeil waere weg. */
+.formular .telefonfeld select,.formular .telefonfeld input{height:100%;border:0;background-color:transparent;border-radius:0}
+.formular .telefonfeld select{border-right:1px solid var(--nacht-linie);padding-right:26px;background-position:calc(100% - 14px) 21px,calc(100% - 9px) 21px}
+.formular .telefonfeld select:focus,.formular .telefonfeld input:focus{border-color:var(--nacht-linie);outline:none}
+.formular .telefonfeld[aria-invalid="true"]{border-color:#F27F70}
 .formular .btn{width:100%;justify-content:center;margin-top:4px}
 .formular .hinweis{margin:14px 0 0;font-size:13px;color:var(--stahl)}
 /* Pflichtfeld-Stern: Bernstein, weil er Aufmerksamkeit will, nicht Blau --
@@ -1142,7 +1155,14 @@ p{margin:0 0 1em}
         </div>
         <div class="reihe">
           <label><span>E-Mail <abbr class="pflicht" title="Pflichtfeld">*</abbr></span><input type="email" name="email" required autocomplete="email" placeholder="name@firma.ch"></label>
-          <label><span>Telefon <abbr class="pflicht" title="Pflichtfeld">*</abbr></span><input type="tel" name="telefon" required autocomplete="tel" placeholder="079 123 45 67"></label>
+          <label><span>Telefon <abbr class="pflicht" title="Pflichtfeld">*</abbr></span><span class="telefonfeld">
+            <select name="vorwahl" aria-label="Landesvorwahl">
+              <option value="+41" selected>+41</option>
+              <option value="+49">+49</option>
+              <option value="+43">+43</option>
+            </select>
+            <input type="tel" name="telefon" required autocomplete="tel" inputmode="numeric" maxlength="17" placeholder="79 123 45 67">
+          </span></label>
         </div>
         <button class="btn primaer" type="submit" id="demoKnopf">Zugang jetzt erhalten <svg><use href="#i-pfeil"/></svg></button>
         <p class="hinweis"><abbr class="pflicht" title="Pflichtfeld">*</abbr> Pflichtfeld. Die Zugangsdaten gehen ausschliesslich an die angegebene E-Mail-Adresse. Keine Newsletter, keine Weitergabe. Bitte keine echten Personendaten in der Demo erfassen – sie wird nach 14 Tagen vollständig gelöscht.</p>
@@ -1217,27 +1237,100 @@ p{margin:0 0 1em}
     meldung.classList.toggle('fehler', !!fehler);
   }
   function feld(name){ return formular.elements[name]; }
+
+  // ── Telefon: Vorwahl waehlen, Ziffern tippen ─────────────────────────
+  //
+  // Die Landesvorwahl kommt aus der Auswahl, nicht aus dem Tippen -- damit
+  // ist sie immer da und immer richtig geschrieben. Ins Zahlenfeld kommen
+  // nur Ziffern und Leerschlaege: Buchstaben werden schon beim Tippen
+  // verworfen, nicht erst beim Absenden beanstandet.
+  //
+  // WIE VIELE ZIFFERN HOECHSTENS: E.164 laesst weltweit 15 Ziffern
+  // einschliesslich Landesvorwahl zu. Bei zweistelliger Vorwahl (+41, +49,
+  // +43) bleiben also 13. Die Schweiz ist fest auf neun, Deutschland und
+  // Oesterreich schwanken. Laenger als das Hoechstmass laesst sich das
+  // Feld nicht mehr fuellen -- vorher wuchs es ohne Ende.
+  var LAENDER = {
+    '+41': { min: 9,  max: 9,  erste: /[2-9]/, beispiel: '79 123 45 67' },
+    '+49': { min: 6,  max: 13, erste: /[1-9]/, beispiel: '151 12345678' },
+    '+43': { min: 4,  max: 13, erste: /[1-9]/, beispiel: '664 1234567' }
+  };
+  var vorwahlFeld = feld('vorwahl');
+  var telefonFeld = feld('telefon');
+  var telefonHuelle = telefonFeld.parentNode;
+  function land(){ return LAENDER[vorwahlFeld.value] || LAENDER['+41']; }
+  function ziffern(wert){ return wert.replace(/\D+/g, ''); }
+  // Nur Ziffern und Leerschlaege, und nie mehr Ziffern als erlaubt. Der
+  // Schreibzeiger bleibt, wo er war -- gezaehlt wird in Ziffern, nicht in
+  // Zeichen, sonst springt er beim Tippen mitten im Feld ans Ende.
+  function saeubern(){
+    var vorher = telefonFeld.value, stelle = telefonFeld.selectionStart;
+    var zifferBisZeiger = ziffern(vorher.slice(0, stelle)).length;
+    var sauber = vorher.replace(/[^\d ]+/g, '').replace(/ {2,}/g, ' ');
+    var zuViel = ziffern(sauber).length - land().max;
+    if (zuViel > 0) {
+      // Von hinten kuerzen, bis die Zahl stimmt.
+      var zeichen = sauber.split('');
+      for (var i = zeichen.length - 1; i >= 0 && zuViel > 0; i--) {
+        if (/\d/.test(zeichen[i])) { zeichen.splice(i, 1); zuViel--; }
+      }
+      sauber = zeichen.join('');
+    }
+    if (sauber === vorher) { return; }
+    telefonFeld.value = sauber;
+    var neueStelle = 0, gezaehlt = 0;
+    while (neueStelle < sauber.length && gezaehlt < zifferBisZeiger) {
+      if (/\d/.test(sauber[neueStelle])) { gezaehlt++; }
+      neueStelle++;
+    }
+    try { telefonFeld.setSelectionRange(neueStelle, neueStelle); } catch (e) {}
+  }
+  telefonFeld.addEventListener('input', saeubern);
+  vorwahlFeld.addEventListener('change', function(){
+    telefonFeld.placeholder = land().beispiel;
+    saeubern();
+  });
+
   formular.addEventListener('submit', function(e){
     e.preventDefault();
+    var nummer = ziffern(telefonFeld.value);
     var daten = {
       firma: feld('firma').value.trim(), name: feld('name').value.trim(),
-      email: feld('email').value.trim(), telefon: feld('telefon').value.trim(),
+      email: feld('email').value.trim(),
+      telefon: nummer === '' ? '' : vorwahlFeld.value + ' ' + telefonFeld.value.trim(),
       website: feld('website').value
     };
-    // Dieselben Regeln wie im Rechenkern (backend/demo_zugang.php): beim
-    // Telefon zaehlen die Ziffern, nicht die Schreibweise. Ob es die
-    // E-Mail-Adresse wirklich gibt, kann nur der Server sagen -- der Browser
-    // kann keinen Mailserver nachschlagen.
-    var fehlend = [];
+    // Dieselben Regeln wie im Rechenkern (demo_zugang_telefon_gueltig() in
+    // backend/demo_zugang.php, Begruendung der Laengen steht dort). Die
+    // Vorwahl kommt aus der Auswahl, gepruft wird darum nur noch der Rest
+    // -- und der traegt keine fuehrende Null: die faellt mit der
+    // Landesvorwahl weg. Ob es die E-Mail-Adresse wirklich gibt, kann nur
+    // der Server sagen -- der Browser kann keinen Mailserver nachschlagen.
+    function telefonGueltig(){
+      var l = land();
+      return nummer.length >= l.min && nummer.length <= l.max
+        && l.erste.test(nummer.charAt(0));
+    }
+    var fehlend = [], leer = false;
     ['firma','name','email','telefon'].forEach(function(n){
       var fehlt = daten[n] === ''
         || (n === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(daten[n]))
-        || (n === 'telefon' && daten[n].replace(/\D+/g, '').length < 9);
-      feld(n).setAttribute('aria-invalid', fehlt ? 'true' : 'false');
+        || (n === 'telefon' && !telefonGueltig());
+      if (daten[n] === '') leer = true;
+      (n === 'telefon' ? telefonHuelle : feld(n)).setAttribute('aria-invalid', fehlt ? 'true' : 'false');
       if (fehlt) fehlend.push(n);
     });
     if (fehlend.length) {
-      melde('Bitte Firma, Name, Telefon und eine gültige E-Mail-Adresse angeben.', true);
+      // Ein leeres Feld und eine falsch geschriebene Nummer sind zwei
+      // verschiedene Aussagen und bekommen zwei verschiedene Texte.
+      var l = land();
+      var laenge = l.min === l.max
+        ? l.min + ' Ziffern'
+        : l.min + ' bis ' + l.max + ' Ziffern';
+      melde(!leer && fehlend.length === 1 && fehlend[0] === 'telefon'
+        ? 'Eine Nummer mit ' + vorwahlFeld.value + ' hat ' + laenge
+          + ' ohne die führende Null, z. B. ' + l.beispiel + '.'
+        : 'Bitte Firma, Name, Telefon und eine gültige E-Mail-Adresse angeben.', true);
       feld(fehlend[0]).focus();
       return;
     }
@@ -1254,7 +1347,10 @@ p{margin:0 0 1em}
         return;
       }
       if (a.json && a.json.felder) {
-        Object.keys(a.json.felder).forEach(function(n){ if (feld(n)) feld(n).setAttribute('aria-invalid','true'); });
+        Object.keys(a.json.felder).forEach(function(n){
+          var ziel = n === 'telefon' ? telefonHuelle : feld(n);
+          if (ziel) { ziel.setAttribute('aria-invalid','true'); }
+        });
       }
       melde((a.json && a.json.message) || 'Die Anfrage konnte nicht übermittelt werden.', true);
     }).catch(function(){

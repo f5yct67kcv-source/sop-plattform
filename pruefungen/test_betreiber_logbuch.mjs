@@ -52,6 +52,16 @@ const OHNE_LOGBUCH = {
     'Demo-Instanzen sind Wegwerfumgebungen (ENT-523), kein Bestand dieser Ebene.',
   'betreiber_demo_ablauf.php':
     'Dasselbe: raeumt abgelaufene Demo-Plaetze auf.',
+  'betreiber_demo_nachgefasst.php':
+    'Eigener Grund, NICHT der der beiden darueber: Hier geht es nicht um die '
+    + 'Wegwerfinstanz, sondern um den Interessenten -- und der Vermerk ist seine '
+    + 'eigene Spur. Wer wann nachgefasst hat, steht mit nachgefasst_von und '
+    + 'nachgefasst_am an der Zeile selbst; ein Logbucheintrag schriebe dasselbe '
+    + 'ein zweites Mal. Ein siebter Bereich in der geschlossenen Liste '
+    + '(LOGBUCH_BEREICHE_BE) waere fuer einen Zwei-Zustands-Vermerk zu viel. '
+    + 'BEWUSST IN KAUF GENOMMEN: Das Zuruecknehmen loescht beide Felder und '
+    + 'hinterlaesst damit keine Spur. Die Folge ist eine Zahl mehr am Abzeichen '
+    + '-- keine verlorenen Daten, kein Geld, keine Personendaten.',
 };
 
 const schreibt = /INSERT INTO|UPDATE\s+[a-z_]+\s+SET|DELETE FROM/i;

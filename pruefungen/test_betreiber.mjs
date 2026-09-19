@@ -813,6 +813,48 @@ check('KRITISCH: das Zahnrad faerbt sich, sobald etwas nachzutragen ist -- still
     /nicht erfasst/.test(seite) && /Leer heisst unbefristet/.test(seite));
 }
 
+// ── Nutzungssignale und die Grenze dieser Ebene (ENT-619) ────────────
+//
+// Die Betreiberin sieht ZAHLEN ueber einen Mandanten, nie dessen Inhalte
+// und nie, wer dort wann gearbeitet hat. Ein MAX() ueber die ganze
+// Belegschaft sagt "die Anlage lebt", ohne jemanden einzeln zu beobachten.
+// Genau diese Grenze ist beim naechsten Feld leicht verletzt -- darum steht
+// sie hier als Pruefung und nicht nur als Kommentar.
+{
+  const groesse = nurCode(modul).match(/function mandant_groesse[\s\S]*?\n}/);
+  check('mandant_groesse() ist auffindbar', !!groesse);
+  const g = groesse ? groesse[0] : '';
+
+  check('KRITISCH: die Nutzungssignale werden ueber alle Personen zusammengefasst',
+    /MAX\(letzter_zugriff\)/.test(g) && /MAX\(erfasst_am\)/.test(g));
+  check('KRITISCH: keine Abfrage holt Zeilen je Person aus der Mandanten-Anlage',
+    !/SELECT\s+(?!COUNT|MAX|DISTINCT)[a-z_]+\s*,/i.test(g)
+    && !/ORDER BY[\s\S]{0,40}LIMIT/i.test(g));
+  // Namen, Rapportinhalte und Unterschriften haben hier nichts zu suchen.
+  check('KRITISCH: keine Inhaltsspalte der Mandantin wird gelesen',
+    !/\b(name|vorname|nachname|kunde|bemerkung|unterschrift|unterzeichner)\b/.test(g));
+
+  check('fehlt die Spalte oder die Tabelle, bleibt der Wert unbekannt statt 0',
+    /hat_spalte\(\$pdo, 'mitarbeiter', 'letzter_zugriff'\)/.test(g)
+    && /hat_tabelle\(\$pdo, 'rapporte'\)/.test(g));
+
+  const zaehl = nurCode(lies('backend/api/betreiber_zaehlstand.php'));
+  check('KRITISCH: die Stille rechnet der Server, damit Liste und Kennzahl dasselbe sagen',
+    /mandant_stille\(/.test(zaehl));
+
+  const seite = lies('betreiber.html');
+  check('KRITISCH: vier Antworten, vier Texte',
+    /nicht erhoben/.test(seite) && /nicht feststellbar/.test(seite)
+    && /noch nie benutzt/.test(seite) && /ohne Nutzung/.test(seite));
+  check('KRITISCH: eine nicht erreichbare Anlage blaeht die Zahl der stillen nicht auf',
+    /stillUnbekannt/.test(seite) && /nicht feststellbar/.test(seite));
+  check('die Schwelle steht an einer Stelle, nicht an dreien',
+    (seite.match(/STILL_AB_TAGEN/g) || []).length >= 3
+    && /const STILL_AB_TAGEN = 30;/.test(seite));
+  check('liegen Zugriff und Rapport auseinander, steht beides da',
+    /Zugriff.*·.*Rapport|angemeldet, aber kein Rapport/.test(seite));
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

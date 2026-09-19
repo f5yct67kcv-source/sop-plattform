@@ -68,10 +68,17 @@ foreach ($endpunkte as $rel) {
         . 'require_once ' . var_export(__DIR__ . '/ladepfad_aufrufe.php', true) . ';'
         . '$offen = [];'
         . '$dateien = array_merge(get_included_files(), [' . var_export($pfad, true) . ']);'
+        // Was der Endpunkt SELBST definiert, ist fuer ihn vorhanden -- er
+        // wird hier bewusst nicht ausgefuehrt (siehe Kopf), also kennt
+        // function_exists() diese Namen nicht. Ohne diese Liste meldete die
+        // Pruefung jede Helferfunktion eines Endpunkts als Loch und waere
+        // damit genau die Sorte Warnung, die man nach dem dritten Mal
+        // wegklickt.
+        . '$eigene = array_flip(ladepfad_definitionen(' . var_export($pfad, true) . '));'
         . 'foreach ($dateien as $datei) {'
         . '  if (strpos($datei, ' . var_export($wurzel . '/backend/', true) . ') !== 0) { continue; }'
         . '  foreach (ladepfad_aufrufe($datei) as $f) {'
-        . '    if (!function_exists($f)) { $offen[$f] = true; }'
+        . '    if (!function_exists($f) && !isset($eigene[$f])) { $offen[$f] = true; }'
         . '  }'
         . '}'
         . 'echo implode(",", array_keys($offen));';

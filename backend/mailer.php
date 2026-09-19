@@ -184,6 +184,117 @@ function smtp_befehl($fp, string $befehl, array $erwarteteCodes): string
     return $antwort;
 }
 
+// Setzt die fertige MIME-Nachricht zusammen -- Kopfzeilen und Rumpf.
+//
+// EIGENE, REINE FUNKTION (ENT-619): Der Aufbau einer Mail mit Klartext,
+// HTML, eingebettetem Bild und Anhang ist die fehleranfaelligste Stelle
+// dieser Datei -- eine falsch verschachtelte Grenze macht aus dem Logo
+// einen Anhang oder aus dem Text eine unlesbare Wand. In smtp_senden()
+// steckte das bis hierher mitten zwischen zwei Socket-Befehlen und war
+// nur mit einem echten Mailserver zu pruefen. Hier laesst es sich fuer
+// sich ausfuehren (pruefungen/pruef_mail_aufbau.php).
+function smtp_nachricht_bauen(string $von, string $an, string $betreff, string $html,
+                              string $text, array $anhaenge = [], array $bilder = [],
+                              ?string $grenze = null): string
+{
+    // Die Grenze ist normalerweise zufaellig; als Parameter nur, damit eine
+    // Pruefung den Aufbau mit einem festen Wert vergleichen kann.
+    $grenze = $grenze ?? 'sop-' . bin2hex(random_bytes(16));
+
+    // Base64 fuer beide Teile: Eine SMTP-Zeile, die mit einem Punkt
+    // beginnt, wuerde von manchen Servern als Nachrichtenende (dot
+    // stuffing) missverstanden -- der Punkt ist im Base64-Alphabet aber
+    // gar nicht enthalten, das Problem stellt sich also nie.
+    $alternative = '--' . $grenze . "\r\n"
+        . "Content-Type: text/plain; charset=UTF-8\r\n"
+        . "Content-Transfer-Encoding: base64\r\n\r\n"
+        . chunk_split(base64_encode($text)) . "\r\n"
+        . '--' . $grenze . "\r\n"
+        . "Content-Type: text/html; charset=UTF-8\r\n"
+        . "Content-Transfer-Encoding: base64\r\n\r\n"
+        . chunk_split(base64_encode($html)) . "\r\n"
+        . '--' . $grenze . "--\r\n";
+
+    // ── Eingebettete Bilder (ENT-619) ─────────────────────────────
+    //
+    // Ein Bild in der Signatur ist weder eine zweite Darstellung der
+    // Nachricht noch ein Anhang daneben: Es GEHOERT zum HTML-Teil und
+    // wird von dort ueber "cid:" angesprochen. Dafuer gibt es
+    // "multipart/related" -- aussen die Nachricht samt ihrer Bilder,
+    // innen weiterhin die Alternative zur Auswahl. Genau so bauen
+    // Outlook und Apple Mail ihre Signaturen.
+    //
+    // WARUM NICHT EINFACH EINE BILDADRESSE IM HTML: Outlook und die
+    // meisten Programme laden externe Bilder erst nach ausdruecklicher
+    // Erlaubnis. Bis dahin stuende an der Stelle des Logos ein leerer
+    // Rahmen -- ausgerechnet unter der Unterschrift.
+    //
+    // OHNE BILDER AENDERT SICH NICHTS: Der Aufbau bleibt Zeichen fuer
+    // Zeichen der bisherige (siehe Versprechen im Kopfkommentar) --
+    // der Offert-Versand soll von dieser Erweiterung nichts merken.
+    $rumpfTyp = 'multipart/alternative; boundary="' . $grenze . '"';
+    $rumpf    = $alternative;
+    if ($bilder) {
+        $rel = 'sop-rel-' . bin2hex(random_bytes(16));
+        $rumpf = '--' . $rel . "\r\n"
+            . 'Content-Type: multipart/alternative; boundary="' . $grenze . "\"\r\n\r\n"
+            . $alternative;
+        foreach ($bilder as $b) {
+            // Die Kennung landet im Kopfbereich und im HTML. Alles
+            // ausser Buchstaben, Ziffern, Punkt und Bindestrich faellt
+            // weg -- ein Umbruch oder eine spitze Klammer darin waere
+            // dieselbe Einschleusung, gegen die oben die Adressen und
+            // der Betreff geprueft werden (ENT-501).
+            $cid = preg_replace('/[^A-Za-z0-9._-]/', '', (string)($b['cid'] ?? '')) ?? '';
+            if ($cid === '') { continue; }
+            $rumpf .= '--' . $rel . "\r\n"
+                . 'Content-Type: ' . (string)($b['mime'] ?? 'image/png') . "\r\n"
+                . "Content-Transfer-Encoding: base64\r\n"
+                . 'Content-ID: <' . $cid . ">\r\n"
+                . 'Content-Disposition: inline; filename="' . $cid . "\"\r\n\r\n"
+                . chunk_split(base64_encode((string)($b['inhalt'] ?? ''))) . "\r\n";
+        }
+        $rumpf .= '--' . $rel . "--\r\n";
+        $rumpfTyp = 'multipart/related; type="multipart/alternative"; boundary="' . $rel . '"';
+    }
+
+    $kopf = [
+        'From: ' . $von,
+        'To: ' . $an,
+        'Subject: ' . smtp_kopf_kodieren($betreff),
+        'MIME-Version: 1.0',
+    ];
+
+    if (!$anhaenge) {
+        $kopf[] = 'Content-Type: ' . $rumpfTyp;
+        $kopf[] = 'Date: ' . date('r');
+        $nachricht = implode("\r\n", $kopf) . "\r\n\r\n" . $rumpf;
+    } else {
+        $aussen = 'sop-mix-' . bin2hex(random_bytes(16));
+        $kopf[] = 'Content-Type: multipart/mixed; boundary="' . $aussen . '"';
+        $kopf[] = 'Date: ' . date('r');
+        $nachricht = implode("\r\n", $kopf) . "\r\n\r\n"
+            . '--' . $aussen . "\r\n"
+            . 'Content-Type: ' . $rumpfTyp . "\r\n\r\n"
+            . $rumpf;
+        foreach ($anhaenge as $a) {
+            // Der Dateiname wird nach RFC 2047 kodiert, falls er Umlaute
+            // traegt -- ein roher Umlaut im Kopfbereich macht die
+            // Nachricht unzustellbar oder den Namen unlesbar.
+            $dateiname = smtp_kopf_kodieren((string)($a['name'] ?? 'anhang'));
+            $mime = (string)($a['mime'] ?? 'application/octet-stream');
+            $nachricht .= '--' . $aussen . "\r\n"
+                . 'Content-Type: ' . $mime . '; name="' . $dateiname . "\"\r\n"
+                . "Content-Transfer-Encoding: base64\r\n"
+                . 'Content-Disposition: attachment; filename="' . $dateiname . "\"\r\n\r\n"
+                . chunk_split(base64_encode((string)($a['inhalt'] ?? ''))) . "\r\n";
+        }
+        $nachricht .= '--' . $aussen . "--\r\n";
+    }
+
+    return $nachricht;
+}
+
 // Verschickt eine HTML-Mail mit Klartext-Alternative. Wirft eine Exception
 // mit einer fuer die Oberflaeche verstaendlichen Meldung, statt selbst einen
 // Fehler auszugeben -- der Aufrufer entscheidet, wie er das dem Benutzer
@@ -204,9 +315,15 @@ function smtp_befehl($fp, string $befehl, array $erwarteteCodes): string
 
    Ohne Anhang bleibt der Aufbau EXAKT wie bisher -- der Offert-Versand
    (ENT-192) laeuft produktiv und soll von dieser Erweiterung nichts
-   merken. */
+   merken.
+
+   $bilder (ENT-619): Liste von ['cid' => 'logo', 'mime' => 'image/png',
+   'inhalt' => <Rohbytes>] -- Bilder, die IM HTML stehen und dort ueber
+   src="cid:logo" angesprochen werden, nicht Anhaenge daneben. Begruendung
+   der Bauart bei der Zusammensetzung weiter unten. Auch hier gilt: Ohne
+   Bilder aendert sich am Aufbau nichts. */
 function smtp_senden(string $anEmail, string $anName, string $betreff, string $html, string $text,
-                     array $anhaenge = []): void
+                     array $anhaenge = [], array $bilder = []): void
 {
     if (!smtp_konfiguriert()) {
         throw new RuntimeException('Der E-Mail-Versand ist noch nicht eingerichtet (SMTP-Zugangsdaten fehlen).');
@@ -322,61 +439,14 @@ function smtp_senden(string $anEmail, string $anName, string $betreff, string $h
         smtp_befehl($fp, 'RCPT TO:<' . $anEmail . '>', [250, 251]);
         smtp_befehl($fp, 'DATA', [354]);
 
-        $grenze = 'sop-' . bin2hex(random_bytes(16));
         $von = $absenderName !== ''
             ? smtp_kopf_kodieren($absenderName) . ' <' . $absenderEmail . '>'
             : $absenderEmail;
         $an = $anName !== ''
             ? smtp_kopf_kodieren($anName) . ' <' . $anEmail . '>'
             : $anEmail;
-
-        // Base64 fuer beide Teile: Eine SMTP-Zeile, die mit einem Punkt
-        // beginnt, wuerde von manchen Servern als Nachrichtenende (dot
-        // stuffing) missverstanden -- der Punkt ist im Base64-Alphabet aber
-        // gar nicht enthalten, das Problem stellt sich also nie.
-        $alternative = '--' . $grenze . "\r\n"
-            . "Content-Type: text/plain; charset=UTF-8\r\n"
-            . "Content-Transfer-Encoding: base64\r\n\r\n"
-            . chunk_split(base64_encode($text)) . "\r\n"
-            . '--' . $grenze . "\r\n"
-            . "Content-Type: text/html; charset=UTF-8\r\n"
-            . "Content-Transfer-Encoding: base64\r\n\r\n"
-            . chunk_split(base64_encode($html)) . "\r\n"
-            . '--' . $grenze . "--\r\n";
-
-        $kopf = [
-            'From: ' . $von,
-            'To: ' . $an,
-            'Subject: ' . smtp_kopf_kodieren($betreff),
-            'MIME-Version: 1.0',
-        ];
-
-        if (!$anhaenge) {
-            $kopf[] = 'Content-Type: multipart/alternative; boundary="' . $grenze . '"';
-            $kopf[] = 'Date: ' . date('r');
-            $nachricht = implode("\r\n", $kopf) . "\r\n\r\n" . $alternative;
-        } else {
-            $aussen = 'sop-mix-' . bin2hex(random_bytes(16));
-            $kopf[] = 'Content-Type: multipart/mixed; boundary="' . $aussen . '"';
-            $kopf[] = 'Date: ' . date('r');
-            $nachricht = implode("\r\n", $kopf) . "\r\n\r\n"
-                . '--' . $aussen . "\r\n"
-                . 'Content-Type: multipart/alternative; boundary="' . $grenze . "\"\r\n\r\n"
-                . $alternative;
-            foreach ($anhaenge as $a) {
-                // Der Dateiname wird nach RFC 2047 kodiert, falls er Umlaute
-                // traegt -- ein roher Umlaut im Kopfbereich macht die
-                // Nachricht unzustellbar oder den Namen unlesbar.
-                $dateiname = smtp_kopf_kodieren((string)($a['name'] ?? 'anhang'));
-                $mime = (string)($a['mime'] ?? 'application/octet-stream');
-                $nachricht .= '--' . $aussen . "\r\n"
-                    . 'Content-Type: ' . $mime . '; name="' . $dateiname . "\"\r\n"
-                    . "Content-Transfer-Encoding: base64\r\n"
-                    . 'Content-Disposition: attachment; filename="' . $dateiname . "\"\r\n\r\n"
-                    . chunk_split(base64_encode((string)($a['inhalt'] ?? ''))) . "\r\n";
-            }
-            $nachricht .= '--' . $aussen . "--\r\n";
-        }
+        $nachricht = smtp_nachricht_bauen($von, $an, $betreff, $html, $text,
+            $anhaenge, $bilder);
 
         fwrite($fp, $nachricht . "\r\n.\r\n");
         $antwort = smtp_lesen($fp);
