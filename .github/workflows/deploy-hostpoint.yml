@@ -2077,6 +2077,20 @@ jobs:
           G_VAPID_KONTAKT=$(hole vapid_kontakt)
           G_PUSH_CRON=$(hole push_cron_schluessel); [ -n "$G_PUSH_CRON" ] && echo "::add-mask::$G_PUSH_CRON"
 
+          # EIN FTP-ZUGANG FUER ALLE ZEHN (Festlegung des Projektinhabers,
+          # 2026-09-19). Er zeigt auf den gemeinsamen Elternordner der zehn
+          # Document-Roots; je Platz laedt der Upload in den Unterordner mit
+          # dem Namen des Platzes.
+          #
+          # NICHT AUF /home/itufeden/www: Von dort aus erreichte derselbe
+          # Zugang auch cupi24.guardops.ch, betreiber.guardops.ch,
+          # portal.guardops.ch und guardops.ch -- ein Fehler hier
+          # ueberschriebe die Anlage der Mandantin. Der eigene Elternordner
+          # zieht die Grenze, ohne zehn Zugaenge zu verlangen.
+          G_FTP_HOST=$(hole ftp_host);     [ -n "$G_FTP_HOST" ] && echo "::add-mask::$G_FTP_HOST"
+          G_FTP_USER=$(hole ftp_user);     [ -n "$G_FTP_USER" ] && echo "::add-mask::$G_FTP_USER"
+          G_FTP_PASS=$(hole ftp_passwort); [ -n "$G_FTP_PASS" ] && echo "::add-mask::$G_FTP_PASS"
+
           # DREI PFLICHTWERTE, und warum genau diese drei:
           #
           #   testmail          -- OHNE SIE GEHT KEINE MAIL RAUS (smtp_ziel()
@@ -2100,10 +2114,21 @@ jobs:
           [ -z "$G_TESTMAIL" ] && PFLICHT_FEHLT="$PFLICHT_FEHLT gemeinsam.testmail"
           [ -z "$G_MAPS" ]     && PFLICHT_FEHLT="$PFLICHT_FEHLT gemeinsam.maps_js_key"
           [ -z "$G_KI" ]       && PFLICHT_FEHLT="$PFLICHT_FEHLT gemeinsam.anthropic_api_key"
+          # Ohne Zugang wird nichts hochgeladen -- und zwar fuer ALLE zehn
+          # Plaetze nicht. Das ist kein halber Zustand, sondern gar keiner.
+          [ -z "$G_FTP_HOST" ] && PFLICHT_FEHLT="$PFLICHT_FEHLT gemeinsam.ftp_host"
+          [ -z "$G_FTP_USER" ] && PFLICHT_FEHLT="$PFLICHT_FEHLT gemeinsam.ftp_user"
+          [ -z "$G_FTP_PASS" ] && PFLICHT_FEHLT="$PFLICHT_FEHLT gemeinsam.ftp_passwort"
           if [ -n "$PFLICHT_FEHLT" ]; then
             echo "::error::DEMO_PLAETZE unvollstaendig -- es fehlt:$PFLICHT_FEHLT. Kein Demo-Platz wurde beliefert. Die uebrigen Adressen dieses Laufs sind davon nicht betroffen und wurden regulaer ausgeliefert."
             exit 1
           fi
+
+          {
+            echo "EFF_DEMOPLAETZE_FTP_HOST=$G_FTP_HOST"
+            echo "EFF_DEMOPLAETZE_FTP_USER=$G_FTP_USER"
+            echo "EFF_DEMOPLAETZE_FTP_PASSWORD=$G_FTP_PASS"
+          } >> "$GITHUB_ENV"
 
           mkdir -p dist-demo
           OHNE=""
@@ -2116,7 +2141,6 @@ jobs:
             fi
 
             feld() { printf '%s' "$VORRAT" | jq -r --arg p "$PLATZ" --arg k "$1" '.plaetze[$p][$k] // ""'; }
-            FTP_HOST=$(feld ftp_host); FTP_USER=$(feld ftp_user); FTP_PASS=$(feld ftp_passwort)
             DB_HOST=$(feld db_host);   DB_NAME=$(feld db_name)
             DB_USER=$(feld db_user);   SECRET_NAME=$(feld secret_name)
 
@@ -2135,14 +2159,11 @@ jobs:
             # Interessent einen Datenbankfehler.
             DB_PASS=$(printf '%s' "${EFF_MANDANT_SECRETS:-}" | base64 -d 2>/dev/null \
                       | jq -r --arg n "$SECRET_NAME" '.[$n] // ""' 2>/dev/null || true)
-            for WERT in "$FTP_HOST" "$FTP_USER" "$FTP_PASS" "$DB_HOST" "$DB_NAME" "$DB_USER" "$DB_PASS"; do
+            for WERT in "$DB_HOST" "$DB_NAME" "$DB_USER" "$DB_PASS"; do
               [ -n "$WERT" ] && echo "::add-mask::$WERT"
             done
 
             LEER=""
-            [ -z "$FTP_HOST" ] && LEER="$LEER ftp_host"
-            [ -z "$FTP_USER" ] && LEER="$LEER ftp_user"
-            [ -z "$FTP_PASS" ] && LEER="$LEER ftp_passwort"
             [ -z "$DB_HOST" ]  && LEER="$LEER db_host"
             [ -z "$DB_NAME" ]  && LEER="$LEER db_name"
             [ -z "$DB_USER" ]  && LEER="$LEER db_user"
@@ -2261,12 +2282,17 @@ jobs:
               exit 1
             fi
 
+            # Das Ziel des Uploads, und zugleich das Zeichen dafuer, dass
+            # dieser Platz gebaut wurde: Der Upload-Schritt unten laeuft nur,
+            # wenn hier etwas steht. Ein Platz ohne Eintrag in DEMO_PLAETZE
+            # kommt gar nicht bis hierher.
+            #
+            # Der Unterordner heisst wie der Platz -- ohne Ausweichfeld im
+            # Vorrat, damit es nicht zwei Wahrheiten gibt. Der
+            # Document-Root von demoN.guardops.ch muss bei Hostpoint also
+            # auf <Elternordner>/demoN zeigen (siehe README).
             GROSS=$(printf '%s' "$PLATZ" | tr 'a-z' 'A-Z')
-            {
-              echo "EFF_${GROSS}_FTP_HOST=$FTP_HOST"
-              echo "EFF_${GROSS}_FTP_USER=$FTP_USER"
-              echo "EFF_${GROSS}_FTP_PASSWORD=$FTP_PASS"
-            } >> "$GITHUB_ENV"
+            echo "EFF_${GROSS}_ZIEL=/$PLATZ/" >> "$GITHUB_ENV"
             GEBAUT="$GEBAUT $PLATZ"
           done
 
@@ -2281,120 +2307,122 @@ jobs:
       # erprobten Weg wie die fuenf Adressen oben, und jeder Platz steht
       # namentlich da -- wie in DEMO_PLAETZE in backend/demo_zugang.php.
       #
-      # Jeder Zugang ist von Hostpoint auf das Document-Root seiner
-      # Subdomain beschraenkt -- daher "/". ACHTUNG (Lehre aus dem
-      # Portal-Umzug, ENT-580): Zeigt ein FTP-Zugang auf einen
-      # gleichnamigen Pfad OHNE "www/", laedt der Upload erfolgreich an
-      # eine unbediente Stelle, und die Adresse bleibt bei 403.
+      # ALLE ZEHN teilen sich EINEN Zugang, der auf den gemeinsamen
+      # Elternordner zeigt; getrennt werden sie ueber das Zielverzeichnis
+      # (server-dir), nicht ueber eigene Zugangsdaten. ACHTUNG (Lehre aus
+      # dem Portal-Umzug, ENT-580): Der Document-Root der Subdomain muss
+      # WIRKLICH auf <Elternordner>/demoN zeigen. Stimmt das nicht, laedt
+      # der Upload erfolgreich an eine unbediente Stelle, und die Adresse
+      # bleibt bei 403 -- ohne dass der Lauf etwas meldet.
       - name: demo1.guardops.ch beliefern (FTPS)
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO1_FTP_HOST != '' }}
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO1_ZIEL != '' }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ env.EFF_DEMO1_FTP_HOST }}
-          username: ${{ env.EFF_DEMO1_FTP_USER }}
-          password: ${{ env.EFF_DEMO1_FTP_PASSWORD }}
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./dist-demo/demo1/
-          server-dir: /
+          server-dir: ${{ env.EFF_DEMO1_ZIEL }}
 
       - name: demo2.guardops.ch beliefern (FTPS)
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO2_FTP_HOST != '' }}
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO2_ZIEL != '' }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ env.EFF_DEMO2_FTP_HOST }}
-          username: ${{ env.EFF_DEMO2_FTP_USER }}
-          password: ${{ env.EFF_DEMO2_FTP_PASSWORD }}
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./dist-demo/demo2/
-          server-dir: /
+          server-dir: ${{ env.EFF_DEMO2_ZIEL }}
 
       - name: demo3.guardops.ch beliefern (FTPS)
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO3_FTP_HOST != '' }}
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO3_ZIEL != '' }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ env.EFF_DEMO3_FTP_HOST }}
-          username: ${{ env.EFF_DEMO3_FTP_USER }}
-          password: ${{ env.EFF_DEMO3_FTP_PASSWORD }}
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./dist-demo/demo3/
-          server-dir: /
+          server-dir: ${{ env.EFF_DEMO3_ZIEL }}
 
       - name: demo4.guardops.ch beliefern (FTPS)
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO4_FTP_HOST != '' }}
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO4_ZIEL != '' }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ env.EFF_DEMO4_FTP_HOST }}
-          username: ${{ env.EFF_DEMO4_FTP_USER }}
-          password: ${{ env.EFF_DEMO4_FTP_PASSWORD }}
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./dist-demo/demo4/
-          server-dir: /
+          server-dir: ${{ env.EFF_DEMO4_ZIEL }}
 
       - name: demo5.guardops.ch beliefern (FTPS)
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO5_FTP_HOST != '' }}
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO5_ZIEL != '' }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ env.EFF_DEMO5_FTP_HOST }}
-          username: ${{ env.EFF_DEMO5_FTP_USER }}
-          password: ${{ env.EFF_DEMO5_FTP_PASSWORD }}
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./dist-demo/demo5/
-          server-dir: /
+          server-dir: ${{ env.EFF_DEMO5_ZIEL }}
 
       - name: demo6.guardops.ch beliefern (FTPS)
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO6_FTP_HOST != '' }}
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO6_ZIEL != '' }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ env.EFF_DEMO6_FTP_HOST }}
-          username: ${{ env.EFF_DEMO6_FTP_USER }}
-          password: ${{ env.EFF_DEMO6_FTP_PASSWORD }}
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./dist-demo/demo6/
-          server-dir: /
+          server-dir: ${{ env.EFF_DEMO6_ZIEL }}
 
       - name: demo7.guardops.ch beliefern (FTPS)
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO7_FTP_HOST != '' }}
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO7_ZIEL != '' }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ env.EFF_DEMO7_FTP_HOST }}
-          username: ${{ env.EFF_DEMO7_FTP_USER }}
-          password: ${{ env.EFF_DEMO7_FTP_PASSWORD }}
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./dist-demo/demo7/
-          server-dir: /
+          server-dir: ${{ env.EFF_DEMO7_ZIEL }}
 
       - name: demo8.guardops.ch beliefern (FTPS)
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO8_FTP_HOST != '' }}
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO8_ZIEL != '' }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ env.EFF_DEMO8_FTP_HOST }}
-          username: ${{ env.EFF_DEMO8_FTP_USER }}
-          password: ${{ env.EFF_DEMO8_FTP_PASSWORD }}
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./dist-demo/demo8/
-          server-dir: /
+          server-dir: ${{ env.EFF_DEMO8_ZIEL }}
 
       - name: demo9.guardops.ch beliefern (FTPS)
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO9_FTP_HOST != '' }}
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO9_ZIEL != '' }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ env.EFF_DEMO9_FTP_HOST }}
-          username: ${{ env.EFF_DEMO9_FTP_USER }}
-          password: ${{ env.EFF_DEMO9_FTP_PASSWORD }}
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./dist-demo/demo9/
-          server-dir: /
+          server-dir: ${{ env.EFF_DEMO9_ZIEL }}
 
       - name: demo10.guardops.ch beliefern (FTPS)
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO10_FTP_HOST != '' }}
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO10_ZIEL != '' }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ env.EFF_DEMO10_FTP_HOST }}
-          username: ${{ env.EFF_DEMO10_FTP_USER }}
-          password: ${{ env.EFF_DEMO10_FTP_PASSWORD }}
+          server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}
+          username: ${{ env.EFF_DEMOPLAETZE_FTP_USER }}
+          password: ${{ env.EFF_DEMOPLAETZE_FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./dist-demo/demo10/
-          server-dir: /
+          server-dir: ${{ env.EFF_DEMO10_ZIEL }}
 
       # "NICHT EINGERICHTET" DARF NICHT WIE "NICHTS ZU TUN" AUSSEHEN, genau
       # wie bei den Adressen oben -- hier aber als WARNUNG und nicht als

@@ -511,12 +511,15 @@ Passwort, und eine `KEY=value`-Zeile verträgt keinen Zeilenumbruch.
     "smtp_absender_name": "…",
     "vapid_private_pem_b64": "…",
     "vapid_kontakt": "mailto:…",
-    "push_cron_schluessel": "…"
+    "push_cron_schluessel": "…",
+    "ftp_host": "…", "ftp_user": "…", "ftp_passwort": "…"
   },
   "plaetze": {
     "demo1": {
-      "ftp_host": "…", "ftp_user": "…", "ftp_passwort": "…",
-      "db_host": "…", "db_name": "…", "db_user": "…", "secret_name": "…"
+      "db_host": "itufeden.mysql.db.internal",
+      "db_name": "itufeden_demo1",
+      "db_user": "itufeden_demo1",
+      "secret_name": "…"
     },
     "demo2": { … }
   }
@@ -531,6 +534,11 @@ base64 -w0 demo-plaetze.json      # -w0: eine einzige Zeile
 rm demo-plaetze.json              # die Datei gehört nicht ins Repository
 ```
 
+- **Ein FTP-Zugang für alle zehn**, unter `gemeinsam`. Er zeigt auf den
+  gemeinsamen Elternordner der zehn Document-Roots, nicht auf einen
+  einzelnen Platz — getrennt werden sie über das Zielverzeichnis. Welcher
+  Platz wohin geht, ist nicht einstellbar: Der Unterordner heisst wie der
+  Platz.
 - **Das Datenbank-Passwort steht hier nicht drin.** Es kommt über
   `secret_name` aus `MANDANT_SECRETS` — demselben Secret, aus dem der
   Betreiber-Bereich es holt (OP-526), und demselben Vorgang, mit dem die
@@ -573,17 +581,37 @@ Sieben Schritte, die ersten drei bei Hostpoint. Ein Platz ist erst dann
 einsatzbereit, wenn alle sieben erledigt sind — und er steht im
 Betreiber-Bereich trotzdem schon vorher im Vorrat.
 
-1. **Subdomain `demoN.guardops.ch`** anlegen, mit eigenem Verzeichnis und
-   SSL-Zertifikat (die Zugangsmail verschickt `https://`-Links).
+1. **Subdomain `demoN.guardops.ch`** anlegen, mit SSL-Zertifikat (die
+   Zugangsmail verschickt `https://`-Links) und — das ist der Punkt, an
+   dem alles hängt — mit dem Document-Root im **gemeinsamen
+   Elternordner**:
+
+   ```
+   /home/itufeden/www/demos/demo1     ← Document-Root von demo1.guardops.ch
+   /home/itufeden/www/demos/demo2     ← Document-Root von demo2.guardops.ch
+   …
+   ```
+
+   Der Ordnername **muss** der Platzname sein; der Deploy lädt in
+   `/demoN/` unterhalb des Zugangs und kennt kein Ausweichfeld dafür.
 2. **Datenbank und Datenbankbenutzer** anlegen — eine eigene je Platz.
    Die Trennung der Interessenten läuft über die Datenbank und nicht über
-   eine Spalte in jeder Tabelle (ENT-600, Punkt 2).
-3. **FTP-Zugang** anlegen, beschränkt auf das Verzeichnis der Subdomain.
+   eine Spalte in jeder Tabelle (ENT-600, Punkt 2). Und nicht über ein
+   geteiltes Verzeichnis: In der `db.php` jedes Platzes stehen seine
+   Datenbank und seine Adresse fest eingetragen, darum braucht jeder Platz
+   ein eigenes Verzeichnis und kann nicht als Alias auf ein gemeinsames
+   zeigen.
+3. **Einen FTP-Zugang** auf den Elternordner anlegen — einen für alle
+   zehn, nicht einen je Platz (Festlegung des Projektinhabers,
+   2026-09-19). **Nicht** auf `/home/itufeden/www`: Von dort erreichte
+   derselbe Zugang auch `cupi24.guardops.ch`, `betreiber.guardops.ch`,
+   `portal.guardops.ch` und `guardops.ch`, und ein Fehler im Deploy
+   überschriebe die Anlage der Mandantin.
    **Achtung, das ist hier schon einmal schiefgegangen** (ENT-580,
-   Portal-Umzug): Der Zugang muss auf den *tatsächlichen* Document-Root
-   zeigen — bei Hostpoint meist mit `www/` im Pfad. Zeigt er auf einen
-   gleichnamigen Pfad ohne `www/`, lädt der Deploy erfolgreich hoch, und
-   die Adresse liefert trotzdem 403.
+   Portal-Umzug): Der Document-Root der Subdomain muss wirklich auf
+   `<Elternordner>/demoN` zeigen. Stimmt das nicht, lädt der Deploy
+   erfolgreich an eine unbediente Stelle hoch, und die Adresse liefert
+   trotzdem 403 — ohne dass der Lauf etwas meldet.
 4. **`MANDANT_SECRETS` ergänzen**: das DB-Passwort des Platzes unter
    einem `secret_name` eintragen. Das Secret ist ein base64-kodiertes
    JSON `{"<secret_name>": "<passwort>", …}`, also: bestehenden Wert
@@ -619,6 +647,10 @@ Betreiber-Bereich trotzdem schon vorher im Vorrat.
   `robots-demo.txt`, dieselben zwei Dateien wie bei der Demo-Umgebung.
   Eine Demo-Instanz unter dem Firmennamen eines Interessenten bei Google
   wäre ein Datenschutzvorfall mit Ansage.
+- **Das Ziel ist der Unterordner des Platzes**, nie der Elternordner. Der
+  Upload räumt sein Zielverzeichnis auf; ginge ein Platz versehentlich in
+  den Elternordner, verschwänden dabei die Verzeichnisse der neun
+  anderen. `test_demo_plaetze.mjs` wacht auch darüber.
 - **Leer bleiben** der Empfänger des Kontaktformulars (das steht auf
   guardops.ch), der Zeitgeber-Schlüssel des nächtlichen Resets (ein Platz
   wird beim Zuteilen und beim Ablauf geleert, nicht nächtlich) und die

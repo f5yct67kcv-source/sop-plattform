@@ -66,13 +66,36 @@ const PRUEFUNGEN = {
       && code.every(p => wf.includes(p));
   },
 
-  // Je Platz ein Upload, und jeder auf sein eigenes Verzeichnis. Ein
+  // Je Platz ein Upload, und jeder in sein eigenes Verzeichnis. Ein
   // Platz ohne Upload-Schritt ist eine Adresse, die im Betreiber-Bereich
   // als "frei" dasteht und trotzdem 403 liefert.
   upload_je_platz(text) {
     return plaetzeAusCode(zugang).every(p =>
       new RegExp(`local-dir:\\s*\\./dist-demo/${p}/\\s*$`, 'm').test(text)
-      && new RegExp(`EFF_${p.toUpperCase()}_FTP_HOST != ''`).test(text));
+      && new RegExp(`server-dir: \\$\\{\\{ env\\.EFF_${p.toUpperCase()}_ZIEL \\}\\}`).test(text)
+      && new RegExp(`EFF_${p.toUpperCase()}_ZIEL != ''`).test(text));
+  },
+
+  // DIE GEFAEHRLICHSTE ZEILE DER UPLOADS, seit sich alle zehn EINEN
+  // Zugang auf den gemeinsamen Elternordner teilen (Festlegung des
+  // Projektinhabers, 2026-09-19): Das Zielverzeichnis MUSS der
+  // Unterordner des Platzes sein. Stuende dort "/", lieferte der Upload
+  // die Dateien EINES Platzes in den Elternordner -- und raeumte dabei
+  // die Verzeichnisse der neun anderen weg, weil er sein Ziel aufraeumt.
+  ziel_ist_der_unterordner(text) {
+    const b = platzBlock(text);
+    return /echo "EFF_\$\{GROSS\}_ZIEL=\/\$PLATZ\/"/.test(b)
+      && !/server-dir: \/\s*$/m.test(text.slice(text.indexOf('- name: demo1.guardops.ch beliefern')));
+  },
+
+  // Ein Zugangssatz fuer alle zehn, nicht zehn einzelne: Wo frueher je
+  // Platz Zugangsdaten standen, steht jetzt EIN gemeinsamer Zugang auf
+  // den Elternordner. Bliebe daneben ein Platz mit eigenen Zugangsdaten
+  // zurueck, gaebe es wieder zwei Wege in dieselbe Sache.
+  ein_gemeinsamer_zugang(text) {
+    const uploads = text.slice(text.indexOf('- name: demo1.guardops.ch beliefern'));
+    return /server: \$\{\{ env\.EFF_DEMOPLAETZE_FTP_HOST \}\}/.test(uploads)
+      && !/EFF_DEMO\d+_FTP_/.test(text);
   },
 
   // DIE GEFAEHRLICHSTE ZEILE DES GANZEN SCHRITTS. Die Vorlage ist eine
@@ -200,6 +223,10 @@ const GEGENPROBEN = [
     t.replace('https://$PLATZ.guardops.ch', 'https://demo1.guardops.ch')],
   ['upload_je_platz', t =>
     t.replace('          local-dir: ./dist-demo/demo7/\n', '          local-dir: ./dist-demo/demo1/\n')],
+  ['ziel_ist_der_unterordner', t =>
+    t.replace('echo "EFF_${GROSS}_ZIEL=/$PLATZ/"', 'echo "EFF_${GROSS}_ZIEL=/"')],
+  ['ein_gemeinsamer_zugang', t =>
+    t.replace('server: ${{ env.EFF_DEMOPLAETZE_FTP_HOST }}', 'server: ${{ env.EFF_DEMO1_FTP_HOST }}')],
   ['listen_decken_sich', t =>
     t.replace(/^(\s*)PLAETZE="[^"]+"/m, '$1PLAETZE="demo1 demo2 demo3"')],
   ['mailumleitung_ist_pflicht', t =>
