@@ -2344,6 +2344,13 @@ jobs:
             # Empfaenger der Demo-ANFRAGEN: Das Kontaktformular steht auf
             # guardops.ch, nicht auf einem Platz.
             ersetze __DEMO_EMPFAENGER__ "" "dist-demo/$PLATZ/demo_anfrage.php"
+            # Die Adresse der Verkaufsseite fuer den Bestaetigungslink
+            # (ENT-624). Auf einem Platz leer: Die Bestaetigung laeuft auf
+            # guardops.ch und im Betreiber-Bereich, nie auf einer
+            # Demo-Instanz. demo_bestaetigung_basis_pruefen() liefert bei
+            # leerem Wert null, und der Endpunkt sagt "noch nicht
+            # eingerichtet", statt einen Link ins Nichts zu verschicken.
+            ersetze __GUARDOPS_BASIS_URL__ "" "dist-demo/$PLATZ/demo_bestaetigung.php"
             # Der Zeitgeber-Schluessel des naechtlichen Resets (ENT-523)
             # gehoert der EINEN Demo-Umgebung. Ein Platz wird nicht
             # naechtlich zurueckgesetzt, sondern wenn er zugeteilt wird und

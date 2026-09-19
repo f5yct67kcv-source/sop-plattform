@@ -54,6 +54,32 @@ function plaetzeAusWorkflow(text) {
 // die Gegenprobe ganz unten dieselben Pruefungen gegen einen veraenderten
 // Text laufen lassen kann. Sonst muesste sie sie nachbauen -- und eine
 // nachgebaute Pruefung beweist nichts ueber die echte.
+// Ohne Nebenwirkung, weil die Gegenprobe dieselbe Funktion gegen einen
+// veraenderten Text laufen laesst: Wuerde sie dabei ins Ergebnis
+// schreiben, faerbte die Gegenprobe die Suite rot, obwohl sie gerade
+// beweist, dass die Pruefung greift. (Genau so beim ersten Versuch
+// passiert.)
+function offenePlatzhalter(text) {
+  const b = platzBlock(text);
+  const quellen = [...text.matchAll(/^\s*cp\s+(\S+)\s+dist\/\S*\s*$/gm)].map(m => m[1]);
+  const offen = new Set();
+  for (const q of quellen) {
+    // Glob-Zeilen (backend/api/*.php) und fehlende Dateien uebergehen --
+    // die deckt die Wache im Deploy ab; hier geht es um die benannten.
+    if (q.includes('*')) { continue; }
+    let inhalt;
+    try { inhalt = readFileSync(`${WURZEL}/${q}`, 'utf8'); } catch { continue; }
+    for (const t of inhalt.match(/__[A-Z0-9_]{3,}__/g) || []) {
+      // PHPs eigene Konstante und der Schluessel der NATIVEN Karte
+      // (ENT-609, gehoert ins App-Buendel) -- dieselben zwei Ausnahmen
+      // wie im Waechter des Deploys.
+      if (t === '__DIR__' || t === '__MAPS_IOS_KEY__') { continue; }
+      if (!b.includes(`ersetze ${t} `)) { offen.add(t); }
+    }
+  }
+  return { offen: [...offen], quellen: quellen.length };
+}
+
 const PRUEFUNGEN = {
 
   // Beide Listen muessen dasselbe sagen. Laufen sie auseinander, entsteht
@@ -186,6 +212,25 @@ const PRUEFUNGEN = {
       && /cp robots-demo\.txt "dist-demo\/\$PLATZ\/robots\.txt"/.test(b);
   },
 
+  // JEDER Platzhalter, der im Buendel landet, wird auch eingesetzt.
+  //
+  // WARUM DIESE PRUEFUNG DIE WICHTIGSTE DER GANZEN SUITE IST: Das
+  // Platz-Buendel ist eine Kopie von dist/. Legt irgendeine andere Sitzung
+  // eine Datei mit einem NEUEN Platzhalter dort hinein, erbt der Platz ihn
+  // -- und der Waechter im Deploy bricht ab, womit KEIN einziger Platz
+  // beliefert wird. Genau das ist am 2026-09-19 mit
+  // __GUARDOPS_BASIS_URL__ aus ENT-624 passiert, gefunden von Hand beim
+  // Nachziehen von main. Hier faellt es beim naechsten Testlauf auf,
+  // Tage vorher.
+  //
+  // Die Dateiliste kommt aus den cp-Zeilen des Workflows selbst, nicht aus
+  // einer zweiten gepflegten Aufzaehlung: Was nach dist/ kopiert wird,
+  // steht dort und nirgends sonst.
+  jeder_platzhalter_eingesetzt(text) {
+    const { offen, quellen } = offenePlatzhalter(text);
+    return offen.length === 0 && quellen > 20;
+  },
+
   // Kein uebersehener Platzhalter geht hoch -- dieselbe Wache wie bei den
   // anderen Buendeln. Ohne sie landete zum Beispiel der woertliche Text
   // "__DB_PASS__" als Passwort in der Anlage.
@@ -244,6 +289,8 @@ const GEGENPROBEN = [
     t.replace(/^(\s*)PLAETZE="[^"]+"/m, '$1PLAETZE="demo1 demo2 demo3"')],
   ['mailumleitung_ist_pflicht', t =>
     t.replace('ersetze __DEMO_TESTMAIL__ "$G_TESTMAIL"', 'ersetze __DEMO_TESTMAIL__ ""')],
+  ['jeder_platzhalter_eingesetzt', t =>
+    t.replace('ersetze __ANTHROPIC_API_KEY__ "$G_KI" "dist-demo/$PLATZ/ai.php"', ': # weg')],
   ['postfach_aus_dem_deploy', t =>
     t.replace(/ersetze __SMTP_HOST__ "\$\{?EFF_GUARDOPS_SMTP_HOST[^"]*"/,
               'ersetze __SMTP_HOST__ "$(hole smtp_host)"')],
@@ -260,6 +307,13 @@ for (const [name, kaputt] of GEGENPROBEN) {
   const wirdRot = !PRUEFUNGEN[name](veraendert);
   check(`Gegenprobe: "${name.replace(/_/g, ' ')}" schlaegt an, wenn man es kaputt macht`,
     hatSichGeaendert && wirdRot);
+}
+
+// Beim echten Workflow wird auch gesagt, WELCHER Platzhalter fehlt --
+// sonst weiss niemand, wo er suchen soll.
+{
+  const { offen } = offenePlatzhalter(workflow);
+  if (offen.length) { bad.push('im Platz-Buendel nicht eingesetzt: ' + offen.join(', ')); }
 }
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
