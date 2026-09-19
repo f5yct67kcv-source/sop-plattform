@@ -1013,16 +1013,33 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   -- Ohne diese Spalte saehe eine Meldung nach 90 Tagen aus wie eine, zu der
   -- nie jemand ein Foto gemacht hat.
   foto_geloescht_am DATETIME NULL,
+  -- Worauf sich die Meldung bezieht (ENT-621). Beide NULL, wenn sie frei
+  -- gemeldet wurde -- der Normalfall. Gesetzt sind sie, wenn der Waechter
+  -- aus einer Aufgabe heraus gemeldet hat, die er nicht erledigen konnte:
+  -- Grund plus Foto. Ohne diesen Bezug staenden in der Auswertung zwei
+  -- Dinge nebeneinander, die niemand verbinden kann -- die Aufgabe als
+  -- nicht moeglich und irgendwo ein Foto aus derselben Runde.
+  --
+  -- ON DELETE SET NULL wie bei rundgang_aufgabe, und aus demselben Grund:
+  -- Die MELDUNG ist der Nachweis und bleibt stehen, auch wenn der
+  -- Kontrollpunkt oder die Aufgabe spaeter aus dem Katalog verschwindet.
+  -- Dass der Bezug dann fehlt, ist eine andere Aussage als: es gab nie
+  -- einen. Wer das anzeigt, muss beides unterscheiden.
+  kontrollpunkt_id INT NULL,
+  aufgabe_id INT NULL,
   lat DECIMAL(10,7) NULL,
   lng DECIMAL(10,7) NULL,
   KEY idx_objekt (objekt_id, erfasst_am),
   KEY idx_rundgang (rundgang_id),
   KEY idx_mitarbeiter (mitarbeiter_id),
+  KEY idx_aufgabe (rundgang_id, kontrollpunkt_id, aufgabe_id),
   FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE CASCADE,
   FOREIGN KEY (rundgang_id) REFERENCES rundgang(id) ON DELETE SET NULL,
   FOREIGN KEY (einsatz_id) REFERENCES einsaetze(id) ON DELETE SET NULL,
   FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE,
-  FOREIGN KEY (ereignisart_id) REFERENCES ereignisart(id) ON DELETE SET NULL
+  FOREIGN KEY (ereignisart_id) REFERENCES ereignisart(id) ON DELETE SET NULL,
+  FOREIGN KEY (kontrollpunkt_id) REFERENCES kontrollpunkt(id) ON DELETE SET NULL,
+  FOREIGN KEY (aufgabe_id) REFERENCES objekt_aufgabe(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
 // Kontrollrunden (ENT-204): eine benannte Vorlage buendelt eine Teilmenge der
@@ -2698,6 +2715,17 @@ $spalten = [
     // eines gab -- „geloescht" und „gab es nie" duerfen nicht gleich aussehen.
     ['ereignis_meldung', 'foto_geloescht_am',
      'ALTER TABLE ereignis_meldung ADD COLUMN foto_geloescht_am DATETIME NULL'],
+    // Bezug einer Meldung auf die Aufgabe, aus der heraus sie entstand
+    // (ENT-621). Der Fremdschluessel haengt am SELBEN ALTER wie die Spalte
+    // -- dieselbe Bauart wie bei belege.versand_token: Existiert die Spalte
+    // schon, wird der ganze Befehl uebersprungen, der Schluessel entsteht
+    // also immer zusammen mit ihr und nie getrennt davon.
+    ['ereignis_meldung', 'kontrollpunkt_id',
+     'ALTER TABLE ereignis_meldung ADD COLUMN kontrollpunkt_id INT NULL AFTER foto_geloescht_am, '
+     . 'ADD COLUMN aufgabe_id INT NULL AFTER kontrollpunkt_id, '
+     . 'ADD KEY idx_aufgabe (rundgang_id, kontrollpunkt_id, aufgabe_id), '
+     . 'ADD FOREIGN KEY (kontrollpunkt_id) REFERENCES kontrollpunkt(id) ON DELETE SET NULL, '
+     . 'ADD FOREIGN KEY (aufgabe_id) REFERENCES objekt_aufgabe(id) ON DELETE SET NULL'],
 
     // Explizite Berechtigung "macht Revierdienst" (ENT-284) -- ersetzt die
     // bisherige Herleitung aus der Schicht-Historie (ENT-234) als einzige

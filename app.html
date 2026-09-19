@@ -2665,6 +2665,11 @@ const W = {
     abGrundHinweis: 'Ohne Grund bleibt in der Auswertung „nicht möglich“ stehen — und niemand weiss, was zu tun ist.',
     abGrundPflicht: 'Bitte einen Grund angeben.',
     abSenden: 'Bestätigen',
+    // Aus der unmoeglichen Aufgabe heraus melden (ENT-621)
+    abMitFoto: 'Mit Foto melden',
+    abMitFotoHinweis: 'Zeigt dem Kunden, was los ist — die Antwort wird dabei gespeichert.',
+    evBezugTitel: 'Bezug',
+    evBezugAufgabe: 'Aufgabe „{a}“ am Kontrollpunkt „{k}“ war nicht möglich.',
     abOffen: 'Aufgabe offen',
     abOffenMehr: 'Aufgaben offen',
     abFertig: 'Alle Aufgaben beantwortet',
@@ -5930,6 +5935,11 @@ let evFoto = null;      // komprimiertes Foto (data: URL), bis gemeldet wird
    beim Zeichnen eines neuen Formulars und nach dem Erfolg. */
 let evLetzteKennung = null;
 let evObjekt = null;    // { id, name } des Objekts, zu dem gemeldet wird
+/* Worauf sich die Meldung bezieht (ENT-621) -- gesetzt, wenn sie aus einer
+   Aufgabe heraus entsteht, die nicht erledigt werden konnte. Sonst null,
+   und das ist der Normalfall: Die meisten Meldungen haengen an keiner
+   Aufgabe. */
+let evBezug = null;
 
 function evWarteschlangeLesen() {
   try { return JSON.parse(localStorage.getItem(EV_WARTESCHLANGE) || '[]'); } catch { return []; }
@@ -6077,11 +6087,14 @@ function afOeffnen() {
     }).join('')}`;
 }
 
-function evOeffnen() {
+function evOeffnen(bezug) {
   if (!$('rgSeite').classList.contains('on')) return;
   rgsAnsicht = 'ereignis';
   rgUnterseiteAn();
   evFoto = null;
+  // Ohne Angabe ausdruecklich zuruecksetzen: Sonst truege die naechste,
+  // frei gemeldete Meldung den Bezug der vorigen mit sich (ENT-621).
+  evBezug = bezug || null;
   $('rgsTitel').textContent = w('evTitel');
   $('rgsBody').innerHTML = `<div class="sk" style="height:120px"></div>`;
   $('rgsFuss').innerHTML = '';
@@ -6102,8 +6115,23 @@ function evFormularZeichnen() {
   // Ein neu gezeichnetes Formular ist ein neuer Vorgang: Die Kennung des
   // letzten Anlaufs gilt nicht mehr weiter.
   evLetzteKennung = null;
+  /* Der Bezug wird ANGEZEIGT, nicht nur mitgeschickt (ENT-621).
+
+     Wer aus einer Aufgabe heraus meldet, muss sehen, dass die Meldung
+     daran haengt -- sonst weiss er nicht, ob er den Kontrollpunkt noch
+     einmal nennen muss. Und der bereits getippte Grund steht als
+     Bemerkung schon drin: Ihn ein zweites Mal zu verlangen waere eine
+     Zumutung. Ueberschreiben darf er ihn jederzeit. */
+  const bezugBlock = evBezug ? `
+    <div class="f">
+      <label>${esc(w('evBezugTitel'))}</label>
+      <div class="rgs-leer" style="padding:2px 2px 0">${esc(
+        w('evBezugAufgabe').replace('{a}', evBezug.aufgabe || '—')
+                           .replace('{k}', evBezug.kontrollpunkt || '—'))}</div>
+    </div>` : '';
   $('rgsBody').innerHTML = `
     <div id="evWartend"></div>
+    ${bezugBlock}
     <div class="f">
       <label for="evArt">${esc(w('evArt'))}</label>
       ${evArten.length ? `<select class="inp" id="evArt">
@@ -6114,7 +6142,8 @@ function evFormularZeichnen() {
 
     <div class="f">
       <label for="evText">${esc(w('evBemerkung'))}</label>
-      <textarea class="inp" id="evText" rows="4" placeholder="${esc(w('evBemerkungHinweis'))}"></textarea>
+      <textarea class="inp" id="evText" rows="4" placeholder="${esc(w('evBemerkungHinweis'))}">${
+        evBezug && evBezug.grund ? esc(evBezug.grund) : ''}</textarea>
     </div>
 
     <div class="f">
@@ -6230,6 +6259,11 @@ function evSenden() {
       vorfall_am: vorfallAm,
       bemerkung: ($('evText') && $('evText').value.trim()) || '',
       foto: evFoto ? evFoto.split(',')[1] : null,
+      // Der Bezug auf die Aufgabe (ENT-621). Der Server prueft ihn gegen
+      // das Objekt und laesst ihn notfalls weg -- die Meldung selbst geht
+      // immer durch.
+      kontrollpunkt_id: evBezug ? evBezug.kontrollpunktId : null,
+      aufgabe_id: evBezug ? evBezug.aufgabeId : null,
       lat: ort.lat !== undefined ? ort.lat : null,
       lng: ort.lng !== undefined ? ort.lng : null,
     };
@@ -8282,6 +8316,19 @@ const RG_NACHT_STIL_NATIV = [
 
 let rgsNativKarte = null;       // die native Karte, solange sie steht
 let rgsNativVersprechen = null; // das einmal geladene Kartenplugin
+/* Der noch laufende Abbau der VORIGEN Karte (OP-610).
+
+   rgKarteNativAbbauen() ist asynchron -- destroy() geht an die native
+   Seite und braucht seine Zeit. Zwei Aufrufer bauen unmittelbar danach
+   neu: der Nachtsicht-Schalter und rgKarteZeichnen() vor dem Ersetzen des
+   Rumpfs. Beide Karten tragen dieselbe Kennung 'rgs-karte' -- Abbau und
+   Aufbau ueberlappten also.
+
+   Die Aufrufer zu Warteten zu machen hiesse, async durch die halbe Datei
+   zu ziehen. Stattdessen merkt sich der Abbau sein eigenes Versprechen,
+   und NUR der Aufbau wartet darauf -- an der einen Stelle, an der es
+   darauf ankommt. */
+let rgsNativAbbau = Promise.resolve();
 
 function rgKarteNativMoeglich() {
   return nativeAppHuelle() && mapsSchluesselTauglich(RGS_MAPS_IOS_SCHLUESSEL);
@@ -8321,6 +8368,16 @@ function rgsNativLaden() {
    auch auf dem Reiter mit der Liste. Darum wird sie ausdruecklich
    abgebaut, und zwar vor jedem Ersetzen des Rumpfs. */
 async function rgKarteNativAbbauen() {
+  /* Jeden noch laufenden Aufbau fuer ueberholt erklaeren (OP-609).
+
+     rgsKarteBauLauf ist der Zaehler, an dem ein Aufbau erkennt, dass er
+     nicht mehr gebraucht wird. Bis hierher wurde er NUR beim Bauen
+     hochgezaehlt -- der Abbau beim Reiterwechsel liess ihn stehen. Lief
+     GoogleMap.create() gerade noch, kam der Aufbau danach durch seine
+     eigene Pruefung, setzte die Klasse 'karte-nativ' wieder auf den
+     Koerper und blendete damit die Bedienoberflaeche aus, obwohl der
+     Waechter laengst auf der Liste stand. */
+  rgsKarteBauLauf++;
   // Die Durchsicht gilt nur, solange die Karte steht -- sonst bliebe die
   // App auf den anderen Reitern unsichtbar.
   document.body.classList.remove('karte-nativ');
@@ -8332,9 +8389,14 @@ async function rgKarteNativAbbauen() {
   // zu keiner Karte mehr gehoeren -- dieselbe Falle wie bei der
   // Standortmarke in ENT-331.
   rgsNativKreise = [];
+  rgsNativMarken = [];
   rgsNativGrenzen = null;
   rgFuellungNativAus();
-  try { await weg.destroy(); } catch (e) {}
+  // Das Versprechen festhalten, damit ein Aufbau darauf warten kann
+  // (OP-610) -- und selbst warten, damit dieser Aufruf sich weiterhin
+  // abwarten laesst.
+  rgsNativAbbau = (async () => { try { await weg.destroy(); } catch (e) {} })();
+  await rgsNativAbbau;
 }
 
 function rgsMapsLaden() {
@@ -8713,6 +8775,10 @@ async function rgKarteNativBauen(d, bauLauf) {
     return;
   }
   if (bauLauf !== rgsKarteBauLauf || $('rgsKarte') !== el) { return; }
+  // Die Vorgaengerin muss ganz weg sein, bevor eine Karte mit derselben
+  // Kennung entsteht (OP-610).
+  try { await rgsNativAbbau; } catch (e) {}
+  if (bauLauf !== rgsKarteBauLauf || $('rgsKarte') !== el) { return; }
   try {
     rgsNativKarte = await window.KarteNativ.GoogleMap.create({
       id: 'rgs-karte',
@@ -8732,10 +8798,18 @@ async function rgKarteNativBauen(d, bauLauf) {
     if (bauLauf === rgsKarteBauLauf) { zeigen('rgsKarteFehler'); }
     return;
   }
-  // Ein noch neuerer Aufbau hat waehrenddessen uebernommen: Diese Karte
-  // gehoert nicht mehr dorthin und muss wieder weg, sonst liegen zwei
-  // native Ansichten uebereinander.
-  if (bauLauf !== rgsKarteBauLauf) { rgKarteNativAbbauen(); return; }
+  // Ein noch neuerer Aufbau hat waehrenddessen uebernommen, oder der
+  // Reiter wurde gewechselt und der Rumpf ersetzt: Diese Karte gehoert
+  // nicht mehr dorthin und muss wieder weg, sonst liegen zwei native
+  // Ansichten uebereinander -- und die Durchsicht bliebe an, obwohl gar
+  // keine Karte mehr zu sehen ist (OP-609). Die Frage nach dem Element
+  // steht zusaetzlich zum Zaehler: Sie faengt auch den Fall ab, in dem
+  // ein Abbau den Zaehler schon hochgesetzt und ein neuer Aufbau ihn
+  // danach erneut vergeben hat.
+  if (bauLauf !== rgsKarteBauLauf || $('rgsKarte') !== el || !el.isConnected) {
+    rgKarteNativAbbauen();
+    return;
+  }
   rgsKarteEl = el;
   document.body.classList.add('karte-nativ');
   // Ausschnitt AUSDRUECKLICH setzen, obwohl er schon in der Erzeugung
@@ -8744,6 +8818,11 @@ async function rgKarteNativBauen(d, bauLauf) {
   // sind offenbar noch nicht wirksam, wenn die Ansicht ihre endgueltige
   // Groesse erst danach bekommt. Ein zweiter, ausdruecklicher Schritt
   // kostet nichts und steht nicht im Zweifel.
+  // Der Lauscher auf den Stillstand der Kamera muss VOR der ersten
+  // Bewegung stehen. Haengt er danach, geht genau der Stillstand
+  // verloren, der auf den Aufbau folgt -- und die Grenzen blieben bis zur
+  // ersten Handbewegung des Waechters ungelesen.
+  try { await rgsNativKarte.setOnCameraIdleListener(() => rgKarteNativGrenzenLesen()); } catch (e) {}
   await rgKarteNativAusschnitt(d, false);
   // Der eigene Standort als NATIVE Anzeige (ENT-609, Entscheidung des
   // Projektinhabers): der eingebaute Punkt samt Richtungskegel und
@@ -8753,12 +8832,20 @@ async function rgKarteNativBauen(d, bauLauf) {
   // gewollt.
   try { await rgsNativKarte.enableCurrentLocation(true); } catch (e) {}
   await rgKarteNativKreiseZeichnen(d.zeigbar);
+  await rgKarteNativMarkenZeichnen(d.zeigbar);
+  // Ein Tipp auf die Marke fuehrt in die Liste -- gemeldet wird dort,
+  // genau wie in der Browser-Fassung. Welche Marke getippt wurde, spielt
+  // dabei keine Rolle: Die Liste zeigt ohnehin alle.
+  try { await rgsNativKarte.setOnMarkerClickListener(() => rgLaufReiter('punkte')); } catch (e) {}
+  // Den Stand merken, an dem spaetere Durchlaeufe erkennen, ob sich an
+  // den Punkten etwas geaendert hat (OP-607) -- dieselbe Signatur und
+  // dieselbe Variable wie in der Browser-Fassung.
+  rgsKartenSignatur = rgKartenSignatur(d.zeigbar);
   // Die Kartengrenzen brauchen wir, um den Kontrollpunkt auf den
   // Bildschirm zu rechnen (Fuellung waehrend der Verweilzeit). Sie aendern
   // sich beim Verschieben und Zoomen -- darum einmal jetzt und danach bei
   // jedem Stillstand der Kamera.
   await rgKarteNativGrenzenLesen();
-  try { await rgsNativKarte.setOnCameraIdleListener(() => rgKarteNativGrenzenLesen()); } catch (e) {}
   // Den Hinweis erst entfernen, wenn die Karte wirklich steht -- dieselbe
   // Reihenfolge wie in der Browser-Fassung.
   const stand = $('rgsKarteStand');
@@ -8832,10 +8919,37 @@ function rgKarteNativMeterInPixel(grenzen, masse, meter) {
 let rgsNativGrenzen = null;    // zuletzt gelesene Kartengrenzen
 let rgsFuellEl = null;         // das Element der Fuellung im Dokument
 
+let rgsGrenzenLaeuft = false;   // ein Lesevorgang genuegt
+let rgsGrenzenZuletzt = 0;     // wann zuletzt nachgefordert wurde
+
 async function rgKarteNativGrenzenLesen() {
   if (!rgsNativKarte) { rgsNativGrenzen = null; return; }
+  if (rgsGrenzenLaeuft) { return; }
+  rgsGrenzenLaeuft = true;
+  rgsGrenzenZuletzt = Date.now();
   try { rgsNativGrenzen = await rgsNativKarte.getMapBounds(); }
   catch (e) { rgsNativGrenzen = null; }
+  finally { rgsGrenzenLaeuft = false; }
+}
+
+/* Die Grenzen nachfordern, wenn sie fehlen (ENT-609).
+
+   Bis hierher wurden sie GENAU ZWEIMAL gelesen: einmal beim Aufbau und
+   danach bei jedem Stillstand der Kamera. Scheitert der erste Versuch --
+   die native Ansicht ist in dem Augenblick gerade erst entstanden --, und
+   verschiebt der Waechter die Karte nie, bleiben sie fuer immer leer. Die
+   Fuellung waehrend der Verweilzeit haengt an ihnen und bliebe dann
+   dauerhaft unsichtbar, ohne jede Meldung.
+
+   Darum fordert das Zeichnen sie selbst nach, hoechstens viermal je
+   Sekunde. Der Abstand ist bewusst kurz: Die Verweilzeit dauert fuenf
+   Sekunden, und eine halbe davon zu verlieren saehe man. Viermal je
+   Sekunde ist fuer die Bruecke zur nativen Seite unerheblich und deckelt
+   den Fall, dass die Grenzen dauerhaft nicht zu haben sind. */
+function rgKarteNativGrenzenNachfordern() {
+  if (!rgsNativKarte || rgsGrenzenLaeuft) { return; }
+  if (Date.now() - rgsGrenzenZuletzt < 250) { return; }
+  rgKarteNativGrenzenLesen();
 }
 
 function rgFuellungNativAus() {
@@ -8852,7 +8966,15 @@ function rgFuellungNativAus() {
 function rgFuellungNativZeichnen(p, anteil) {
   const huelle = $('rgsBody') ? $('rgsBody').querySelector('.rgs-karte-huelle') : null;
   const karte = $('rgsKarte');
-  if (!huelle || !karte || !rgsNativGrenzen) { rgFuellungNativAus(); return false; }
+  if (!huelle || !karte) { rgFuellungNativAus(); return false; }
+  if (!rgsNativGrenzen) {
+    // Ohne Grenzen laesst sich nichts an die richtige Stelle rechnen --
+    // lieber nichts zeigen als etwas Falsches. Aber nicht stumm bleiben:
+    // nachfordern, damit das naechste Bild zeichnen kann.
+    rgKarteNativGrenzenNachfordern();
+    rgFuellungNativAus();
+    return false;
+  }
   const masse = karte.getBoundingClientRect();
   const ort = rgKarteNativAufSchirm(rgsNativGrenzen, masse, Number(p.lat), Number(p.lng));
   if (!ort) { rgFuellungNativAus(); return false; }
@@ -8880,6 +9002,44 @@ function rgFuellungNativZeichnen(p, anteil) {
    Farbe und Zustand kommen aus rgPunktZustand, derselben Quelle wie in
    der Browser-Fassung. */
 let rgsNativKreise = [];
+let rgsNativMarken = [];
+
+/* Die Marken der Kontrollpunkte auf der nativen Karte (ENT-609).
+
+   ANLASS (vom Projektinhaber am Geraet gemeldet): Beim Herauszoomen
+   verschwanden die Kontrollpunkte vollstaendig. Sie waren nicht
+   ausgeblendet -- es standen nur die Geofence-KREISE da, und die haben
+   den echten Radius in Metern, meist 20. Auf einer Karte ueber den halben
+   Kanton ist das weniger als ein Bildpunkt.
+
+   Eine Marke hat dagegen eine feste Groesse in Bildpunkten und bleibt auf
+   jeder Zoomstufe gleich gross. Kreis und Marke sagen darum
+   Verschiedenes und bleiben beide: Der Kreis zeigt, wie weit der Bereich
+   reicht, die Marke zeigt, dass es den Punkt gibt.
+
+   iconAnchor sitzt in der MITTE des Bildes, nicht unten: Die Marke ist
+   eine Scheibe wie in der Browser-Fassung, keine Stecknadel. Ohne das
+   haenge sie um ihren halben Durchmesser zu weit noerdlich -- die
+   Voreinstellung des Plugins geht von einer Nadelspitze unten aus. */
+const RG_MARKE_PT = 32;      // Kantenlaenge auf dem Schirm; das Bild ist 96 px (dreifach)
+async function rgKarteNativMarkenZeichnen(punkte) {
+  if (!rgsNativKarte) { return; }
+  try {
+    if (rgsNativMarken.length) {
+      await rgsNativKarte.removeMarkers(rgsNativMarken);
+      rgsNativMarken = [];
+    }
+    if (!punkte || !punkte.length) { return; }
+    rgsNativMarken = await rgsNativKarte.addMarkers(punkte.map(p => ({
+      coordinate: { lat: p.lat, lng: p.lng },
+      title: p.bezeichnung,
+      iconUrl: rgPunktZustand(p).bild,
+      iconSize: { width: RG_MARKE_PT, height: RG_MARKE_PT },
+      iconAnchor: { x: RG_MARKE_PT / 2, y: RG_MARKE_PT / 2 },
+    }))) || [];
+  } catch (e) { rgsNativMarken = []; }
+}
+
 async function rgKarteNativKreiseZeichnen(punkte) {
   if (!rgsNativKarte) { return; }
   try {
@@ -8929,8 +9089,11 @@ async function rgKarteNativAusschnitt(d, weich) {
   } catch (e) {}
 }
 
-/* Was sich an der nativen Karte ohne Neubau aendert. Vorerst nur das, was
-   NEBEN der Karte steht -- die Marken kommen mit dem naechsten Schritt. */
+/* Was sich an der nativen Karte ohne Neubau aendert.
+
+   Die Marken mit Nummer und Haken fehlen hier weiterhin -- dafuer braucht
+   es vorerzeugte Bilddateien, siehe rgKarteNativKreiseZeichnen. Die
+   RADIEN tragen die Farbe aber schon heute, und die haengt am Zustand. */
 function rgKarteNativAktualisieren(d, ortungHinweis, hinweis) {
   const huelle = $('rgsBody') ? $('rgsBody').querySelector('.rgs-karte-huelle') : null;
   if (huelle) {
@@ -8944,6 +9107,27 @@ function rgKarteNativAktualisieren(d, ortungHinweis, hinweis) {
     $('rgsZentrieren').insertAdjacentHTML('beforebegin', chipNeu);
   }
   rgOrtChipZeichnen();
+  /* Die Radien neu zeichnen, wenn sich an den Punkten etwas geaendert hat
+     (OP-607).
+
+     Bis hierher geschah das NUR beim Aufbau. Steht die Karte, laeuft jeder
+     weitere Durchlauf durch diese Funktion -- ein erfasster Kontrollpunkt
+     behielt darum die Farbe "offen", bis die Karte aus einem anderen
+     Grund neu entstand (Nachtsicht, Reiterwechsel). Der Nachweis haengt
+     nicht daran, der laeuft ueber rgBereichPruefen() und den Server; die
+     Karte sagte dem Waechter aber etwas Falsches ueber seinen eigenen
+     Fortschritt.
+
+     Mit Signaturvergleich statt bei jedem Aufruf: Jede Positionsmeldung
+     landet hier, und die Radien bei jeder neu zu zeichnen hiesse, sie im
+     Sekundentakt zu loeschen und wieder anzulegen. Dieselbe Ueberlegung
+     und dieselbe Signatur wie in der Browser-Fassung. */
+  const sig = rgKartenSignatur(d.zeigbar);
+  if (sig !== rgsKartenSignatur) {
+    rgsKartenSignatur = sig;
+    rgKarteNativKreiseZeichnen(d.zeigbar);
+    rgKarteNativMarkenZeichnen(d.zeigbar);
+  }
 }
 
 /* Was sich ohne Neubau aendern kann (ENT-543).
@@ -9103,6 +9287,19 @@ function rgPunktZustand(p) {
   return {
     farbe: fertig ? '#4FCE96' : abweichend ? '#E2B156' : '#7098F7',
     zeichen: fertig ? '✓' : abweichend ? '!' : String(p.nr),
+    /* Dasselbe als BILD, fuer die native Karte (ENT-609).
+
+       Das native SDK zeichnet keine Vektorsymbole -- eine Marke ist dort
+       ausschliesslich eine Bilddatei. Die drei Bilder entstehen in
+       marken-erzeugen.py und tragen dieselben Farben wie oben.
+
+       Sie tragen KEINE Nummer (Entscheidung des Projektinhabers): Das
+       waere ein Bild je Nummer und Zustand, bei 40 Punkten also 120
+       Dateien -- und bei Punkt 41 fehlte eines. Die Nummer steht in der
+       Liste; auf der Karte ist gefragt, wo der Punkt liegt und ob er
+       erledigt ist. */
+    bild: fertig ? 'icons/kp-erledigt.png'
+      : abweichend ? 'icons/kp-abweichend.png' : 'icons/kp-offen.png',
   };
 }
 
@@ -10748,6 +10945,14 @@ function rdAufgabenOeffnen(kontrollpunktId) {
         <label for="abT${Number(a.id)}">${esc(w('abGrund'))}</label>
         <textarea class="inp" id="abT${Number(a.id)}" rows="2"></textarea>
         <div class="rgs-leer" style="padding:6px 2px 0">${esc(w('abGrundHinweis'))}</div>
+        <!-- Aus der Aufgabe heraus melden (ENT-621). Der Knopf steht HIER
+             und nicht auf dem Reiter "Funktionen": Wer um drei Uhr nachts
+             im Regen vor einer klemmenden Tuer steht, sucht keinen zweiten
+             Weg durch die App. Er speichert die Antworten mit und oeffnet
+             dann das Ereignisformular -- so geht nichts verloren. -->
+        <button type="button" class="btn btn-plain btn-wide" style="margin-top:10px"
+                onclick="rdAufgabeEreignis(${Number(a.id)})">${esc(w('abMitFoto'))}</button>
+        <div class="rgs-leer" style="padding:6px 2px 0">${esc(w('abMitFotoHinweis'))}</div>
       </div>
     </div>`).join('')}`;
   $('blFuss').innerHTML =
@@ -10770,9 +10975,17 @@ function rdAufgabeWahl(aufgabeId, wert) {
   if (grund) { grund.style.display = wert === 'nicht_moeglich' ? '' : 'none'; }
 }
 
+/* Gibt zurueck, OB gesendet wurde (ENT-621).
+
+   Bis hierher war das Ergebnis niemanden interessant -- der einzige
+   Aufrufer war der Bestaetigen-Knopf. Seit man aus der Aufgabe heraus ein
+   Ereignis melden kann, haengt daran eine zweite Handlung: Das
+   Ereignisformular darf nur aufgehen, wenn die Antworten wirklich
+   gespeichert sind. Sonst stuende der Waechter im Formular, und seine
+   Antwort auf die Aufgabe waere still verloren. */
 function rdAufgabenSenden() {
   const k = rundgangAktiv && rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === Number(abPunktId));
-  if (!k) return;
+  if (!k) return false;
   const err = $('abErr'); if (err) err.style.display = 'none';
   const karten = [...document.querySelectorAll('#blBody .ab-karte')];
   const eintraege = [];
@@ -10782,14 +10995,14 @@ function rdAufgabenSenden() {
     if (!wahl) {
       if (err) { err.textContent = w('abHinweis'); err.style.display = ''; }
       karte.scrollIntoView({ block: 'center' });
-      return;
+      return false;
     }
     const feld = $('abT' + id);
     const grund = feld ? feld.value.trim() : '';
     if (wahl === 'nicht_moeglich' && !grund) {
       if (err) { err.textContent = w('abGrundPflicht'); err.style.display = ''; }
       if (feld) feld.focus();
-      return;
+      return false;
     }
     eintraege.push({ rundgang_id: rundgangAktiv.id, kontrollpunkt_id: k.id,
       aufgabe_id: id, status: wahl, grund: grund || null, erfasst_am: jetztDatetime() });
@@ -10806,6 +11019,37 @@ function rdAufgabenSenden() {
   abPunktId = null;
   rundgangAnzeigen(rundgangAktiv.einsatz_id);
   rdWarteschlangeSenden();
+  return true;
+}
+
+/* Aus einer unmoeglichen Aufgabe heraus ein Ereignis mit Foto melden
+   (ENT-621).
+
+   Zuerst werden die Antworten gespeichert -- mit derselben Pruefung wie
+   beim Bestaetigen, also vollstaendig und mit Grund. Erst danach geht das
+   Ereignisformular auf, mit dem Bezug auf Kontrollpunkt und Aufgabe und
+   dem bereits getippten Grund als Bemerkung.
+
+   Freiwillig, nicht automatisch (ENT-621): Nicht jede unmoegliche Aufgabe
+   ist eine Meldung wert. Landete jede ungefragt im Wachbuch, waere es
+   bald unlesbar. */
+function rdAufgabeEreignis(aufgabeId) {
+  const k = rundgangAktiv && rundgangAktiv.kontrollpunkte.find(x => Number(x.id) === Number(abPunktId));
+  if (!k) { return; }
+  const a = (k.aufgaben || []).find(x => Number(x.id) === Number(aufgabeId));
+  const feld = $('abT' + Number(aufgabeId));
+  const grund = feld ? feld.value.trim() : '';
+  // Der Bezug wird VOR dem Senden gelesen: rdAufgabenSenden() schliesst das
+  // Blatt und wirft die Felder weg.
+  const bezug = {
+    kontrollpunktId: Number(k.id),
+    aufgabeId: Number(aufgabeId),
+    kontrollpunkt: k.bezeichnung || '',
+    aufgabe: a ? (a.bezeichnung || '') : '',
+    grund,
+  };
+  if (!rdAufgabenSenden()) { return; }
+  evOeffnen(bezug);
 }
 
 // ── Ersatzscan (Q-22 in sop-projekt): Fotobeleg statt technischer Pruefung,
