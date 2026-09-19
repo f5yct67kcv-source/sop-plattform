@@ -832,6 +832,20 @@ jobs:
           cp backend/lohnlauf.php dist/lohnlauf.php
           cp backend/mitteilungen.php dist/mitteilungen.php
           cp backend/push.php dist/push.php
+          # Zwei Rechenkerne, die kein Endpunkt ist und die darum leicht
+          # vergessen gehen: Sie werden nur per require_once aus
+          # backend/api/*.php gezogen. Die Endpunkte selbst kommen unten
+          # pauschal mit ("cp backend/api/*.php"), die Module hier einzeln --
+          # fehlt eines, liegt der Endpunkt live da und bricht beim
+          # require_once mit einem PHP-Fatal ab, also mit HTTP 500 und ohne
+          # verwertbare Meldung. Genau das ist mit
+          # planung_einrichten_kern.php passiert (ENT-612 lagerte den Kern
+          # aus und trug nur die betreiber-Zeile nach): Das Cockpit rief
+          # api/planung_einrichten.php bei jedem Laden still im Hintergrund
+          # auf, bekam 500, und der Einrichtungs-Punkt blieb dauerhaft grau
+          # -- "unbekannt" sah aus wie "nichts nachzutragen".
+          cp backend/planung_einrichten_kern.php dist/planung_einrichten_kern.php
+          cp backend/demo_instanz.php dist/demo_instanz.php
           # Schutzeinstellungen (ENT-075). Im Repository heisst die Datei
           # bewusst ohne fuehrenden Punkt -- sonst uebersieht man sie. Wird
           # trotzdem fuer ALLE Umgebungen hier erzeugt (auch wenn der
@@ -1739,6 +1753,20 @@ jobs:
           cp backend/lohnlauf.php dist-cupi24/lohnlauf.php
           cp backend/mitteilungen.php dist-cupi24/mitteilungen.php
           cp backend/push.php dist-cupi24/push.php
+          # Zwei Rechenkerne, die kein Endpunkt ist und die darum leicht
+          # vergessen gehen: Sie werden nur per require_once aus
+          # backend/api/*.php gezogen. Die Endpunkte selbst kommen unten
+          # pauschal mit ("cp backend/api/*.php"), die Module hier einzeln --
+          # fehlt eines, liegt der Endpunkt live da und bricht beim
+          # require_once mit einem PHP-Fatal ab, also mit HTTP 500 und ohne
+          # verwertbare Meldung. Genau das ist mit
+          # planung_einrichten_kern.php passiert (ENT-612 lagerte den Kern
+          # aus und trug nur die betreiber-Zeile nach): Das Cockpit rief
+          # api/planung_einrichten.php bei jedem Laden still im Hintergrund
+          # auf, bekam 500, und der Einrichtungs-Punkt blieb dauerhaft grau
+          # -- "unbekannt" sah aus wie "nichts nachzutragen".
+          cp backend/planung_einrichten_kern.php dist-cupi24/planung_einrichten_kern.php
+          cp backend/demo_instanz.php dist-cupi24/demo_instanz.php
           cp htaccess-cupi24 dist-cupi24/.htaccess
           cp backend/api/*.php dist-cupi24/api/
           cp handbuch/*.php dist-cupi24/handbuch/

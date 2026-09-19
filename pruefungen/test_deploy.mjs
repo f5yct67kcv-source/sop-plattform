@@ -1907,6 +1907,98 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
   }
 }
 
+// ── Rapport-Tool (dist/) und cupi24 (dist-cupi24/): jede eingebundene
+// Backend-Datei muss mit ─────────────────────────────────────────────────
+//
+// ANLASS (2026-09-18, live auf cupi24.guardops.ch): api/planung_einrichten.php
+// zieht seit ENT-612 planung_einrichten_kern.php nach. Die cp-Zeile dafuer
+// entstand nur fuer dist-betreiber/. Auf cupi24 lag der Endpunkt also da,
+// das Modul nicht -- require_once brach mit einem PHP-Fatal ab, also HTTP
+// 500. Das Cockpit ruft den Endpunkt bei jedem Laden still im Hintergrund
+// auf (pruefeUpdate), fing den Fehler mit einem leeren catch ab, und der
+// Einrichtungs-Punkt blieb dauerhaft grau: "unbekannt" sah aus wie "nichts
+// nachzutragen".
+//
+// Dieselbe Pruefung gibt es fuer dist-guardops, dist-betreiber und
+// dist-portal bereits -- ausgerechnet fuer diese beiden Buendel nicht.
+// Dabei sind sie die gefaehrdetsten: Sie liefern ALLE Endpunkte pauschal
+// aus ("cp backend/api/*.php"), die Module dagegen namentlich. Jede neue
+// Backend-Datei faellt hier also von selbst durchs Raster, waehrend ihr
+// Aufrufer live geht.
+//
+// Geprueft wird die AUSSAGE (das Modul liegt im Buendel), nicht der
+// Wortlaut einer bestimmten cp-Zeile: Die noetigen Module werden aus den
+// require-Zeilen der Endpunkte gelesen, transitiv, nicht aufgezaehlt.
+{
+  const schritt = (name) => {
+    const i = workflow.indexOf(`- name: ${name}`);
+    if (i < 0) { return ''; }
+    const j = workflow.indexOf('\n      - name:', i + 10);
+    return workflow.slice(i, j < 0 ? undefined : j);
+  };
+
+  // Transitiv, nicht nur die direkten Einbindungen: db.php zieht
+  // seinerseits weiter, und genau solche Ketten sind hier schon einmal
+  // gerissen. Ein Modul, das es gar nicht gibt, wird uebersprungen -- das
+  // faengt eine andere Pruefung ab, nicht diese.
+  const transitiveModule = (startPfade) => {
+    const gefunden = new Set();
+    const zuLesen = [...startPfade];
+    const gelesen = new Set();
+    while (zuLesen.length) {
+      const pfad = zuLesen.shift();
+      if (gelesen.has(pfad)) { continue; }
+      gelesen.add(pfad);
+      const voll = `${WURZEL}/backend/${pfad}`;
+      if (!existsSync(voll)) { continue; }
+      for (const m of readFileSync(voll, 'utf8')
+        .matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g)) {
+        gefunden.add(m[1]);
+        zuLesen.push(m[1]);
+      }
+    }
+    return gefunden;
+  };
+
+  // Beide Buendel liefern JEDEN Endpunkt aus -- darum ist hier auch jeder
+  // Endpunkt der Ausgangspunkt, nicht nur eine Praefix-Auswahl wie in den
+  // schlanken Buendeln oben.
+  const alleEndpunkte = readdirSync(`${WURZEL}/backend/api`).filter(f => f.endsWith('.php'));
+  const noetigeModule = [...transitiveModule(alleEndpunkte.map(e => `api/${e}`))];
+
+  const BUENDEL = [
+    { ordner: 'dist',        text: schritt('Platzhalter durch echte Werte ersetzen'),                    name: 'Rapport-Tool-Bündel' },
+    { ordner: 'dist-cupi24', text: schritt('Rapport-Tool-Buendel fuer cupi24.guardops.ch bauen'),        name: 'cupi24-Bündel' },
+  ];
+
+  for (const { ordner, text, name } of BUENDEL) {
+    const ziele = new Set([...text.matchAll(/^\s*cp\s+\S+\s+(\S+\.php)\s*$/gm)].map(m => m[1]));
+    const fehlend = noetigeModule.filter(m => !ziele.has(`${ordner}/${m}`));
+    check(`KRITISCH: jede Datei, die ein Endpunkt transitiv einbindet, liegt im ${name}`,
+      noetigeModule.length >= 20 && fehlend.length === 0);
+    if (fehlend.length) { bad.push(`Einbindung fehlt im ${name}: ` + fehlend.join(', ')); }
+  }
+
+  // Und was neu mitgeliefert wird, muss auch gegen den direkten Abruf
+  // gesperrt sein. Fuer cupi24 und die schlanken Buendel gibt es diese
+  // Pruefung schon; fuer dist/ (htaccess-hostpoint) fehlte sie -- dieselbe
+  // Luecke wie oben, nur an der anderen Datei. Ein Modul, das man per URL
+  // aufrufen kann, ist keine Sperre, sondern eine Einladung.
+  {
+    const bauen = schritt('Platzhalter durch echte Werte ersetzen');
+    const ht = readFileSync(`${WURZEL}/htaccess-hostpoint`, 'utf8');
+    const gesperrt = new Set((ht.match(/<FilesMatch "\^\(([a-z_|]+)\)\\\.php\$">/) || [])[1]?.split('|') ?? []);
+    const mitgeliefertePhp = [...bauen.matchAll(/^\s*cp\s+\S+\s+(dist\/\S+\.php)\s*$/gm)]
+      .map(m => m[1])
+      .filter(z => !z.startsWith('dist/api/'))
+      .map(z => z.replace('dist/', '').replace(/\.php$/, ''));
+    const ungeschuetzt = mitgeliefertePhp.filter(m => !gesperrt.has(m));
+    check('KRITISCH: die .htaccess des Rapport-Tools sperrt jede mitgelieferte Backend-Hilfsdatei gegen direkten Abruf',
+      mitgeliefertePhp.length >= 15 && ungeschuetzt.length === 0);
+    if (ungeschuetzt.length) { bad.push('ungeschützt im Rapport-Tool-Bündel: ' + ungeschuetzt.join(', ')); }
+  }
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');
