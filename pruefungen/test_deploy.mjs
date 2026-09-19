@@ -1074,14 +1074,37 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     && liegtImBuendel('dist-betreiber/betreiber.php'));
   if (fehlendeModule.length) { bad.push('Einbindung fehlt im betreiber-Bündel: ' + fehlendeModule.join(', ')); }
 
-  // Die zwei öffentlichen Selbstbedienungs-Endpunkte (ENT-601) tragen kein
-  // betreiber_-Präfix -- absichtlich, sie laufen ohne Anmeldung -- und
-  // fallen darum durch die Prüfung zwei Blöcke oben. Eigene, schmale
+  // Die öffentlichen Selbstbedienungs-Endpunkte (ENT-601, ENT-624) tragen
+  // kein betreiber_-Präfix -- absichtlich, sie laufen ohne Anmeldung --
+  // und fallen darum durch die Prüfung zwei Blöcke oben. Eigene, schmale
   // Prüfung mit derselben Aussage: mitgeliefert, und jede ihrer
   // Einbindungen liegt ebenfalls im Bündel.
-  const OEFFENTLICHE_DEMO_ENDPUNKTE = ['demo_anfordern.php', 'demo_erneut_senden.php'];
-  check('KRITISCH: die öffentlichen Demo-Endpunkte (ENT-601) werden ins betreiber-Bündel kopiert',
-    OEFFENTLICHE_DEMO_ENDPUNKTE.every(e => wirdKopiert(`backend/api/${e}`)));
+  //
+  // DIE LISTE WIRD NICHT ABGESCHRIEBEN, SONDERN AUS backend/db.php
+  // GELESEN. Eine hier von Hand gepflegte Kopie war genau der Grund,
+  // warum api/demo_bestaetigen.php (ENT-624) monatelang im Bündel fehlte,
+  // ohne dass etwas rot wurde: Der Endpunkt stand in
+  // OEFFENTLICHE_DEMO_SKRIPTE, durfte also cross-origin angesprochen
+  // werden, wurde aber nie kopiert. Live antwortete Apache mit 404 -- und
+  // eine 404-Seite trägt keine CORS-Kopfzeile, weshalb der Browser die
+  // Antwort verwarf und die Bestätigungsseite nur ihren Sammelfall zeigte.
+  // Wer die Liste in db.php erweitert, bekommt die fehlende cp-Zeile ab
+  // jetzt hier gemeldet.
+  const OEFFENTLICHE_DEMO_ENDPUNKTE = (() => {
+    const db = readFileSync(`${WURZEL}/backend/db.php`, 'utf8');
+    const block = db.match(/const OEFFENTLICHE_DEMO_SKRIPTE\s*=\s*\[([^\]]*)\]/);
+    return block ? [...block[1].matchAll(/'([a-z_]+\.php)'/g)].map(m => m[1]) : [];
+  })();
+  check('KRITISCH: jeder Endpunkt aus OEFFENTLICHE_DEMO_SKRIPTE (backend/db.php) wird ins betreiber-Bündel kopiert',
+    OEFFENTLICHE_DEMO_ENDPUNKTE.length >= 3
+    && OEFFENTLICHE_DEMO_ENDPUNKTE.every(e => existsSync(`${WURZEL}/backend/api/${e}`))
+    && OEFFENTLICHE_DEMO_ENDPUNKTE.every(e => wirdKopiert(`backend/api/${e}`)));
+  {
+    const nichtKopiert = OEFFENTLICHE_DEMO_ENDPUNKTE.filter(e => !wirdKopiert(`backend/api/${e}`));
+    if (nichtKopiert.length) {
+      bad.push('öffentlicher Demo-Endpunkt fehlt im betreiber-Bündel: ' + nichtKopiert.join(', '));
+    }
+  }
   const oeffentlicheModule = transitiveModule(OEFFENTLICHE_DEMO_ENDPUNKTE.map(e => `api/${e}`));
   const fehlendeOeffentlicheModule = [...oeffentlicheModule].filter(m => !liegtImBuendel(`dist-betreiber/${m}`));
   check('KRITISCH: jede Datei, die ein öffentlicher Demo-Endpunkt transitiv einbindet, liegt im betreiber-Bündel',
