@@ -170,8 +170,10 @@ const PRUEFUNGEN = {
   // dieselbe stille Falle wie beim Datenbank-Passwort.
   postfach_aus_dem_deploy(text) {
     const b = platzBlock(text);
-    return /ersetze __SMTP_HOST__ "\$EFF_GUARDOPS_SMTP_HOST"/.test(b)
-      && /ersetze __SMTP_PASSWORD__ "\$EFF_GUARDOPS_SMTP_PASSWORD"/.test(b)
+    // Die Schreibweise der Variablen bleibt offen ("$X" oder "${X:-}") --
+    // geprueft wird, WOHER der Wert kommt, nicht wie er geschrieben steht.
+    return /ersetze __SMTP_HOST__ "\$\{?EFF_GUARDOPS_SMTP_HOST/.test(b)
+      && /ersetze __SMTP_PASSWORD__ "\$\{?EFF_GUARDOPS_SMTP_PASSWORD/.test(b)
       && !/hole smtp_/.test(b);
   },
 
@@ -243,7 +245,7 @@ const GEGENPROBEN = [
   ['mailumleitung_ist_pflicht', t =>
     t.replace('ersetze __DEMO_TESTMAIL__ "$G_TESTMAIL"', 'ersetze __DEMO_TESTMAIL__ ""')],
   ['postfach_aus_dem_deploy', t =>
-    t.replace('ersetze __SMTP_HOST__ "$EFF_GUARDOPS_SMTP_HOST"',
+    t.replace(/ersetze __SMTP_HOST__ "\$\{?EFF_GUARDOPS_SMTP_HOST[^"]*"/,
               'ersetze __SMTP_HOST__ "$(hole smtp_host)"')],
   ['kein_suchmaschinen_eintrag', t =>
     t.replace('cat htaccess-demo-zusatz >> "dist-demo/$PLATZ/.htaccess"', ': # kein Zusatz')],

@@ -2182,10 +2182,21 @@ jobs:
             fi
 
             # "Nicht in der Tafel" ist eine andere Aussage als "Feld leer
-            # gelassen" und bekommt darum eine eigene Meldung (Hausregel).
+            # gelassen", und sie hat eine andere Folge (Hausregel: vier
+            # Zustaende, vier Texte).
+            #
+            # Ein leer gelassenes FELD oben ist ein Tippfehler im Vorrat --
+            # laut, sofort, Abbruch. Ein fehlender Eintrag in
+            # MANDANT_SECRETS heisst dagegen schlicht: Dieser Platz ist
+            # noch nicht fertig eingerichtet. Dann wird er UEBERSPRUNGEN
+            # wie ein Platz ohne Eintrag, und die uebrigen werden trotzdem
+            # beliefert. Alles andere waere die falsche Reaktion: Ein
+            # halbfertiger Platz Nummer zehn darf die neun fertigen nicht
+            # ohne Dateien lassen (Befund des Projektinhabers, 2026-09-19).
             if [ -z "$DB_PASS" ]; then
-              echo "::error::Demo-Platz $PLATZ: Zum secret_name \"$SECRET_NAME\" steht in MANDANT_SECRETS kein Passwort. Dort eintragen -- derselbe Weg wie bei den Plaetzen davor."
-              exit 1
+              echo "::warning::Demo-Platz $PLATZ uebersprungen -- zum secret_name \"$SECRET_NAME\" steht in MANDANT_SECRETS kein Passwort. Der Platz bleibt ohne Dateien, bis er dort eingetragen ist."
+              OHNE="$OHNE $PLATZ"
+              continue
             fi
 
             cp -a dist-demoplatz-vorlage "dist-demo/$PLATZ"
@@ -2214,11 +2225,11 @@ jobs:
 
             # ── Gemeinsame Werte ─────────────────────────────────────────
             ersetze __ANTHROPIC_API_KEY__ "$G_KI" "dist-demo/$PLATZ/ai.php"
-            ersetze __SMTP_HOST__ "$EFF_GUARDOPS_SMTP_HOST" "dist-demo/$PLATZ/mailer.php"
-            ersetze __SMTP_PORT__ "$EFF_GUARDOPS_SMTP_PORT" "dist-demo/$PLATZ/mailer.php"
-            ersetze __SMTP_VERSCHLUESSELUNG__ "$EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG" "dist-demo/$PLATZ/mailer.php"
-            ersetze __SMTP_USER__ "$EFF_GUARDOPS_SMTP_USER" "dist-demo/$PLATZ/mailer.php"
-            ersetze __SMTP_PASSWORD__ "$EFF_GUARDOPS_SMTP_PASSWORD" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_HOST__ "${EFF_GUARDOPS_SMTP_HOST:-}" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_PORT__ "${EFF_GUARDOPS_SMTP_PORT:-}" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_VERSCHLUESSELUNG__ "${EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG:-}" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_USER__ "${EFF_GUARDOPS_SMTP_USER:-}" "dist-demo/$PLATZ/mailer.php"
+            ersetze __SMTP_PASSWORD__ "${EFF_GUARDOPS_SMTP_PASSWORD:-}" "dist-demo/$PLATZ/mailer.php"
             ersetze __SMTP_ABSENDER__ "info@guardops.ch" "dist-demo/$PLATZ/mailer.php"
             ersetze __SMTP_ABSENDER_NAME__ "GuardOpS Demo" "dist-demo/$PLATZ/mailer.php"
             ersetze __MAIL_SIGNATUR__ "" "dist-demo/$PLATZ/mailer.php"
