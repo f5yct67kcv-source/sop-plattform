@@ -273,6 +273,16 @@ check('Stattdessen öffnet sich die laufende Runde als Vollseite mit erreichbare
 check('Die Vorschau-Module sind dabei weg -- die Runde laeuft, sie wird nicht mehr angekuendigt',
   !(await page.isVisible('#rgsModPause')));
 
+/* Notausgang für die Gegenprobe: Führt die Änderung NICHT aus der Runde
+   heraus, bleibt die Seite offen und der nächste Klick auf den Chip liefe
+   in einen Timeout -- die Prüfung stürzte ab, statt rot zu melden. Eine
+   Prüfung, die abstürzt, sagt nichts. */
+const raus = async (schonDraussen) => {
+  if (schonDraussen) { return; }
+  await page.evaluate(() => { blattZu(); rgSeiteZu(); zeichneHeute(); });
+  await page.waitForTimeout(300);
+};
+
 // ══════════ PAUSIEREN AUS DEM FUNKTIONEN-REITER ═══════════════════════
 await page.click('#rgsRt-funktionen');
 await page.waitForTimeout(200);
@@ -282,9 +292,52 @@ check('KRITISCH: auch aus dem Funktionen-Reiter kommt dieselbe Rueckfrage, nicht
   await page.isVisible('#rgsDlg')
   && (await page.textContent('#rgsDlgFrage')) === 'Rundgang pausieren?');
 await page.click('#rgsDlgJa');
-await page.waitForTimeout(400);
+await page.waitForTimeout(500);
 check('KRITISCH: der laufende Rundgang übernimmt den pausierten Zustand',
   await page.evaluate(() => rundgangAktiv && rundgangAktiv.status === 'pausiert'));
+
+/* ENT-631: Wer pausiert, will weg. Bis hierher blieb die Seite stehen --
+   auf einer Runde, in der nichts mehr geht: Die Kontrollpunkte sind
+   gesperrt, und der Pfeil führte in die Rückfrage aus ENT-324, deren
+   einziger unschädlicher Ausgang ("Pausieren") am Server scheiterte, weil
+   die Runde schon pausiert war. Gemeldet vom Projektinhaber. */
+const pauseRaus = !(await page.isVisible('#rgSeite'));
+check('KRITISCH: das Pausieren führt aus der Runde heraus, statt auf der gesperrten Seite zu enden',
+  pauseRaus);
+// Bleibt die Seite stehen (Gegenprobe), hier von Hand hinaus -- sonst
+// endete die Prüfung im Klick-Timeout und sagte gar nichts mehr.
+await raus(pauseRaus);
+check('KRITISCH: und zwar auf "Heute", frisch gezeichnet -- nicht ins Leere',
+  await page.isVisible('#v-heute.on') && await page.isVisible('#v-heute .rd-chip'));
+// Der Weg zurück ist der Chip (ENT-234). Ohne ihn wäre das Verlassen ein
+// Verlieren.
+check('KRITISCH: der Chip auf "Heute" nennt die pausierte Runde als Weg zurück',
+  await page.isVisible('.rd-chip')
+  && (await page.textContent('.rd-chip')).includes('Rundgang pausiert'));
+await page.click('.rd-chip');
+await page.waitForTimeout(600);
+check('KRITISCH: und führt wirklich in dieselbe Runde zurück',
+  await page.isVisible('#rgSeite')
+  && await page.evaluate(() => rundgangAktiv && Number(rundgangAktiv.id) === 951));
+await page.click('#rgsRt-funktionen');
+await page.waitForTimeout(250);
+check('Dort steht "Rundgang fortsetzen" -- die Pause ist nicht verlorengegangen',
+  (await page.textContent('#rgsLaufPause')).includes('fortsetzen'));
+
+// Die Gegenprobe zum Pfeil: Eine pausierte Runde hält niemanden mehr fest.
+// Sie IST der dokumentierte Zustand, nach dem ENT-324 fragt.
+await page.click('#rgsZurueck');
+await page.waitForTimeout(400);
+const pfeilRaus = !(await page.isVisible('#rgSeite'));
+check('KRITISCH: der Zurück-Pfeil führt bei pausierter Runde hinaus, statt in eine Sackgasse',
+  pfeilRaus);
+check('KRITISCH: und stellt dabei keine Frage, die sich nicht beantworten lässt',
+  !(await page.isVisible('#blatt.on')));
+await raus(pfeilRaus);
+await page.click('.rd-chip');
+await page.waitForTimeout(600);
+await page.click('#rgsRt-funktionen');
+await page.waitForTimeout(250);
 
 // ══════════ KEIN SEITEN-SCROLL, DESKTOP MITGEPRÜFT ════════════════════
 check('KRITISCH: kein waagrechter Seiten-Scroll bei 390px', await page.evaluate(() =>
