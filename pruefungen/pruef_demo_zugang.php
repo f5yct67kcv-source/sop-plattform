@@ -381,6 +381,85 @@ $pruef('KRITISCH: erreichbarer Namensdienst, aber die Domain gibt es wirklich ni
     demo_zugang_adresse_zustellbar('a@nirgends.test', $nurKontrolle) === false);
 $pruef('eine Adresse ohne @ gilt als nicht zustellbar, ohne Absturz',
     demo_zugang_adresse_zustellbar('keine-email', $immerJa) === false);
+// ══ Die bekannte Adresse meldet sich erneut (ENT-623) ═════════════════
+//
+// Bis hierher kam dieselbe Mail heraus wie beim ersten Mal. Kein neuer
+// Zugang wurde angelegt -- das ist die Sperre aus ENT-601 und war nie
+// anders --, aber die Mail sah aus wie ein zweiter Zugang. Der
+// Projektinhaber hat das am 2026-09-19 an der echten Mail beanstandet.
+
+$erst   = demo_zugang_mail('Muster Sicherheit GmbH', 'R. Muster',
+    'https://demo1.guardops.ch', 'mustersicherh', 'AbcDefGhiJkm', '2026-10-03 09:14:00');
+$wieder = demo_zugang_bekannt_mail('Muster Sicherheit GmbH', 'R. Muster',
+    'https://demo1.guardops.ch', 'mustersicherh', 'AbcDefGhiJkm', '2026-10-03 09:14:00');
+
+// DER Punkt: Im Postfach muss man die beiden auseinanderhalten koennen,
+// ohne sie zu oeffnen.
+$pruef('KRITISCH: die zweite Mail traegt einen anderen Betreff als die erste',
+    $wieder['betreff'] !== $erst['betreff']);
+// Und sie sagt die Sache, nicht nur einen anderen Betreff.
+foreach (['text', 'html'] as $teil) {
+    $pruef("die $teil-Fassung sagt, dass der Zugang bereits besteht",
+        str_contains(mb_strtolower(strip_tags($wieder[$teil])), 'bereits'));
+    // Wer die erste Mail verloren hat, muss wieder hineinkommen -- sonst
+    // ist er vierzehn Tage ausgesperrt. "Zugangsdaten erneut senden" gibt
+    // es als Endpunkt, aber auf keiner Seite als Bedienelement.
+    $pruef("die $teil-Fassung bringt Adresse, Anmeldename und Passwort mit",
+        str_contains($wieder[$teil], 'https://demo1.guardops.ch')
+        && str_contains($wieder[$teil], 'mustersicherh')
+        && str_contains($wieder[$teil], 'AbcDefGhiJkm'));
+    // demo_zugang_neues_passwort() wirft die bestehenden Sitzungen weg.
+    // Wer das nicht erfaehrt, haelt seinen Zugang fuer kaputt.
+    $pruef("die $teil-Fassung sagt, dass die alten Zugangsdaten nicht mehr gelten",
+        str_contains(mb_strtolower(strip_tags($wieder[$teil])), 'nicht mehr'));
+    // Das Ablaufdatum des BESTEHENDEN Zugangs, nicht ein neues: Der Zugang
+    // laeuft weiter, er faengt nicht von vorne an.
+    $pruef("die $teil-Fassung nennt das Ablaufdatum des bestehenden Zugangs",
+        str_contains($wieder[$teil], '03.10.2026'));
+}
+// Sie geht an einen Interessenten, nicht an uns -- also mit Unterschrift
+// und Logo, anders als die Meldungen weiter unten.
+$pruef('die Mail an den Interessenten ist gezeichnet wie die erste',
+    str_contains($wieder['html'], 'Mit freundlichen Grüssen'));
+$boesWieder = demo_zugang_bekannt_mail('<b>M</b>', '"><script>x</script>',
+    'https://demo1.guardops.ch', 'l', 'p', '2026-10-03 09:14:00');
+$pruef('KRITISCH: auch hier bleibt eingeschmuggelte Auszeichnung Text',
+    !str_contains($boesWieder['html'], '<script>')
+    && !str_contains($boesWieder['html'], '<b>M</b>'));
+
+// Der Umschalter sitzt in demo_zugang_neues_passwort(). Sein Vorgabewert
+// entscheidet, was "Zugangsdaten erneut senden" verschickt -- dort hat
+// jemand ausdruecklich danach gefragt und bekommt die gewohnte Mail.
+require_once __DIR__ . '/../backend/demo_instanz.php';
+$umschalter = (new ReflectionFunction('demo_zugang_neues_passwort'))->getParameters();
+$dritter = $umschalter[2] ?? null;
+$pruef('KRITISCH: die Unterscheidung ist ein eigener Schalter, nicht zwei Kopien der Funktion',
+    $dritter !== null && $dritter->isOptional());
+$pruef('KRITISCH: ohne Angabe bleibt es die gewohnte Mail -- sonst bekaeme auch '
+        . '"Zugangsdaten erneut senden" den Text "besteht bereits"',
+    $dritter !== null && $dritter->getDefaultValue() === false);
+
+// Die Meldung an uns ueber die erneute Anfrage. Eigener Betreff, damit sie
+// sich im Postfach von einer echten Neuanmeldung unterscheidet.
+$erneut = demo_erneut_mail('Muster Sicherheit GmbH', 'R. Muster', 'r.muster@beispiel.ch',
+    '+41 00 000 00 00', 'demo1', 'https://demo1.guardops.ch', '2026-10-03 09:14:00');
+$pruef('KRITISCH: die erneute Anfrage meldet sich anders als eine Neuanmeldung',
+    $erneut['betreff'] !== demo_melde_mail('Muster Sicherheit GmbH', 'R. Muster',
+        'r.muster@beispiel.ch', '+41 00 000 00 00', 'demo1',
+        'https://demo1.guardops.ch', '2026-10-03 09:14:00')['betreff']);
+// Ohne diesen Satz liest man sie als zweiten Zugang und sucht einen Platz,
+// der gar nicht belegt wurde.
+$pruef('KRITISCH: sie sagt ausdrücklich, dass kein neuer Zugang und kein Platz dazukam',
+    str_contains($erneut['text'], 'KEIN neuer Zugang')
+    && str_contains(strip_tags($erneut['html']), 'kein')
+    && str_contains(mb_strtolower($erneut['text']), 'kein weiterer platz'));
+$pruef('sie nennt Firma, Person und Erreichbarkeit',
+    str_contains($erneut['text'], 'R. Muster')
+    && str_contains($erneut['text'], 'r.muster@beispiel.ch')
+    && str_contains($erneut['text'], '+41 00 000 00 00'));
+$pruef('auch sie ist Hauspost -- kein Logo im Schlepptau',
+    $erneut['bilder'] === [] && !str_contains($erneut['html'], 'cid:'));
+
 // ══ Meldungen an den Betreiber (ENT-622) ══════════════════════════════
 //
 // Bis hierher lief die Selbstbedienung an uns vorbei. Zwei Meldungen

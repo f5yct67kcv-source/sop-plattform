@@ -148,7 +148,11 @@ $stmt = $pdo->prepare("SELECT * FROM demo_zugang WHERE status = 'aktiv' AND emai
 $stmt->execute([$email]);
 $bestehend = $stmt->fetch(PDO::FETCH_ASSOC);
 if ($bestehend) {
-    $ergebnis = demo_zugang_neues_passwort($pdo, $bestehend);
+    // true = "diese Adresse hat schon einen Zugang" (ENT-623). Die Mail
+    // sagt dann zuerst genau das, statt wie beim ersten Mal auszusehen --
+    // sie traegt trotzdem ein Passwort, weil es sonst keinen Weg zurueck
+    // gibt (Begruendung bei demo_zugang_bekannt_mail()).
+    $ergebnis = demo_zugang_neues_passwort($pdo, $bestehend, true);
     if ($ergebnis['fehler'] !== null) {
         error_log('demo_anfordern (bestehender Zugang): ' . $ergebnis['fehler']);
     } else {
@@ -159,6 +163,22 @@ if ($bestehend) {
         } catch (Throwable $e) {
             error_log('demo_anfordern (bestehender Zugang): Versand fehlgeschlagen -- ' . $e->getMessage());
         }
+        // Auch dieser Fall wird gemeldet (ENT-623, Revision von ENT-622):
+        // Wer sich ein zweites Mal meldet, ist selbst ein Signal -- und
+        // ohne diese Meldung liess sich beim Testen nicht unterscheiden,
+        // ob die Meldungen gehen oder ob es nichts zu melden gab. Eigener
+        // Betreff, damit sie nicht mit einer Neuanmeldung verwechselt wird.
+        //
+        // Nur im Erfolgsfall: Konnte das Passwort nicht gesetzt werden,
+        // stimmt die Aussage "der bestehende Zugang hat ein neues
+        // Passwort bekommen" nicht. Der Fehler steht dann im Protokoll.
+        demo_betreiber_melden(
+            demo_erneut_mail((string)$bestehend['firma'], (string)$bestehend['person'],
+                (string)$bestehend['email'], (string)$bestehend['telefon'],
+                (string)$bestehend['platz'],
+                (string)demo_platz_adresse((string)$bestehend['platz']),
+                (string)$bestehend['laeuft_ab_am']),
+            'Meldung ueber erneute Anfrage', true);
     }
     json_response(['status' => 'ok', 'message' => DEMO_ANFORDERN_DANKE]);
 }

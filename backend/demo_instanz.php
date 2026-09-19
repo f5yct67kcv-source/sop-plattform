@@ -75,7 +75,15 @@ function demo_instanz_leeren(PDO $betreiber, string $platz): ?string
 // 'mail' => [...]] zurueck -- die aufrufende Datei entscheidet, ob und wie
 // sie einen Fehler nach aussen zeigt (demo_erneut_senden.php zeigt NIE
 // etwas, demo_anfordern.php zeigt eine Betriebsstoerung).
-function demo_zugang_neues_passwort(PDO $betreiber, array $zugang): array
+// $schonRegistriert unterscheidet die beiden Aufrufer (ENT-623): Bei
+// "Zugangsdaten erneut senden" hat jemand ausdruecklich danach gefragt und
+// bekommt die gewohnte Zugangsdaten-Mail. Bei einer zweiten Anfrage ueber
+// das Anforderungsformular hat er das NICHT -- dort muss die Mail zuerst
+// sagen, dass sein Zugang bereits besteht, sonst haelt er sie fuer einen
+// zweiten. Alles davor -- Passwort setzen, Sitzungen wegwerfen -- ist in
+// beiden Faellen dasselbe und bleibt darum an einer Stelle.
+function demo_zugang_neues_passwort(PDO $betreiber, array $zugang,
+                                    bool $schonRegistriert = false): array
 {
     $platz = (string)$zugang['platz'];
     $stmt = $betreiber->prepare('SELECT * FROM mandant WHERE subdomain = ? LIMIT 1');
@@ -112,13 +120,23 @@ function demo_zugang_neues_passwort(PDO $betreiber, array $zugang): array
     // passwort_zuruecksetzen.php).
     $instanz->prepare('DELETE FROM sessions WHERE mitarbeiter_id = ?')->execute([(int)$konto['id']]);
 
-    $mail = demo_zugang_mail(
-        (string)$zugang['firma'],
-        (string)$zugang['person'],
-        (string)demo_platz_adresse($platz),
-        (string)$zugang['login'],
-        $passwort,
-        (string)$zugang['laeuft_ab_am']
-    );
+    // Beide Namen ausgeschrieben statt ueber eine Variable aufgerufen: Ein
+    // variabler Funktionsname ist fuer pruef_ladepfad.php unsichtbar, und
+    // damit faende sie ein fehlendes require hier nicht mehr.
+    $mail = $schonRegistriert
+        ? demo_zugang_bekannt_mail(
+            (string)$zugang['firma'],
+            (string)$zugang['person'],
+            (string)demo_platz_adresse($platz),
+            (string)$zugang['login'],
+            $passwort,
+            (string)$zugang['laeuft_ab_am'])
+        : demo_zugang_mail(
+            (string)$zugang['firma'],
+            (string)$zugang['person'],
+            (string)demo_platz_adresse($platz),
+            (string)$zugang['login'],
+            $passwort,
+            (string)$zugang['laeuft_ab_am']);
     return ['fehler' => null, 'mail' => $mail];
 }

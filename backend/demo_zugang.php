@@ -427,6 +427,69 @@ function demo_zugang_mail(string $firma, string $person, string $adresse,
         'bilder' => $bilder];
 }
 
+// Die Mail, wenn sich eine BEKANNTE Adresse ein zweites Mal meldet
+// (ENT-623). Kein neuer Zugang -- den gab es auch vorher nicht, das ist
+// die Sperre aus ENT-601 --, aber bis hierher kam dieselbe Mail wie beim
+// ersten Mal heraus. Sie sah aus wie ein zweiter Zugang, und der
+// Projektinhaber hat genau das am 2026-09-19 beanstandet.
+//
+// SIE TRAEGT TROTZDEM EIN PASSWORT. Ein Interessent, der die erste Mail
+// geloescht hat, haette sonst keinen Weg zurueck: "Zugangsdaten erneut
+// senden" gibt es als Endpunkt, aber auf keiner Seite als Bedienelement.
+// Ihn vierzehn Tage auszusperren waere teurer als die Mail.
+//
+// UND SIE SAGT, DASS DIE ALTEN ZUGANGSDATEN NICHT MEHR GELTEN.
+// demo_zugang_neues_passwort() wirft die bestehenden Sitzungen weg; wer
+// das nicht erfaehrt, haelt den Zugang fuer kaputt.
+function demo_zugang_bekannt_mail(string $firma, string $person, string $adresse,
+                                  string $login, string $passwort, string $laeuftAbAm): array
+{
+    $ab = date('d.m.Y', strtotime($laeuftAbAm));
+    $betreff = 'Ihr Demo-Zugang besteht bereits';
+
+    $zeilen = mail_signatur_zeilen();
+    $gruss  = $zeilen === [] ? ['pzu consulting gmbh'] : $zeilen;
+    $logo     = mail_logo();
+    $logoHell = mail_logo_hell();
+    $kennung     = $logo === null ? '' : (string)$logo['cid'];
+    $kennungHell = $logoHell === null ? '' : (string)$logoHell['cid'];
+    $bilder = array_values(array_filter([$logo, $logoHell]));
+
+    $text = "Guten Tag $person\n\n"
+          . "für Ihre E-Mail-Adresse besteht bereits ein Demo-Zugang zu GuardOpS. "
+          . "Ein zweiter wird nicht angelegt — Ihr bisheriger läuft weiter, "
+          . "bis am $ab.\n\n"
+          . "Damit Sie sofort wieder hineinkommen, haben wir das Passwort neu "
+          . "gesetzt:\n\n"
+          . "Adresse:      $adresse\n"
+          . "Anmeldename:  $login\n"
+          . "Passwort:     $passwort\n\n"
+          . "Das bisherige Passwort gilt damit nicht mehr, und offene Anmeldungen "
+          . "wurden beendet. Was Sie im Demobereich bereits erfasst haben, bleibt "
+          . "unverändert.\n\n"
+          . "Bei Fragen oder Unklarheiten melden Sie sich jederzeit bei uns.\n\n"
+          . "Mit freundlichen Grüssen\n" . implode("\n", $gruss);
+
+    $inhalt = mail_absatz('Guten Tag ' . mail_e($person))
+        . mail_absatz('für Ihre E-Mail-Adresse besteht bereits ein Demo-Zugang zu GuardOpS. '
+            . 'Ein zweiter wird nicht angelegt — Ihr bisheriger läuft weiter, bis am '
+            . '<b>' . mail_e($ab) . '</b>.')
+        . mail_absatz('Damit Sie sofort wieder hineinkommen, haben wir das Passwort neu gesetzt:')
+        . mail_block(
+            mail_feld('Adresse', '<a href="' . mail_e($adresse) . '" style="color:'
+                . MAIL_FARBE_BLAU . ';text-decoration:none;">' . mail_e($adresse) . '</a>')
+            . mail_feld('Anmeldename', mail_e($login), true)
+            . mail_feld('Passwort', mail_e($passwort), true))
+        . mail_absatz('Das bisherige Passwort gilt damit nicht mehr, und offene Anmeldungen '
+            . 'wurden beendet. Was Sie im Demobereich bereits erfasst haben, bleibt '
+            . 'unverändert.')
+        . mail_absatz('Bei Fragen oder Unklarheiten melden Sie sich jederzeit bei uns.')
+        . mail_signatur($zeilen, $kennung, $kennungHell);
+
+    return ['betreff' => $betreff, 'text' => $text, 'html' => mail_rahmen($inhalt),
+        'bilder' => $bilder];
+}
+
 // ══ Meldungen an den Betreiber (ENT-622) ═══════════════════════════════
 //
 // Bis hierher lief die Selbstbedienung vollstaendig an uns vorbei: Der
@@ -518,6 +581,57 @@ function demo_melde_mail(string $firma, string $person, string $email,
             . 'unterwegs. Offen ist das Nachfassen: Im Betreiber-Bereich unter '
             . '<b>Mandanten</b> steht der Zugang als offen, bis ihn dort jemand auf '
             . 'nachgefasst setzt.');
+
+    return ['betreff' => $betreff, 'text' => $text, 'html' => mail_rahmen($inhalt),
+        'bilder' => []];
+}
+
+// Die Meldung, wenn sich eine bekannte Adresse ein zweites Mal meldet
+// (ENT-623). ENT-622 hatte diesen Fall bewusst ausgenommen -- eine Meldung
+// ohne Handlungsbedarf senke die Aufmerksamkeit fuer die anderen. Die
+// Praxis hat dagegen gesprochen: Beim Testen liess sich nicht
+// unterscheiden, ob die Meldungen ueberhaupt gehen oder ob es nichts zu
+// melden gab. Dazu ist ein Interessent, der sich ein zweites Mal meldet,
+// selbst ein Signal.
+//
+// EIGENER BETREFF, damit sie sich im Postfach von einer echten
+// Neuanmeldung unterscheiden laesst, ohne sie zu oeffnen.
+function demo_erneut_mail(string $firma, string $person, string $email,
+                          string $telefon, string $platz, string $adresse,
+                          string $laeuftAbAm): array
+{
+    $ab = date('d.m.Y', strtotime($laeuftAbAm));
+    $betreff = 'Erneute Anfrage: ' . $firma;
+
+    $text = "Eine bereits bekannte Adresse hat sich ein zweites Mal gemeldet.\n\n"
+          . "Firma:     $firma\n"
+          . "Person:    $person\n"
+          . "E-Mail:    $email\n"
+          . "Telefon:   " . ($telefon !== '' ? $telefon : 'keine Angabe') . "\n"
+          . "Platz:     $platz ($adresse)\n"
+          . "Läuft ab:  $ab\n\n"
+          . "Es wurde KEIN neuer Zugang angelegt und kein weiterer Platz belegt. "
+          . "Der bestehende Zugang hat ein neues Passwort bekommen, und der "
+          . "Interessent weiss, dass sein Zugang schon besteht.\n\n"
+          . "Wer sich ein zweites Mal meldet, hat entweder die erste Mail verloren "
+          . "oder es sich anders überlegt. Beides ist ein Anlass, ihn anzurufen.\n";
+
+    $inhalt = mail_absatz('Eine bereits bekannte Adresse hat sich ein zweites Mal gemeldet.')
+        . mail_block(
+            mail_feld('Firma', mail_e($firma))
+            . mail_feld('Person', mail_e($person))
+            . mail_feld('E-Mail', '<a href="mailto:' . mail_e($email) . '" style="color:'
+                . MAIL_FARBE_BLAU . ';text-decoration:none;">' . mail_e($email) . '</a>')
+            . mail_feld('Telefon', $telefon !== ''
+                ? mail_e($telefon)
+                : '<span style="color:' . MAIL_FARBE_LEISE . '">keine Angabe</span>')
+            . mail_feld('Platz', mail_e($platz . ' (' . $adresse . ')'))
+            . mail_feld('Läuft ab', mail_e($ab)))
+        . mail_absatz('Es wurde <b>kein</b> neuer Zugang angelegt und kein weiterer Platz '
+            . 'belegt. Der bestehende Zugang hat ein neues Passwort bekommen, und der '
+            . 'Interessent weiss, dass sein Zugang schon besteht.')
+        . mail_absatz('Wer sich ein zweites Mal meldet, hat entweder die erste Mail verloren '
+            . 'oder es sich anders überlegt. Beides ist ein Anlass, ihn anzurufen.');
 
     return ['betreff' => $betreff, 'text' => $text, 'html' => mail_rahmen($inhalt),
         'bilder' => []];
