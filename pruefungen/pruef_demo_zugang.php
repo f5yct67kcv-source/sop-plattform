@@ -199,6 +199,48 @@ $quelle = (string)file_get_contents(dirname(__DIR__) . '/backend/demo_zugang.php
 $pruef('KRITISCH: die Mail holt die Signatur aus dem Deploy, statt sie im Quelltext zu fuehren',
     str_contains($quelle, 'mail_signatur_zeilen()'));
 
+// ── Die Telefonnummer in der Signatur (Befund 2026-09-19) ────────────
+//
+// Apple Mail und iOS Mail erkennen eine Telefonnummer im Fliesstext selbst
+// und machen daraus einen Waehl-Verweis -- blau und unterstrichen, mitten
+// in einer bewusst grauen Signatur. Wir setzen den Verweis deshalb selbst:
+// antippbar bleibt sie, aussehen tut sie wie geplant. Geprueft wird die
+// Wirkung am erzeugten HTML, nicht der Wortlaut im Quelltext.
+$telZeile = '+41 00 000 00 00';
+$mitTel = mail_signatur(['A. Beispiel', 'Funktion', $telZeile]);
+preg_match('/<a ([^>]*)href="tel:([^"]*)"([^>]*)>/', $mitTel, $telVerweis);
+$pruef('KRITISCH: die Telefonnummer traegt einen eigenen Waehl-Verweis',
+    $telVerweis !== [] && preg_replace('/[^0-9+]/', '', $telZeile) === $telVerweis[2]);
+$telAuf = ($telVerweis[1] ?? '') . ($telVerweis[3] ?? '');
+$pruef('KRITISCH: der Waehl-Verweis bringt seine Farbe selbst mit, statt sie dem Programm zu ueberlassen',
+    str_contains($telAuf, 'color:' . MAIL_FARBE_LEISE));
+$pruef('der Waehl-Verweis ist nicht unterstrichen -- er soll wie die uebrigen Zeilen aussehen',
+    str_contains($telAuf, 'text-decoration:none'));
+$pruef('KRITISCH: im Dunkelmodus faerbt sich der Waehl-Verweis mit',
+    preg_match('/class="[^"]*\bd-leise\b[^"]*"/', $telAuf) === 1
+    && str_contains(mail_dunkelmodus(), '.d-leise'));
+// Nur die Nummer wird verlinkt. Ein Verweis auf dem Namen oder der Funktion
+// waere schlimmer als gar keiner.
+$pruef('KRITISCH: nur die Nummer wird verlinkt, nicht Name oder Funktion',
+    substr_count($mitTel, '<a ') === 1);
+// Zu kurz und zu lang sind beide keine Rufnummer -- eine Referenz- oder
+// Belegnummer in der Signatur darf nicht zum Waehlziel werden.
+foreach (['A. Beispiel', 'Geschäftsführer', 'Hochgasse 7', '4632 Trimbach',
+          'pzu consulting gmbh', 'info@guardops.ch', '2026',
+          '1234-5678', '1234 5678 9012 3456 7890'] as $keineNummer) {
+    $pruef('keine Nummer, kein Waehl-Verweis: ' . $keineNummer,
+        mail_telefon_ziel($keineNummer) === '');
+}
+foreach ([$telZeile, '079 000 00 00', 'Tel. ' . $telZeile, 'Mobil: 079 000 00 00'] as $nummer) {
+    $pruef('als Nummer erkannt: ' . $nummer, mail_telefon_ziel($nummer) !== '');
+}
+// Was das Programm trotzdem selbst erkennt -- eine Ortsangabe im Fuss etwa --
+// soll wenigstens nicht aus der Gestaltung fallen.
+$pruef('KRITISCH: die automatische Einfaerbung von Apple Mail ist ueberschrieben',
+    str_contains($mail['html'], 'x-apple-data-detectors')
+    && preg_match('/x-apple-data-detectors[^}]*color:\s*inherit\s*!important/', $mail['html']) === 1
+    && preg_match('/x-apple-data-detectors[^}]*text-decoration:\s*none\s*!important/', $mail['html']) === 1);
+
 // ── Das Logo in der Signatur (ENT-619) ───────────────────────────────
 //
 // Eingebettet, nicht verlinkt: Outlook und die meisten Programme laden ein
@@ -251,13 +293,21 @@ $pruef('KRITISCH: die Beschriftung steht vor ihrem Wert, nicht daneben oder daru
     strpos($mail['html'], '>Passwort<') !== false
     && strpos($mail['html'], '>Passwort<') < strpos($mail['html'], 'AbcDefGhiJkm'));
 // Ein Stylesheet im Kopf wird von Mailprogrammen regelmaessig entfernt.
-// Es gibt genau einen, und er traegt AUSSCHLIESSLICH den Dunkelmodus --
-// faellt er weg, bleibt die Mail vollstaendig gestaltet, nur eben hell.
+// Es gibt genau einen, und er traegt AUSSCHLIESSLICH zwei Korrekturen:
+// den Dunkelmodus und die Ueberschreibung von Apples Datenerkennung.
+// Beide darf man verlieren -- faellt der Block weg, bleibt die Mail
+// vollstaendig gestaltet, nur eben hell. Geprueft wird das, indem genau
+// diese beiden Bloecke herausgeschnitten werden: was uebrig bleibt, waere
+// Gestaltung, die nur hier steht.
 $stil = (string)(preg_match('/<style>(.*?)<\/style>/s', $mail['html'], $t) ? $t[1] : '');
+$rest = trim((string)preg_replace(
+    ['/a\[x-apple-data-detectors\]\s*\{[^}]*\}/',
+     '/@media \(prefers-color-scheme: dark\)\s*\{.*\}/s'],
+    '', $stil));
 $pruef('KRITISCH: die Gestaltung haengt an Inline-Styles, nicht am Stylesheet',
     str_contains($mail['html'], 'style="')
     && substr_count($mail['html'], '<style') === 1
-    && str_starts_with(trim($stil), '@media (prefers-color-scheme: dark)'));
+    && $stil !== '' && $rest === '');
 // Gegenprobe im Kleinen: Ohne den Block darf keine Farbe und keine
 // Flaeche verschwinden -- alles Sichtbare steht auch inline.
 $ohneStil = (string)preg_replace('/<style>.*?<\/style>/s', '', $mail['html']);

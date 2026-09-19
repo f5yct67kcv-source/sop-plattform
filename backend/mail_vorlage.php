@@ -124,8 +124,14 @@ function mail_signatur(array $zeilen, string $bildKennung = '',
         . MAIL_FARBE_TEXT . ';">'
         . '<b>' . mail_e(array_shift($sichtbar)) . '</b>';
     foreach ($sichtbar as $z) {
+        $inhalt = mail_e($z);
+        $tel = mail_telefon_ziel($z);
+        if ($tel !== '') {
+            $inhalt = '<a class="d-leise" href="tel:' . mail_e($tel) . '" style="color:'
+                . MAIL_FARBE_LEISE . ';text-decoration:none;">' . $inhalt . '</a>';
+        }
         $html .= '<br><span class="d-leise" style="color:' . MAIL_FARBE_LEISE . ';">'
-            . mail_e($z) . '</span>';
+            . $inhalt . '</span>';
     }
     $html .= '</p>';
     if ($bildKennung !== '') {
@@ -140,6 +146,32 @@ function mail_signatur(array $zeilen, string $bildKennung = '',
         $html .= mail_logo_bild($bildKennungHell, true);
     }
     return $html;
+}
+
+/**
+ * Erkennt, ob eine Signaturzeile eine Telefonnummer ist, und gibt das Ziel
+ * fuer einen tel:-Verweis zurueck ('' wenn die Zeile keine Nummer ist).
+ *
+ * Hintergrund: Apple Mail und iOS Mail erkennen Telefonnummern im Fliesstext
+ * selbst und machen daraus einen Waehl-Verweis -- in ihrer eigenen Farbe und
+ * unterstrichen, quer zur uebrigen Signatur. Wer den Verweis selbst setzt,
+ * behaelt die Gestaltung, und die Nummer bleibt antippbar. Befund des
+ * Projektinhabers am 2026-09-19 an der echten Mail.
+ */
+function mail_telefon_ziel(string $zeile): string
+{
+    $zeile = trim($zeile);
+    // Eine optionale Beschriftung davor ('Tel.', 'Mobil:', 'T') wird
+    // mitgelesen, aber nicht ins Waehlziel uebernommen.
+    if (!preg_match('/^(?:(?:Tel|Telefon|Mobile?|Mob|Fon|T|M)\.?\s*:?\s*)?'
+            . '(\+?[0-9][0-9\s.\/()-]{7,}[0-9])$/u', $zeile, $treffer)) {
+        return '';
+    }
+    $ziffern = (string)preg_replace('/[^0-9]/', '', $treffer[1]);
+    // Kuerzer als neun Ziffern ist keine Rufnummer, laenger als fuenfzehn
+    // gibt es nach E.164 nicht -- beides deutet auf etwas anderes hin.
+    if (strlen($ziffern) < 9 || strlen($ziffern) > 15) { return ''; }
+    return (str_starts_with($treffer[1], '+') ? '+' : '') . $ziffern;
 }
 
 // Ein Logo-Bild in der Signatur.
@@ -210,7 +242,7 @@ function mail_rahmen(string $inhalt): string
         // Faust um -- und treffen dabei den Text, aber nie ein Bild.
         . '<meta name="color-scheme" content="light dark">'
         . '<meta name="supported-color-schemes" content="light dark">'
-        . '<style>' . mail_dunkelmodus() . '</style></head>'
+        . '<style>' . mail_datenerkennung() . mail_dunkelmodus() . '</style></head>'
         . '<body style="margin:0;padding:0;">'
         . '<table role="presentation" class="d-grund" cellpadding="0" cellspacing="0" border="0"'
         . ' width="100%" style="background:#FFFFFF;margin:0;padding:0;">'
@@ -250,5 +282,24 @@ function mail_dunkelmodus(): string
         . '.logo-dunkel { display:none !important; }'
         . '.logo-hell { display:block !important; }'
         . '}';
+}
+
+/**
+ * Nimmt dem Mailprogramm die Hoheit ueber das, was es selbst als Telefonnummer,
+ * Datum oder Adresse erkennt. Apple Mail faerbt solche Fundstellen sonst blau
+ * und unterstreicht sie -- auch mitten in einer bewusst grauen Signatur.
+ * Was wir selbst verlinken, ist davon nicht betroffen; die Regel faengt den
+ * Rest ab, etwa eine Ortsangabe im Fuss.
+ */
+function mail_datenerkennung(): string
+{
+    return 'a[x-apple-data-detectors] {'
+        . ' color: inherit !important;'
+        . ' text-decoration: none !important;'
+        . ' font-size: inherit !important;'
+        . ' font-family: inherit !important;'
+        . ' font-weight: inherit !important;'
+        . ' line-height: inherit !important;'
+        . ' }';
 }
 
