@@ -8355,6 +8355,7 @@ async function rgKarteNativAbbauen() {
   // zu keiner Karte mehr gehoeren -- dieselbe Falle wie bei der
   // Standortmarke in ENT-331.
   rgsNativKreise = [];
+  rgsNativMarken = [];
   rgsNativGrenzen = null;
   rgFuellungNativAus();
   // Das Versprechen festhalten, damit ein Aufbau darauf warten kann
@@ -8792,6 +8793,11 @@ async function rgKarteNativBauen(d, bauLauf) {
   // gewollt.
   try { await rgsNativKarte.enableCurrentLocation(true); } catch (e) {}
   await rgKarteNativKreiseZeichnen(d.zeigbar);
+  await rgKarteNativMarkenZeichnen(d.zeigbar);
+  // Ein Tipp auf die Marke fuehrt in die Liste -- gemeldet wird dort,
+  // genau wie in der Browser-Fassung. Welche Marke getippt wurde, spielt
+  // dabei keine Rolle: Die Liste zeigt ohnehin alle.
+  try { await rgsNativKarte.setOnMarkerClickListener(() => rgLaufReiter('punkte')); } catch (e) {}
   // Den Stand merken, an dem spaetere Durchlaeufe erkennen, ob sich an
   // den Punkten etwas geaendert hat (OP-607) -- dieselbe Signatur und
   // dieselbe Variable wie in der Browser-Fassung.
@@ -8923,6 +8929,44 @@ function rgFuellungNativZeichnen(p, anteil) {
    Farbe und Zustand kommen aus rgPunktZustand, derselben Quelle wie in
    der Browser-Fassung. */
 let rgsNativKreise = [];
+let rgsNativMarken = [];
+
+/* Die Marken der Kontrollpunkte auf der nativen Karte (ENT-609).
+
+   ANLASS (vom Projektinhaber am Geraet gemeldet): Beim Herauszoomen
+   verschwanden die Kontrollpunkte vollstaendig. Sie waren nicht
+   ausgeblendet -- es standen nur die Geofence-KREISE da, und die haben
+   den echten Radius in Metern, meist 20. Auf einer Karte ueber den halben
+   Kanton ist das weniger als ein Bildpunkt.
+
+   Eine Marke hat dagegen eine feste Groesse in Bildpunkten und bleibt auf
+   jeder Zoomstufe gleich gross. Kreis und Marke sagen darum
+   Verschiedenes und bleiben beide: Der Kreis zeigt, wie weit der Bereich
+   reicht, die Marke zeigt, dass es den Punkt gibt.
+
+   iconAnchor sitzt in der MITTE des Bildes, nicht unten: Die Marke ist
+   eine Scheibe wie in der Browser-Fassung, keine Stecknadel. Ohne das
+   haenge sie um ihren halben Durchmesser zu weit noerdlich -- die
+   Voreinstellung des Plugins geht von einer Nadelspitze unten aus. */
+const RG_MARKE_PT = 32;      // Kantenlaenge auf dem Schirm; das Bild ist 96 px (dreifach)
+async function rgKarteNativMarkenZeichnen(punkte) {
+  if (!rgsNativKarte) { return; }
+  try {
+    if (rgsNativMarken.length) {
+      await rgsNativKarte.removeMarkers(rgsNativMarken);
+      rgsNativMarken = [];
+    }
+    if (!punkte || !punkte.length) { return; }
+    rgsNativMarken = await rgsNativKarte.addMarkers(punkte.map(p => ({
+      coordinate: { lat: p.lat, lng: p.lng },
+      title: p.bezeichnung,
+      iconUrl: rgPunktZustand(p).bild,
+      iconSize: { width: RG_MARKE_PT, height: RG_MARKE_PT },
+      iconAnchor: { x: RG_MARKE_PT / 2, y: RG_MARKE_PT / 2 },
+    }))) || [];
+  } catch (e) { rgsNativMarken = []; }
+}
+
 async function rgKarteNativKreiseZeichnen(punkte) {
   if (!rgsNativKarte) { return; }
   try {
@@ -9009,6 +9053,7 @@ function rgKarteNativAktualisieren(d, ortungHinweis, hinweis) {
   if (sig !== rgsKartenSignatur) {
     rgsKartenSignatur = sig;
     rgKarteNativKreiseZeichnen(d.zeigbar);
+    rgKarteNativMarkenZeichnen(d.zeigbar);
   }
 }
 
@@ -9169,6 +9214,19 @@ function rgPunktZustand(p) {
   return {
     farbe: fertig ? '#4FCE96' : abweichend ? '#E2B156' : '#7098F7',
     zeichen: fertig ? '✓' : abweichend ? '!' : String(p.nr),
+    /* Dasselbe als BILD, fuer die native Karte (ENT-609).
+
+       Das native SDK zeichnet keine Vektorsymbole -- eine Marke ist dort
+       ausschliesslich eine Bilddatei. Die drei Bilder entstehen in
+       marken-erzeugen.py und tragen dieselben Farben wie oben.
+
+       Sie tragen KEINE Nummer (Entscheidung des Projektinhabers): Das
+       waere ein Bild je Nummer und Zustand, bei 40 Punkten also 120
+       Dateien -- und bei Punkt 41 fehlte eines. Die Nummer steht in der
+       Liste; auf der Karte ist gefragt, wo der Punkt liegt und ob er
+       erledigt ist. */
+    bild: fertig ? 'icons/kp-erledigt.png'
+      : abweichend ? 'icons/kp-abweichend.png' : 'icons/kp-offen.png',
   };
 }
 

@@ -2128,6 +2128,63 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
   }
 }
 
+// ── Die Marken der nativen Karte (ENT-609) ───────────────────────────────
+//
+// Drei PNG-Dateien, weil das native Maps-SDK keine Vektorsymbole zeichnet.
+// Sie entstehen in marken-erzeugen.py und liegen mitversioniert in icons/.
+//
+// Zwei Wege koennen sie verlieren: Jemand aendert das Skript und vergisst,
+// es laufen zu lassen (dann zeigt die App etwas anderes als der Quelltext
+// sagt), oder die Dateien kommen nicht ins Buendel (dann bleibt die Marke
+// auf dem Geraet leer, ohne Fehlermeldung).
+{
+  const { execFileSync } = await import('child_process');
+  const { mkdtempSync, readFileSync: lies, existsSync: da, rmSync } = await import('fs');
+  const { tmpdir } = await import('os');
+  const { join } = await import('path');
+
+  const MARKEN = ['icons/kp-offen.png', 'icons/kp-erledigt.png', 'icons/kp-abweichend.png'];
+
+  check('KRITISCH: die drei Marken-Bilder der nativen Karte liegen im Repository',
+    MARKEN.every(m => da(`${WURZEL}/${m}`)));
+
+  // Skript und Ergebnis duerfen nicht auseinanderlaufen -- dieselbe Regel
+  // wie bei skizze.js/skizze-einbetten.py. Erzeugt wird in einen
+  // Wegwerf-Ordner; die echten Dateien werden nicht angefasst.
+  {
+    const ordner = mkdtempSync(join(tmpdir(), 'marken-'));
+    let gelaufen = true;
+    try {
+      execFileSync('python3', [`${WURZEL}/marken-erzeugen.py`, ordner],
+        { encoding: 'utf8', stdio: 'ignore' });
+    } catch (e) { gelaufen = false; }
+    check('KRITISCH: marken-erzeugen.py läuft durch', gelaufen);
+    if (gelaufen) {
+      const abweichend = MARKEN.filter(m =>
+        !da(join(ordner, m)) || !lies(`${WURZEL}/${m}`).equals(lies(join(ordner, m))));
+      check('KRITISCH: die abgelegten Marken sind genau das, was marken-erzeugen.py erzeugt'
+          + ' (sonst "python3 marken-erzeugen.py" ausführen)',
+        abweichend.length === 0);
+      if (abweichend.length) { bad.push('Marke läuft auseinander: ' + abweichend.join(', ')); }
+    }
+    rmSync(ordner, { recursive: true, force: true });
+  }
+
+  // Und sie muessen dort ankommen, wo die App sie sucht: Der iconUrl-Pfad
+  // ist relativ zum Web-Verzeichnis des Buendels.
+  const buendel = readFileSync(`${WURZEL}/mobile-buendel-erstellen.py`, 'utf8');
+  check('KRITISCH: das App-Bündel nimmt den ganzen icons-Ordner mit — dort liegen die Marken',
+    /for\s+ordner_name\s+in\s+\([^)]*'icons'/.test(buendel));
+
+  // Die Web-Bündel ebenfalls: dist/ und dist-cupi24/ liefern app.html aus,
+  // und ein fehlendes Bild faellt dort nicht auf, weil die Web-Fassung
+  // weiterhin Vektorsymbole zeichnet -- es waere erst in der App zu sehen.
+  for (const ziel of ['dist', 'dist-cupi24']) {
+    check(`KRITISCH: die Marken-Bilder kommen ins ${ziel}-Bündel`,
+      new RegExp(`cp\\s+icons/\\*\\.png\\s+${ziel}/icons/`).test(workflow));
+  }
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

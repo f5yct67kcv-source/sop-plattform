@@ -503,6 +503,146 @@ check('KRITISCH: ein Abbau während des Aufbaus lässt die Durchsicht nicht an',
     return durchsicht === false && zerstoert === true;
   }));
 
+/* Die Marken der Kontrollpunkte auf der nativen Karte (ENT-609).
+
+   ANLASS (vom Projektinhaber am Geraet gemeldet): Beim Herauszoomen
+   verschwanden die Kontrollpunkte vollstaendig. Es standen nur die
+   Geofence-KREISE da, und die haben den echten Radius in Metern -- auf
+   einer weiten Karte weniger als ein Bildpunkt. Eine Marke hat eine
+   feste Groesse in Bildpunkten und bleibt sichtbar.
+
+   Geprueft wird die AUSSAGE (die Marke traegt das Bild, das zum Zustand
+   gehoert), nicht ein Dateiname im Quelltext: Der Sollwert kommt aus
+   rgPunktZustand, derselben Quelle, die auch die Browser-Karte faerbt. */
+check('KRITISCH: beim Aufbau bekommt jeder Kontrollpunkt eine Marke mit dem Bild seines Zustands',
+  await page.evaluate(async () => {
+    const merkN = window.KarteNativ, merkK = rgsNativKarte, merkE = rgsKarteEl;
+    const merkS = rgsKartenSignatur;
+    let gesetzt = [];
+    const attrappe = {
+      setCamera: async () => {}, fitBounds: async () => {},
+      enableCurrentLocation: async () => {}, destroy: async () => {},
+      removeCircles: async () => {}, addCircles: async () => [],
+      getMapBounds: async () => null, setOnCameraIdleListener: async () => {},
+      setOnMarkerClickListener: async () => {},
+      removeMarkers: async () => {},
+      addMarkers: async (liste) => { gesetzt = liste; return liste.map((_, i) => 'm' + i); },
+    };
+    window.KarteNativ = { GoogleMap: { create: async () => attrappe } };
+    const d = rgKarteDaten(rundgangAktiv.kontrollpunkte);
+    await rgKarteNativBauen(d, rgsKarteBauLauf);
+    const soll = d.zeigbar.map(p => rgPunktZustand(p).bild);
+    const ist = gesetzt.map(m => m.iconUrl);
+    await rgKarteNativAbbauen();
+    window.KarteNativ = merkN; rgsNativKarte = merkK; rgsKarteEl = merkE;
+    rgsKartenSignatur = merkS;
+    document.body.classList.remove('karte-nativ');
+    return d.zeigbar.length > 0 && ist.length === d.zeigbar.length
+      && ist.every((b, i) => b === soll[i]) && ist.every(b => /\.png$/.test(b));
+  }));
+
+/* Der Anker sitzt in der MITTE des Bildes, nicht unten.
+
+   Die Voreinstellung des Plugins geht von einer Stecknadel aus und setzt
+   den Anker unten mittig. Unsere Marke ist aber eine Scheibe wie in der
+   Browser-Fassung -- mit der Voreinstellung haenge sie um ihren halben
+   Durchmesser zu weit noerdlich, also neben dem Kontrollpunkt. */
+check('KRITISCH: die Marke ist auf ihrer Mitte verankert, nicht auf ihrem unteren Rand',
+  await page.evaluate(async () => {
+    const merkN = window.KarteNativ, merkK = rgsNativKarte, merkE = rgsKarteEl;
+    const merkS = rgsKartenSignatur;
+    let gesetzt = [];
+    const attrappe = {
+      setCamera: async () => {}, fitBounds: async () => {},
+      enableCurrentLocation: async () => {}, destroy: async () => {},
+      removeCircles: async () => {}, addCircles: async () => [],
+      getMapBounds: async () => null, setOnCameraIdleListener: async () => {},
+      setOnMarkerClickListener: async () => {}, removeMarkers: async () => {},
+      addMarkers: async (liste) => { gesetzt = liste; return liste.map((_, i) => 'm' + i); },
+    };
+    window.KarteNativ = { GoogleMap: { create: async () => attrappe } };
+    await rgKarteNativBauen(rgKarteDaten(rundgangAktiv.kontrollpunkte), rgsKarteBauLauf);
+    const m = gesetzt[0];
+    await rgKarteNativAbbauen();
+    window.KarteNativ = merkN; rgsNativKarte = merkK; rgsKarteEl = merkE;
+    rgsKartenSignatur = merkS;
+    document.body.classList.remove('karte-nativ');
+    return !!m && m.iconSize && m.iconAnchor
+      && m.iconSize.width > 0 && m.iconSize.height > 0
+      && Math.abs(m.iconAnchor.x - m.iconSize.width / 2) < 0.01
+      && Math.abs(m.iconAnchor.y - m.iconSize.height / 2) < 0.01;
+  }));
+
+/* Wird ein Punkt erfasst, muss auch die MARKE das neue Bild tragen --
+   nicht nur der Kreis seine neue Farbe. Beides haengt an rgPunktZustand;
+   die Marke war beim ersten Bauen aber nicht mitgezogen worden. */
+check('KRITISCH: wird ein Kontrollpunkt erfasst, wechselt auch das Bild seiner Marke',
+  await page.evaluate(async () => {
+    const merkN = window.KarteNativ, merkK = rgsNativKarte, merkE = rgsKarteEl;
+    const merkS = rgsKartenSignatur;
+    let bilder = [];
+    const attrappe = {
+      setCamera: async () => {}, fitBounds: async () => {},
+      enableCurrentLocation: async () => {}, destroy: async () => {},
+      removeCircles: async () => {}, addCircles: async () => [],
+      getMapBounds: async () => null, setOnCameraIdleListener: async () => {},
+      setOnMarkerClickListener: async () => {}, removeMarkers: async () => {},
+      addMarkers: async (liste) => { bilder = liste.map(m => m.iconUrl); return liste.map((_, i) => 'm' + i); },
+    };
+    window.KarteNativ = { GoogleMap: { create: async () => attrappe } };
+    const kp = rundgangAktiv.kontrollpunkte.find(k => k.lat !== null && k.lat !== undefined);
+    const merkErledigt = kp.erledigt;
+    kp.erledigt = null;
+    await rgKarteNativBauen(rgKarteDaten(rundgangAktiv.kontrollpunkte), rgsKarteBauLauf);
+    const vorher = bilder.slice();
+    kp.erledigt = { status: 'ok' };
+    const d = rgKarteDaten(rundgangAktiv.kontrollpunkte);
+    rgKarteNativAktualisieren(d, '', '');
+    await new Promise(r => setTimeout(r, 60));
+    const nachher = bilder.slice();
+    const soll = rgPunktZustand(d.zeigbar.find(p => Number(p.id) === Number(kp.id))).bild;
+    kp.erledigt = merkErledigt;
+    await rgKarteNativAbbauen();
+    window.KarteNativ = merkN; rgsNativKarte = merkK; rgsKarteEl = merkE;
+    rgsKartenSignatur = merkS;
+    document.body.classList.remove('karte-nativ');
+    return vorher.length > 0 && nachher.join() !== vorher.join() && nachher.includes(soll);
+  }));
+
+/* Ein Tipp auf die Marke fuehrt in die Liste -- dieselbe Verdrahtung wie
+   in der Browser-Fassung. Gemeldet wird dort, nicht auf der Karte. */
+check('KRITISCH: ein Tipp auf eine native Marke führt in die Kontrollpunkt-Liste',
+  await page.evaluate(async () => {
+    const merkN = window.KarteNativ, merkK = rgsNativKarte, merkE = rgsKarteEl;
+    const merkS = rgsKartenSignatur, merkR = rgsReiter;
+    let hoerer = null;
+    const attrappe = {
+      setCamera: async () => {}, fitBounds: async () => {},
+      enableCurrentLocation: async () => {}, destroy: async () => {},
+      removeCircles: async () => {}, addCircles: async () => [],
+      getMapBounds: async () => null, setOnCameraIdleListener: async () => {},
+      removeMarkers: async () => {}, addMarkers: async (l) => l.map((_, i) => 'm' + i),
+      setOnMarkerClickListener: async (cb) => { hoerer = cb; },
+    };
+    window.KarteNativ = { GoogleMap: { create: async () => attrappe } };
+    await rgKarteNativBauen(rgKarteDaten(rundgangAktiv.kontrollpunkte), rgsKarteBauLauf);
+    const verdrahtet = typeof hoerer === 'function';
+    if (verdrahtet) { hoerer({ markerId: 'm0' }); }
+    await new Promise(r => setTimeout(r, 120));
+    const inListe = rgsReiter === 'punkte';
+    await rgKarteNativAbbauen();
+    window.KarteNativ = merkN; rgsNativKarte = merkK; rgsKarteEl = merkE;
+    rgsKartenSignatur = merkS;
+    document.body.classList.remove('karte-nativ');
+    // Der Tipp hat den Reiter wirklich gewechselt und damit den Rumpf
+    // ersetzt. Zurueck auf den Karten-Reiter, sonst steht den Pruefungen
+    // danach keine Karte mehr zur Verfuegung -- und sie waeren rot, ohne
+    // dass an ihrer eigenen Sache etwas fehlt.
+    if (merkR !== rgsReiter) { rgLaufReiter(merkR); }
+    await new Promise(r => setTimeout(r, 400));
+    return verdrahtet && inListe;
+  }));
+
 /* OP-610: Abbau und Aufbau tragen dieselbe Kartenkennung. Bis hierher
    liefen sie nebeneinander -- destroy() der alten war noch unterwegs,
    waehrend create() die neue schon anlegte. */
