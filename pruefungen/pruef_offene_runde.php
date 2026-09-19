@@ -113,6 +113,51 @@ pruef('KRITISCH: eine erst vorbereitete Runde zaehlt als offen -- sonst bliebe d
 pruef('Sie steht bei 0 von 2 -- und das ist eine Aussage, keine Luecke',
     $a['rundgang']['erledigt_anzahl'] === 0 && $a['rundgang']['punkte_anzahl'] === 2);
 
+// ══════════════ IST ES DIESELBE RUNDE? (ENT-630)
+// ENT-629 sperrte jeden zweiten Start. Der Projektinhaber hat das am
+// Geraet verworfen: gesperrt wird nur noch DIESELBE Runde, alles andere
+// startet normal. Was "dieselbe" heisst, entscheidet diese Funktion --
+// und ein Fehler hier faellt nach beiden Seiten teuer aus: zu eng, und
+// die Leichen aus den Bildschirmfotos entstehen wieder; zu weit, und der
+// Waechter steht vor einem fremden Objekt und kommt nicht los.
+$mitVorlage   = ['vorlage_id' => 30,   'objekt_id' => 7, 'status' => 'pausiert'];
+$ohneVorlage  = ['vorlage_id' => null, 'objekt_id' => 7, 'status' => 'pausiert'];
+
+pruef('KRITISCH: dieselbe Kontrollrunde ist dieselbe Runde',
+    rundgang_gleiche_runde($mitVorlage, 7, 30) === true);
+pruef('KRITISCH: eine ANDERE Kontrollrunde ist es nicht -- auch am selben Objekt nicht',
+    rundgang_gleiche_runde($mitVorlage, 7, 31) === false);
+pruef('Dieselbe Kontrollrunde bleibt dieselbe, auch wenn das Objekt anders gezaehlt wird',
+    rundgang_gleiche_runde($mitVorlage, 99, 30) === true);
+
+// Ohne Kontrollrunde umfasst die Runde alle aktiven Punkte des Objekts --
+// dann entscheidet das Objekt.
+pruef('KRITISCH: ohne Kontrollrunde entscheidet das Objekt',
+    rundgang_gleiche_runde($ohneVorlage, 7, null) === true);
+pruef('KRITISCH: ein ANDERES Objekt ist eine andere Runde',
+    rundgang_gleiche_runde($ohneVorlage, 8, null) === false);
+
+// Die beiden Bauarten sind nie dasselbe: Die eine hat einen festgelegten
+// Umfang, die andere nicht.
+pruef('KRITISCH: eine Runde MIT Vorlage und eine OHNE sind nie dieselbe (Objekt gleich)',
+    rundgang_gleiche_runde($mitVorlage, 7, null) === false
+    && rundgang_gleiche_runde($ohneVorlage, 7, 30) === false);
+
+// 0 ist keine Vorlage -- das kommt aus (int) auf einen leeren Wert.
+pruef('Eine vorlage_id von 0 zaehlt wie keine',
+    rundgang_gleiche_runde($ohneVorlage, 7, 0) === true
+    && rundgang_gleiche_runde($mitVorlage, 7, 0) === false);
+
+pruef('KRITISCH: ohne offene Runde gibt es nie einen Konflikt',
+    rundgang_gleiche_runde(null, 7, 30) === false
+    && rundgang_gleiche_runde(null, 7, null) === false);
+
+// Die Funktion sagt NICHTS ueber den Zustand -- das entscheiden die
+// Endpunkte. Sonst muesste man sie fuer jeden neuen Zustand anfassen.
+$laufend = ['vorlage_id' => 30, 'objekt_id' => 7, 'status' => 'laeuft'];
+pruef('Sie urteilt ueber die Runde, nicht ueber ihren Zustand',
+    rundgang_gleiche_runde($laufend, 7, 30) === true);
+
 echo "\n$ok bestanden, " . count($bad) . " nicht bestanden\n\n";
 foreach ($bad as $b) { echo "  ✗ $b\n"; }
 exit($bad ? 1 : 0);

@@ -1583,6 +1583,10 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
 .ro-z b { display: block; font-size: 11px; font-weight: 640; letter-spacing: .6px;
   text-transform: uppercase; color: var(--ink-3); }
 .ro-z span { display: block; font-size: 14.5px; color: var(--ink); margin-top: 2px; }
+/* Dass noch mehr offen ist, steht abgesetzt unter den Angaben -- es gehoert
+   nicht zu dieser Runde, sondern sagt etwas ueber den Rest (ENT-630). */
+.ro-weitere { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line);
+  font-size: 13px; line-height: 1.45; color: var(--ink-3); }
 
 @media (min-width: 700px) {
   .md-paar-sh { grid-template-columns: 3fr 1fr; }
@@ -2581,6 +2585,17 @@ const W = {
     // darum ausgeschrieben da.
     roAllePunkte: 'Alle Kontrollpunkte des Objekts',
     roFortsetzenKnopf: 'Fortsetzen',
+    // Aus einem abgelehnten Start heraus (ENT-630) heissen die Wege anders:
+    // Der Abbruch ist dort kein Selbstzweck, sondern der Weg zur Runde, die
+    // man eigentlich starten wollte -- und das gehoert auf den Knopf.
+    roAbbrechenNeuKnopf: 'Abbrechen & neu starten',
+    roAbbrechenNeuUnter: 'Der offene Rundgang wird mit Grund abgebrochen, danach startet der neue',
+    roFortsetzenStattNeu: 'Statt einen neuen zu starten',
+    roNeuGestartet: 'Der neue Rundgang ist gestartet.',
+    // „Unbekannt" darf nie wie „keine" aussehen: Dass noch mehr offen ist,
+    // wird gesagt, nicht verschwiegen (ENT-630 laesst mehrere zu).
+    roWeitereEiner: 'Ein weiterer Rundgang ist ebenfalls noch offen — er kommt als Nächstes dran.',
+    roWeitereMehrere: 'weitere Rundgänge sind ebenfalls noch offen — sie kommen nacheinander dran.',
     roFortsetzenUnter: 'Weiter im Rundgang',
     roPausiertLassenKnopf: 'Pausiert lassen',
     roPausiertLassenUnter: 'Der Rundgang bleibt offen und lässt sich später fortsetzen',
@@ -3699,6 +3714,20 @@ function rundgangChipHtml() {
 // zurueckkommen.
 let roOffen = null;
 let roAbrufLaeuft = false;
+/* Kommt die Rueckfrage aus einem abgelehnten START (ENT-630)? Dann sieht
+   sie anders aus als beim App-Start, weil der Waechter etwas VORHAT:
+   „Pausiert lassen" braechte ihn keinen Schritt weiter -- es ist derselbe
+   Zustand, aus dem er gerade kommt. Vom Projektinhaber am Geraet gemeldet,
+   nachdem er genau diesen Knopf gedrueckt hatte und wieder vor der Sperre
+   stand. */
+let roAusStart = false;
+// Was nach einem erfolgreichen Abbruch zu tun ist: den Start wiederholen,
+// den der Server gerade abgelehnt hat. Sonst landet man auf „Heute" und
+// sucht sich die Runde, die man schon einmal gewaehlt hatte, neu zusammen.
+let roNachAbbruch = null;
+// Wie viele Runden ausser dieser noch offen sind -- gemerkt, damit der
+// Rueckweg aus der Grundabfrage dieselbe Auskunft zeigt wie vorher.
+let roWeitereZahl = 0;
 
 function roPruefen() {
   // Vor der Anmeldung gibt es nichts zu fragen -- und `visibilitychange`
@@ -3716,7 +3745,9 @@ function roPruefen() {
     // Zwischen Absenden und Antwort kann die App die Runde selbst geoeffnet
     // haben (Chip, Einsatzmodus). Dann ist die Frage beantwortet.
     if (roAppKenntRunde()) { return; }
-    roZeigen(data.rundgang);
+    roAusStart = false;
+    roNachAbbruch = null;
+    roZeigen(data.rundgang, data.weitere);
   });
 }
 
@@ -3725,8 +3756,9 @@ function roAppKenntRunde() {
     && RUNDGANG_OFFENE_STATUS.includes(rundgangAktiv.status);
 }
 
-function roZeigen(r) {
+function roZeigen(r, weitere) {
   roOffen = r;
+  if (weitere !== undefined) { roWeitereZahl = Number(weitere || 0); }
   const pausiert = r.status === 'pausiert';
   $('roLb').textContent = w('roLb');
   $('roFrage').textContent = w('roFrage');
@@ -3750,17 +3782,40 @@ function roZeigen(r) {
     zeilen.push([w('rundgangPausiertSeit'),
       dmy(r.pausiert_seit) + ' – ' + String(r.pausiert_seit).slice(11, 16)]);
   }
+  /* Mehrere offene Runden sind seit ENT-630 wieder moeglich -- die Sperre
+     greift nur noch bei DERSELBEN. Dass noch mehr offen ist, wird darum
+     gesagt: Sonst saehe „eine Runde offen" aus wie „genau eine", und der
+     Rest bliebe unsichtbar, bis er von selbst wieder auftaucht. */
+  const uebrig = roWeitereZahl;
+  const weitereZeile = uebrig === 1 ? w('roWeitereEiner')
+    : uebrig > 1 ? uebrig + ' ' + w('roWeitereMehrere') : '';
   $('roMeta').innerHTML = zeilen.map(([lb, wert]) =>
-    `<div class="ro-z"><b>${esc(lb)}</b><span>${esc(wert)}</span></div>`).join('');
+    `<div class="ro-z"><b>${esc(lb)}</b><span>${esc(wert)}</span></div>`).join('')
+    + (weitereZeile ? `<div class="ro-weitere" id="roWeitere">${esc(weitereZeile)}</div>` : '');
 
-  $('roBtnWeiter').innerHTML = `${esc(w('roFortsetzenKnopf'))}<span class="btn-unter">${esc(w('roFortsetzenUnter'))}</span>`;
-  // Eine bereits pausierte Runde laesst sich nicht noch einmal pausieren --
-  // das waere eine Pause in der Pause, und der Server zaehlte sie doppelt.
-  // Der mittlere Weg heisst dann, was er tut: nichts aendern.
-  $('roBtnPause').innerHTML = pausiert
-    ? `${esc(w('roPausiertLassenKnopf'))}<span class="btn-unter">${esc(w('roPausiertLassenUnter'))}</span>`
-    : `${esc(w('rundgangPausierenKnopf'))}<span class="btn-unter">${esc(w('rundgangPausierenUnter'))}</span>`;
-  $('roBtnAb').innerHTML = `${esc(w('rundgangAbbrechenKnopf'))}<span class="btn-unter">${esc(w('rundgangAbbrechenUnter'))}</span>`;
+  $('roBtnWeiter').innerHTML = `${esc(w('roFortsetzenKnopf'))}<span class="btn-unter">${
+    esc(roAusStart ? w('roFortsetzenStattNeu') : w('roFortsetzenUnter'))}</span>`;
+  /* Der mittlere Weg entfaellt, wenn die Frage aus einem abgelehnten Start
+     kommt (ENT-630): Von den drei Knoepfen braechte dort genau einer den
+     Waechter nirgendwohin -- zurueck in denselben Zustand, aus dem er
+     gerade kommt. Ein Knopf, der in diesem Moment nichts bewirkt, ist
+     schlimmer als keiner; man drueckt ihn ja, weil er nach einem Ausweg
+     aussieht. */
+  $('roBtnPause').hidden = roAusStart;
+  if (!roAusStart) {
+    // Eine bereits pausierte Runde laesst sich nicht noch einmal pausieren
+    // -- das waere eine Pause in der Pause, und der Server zaehlte sie
+    // doppelt. Der mittlere Weg heisst dann, was er tut: nichts aendern.
+    $('roBtnPause').innerHTML = pausiert
+      ? `${esc(w('roPausiertLassenKnopf'))}<span class="btn-unter">${esc(w('roPausiertLassenUnter'))}</span>`
+      : `${esc(w('rundgangPausierenKnopf'))}<span class="btn-unter">${esc(w('rundgangPausierenUnter'))}</span>`;
+  }
+  // Aus einem abgelehnten Start heraus ist der Abbruch kein Selbstzweck,
+  // sondern der Weg zu der Runde, die man starten wollte. Das steht auf
+  // dem Knopf, statt dass man es sich denken muss.
+  $('roBtnAb').innerHTML = roAusStart
+    ? `${esc(w('roAbbrechenNeuKnopf'))}<span class="btn-unter">${esc(w('roAbbrechenNeuUnter'))}</span>`
+    : `${esc(w('rundgangAbbrechenKnopf'))}<span class="btn-unter">${esc(w('rundgangAbbrechenUnter'))}</span>`;
   ['roBtnWeiter', 'roBtnPause', 'roBtnAb'].forEach(i => { $(i).disabled = false; });
   $('roDlg').classList.add('on');
   $('roDlg').setAttribute('aria-hidden', 'false');
@@ -3774,7 +3829,13 @@ function roZu() {
   $('roDlg').setAttribute('aria-hidden', 'true');
 }
 
-function roFertig() { roZu(); roOffen = null; }
+// Fertig heisst: Die Frage ist beantwortet. Damit faellt auch alles weg,
+// was nur fuer diese eine Frage galt -- insbesondere der gemerkte Start.
+// Wer „Fortsetzen" waehlt, will den neuen Rundgang ausdruecklich NICHT.
+function roFertig() {
+  roZu();
+  roOffen = null; roAusStart = false; roNachAbbruch = null; roWeitereZahl = 0;
+}
 
 /* Was die App nach „Pausieren" von der Runde weiss: die Zahlen, nicht die
    Punkte. Genug fuer den Chip auf „Heute" und genug, um die Rueckfrage
@@ -3876,7 +3937,7 @@ function roAbbrechen() {
 // aergerlich -- der Dialog laesst sich ja sonst nicht schliessen.
 function roZurueckAusAbbruch() {
   blattZu();
-  if (roOffen) { roZeigen(roOffen); }
+  if (roOffen) { roZeigen(roOffen, roWeitereZahl); }
 }
 
 /* Der Start ist abgelehnt worden, weil noch eine Runde offen ist
@@ -3887,10 +3948,14 @@ function roZurueckAusAbbruch() {
 
    Gibt der Server die offene Runde ausnahmsweise nicht mit, bleibt es beim
    Satz: lieber eine magere Auskunft als eine erfundene Rueckfrage. */
-function rgStartAbgelehntOffeneRunde(data) {
+function rgStartAbgelehntOffeneRunde(data, wiederholen) {
   if (!data || data.code !== 'runde_offen') { return false; }
   if (!data.offen) { toast(data.message || w('netzfehler')); return true; }
-  roZeigen(data.offen);
+  roAusStart = true;
+  // Was der Waechter wollte, bleibt gemerkt: Nach dem Abbruch startet
+  // genau dieser Rundgang, statt ihn auf „Heute" neu suchen zu lassen.
+  roNachAbbruch = wiederholen || null;
+  roZeigen(data.offen, data.weitere);
   return true;
 }
 
@@ -6720,8 +6785,10 @@ function rundgangSpontanStarten(vorlageId, ausnahmeGrund, trotzDoppel) {
     }
     if (!ok || data.status !== 'ok') {
       document.querySelectorAll('#blBody button, #rfsBtn').forEach(b => b.disabled = false);
-      // Noch eine Runde offen (ENT-629): Die Rueckfrage traegt den Ausweg.
-      if (rgStartAbgelehntOffeneRunde(data)) { return; }
+      // Dieselbe Runde ist pausiert (ENT-630): Die Rueckfrage traegt den
+      // Ausweg, und nach dem Abbruch startet dieser Versuch von selbst.
+      if (rgStartAbgelehntOffeneRunde(data,
+        () => rundgangSpontanStarten(vorlageId, ausnahmeGrund, trotzDoppel))) { return; }
       toast(data.message || w('netzfehler'));
       return;
     }
@@ -7974,8 +8041,10 @@ function rundgangStartenMitVorlage(einsatzId, vorlageId, ausnahmeGrund) {
   api('mein_rundgang_starten.php', { method: 'POST', body }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') {
       document.querySelectorAll('#blRundgang button, #rdVorlageListe button, #rfBtn').forEach(b => b.disabled = false);
-      // Noch eine Runde offen (ENT-629): Die Rueckfrage traegt den Ausweg.
-      if (rgStartAbgelehntOffeneRunde(data)) { return; }
+      // Dieselbe Runde ist pausiert (ENT-630): Die Rueckfrage traegt den
+      // Ausweg, und nach dem Abbruch startet dieser Versuch von selbst.
+      if (rgStartAbgelehntOffeneRunde(data,
+        () => rundgangStartenMitVorlage(einsatzId, vorlageId, ausnahmeGrund))) { return; }
       toast(data.message || w('netzfehler'));
       return;
     }
@@ -11645,7 +11714,20 @@ function rundgangAbbrechenSenden(einsatzId, raus) {
       // Ist die Runde abgebrochen und die Frage kam aus dem Pfeil, ist der
       // Weg hinaus die Antwort -- ein Zurueckspringen auf die Seite einer
       // beendeten Runde waere eine Sackgasse.
-      if (raus) { blattZu(); rgSeiteZu(); zeichneHeute(); return; }
+      if (raus) {
+        blattZu(); rgSeiteZu(); zeichneHeute();
+        /* Kam die Frage aus einem abgelehnten Start (ENT-630), war der
+           Abbruch nur der Weg dorthin -- jetzt geht der Rundgang los, den
+           der Waechter eigentlich wollte. Ohne das landet er auf „Heute"
+           und sucht sich die Runde, die er schon gewaehlt hatte, samt
+           Ausnahmegrund neu zusammen. */
+        if (roNachAbbruch) {
+          const weiter = roNachAbbruch;
+          roNachAbbruch = null; roAusStart = false;
+          weiter();
+        }
+        return;
+      }
       rundgangAnzeigen(einsatzId);
     });
 }
