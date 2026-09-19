@@ -1559,7 +1559,7 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
    Prüfung: "Verstanden" stand neben den Termin-Knöpfen. */
 .mit-dlg-fuss .btn[hidden] { display: none; }
 
-/* ══ Offener Rundgang beim App-Start (ENT-624) ════════════════════════
+/* ══ Offener Rundgang beim App-Start (ENT-628) ════════════════════════
    Dieselbe Huelle wie die wichtige Mitteilung -- ein zweiter Dialog, der
    anders aussieht als der erste, waere fuer denselben Zweck eine zweite
    Sprache. Geaendert wird nur, was sich inhaltlich unterscheidet. */
@@ -2222,7 +2222,7 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
   <div class="blatt-ft" id="blFuss"></div>
 </div>
 
-<!-- Offener Rundgang beim App-Start (ENT-624). Bewusst dieselbe Huelle wie
+<!-- Offener Rundgang beim App-Start (ENT-628). Bewusst dieselbe Huelle wie
      die wichtige Mitteilung (.mit-dlg): fest ueber allem, kein Kreuz, kein
      Klick daneben. Wer die App oeffnet und eine Runde offen hat, waehlt
      einen der drei Wege -- es gibt keinen vierten. Die drei Knoepfe tragen
@@ -2563,7 +2563,7 @@ const W = {
     rundgangPauseWiederaufnehmen: 'Fortsetzen',
     rundgangPausiertHinweis: 'Der Rundgang ist pausiert. Kontrollpunkte lassen sich erst nach dem Fortsetzen wieder melden.',
     rundgangPausiertSeit: 'pausiert seit',
-    // ══ Wiedereinstieg nach App-Neustart (ENT-624) ══════════════════
+    // ══ Wiedereinstieg nach App-Neustart (ENT-628) ══════════════════
     // Der Chip aus ENT-234 lebt nur im Arbeitsspeicher der Sitzung. Wer die
     // App schliesst, sieht die offene Runde danach nirgends mehr -- sie
     // laeuft aber weiter und steht in der Auswertung als unbeendet. Darum
@@ -3125,7 +3125,7 @@ function starten() {
   // jemandem auffiel.
   evWarteschlangeSenden();
   // Steht eine Runde vom letzten Mal noch offen, wird jetzt gefragt
-  // (ENT-624). Bewusst hier und nicht in allesLaden(): Es ist eine Frage an
+  // (ENT-628). Bewusst hier und nicht in allesLaden(): Es ist eine Frage an
   // den Menschen, kein Nachladen von Daten.
   roPruefen();
   // Den Service Worker registrieren (ENT-424). Er traegt die
@@ -3641,7 +3641,7 @@ function schichtKarte(e, mitDatum) {
 // desselben App-Aufenthalts, kein zusaetzlicher Serveraufruf bei jedem Laden.
 function rundgangChipHtml() {
   if (!rundgangAktiv || rundgangAktiv.status === 'abgebrochen' || rundgangAktiv.status === 'abgeschlossen') return '';
-  /* Kam die Runde aus der Rueckfrage beim App-Start (ENT-624), kennt die
+  /* Kam die Runde aus der Rueckfrage beim App-Start (ENT-628), kennt die
      App nur die ZAHLEN, nicht die einzelnen Punkte -- geholt wird die
      volle Liste erst beim Einstieg. Ohne diese Fallunterscheidung stuende
      hier "0 von 0 erledigt", und das sieht aus wie eine leere Runde
@@ -3663,7 +3663,7 @@ function rundgangChipHtml() {
   </button>`;
 }
 
-/* ══ OFFENER RUNDGANG BEIM APP-START (ENT-624) ════════════════════════
+/* ══ OFFENER RUNDGANG BEIM APP-START (ENT-628) ════════════════════════
 
    Vom Projektinhaber verlangt: Wer eine Runde pausiert und die App
    verlaesst, soll beim naechsten Oeffnen gefragt werden, ob er
@@ -3840,7 +3840,7 @@ function roPausieren() {
   const r = roOffen;
   if (!r) { return; }
   // blattZu(): Kam die Rueckfrage aus einer abgelehnten Startanfrage
-  // (ENT-625), steht die Startschublade noch offen -- sie gehoert zu einem
+  // (ENT-629), steht die Startschublade noch offen -- sie gehoert zu einem
   // Schritt, der jetzt vorbei ist.
   if (r.status === 'pausiert') { roStumpfSetzen(r, 'pausiert'); roFertig(); blattZu(); zeichneHeute(); return; }
   const btn = $('roBtnPause');
@@ -3880,7 +3880,7 @@ function roZurueckAusAbbruch() {
 }
 
 /* Der Start ist abgelehnt worden, weil noch eine Runde offen ist
-   (ENT-625). Statt eines roten Satzes kommt dieselbe Rueckfrage wie beim
+   (ENT-629). Statt eines roten Satzes kommt dieselbe Rueckfrage wie beim
    App-Start: fortsetzen, pausieren, abbrechen mit Grund. Eine Sperre ohne
    Ausweg waere hier wertlos -- der Waechter steht vor dem Objekt und kann
    nicht erst suchen gehen, wo die alte Runde liegt.
@@ -6720,7 +6720,7 @@ function rundgangSpontanStarten(vorlageId, ausnahmeGrund, trotzDoppel) {
     }
     if (!ok || data.status !== 'ok') {
       document.querySelectorAll('#blBody button, #rfsBtn').forEach(b => b.disabled = false);
-      // Noch eine Runde offen (ENT-625): Die Rueckfrage traegt den Ausweg.
+      // Noch eine Runde offen (ENT-629): Die Rueckfrage traegt den Ausweg.
       if (rgStartAbgelehntOffeneRunde(data)) { return; }
       toast(data.message || w('netzfehler'));
       return;
@@ -7974,7 +7974,7 @@ function rundgangStartenMitVorlage(einsatzId, vorlageId, ausnahmeGrund) {
   api('mein_rundgang_starten.php', { method: 'POST', body }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') {
       document.querySelectorAll('#blRundgang button, #rdVorlageListe button, #rfBtn').forEach(b => b.disabled = false);
-      // Noch eine Runde offen (ENT-625): Die Rueckfrage traegt den Ausweg.
+      // Noch eine Runde offen (ENT-629): Die Rueckfrage traegt den Ausweg.
       if (rgStartAbgelehntOffeneRunde(data)) { return; }
       toast(data.message || w('netzfehler'));
       return;
@@ -8907,7 +8907,7 @@ document.addEventListener('visibilitychange', () => {
   rgWachAnfordern();
   /* Auf dem iPhone wird die App beim Wechsel nicht neu geladen -- sie
      bleibt im Speicher stehen. Ohne diese Zeile kaeme die Rueckfrage nach
-     einer offenen Runde (ENT-624) erst nach einem echten Kaltstart, und
+     einer offenen Runde (ENT-628) erst nach einem echten Kaltstart, und
      genau den erzwingt niemand. roPruefen() schweigt, wenn die App die
      Runde bereits kennt. */
   roPruefen();

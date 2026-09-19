@@ -84,7 +84,7 @@ if ($fensterVon !== null && $fensterBis !== null) {
 }
 
 // Kein zweiter offener Rundgang, solange einer offen ist -- und zwar ueber
-// ALLE Einsaetze hinweg (ENT-625, erweitert die Sperre je Einsatz aus
+// ALLE Einsaetze hinweg (ENT-629, erweitert die Sperre je Einsatz aus
 // ENT-180). Mehrere Rundgaenge NACHEINANDER pro Schicht bleiben vorgesehen
 // (z.B. stuendliche Kontrollen); parallel gibt es keinen.
 //

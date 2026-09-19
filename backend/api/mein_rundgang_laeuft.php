@@ -1,6 +1,6 @@
 <?php
 // Gibt es fuer die angemeldete Person UEBERHAUPT noch einen offenen
-// Rundgang? (ENT-624)
+// Rundgang? (ENT-628)
 //
 // Der Unterschied zu mein_rundgang_offen.php ist die fehlende einsatz_id:
 // Jener Endpunkt beantwortet "laeuft fuer DIESEN Einsatz noch etwas" und
@@ -11,7 +11,7 @@
 // unsichtbar, obwohl sie in der Auswertung weiterlief.
 //
 // Die Arbeit macht rundgang_offener() in backend/rundgang.php -- dieselbe
-// Funktion, die seit ENT-625 auch die beiden Startwege benutzen. Sie ist
+// Funktion, die seit ENT-629 auch die beiden Startwege benutzen. Sie ist
 // bewusst mager: Dieser Endpunkt laeuft bei jedem App-Start und bei jeder
 // Rueckkehr aus dem Hintergrund und darf nichts kosten. Die vollstaendige
 // Runde samt Kontrollpunkten holt erst "Fortsetzen".

@@ -66,7 +66,7 @@ if ($v['fenster_von'] !== null && $v['fenster_bis'] !== null) {
     $ausnahmeGrund = null;
 }
 
-/* Keine zweite offene Runde (ENT-625) -- vor allem anderen, und vor allem
+/* Keine zweite offene Runde (ENT-629) -- vor allem anderen, und vor allem
    VOR dem Anlegen von Einsatz und Zuteilung: Ein Abbruch weiter unten
    hinterliesse sonst genau die Karteileichen im Einsatzplan, die ENT-294
    losgeworden ist.
@@ -85,7 +85,7 @@ if ($offen['rundgang']) {
             'rundgang_id' => (int)$offen['rundgang']['id']]);
     }
     // Die offene Runde kommt mit: Die App stellt daraus dieselbe Rueckfrage
-    // wie beim App-Start (ENT-624) -- fortsetzen, pausieren, abbrechen mit
+    // wie beim App-Start (ENT-628) -- fortsetzen, pausieren, abbrechen mit
     // Grund. Eine Sperre ohne Ausweg waere hier wertlos; der Waechter steht
     // vor dem Objekt.
     json_response(['status' => 'error', 'code' => 'runde_offen',
@@ -107,7 +107,7 @@ $bis = date('H:i:s', strtotime('+30 minutes'));
 $doppelt = doppelbelegungen(0, $heute, $jetzt, $bis, [(int)$user['id']]);
 if ($doppelt) {
     // Die Weiche fuer "dieselbe Runde laeuft schon" (ENT-290) stand bis
-    // ENT-625 HIER. Sie ist nach oben gewandert, vor diese Pruefung: Dort
+    // ENT-629 HIER. Sie ist nach oben gewandert, vor diese Pruefung: Dort
     // greift sie auch ohne Zeitueberschneidung, und hier waere sie seither
     // unerreichbar -- jede offene Runde ist oben schon beantwortet.
     $konfliktEinsatzId = (int)$doppelt[0]['einsatz_id'];

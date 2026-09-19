@@ -1,16 +1,16 @@
 <?php
 declare(strict_types=1);
-// rundgang_offener() in backend/rundgang.php (ENT-624/625) gegen eine
+// rundgang_offener() in backend/rundgang.php (ENT-628/625) gegen eine
 // wirkliche Datenbank -- SQLite im Arbeitsspeicher, gleiches Muster wie
 // pruef_rundgang.php.
 //
 // WORUM ES GEHT: Eine Person hat hoechstens EINE offene Runde. Diese
 // Funktion ist die einzige Stelle, die beantwortet, welche das ist --
-// die Rueckfrage beim App-Start (ENT-624) und beide Startwege (ENT-625)
+// die Rueckfrage beim App-Start (ENT-628) und beide Startwege (ENT-629)
 // fragen sie. Sie muss darum zwei Dinge sicher koennen:
 //
 //  1. Ueber ALLE Einsaetze hinweg suchen. Genau daran hing der Fehler, den
-//     ENT-625 behebt: Die alte Sperre sah nur denselben Einsatz an, und
+//     ENT-629 behebt: Die alte Sperre sah nur denselben Einsatz an, und
 //     eine Nachtschicht von gestern (20:00-06:00) ueberschneidet sich
 //     zeitlich mit nichts, was heute Nachmittag beginnt.
 //  2. Nur die EIGENEN Runden. Die mitarbeiter_id kommt aus der Sitzung;
@@ -84,13 +84,13 @@ pruef('KRITISCH: ohne Kontrollrunde bleibt vorlage_name null -- die App sagt dan
 pruef('Ohne Kontrollrunde zaehlen alle aktiven Punkte des Objekts',
     $b['rundgang']['punkte_anzahl'] === 1);
 
-// ══════════════ EIN ZWEITER EINSATZ -- GENAU DER FALL AUS ENT-625
+// ══════════════ EIN ZWEITER EINSATZ -- GENAU DER FALL AUS ENT-629
 // Die alte Sperre sah nur denselben Einsatz an. Eine vergessene Runde von
 // gestern und eine neue von heute standen nebeneinander.
 $pdo->exec("INSERT INTO rundgang (id, einsatz_id, mitarbeiter_id, objekt_id, rundgang_vorlage_id,
             status, vorbereitet_am) VALUES (902, 701, 1, 8, NULL, 'laeuft', '2026-09-02 14:00:00')");
 $a = rundgang_offener($pdo, 1);
-pruef('KRITISCH: eine offene Runde auf einem ANDEREN Einsatz wird gefunden -- darum ging es bei ENT-625',
+pruef('KRITISCH: eine offene Runde auf einem ANDEREN Einsatz wird gefunden -- darum ging es bei ENT-629',
     $a['rundgang']['id'] === 902 && $a['rundgang']['einsatz_id'] === 701);
 pruef('Die neuere kommt zuerst, die aeltere wird mitgezaehlt statt verschwiegen',
     $a['weitere'] === 1);

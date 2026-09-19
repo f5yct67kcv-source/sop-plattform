@@ -1,4 +1,4 @@
-// Rueckfrage beim App-Start, wenn noch ein Rundgang offen ist (ENT-624).
+// Rueckfrage beim App-Start, wenn noch ein Rundgang offen ist (ENT-628).
 //
 // WORUM ES GEHT: Der Hinweis-Chip aus ENT-234 haengt an `rundgangAktiv`,
 // und das lebt nur im Arbeitsspeicher der Sitzung. App zu, App auf -- und
@@ -310,7 +310,7 @@ check('KRITISCH: ohne offene Runde erscheint die Rückfrage nicht',
   !(await page.isVisible('#roDlg')));
 check('Und auch kein Chip', !(await page.isVisible('.rd-chip')));
 
-// ══════════ ABGELEHNTER START: DIE SPERRE TRÄGT DEN AUSWEG (ENT-625) ══
+// ══════════ ABGELEHNTER START: DIE SPERRE TRÄGT DEN AUSWEG (ENT-629) ══
 // Der Wächter steht vor Objekt B, bei Objekt A läuft noch etwas. Ein roter
 // Satz "Es ist noch ein Rundgang offen" liesse ihn dort stehen -- er müsste
 // erst suchen gehen, wo die alte Runde liegt. Stattdessen kommt dieselbe

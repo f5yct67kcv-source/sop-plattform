@@ -515,11 +515,11 @@ function rundgang_im_fenster(string $jetztHm, ?string $fensterVonHm, ?string $fe
 // Punkte des Objekts gezaehlt und saehe nach einer unvollstaendigen Runde
 // aus, obwohl er vollstaendig war.
 /* Der eine, noch offene Rundgang dieser Person -- ueber ALLE Einsaetze
-   hinweg (ENT-624/625).
+   hinweg (ENT-628/625).
 
    Eine Person hat hoechstens EINE offene Runde. Der Projektinhaber dazu:
    „Ein begonnener Rundgang wird immer zu Ende gefuehrt, weil der
-   Mitarbeiter bei einem Objekt ist." Bis ENT-625 galt die Sperre nur je
+   Mitarbeiter bei einem Objekt ist." Bis ENT-629 galt die Sperre nur je
    Einsatz -- eine vergessene Runde von gestern und eine neue von heute
    konnten nebeneinander stehen, ohne dass jemand etwas falsch gemacht
    hatte: Die Doppelbelegungspruefung sieht nur Zeitueberschneidungen, und
@@ -535,7 +535,7 @@ function rundgang_im_fenster(string $jetztHm, ?string $fensterVonHm, ?string $fe
    Runde samt Kontrollpunkten holt mein_rundgang_offen.php.
 
    Rueckgabe: ['rundgang' => array|null, 'weitere' => int]. 'weitere' zaehlt
-   die uebrigen offenen Runden -- normalerweise 0; seit ENT-625 kann es sie
+   die uebrigen offenen Runden -- normalerweise 0; seit ENT-629 kann es sie
    nur noch aus der Zeit davor geben. */
 function rundgang_offener(PDO $pdo, int $mitarbeiterId): array
 {
