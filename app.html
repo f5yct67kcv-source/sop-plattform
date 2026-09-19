@@ -8784,6 +8784,11 @@ async function rgKarteNativBauen(d, bauLauf) {
   // sind offenbar noch nicht wirksam, wenn die Ansicht ihre endgueltige
   // Groesse erst danach bekommt. Ein zweiter, ausdruecklicher Schritt
   // kostet nichts und steht nicht im Zweifel.
+  // Der Lauscher auf den Stillstand der Kamera muss VOR der ersten
+  // Bewegung stehen. Haengt er danach, geht genau der Stillstand
+  // verloren, der auf den Aufbau folgt -- und die Grenzen blieben bis zur
+  // ersten Handbewegung des Waechters ungelesen.
+  try { await rgsNativKarte.setOnCameraIdleListener(() => rgKarteNativGrenzenLesen()); } catch (e) {}
   await rgKarteNativAusschnitt(d, false);
   // Der eigene Standort als NATIVE Anzeige (ENT-609, Entscheidung des
   // Projektinhabers): der eingebaute Punkt samt Richtungskegel und
@@ -8807,7 +8812,6 @@ async function rgKarteNativBauen(d, bauLauf) {
   // sich beim Verschieben und Zoomen -- darum einmal jetzt und danach bei
   // jedem Stillstand der Kamera.
   await rgKarteNativGrenzenLesen();
-  try { await rgsNativKarte.setOnCameraIdleListener(() => rgKarteNativGrenzenLesen()); } catch (e) {}
   // Den Hinweis erst entfernen, wenn die Karte wirklich steht -- dieselbe
   // Reihenfolge wie in der Browser-Fassung.
   const stand = $('rgsKarteStand');
@@ -8881,10 +8885,37 @@ function rgKarteNativMeterInPixel(grenzen, masse, meter) {
 let rgsNativGrenzen = null;    // zuletzt gelesene Kartengrenzen
 let rgsFuellEl = null;         // das Element der Fuellung im Dokument
 
+let rgsGrenzenLaeuft = false;   // ein Lesevorgang genuegt
+let rgsGrenzenZuletzt = 0;     // wann zuletzt nachgefordert wurde
+
 async function rgKarteNativGrenzenLesen() {
   if (!rgsNativKarte) { rgsNativGrenzen = null; return; }
+  if (rgsGrenzenLaeuft) { return; }
+  rgsGrenzenLaeuft = true;
+  rgsGrenzenZuletzt = Date.now();
   try { rgsNativGrenzen = await rgsNativKarte.getMapBounds(); }
   catch (e) { rgsNativGrenzen = null; }
+  finally { rgsGrenzenLaeuft = false; }
+}
+
+/* Die Grenzen nachfordern, wenn sie fehlen (ENT-609).
+
+   Bis hierher wurden sie GENAU ZWEIMAL gelesen: einmal beim Aufbau und
+   danach bei jedem Stillstand der Kamera. Scheitert der erste Versuch --
+   die native Ansicht ist in dem Augenblick gerade erst entstanden --, und
+   verschiebt der Waechter die Karte nie, bleiben sie fuer immer leer. Die
+   Fuellung waehrend der Verweilzeit haengt an ihnen und bliebe dann
+   dauerhaft unsichtbar, ohne jede Meldung.
+
+   Darum fordert das Zeichnen sie selbst nach, hoechstens viermal je
+   Sekunde. Der Abstand ist bewusst kurz: Die Verweilzeit dauert fuenf
+   Sekunden, und eine halbe davon zu verlieren saehe man. Viermal je
+   Sekunde ist fuer die Bruecke zur nativen Seite unerheblich und deckelt
+   den Fall, dass die Grenzen dauerhaft nicht zu haben sind. */
+function rgKarteNativGrenzenNachfordern() {
+  if (!rgsNativKarte || rgsGrenzenLaeuft) { return; }
+  if (Date.now() - rgsGrenzenZuletzt < 250) { return; }
+  rgKarteNativGrenzenLesen();
 }
 
 function rgFuellungNativAus() {
@@ -8901,7 +8932,15 @@ function rgFuellungNativAus() {
 function rgFuellungNativZeichnen(p, anteil) {
   const huelle = $('rgsBody') ? $('rgsBody').querySelector('.rgs-karte-huelle') : null;
   const karte = $('rgsKarte');
-  if (!huelle || !karte || !rgsNativGrenzen) { rgFuellungNativAus(); return false; }
+  if (!huelle || !karte) { rgFuellungNativAus(); return false; }
+  if (!rgsNativGrenzen) {
+    // Ohne Grenzen laesst sich nichts an die richtige Stelle rechnen --
+    // lieber nichts zeigen als etwas Falsches. Aber nicht stumm bleiben:
+    // nachfordern, damit das naechste Bild zeichnen kann.
+    rgKarteNativGrenzenNachfordern();
+    rgFuellungNativAus();
+    return false;
+  }
   const masse = karte.getBoundingClientRect();
   const ort = rgKarteNativAufSchirm(rgsNativGrenzen, masse, Number(p.lat), Number(p.lng));
   if (!ort) { rgFuellungNativAus(); return false; }

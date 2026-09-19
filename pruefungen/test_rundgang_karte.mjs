@@ -503,6 +503,128 @@ check('KRITISCH: ein Abbau während des Aufbaus lässt die Durchsicht nicht an',
     return durchsicht === false && zerstoert === true;
   }));
 
+/* Die gruene Fuellung waehrend der Verweilzeit -- DURCHGAENGIG, mit
+   echten Kartengrenzen (ENT-579 auf der nativen Karte).
+
+   ANLASS: Vom Projektinhaber am Geraet gemeldet, dass man waehrend der
+   fuenf Sekunden nichts sieht. Die bisherigen Pruefungen hatten die
+   Geometrie einzeln geprueft und den Aufbau einzeln -- aber nie den
+   ganzen Weg von "Waechter steht im Radius" bis "Element steht im
+   Dokument und hat eine Groesse". Genau in dieser Luecke sass der Fehler.
+
+   Gemessen wird am gerenderten Zustand, nicht im Quelltext nachgelesen. */
+check('KRITISCH: steht der Wächter im Radius, wächst eine sichtbare Füllung auf der nativen Karte',
+  await page.evaluate(async () => {
+    const merkN = window.KarteNativ, merkK = rgsNativKarte, merkE = rgsKarteEl;
+    const merkS = rgsKartenSignatur, merkO = rgsMeinOrt;
+    const grenzen = { southwest: { lat: 47.0, lng: 8.0 },
+                      northeast: { lat: 47.01, lng: 8.01 },
+                      center: { lat: 47.005, lng: 8.005 } };
+    const attrappe = {
+      setCamera: async () => {}, fitBounds: async () => {},
+      enableCurrentLocation: async () => {}, destroy: async () => {},
+      removeCircles: async () => {}, addCircles: async () => [],
+      removeMarkers: async () => {}, addMarkers: async (l) => l.map((_, i) => 'm' + i),
+      setOnMarkerClickListener: async () => {}, setOnCameraIdleListener: async () => {},
+      getMapBounds: async () => grenzen,
+    };
+    window.KarteNativ = { GoogleMap: { create: async () => attrappe } };
+    const d = rgKarteDaten(rundgangAktiv.kontrollpunkte);
+    await rgKarteNativBauen(d, rgsKarteBauLauf);
+    // Der Waechter steht seit zwei Sekunden im Radius des ersten Punkts.
+    const kp = rundgangAktiv.kontrollpunkte.find(k => k.lat !== null && k.lat !== undefined);
+    const merkTyp = kp.typ, merkErl = kp.erledigt;
+    kp.typ = 'geofence'; kp.erledigt = null;
+    kp.lat = grenzen.center.lat; kp.lng = grenzen.center.lng;
+    kp._drinSeit = Date.now() - 2000;
+    kp._autoRest = 3;
+    rgsMeinOrt = { lat: grenzen.center.lat, lng: grenzen.center.lng };
+    /* Warten, bis die Fuellung steht -- und den Zustand dabei halten.
+
+       Zwei Gruende, warum ein einzelnes requestAnimationFrame hier nicht
+       genuegt und die Pruefung davon flackerte: Der Sekundentakt der App
+       rechnet _autoRest und _drinSeit staendig neu und raeumte den
+       gesetzten Zustand wieder weg, und die Bildfolge des Browsers ist
+       nicht auf die Millisekunde verlaesslich. Also: den Waechter
+       weiterhin im Radius stehen lassen und bis zu einer Sekunde lang
+       nachsehen. Faellt die Fuellung in dieser Zeit nicht, faellt sie
+       gar nicht. */
+    let el = null;
+    for (let i = 0; i < 40 && !el; i++) {
+      kp.typ = 'geofence'; kp.erledigt = null;
+      kp._drinSeit = Date.now() - 2000; kp._autoRest = 3;
+      rgFuellungNachfuehren();
+      await new Promise(r => setTimeout(r, 25));
+      el = document.querySelector('.rgs-fuellung');
+    }
+    // Ablesen, SOLANGE das Element im Dokument steht: getComputedStyle
+    // liefert eine LEBENDE Sicht -- nach dem Entfernen stuenden dort
+    // leere Zeichenketten, und die Pruefung waere rot, ohne dass an der
+    // Sache etwas fehlt. (Genau darauf bin ich hier hereingefallen.)
+    const mass = el ? el.getBoundingClientRect() : null;
+    const sicht = el ? (() => { const c = getComputedStyle(el);
+      return { visibility: c.visibility, display: c.display,
+               backgroundColor: c.backgroundColor }; })() : null;
+    rgFuellungAus();
+    kp.typ = merkTyp; kp.erledigt = merkErl;
+    kp._drinSeit = null; kp._autoRest = null;
+    rgsMeinOrt = merkO;
+    await rgKarteNativAbbauen();
+    window.KarteNativ = merkN; rgsNativKarte = merkK; rgsKarteEl = merkE;
+    rgsKartenSignatur = merkS;
+    document.body.classList.remove('karte-nativ');
+    return !!el && mass.width > 1 && mass.height > 1
+      && sicht.visibility === 'visible' && sicht.display !== 'none'
+      && /rgba?\(/.test(sicht.backgroundColor)
+      && sicht.backgroundColor !== 'rgba(0, 0, 0, 0)';
+  }));
+
+/* Und wenn die Grenzen beim Aufbau NICHT zu haben sind -- die native
+   Ansicht ist da gerade erst entstanden --, darf das nicht das Ende sein:
+   Die Fuellung fordert sie nach. Ohne das blieb sie fuer die ganze Runde
+   unsichtbar, sofern der Waechter die Karte nie verschob. */
+check('KRITISCH: scheitert das erste Lesen der Kartengrenzen, werden sie nachgefordert',
+  await page.evaluate(async () => {
+    const merkN = window.KarteNativ, merkK = rgsNativKarte, merkE = rgsKarteEl;
+    const merkS = rgsKartenSignatur;
+    const grenzen = { southwest: { lat: 47.0, lng: 8.0 },
+                      northeast: { lat: 47.01, lng: 8.01 },
+                      center: { lat: 47.005, lng: 8.005 } };
+    let versuche = 0;
+    const attrappe = {
+      setCamera: async () => {}, fitBounds: async () => {},
+      enableCurrentLocation: async () => {}, destroy: async () => {},
+      removeCircles: async () => {}, addCircles: async () => [],
+      removeMarkers: async () => {}, addMarkers: async (l) => l.map((_, i) => 'm' + i),
+      setOnMarkerClickListener: async () => {}, setOnCameraIdleListener: async () => {},
+      // Der erste Versuch scheitert, wie auf dem Geraet moeglich.
+      getMapBounds: async () => {
+        versuche++;
+        if (versuche === 1) { throw new Error('noch nicht so weit'); }
+        return grenzen;
+      },
+    };
+    window.KarteNativ = { GoogleMap: { create: async () => attrappe } };
+    await rgKarteNativBauen(rgKarteDaten(rundgangAktiv.kontrollpunkte), rgsKarteBauLauf);
+    const nachAufbau = rgsNativGrenzen;
+    // Ein Zeichenversuch ohne Grenzen muss das Nachfordern ausloesen.
+    // Das Zeichnen laeuft in der Runde rahmenweise -- also auch hier
+    // zweimal, mit der Bremse dazwischen. Beim ersten Mal ist das
+    // Nachfordern noch gebremst (das Lesen beim Aufbau liegt keine
+    // Millisekunde zurueck), beim zweiten greift es.
+    const p = { lat: grenzen.center.lat, lng: grenzen.center.lng, geofence_radius_m: 20 };
+    rgFuellungNativZeichnen(p, 0.5);
+    await new Promise(r => setTimeout(r, 300));
+    rgFuellungNativZeichnen(p, 0.5);
+    await new Promise(r => setTimeout(r, 150));
+    const danach = rgsNativGrenzen;
+    await rgKarteNativAbbauen();
+    window.KarteNativ = merkN; rgsNativKarte = merkK; rgsKarteEl = merkE;
+    rgsKartenSignatur = merkS;
+    document.body.classList.remove('karte-nativ');
+    return nachAufbau === null && !!danach && !!danach.southwest;
+  }));
+
 /* Die Marken der Kontrollpunkte auf der nativen Karte (ENT-609).
 
    ANLASS (vom Projektinhaber am Geraet gemeldet): Beim Herauszoomen
