@@ -840,6 +840,11 @@ const NUR_EIGENE_DATEN = [
   // darum bewusst NICHT in dieser Liste.
   'mein_rundgang_position.php',
   'mein_rundgang_offen.php',   // eigenen offenen Rundgang zu einem Einsatz abfragen (Wiedereinstieg)
+  // Dasselbe ohne einsatz_id: "habe ich UEBERHAUPT noch eine offene Runde"
+  // (ENT-624). Liest ausschliesslich Runden mit der eigenen
+  // mitarbeiter_id aus der Sitzung -- ein Recht waere hier falsch, denn
+  // jede eingeteilte Person geht Runden, nicht nur die Verwaltung.
+  'mein_rundgang_laeuft.php',
   'mein_rundgang_pausieren.php',  // eigenen Rundgang pausieren (ENT-146)
   'mein_rundgang_fortsetzen.php', // eigenen pausierten Rundgang fortsetzen (ENT-146)
   'mein_rundgang_abbrechen.php',  // eigenen Rundgang endgueltig abbrechen (ENT-146)
