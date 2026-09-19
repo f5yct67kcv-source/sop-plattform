@@ -346,8 +346,13 @@ function demo_zugang_mail(string $firma, string $person, string $adresse,
     $gruss  = $zeilen === [] ? ['pzu consulting gmbh'] : $zeilen;
     // Die Kennung nur setzen, wenn es das Bild wirklich gibt -- ein
     // cid-Verweis ins Leere zeigt im Mailprogramm ein zerbrochenes Bild.
-    $logo = mail_logo();
-    $kennung = $logo === null ? '' : (string)$logo['cid'];
+    // Zwei Fassungen: die dunkle fuer den hellen Modus, die helle fuer den
+    // Dunkelmodus (ENT-619). Fehlt eine, faellt nur sie weg.
+    $logo     = mail_logo();
+    $logoHell = mail_logo_hell();
+    $kennung     = $logo === null ? '' : (string)$logo['cid'];
+    $kennungHell = $logoHell === null ? '' : (string)$logoHell['cid'];
+    $bilder = array_values(array_filter([$logo, $logoHell]));
 
     $text = "Guten Tag $person\n\n"
           . "vielen Dank für Ihr Interesse an GuardOpS, der Betriebssoftware für "
@@ -377,10 +382,10 @@ function demo_zugang_mail(string $firma, string $person, string $adresse,
         . mail_absatz('Die Demo ist zum Ausprobieren da. Bitte erfassen Sie darin keine '
             . 'echten Personendaten.')
         . mail_absatz('Bei Fragen oder Unklarheiten melden Sie sich jederzeit bei uns.')
-        . mail_signatur($zeilen, $kennung);
+        . mail_signatur($zeilen, $kennung, $kennungHell);
 
     return ['betreff' => $betreff, 'text' => $text, 'html' => mail_rahmen($inhalt),
-        'bilder' => $logo === null ? [] : [$logo]];
+        'bilder' => $bilder];
 }
 
 // Die Tabelle des Registers. Sie liegt in der BETREIBER-Datenbank, nicht in

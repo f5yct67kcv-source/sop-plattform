@@ -204,12 +204,27 @@ $pruef('KRITISCH: die Mail holt die Signatur aus dem Deploy, statt sie im Quellt
 // Eingebettet, nicht verlinkt: Outlook und die meisten Programme laden ein
 // extern verlinktes Bild erst auf Erlaubnis -- bis dahin stuende unter der
 // Unterschrift ein leerer Rahmen.
-$pruef('KRITISCH: das Logo wird als Bild MITGEGEBEN, nicht von aussen nachgeladen',
-    count($mail['bilder']) === 1
-    && ($mail['bilder'][0]['inhalt'] ?? '') !== ''
+$pruef('KRITISCH: jedes Logo wird als Bild MITGEGEBEN, nicht von aussen nachgeladen',
+    count($mail['bilder']) === 2
+    && array_filter($mail['bilder'], fn($b) => ($b['inhalt'] ?? '') === '') === []
     && !preg_match('/<img[^>]+src="https?:/', $mail['html']));
-$pruef('KRITISCH: das HTML spricht genau die mitgegebene Kennung an',
-    str_contains($mail['html'], 'cid:' . $mail['bilder'][0]['cid']));
+$pruef('KRITISCH: das HTML spricht jede mitgegebene Kennung an',
+    array_filter($mail['bilder'],
+        fn($b) => !str_contains($mail['html'], 'cid:' . $b['cid'])) === []);
+// Zwei Fassungen, damit im Dunkelmodus nicht Dunkel auf Dunkel steht.
+// Genau so kam die Mail beim Projektinhaber an (2026-09-19).
+$pruef('KRITISCH: es gibt eine helle und eine dunkle Fassung, nicht zweimal dieselbe',
+    ($mail['bilder'][0]['inhalt'] ?? '') !== ($mail['bilder'][1]['inhalt'] ?? ''));
+// Sichtbar ist immer genau eine: die helle steht auf display:none und
+// wird erst im Dunkelmodus eingeblendet.
+$pruef('KRITISCH: im hellen Modus ist nur die dunkle Fassung sichtbar',
+    preg_match('/class="logo-hell"[^>]*style="display:none/', $mail['html']) === 1
+    && preg_match('/class="logo-dunkel"[^>]*style="display:block/', $mail['html']) === 1);
+$pruef('KRITISCH: der Dunkelmodus tauscht beide Fassungen wirklich gegeneinander',
+    preg_match('/@media \(prefers-color-scheme: dark\)[\s\S]*'
+        . '\.logo-dunkel \{ display:none/', $mail['html']) === 1
+    && preg_match('/@media \(prefers-color-scheme: dark\)[\s\S]*'
+        . '\.logo-hell \{ display:block/', $mail['html']) === 1);
 // Ein cid-Verweis ohne Bild dahinter zeigt ein zerbrochenes Bild.
 $pruef('KRITISCH: ohne Bilddatei steht auch kein Verweis darauf in der Mail',
     (mail_logo() === null) === (!str_contains($mail['html'], 'cid:')));
@@ -235,10 +250,28 @@ $pruef('KRITISCH: kein Briefkopf-Balken neben dem Logo -- die Marke steht nicht 
 $pruef('KRITISCH: die Beschriftung steht vor ihrem Wert, nicht daneben oder darunter',
     strpos($mail['html'], '>Passwort<') !== false
     && strpos($mail['html'], '>Passwort<') < strpos($mail['html'], 'AbcDefGhiJkm'));
-// Ein Stylesheet im Kopf wird von Mailprogrammen regelmaessig entfernt --
-// dann stuende die Mail ohne jede Gestaltung da.
-$pruef('KRITISCH: die Gestaltung haengt an Inline-Styles, nicht an einem Stylesheet',
-    !str_contains($mail['html'], '<style') && str_contains($mail['html'], 'style="'));
+// Ein Stylesheet im Kopf wird von Mailprogrammen regelmaessig entfernt.
+// Es gibt genau einen, und er traegt AUSSCHLIESSLICH den Dunkelmodus --
+// faellt er weg, bleibt die Mail vollstaendig gestaltet, nur eben hell.
+$stil = (string)(preg_match('/<style>(.*?)<\/style>/s', $mail['html'], $t) ? $t[1] : '');
+$pruef('KRITISCH: die Gestaltung haengt an Inline-Styles, nicht am Stylesheet',
+    str_contains($mail['html'], 'style="')
+    && substr_count($mail['html'], '<style') === 1
+    && str_starts_with(trim($stil), '@media (prefers-color-scheme: dark)'));
+// Gegenprobe im Kleinen: Ohne den Block darf keine Farbe und keine
+// Flaeche verschwinden -- alles Sichtbare steht auch inline.
+$ohneStil = (string)preg_replace('/<style>.*?<\/style>/s', '', $mail['html']);
+// Geprueft wird jedes gefaerbte Element einzeln, nicht ob eine Farbe
+// irgendwo noch vorkommt: Ein Link ohne eigene Farbe faellt sonst auf das
+// Standardblau des Mailprogramms zurueck, und im Dunkelmodus auf eine
+// Farbe, die auf dunklem Grund kaum lesbar ist.
+preg_match_all('/<a [^>]*>/', $ohneStil, $links);
+$ohneFarbe = array_values(array_filter($links[0],
+    fn($a) => !preg_match('/style="[^"]*color:#/', $a)));
+$pruef('KRITISCH: ohne den Stylesheet-Block traegt jeder Link seine Farbe selbst',
+    $links[0] !== [] && $ohneFarbe === []);
+$pruef('KRITISCH: ohne den Stylesheet-Block bleiben Textfarbe und Flaeche erhalten',
+    str_contains($ohneStil, MAIL_FARBE_TEXT) && str_contains($ohneStil, MAIL_FARBE_FLAECHE));
 
 // ── Formhelfer der Selbstbedienung (ENT-601) ─────────────────────────
 $pruef('das Fallenfeld erkennt eine gefuellte Falle',
