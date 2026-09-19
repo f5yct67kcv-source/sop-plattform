@@ -97,7 +97,9 @@ foreach ($mandanten as $m) {
     } catch (Throwable $e) {
         // Der Treibertext kann Host und Benutzer tragen und geht nicht
         // nach aussen -- dieselbe Ueberlegung wie bei mandant_stand().
-        $fehler[] = $bezug . ': Verbindung fehlgeschlagen';
+        // Der numerische Fehlercode schon: Er sagt, WELCHER Handgriff
+        // noetig ist, und verraet nichts ueber die Anlage.
+        $fehler[] = $bezug . ': ' . be_verbindungsfehler_text($e);
     }
 }
 

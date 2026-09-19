@@ -443,6 +443,65 @@ $pruef('KRITISCH: "nie" und 0 Tage sind unterscheidbar, nicht beide leer',
     && mandant_stille(['letzter_zugriff' => date('Y-m-d') . ' 07:00:00']) === 0
     && mandant_stille(['letzter_zugriff' => null]) !== mandant_stille(['letzter_zugriff' => date('Y-m-d') . ' 07:00:00']));
 
+// ══ Warum eine Mandanten-Verbindung scheiterte (Befund 2026-09-19) ═══
+//
+// ANLASS: Beim Einrichten meldeten zwei Demo-Plaetze "Verbindung
+// fehlgeschlagen" -- und damit war nicht zu erkennen, ob die Datenbank
+// fehlt, das Passwort nicht stimmt oder der Server schweigt. Drei
+// Ursachen, drei Handgriffe an drei Orten.
+//
+// DIE ZWEITE HAELFTE IST DIE WICHTIGERE: Der Treibertext traegt Host,
+// Benutzer und oft den Datenbanknamen und darf NICHT durchgereicht
+// werden. Geprueft wird beides -- dass die Ursache benannt wird, und dass
+// dabei nichts aus der Anlage mitgeht.
+$fall = fn (string $text): string => be_verbindungsfehler_text(new PDOException($text));
+
+$pruef('KRITISCH: eine fehlende Datenbank wird als solche benannt',
+    str_contains($fall('SQLSTATE[HY000] [1049] Unknown database'), 'gibt es nicht'));
+$pruef('KRITISCH: abgewiesene Zugangsdaten werden als solche benannt',
+    str_contains($fall('SQLSTATE[HY000] [1045] Access denied'), 'Zugangsdaten'));
+$pruef('ein schweigender Server ist etwas Drittes',
+    str_contains($fall('SQLSTATE[HY000] [2002] Connection refused'), 'antwortet nicht'));
+// Vier Aussagen, vier Texte: Die drei oben duerfen nicht denselben Satz
+// ergeben, sonst ist die Unterscheidung nur behauptet.
+$pruef('KRITISCH: die drei Ursachen ergeben drei verschiedene Texte',
+    count(array_unique([
+        $fall('SQLSTATE[HY000] [1049] x'),
+        $fall('SQLSTATE[HY000] [1045] x'),
+        $fall('SQLSTATE[HY000] [2002] x'),
+    ])) === 3);
+// Ein unbekannter Code ist nicht dasselbe wie gar kein Code -- wer den
+// naechsten Fall untersucht, braucht die Zahl.
+$pruef('ein unbekannter Code wird mitgegeben, statt als "unbekannt" zu verschwinden',
+    str_contains($fall('SQLSTATE[HY000] [9999] x'), '9999'));
+$pruef('ganz ohne Code bleibt es beim schlichten Satz',
+    $fall('irgendein Text') === 'Verbindung fehlgeschlagen');
+
+// DER Punkt: Nichts aus dem Treibertext darf durchsickern.
+$verraeterisch = 'SQLSTATE[HY000] [1045] Access denied for user '
+    . "'db_benutzer'@'10.0.0.7' to database 'geheime_db' (using password: YES)";
+$hinaus = $fall($verraeterisch);
+$pruef('KRITISCH: weder Benutzer noch Host noch Datenbankname gehen nach aussen',
+    !str_contains($hinaus, 'db_benutzer') && !str_contains($hinaus, '10.0.0.7')
+    && !str_contains($hinaus, 'geheime_db'));
+$pruef('KRITISCH: auch der englische Treibertext selbst geht nicht mit',
+    !str_contains($hinaus, 'Access denied') && !str_contains($hinaus, 'SQLSTATE'));
+// Auch der Ausnahmetext eines ganz anderen Fehlers darf nicht
+// durchgereicht werden -- die Liste ist geschlossen, nicht ergaenzend.
+$pruef('KRITISCH: ein beliebiger Ausnahmetext wird nicht weitergereicht',
+    !str_contains($fall('Interner Pfad /home/user/geheim.php'), 'geheim.php'));
+// Und derselbe Test auf dem RUECKFALLPFAD (Befund an der eigenen
+// Gegenprobe): Die Zeile fuer den unbekannten Code ist die einzige, die
+// etwas Berechnetes ausgibt statt eines festen Satzes -- ein Treibertext,
+// der dort durchgereicht wuerde, entkaeme allen Pruefungen oben, weil die
+// alle einen BEKANNTEN Code benutzen und gar nicht dorthin kommen.
+$unbekannt = $fall("SQLSTATE[HY000] [9999] Access denied for user "
+    . "'db_benutzer'@'10.0.0.7' to database 'geheime_db'");
+$pruef('KRITISCH: auch beim unbekannten Code geht nichts aus der Anlage mit',
+    str_contains($unbekannt, '9999')
+    && !str_contains($unbekannt, 'db_benutzer') && !str_contains($unbekannt, '10.0.0.7')
+    && !str_contains($unbekannt, 'geheime_db') && !str_contains($unbekannt, 'Access denied'));
+
 echo count($bad) === 0
     ? "$ok bestanden, 0 nicht bestanden\n"
     : "$ok bestanden, " . count($bad) . " nicht bestanden\n";
