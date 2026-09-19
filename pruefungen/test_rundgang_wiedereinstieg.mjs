@@ -316,12 +316,13 @@ check('Und auch kein Chip', !(await page.isVisible('.rd-chip')));
 // erst suchen gehen, wo die alte Runde liegt. Stattdessen kommt dieselbe
 // Rückfrage wie beim App-Start.
 LAEUFT = { status: 'ok', rundgang: null, weitere: 0 };
+const OFFENE_RUNDE = { id: 951, einsatz_id: 777, einsatz_datum: tag(-1), status: 'pausiert',
+  vorbereitet_am: tag(-1) + ' 21:14:00', rohzeit_start: null, pausiert_seit: tag(-1) + ' 23:02:00',
+  pause_minuten: 0, objekt_name: 'Musterobjekt Nord', kunde_name: 'Musterliegenschaften AG',
+  vorlage_name: 'Patrouille Nord', punkte_anzahl: 3, erledigt_anzahl: 1 };
 STARTFEHLER = { status: 'error', code: 'runde_offen',
-  message: 'Es ist noch ein Rundgang offen. Er muss zuerst beendet oder abgebrochen werden.',
-  offen: { id: 951, einsatz_id: 777, einsatz_datum: tag(-1), status: 'laeuft',
-    vorbereitet_am: tag(-1) + ' 21:14:00', rohzeit_start: null, pausiert_seit: null,
-    pause_minuten: 0, objekt_name: 'Musterobjekt Nord', kunde_name: 'Musterliegenschaften AG',
-    vorlage_name: 'Patrouille Nord', punkte_anzahl: 3, erledigt_anzahl: 1 } };
+  message: 'Dieser Rundgang ist pausiert. Er muss zuerst fortgesetzt oder abgebrochen werden.',
+  offen: OFFENE_RUNDE };
 /* Der Start geht ueber das Blatt "Ausserhalb der ueblichen Zeit" und
    dessen Knopf -- nicht ueber einen direkten Aufruf der Startfunktion.
    Der Unterschied ist nicht theoretisch: Der Projektinhaber meldete genau
@@ -356,6 +357,20 @@ check('Sie nennt die Runde, die im Weg steht -- und zwar deren Objekt',
   (await page.textContent('#roName')) === 'Musterobjekt Nord');
 check('KRITISCH: sie bietet den Abbruch mit Grund an -- das ist der Ausweg vor Ort',
   (await page.textContent('#roBtnAb')).includes('Abbrechen'));
+/* ENT-630: Aus einem abgelehnten Start heraus sind es nur noch ZWEI Wege.
+   „Pausiert lassen" braechte den Waechter dort keinen Schritt weiter --
+   zurueck in denselben Zustand, aus dem er gerade kommt. Vom
+   Projektinhaber am Geraet gemeldet, nachdem er genau diesen Knopf
+   gedrueckt hatte und wieder vor der Sperre stand. */
+check('KRITISCH: der mittlere Weg fehlt hier -- er brächte den Wächter nirgendwohin',
+  !(await page.isVisible('#roBtnPause')));
+check('KRITISCH: der Abbruch sagt, dass danach der neue Rundgang startet',
+  (await page.textContent('#roBtnAb')).includes('neu starten'));
+check('Und "Fortsetzen" sagt, wogegen man sich damit entscheidet',
+  (await page.textContent('#roBtnWeiter')).includes('Statt einen neuen'));
+check('Beide Knöpfe sind mindestens 44px hoch (CLAUDE.md, gemessen)',
+  await page.evaluate(() => ['roBtnWeiter', 'roBtnAb']
+    .every(i => document.getElementById(i).getBoundingClientRect().height >= 44)));
 rufe = [];
 // Nur anklicken, wenn es den Knopf gibt: Fehlt die Rückfrage, soll die
 // Suite mit roten Punkten enden statt mit einer Zeitüberschreitung.
@@ -366,9 +381,74 @@ if (await page.isVisible('#roBtnAb')) {
 check('KRITISCH: und der Abbruch führt wirklich in die Grundabfrage',
   await page.isVisible('#raGrund'));
 
+/* Und nach dem Abbruch geht der Rundgang los, den der Wächter wollte
+   (ENT-630). Ohne das landet er auf „Heute" und sucht sich die Runde, die
+   er schon gewählt hatte, samt Ausnahmegrund neu zusammen -- fünf Tipps
+   für etwas, das er gerade schon getan hatte. */
+STARTFEHLER = null;   // der zweite Anlauf gelingt
+await page.selectOption('#raGrund', { index: 1 });
+rufe = [];
+await page.click('#raBtn');
+await page.waitForTimeout(900);
+check('KRITISCH: der Abbruch geht an den Server',
+  rufe.some(r => r.p.includes('mein_rundgang_abbrechen') && r.body && r.body.rundgang_id === 951));
+check('KRITISCH: und danach startet der gewünschte Rundgang von selbst',
+  rufe.some(r => r.p.includes('spontan_starten')));
+check('KRITISCH: mit dem Ausnahmegrund, den der Wächter schon angegeben hatte',
+  rufe.some(r => r.p.includes('spontan_starten') && r.body && r.body.ausnahme_grund));
+check('Die Rückfrage ist danach weg', !(await page.isVisible('#roDlg')));
+
+// Gegenstück: Wer FORTSETZEN wählt, will den neuen Rundgang ausdrücklich
+// nicht -- er darf danach nicht doch noch losgehen.
+STARTFEHLER = { status: 'error', code: 'runde_offen',
+  message: 'Dieser Rundgang ist pausiert.', offen: OFFENE_RUNDE };
+await anmelden();
+await startVersuch();
+check('Vorbedingung: die Rückfrage steht wieder da', await page.isVisible('#roDlg'));
+STARTFEHLER = null;
+rufe = [];
+await page.click('#roBtnWeiter');
+await page.waitForTimeout(900);
+check('KRITISCH: nach "Fortsetzen" startet KEIN neuer Rundgang -- das wäre das Gegenteil der Wahl',
+  !rufe.some(r => r.p.includes('spontan_starten')));
+check('Stattdessen wird die bestehende Runde geholt',
+  rufe.some(r => r.p.includes('mein_rundgang_offen')));
+
+/* Und der gemerkte Start darf danach nicht als Blindgänger liegenbleiben.
+   Der Weg, auf dem er sonst losginge: Wer die fortgesetzte Runde später
+   über den Zurück-Pfeil abbricht (ENT-324), landet in derselben
+   Abbruch-Funktion -- und die startet, was gemerkt ist. Es startete also
+   ein Rundgang, den niemand mehr verlangt hat, Minuten nach der
+   Entscheidung dagegen. Genau das prüft der nächste Punkt. */
+rufe = [];
+await page.evaluate(() => rundgangAbbrechenAnzeigen(777, 'pfeil', true));
+await page.waitForTimeout(400);
+await page.selectOption('#raGrund', { index: 1 });
+await page.click('#raBtn');
+await page.waitForTimeout(800);
+check('KRITISCH: ein späterer Abbruch startet den verworfenen Rundgang NICHT nachträglich',
+  !rufe.some(r => r.p.includes('spontan_starten')));
+
+// Mehrere offene Runden sind seit ENT-630 wieder möglich -- das wird
+// gesagt, nicht verschwiegen.
+// LAEUFT stand hier zuletzt auf "keine offene Runde" -- fuer diese beiden
+// Pruefungen braucht es wieder eine.
+LAEUFT = { status: 'ok', weitere: 2, rundgang: OFFENE_RUNDE };
+await anmelden();
+check('KRITISCH: sind weitere Runden offen, steht das in der Rückfrage',
+  await page.isVisible('#roWeitere')
+  && (await page.textContent('#roWeitere')).includes('2'));
+LAEUFT = { status: 'ok', weitere: 0, rundgang: OFFENE_RUNDE };
+await anmelden();
+check('KRITISCH: ist keine weitere offen, steht dort auch nichts -- keine erfundene Zahl',
+  !(await page.isVisible('#roWeitere')));
+
 // Gegenstück: Ein Startfehler, der NICHTS mit einer offenen Runde zu tun
 // hat, darf die Rückfrage nicht auslösen -- sonst behauptete sie eine
 // offene Runde, die es nicht gibt.
+// Ohne offene Runde starten, sonst stünde die Rückfrage vom App-Start
+// schon da und verdeckte den Knopf im Blatt.
+LAEUFT = { status: 'ok', rundgang: null, weitere: 0 };
 await anmelden();
 STARTFEHLER = { status: 'error', message: 'Ausserhalb des Zeitfensters dieser Kontrollrunde.' };
 await startVersuch();

@@ -567,6 +567,7 @@ function rundgang_offener(PDO $pdo, int $mitarbeiterId): array
     return ['weitere' => count($offene) - 1, 'rundgang' => [
         'id'              => (int)$r['id'],
         'einsatz_id'      => (int)$r['einsatz_id'],
+        'objekt_id'       => (int)$r['objekt_id'],
         'vorlage_id'      => $vorlageId,
         // Damit die App die Schicht nachladen kann, wenn sie ausserhalb des
         // geladenen Zeitraums liegt -- genau der Fall einer vergessenen
@@ -586,6 +587,37 @@ function rundgang_offener(PDO $pdo, int $mitarbeiterId): array
         'punkte_anzahl'   => (int)$fortschritt['gesamt'],
         'erledigt_anzahl' => (int)$fortschritt['erledigt'],
     ]];
+}
+
+/* Ist die offene Runde DIESELBE wie die, die gerade gestartet werden soll?
+   (ENT-630, Revision von ENT-629)
+
+   ENT-629 sperrte jeden zweiten Start, solange irgendeine Runde offen war.
+   Der Projektinhaber hat das am selben Tag am Geraet verworfen: „Andere
+   Rundgaenge lassen sich normal starten. Nur wenn es der pausierte
+   Rundgang betrifft, braucht es eine Entscheidung." Sein urspruenglicher
+   Auftrag sagte bereits „und DERSELBE angewaehlt wird" -- die Ausweitung
+   auf jede Runde war meine Auslegung, nicht seine Ansage.
+
+   WAS „DIESELBE" HEISST: die gewaehlte Kontrollrunde. Wurde keine gewaehlt,
+   umfasst die Runde alle aktiven Punkte des Objekts -- dann entscheidet das
+   Objekt. Eine Runde MIT Vorlage und eine OHNE sind nie dieselbe, auch am
+   selben Objekt nicht: Die eine hat einen festgelegten Umfang, die andere
+   nicht.
+
+   Die Sperre gegen einen zweiten offenen Rundgang JE EINSATZ (ENT-180)
+   faellt damit ebenfalls -- zwei verschiedene Kontrollrunden derselben
+   Schicht duerfen nebeneinander offen stehen. Das ist Absicht und nicht
+   Nebenwirkung: Etwas anderes waere nicht zu erklaeren, wenn dieselben
+   zwei Runden an zwei Schichten erlaubt waeren. Was dabei liegenbleibt,
+   holt die Rueckfrage beim App-Start (ENT-628) nacheinander ein. */
+function rundgang_gleiche_runde(?array $offen, int $objektId, ?int $vorlageId): bool
+{
+    if (!$offen) { return false; }
+    if ($vorlageId !== null && $vorlageId > 0) {
+        return $offen['vorlage_id'] === $vorlageId;
+    }
+    return $offen['vorlage_id'] === null && (int)$offen['objekt_id'] === $objektId;
 }
 
 function rundgang_fortschritt(PDO $pdo, int $rundgangId, int $objektId, ?int $vorlageId = null): array

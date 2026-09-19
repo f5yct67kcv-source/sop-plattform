@@ -71,26 +71,37 @@ if ($v['fenster_von'] !== null && $v['fenster_bis'] !== null) {
    hinterliesse sonst genau die Karteileichen im Einsatzplan, die ENT-294
    losgeworden ist.
 
-   Ist es dieselbe Kontrollrunde, die schon laeuft, ist das kein Konflikt,
-   sondern ein zweites Antippen derselben Kachel (ENT-290): Dann fuehrt die
-   Antwort in die bestehende Runde zurueck, statt sie abbrechen zu lassen.
-   Diese Weiche sass bis hierher INNERHALB der Doppelbelegungspruefung und
-   griff darum nur bei einer Zeitueberschneidung -- eine pausierte Runde von
-   gestern Nacht erreichte sie nie. */
-$offen = rundgang_offener($pdo, (int)$user['id']);
-if ($offen['rundgang']) {
-    if ($offen['rundgang']['vorlage_id'] === $vorlageId) {
-        json_response(['status' => 'laeuft_bereits',
-            'einsatz_id' => (int)$offen['rundgang']['einsatz_id'],
-            'rundgang_id' => (int)$offen['rundgang']['id']]);
+   Gefragt wird NUR bei derselben Kontrollrunde (ENT-630, Revision von
+   ENT-629). Eine andere Runde an einem anderen Objekt startet ohne
+   Rueckfrage -- der Projektinhaber am Geraet: „Andere Rundgaenge lassen
+   sich normal starten. Nur wenn es der pausierte Rundgang betrifft,
+   braucht es eine Entscheidung."
+
+   PAUSIERT: Genau der Fall aus seinen Bildschirmfotos. Beim Wettbewerb
+   entsteht dort auf Wunsch eine ZWEITE pausierte Runde derselben
+   Patrouille, und dieselbe Runde steht danach gleichzeitig als
+   „ausgefuehrt" und zweimal als „pausiert" da. Hier nicht: fortsetzen
+   oder mit Grund abbrechen und neu starten, ein Drittes gibt es nicht.
+
+   LAEUFT ODER ERST VORBEREITET: kein Konflikt, sondern ein zweites
+   Antippen derselben Kachel (ENT-290) -- etwa weil der erste Versuch nur
+   „vorbereitet" blieb. Die Antwort fuehrt wie bisher in die bestehende
+   Runde zurueck. Diese Weiche sass bis ENT-629 INNERHALB der
+   Doppelbelegungspruefung und griff darum nur bei einer
+   Zeitueberschneidung. */
+$offen = rundgang_offener($pdo, (int)$user['id'])['rundgang'];
+if ($offen && $offen['vorlage_id'] === $vorlageId) {
+    if ($offen['status'] === 'pausiert') {
+        // Die offene Runde kommt MIT: Die App stellt daraus die Rueckfrage,
+        // statt einen roten Satz zu zeigen. Eine Sperre ohne Ausweg waere
+        // hier wertlos -- der Waechter steht vor dem Objekt.
+        json_response(['status' => 'error', 'code' => 'runde_offen',
+            'message' => 'Dieser Rundgang ist pausiert. Er muss zuerst fortgesetzt oder abgebrochen werden.',
+            'offen' => $offen], 409);
     }
-    // Die offene Runde kommt mit: Die App stellt daraus dieselbe Rueckfrage
-    // wie beim App-Start (ENT-628) -- fortsetzen, pausieren, abbrechen mit
-    // Grund. Eine Sperre ohne Ausweg waere hier wertlos; der Waechter steht
-    // vor dem Objekt.
-    json_response(['status' => 'error', 'code' => 'runde_offen',
-        'message' => 'Es ist noch ein Rundgang offen. Er muss zuerst beendet oder abgebrochen werden.',
-        'offen' => $offen['rundgang']], 409);
+    json_response(['status' => 'laeuft_bereits',
+        'einsatz_id' => (int)$offen['einsatz_id'],
+        'rundgang_id' => (int)$offen['id']]);
 }
 
 $heute = date('Y-m-d');

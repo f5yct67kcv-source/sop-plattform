@@ -83,27 +83,41 @@ if ($fensterVon !== null && $fensterBis !== null) {
     $ausnahmeGrund = null;
 }
 
-// Kein zweiter offener Rundgang, solange einer offen ist -- und zwar ueber
-// ALLE Einsaetze hinweg (ENT-629, erweitert die Sperre je Einsatz aus
-// ENT-180). Mehrere Rundgaenge NACHEINANDER pro Schicht bleiben vorgesehen
-// (z.B. stuendliche Kontrollen); parallel gibt es keinen.
-//
-// Der Projektinhaber: „Wenn ein bereits bestehender Rundgang offen ist,
-// muss der andere zuerst begruendet abgeschlossen oder abgebrochen
-// werden." Bis hierher sah diese Pruefung nur denselben Einsatz an -- eine
-// vergessene Runde von gestern und eine neue von heute standen nebeneinander.
-//
-// ABGRENZUNG ZU ENT-342: Dort ist eine Startsperre bewusst GEFALLEN, weil
-// sie den Waechter vor einem Planungsfehler stehen liess, den er draussen
-// gar nicht beheben konnte. Das gilt hier nicht: Diese Sperre haengt an der
-// eigenen offenen Runde, und der Ausweg liegt in derselben Rueckfrage --
-// fortsetzen, pausieren oder mit Grund abbrechen. Deshalb kommt die offene
-// Runde mit der Absage MIT, statt die App auf einen roten Satz zu setzen.
-$offen = rundgang_offener($pdo, (int)$user['id']);
-if ($offen['rundgang']) {
-    json_response(['status' => 'error', 'code' => 'runde_offen',
-        'message' => 'Es ist noch ein Rundgang offen. Er muss zuerst beendet oder abgebrochen werden.',
-        'offen' => $offen['rundgang']], 409);
+/* Steht DIESELBE Runde noch offen? (ENT-630, Revision von ENT-629)
+
+   ENT-629 sperrte jeden zweiten Start, egal welche Runde offen war. Der
+   Projektinhaber hat das am Geraet verworfen: „Andere Rundgaenge lassen
+   sich normal starten. Nur wenn es der pausierte Rundgang betrifft,
+   braucht es eine Entscheidung." Genau danach faellt die Entscheidung
+   hier -- und nur hier.
+
+   ZWEI FAELLE, ZWEI ANTWORTEN:
+
+   PAUSIERT: Der Waechter waehlt dieselbe Runde noch einmal an, waehrend
+   sie pausiert liegt. Das ist der Fall aus den Bildschirmfotos des
+   Projektinhabers: Beim Wettbewerb entsteht dort auf Wunsch eine ZWEITE
+   pausierte Runde derselben Patrouille, und dieselbe Runde steht danach
+   gleichzeitig als „ausgefuehrt" und zweimal als „pausiert" da. Solche
+   Leichen entstehen hier nicht: Es gibt nur fortsetzen oder mit Grund
+   abbrechen und neu starten. Die offene Runde kommt mit der Absage MIT,
+   damit die App beides anbieten kann, statt einen roten Satz zu zeigen.
+
+   LAEUFT ODER ERST VORBEREITET: Das ist kein Konflikt, sondern derselbe
+   Startknopf ein zweites Mal (ENT-180/ENT-290) -- etwa weil der erste
+   Versuch nur „vorbereitet" blieb. Antwort wie bisher.
+
+   ABGRENZUNG ZU ENT-342: Dort ist eine Startsperre bewusst GEFALLEN, weil
+   sie den Waechter vor einem Planungsfehler stehen liess, den er draussen
+   gar nicht beheben konnte. Das gilt hier nicht: Die Sperre haengt an
+   seiner eigenen Runde, und der Ausweg liegt im selben Fenster. */
+$offen = rundgang_offener($pdo, (int)$user['id'])['rundgang'];
+if (rundgang_gleiche_runde($offen, $objektId, $vorlageId)) {
+    if ($offen['status'] === 'pausiert') {
+        json_response(['status' => 'error', 'code' => 'runde_offen',
+            'message' => 'Dieser Rundgang ist pausiert. Er muss zuerst fortgesetzt oder abgebrochen werden.',
+            'offen' => $offen], 409);
+    }
+    json_response(['status' => 'error', 'message' => 'Es laeuft bereits ein Rundgang fuer diesen Einsatz'], 409);
 }
 
 $ins = $pdo->prepare(
