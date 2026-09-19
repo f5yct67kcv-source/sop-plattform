@@ -779,6 +779,7 @@ jobs:
           cp backend/demo_zugang.php dist/demo_zugang.php
           cp backend/mail_vorlage.php dist/mail_vorlage.php
           cp backend/guardops-signatur.png dist/guardops-signatur.png
+          cp backend/guardops-signatur-hell.png dist/guardops-signatur-hell.png
           # Support-Freigabe (ENT-526). Wird von BEIDEN Seiten eingebunden --
           # von den support_*-Endpunkten des Betriebs und von
           # api/betreiber_support.php -- und nie direkt aufgerufen; steht
@@ -1291,6 +1292,9 @@ jobs:
           cp backend/mail_vorlage.php  dist-betreiber/mail_vorlage.php
           # Das Logo der Signatur -- flach neben die Vorlage, die es von dort liest.
           cp backend/guardops-signatur.png     dist-betreiber/guardops-signatur.png
+          # Die helle Fassung fuer den Dunkelmodus -- ohne sie stuende das Logo
+          # dort dunkel auf dunkel (ENT-619).
+          cp backend/guardops-signatur-hell.png dist-betreiber/guardops-signatur-hell.png
           # Der Griff in eine Demo-Instanz (ENT-600) und was er braucht.
           # demo_instanz.php bindet demo_reset.php ein, demo_reset.php
           # erwartet system_rollen() aus rechte.php (oben schon dabei), und
@@ -1723,6 +1727,7 @@ jobs:
           cp backend/demo_zugang.php dist-cupi24/demo_zugang.php
           cp backend/mail_vorlage.php dist-cupi24/mail_vorlage.php
           cp backend/guardops-signatur.png dist-cupi24/guardops-signatur.png
+          cp backend/guardops-signatur-hell.png dist-cupi24/guardops-signatur-hell.png
           cp backend/support.php dist-cupi24/support.php
           cp backend/supportvorgang.php dist-cupi24/supportvorgang.php
           cp backend/demo_anfrage.php dist-cupi24/demo_anfrage.php

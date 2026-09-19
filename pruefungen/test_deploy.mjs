@@ -858,6 +858,28 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     /__SMTP_ABSENDER__\|info@guardops\.ch\|g"\s+dist-guardops\/mailer\.php/.test(bauen)
     && /__SMTP_ABSENDER_NAME__\|GuardOpS\|g"\s+dist-guardops\/mailer\.php/.test(bauen));
 
+  // Jede Bilddatei, die die Mailvorlage LIEST, muss in jedem Bündel liegen,
+  // das die Vorlage mitnimmt. Sonst liefert mail_logo() dort null und das
+  // Logo fehlt in der Mail — sichtbar erst beim Empfänger. Dieselbe
+  // Fehlerklasse, die am 2026-09-18 den Demo-Zugang blockiert hat: eine
+  // Datei, die der Code braucht und der Deploy nicht mitnimmt.
+  //
+  // Die Dateinamen kommen aus der Vorlage selbst, nicht aus einer zweiten
+  // Liste hier — sonst liefen die beiden auseinander.
+  const vorlage = readFileSync(`${WURZEL}/backend/mail_vorlage.php`, 'utf8');
+  const bilddateien = [...vorlage.matchAll(/const MAIL_LOGO_DATEI[A-Z_]* *= *'([^']+)'/g)]
+    .map(m => m[1]);
+  check('KRITISCH: die Mailvorlage nennt ihre Bilddateien über Konstanten (sonst greift die Prüfung darunter ins Leere)',
+    bilddateien.length >= 2);
+  for (const bundle of ['dist', 'dist-betreiber', 'dist-cupi24']) {
+    const nimmtVorlage = new RegExp(`cp backend/mail_vorlage\\.php\\s+${bundle}/`).test(workflow);
+    if (!nimmtVorlage) { continue; }
+    const fehlend = bilddateien.filter(d =>
+      !new RegExp(`cp backend/${d.replace('.', '\\.')}\\s+${bundle}/`).test(workflow));
+    check(`KRITISCH: jedes Logo der Mailvorlage liegt im ${bundle}-Bündel`, fehlend.length === 0);
+    if (fehlend.length) { bad.push(`fehlt in ${bundle}: ${fehlend.join(', ')}`); }
+  }
+
   // Der Betreiber-Bereich verschickt eigene Kommunikation der Betreiberin
   // (Demo-Zugaenge, Offerten, Rechnungen) und darf dafuer nie den Absender
   // der Mandantin tragen (ENT-568/ENT-569). Genau das ist am 2026-09-18
