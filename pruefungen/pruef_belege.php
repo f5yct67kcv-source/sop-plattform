@@ -163,6 +163,75 @@ check('Alle fuenf Status sind gueltig',
     count(array_filter(BELEG_STATUS, 'beleg_status_gueltig')) === 5);
 check('KRITISCH: ein unbekannter Status wird abgewiesen', !beleg_status_gueltig('storniert'));
 
+check('Vertrag ist als Belegart vorgesehen', beleg_art_gueltig('vertrag'));
+
+// ── Perioden (ENT-637) ────────────────────────────────────────────────────
+//
+// Geprueft wird die AUSSAGE, nicht der Wortlaut: dass gleichartige
+// Positionen zusammen gerechnet werden, dass keine Gesamtsumme ueber die
+// Perioden entsteht und dass eine leere Periode gar nicht erst auftaucht.
+check('Einmalig ist eine gueltige Periode', beleg_periode_gueltig('einmalig'));
+check('Monatlich und jaehrlich ebenso',
+    beleg_periode_gueltig('monatlich') && beleg_periode_gueltig('jaehrlich'));
+check('KRITISCH: eine unbekannte Periode wird abgewiesen',
+    !beleg_periode_gueltig('woechentlich'));
+check('KRITISCH: einmalig traegt keinen Zusatz -- sonst stuende auf jeder '
+    . 'Offerte "Total einmalig"', beleg_periode_zusatz('einmalig') === '');
+check('Monatlich und jaehrlich tragen je einen eigenen Zusatz',
+    beleg_periode_zusatz('monatlich') !== ''
+    && beleg_periode_zusatz('jaehrlich') !== ''
+    && beleg_periode_zusatz('monatlich') !== beleg_periode_zusatz('jaehrlich'));
+
+$gemischt = [
+    ['menge' => 1, 'einzelpreis_rappen' => 50000, 'mwst_satz_bp' => 810, 'periode' => 'einmalig'],
+    ['menge' => 1, 'einzelpreis_rappen' => 12000, 'mwst_satz_bp' => 810, 'periode' => 'monatlich'],
+    ['menge' => 2, 'einzelpreis_rappen' =>  3000, 'mwst_satz_bp' => 810, 'periode' => 'monatlich'],
+];
+$per = beleg_summen_perioden($gemischt, 0);
+check('Ein gemischter Vertrag ergibt genau zwei Bloecke', count($per) === 2);
+check('KRITISCH: die Monatspositionen werden zusammengerechnet, nicht einzeln',
+    ($per['monatlich']['zwischensumme_rappen'] ?? -1) === 18000);
+check('KRITISCH: die einmalige Position bleibt in ihrem eigenen Block',
+    ($per['einmalig']['zwischensumme_rappen'] ?? -1) === 50000);
+check('KRITISCH: es entsteht KEINE Summe ueber die Perioden hinweg -- ' .
+    'einmalig und monatlich sind zwei Einheiten',
+    !array_key_exists('total_rappen', $per));
+check('Die einmalige Periode steht zuerst, unabhaengig von der Eingabereihenfolge',
+    array_key_first(beleg_summen_perioden(array_reverse($gemischt), 0)) === 'einmalig');
+check('Ein gemischter Vertrag traegt wiederkehrende Positionen',
+    beleg_hat_wiederkehrend($per));
+
+$nurEinmal = beleg_summen_perioden([
+    ['menge' => 1, 'einzelpreis_rappen' => 10000, 'mwst_satz_bp' => 0],
+], 0);
+check('KRITISCH: eine Offerte ohne Periodenangabe bleibt einmalig',
+    count($nurEinmal) === 1 && array_key_exists('einmalig', $nurEinmal));
+check('Eine Offerte traegt nichts Wiederkehrendes',
+    !beleg_hat_wiederkehrend($nurEinmal));
+check('KRITISCH: eine leere Periode steht gar nicht erst da -- ' .
+    '"einmalig CHF 0.00" saehe aus wie ein Preis',
+    !array_key_exists('monatlich', $nurEinmal));
+check('Ohne Positionen gibt es keinen einzigen Block',
+    count(beleg_summen_perioden([], 0)) === 0);
+
+// Der Gesamtrabatt gilt in JEDER Periode -- zehn Prozent auf einen Vertrag
+// heissen zehn Prozent auf die Einrichtung und zehn Prozent auf den Monat.
+$mitRabatt = beleg_summen_perioden($gemischt, 1000);
+check('KRITISCH: der Gesamtrabatt greift in jeder Periode einzeln',
+    $mitRabatt['einmalig']['rabatt_rappen'] === 5000
+    && $mitRabatt['monatlich']['rabatt_rappen'] === 1800);
+
+// Eine Position mit unbekannter Periode wird beim Einlesen zu 'einmalig' --
+// aber sie verschwindet nicht, und sie wandert auch nicht in einen
+// erfundenen Block.
+$fremd = beleg_position_lesen(['produkt_name' => 'x', 'periode' => 'taeglich']);
+check('KRITISCH: eine unbekannte Periode faellt auf einmalig zurueck, '
+    . 'statt die Zeile zu verlieren', $fremd['periode'] === 'einmalig');
+$echt = beleg_position_lesen(['produkt_name' => 'x', 'periode' => 'monatlich']);
+check('Eine gueltige Periode bleibt erhalten', $echt['periode'] === 'monatlich');
+check('Fehlt die Angabe ganz, gilt einmalig',
+    beleg_position_lesen(['produkt_name' => 'x'])['periode'] === 'einmalig');
+
 echo count($bad) === 0 ? "$ok Pruefungen bestanden\n" : '';
 foreach ($bad as $b) { echo "X $b\n"; }
 exit(count($bad) === 0 ? 0 : 1);

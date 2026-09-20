@@ -96,12 +96,53 @@ $kopf = [
 ];
 $rabattBp = max(0, min(10000, (int)round((float)($in['rabatt_bp'] ?? 0))));
 
+// ── Laufzeit, nur beim Vertrag (ENT-637) ──────────────────────────────────
+//
+// Beim Aendern entscheidet die GESPEICHERTE Art, nicht die mitgeschickte:
+// `art` steht nicht in $kopf und wird darum nie ueberschrieben. Kaeme die
+// Angabe aus der Anfrage, liesse sich einem bestehenden Vertrag mit einem
+// art=offerte seine Laufzeit leeren, ohne dass er aufhoerte, ein Vertrag zu
+// sein.
+if ($id > 0) {
+    $a = $pdo->prepare('SELECT art FROM be_belege WHERE id = ?');
+    $a->execute([$id]);
+    $gespeichert = $a->fetchColumn();
+    if ($gespeichert !== false) { $art = (string)$gespeichert; }
+}
+
+// Die Spalten kommen ueber be_spalten_anlegen() nach; zwischen Deploy und
+// Einrichtungslauf gibt es sie nicht. Sie dann zu nennen, brauchte den
+// ganzen Endpunkt zum Absturz -- auch fuer die Offerte, die mit ihnen
+// nichts zu tun hat.
+$laufzeitDa = hat_spalte($pdo, 'be_belege', 'vertrag_beginn');
+if ($laufzeitDa) {
+    $monateOderNull = static function ($wert): ?int {
+        if ($wert === null || $wert === '' || $wert === false) { return null; }
+        return max(0, min(600, (int)round((float)$wert)));
+    };
+    $datumOderNull = static function ($wert): ?string {
+        $d = (string)($wert ?? '');
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) ? $d : null;
+    };
+    // Eine Offerte traegt keine Laufzeit. Ausdruecklich auf null gesetzt und
+    // nicht bloss weggelassen: Wird aus einem Vertrag durch Duplizieren eine
+    // Offerte, muessen die Felder tatsaechlich leer werden.
+    $kopf['vertrag_beginn']          = $art === 'vertrag' ? $datumOderNull($in['vertrag_beginn'] ?? null) : null;
+    $kopf['mindestlaufzeit_monate']  = $art === 'vertrag' ? $monateOderNull($in['mindestlaufzeit_monate'] ?? null) : null;
+    $kopf['kuendigungsfrist_monate'] = $art === 'vertrag' ? $monateOderNull($in['kuendigungsfrist_monate'] ?? null) : null;
+    $kopf['verlaengerung_monate']    = $art === 'vertrag' ? $monateOderNull($in['verlaengerung_monate'] ?? null) : null;
+}
+
 // Leere Zeilen fallen weg. Eine Zeile gilt als leer, wenn sie weder Namen
 // noch Beschreibung noch Preis traegt -- ein reiner Textblock (Preis 0, aber
 // mit Text) muss bleiben, den gibt es auf jeder zweiten Offerte.
 $positionen = [];
 foreach ((array)($in['positionen'] ?? []) as $p) {
     $z = beleg_position_lesen((array)$p);
+    // Nur ein Vertrag kennt wiederkehrende Positionen (ENT-637). Auf einer
+    // Offerte waere „pro Monat" eine Zusage, die das Dokument nirgends
+    // ausweist -- es hat keine Laufzeit, in der ein Monat wiederkehrte.
+    if ($art !== 'vertrag') { $z['periode'] = 'einmalig'; }
     if ($z['produkt_name'] === '' && $z['beschreibung'] === '' && $z['einzelpreis_rappen'] === 0) {
         continue;
     }

@@ -39,6 +39,33 @@ const BELEG_ARTEN = [
                    'datum_label' => 'Offertendatum', 'nummer_label' => 'Offertennummer'],
     'rechnung' => ['praefix' => 'RE', 'titel' => 'Rechnung',
                    'datum_label' => 'Rechnungsdatum', 'nummer_label' => 'Rechnungsnummer'],
+    // Dritte Art seit ENT-637. Sie erbt Versand, oeffentliche Ansicht und
+    // Annahme unveraendert -- die unterscheiden die Art gar nicht. Was sie
+    // zusaetzlich hat, ist eine Laufzeit und ein Preis je Periode.
+    //
+    // NUR AUF DER BETREIBER-SEITE: Die Tabelle `belege` des Mandanten kennt
+    // den Wert in ihrem ENUM nicht, dort laesst sich also kein Vertrag
+    // ablegen. Ob eine Sicherheitsfirma ihren eigenen Kunden Vertraege
+    // schreiben soll, ist eine eigene Frage und nicht entschieden.
+    'vertrag'  => ['praefix' => 'VE', 'titel' => 'Vertrag',
+                   'datum_label' => 'Vertragsdatum', 'nummer_label' => 'Vertragsnummer'],
+];
+
+// Wie oft eine Position anfaellt (ENT-637). Eine Einrichtungsgebuehr faellt
+// einmal an, eine Grundgebuehr jeden Monat -- das sind zwei Einheiten, und
+// sie duerfen nie unter einer Summe stehen (Hausregel: Einheiten nie
+// vermischen). Darum rechnet ein Vertrag je Periode eine eigene Summe.
+//
+// Offerte und Rechnung kennen nur 'einmalig'. Das ist auch der Vorgabewert
+// der Spalte, darum aendert sich fuer sie nichts.
+//
+// KEINE UMRECHNUNG zwischen den Perioden. Zwoelf Monatsgebuehren sind nicht
+// dasselbe wie eine Jahresgebuehr -- wer unterjaehrig aussteigt, zahlt
+// anders. Was der Vertrag sagt, bleibt stehen, wie es dasteht.
+const BELEG_PERIODEN = [
+    'einmalig'  => ['titel' => 'einmalig',   'zusatz' => ''],
+    'monatlich' => ['titel' => 'pro Monat',  'zusatz' => 'pro Monat'],
+    'jaehrlich' => ['titel' => 'pro Jahr',   'zusatz' => 'pro Jahr'],
 ];
 
 // Die Status einer Offerte. Bewusst von Hand gesetzt, auch 'angeschaut':
@@ -79,6 +106,20 @@ function beleg_tabelle(string $praefix, string $name): string
 function beleg_art_gueltig(string $art): bool
 {
     return array_key_exists($art, BELEG_ARTEN);
+}
+
+function beleg_periode_gueltig(string $periode): bool
+{
+    return array_key_exists($periode, BELEG_PERIODEN);
+}
+
+// Der Zusatz hinter einem Betrag: "pro Monat", "pro Jahr" -- und bei
+// 'einmalig' ABSICHTLICH nichts. Auf einer Offerte hiesse "Total einmalig"
+// nichts; dort ist alles einmalig, und der Zusatz wuerde eine
+// Unterscheidung behaupten, die es auf dem Blatt gar nicht gibt.
+function beleg_periode_zusatz(string $periode): string
+{
+    return (string)(BELEG_PERIODEN[$periode]['zusatz'] ?? '');
 }
 
 function beleg_status_gueltig(string $status): bool
@@ -227,6 +268,49 @@ function beleg_summen(array $positionen, int $rabattBp = 0): array
     ];
 }
 
+// Ein Vertrag rechnet JE PERIODE eine eigene Summe (ENT-637) -- mit
+// derselben Funktion oben, nur dreimal aufgerufen. Kein zweiter Rechenkern:
+// Eine Gruppe gleichartiger Positionen rechnet sich genau so wie eine
+// Offerte, und test_belege.mjs prueft weiterhin eine Formel.
+//
+// WARUM KEINE GESAMTSUMME herausfaellt: "Total CHF 4'800" ueber einer
+// Mischung aus einmaliger Einrichtung und Monatsgebuehr ist eine Zahl, die
+// niemand bezahlt. Leere Perioden stehen gar nicht erst in der Antwort --
+// ein Block "einmalig CHF 0.00" saehe aus wie ein Preis, nicht wie eine
+// fehlende Zeile.
+//
+// Der Gesamtrabatt gilt in jeder Periode. Zehn Prozent auf einen Vertrag
+// heissen zehn Prozent auf die Einrichtung und zehn Prozent auf die
+// Monatsgebuehr; alles andere muesste der Vertrag ausschreiben.
+function beleg_summen_perioden(array $positionen, int $rabattBp = 0): array
+{
+    $gruppen = [];
+    foreach ($positionen as $p) {
+        $periode = (string)($p['periode'] ?? 'einmalig');
+        if (!beleg_periode_gueltig($periode)) { $periode = 'einmalig'; }
+        $gruppen[$periode][] = $p;
+    }
+    // Reihenfolge aus BELEG_PERIODEN, nicht aus der Eingabe: Auf dem
+    // Dokument steht immer zuerst, was sofort faellig wird.
+    $raus = [];
+    foreach (array_keys(BELEG_PERIODEN) as $periode) {
+        if (empty($gruppen[$periode])) { continue; }
+        $raus[$periode] = beleg_summen($gruppen[$periode], $rabattBp);
+    }
+    return $raus;
+}
+
+// Traegt dieser Beleg wiederkehrende Positionen? Getrennt beantwortbar, weil
+// die Oberflaeche daran entscheidet, ob sie ueberhaupt von "pro Monat"
+// spricht.
+function beleg_hat_wiederkehrend(array $perioden): bool
+{
+    foreach ($perioden as $periode => $s) {
+        if ($periode !== 'einmalig') { return true; }
+    }
+    return false;
+}
+
 // ══════════════════════════════════════════════════════════════════════════
 // Datenbankteil
 // ══════════════════════════════════════════════════════════════════════════
@@ -259,19 +343,69 @@ function beleg_position_lesen(array $p): array
         // Umwegen; weniger als 0 ein Zuschlag, der so nicht heissen darf.
         'rabatt_bp'          => $ganz($p['rabatt_bp'] ?? 0, 0, 10000),
         'mwst_satz_bp'       => $ganz($p['mwst_satz_bp'] ?? 0, 0, 10000),
+        // Eine unbekannte Periode wird NICHT stillschweigend zu 'einmalig'
+        // gebogen, wenn sie ueberhaupt genannt wurde -- sonst stuende auf dem
+        // Vertrag eine Abmachung, die niemand getroffen hat. Nur das FEHLENDE
+        // Feld gilt als 'einmalig', und das ist die Offerte.
+        'periode'            => beleg_periode_gueltig((string)($p['periode'] ?? 'einmalig'))
+                                ? (string)($p['periode'] ?? 'einmalig')
+                                : 'einmalig',
     ];
+}
+
+// Gibt es die Periodenspalte schon? Sie kommt ueber die Einrichtung nach
+// (ENT-637), und zwischen Deploy und Einrichtungslauf gibt es sie nicht.
+// Eine Abfrage, die sie dann nennt, bricht mit einem SQL-Fehler ab -- und
+// machte aus einer fehlenden Spalte eine unbenutzbare Offertenliste.
+//
+// Gemerkt je Tabellensatz: Der Aufruf kommt in jeder Belegzeile vor.
+// EIGENE PRUEFUNG STATT DER AUS db.php: Diese Datei ist der Rechenkern und
+// wird auch dort geladen, wo db.php nicht danebensteht --
+// pruef_offerten_betreiber.php faehrt sie mit einer eigenen Verbindung. Eine
+// Abhaengigkeit auf db.php waere genau die Art Kopplung, die den Rechenkern
+// unpruefbar macht.
+//
+// Gemerkt je Tabelle und Spalte: Der Aufruf kommt in jeder Belegzeile vor.
+function beleg_spalte_da(PDO $pdo, string $tabelle, string $spalte): bool
+{
+    static $gemerkt = [];
+    $schluessel = $tabelle . '.' . $spalte;
+    if (!array_key_exists($schluessel, $gemerkt)) {
+        try {
+            $s = $pdo->prepare("SHOW COLUMNS FROM {$tabelle} LIKE ?");
+            $s->execute([$spalte]);
+            $gemerkt[$schluessel] = $s->fetch() !== false;
+        } catch (Throwable $e) {
+            // Gibt es die Tabelle gar nicht, gibt es auch die Spalte nicht.
+            $gemerkt[$schluessel] = false;
+        }
+    }
+    return $gemerkt[$schluessel];
+}
+
+function beleg_periode_spalte_da(PDO $pdo, string $tabPraefix = ''): bool
+{
+    return beleg_spalte_da($pdo, beleg_tabelle($tabPraefix, 'beleg_positionen'), 'periode');
 }
 
 function beleg_positionen_lesen(PDO $pdo, int $belegId, string $tabPraefix = ''): array
 {
     $tab = beleg_tabelle($tabPraefix, 'beleg_positionen');
+    $periodeDa = beleg_periode_spalte_da($pdo, $tabPraefix);
     $s = $pdo->prepare(
         "SELECT id, sortierung, produkt_id, produkt_name, beschreibung, menge,
-                einheit, einzelpreis_rappen, rabatt_bp, mwst_satz_bp
+                einheit, einzelpreis_rappen, rabatt_bp, mwst_satz_bp"
+        . ($periodeDa ? ', periode' : '') . "
            FROM {$tab} WHERE beleg_id = ? ORDER BY sortierung, id"
     );
     $s->execute([$belegId]);
-    return $s->fetchAll();
+    $zeilen = $s->fetchAll();
+    // Fehlt die Spalte, traegt jede Zeile trotzdem eine Periode -- 'einmalig'
+    // ist die Aussage der Anlage vor ENT-637 und keine Annahme.
+    if (!$periodeDa) {
+        foreach ($zeilen as $i => $z) { $zeilen[$i]['periode'] = 'einmalig'; }
+    }
+    return $zeilen;
 }
 
 // Positionen ersetzen: erst alle weg, dann neu schreiben. Ein Abgleich Zeile
@@ -283,17 +417,21 @@ function beleg_positionen_schreiben(PDO $pdo, int $belegId, array $positionen,
                                     string $tabPraefix = ''): void
 {
     $tab = beleg_tabelle($tabPraefix, 'beleg_positionen');
+    $periodeDa = beleg_periode_spalte_da($pdo, $tabPraefix);
     $pdo->prepare("DELETE FROM {$tab} WHERE beleg_id = ?")->execute([$belegId]);
     $ein = $pdo->prepare(
         "INSERT INTO {$tab}
             (beleg_id, sortierung, produkt_id, produkt_name, beschreibung, menge,
-             einheit, einzelpreis_rappen, rabatt_bp, mwst_satz_bp)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             einheit, einzelpreis_rappen, rabatt_bp, mwst_satz_bp"
+        . ($periodeDa ? ', periode' : '') . ")
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?" . ($periodeDa ? ', ?' : '') . ")"
     );
     foreach (array_values($positionen) as $i => $p) {
-        $ein->execute([$belegId, $i, $p['produkt_id'], $p['produkt_name'], $p['beschreibung'],
-                       $p['menge'], $p['einheit'], $p['einzelpreis_rappen'],
-                       $p['rabatt_bp'], $p['mwst_satz_bp']]);
+        $werte = [$belegId, $i, $p['produkt_id'], $p['produkt_name'], $p['beschreibung'],
+                  $p['menge'], $p['einheit'], $p['einzelpreis_rappen'],
+                  $p['rabatt_bp'], $p['mwst_satz_bp']];
+        if ($periodeDa) { $werte[] = $p['periode'] ?? 'einmalig'; }
+        $ein->execute($werte);
     }
 }
 
@@ -304,16 +442,42 @@ function beleg_positionen_schreiben(PDO $pdo, int $belegId, array $positionen,
 // Browser mitschickt, ist eine Vorschau. Massgeblich ist, was tatsaechlich
 // gespeichert wurde -- sonst koennte ein Beleg Summen tragen, die zu seinen
 // eigenen Positionen nicht passen.
+// WAS IN DEN BESTEHENDEN SUMMENSPALTEN STEHT, IST DIE EINMALIGE PERIODE --
+// seit ENT-637 und aus Ueberzeugung. Fuer Offerte und Rechnung aendert das
+// nichts: Ihre Positionen sind alle einmalig, also ist es dieselbe Zahl wie
+// vorher. Fuer einen Vertrag ist es die einzige ehrliche Belegung: `total_rappen`
+// heisst ueberall "das wird jetzt faellig", und eine Monatsgebuehr mit
+// hineinzurechnen wuerde denselben Spaltennamen an zwei Orten verschieden
+// bedeuten.
+//
+// Die wiederkehrenden Summen stehen daneben, in eigenen Spalten. Sie sind
+// eine Bequemlichkeit fuer die Listen -- massgeblich bleiben die Positionen,
+// aus denen beleg_lesen() und die oeffentliche Ansicht jedes Mal neu rechnen.
 function beleg_summen_schreiben(PDO $pdo, int $belegId, int $rabattBp,
                                 string $tabPraefix = ''): array
 {
     $tab = beleg_tabelle($tabPraefix, 'belege');
-    $s = beleg_summen(beleg_positionen_lesen($pdo, $belegId, $tabPraefix), $rabattBp);
-    $pdo->prepare(
-        "UPDATE {$tab} SET rabatt_bp = ?, zwischensumme_rappen = ?, rabatt_rappen = ?,
-                mwst_rappen = ?, rundung_rappen = ?, total_rappen = ? WHERE id = ?"
-    )->execute([$rabattBp, $s['zwischensumme_rappen'], $s['rabatt_rappen'],
-                $s['mwst_rappen'], $s['rundung_rappen'], $s['total_rappen'], $belegId]);
+    $positionen = beleg_positionen_lesen($pdo, $belegId, $tabPraefix);
+    $perioden = beleg_summen_perioden($positionen, $rabattBp);
+
+    // Keine einmalige Position heisst: null einmalig. Nicht "unbekannt" --
+    // hier ist tatsaechlich nichts sofort faellig.
+    $s = $perioden['einmalig'] ?? beleg_summen([], $rabattBp);
+
+    $felder = "rabatt_bp = ?, zwischensumme_rappen = ?, rabatt_rappen = ?,
+               mwst_rappen = ?, rundung_rappen = ?, total_rappen = ?";
+    $werte  = [$rabattBp, $s['zwischensumme_rappen'], $s['rabatt_rappen'],
+               $s['mwst_rappen'], $s['rundung_rappen'], $s['total_rappen']];
+
+    if (beleg_spalte_da($pdo, $tab, 'total_monat_rappen')) {
+        $felder .= ", total_monat_rappen = ?, total_jahr_rappen = ?";
+        $werte[] = $perioden['monatlich']['total_rappen'] ?? 0;
+        $werte[] = $perioden['jaehrlich']['total_rappen'] ?? 0;
+    }
+    $werte[] = $belegId;
+    $pdo->prepare("UPDATE {$tab} SET {$felder} WHERE id = ?")->execute($werte);
+
+    $s['perioden'] = $perioden;
     return $s;
 }
 
@@ -329,5 +493,9 @@ function beleg_lesen(PDO $pdo, int $id, string $tabPraefix = ''): ?array
     if (!$b) { return null; }
     $b['positionen'] = beleg_positionen_lesen($pdo, $id, $tabPraefix);
     $b['summen'] = beleg_summen($b['positionen'], (int)$b['rabatt_bp']);
+    // Die Periodensummen kommen IMMER mit, auch bei einer Offerte. Dort
+    // stehen sie auf genau einem Block, und das Formular braucht keine
+    // Fallunterscheidung.
+    $b['perioden'] = beleg_summen_perioden($b['positionen'], (int)$b['rabatt_bp']);
     return $b;
 }

@@ -176,6 +176,20 @@ try {
 
     $b['positionen'] = beleg_positionen_lesen($pdo, (int)$b['id'], 'be_');
     $summen = beleg_summen($b['positionen'], (int)$b['rabatt_bp']);
+    // Ein Vertrag rechnet je Periode (ENT-637). Offerte und Rechnung haben
+    // genau eine, und fuer sie sieht das Blatt danach aus wie vorher.
+    $perioden = beleg_summen_perioden($b['positionen'], (int)$b['rabatt_bp']);
+    if (!$perioden) { $perioden = ['einmalig' => $summen]; }
+    $mehrPerioden = count($perioden) > 1;
+    // Der Betrag in der Seitenspalte. Bei einem Vertrag OHNE einmalige
+    // Position waere das bisherige $summen['total_rappen'] eine Null -- und
+    // "Total 0.00 CHF" ueber einer Monatsgebuehr von 450 Franken waere die
+    // falscheste Zahl, die dort stehen koennte. Darum die erste tatsaechlich
+    // vorhandene Periode, mit ihrem Zusatz daneben.
+    $leitPeriode = (string)array_key_first($perioden);
+    $leitBetrag  = (int)$perioden[$leitPeriode]['total_rappen'];
+    $leitLabel   = beleg_periode_zusatz($leitPeriode) !== ''
+                 ? 'Total ' . beleg_periode_zusatz($leitPeriode) : 'Total';
 
     $entschieden = !empty($b['entscheidung_am']);
     $heute = date('Y-m-d');
@@ -213,7 +227,16 @@ try {
             . '<td style="' . $td . ';white-space:pre-line">' . portal_esc($p['beschreibung']) . '</td>'
             . '<td style="' . $td . ';text-align:right;white-space:nowrap">' . portal_chf((int)$p['einzelpreis_rappen']) . '</td>'
             . '<td style="' . $td . ';text-align:right;white-space:nowrap">' . portal_nf($mengeD, floor($mengeD) === $mengeD ? 0 : 2) . ' ' . portal_esc($p['einheit']) . '</td>'
-            . '<td style="' . $td . ';text-align:right;white-space:nowrap">' . portal_chf((int)$z['zwischen_rappen']) . ' CHF</td>'
+            // Sobald ein Blatt mehrere Perioden traegt, steht sie an JEDER
+            // Zeile. Ohne sie liesse sich am Betrag nicht erkennen, ob er
+            // einmal oder jeden Monat faellig wird -- und genau das ist die
+            // Frage, die der Empfaenger an diese Tabelle hat.
+            . '<td style="' . $td . ';text-align:right;white-space:nowrap">' . portal_chf((int)$z['zwischen_rappen']) . ' CHF'
+            . ($mehrPerioden && beleg_periode_zusatz((string)($p['periode'] ?? 'einmalig')) !== ''
+               ? '<div style="font-size:10.5px;color:#6B7280">'
+                 . portal_esc(beleg_periode_zusatz((string)($p['periode'] ?? 'einmalig'))) . '</div>'
+               : '')
+            . '</td>'
             . '</tr>';
     }
 
@@ -223,19 +246,34 @@ try {
         return '<tr><td style="padding:4px 8px;text-align:right;font-size:12px' . $fw . '">' . $label . '</td>'
             . '<td style="padding:4px 8px;text-align:right;font-size:' . $fs . ';white-space:nowrap' . $fw . '">' . $wert . '</td></tr>';
     };
-    $summenHtml = $sz('Zwischensumme', portal_chf($summen['zwischensumme_rappen']) . ' CHF');
-    if ($summen['rabatt_rappen'] > 0) {
-        $summenHtml .= $sz(portal_bp($summen['rabatt_bp']) . '% Rabatt', '-' . portal_chf($summen['rabatt_rappen']) . ' CHF');
+    // JE PERIODE EIN EIGENER BLOCK, und keine Zahl darueber (ENT-637): Eine
+    // einmalige Einrichtung und eine Monatsgebuehr in einer Summe waere ein
+    // Betrag, den niemand bezahlt (Hausregel: Einheiten nie vermischen).
+    // Am Total steht, wofuer es gilt -- aber nur, wenn es mehr als eine
+    // Periode gibt; auf einer Offerte hiesse „Total einmalig" nichts.
+    $summenHtml = '';
+    foreach ($perioden as $periode => $ps) {
+        $zusatz = beleg_periode_zusatz((string)$periode);
+        if ($mehrPerioden) {
+            $summenHtml .= '<tr><td colspan="2" style="padding:10px 8px 2px;text-align:right;'
+                . 'font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#6B7280">'
+                . portal_esc($zusatz !== '' ? $zusatz : 'einmalig') . '</td></tr>';
+        }
+        $summenHtml .= $sz('Zwischensumme', portal_chf($ps['zwischensumme_rappen']) . ' CHF');
+        if ($ps['rabatt_rappen'] > 0) {
+            $summenHtml .= $sz(portal_bp($ps['rabatt_bp']) . '% Rabatt', '-' . portal_chf($ps['rabatt_rappen']) . ' CHF');
+        }
+        foreach ($ps['mwst'] as $m) {
+            $summenHtml .= $sz(portal_chf($m['grundlage_rappen']) . ' CHF ' . portal_bp($m['satz_bp']) . '% MWST',
+                portal_chf($m['betrag_rappen']) . ' CHF');
+        }
+        if ($ps['rundung_rappen'] !== 0) {
+            $summenHtml .= $sz('Rundungsdifferenz',
+                ($ps['rundung_rappen'] > 0 ? '' : '-') . portal_chf(abs($ps['rundung_rappen'])) . ' CHF');
+        }
+        $summenHtml .= $sz($mehrPerioden && $zusatz !== '' ? 'Total ' . $zusatz : 'Total',
+            portal_chf($ps['total_rappen']) . ' CHF', true);
     }
-    foreach ($summen['mwst'] as $m) {
-        $summenHtml .= $sz(portal_chf($m['grundlage_rappen']) . ' CHF ' . portal_bp($m['satz_bp']) . '% MWST',
-            portal_chf($m['betrag_rappen']) . ' CHF');
-    }
-    if ($summen['rundung_rappen'] !== 0) {
-        $summenHtml .= $sz('Rundungsdifferenz',
-            ($summen['rundung_rappen'] > 0 ? '' : '-') . portal_chf(abs($summen['rundung_rappen'])) . ' CHF');
-    }
-    $summenHtml .= $sz('Total', portal_chf($summen['total_rappen']) . ' CHF', true);
 
     // ── QR-Zahlteil (ENT-616) ─────────────────────────────────────────
     //
@@ -326,8 +364,12 @@ try {
         . portal_esc($datumLabel) . '<br><span style="color:#6B7280">' . portal_dmy($b['datum']) . '</span>'
         . (!portal_leeres_datum($b['gueltig_bis']) ? '<br><br>Gültig bis<br><span style="color:#6B7280">' . portal_dmy($b['gueltig_bis']) . '</span>' : '')
         . '</div>'
-        . '<div class="zf-label">Total</div>'
-        . '<div style="font-size:20px;font-weight:700">' . portal_chf($summen['total_rappen']) . ' CHF</div>'
+        . '<div class="zf-label">' . portal_esc($leitLabel) . '</div>'
+        . '<div style="font-size:20px;font-weight:700">' . portal_chf($leitBetrag) . ' CHF</div>'
+        // Bei mehreren Perioden sagt die Seitenspalte, dass sie nicht alles
+        // zeigt. Eine Zahl allein saehe sonst aus wie der ganze Preis.
+        . ($mehrPerioden ? '<div style="font-size:11.5px;color:#6B7280;margin-top:2px">'
+            . 'Weitere Beträge im Dokument</div>' : '')
         . $knoepfe;
 
     $logoHtml = $logoDatenUrl
@@ -360,6 +402,35 @@ try {
     }
 
     $spalte = 'padding:2px 24px 2px 0;color:#6B7280;font-size:12px';
+
+    // Die Laufzeitzeilen fuer den Dokumentkopf. Nur beim Vertrag, und nur
+    // die Felder, die tatsaechlich gefuellt sind.
+    $laufzeitZeilen = '';
+    if ($b['art'] === 'vertrag') {
+        $monate = static fn(?int $n): string => $n === 1 ? '1 Monat' : $n . ' Monate';
+        $kopfzeile = static fn(string $l, string $w): string =>
+            '<tr><td style="' . $spalte . '">' . portal_esc($l) . '</td>'
+            . '<td style="padding:2px 0;font-size:12px">' . portal_esc($w) . '</td></tr>';
+        if (!portal_leeres_datum($b['vertrag_beginn'] ?? null)) {
+            $laufzeitZeilen .= $kopfzeile('Beginn', portal_dmy($b['vertrag_beginn']));
+        }
+        if (($b['mindestlaufzeit_monate'] ?? null) !== null) {
+            $laufzeitZeilen .= $kopfzeile('Mindestlaufzeit', $monate((int)$b['mindestlaufzeit_monate']));
+        }
+        if (($b['kuendigungsfrist_monate'] ?? null) !== null) {
+            $laufzeitZeilen .= $kopfzeile('Kündigungsfrist', $monate((int)$b['kuendigungsfrist_monate']));
+        }
+        // Eine Verlaengerung von 0 ist eine Abmachung und kein leeres Feld:
+        // Der Vertrag endet dann und verlaengert sich NICHT. Das gehoert
+        // ausgeschrieben, sonst liest es sich wie nicht geregelt.
+        if (($b['verlaengerung_monate'] ?? null) !== null) {
+            $laufzeitZeilen .= $kopfzeile('Verlängerung',
+                (int)$b['verlaengerung_monate'] === 0
+                    ? 'keine automatische Verlängerung'
+                    : 'um jeweils ' . $monate((int)$b['verlaengerung_monate']));
+        }
+    }
+
     $dokument = '<div class="keindruck" style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:24px">'
         . '<button type="button" class="knopf knopf-plain" onclick="window.print()">Drucken</button>'
         . '<button type="button" class="knopf knopf-plain" id="btnHerunterladen" onclick="portalHerunterladen()">Herunterladen</button>'
@@ -378,6 +449,12 @@ try {
         // schon, auf diesem nicht -- ein Beleg, der eine Zahlung verlangt
         // und nicht sagt bis wann, ist keine Rechnung.
         . (!portal_leeres_datum($b['faellig_bis'] ?? null) ? '<tr><td style="' . $spalte . '">Fällig bis</td><td style="padding:2px 0;font-size:12px">' . portal_dmy($b['faellig_bis']) . '</td></tr>' : '')
+        // Die Laufzeit eines Vertrags (ENT-637). Sie gehoert auf das Blatt,
+        // das unterschrieben wird -- wer zustimmt, muss dort lesen koennen,
+        // worauf er sich einlaesst. Was leer blieb, steht gar nicht da:
+        // Eine Zeile "Mindestlaufzeit --" saehe aus wie "keine", und das ist
+        // etwas anderes als "nicht vereinbart".
+        . $laufzeitZeilen
         . '</table>'
         . '<div style="line-height:1.5;font-size:12px;min-width:200px;text-align:right;margin-left:auto">' . implode('<br>', array_map('portal_esc', $empfaenger)) . '</div>'
         . '</div>'
