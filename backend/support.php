@@ -237,3 +237,61 @@ function support_konto_sicherstellen(PDO $pdo): bool
     }
     return true;
 }
+
+// ── Die Spur im Cockpit (ENT-631) ─────────────────────────────────────
+
+function support_spur_da(PDO $pdo): bool
+{
+    return hat_tabelle($pdo, 'support_spur');
+}
+
+// Einen Schritt festhalten.
+//
+// AUFGERUFEN AUS require_session(), also aus der EINEN Stelle, durch die
+// jeder angemeldete Endpunkt laeuft. Die Alternative waere ein Aufruf in
+// jedem einzelnen Schreibweg gewesen -- und genau so eine Regel ist hier
+// schon mehrfach an etwas Neuem gescheitert, das sie nicht geerbt hat
+// (CLAUDE.md). Ein Endpunkt, den jemand morgen dazuschreibt, protokolliert
+// mit, ohne dass er davon wissen muss.
+//
+// NUR VERAENDERNDE ANFRAGEN. Jeden Abruf mitzuschreiben ergaebe Berge, in
+// denen die Aenderungen untergehen -- ein Cockpit laedt ein Dutzend
+// Endpunkte beim Oeffnen. Dass jemand DA war, steht ohnehin in
+// support_sprung; was er GETAN hat, steht hier.
+//
+// SCHLAEGT NIE DURCH: Ein Fehler beim Protokollieren darf die Arbeit nicht
+// abbrechen -- sonst waere die Folge eines vollen Datentraegers, dass
+// niemand mehr etwas speichern kann. Die Ausnahme wird verschluckt, der
+// Aufrufer merkt nichts. Das ist die bewusste Gegenrichtung zu
+// support_zugriff_merken(), wo der Eintrag VOR der Auslieferung steht und
+// scheitern DARF: Dort entscheidet er, ob Daten herausgehen; hier hält er
+// fest, was ohnehin geschieht.
+function support_spur_merken(PDO $pdo, ?int $sprungId, string $wer,
+                             string $methode, string $endpunkt): void
+{
+    if (!support_spur_da($pdo)) { return; }
+    try {
+        $pdo->prepare(
+            'INSERT INTO support_spur (sprung_id, wer, methode, endpunkt) VALUES (?, ?, ?, ?)'
+        )->execute([
+            $sprungId,
+            mb_substr($wer, 0, 200),
+            mb_substr($methode, 0, 10),
+            mb_substr($endpunkt, 0, 100),
+        ]);
+    } catch (Throwable $e) {
+        // bewusst still, siehe oben
+    }
+}
+
+// Die Spur eines Betriebs, juengste zuerst. Fuer den Betrieb selbst --
+// er soll nachlesen koennen, ohne den Betreiber zu fragen.
+function support_spur_lesen(PDO $pdo, int $grenze = 200): array
+{
+    if (!support_spur_da($pdo)) { return []; }
+    $s = $pdo->prepare('SELECT id, sprung_id, zeitpunkt, wer, methode, endpunkt
+                          FROM support_spur ORDER BY id DESC LIMIT ?');
+    $s->bindValue(1, max(1, min($grenze, 1000)), PDO::PARAM_INT);
+    $s->execute();
+    return $s->fetchAll(PDO::FETCH_ASSOC);
+}

@@ -15,8 +15,13 @@ require_recht($user, 'rechte_' . STUFE_LESEN);
 
 $pdo = db();
 if (!support_tabellen_da($pdo)) {
+    // Die Spur trotzdem ausliefern (ENT-631): Sie haengt nicht an der
+    // Freigabe. Auf einem Demo-Platz gibt es keine Freigabe-Tabellen und
+    // trotzdem Supportzugaenge -- hier abzubrechen hiesse, dem Betrieb
+    // genau die Eintraege vorzuenthalten, die ihn betreffen.
     json_response(['status' => 'ok', 'lage' => 'nicht_eingerichtet',
-        'zugriffe' => [], 'anzahl' => 0]);
+        'zugriffe' => [], 'anzahl' => 0,
+        'spur' => support_spur_lesen($pdo), 'freigaben' => []]);
 }
 
 $zeilen = $pdo->query(
@@ -42,4 +47,7 @@ json_response([
     'zugriffe'  => $zeilen,
     'anzahl'    => count($zeilen),
     'freigaben' => $freigaben,
+    // Was der Betreiber im Cockpit TAT (ENT-631) -- eine andere Aussage
+    // als "hat von aussen hineingesehen" und darum eine eigene Liste.
+    'spur'      => support_spur_lesen($pdo),
 ]);

@@ -2062,6 +2062,33 @@ CREATE TABLE IF NOT EXISTS lohnlauf_zeile (
   KEY idx_support_sprung_lauf (eingeloest_am, gilt_bis)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Was der Betreiber im Cockpit dieses Betriebs TUT (ENT-631).
+//
+// WARUM NICHT support_zugriff: Jene Tabelle haelt fest, dass der Betreiber
+// von aussen eine Diagnose abgerufen hat (ENT-526), und verlangt dafuer
+// eine Freigabe-Id. Ein Demo-Platz hat keine Freigabe -- es gibt dort
+// keinen Kunden, der eine erteilen koennte. Und eine Aktion IM Cockpit ist
+// eine andere Aussage als ein Abruf von aussen: Sie hat einen Endpunkt,
+// eine Methode und eine Sitzung. Zwei Aussagen, zwei Tabellen.
+//
+// Die Kette bleibt vollstaendig: Spur -> Sprung -> Freigabe. Wer wissen
+// will, unter welcher Freigabe eine Aenderung geschah, findet es ueber
+// sprung_id, ohne dass es hier doppelt stehen muss.
+//
+// SIE GEHOERT DEM BETRIEB. Er liest hier nach, was der Betreiber
+// veraendert hat, ohne ihn fragen zu muessen -- dieselbe Ueberlegung wie
+// bei support_freigabe und support_zugriff.
+'support_spur' => "CREATE TABLE IF NOT EXISTS support_spur (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  sprung_id INT UNSIGNED NULL,
+  zeitpunkt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  wer VARCHAR(200) NOT NULL,
+  methode VARCHAR(10) NOT NULL,
+  endpunkt VARCHAR(100) NOT NULL,
+  KEY idx_support_spur_zeit (zeitpunkt),
+  KEY idx_support_spur_sprung (sprung_id, zeitpunkt)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
     ];
 }
 }
@@ -2089,6 +2116,15 @@ function kern_spalten(): array {
     // Stelle, an der "das ist kein Mensch" steht.
     ['mitarbeiter', 'support_konto',
      'ALTER TABLE mitarbeiter ADD COLUMN support_konto TINYINT(1) NOT NULL DEFAULT 0'],
+
+    // Die Sitzung sagt selbst, dass sie aus einem Sprung stammt (ENT-631).
+    // Die Alternative -- bei jeder Anfrage nachsehen, ob die
+    // mitarbeiter_id zufaellig das Support-Konto ist -- braeuchte eine
+    // zweite Abfrage und liesse offen, ZU WELCHEM Sprung die Sitzung
+    // gehoert. Ueber diese Spalte fuehrt die Spur zurueck bis zur
+    // Freigabe.
+    ['sessions', 'support_sprung_id',
+     'ALTER TABLE sessions ADD COLUMN support_sprung_id INT UNSIGNED NULL'],
 
     ['kundenzugang', 'password_hash',
      'ALTER TABLE kundenzugang ADD COLUMN password_hash VARCHAR(255) NULL'],

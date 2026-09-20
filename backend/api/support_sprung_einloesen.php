@@ -68,12 +68,28 @@ if ($supportId === null) {
 // die Tabelle (ENT-501). Kein eigener Weg, damit eine spaetere Aenderung
 // an Sitzungen nicht an einer zweiten Stelle vergessen wird.
 $token = bin2hex(random_bytes(32));
+$spalten = ['token', 'mitarbeiter_id'];
+$werte   = [sitzung_abdruck($token), $supportId];
 if (hat_spalte($pdo, 'sessions', 'letzte_nutzung')) {
-    $stmt = $pdo->prepare('INSERT INTO sessions (token, mitarbeiter_id, letzte_nutzung) VALUES (?, ?, NOW())');
-} else {
-    $stmt = $pdo->prepare('INSERT INTO sessions (token, mitarbeiter_id) VALUES (?, ?)');
+    // Eine frische Sitzung darf nicht im selben Moment als untaetig
+    // gelten, in dem sie entsteht (ENT-075) -- dieselbe Ueberlegung wie
+    // in api/login.php.
+    $spalten[] = 'letzte_nutzung';
 }
-$stmt->execute([sitzung_abdruck($token), $supportId]);
+// Der Vermerk, an dem require_session() die Support-Sitzung erkennt und
+// aus dem die Spur bis zur Freigabe zurueckfuehrt (ENT-631). OHNE ihn
+// waere die Sitzung von einer gewoehnlichen nicht zu unterscheiden, und
+// es wuerde nichts protokolliert -- der Zugang funktionierte, waere aber
+// unsichtbar. Genau das schliesst ENT-631 aus.
+$hatSprungSpalte = hat_spalte($pdo, 'sessions', 'support_sprung_id');
+if ($hatSprungSpalte) {
+    $spalten[] = 'support_sprung_id';
+    $werte[]   = (int)$sprung['id'];
+}
+$felder = implode(', ', $spalten);
+$marken = implode(', ', array_map(
+    static fn (string $s): string => $s === 'letzte_nutzung' ? 'NOW()' : '?', $spalten));
+$pdo->prepare("INSERT INTO sessions ($felder) VALUES ($marken)")->execute($werte);
 
 $rollen = rechte_rollen($pdo, $supportId, true);
 $rechte = rechte_aus_rollen($rollen, rollen_definitionen($pdo));
@@ -85,6 +101,11 @@ json_response([
     'ist_admin' => in_array('rechte_' . STUFE_SCHREIBEN, $rechte, true),
     'rollen'    => $rollen,
     'rechte'    => $rechte,
+    // Sagt der Oberflaeche, ob die Spur mitlaeuft. false heisst: Die
+    // Einrichtung ist noch nicht durch, und dieser Zugang hinterlaesst
+    // KEINE Spur -- das Band sagt es dann auch so. Eine Zusicherung, die
+    // still ausfaellt, ist schlimmer als keine.
+    'protokolliert' => $hatSprungSpalte,
     // Sagt der Oberflaeche, dass sie das Band zeigen muss (Schritt 3).
     // Sie erfaehrt es hier und nicht aus dem Namen des Kontos: Ein Name
     // ist Text, den jemand aendern kann, und daran darf keine Anzeige
