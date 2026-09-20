@@ -710,6 +710,81 @@ $pruef('KRITISCH: der Knopf bringt seine Farben selbst mit, nicht aus dem Styles
 $pruef('KRITISCH: eingeschmuggelte Auszeichnung im Knopf bleibt Text',
     !str_contains(mail_knopf('<b>X</b>', 'https://a.ch'), '<b>X</b>'));
 
+// ══ Die Abschiedsmail nach dem Ablauf (ENT-634) ══════════════════════
+//
+// Geprueft wird die AUSSAGE der Mail, nicht ihr Wortlaut: dass sie den
+// Weg zurueck anbietet, dass sie ohne Link trotzdem brauchbar bleibt, und
+// dass der Link den Wert traegt.
+$ende = demo_ende_mail('Beispiel Betrieb AG', 'R. Beispiel',
+    demo_ende_link(str_repeat('a', 64), 'https://guardops.ch'));
+$pruef('die Abschiedsmail nennt Firma und Person',
+    str_contains($ende['text'], 'Beispiel Betrieb AG')
+    && str_contains($ende['text'], 'R. Beispiel'));
+// Der Anlass der Mail ist nicht die Schliessung, sondern die Frage, ob es
+// weitergeht. Ohne Knopf waere sie genau die trockene Sperrmeldung, die
+// der Projektinhaber nicht wollte.
+$pruef('KRITISCH: sie bietet den Weg zurueck an, statt nur das Ende zu melden',
+    str_contains($ende['html'], 'weiter nutzen')
+    && str_contains($ende['html'], '/demo-weiter.html?w='));
+// Sie sagt, dass die Daten weg sind -- wer das nicht liest, sucht sie
+// spaeter beim Support.
+$pruef('KRITISCH: sie sagt, dass die Testdaten geloescht sind',
+    str_contains($ende['text'], 'gelöscht'));
+// Der Knopf verspricht keine Wiederaufnahme, sondern einen Anruf.
+$pruef('KRITISCH: sie kuendigt an, dass sich jemand meldet -- der Zugang geht nicht wieder auf',
+    str_contains($ende['text'], 'Wir melden uns'));
+// Eine Mail, deren Textfassung anders zeichnet als ihre HTML-Fassung, ist
+// nicht "fast gleich" -- je nach Mailprogramm sieht der Empfaenger die eine
+// oder die andere.
+$pruef('KRITISCH: Text- und HTML-Fassung zeichnen mit derselben Grussformel',
+    str_contains($ende['text'], 'Mit freundlichen Grüssen')
+    && str_contains(strip_tags($ende['html']), 'Mit freundlichen Grüssen'));
+// Eingeschmuggelte Auszeichnung bleibt Text -- wie ueberall sonst.
+$ende2 = demo_ende_mail('<b>X</b>', '<i>Y</i>', null);
+$pruef('KRITISCH: eingeschmuggelte Auszeichnung bleibt Text',
+    !str_contains($ende2['html'], '<b>X</b>') && !str_contains($ende2['html'], '<i>Y</i>'));
+// Ohne Basisadresse im Deploy gibt es keinen Link. Die Mail muss trotzdem
+// stehen: Ein Knopf ins Leere waere schlimmer als keiner, ein Ausfall des
+// Ablaufs waere am schlimmsten.
+$pruef('KRITISCH: ohne Basisadresse faellt nur der Knopf weg, nicht die Mail',
+    demo_ende_link(str_repeat('a', 64), null) === null
+    && $ende2['betreff'] !== '' && !str_contains($ende2['html'], 'demo-weiter.html'));
+
+// Der Wert im Link steht in der Datenbank nur als Abdruck (ENT-501).
+$wert = demo_ende_wert();
+$pruef('KRITISCH: der Wert ist 64 Zeichen hexadezimal, wie der Bestaetigungswert',
+    (bool)preg_match('/^[0-9a-f]{64}$/', $wert));
+$pruef('KRITISCH: zwei Werte sind nicht derselbe',
+    $wert !== demo_ende_wert());
+$pruef('KRITISCH: der Abdruck ist nicht der Wert -- ein Blick in die Datenbank gibt keinen Link her',
+    demo_ende_abdruck($wert) !== $wert
+    && demo_ende_abdruck($wert) === demo_ende_abdruck($wert));
+
+// Die Groessenklassen. "keine Angabe" ist eine ANTWORT und muss sich von
+// "gar nicht gefragt" unterscheiden (Hausregel).
+$pruef('KRITISCH: nur bekannte Groessenklassen werden angenommen',
+    demo_groesse_gueltig('bis10') && demo_groesse_gueltig('keine')
+    && !demo_groesse_gueltig('') && !demo_groesse_gueltig('bis 10')
+    && !demo_groesse_gueltig('riesig'));
+$pruef('KRITISCH: die ausdrueckliche Verweigerung liest sich anders als eine fehlende Angabe',
+    demo_groesse_text('keine') !== demo_groesse_text('')
+    && demo_groesse_text('') !== '');
+$pruef('jede Klasse hat einen lesbaren Text, keinen Schluessel',
+    count(array_filter(array_keys(DEMO_GROESSE_KLASSEN),
+        fn($k) => demo_groesse_text($k) === $k)) === 0);
+
+// Die Meldung an den Betreiber. Die Groesse ist der Grund, warum gefragt
+// wird -- sie gehoert in den Betreff, nicht nur in den Rumpf.
+$weiter = demo_weiter_mail('Beispiel Betrieb AG', 'R. Beispiel', 'r@beispiel.ch',
+    '+41 79 000 00 00', 'demo1', 'elfbis30');
+$pruef('KRITISCH: die Meldung traegt Firma und Groesse im Betreff',
+    str_contains($weiter['betreff'], 'Beispiel Betrieb AG')
+    && str_contains($weiter['betreff'], demo_groesse_text('elfbis30')));
+$pruef('sie nennt alle Wege, den Interessenten zu erreichen',
+    str_contains($weiter['text'], 'r@beispiel.ch')
+    && str_contains($weiter['text'], '+41 79 000 00 00')
+    && str_contains($weiter['text'], 'demo1'));
+
 echo "\n$ok bestanden, " . count($bad) . " nicht bestanden\n";
 foreach ($bad as $n) { echo "  x $n\n"; }
 exit(count($bad) ? 1 : 0);

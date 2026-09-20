@@ -1451,6 +1451,14 @@ function be_spalten(): array
         // wuerde behaupten, was nicht geprueft wurde.
         ['demo_zugang', 'nachgefasst_am',  "ALTER TABLE demo_zugang ADD COLUMN nachgefasst_am DATETIME NULL AFTER beendet_am"],
         ['demo_zugang', 'nachgefasst_von', "ALTER TABLE demo_zugang ADD COLUMN nachgefasst_von VARCHAR(200) NOT NULL DEFAULT '' AFTER nachgefasst_am"],
+        // Die Abschiedsmail und der Weg zurueck (ENT-634). Vier Spalten,
+        // die es auf Anlagen von vor diesem Eintrag noch nicht gibt --
+        // ohne den Nachtrag faellt die Demo-Liste aus, weil EIN Feld
+        // fehlt.
+        ['demo_zugang', 'ende_abdruck',   "ALTER TABLE demo_zugang ADD COLUMN ende_abdruck CHAR(64) NOT NULL DEFAULT '' AFTER nachgefasst_von"],
+        ['demo_zugang', 'ende_mail_am',   "ALTER TABLE demo_zugang ADD COLUMN ende_mail_am DATETIME NULL AFTER ende_abdruck"],
+        ['demo_zugang', 'weiter_am',      "ALTER TABLE demo_zugang ADD COLUMN weiter_am DATETIME NULL AFTER ende_mail_am"],
+        ['demo_zugang', 'weiter_groesse', "ALTER TABLE demo_zugang ADD COLUMN weiter_groesse VARCHAR(20) NOT NULL DEFAULT '' AFTER weiter_am"],
     ];
 }
 
