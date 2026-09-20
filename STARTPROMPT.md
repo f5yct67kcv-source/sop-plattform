@@ -13,7 +13,7 @@ und wird nicht gepflegt. Die Datei wird gepflegt.
 
 | Art des Chats | Repositories | Warum |
 |---|---|---|
-| **Aufgaben-Chat (Code)** | `sop-plattform` **und** `sop-projekt` | Der Code, und dazu Entscheidungsprotokoll, offene Punkte und die GAV-Register. Ohne das zweite kennt der Chat weder die freie ENT-Nummer noch die Auslegungen — genau daran ist am 21.08.2026 eine Nummer doppelt vergeben worden. |
+| **Aufgaben-Chat (Code)** | `sop-plattform` **und** `sop-projekt` | Der Code, und dazu Entscheidungsprotokoll, offene Punkte und die GAV-Register. Ohne das zweite kennt der Chat weder die freie Nummer noch die Auslegungen — genau daran sind zweimal Nummern doppelt vergeben worden (ENT-043 am 19.08.2026, OP-49/OP-50 am 20.08.2026). |
 | **Nur Dokumentation** (Protokoll, Recherche, GAV) | nur `sop-projekt` | Ohne Code, damit gar nicht erst versehentlich gebaut wird. |
 | **Dashboard-Werkzeug** | nur `sop-dashboard` | Eigenes Werkzeug (Vite/JS), berührt das Produkt nicht. |
 
@@ -23,7 +23,9 @@ tun; es mitzuladen kostet nur Aufmerksamkeit.
 Was im Projekt-Repository steht und im Code-Chat gebraucht wird:
 
 - `00-projekt/entscheidungsprotokoll.md` — alle Entscheidungen. **Vor jeder
-  neuen ENT-Nummer hier nachsehen, welche frei ist.**
+  neuen ENT- oder OP-Nummer über ALLE Branches prüfen, welche frei ist — nicht
+  nur in der eigenen Arbeitskopie (ENT-080).** Der Prüfbefehl steht in
+  `CLAUDE.md` unter „Entscheidungen und Nummern".
 - `00-projekt/offene-punkte.md` — was ungeklärt ist. Neue Befunde gehören
   hierher, nicht in eine Chatnachricht, die verloren geht.
 - `90-gav/regelmatrix.md`, `auslegungsregister.md`, `testbibliothek.md` —
