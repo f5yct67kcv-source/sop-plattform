@@ -8,6 +8,7 @@
 // beantwortet.
 declare(strict_types=1);
 
+
 // ── Sparten des Betriebs (ENT-037)
 //
 // CUPI 24 bietet Sicherheit UND Reinigung an. Beides laeuft strikt getrennt

@@ -442,6 +442,7 @@ function be_verbindung_lage(array $m): string
 // und es gibt keine Ebene darueber, die einen Missbrauch bemerken oder
 // rueckgaengig machen koennte.
 require_once __DIR__ . '/zweifaktor.php';
+require_once __DIR__ . '/mitarbeiter.php';   // ma_nur_menschen() (ENT-631)
 
 function be_zf_tabelle_da(PDO $pdo): bool
 {
@@ -807,8 +808,8 @@ function mandant_groesse(array $m): ?array
         $pdo = mandant_db($m);
         if (!hat_tabelle($pdo, 'mitarbeiter')) { return null; }
 
-        $gesamt = (int)$pdo->query('SELECT COUNT(*) FROM mitarbeiter')->fetchColumn();
-        $aktiv  = (int)$pdo->query('SELECT COUNT(*) FROM mitarbeiter WHERE aktiv = 1')->fetchColumn();
+        $gesamt = (int)$pdo->query('SELECT COUNT(*) FROM mitarbeiter WHERE ' . ma_nur_menschen($pdo))->fetchColumn();
+        $aktiv  = (int)$pdo->query('SELECT COUNT(*) FROM mitarbeiter WHERE aktiv = 1 AND ' . ma_nur_menschen($pdo))->fetchColumn();
 
         // Wer im laufenden Monat tatsächlich eingeteilt war. Die dritte
         // Zahl, weil "auf der Liste" und "im Einsatz" bei Aushilfen weit
@@ -842,7 +843,7 @@ function mandant_groesse(array $m): ?array
         // (Hausregel), und die Oberflaeche haelt die beiden auseinander.
         $letzterZugriff = null;
         if (hat_spalte($pdo, 'mitarbeiter', 'letzter_zugriff')) {
-            $letzterZugriff = $pdo->query('SELECT MAX(letzter_zugriff) FROM mitarbeiter')->fetchColumn();
+            $letzterZugriff = $pdo->query('SELECT MAX(letzter_zugriff) FROM mitarbeiter WHERE ' . ma_nur_menschen($pdo))->fetchColumn();
             $letzterZugriff = $letzterZugriff ?: null;
         }
         $letzterRapport = null;

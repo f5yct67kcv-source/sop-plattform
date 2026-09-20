@@ -24,7 +24,7 @@ foreach (['letzter_zugriff', 'passwort_geaendert_am'] as $z) {
 
 $rows = $pdo->query(
     'SELECT ' . implode(', ', array_merge($fest, $felder)) . '
-     FROM mitarbeiter WHERE aktiv = 1 ORDER BY name'
+     FROM mitarbeiter WHERE aktiv = 1 AND ' . ma_nur_menschen(db()) . ' ORDER BY name'
 )->fetchAll(PDO::FETCH_ASSOC);
 
 // Die beiden pflegbaren Listen kommen mit, damit die Oberflaeche aus einer

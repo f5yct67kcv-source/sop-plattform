@@ -295,6 +295,7 @@ function sitzung_abdruck(string $token): string
     return hash('sha256', $token);
 }
 
+
 function require_session(): array {
     // NUR aus dem Kopfbereich (ENT-075). In der URL landet ein Token in
     // Server-Protokollen, im Browserverlauf und in der Adresszeile, die

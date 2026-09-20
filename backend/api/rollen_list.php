@@ -63,7 +63,7 @@ $leute = $pdo->query(
     'SELECT id, name, vorname, nachname, personalnummer, aktiv, ist_admin,
             diensthundefuehrer, waffentragberechtigt, revierdienst_berechtigt,
             diensthund_bewilligung_bis, waffe_bewilligung_bis
-       FROM mitarbeiter ORDER BY nachname, vorname, name'
+       FROM mitarbeiter WHERE ' . ma_nur_menschen(db()) . ' ORDER BY nachname, vorname, name'
 )->fetchAll();
 $rollenAlle = rechte_rollen_alle($pdo);
 foreach ($leute as &$p) {

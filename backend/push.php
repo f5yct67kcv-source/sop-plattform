@@ -48,6 +48,7 @@
 //     Nachzuegler-Versand steht in api/push_versand.php.
 declare(strict_types=1);
 
+
 // ── Das Geheimnis ─────────────────────────────────────────────────────
 // Beim Deploy ersetzt, derselbe Mechanismus wie "__DB" + "_HOST__" und
 // __SMTP_*__. Bleibt es ungesetzt, meldet push_konfiguriert() "nicht

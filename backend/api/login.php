@@ -36,7 +36,7 @@ if ($sperre > 0) {
         'message' => "Zu viele Fehlversuche. Bitte $sperre Minuten warten."], 429);
 }
 
-$stmt = db()->prepare('SELECT id, password_hash, ist_admin FROM mitarbeiter WHERE name = ? AND aktiv = 1');
+$stmt = db()->prepare('SELECT id, password_hash, ist_admin FROM mitarbeiter WHERE name = ? AND aktiv = 1 AND ' . ma_nur_menschen(db()));
 $stmt->execute([$name]);
 $user = $stmt->fetch();
 

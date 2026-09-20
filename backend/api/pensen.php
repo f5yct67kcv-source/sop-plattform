@@ -13,10 +13,11 @@
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
-require __DIR__ . '/../planung.php';
+require_once __DIR__ . '/../planung.php';
 
 $user = require_session();
 require_recht($user, 'verfuegbarkeit_lesen');
+require_once __DIR__ . '/../mitarbeiter.php';   // ma_nur_menschen() (ENT-631)
 
 $jahr = (int)($_GET['jahr'] ?? date('Y'));
 if ($jahr < 2000 || $jahr > 2100) {
@@ -30,7 +31,7 @@ $felder = $hatKat
     ? 'id, name, vorname, nachname, personalnummer, anstellungskategorie, pensum_stunden, eintritt'
     : "id, name, vorname, nachname, personalnummer, NULL AS anstellungskategorie,
        NULL AS pensum_stunden, NULL AS eintritt";
-$leute = db()->query("SELECT $felder FROM mitarbeiter WHERE aktiv = 1 ORDER BY nachname, vorname, name")
+$leute = db()->query("SELECT $felder FROM mitarbeiter WHERE aktiv = 1 AND " . ma_nur_menschen(db()) . " ORDER BY nachname, vorname, name")
     ->fetchAll();
 
 // Alle Zuteilungen des Jahres in EINER Abfrage -- eine je Person waere bei

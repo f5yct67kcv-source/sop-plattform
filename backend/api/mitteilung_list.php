@@ -14,6 +14,7 @@ require_once __DIR__ . '/../push.php';
 
 $user = require_session();
 require_recht($user, 'mitteilungen_lesen');
+require_once __DIR__ . '/../mitarbeiter.php';   // ma_nur_menschen() (ENT-631)
 
 $pdo = db();
 if (!hat_tabelle($pdo, 'mitteilungen')) {
@@ -73,7 +74,7 @@ if ($detail > 0) {
                FROM mitarbeiter p
                LEFT JOIN mitteilung_gelesen g
                       ON g.mitarbeiter_id = p.id AND g.mitteilung_id = ?
-              WHERE $wo
+              WHERE $wo AND " . ma_nur_menschen($pdo, 'p') . "
               ORDER BY p.nachname, p.vorname, p.name"
         );
         $st->execute([$detail]);
