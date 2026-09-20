@@ -4429,6 +4429,10 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   .supportband { font-size: 12.5px; gap: 8px; }
   .supportband .sb-text { display: flex; flex-direction: column; gap: 1px; }
   .supportband .sb-ende { height: 44px; font-size: 14px; padding: 0 14px; }
+  /* Der Zusatz faellt weg: Gemessen lief der volle Satz auf 390 px ueber
+     drei Zeilen und draengte das Band zusammen. Die Uhrzeit ist die
+     Aussage, der Grund steht am Zeiger. */
+  .supportband .sb-grund { display: none; }
   .btn-burger { display: inline-flex; }
   .nur-schublade { display: flex; }
   .ohne-schublade { display: none !important; }
@@ -5186,7 +5190,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 <div class="supportband" id="supportband" role="status">
   <div class="sb-text">
     <span class="sb-was">Supportzugriff durch GuardOpS</span>
-    <span class="sb-bis" id="sbBis"></span>
+    <span class="sb-bis" id="sbBis"><span id="sbUhr"></span><span class="sb-grund"> — endet nur, wenn niemand mehr etwas tut</span></span>
   </div>
   <button type="button" class="sb-ende" id="sbEnde" onclick="supportBeenden()">Beenden</button>
 </div>
@@ -10537,7 +10541,10 @@ function supportBandSetzen() {
   if (!document.body.classList.contains('support-an')) { return; }
   const ende = new Date(utLetzte + UT_FRIST_MS);
   const uhr = ende.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
-  $('sbBis').textContent = `endet um ${uhr}, falls niemand mehr etwas tut`;
+  $('sbUhr').textContent = `endet um ${uhr}`;
+  // Der volle Satz bleibt am Zeiger erreichbar, auch wo der Zusatz aus
+  // Platzgruenden wegfaellt.
+  $('sbBis').title = `endet um ${uhr}, falls bis dahin niemand mehr etwas tut`;
 }
 
 function supportBandStarten() {
