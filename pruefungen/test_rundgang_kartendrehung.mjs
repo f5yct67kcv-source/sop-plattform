@@ -28,6 +28,12 @@ import { chromium } from 'playwright';
 const EXE = browserPfad();
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
+/* Kurze Frist statt 30 Sekunden ins Leere. Diese Suite ist beim Umbau auf
+   ENT-640 abgestuerzt, statt rot zu melden, weil ein Bedienelement den
+   Namen gewechselt hatte -- eine abgestuerzte Suite meldet gar nichts.
+   Dasselbe Mittel wie in test_rundgang_karte.mjs. */
+const klick = async s => { try { await page.click(s, { timeout: 2500 }); return true; }
+                           catch (e) { return false; } };
 
 const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 const tag = n => iso(new Date(Date.now() + n * 864e5));
@@ -164,10 +170,17 @@ await page.waitForTimeout(300);
 check('KRITISCH: kommt der Standort zurück, verschwindet die Warnung wieder',
   await page.evaluate(() => !document.getElementById('rgsOrtWarn')));
 
-// ══════════ NACHTSICHT: NEUBAU, ABER MIT DER ANSICHT ═════════════════
+// ══════════ KARTENBILD: NEUBAU, ABER MIT DER ANSICHT ═════════════════
 // Das Farbschema lässt sich nur beim Bauen setzen. Dieser eine Neubau
 // bleibt also — er darf aber die Ansicht nicht wegwerfen.
-await page.click('#rgsNachtsicht');
+//
+// Die Wahl wohnt seit ENT-640 im Einstellungsblatt hinter dem Zahnrad,
+// nicht mehr auf einem eigenen Knopf. Die Aussagen dieses Blocks sind
+// unverändert: ein Neubau, die Karte wird wirklich hell, und Zoom,
+// Ausschnitt und Drehung überstehen ihn.
+await klick('#rgsEinstKnopf');
+await page.waitForTimeout(300);
+await klick('#rgsKb-tag');
 await page.waitForTimeout(700);
 const nachNacht = await page.evaluate(() => ({
   gebaut: window.__gebaut,
@@ -175,19 +188,21 @@ const nachNacht = await page.evaluate(() => ({
   zoom: rgsKarte.getZoom(),
   lat: +rgsKarte.getCenter().lat().toFixed(4),
   winkel: rgsKarte.getHeading(),
-  gedrueckt: document.getElementById('rgsNachtsicht').getAttribute('aria-pressed'),
+  gedrueckt: document.getElementById('rgsKb-tag').getAttribute('aria-checked'),
 }));
 check('KRITISCH: der Nachtsicht-Schalter baut die Karte neu — anders geht das Farbschema nicht',
   nachNacht.gebaut === 1);
 check('KRITISCH: und er wirkt auch wirklich (Karte wird hell)',
-  nachNacht.stil === 'standard' && nachNacht.gedrueckt === 'false');
+  nachNacht.stil === 'standard' && nachNacht.gedrueckt === 'true');
 check('KRITISCH: dabei bleiben Zoom, Ausschnitt und Drehung erhalten — der Schalter wirft die Ansicht nicht weg',
   nachNacht.zoom === 19 && nachNacht.lat === vor.lat && nachNacht.winkel === 70);
-await page.click('#rgsNachtsicht');
+await klick('#rgsKb-nacht');
 await page.waitForTimeout(700);
 check('Zurück auf dunkel geht ebenso', await page.evaluate(() =>
   document.getElementById('rgsKarte').dataset.kartenstil !== 'standard'
-  && document.getElementById('rgsNachtsicht').getAttribute('aria-pressed') === 'true'));
+  && document.getElementById('rgsKb-nacht').getAttribute('aria-checked') === 'true'));
+await klick('#rgsEinstX');
+await page.waitForTimeout(150);
 await page.screenshot({ path: `${OUT}/kartendrehung-01.png` });
 
 // ══════════ DER RICHTUNGSPFEIL HÄLT GEGEN DIE DREHUNG ════════════════

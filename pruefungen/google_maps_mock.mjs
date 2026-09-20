@@ -176,6 +176,16 @@ export const GOOGLE_MAPS_MOCK = `
       this._feuern('heading_changed');
     }
     getStyles() { return this._styles; }
+    /* Kartentyp (ENT-640). Wie beim Kartenstil darueber wird er am
+       Container VERMERKT, statt nur gespeichert zu werden -- sonst liesse
+       sich nur pruefen, dass die App irgendeine Zeichenkette uebergeben
+       hat, und nicht, dass die Karte sie auch annimmt. Die Vorgabe ist
+       'roadmap', wie bei Google selbst. */
+    setMapTypeId(t) {
+      this._kartentyp = t || 'roadmap';
+      this.container.dataset.kartentyp = this._kartentyp;
+    }
+    getMapTypeId() { return this._kartentyp || 'roadmap'; }
     setCenter(c) { this._center = alsLiteral(c); this._neuPositionieren(); }
     getCenter() { return machLatLng(this._center.lat, this._center.lng); }
     setZoom(z) { this._zoom = z; this._neuPositionieren(); }
