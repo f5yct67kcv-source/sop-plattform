@@ -134,6 +134,15 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
      zu früh, und die Reiterleiste stand sichtbar über der Kante.
      Gesetzt wird er gemessen, nicht geraten -- siehe sockelSetzen(). */
   --sockel: 0px;
+
+  /* Die TASTATUR (ENT-635): dieselbe Messung wie beim Sockel
+     (window.innerHeight gegen window.visualViewport.height), nur die
+     andere Haelfte davon. sockelMessen() deckelt ihr eigenes Ergebnis
+     bewusst bei 80 px, mit der Begruendung "was darueber liegt, ist etwas
+     anderes (aufgeklappte Tastatur ...) und wird nicht angefasst" -- hier
+     wird genau dieser Fall angefasst. Auf jedem Geraet ohne offene
+     Tastatur 0. Gesetzt von tastaturVerfolgen(). */
+  --tastatur: 0px;
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -315,7 +324,14 @@ svg.i-sm { width: 17px; height: 17px; }
   /* Spalte statt Zeile, damit die Herstellersignatur unten am Rand steht --
      wie im Cockpit. Wie das ohne "position: fixed" geht, steht bei
      .gate-sig weiter unten. */
-  position: fixed; inset: 0; bottom: calc(0px - var(--sockel)); z-index: 900;
+  /* + var(--tastatur) (ENT-635): Ohne das schrumpft dieses Feld beim
+     Oeffnen der Tastatur NICHT selbst -- iOS verschiebt stattdessen das
+     ganze sichtbare Fenster, damit das fokussierte Feld ueber der
+     Tastatur bleibt, und ein Teil von #gate (das Logo) rutscht dabei aus
+     dem Bild. Schrumpft die Flaeche stattdessen selbst von unten, bleibt
+     sie an Ort und Stelle, und der eigene Rumpf (overflow-y:auto) rueckt
+     das Feld ins Bild -- derselbe Rahmen, kein Sprung. */
+  position: fixed; inset: 0; bottom: calc(0px - var(--sockel) + var(--tastatur)); z-index: 900;
   display: flex; flex-direction: column; overflow-y: auto;
   padding: 32px 22px calc(32px + env(safe-area-inset-bottom) + var(--sockel));
   color: var(--ink);
@@ -3328,6 +3344,49 @@ function sockelSetzen() {
   // zuruecksetzen. Sonst nimmt ein offenes Blatt der Leiste ihren Sockel.
   if (wert === null) { stil.setProperty('--sockel', vorher || '0px'); return; }
   stil.setProperty('--sockel', wert + 'px');
+}
+
+// ══════════════════════════════════════════ TASTATUR (ENT-635)
+// Vom Projektinhaber gemeldet, am Anmeldebildschirm: "Der Bildschirm
+// verschiebt sich beim Oeffnen der Tastatur." #gate ist "position:fixed"
+// -- ohne Gegenmassnahme laesst iOS seine eingebaute Fokus-Verschiebung
+// laufen: Sie hebt das fokussierte Feld ueber die Tastatur, indem sie das
+// SICHTBARE Fenster innerhalb des Layout-Fensters verschiebt (die
+// Statusleiste ist danach weg, das Logo mit ihr). #gate bleibt dabei zwar
+// an seinem Platz im Layout, ein Teil davon rutscht aber aus dem
+// sichtbaren Bereich -- genau der gemeldete Sprung.
+//
+// Die Messgroesse ist dieselbe wie beim Sockel weiter oben:
+// window.innerHeight (das Layout-Fenster, aendert sich mit der Tastatur
+// NICHT) gegen window.visualViewport.height (der sichtbare Ausschnitt
+// darin, schrumpft mit der Tastatur). sockelMessen() deckelt ihr eigenes
+// Ergebnis ausdruecklich bei 80 px, mit der Begruendung "was darueber
+// liegt, ist etwas anderes (aufgeklappte Tastatur ...) und wird nicht
+// angefasst" -- hier wird genau dieser Fall behandelt, mit derselben
+// Grenze als Wasserscheide.
+function tastaturVerfolgen() {
+  const vv = window.visualViewport;
+  if (!vv) { return; }
+  const hoehe = Math.round(window.innerHeight - vv.height);
+  document.documentElement.style.setProperty('--tastatur', (hoehe > 80 ? hoehe : 0) + 'px');
+  // Die Verschiebung, die den Fehler ausmacht, hat iOS zu diesem
+  // Zeitpunkt schon vorgenommen -- sie wird hier rueckgaengig gemacht.
+  // #gate passt sich stattdessen ueber die neue Groesse an (siehe die
+  // CSS-Regel) und rollt seinen EIGENEN Rumpf (overflow-y:auto), statt
+  // dass iOS das ganze Fenster verschiebt.
+  window.scrollTo(0, 0);
+  // Das fokussierte Feld selbst muss dabei sichtbar bleiben -- die
+  // automatische Fokus-Verschiebung wird ja gerade aufgehoben. Ohne das
+  // stuende die Tastatur zwar korrekt, aber unter Umstaenden genau ueber
+  // dem Feld, das man gerade ausfuellt.
+  const fokus = document.activeElement;
+  if (fokus && fokus !== document.body && typeof fokus.scrollIntoView === 'function') {
+    fokus.scrollIntoView({ block: 'nearest' });
+  }
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', tastaturVerfolgen);
+  window.visualViewport.addEventListener('scroll', tastaturVerfolgen);
 }
 
 // Die Zahlen, aus denen der Sockel entsteht -- als eine Zeile im Menue.
