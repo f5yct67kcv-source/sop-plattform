@@ -865,6 +865,33 @@ button.rd-kopf:active { background: var(--line-soft); }
 .rd-ort.weit { color: var(--warn); }
 .rd-ort.mut { color: var(--ink-3); font-weight: 400; }
 .rd-hinweis { font-size: 12.5px; color: var(--ink-3); margin: 0 13px 11px 87px; }
+/* Die Aufgaben eines Kontrollpunkts (ENT-638). Sie fluchten mit dem Text
+   der Zeile, wie alles unter dem Kopf (87 px). Als Knopf traegt die Zeile
+   die 44-px-Mindesthoehe fuers Handy (CLAUDE.md); als starre Zeile -- eine
+   einzelne Aufgabe ohne Erklaertext -- braucht sie die nicht, weil es
+   nichts zu treffen gibt. */
+.rd-aufg { display: flex; align-items: center; gap: 8px; margin: 0 13px 10px 87px;
+  padding: 0; background: none; border: 0; color: var(--ink-2); font: inherit;
+  font-size: 13px; font-weight: 560; text-align: left; }
+.rd-aufg .i { flex: none; color: var(--ink-3); }
+button.rd-aufg { min-height: 44px; margin-bottom: 2px; cursor: pointer; }
+button.rd-aufg:active .rd-aufg-kopf { color: var(--ink); }
+.rd-aufg-kopf { flex: 1; min-width: 0; }
+.rd-aufg-pfeil { transition: transform .15s ease; }
+.rd-aufg.auf .rd-aufg-pfeil { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .rd-aufg-pfeil { transition: none; } }
+/* Der aufgeklappte Inhalt. Der Streifen links bindet ihn sichtbar an die
+   Zeile darueber -- ohne ihn schwebte der Erklaertext zwischen zwei
+   Kontrollpunkten und liesse offen, zu welchem er gehoert. */
+.rd-aufg-liste { margin: 0 13px 11px 87px; display: flex; flex-direction: column; gap: 8px; }
+/* Ohne diese Zeile bliebe der zugeklappte Block SICHTBAR: Das
+   `display:flex` einer Klasse ueberstimmt das `display:none`, das der
+   Browser dem hidden-Attribut gibt. Gemessen aufgefallen, nicht vermutet
+   -- im Quelltext sah das hidden richtig aus. */
+.rd-aufg-liste[hidden] { display: none; }
+.rd-aufg-z { border-left: 2px solid var(--line); padding-left: 9px; }
+.rd-aufg-bez { font-size: 13px; font-weight: 620; color: var(--ink-2); }
+.rd-aufg-info { font-size: 12.5px; color: var(--ink-3); line-height: 1.45; }
 .rd-akt { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 13px 13px 87px; }
 .rd-nv { margin: 0 13px 13px 87px; display: flex; flex-direction: column; gap: 8px; }
 .rd-nv .inp { margin: 0; }
@@ -1196,6 +1223,11 @@ body.karte-nativ .app { visibility: hidden; }
 .rgs-karte-btn2.an { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); }
 /* Unten links wie im Vorbild, und mit 44px Trefferflaeche. */
 .rgs-karte-btn { position: absolute; left: 12px; bottom: 28px; min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; border: 1px solid var(--accent-line); border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent); font: inherit; font-size: 14px; font-weight: 640; cursor: pointer; box-shadow: var(--sh-2); }
+/* Der Knopf fragt seit ENT-639 den Standort ab und laesst die Karte
+   stehen, bis die Antwort da ist (bis zu 8 s). Ohne ein Zeichen dafuer
+   saehe das aus wie ein Knopf, der nicht reagiert -- und genau das war der
+   Ausgangsbefund. */
+.rgs-karte-btn.laeuft { opacity: .62; }
 /* Beide Kartenknoepfe sitzen bewusst 28 px ueber der Kante, nicht 12
    (ENT-355). Darunter laeuft die Leiste des Kartenanbieters mit dem
    Kartendaten-Hinweis und dem Link auf seine Nutzungsbedingungen. Sie darf
@@ -2745,6 +2777,7 @@ const W = {
     rgSignalErfasst: 'Kontrollpunkt erfasst',
     rgsOrtungAus: 'Kein Standort — Ortung im Gerät erlauben',
     rdEntfernung: 'noch {m} m',
+    rdEntfernungKm: 'noch {km} km',
     rdImBereich: 'Du bist im Bereich',
     // Die Zeile waehrend der Verweilzeit (ENT-576). Sie muss sagen, dass
     // gerade etwas laeuft -- ein Bereich, in dem man steht und in dem
@@ -2844,6 +2877,8 @@ const W = {
     rgpNaechster: 'Nächster Kontrollpunkt',
     rgpAufgabe: 'Aufgabe: {was}',
     rgpAufgabenN: '{n} Aufgaben',
+    rgpAufgabenAuf: 'Aufgaben anzeigen',
+    rgpAufgabenZu: 'Aufgaben zuklappen',
     rgpOeffnen: 'Kontrollpunkt öffnen',
     rgpSchliessen: 'Kontrollpunkt schliessen',
     rgsZumRundgang: 'Zum Rundgang',
@@ -5985,6 +6020,10 @@ function rgSeiteZu() {
   // hier stehen laesst, hat sie danach ueber der Uebersicht liegen -- samt
   // der Durchsicht, die die ganze App durchscheinen laesst.
   rgKarteNativAbbauen();
+  // Der gemerkte Kartenausschnitt gehoert zu DIESER Runde (ENT-639). Bliebe
+  // er stehen, oeffnete die naechste Runde ihre Karte ueber einem fremden
+  // Objekt -- und der erste Blick zeigte die falsche Stadt.
+  rgsNativAnsicht = null;
   $('rgsReiter').hidden = true;
   rgZahlenAn(false);
   $('rgsFuss').hidden = false;
@@ -8574,8 +8613,16 @@ function rgLaufFunktionen() {
   const kpsAlle = rundgangAktiv.kontrollpunkte || [];
   const beendet = rundgangAktiv.status === 'abgeschlossen' || rundgangAktiv.status === 'abgebrochen'
     || (kpsAlle.length > 0 && kpsAlle.every(k => k.erledigt));
-  const aufgabenGesamt = (rundgangAktiv.kontrollpunkte || [])
-    .reduce((n, k) => n + ((k.aufgaben || []).length), 0);
+  /* „Aufgaben anzeigen" stand hier bis ENT-638 als eigenes Modul. Es ist
+     entfallen, nicht verlorengegangen: Die Aufgaben stehen seit ENT-638
+     samt Erklaertext AM Kontrollpunkt, aufklappbar -- also dort, wo sie
+     hingehoeren, weil sie an ihn gebunden sind. Zweimal dasselbe an zwei
+     Orten zu pflegen, waere die schlechtere Haelfte beider Loesungen.
+
+     In der VORSCHAU bleibt die Gesamtliste (afOeffnen): Dort plant man die
+     Runde, bevor man losgeht, und dafuer ist ein Blick auf alle Aufgaben
+     genau das Richtige. In der laufenden Runde arbeitet man Punkt fuer
+     Punkt. */
   const modul = (id, wort, pfad, extra) => `<button type="button" class="rgs-modul" id="${id}" ${extra || ''}>
       <span class="rgs-modul-ic"><svg class="i i-sm" viewBox="0 0 24 24">${pfad}</svg></span>
       <span>${esc(wort)}</span>
@@ -8587,11 +8634,6 @@ function rgLaufFunktionen() {
       ${modul('rgsLaufEreignis', w('evTitel'),
         '<path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
         'onclick="evOeffnen()"')}
-      ${aufgabenGesamt ? `<button type="button" class="rgs-modul" id="rgsLaufAufgaben" onclick="rgLaufAufgabenListe()">
-        <span class="rgs-modul-ic"><svg class="i i-sm" viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><polyline points="4 6 5 7 7 5"/><polyline points="4 12 5 13 7 11"/><polyline points="4 18 5 19 7 17"/></svg></span>
-        <span>${esc(w('afTitel'))}</span>
-        <span class="rgs-modul-zahl">${aufgabenGesamt}</span>
-      </button>` : ''}
       ${beendet ? '' : modul('rgsLaufPause', pausiert ? w('rgsFortsetzen') : w('rgsPausieren'),
         pausiert ? '<polygon points="6 4 20 12 6 20 6 4"/>'
                  : '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>',
@@ -9244,15 +9286,19 @@ function rgKarteZeichnen() {
        Sonst spraenge die Karte bei jedem Tippen auf den Schalter auf die
        Uebersicht zurueck -- dieselbe Sorte Aerger, gegen die dieser Umbau
        ueberhaupt entstanden ist. */
+    /* NICHT rgKarteZentrieren(): Der Knopf fragt seit ENT-639 den Standort
+       ab und laesst die Karte stehen, bis die Antwort da ist. Fuer den
+       ersten Ausschnitt waere das falsch -- die Karte stuende dann
+       sekundenlang dort, wo ihre Erzeugung sie zufaellig hingesetzt hat. */
     if (rgsKarteAnsicht) {
       const a = rgsKarteAnsicht; rgsKarteAnsicht = null;
       try {
         rgsKarte.setCenter({ lat: a.lat, lng: a.lng });
         rgsKarte.setZoom(a.zoom);
         if (a.heading && typeof rgsKarte.setHeading === 'function') { rgsKarte.setHeading(a.heading); }
-      } catch (e) { rgKarteZentrieren(); }
+      } catch (e) { rgKarteErstAusschnitt(dJetzt); }
     } else {
-      rgKarteZentrieren();
+      rgKarteErstAusschnitt(dJetzt);
     }
     // Den Hinweis erst entfernen, wenn die Karte wirklich steht. Wird er
     // vorher weggeraeumt und das Bauen scheitert, bleibt eine graue Flaeche
@@ -9353,7 +9399,13 @@ async function rgKarteNativBauen(d, bauLauf) {
   // verloren, der auf den Aufbau folgt -- und die Grenzen blieben bis zur
   // ersten Handbewegung des Waechters ungelesen.
   try { await rgsNativKarte.setOnCameraIdleListener(() => rgKarteNativGrenzenLesen()); } catch (e) {}
-  await rgKarteNativAusschnitt(d, false);
+  /* Den zuletzt betrachteten Ausschnitt wieder herstellen, statt erneut auf
+     die Kontrollpunkte einzupassen (ENT-639). Beim ERSTEN Aufbau einer
+     Runde gibt es keinen -- dann bleibt es bei der Uebersicht, und das ist
+     richtig: Wer die Karte oeffnet, will zuerst sehen, worum es geht. */
+  if (!(await rgKarteNativAnsichtHerstellen())) {
+    await rgKarteNativAusschnitt(d, false);
+  }
   // Der eigene Standort als NATIVE Anzeige (ENT-609, Entscheidung des
   // Projektinhabers): der eingebaute Punkt samt Richtungskegel und
   // Ungenauigkeit. Er dreht stufenlos mit und muss nicht nachgebaut
@@ -9447,6 +9499,31 @@ function rgKarteNativMeterInPixel(grenzen, masse, meter) {
 }
 
 let rgsNativGrenzen = null;    // zuletzt gelesene Kartengrenzen
+/* Derselbe Ausschnitt, aber ueber den Abbau hinweg (ENT-639).
+
+   rgsNativGrenzen gehoert der STEHENDEN Karte und wird beim Abbau geleert
+   -- richtig so, sonst rechnete die Fuellung gegen die Grenzen einer Karte,
+   die es nicht mehr gibt. Genau deshalb braucht es eine zweite Variable:
+   Sie ueberdauert den Abbau und sagt dem naechsten Aufbau, wo der Waechter
+   zuletzt hingeschaut hat.
+
+   Vom Projektinhaber am Geraet gemeldet: „Beim Wechsel von hell zu dunkel
+   ist der Wechsel sehr unruhig. Die Karte zoomt immer Richtung
+   Kontrollpunkt." Der Befund: Die Browser-Fassung merkt sich Zoom, Mitte
+   und Drehung vor dem Neubau (rgsKarteAnsicht in rgNachtUm) -- die NATIVE
+   Fassung, also die in der App, tat das nie. Der Kommentar dort behauptete
+   sogar ausdruecklich das Gegenteil. Jeder Neuaufbau passte den Ausschnitt
+   stattdessen wieder auf die Kontrollpunkte ein.
+
+   Es geht nicht nur um den Nachtsicht-Schalter: Die native Karte wird bei
+   JEDEM Reiterwechsel abgebaut und neu gebaut. Wer auf die Liste und
+   zurueck ging -- oder ins Menue, um hell/dunkel umzuschalten --, verlor
+   seinen Ausschnitt genauso. Darum sitzt das Merken hier, beim Lesen der
+   Grenzen, und nicht im Nachtsicht-Schalter.
+
+   Geleert wird sie erst beim Verlassen der Runde (rgSeiteZu): Der
+   Ausschnitt gehoert zu DIESER Runde, nicht zur naechsten. */
+let rgsNativAnsicht = null;
 let rgsFuellEl = null;         // das Element der Fuellung im Dokument
 
 let rgsGrenzenLaeuft = false;   // ein Lesevorgang genuegt
@@ -9460,6 +9537,12 @@ async function rgKarteNativGrenzenLesen() {
   try { rgsNativGrenzen = await rgsNativKarte.getMapBounds(); }
   catch (e) { rgsNativGrenzen = null; }
   finally { rgsGrenzenLaeuft = false; }
+  // Nur uebernehmen, was brauchbar ist. Ein fehlgeschlagener Abruf darf den
+  // zuletzt bekannten Ausschnitt nicht loeschen -- sonst faellt die Karte
+  // beim naechsten Neubau doch wieder auf die Kontrollpunkte zurueck.
+  if (rgsNativGrenzen && rgsNativGrenzen.southwest && rgsNativGrenzen.northeast) {
+    rgsNativAnsicht = rgsNativGrenzen;
+  }
 }
 
 /* Die Grenzen nachfordern, wenn sie fehlen (ENT-609).
@@ -9617,6 +9700,33 @@ async function rgKarteNativAusschnitt(d, weich) {
       northeast: { lat: sN, lng: sO },
     }, 48);
   } catch (e) {}
+}
+
+/* Den gemerkten Ausschnitt auf die frisch gebaute Karte legen (ENT-639).
+
+   Gibt zurueck, ob es geklappt hat -- der Aufrufer faellt sonst auf die
+   Uebersicht zurueck. Ein stillschweigendes "nichts getan" waere hier der
+   schlechteste Ausgang: Die Karte stuende dann auf dem Ausschnitt, den die
+   Erzeugung zufaellig gesetzt hat.
+
+   Ohne Weichzeichnen (animate: false): Die Karte ist gerade erst
+   entstanden, es gibt nichts, wovon sie wegfahren koennte. Eine Fahrt von
+   einem Ausschnitt, den niemand gesehen hat, waere genau die Unruhe, gegen
+   die das hier gebaut ist. */
+async function rgKarteNativAnsichtHerstellen() {
+  const a = rgsNativAnsicht;
+  if (!rgsNativKarte || !a || !a.southwest || !a.northeast) { return false; }
+  try {
+    await rgsNativKarte.fitBounds({
+      southwest: { lat: Number(a.southwest.lat), lng: Number(a.southwest.lng) },
+      center: {
+        lat: (Number(a.northeast.lat) + Number(a.southwest.lat)) / 2,
+        lng: (Number(a.northeast.lng) + Number(a.southwest.lng)) / 2,
+      },
+      northeast: { lat: Number(a.northeast.lat), lng: Number(a.northeast.lng) },
+    }, 0);
+  } catch (e) { return false; }
+  return true;
 }
 
 /* Was sich an der nativen Karte ohne Neubau aendert.
@@ -10903,56 +11013,104 @@ function rgRichtungMarkeNachfuehren() {
    Ist der Standort nicht bekannt -- Keller, Tiefgarage, gerade erst
    geoeffnet --, bleibt es beim alten Verhalten: Dann zeigt der Knopf die
    Kontrollpunkte, statt gar nichts zu tun. */
-function rgKarteZentrieren() {
-  const dn = rgKarteDaten(rundgangAktiv ? rundgangAktiv.kontrollpunkte : []);
-  // Die native Karte zuerst: Sie hat ihren eigenen Weg, und den eigenen
-  // Standort zeichnet bei ihr das Betriebssystem.
+/* Die Karte auf einen bekannten eigenen Standort fahren -- auf beiden
+   Kartenarten, mit einer Funktion. */
+function rgKarteAufOrt(lat, lng) {
   if (rgsNativKarte) {
-    if (rgsMeinOrt) {
-      try {
-        rgsNativKarte.setCamera({
-          coordinate: { lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng },
-          zoom: 17, animate: true,
-        });
-      } catch (e) {}
-      return;
-    }
-    rgKarteNativAusschnitt(dn, true);
+    // Den eigenen Standort zeichnet bei der nativen Karte das
+    // Betriebssystem (enableCurrentLocation) -- hier ist nur die Kamera zu
+    // bewegen.
+    try {
+      rgsNativKarte.setCamera({ coordinate: { lat, lng }, zoom: 17, animate: true });
+    } catch (e) {}
     return;
   }
   if (!rgsKarte || !window.google) { return; }
-  const d = dn;
-  if (!d.zeigbar.length && !rgsMeinOrt) { return; }
-  if (rgsMeinOrt) {
-    rgsKarte.setCenter({ lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng });
-    rgsKarte.setZoom(17);
-    // Die Marke trotzdem frisch setzen -- der Standort kann sich seit dem
-    // letzten Zeichnen bewegt haben, und der Knopf soll zeigen, wo man
-    // JETZT ist.
-    rgStandortMarkeSetzen({ lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng });
-    rgRichtungMarkeSetzen({ lat: rgsMeinOrt.lat, lng: rgsMeinOrt.lng }, rgRichtungJetzt());
-    return;
-  }
-  if (!d.zeigbar.length) { return; }
-  const grenzen = new google.maps.LatLngBounds();
-  d.zeigbar.forEach(p => grenzen.extend({ lat: p.lat, lng: p.lng }));
+  rgsKarte.setCenter({ lat, lng });
+  rgsKarte.setZoom(17);
+  // Die Marke frisch setzen -- der Standort kann sich seit dem letzten
+  // Zeichnen bewegt haben, und der Knopf soll zeigen, wo man JETZT ist.
+  // Dieselbe Marke wie bei der laufenden Ortung (ENT-331), nicht eine
+  // zweite, eigene.
+  rgStandortMarkeSetzen({ lat, lng });
+  // Der Pfeil kommt aus der laufenden Ortung, nicht aus einem einzelnen
+  // Abruf: Eine einzelne Messung hat keine Vorgaengerin und damit keine
+  // Richtung. Ist gerade eine bekannt, wird sie mitgezeichnet.
+  rgRichtungMarkeSetzen({ lat, lng }, rgRichtungJetzt());
+}
+
+// Die Kontrollpunkte ins Bild -- der Rueckfallweg, wenn der eigene Standort
+// nicht zu haben ist.
+function rgKarteAufPunkte(d) {
+  if (rgsNativKarte) { rgKarteNativAusschnitt(d, true); return; }
+  if (!rgsKarte || !window.google || !d.zeigbar.length) { return; }
   if (d.zeigbar.length === 1) {
     rgsKarte.setCenter({ lat: d.zeigbar[0].lat, lng: d.zeigbar[0].lng });
     rgsKarte.setZoom(17);
-  } else {
-    rgsKarte.fitBounds(grenzen, 48);
+    return;
   }
-  if (!navigator.geolocation) { return; }
+  const grenzen = new google.maps.LatLngBounds();
+  d.zeigbar.forEach(p => grenzen.extend({ lat: p.lat, lng: p.lng }));
+  rgsKarte.fitBounds(grenzen, 48);
+}
+
+/* Der Ausschnitt, mit dem eine frisch gebaute Karte anfaengt.
+   Eine bereits bekannte Position gewinnt, sonst die Kontrollpunkte. Es
+   wird hier ausdruecklich NICHT nach dem Standort gefragt: Der erste
+   Ausschnitt darf nicht auf eine Antwort warten. */
+function rgKarteErstAusschnitt(d) {
+  if (rgsMeinOrt) { rgKarteAufOrt(rgsMeinOrt.lat, rgsMeinOrt.lng); return; }
+  rgKarteAufPunkte(d);
+}
+
+// Laeuft gerade ein Standortabruf des Knopfes? Zwei Abrufe nebeneinander
+// bringen nur zwei Kamerafahrten auf dasselbe Ziel.
+let rgsZentrierenLaeuft = false;
+
+function rgsZentrierenBusy(an) {
+  rgsZentrierenLaeuft = an;
+  const b = $('rgsZentrieren');
+  if (!b) { return; }
+  b.classList.toggle('laeuft', an);
+  if (an) { b.setAttribute('aria-busy', 'true'); } else { b.removeAttribute('aria-busy'); }
+}
+
+/* „Zentrieren" fuehrt auf den EIGENEN Standort, nicht auf die
+   Kontrollpunkte (ENT-639, davor schon einmal angegangen).
+
+   Vom Projektinhaber am Geraet gemeldet: „Zentrieren geht nicht zurück zum
+   Standort!" Der Befund: Der Knopf fuehrte nur dann dorthin, wenn die App
+   bereits eine Position hatte -- die hat sie nur bei LAUFENDER Ortung und
+   erst nach dem ersten Fix. Sonst fiel er still auf die Kontrollpunkte
+   zurueck, ohne den Standort ueberhaupt zu ERFRAGEN. Pausierte Runde,
+   frisch geoeffnete Karte, kurzer Aussetzer: in allen drei Faellen sprang
+   die Karte auf den Kontrollpunkt statt auf den Waechter.
+
+   Jetzt wird gefragt. Ein einzelner Abruf auf ausdrueckliches Tippen, kein
+   watchPosition -- ENT-131 schliesst die fortlaufende Positionsverfolgung
+   aus, nicht die Frage „wo bin ich", die der Waechter selbst stellt.
+
+   Und bis die Antwort da ist, bewegt sich die Karte NICHT. Erst auf die
+   Kontrollpunkte zu springen und Sekunden spaeter zum Standort weiter
+   waere zweimal dieselbe Unruhe, ueber die der Bericht handelt. Der Knopf
+   zeigt stattdessen, dass er arbeitet. Erst wenn die Frage scheitert,
+   uebernimmt der alte Rueckfallweg. */
+function rgKarteZentrieren() {
+  if (rgsZentrierenLaeuft) { return; }
+  const d = rgKarteDaten(rundgangAktiv ? rundgangAktiv.kontrollpunkte : []);
+  if (!rgsNativKarte && (!rgsKarte || !window.google)) { return; }
+  if (rgsMeinOrt) { rgKarteAufOrt(rgsMeinOrt.lat, rgsMeinOrt.lng); return; }
+  if (!navigator.geolocation) { rgKarteAufPunkte(d); return; }
+  rgsZentrierenBusy(true);
   navigator.geolocation.getCurrentPosition(pos => {
-    if (!rgsKarte || !window.google) { return; }
-    // Dieselbe Marke wie bei der laufenden Ortung (ENT-331) -- nicht eine
-    // zweite, eigene. Der eigene Standort sieht auf beiden Wegen gleich aus.
-    rgStandortMarkeSetzen({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-    // Der Pfeil kommt aus der laufenden Ortung, nicht aus diesem einen
-    // Abruf: Eine einzelne Messung hat keine Vorgaengerin und damit keine
-    // Richtung. Ist gerade eine bekannt, wird sie mitgezeichnet.
-    rgRichtungMarkeSetzen({ lat: pos.coords.latitude, lng: pos.coords.longitude }, rgRichtungJetzt());
-  }, () => {}, { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 });
+    rgsZentrierenBusy(false);
+    rgKarteAufOrt(pos.coords.latitude, pos.coords.longitude);
+  }, () => {
+    rgsZentrierenBusy(false);
+    // Standort nicht zu haben (verweigert, Keller, Zeitablauf): Dann zeigt
+    // der Knopf die Kontrollpunkte, statt gar nichts zu tun.
+    rgKarteAufPunkte(d);
+  }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 });
 }
 
 // Pausieren aus dem Funktionen-Reiter: dieselbe Rueckfrage wie im
@@ -10992,12 +11150,10 @@ function rgLaufKontakte() {
   $('rgsBody').innerHTML = rgsKontakteHtml(daten);
 }
 
-// Aufgabenliste der laufenden Runde -- dieselbe Darstellung wie in der
-// Vorschau (ENT-304), nur aus rundgangAktiv statt aus rgsDaten gespeist.
-function rgLaufAufgabenListe() {
-  rgsDaten = { kontrollpunkte: rundgangAktiv.kontrollpunkte || [] };
-  afOeffnen();
-}
+/* Die Aufgabenliste der laufenden Runde (rgLaufAufgabenListe) ist mit
+   ENT-638 entfallen -- samt ihrem Modul im Funktionen-Reiter. Die Aufgaben
+   stehen jetzt am Kontrollpunkt selbst (rdAufgabenBlock). afOeffnen()
+   bleibt und traegt weiterhin die Gesamtliste in der VORSCHAU. */
 
 // Eigene Funktion statt Teil von rundgangAnzeigen(): der Fuss muss sich auch
 // OHNE Neuaufbau des ganzen Bildschirms aktualisieren, sobald sich der Status
@@ -11134,6 +11290,95 @@ function rdUmklappen(kontrollpunktId) {
   rundgangListeZeichnen();
 }
 
+/* Die Aufgaben eines Kontrollpunkts, aufklappbar AM PUNKT (ENT-638).
+
+   Vom Projektinhaber gemeldet, mit Coredinate als Vorbild: „Aufgaben, die
+   an Kontrollpunkte gebunden sind, sind entsprechend markiert und lassen
+   sich ausklappen. Sie gehören auch da hin, weil sie direkt gekoppelt
+   sind."
+
+   Der Befund dahinter war groesser als die Gestaltungsfrage: Der
+   ERKLAERTEXT einer Aufgabe (`information`, z.B. „Bei Alarm Meldung an die
+   Zentrale") stand bis hierher ueberhaupt nicht an der Zeile. Er war
+   ausschliesslich ueber Funktionen -> „Aufgaben anzeigen" zu finden --
+   also drei Tipps entfernt von dem Punkt, an dem er gebraucht wird. In der
+   Zeile stand nur die Bezeichnung.
+
+   EIGENER Aufklapper, nicht die bestehende Zeilen-Aufklappung (die zeigt
+   die Knoepfe Bestaetigen/Ersatzscan/Nicht verfuegbar): Die
+   Zeilen-Aufklappung ist auf einer PAUSIERTEN Runde bewusst gesperrt --
+   dort gibt es nichts zu bestaetigen. Die Aufgaben haengen aber nicht an
+   der Bedienbarkeit: Wer pausiert hat und ueberlegt, ob er fortsetzt, darf
+   nachlesen duerfen, was ihn erwartet.
+
+   Bewusst NICHT im localStorage, gleiche Ueberlegung wie bei
+   rdAufgeklappt: Das gilt fuer diesen Blick auf diese Liste. */
+/* Die Entfernung in Worten (ENT-638).
+
+   Ab 1000 m in Kilometern mit zwei Stellen statt in Metern. Wunsch des
+   Projektinhabers nach dem Vorbild von Coredinate, und nicht nur Geschmack:
+   „noch 2750 m" liest man als Zahl, nicht als Entfernung -- vier Ziffern
+   muss man erst umrechnen, um zu wissen, ob man geht oder faehrt.
+
+   Die Grenze liegt genau bei 1000 und nicht darunter: Unter einem
+   Kilometer ist der Meter die Einheit, in der man einen Fussweg denkt, und
+   „0.40 km" waere eine Verschlechterung. */
+function rdEntfernungText(meter) {
+  if (meter >= 1000) {
+    return w('rdEntfernungKm').replace('{km}', (meter / 1000).toFixed(2));
+  }
+  return w('rdEntfernung').replace('{m}', String(Math.round(meter)));
+}
+
+const rdAufgabenAuf = new Set();
+
+function rdAufgabenUmklappen(kontrollpunktId) {
+  const id = Number(kontrollpunktId);
+  if (rdAufgabenAuf.has(id)) { rdAufgabenAuf.delete(id); } else { rdAufgabenAuf.add(id); }
+  rundgangListeZeichnen();
+}
+
+/* Der Aufgabenblock einer Zeile -- oder ''.
+
+   Aufgeklappt wird nur, wo es auch etwas aufzuklappen GIBT: bei genau
+   einer Aufgabe ohne Erklaertext steht die Bezeichnung schon in der Zeile,
+   und ein Knopf, der nichts freigibt, ist schlimmer als keiner (dieselbe
+   Regel wie beim Zentrieren-Knopf und beim Nachtsicht-Schalter).
+
+   Das Zeichen ist die Checkliste, die im Haus schon fuer Aufgaben steht
+   (Funktionen-Modul, leere Aufgabenliste) -- kein neu erfundenes Sinnbild
+   und keines von Coredinate abgeschaut. */
+function rdAufgabenBlock(k) {
+  const aufg = (k && k.aufgaben) || [];
+  if (!aufg.length) { return ''; }
+  const id = Number(k.id);
+  const eine = aufg.length === 1;
+  const kopf = eine
+    ? String(aufg[0].bezeichnung || '')
+    : w('rgpAufgabenN').replace('{n}', String(aufg.length));
+  const klappbar = !eine || !!aufg[0].information;
+  const zeichen = '<svg class="i i-sm" viewBox="0 0 24 24"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><polyline points="4 6 5 7 7 5"/><polyline points="4 12 5 13 7 11"/><polyline points="4 18 5 19 7 17"/></svg>';
+  if (!klappbar) {
+    return `<div class="rd-aufg rd-aufg-starr">${zeichen}<span>${esc(kopf)}</span></div>`;
+  }
+  const auf = rdAufgabenAuf.has(id);
+  // Bei genau einer Aufgabe steht die Bezeichnung schon im Kopf -- sie
+  // darunter zu wiederholen waere Fuellmaterial. Dann nur der Erklaertext.
+  const liste = aufg.map(a => `<div class="rd-aufg-z">
+      ${eine ? '' : `<div class="rd-aufg-bez">${esc(a.bezeichnung || '')}</div>`}
+      ${a.information ? `<div class="rd-aufg-info">${esc(a.information)}</div>` : ''}
+    </div>`).join('');
+  return `<button type="button" class="rd-aufg rd-aufg-knopf${auf ? ' auf' : ''}"
+      id="rdAufg${id}" aria-expanded="${auf ? 'true' : 'false'}"
+      aria-controls="rdAufgListe${id}"
+      aria-label="${esc((auf ? w('rgpAufgabenZu') : w('rgpAufgabenAuf')) + ' — ' + k.bezeichnung)}"
+      onclick="rdAufgabenUmklappen(${id})">
+      ${zeichen}<span class="rd-aufg-kopf">${esc(kopf)}</span>
+      <svg class="i i-sm rd-aufg-pfeil" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div class="rd-aufg-liste" id="rdAufgListe${id}"${auf ? '' : ' hidden'}>${liste}</div>`;
+}
+
 /* Eine Zeile der Kontrollpunkt-Liste, als Zeitleiste (ENT-541).
 
    Aufbau, links nach rechts, fuer JEDE Zeile gleich (CLAUDE.md: gleiches
@@ -11228,7 +11473,7 @@ function rdZeile(k, gesperrt, naechsterId) {
     : drin ? `<div class="rd-ort drin" id="rdOrt${k.id}">${esc(zaehltRest
         ? w('rdAutoZaehlt').replace('{s}', String(zaehltRest))
         : w('rdImBereich'))}</div>`
-    : `<div class="rd-ort weit">${esc(w('rdEntfernung').replace('{m}', String(Math.round(dist))))}</div>`;
+    : `<div class="rd-ort weit">${esc(rdEntfernungText(dist))}</div>`;
   /* Der Knopf ist seit ENT-531 der RUECKFALLWEG, nicht der Normalweg.
 
      Er verschwindet genau dann, wenn die automatische Erfassung diesen Punkt
@@ -11255,17 +11500,15 @@ function rdZeile(k, gesperrt, naechsterId) {
   // ihm der Knopf, auch wenn er nicht an der Reihe ist. Ohne diese Zeile
   // muesste der Waechter am Ziel erst aufklappen, was er gerade erreicht hat.
   const auf = !gesperrt && (jetzt || drin === true || !!k.offen || rdAufgeklappt.has(Number(k.id)));
-  const aufgabenN = (k.aufgaben || []).length;
-  const aufgabenTxt = aufgabenN === 1
-    ? w('rgpAufgabe').replace('{was}', String((k.aufgaben[0] || {}).bezeichnung || ''))
-    : aufgabenN > 1 ? w('rgpAufgabenN').replace('{n}', String(aufgabenN)) : '';
+  /* Die Aufgaben standen bis hierher als graue Unterzeile IM Zeilenkopf.
+     Sie sind seit ENT-638 ein eigener Block darunter -- mit Erklaertext und
+     aufklappbar. Im Kopf bliebe sonst dieselbe Angabe zweimal stehen. */
   const kopfInhalt = `
       <span class="rd-zeit" aria-hidden="true">${jetzt ? '→' : '–'}</span>
       <span class="rd-haken" aria-hidden="true"></span>
       <span class="rd-txt">
         <span class="rd-bez">${esc(k.bezeichnung)}</span>
         ${jetzt ? `<span class="vh">${esc(w('rgpNaechster'))}</span>` : ''}
-        ${aufgabenTxt ? `<span class="rd-meta">${esc(aufgabenTxt)}</span>` : ''}
       </span>
       <span class="rd-marke">${esc(typLabel)}</span>`;
   return `<div class="rd-zeile rd-offen${jetzt ? ' rd-jetzt' : ''}${auf ? ' rd-auf' : ''}">
@@ -11277,6 +11520,7 @@ function rdZeile(k, gesperrt, naechsterId) {
            aria-expanded="${auf ? 'true' : 'false'}"
            aria-label="${esc((auf ? w('rgpSchliessen') : w('rgpOeffnen')) + ' — ' + k.bezeichnung)}"
            onclick="rdUmklappen(${Number(k.id)})">${kopfInhalt}</button>`}
+    ${rdAufgabenBlock(k)}
     ${gesperrt ? '' : ortTxt}
     ${!kannScannen && !gesperrt ? `<div class="rd-hinweis">${esc(w('kpNfcNichtVerfuegbarGeraet'))}</div>` : ''}
     ${k.fehler ? `<div class="msg-err rd-einzug">${esc(k.fehler)}</div>` : ''}
