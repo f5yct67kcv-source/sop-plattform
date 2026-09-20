@@ -351,10 +351,31 @@ svg.i-sm { width: 17px; height: 17px; }
      Schleier braucht also eine eigene Ebene, aber denselben Wert. */
   --gate-schleier: linear-gradient(rgba(10,11,15,.66), rgba(10,11,15,.82));
 }
-/* margin:auto statt justify-content:center -- reicht die Hoehe nicht
-   (kleines Geraet, offene Tastatur), bleibt der obere Rand so
-   erreichbar, waehrend zentrierter Flex-Inhalt oben abgeschnitten wuerde. */
-.gate-mitte { margin: auto; width: 100%; max-width: 348px; }
+/* Verankert oben statt zentriert (ENT-636). Vorher stand hier
+   "margin:auto" -- mittig UND (ueber die Auto-Raender oben UND unten
+   AM SELBEN Element) der Grund, warum ein Schrumpfen von #gate durch die
+   Tastatur (ENT-635) den Block spuerbar verschob: Mit weniger Hoehe
+   wandert eine Mitte zwangslaeufig mit. Der Platz oben kommt jetzt aus
+   .gate-luft-oben, einem eigenen, kleinen Element davor (48 px, siehe
+   dort) -- .gate-mitte selbst hat oben keinen Rand mehr und wandert
+   darum nicht, wenn #gate von unten schrumpft. Zugleich naeher am
+   Vorbild, das der Projektinhaber gezeigt hat (Coredinate: Anmeldeblock
+   oben, nicht mittig).
+   margin-bottom bleibt auto: Die Herstellersignatur (.gate-sig) soll
+   weiterhin ganz unten stehen, und dieser einzelne Auto-Rand beansprucht
+   dafuer weiterhin den GESAMTEN freien Raum, der nach .gate-luft-oben
+   noch uebrig ist. flex-shrink:0, weil das Schrumpfen bei zu wenig Platz
+   .gate-luft-oben treffen soll (das ist reine Luft), nicht den Inhalt
+   dieses Blocks. */
+.gate-mitte { margin: 0 auto auto; flex-shrink: 0; width: 100%; max-width: 348px; }
+/* Der Platz ueber dem Anmeldeblock (ENT-636): "moechte" 48 px sein
+   (flex-grow:0 -- er wird nie groesser, auch wenn viel Platz da ist; die
+   Signatur unten soll den Rest bekommen, nicht dieser Block), darf aber
+   auf 0 zusammenschrumpfen (flex-shrink:1), wenn der Bildschirm zu knapp
+   ist. Reicht selbst das nicht (ein sehr kleines Geraet), bleibt #gate
+   ueber overflow-y:auto weiterhin scrollbar -- wie zuvor mit
+   "margin:auto", das aus demselben Grund nie negativ wird. */
+.gate-luft-oben { flex: 0 1 48px; }
 /* 42 px, nicht 34: Der Abstand zwischen Logoblock und Formular muss
    deutlich groesser sein als der zwischen zwei Feldern (41 px), sonst
    lesen Identitaet und Eingabe als eine einzige Reihe statt als zwei
@@ -473,7 +494,12 @@ svg.i-sm { width: 17px; height: 17px; }
   @media (prefers-reduced-motion: reduce) {
     .gate-video, .gate-schleier { display: none; }
   }
-  .gate-mitte { max-width: 400px; position: relative; z-index: 2; }
+  /* Der Desktop kennt keine Bildschirmtastatur, die etwas verschiebt --
+     hier bleibt der Block darum mittig, wie schon vor ENT-636:
+     .gate-luft-oben traegt nichts bei (flex:0), .gate-mitte zentriert
+     wieder ueber zwei gleich grosse Auto-Raender wie frueher. */
+  .gate-luft-oben { flex: 0; }
+  .gate-mitte { max-width: 400px; margin: auto; flex-shrink: 1; position: relative; z-index: 2; }
   .gate-oben img { width: 176px; height: 176px;
     filter: drop-shadow(0 22px 44px rgba(0,0,0,.8)); }
   .gate-oben .sub { margin-top: 26px; font-size: 15px; letter-spacing: 3px; }
@@ -1995,6 +2021,14 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
  }
  </script>
  <div class="gate-schleier"></div>
+ <!-- Luft ueber dem Anmeldeblock (ENT-636), rein optisch -- deshalb
+      aria-hidden. Ein eigenes Element statt eines Randes an .gate-mitte
+      selbst: Nur so laesst sich der Platz oben ANDERS gewichten als der
+      Platz unten (Signatur), den .gate-mitte weiterhin ueber die eigene
+      margin-bottom:auto beansprucht -- zwei Auto-Raender AM SELBEN
+      Element teilen sich freien Platz immer zu gleichen Teilen, das
+      liesse sich mit einem einzigen Element nicht trennen. -->
+ <div class="gate-luft-oben" aria-hidden="true"></div>
  <div class="gate-mitte">
   <div class="gate-oben">
     <img src="icons/guardops-192.png" alt="">
