@@ -70,8 +70,8 @@ const PROFIL = { status: 'ok', monat: { anzahl: 0, stunden: 0 },
 
 const browser = await chromium.launch({ executablePath: browserPfad() });
 
-async function seite(hoehe) {
-  const page = await browser.newPage({ viewport: { width: 390, height: hoehe }, deviceScaleFactor: 2,
+async function seite(hoehe, breite = 390) {
+  const page = await browser.newPage({ viewport: { width: breite, height: hoehe }, deviceScaleFactor: 2,
     permissions: ['geolocation'], geolocation: { latitude: 47.35, longitude: 7.9, accuracy: 8 } });
   // Eigene Wachsperre statt der echten: So laesst sich zaehlen, ob
   // angefordert und freigegeben wird -- unabhaengig davon, ob der
@@ -232,6 +232,66 @@ check('Marke und Zentrieren-Knopf ueberlappen sich nicht',
   m.chip?.b < m.zen?.t);
 check('KRITISCH: die Zahlen und das Zahnrad ueberlappen sich nicht -- beide liegen oben',
   m.zChip?.r < m.zahn?.l && m.tChip?.r < m.zahn?.l);
+
+// ══════════ DIE REITERLEISTE: ZEICHEN GROSS, LEISTE SCHLANK ═══════════
+/* Nachgemessen an einem Bildschirmfoto des Wettbewerbers (ENT-642), Pixel
+   fuer Pixel auf demselben Geraet -- beide Aufnahmen 1179 px breit, also
+   dreifach. Das Ergebnis war das Gegenteil der Vermutung: Die fremde
+   Leiste ist NICHT hoeher (rund 57 gegen unsere 56 px) und ihre
+   Beschriftung nicht groesser (11,3 gegen 11,0 pt Tinte). Groesser wirkt
+   sie allein wegen der ZEICHEN -- 23 gegen unsere damaligen 14,3 pt.
+
+   Geprueft wird darum genau das, und am gerenderten Zustand: Die Zeichen
+   der Leiste sind deutlich groesser als die Zeichen sonst im Haus, der
+   Inhaltsblock trifft das Mass der Vorlage, und die Leiste bleibt
+   trotzdem schlank. Absichtlich als Spanne und nicht auf den Pixel: Eine
+   Pruefung, die 28.0 verlangt, geht bei jeder Schriftaenderung kaputt,
+   ohne dass jemand etwas falsch gemacht haette. */
+const leiste = await page.evaluate(() => {
+  const sv = document.querySelector('.rgs-reiter button svg');
+  const lb = document.querySelector('.rgs-reiter button span:last-child');
+  const bar = document.querySelector('.rgs-reiter');
+  // Ein Zeichen aus dem uebrigen Haus als Vergleich -- irgendeines mit
+  // .i-sm ausserhalb der Leiste.
+  const klein = [...document.querySelectorAll('svg.i-sm')]
+    .find(e => !e.closest('.rgs-reiter'));
+  const h = e => e ? e.getBoundingClientRect().height : null;
+  return { ikon: h(sv), klein: h(klein), leiste: h(bar),
+           block: sv && lb ? lb.getBoundingClientRect().bottom - sv.getBoundingClientRect().top : null };
+});
+check('Vorbedingung: es gibt ein Vergleichszeichen ausserhalb der Leiste',
+  leiste.klein !== null && leiste.klein > 0);
+check('KRITISCH: die Zeichen der Reiterleiste sind deutlich groesser als die Zeichen sonst im Haus',
+  leiste.ikon >= leiste.klein * 1.4);
+/* Achtung, zwei verschiedene Masse: Die 38 pt der Vorlage sind an der
+   TINTE gemessen (am Bildschirmfoto, heller Punkt gegen Hintergrund),
+   hier misst der Browser KAESTEN. Der Kasten ist rund 3,5 px groesser,
+   weil Zeichenrahmen und Zeilendurchschuss Luft mittragen. Gemessen am
+   eigenen Ergebnis: Kasten 41,5 px entspricht 38,0 pt Tinte -- genau dem
+   Wert der Vorlage. Die Spanne unten gilt fuer den KASTEN. */
+check('KRITISCH: der Inhaltsblock trifft das Mass der Vorlage (Kasten 40-43 px, entspricht 38 pt Tinte)',
+  leiste.block >= 40 && leiste.block <= 43);
+check('KRITISCH: die Leiste bleibt dabei schlank -- hoechstens 60 px, und nicht unter der Trefferflaeche von 44',
+  leiste.leiste >= 44 && leiste.leiste <= 60);
+
+// Die Beschriftungen muessen auf dem schmalsten Geraet einzeilig bleiben.
+// Bei drei Reitern teilt sich die Breite durch drei, und
+// „Kontrollpunkte" ist das laengste Wort der Leiste.
+{
+  const schmal = await seite(568, 320);
+  await schmal.evaluate(() => ladeSchichten().then(() => rundgangFortsetzen(71)));
+  await schmal.waitForTimeout(1500);
+  const lab = await schmal.evaluate(() =>
+    [...document.querySelectorAll('.rgs-reiter button')].map(b => {
+      const t = b.querySelector('span:last-child').getBoundingClientRect();
+      return { breite: t.width, zelle: b.getBoundingClientRect().width, hoehe: t.height };
+    }));
+  check('KRITISCH: auf 320 px bleibt jede Beschriftung einzeilig',
+    lab.length === 3 && lab.every(l => l.hoehe < 18));
+  check('KRITISCH: und jede passt in ihre Zelle, ohne an den Rand zu stossen',
+    lab.every(l => l.breite <= l.zelle - 8));
+  await schmal.close();
+}
 
 // ══════════ REITER OHNE KARTE ════════════════════════════════════════
 // Dort gibt es nichts zu ueberlagern -- die Chips stehen im Fluss, und der
