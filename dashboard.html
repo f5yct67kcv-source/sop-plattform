@@ -28869,6 +28869,15 @@ function pruefeUpdate() {
     $('nav-einrichtung').classList.toggle('hat-update', hat);
     $('nav-einrichtung').title = hat ? 'Update verfügbar: neue Einrichtung steht aus' : 'Einrichtung';
     $('navEinrichtungLbl').textContent = hat ? 'Update' : 'Einrichtung';
+    // Der Punkt am Konto-Logo faellt nicht auf, solange niemand dort
+    // hinschaut (Rueckmeldung des Projektinhabers). Derselbe Toast wie
+    // ueberall sonst im Cockpit statt eines neuen Bausteins -- nur ein
+    // zusaetzlicher Ausloeser beim Anmelden. Nur am Desktop: "Einrichtung"
+    // ist .nur-desktop (ENT-235), ein Toast dazu am Handy zeigte auf einen
+    // Menuepunkt, den es dort gar nicht gibt.
+    if (hat && !window.matchMedia('(max-width: 900px)').matches) {
+      toast('Update verfügbar — unter „Einrichtung“ im Kontomenü nachholen.');
+    }
   }).catch(() => {});
 }
 
