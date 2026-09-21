@@ -62,27 +62,149 @@ check('Das Eingabefeld hebt sich vom Grund ab (--surface-2 #1E2535)',
 check('KRITISCH: der eingegebene Text liest hell auf dunkel, nicht schwarz auf dunkel',
   feld !== null && kontrast(feld.farbe, feld.grund) >= 7);
 
-// ══════════ DAS LOGO IST "MUTIGER" GEWORDEN ═══════════════════════════
-const logo = await mass('.gate-oben img');
-check('KRITISCH: das Logo ist deutlich groesser als die frueheren 66 px',
-  logo !== null && logo.w >= 120 && logo.h >= 120);
-// Zweite Runde des Projektinhabers: "nur das kreisrunde logo, ohne den
-// Rahmen". Die weisse Flaeche, das Eckenrund und der helle Ring kamen
-// alle aus dem CSS -- keiner davon darf zurueckkommen.
+/* ══════════ DIE MARKE STEHT FREI ═══════════════════════════════════
+   REVIDIERT durch ENT-657. Hier stand "das Logo ist deutlich groesser als
+   die frueheren 66 px" und mass den KASTEN einer Bilddatei. Der Kasten
+   war die falsche Groesse: guardops-192.png war zu 100 % deckend -- das
+   dunkle Quadrat WAR die Datei. Vom Projektinhaber beanstandet: "Das G
+   ist innerhalb eines Quadrats. Ich will da nur das G."
+
+   Gemessen wurde: 86 x 110 von 192 Bildpunkten waren die weisse Marke,
+   im 130er Kasten also 58 x 74 px. Der Rest war Quadratrand -- mehr als
+   die halbe Flaeche. Die Pruefung auf "Kasten >= 120" war damit gruen,
+   obwohl die Marke selbst nur 74 px hoch war.
+
+   Geprueft wird jetzt die TINTE, nicht der Kasten, und dass sie nicht
+   kleiner geworden ist. Die drei Aussagen zur Fassung (keine Flaeche,
+   kein Eckenrund, kein Ring) bleiben unveraendert gueltig -- sie kamen
+   frueher aus dem CSS, und jetzt kommt ausserdem keine mehr aus der
+   Datei. */
+const logo = await mass('.gate-oben .gate-marke');
+check('KRITISCH: die Marke ist als Zeichnung eingebunden, nicht als Bilddatei -- nur so kann sie kein Quadrat mittragen',
+  await ev(() => !document.querySelector('.gate-oben img')
+    && !!document.querySelector('.gate-oben svg.gate-marke')));
+check('KRITISCH: die Marke ist mindestens so hoch wie zuvor -- sie darf durch den Wegfall des Quadrats nicht schrumpfen',
+  logo !== null && logo.h >= 70);
 const fassung = await ev(() => {
-  const c = getComputedStyle(document.querySelector('.gate-oben img'));
+  const c = getComputedStyle(document.querySelector('.gate-oben .gate-marke'));
   return { grund: c.backgroundColor, radius: c.borderRadius,
            padding: c.paddingTop, schatten: c.boxShadow };
 });
-check('KRITISCH: das Logo traegt keine weisse Flaeche mehr hinter sich',
+check('KRITISCH: die Marke traegt keine weisse Flaeche mehr hinter sich',
   fassung !== null && /rgba\(0, 0, 0, 0\)|transparent/.test(fassung.grund));
 check('KRITISCH: und keinen gerundeten Rahmen -- kein Eckenrund, kein Innenabstand, kein Ring',
   fassung !== null && parseFloat(fassung.radius) === 0
   && parseFloat(fassung.padding) === 0 && fassung.schatten === 'none');
+/* Und sie ist wirklich GEZEICHNET. Der Kommentar am Sprite in app.html
+   warnt genau davor: Wer die viewBox des Symbols auch aussen hinschreibt,
+   verschiebt die Zeichnung aus dem Kasten -- Kasten, Farbe und Kontrast
+   messen sich danach unveraendert, nur das Bild fehlt. Darum die Tinte:
+   Ein Umriss deckt einen Teil der Flaeche, eine leere Marke null, ein
+   zurueckgekehrtes Quadrat fast alles. */
+const tinte = await (async () => {
+  /* Das GERENDERTE Bild, von Playwright aufgenommen -- nicht eine
+     nachgebaute Zeichnung.
+
+     Der erste Anlauf baute das Symbol in eine eigene Leinwand nach und
+     mass die. Die Gegenprobe "Symbol-viewBox verschoben" blieb dabei
+     GRUEN: Der Nachbau setzte die viewBox des Elements, nicht die des
+     Symbols, und zeichnete darum immer richtig. Eine Pruefung, die nie
+     angeschlagen hat, ist eine Behauptung (CLAUDE.md) -- also wird jetzt
+     das aufgenommen, was wirklich auf dem Schirm steht. */
+  const el = await page.$('.gate-oben .gate-marke');
+  if (!el) { return -1; }
+  const bild = (await el.screenshot()).toString('base64');
+  return page.evaluate(async d => {
+    const im = new Image(); im.src = 'data:image/png;base64,' + d;
+    await im.decode();
+    const c = document.createElement('canvas');
+    c.width = im.width; c.height = im.height;
+    const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+    const px = x.getImageData(0, 0, c.width, c.height).data;
+    let hell = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      if (px[i + 3] > 128 && (px[i] + px[i + 1] + px[i + 2]) / 3 > 150) { hell++; }
+    }
+    return Math.round(1000 * hell / (c.width * c.height)) / 10;
+  }, bild);
+})();
+check('KRITISCH: die Marke ist tatsaechlich gezeichnet und nicht leer',
+  tinte > 5);
+check('KRITISCH: und sie ist ein Umriss, keine gefuellte Flaeche -- das Quadrat ist wirklich weg',
+  tinte >= 0 && tinte < 60);
 const mitte = await mass('.gate-mitte');
 // CLAUDE.md: "Mittiges gehoert wirklich in die Mitte -- bezogen auf den
 // Container." Zwei Pixel Toleranz fuer ungerade Breiten.
-check('Das Logo steht waagrecht wirklich mittig, nicht nur ungefaehr',
+/* ══════════ DER BLOCK IST BETONIERT (ENT-657) ══════════════════════
+   Vom Projektinhaber zum zweiten Mal gemeldet: "Die Anmeldemaske bewegt
+   sich IMMER noch, wenn man auf das Eingabefeld klickt. Betoniere den
+   Container fest."
+
+   ENT-635 hatte den CONTAINER schrumpfen lassen (--tastatur), damit iOS
+   nicht das ganze Fenster verschiebt. Der Inhalt DARIN floss aber weiter
+   um: .gate-luft-oben war als schrumpfbar gebaut (flex: 0 1 48px) und
+   fiel als Erstes auf null zusammen. Gemessen: Die Oberkante der Marke
+   sprang von 80 auf 32 px -- genau diese 48.
+
+   Geprueft werden BEIDE Wege, auf denen die Tastatur ankommen kann, denn
+   sie fuehren zu verschiedenen Messwerten und muessen beide still
+   bleiben:
+     1. Nur der sichtbare Ausschnitt schrumpft; --tastatur wird gesetzt
+        und #gate schrumpft von unten (der Weg aus ENT-635).
+     2. Das Fenster selbst schrumpft (die Huelle verkleinert die Ansicht);
+        --tastatur bleibt 0, die Hoehe faellt trotzdem.
+   Der zweite Fall ist der wichtigere: Dort greift der Mechanismus aus
+   ENT-635 gar nicht, und genau dort war der Sprung bisher ungeprueft. */
+{
+  const lage = () => ev(() => {
+    const g = s => { const e = document.querySelector(s);
+      if (!e) { return null; }
+      const r = e.getBoundingClientRect(); return Math.round(r.top); };
+    return { marke: g('.gate-oben .gate-marke'), name: g('#gName'),
+             knopf: g('#gBtn'), luft: (() => {
+               const e = document.querySelector('.gate-luft-oben');
+               return e ? Math.round(e.getBoundingClientRect().height) : null; })() };
+  });
+  const ruhe = await lage();
+  check('Vorbedingung: der Block ist ueberhaupt messbar',
+    ruhe.marke !== null && ruhe.name !== null && ruhe.knopf !== null);
+
+  // Weg 1: sichtbarer Ausschnitt schrumpft.
+  await ev(() => document.documentElement.style.setProperty('--tastatur', '336px'));
+  await page.waitForTimeout(120);
+  const mitTastatur = await lage();
+  await ev(() => document.documentElement.style.setProperty('--tastatur', '0px'));
+  await page.waitForTimeout(120);
+  check('KRITISCH: mit offener Tastatur bleibt die Marke an derselben Stelle',
+    mitTastatur.marke === ruhe.marke);
+  check('KRITISCH: und die beiden Eingabefelder ebenso -- der Block wandert nicht',
+    mitTastatur.name === ruhe.name && mitTastatur.knopf === ruhe.knopf);
+  check('KRITISCH: die Luft ueber dem Block faellt dabei nicht zusammen -- sie war die Ursache',
+    mitTastatur.luft === ruhe.luft && ruhe.luft > 0);
+
+  // Weg 2: das Fenster selbst wird kleiner.
+  const voll = page.viewportSize();
+  await page.setViewportSize({ width: voll.width, height: voll.height - 336 });
+  await page.waitForTimeout(150);
+  const kleinerSchirm = await lage();
+  await page.setViewportSize(voll);
+  await page.waitForTimeout(150);
+  check('KRITISCH: schrumpft das Fenster selbst, bleibt der Block ebenfalls stehen',
+    kleinerSchirm.marke === ruhe.marke && kleinerSchirm.name === ruhe.name);
+  check('KRITISCH: auch dort faellt die Luft ueber dem Block nicht zusammen',
+    kleinerSchirm.luft === ruhe.luft);
+  /* Stehenbleiben heisst nicht wegfallen: Wenn der Block hoeher ist als
+     der Rest des Bildschirms, muss er erreichbar bleiben -- sonst waere
+     "betoniert" nur ein anderes Wort fuer "abgeschnitten". */
+  check('KRITISCH: der Zugang bleibt dabei erreichbar -- er rollt, statt den Inhalt abzuschneiden',
+    await ev(() => {
+      const g = document.getElementById('gate');
+      return getComputedStyle(g).overflowY === 'auto'
+        && g.scrollHeight >= g.clientHeight;
+    }));
+}
+
+check('Die Marke steht waagrecht wirklich mittig, nicht nur ungefaehr',
   logo !== null && mitte !== null
   && Math.abs((logo.x + logo.w / 2) - (mitte.x + mitte.w / 2)) <= 2);
 check('Der Firmenname steht als einzige Textzeile unter dem Logo',
@@ -141,7 +263,7 @@ await page.setViewportSize({ width: 1440, height: 900 });
 await page.waitForTimeout(250);
 const dMitte = await mass('.gate-mitte');
 const dCta = await mass('#gBtn');
-const dLogo = await mass('.gate-oben img');
+const dLogo = await mass('.gate-oben .gate-marke');
 check('KRITISCH: auf dem Desktop bleibt die Spalte schmal, statt sich ueber die ganze Breite zu ziehen',
   dMitte !== null && dMitte.w <= 420);
 check('Und sie steht dort mittig',
