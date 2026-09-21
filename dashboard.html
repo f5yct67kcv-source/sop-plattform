@@ -5302,7 +5302,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <button type="button" class="marken-knopf" id="btnMarke" onclick="markenMenuUm(event)"
               aria-haspopup="true" aria-expanded="false" aria-controls="sideFoot"
               title="Konto, Einrichtung und Abmelden" aria-label="Konto, Einrichtung und Abmelden">
-        <img src="icons/guardops-192.png" alt="">
+        <img src="icons/guardops-192.png" alt="" id="btnMarkeLogo">
       </button>
       <div class="txt">
         <div class="wm" id="sideWm">Cockpit</div>
@@ -23726,7 +23726,19 @@ function bkQrIbanPruefen() {
 function briefkopfLaden() {
   return api('betrieb.php').then(({ ok, data }) => {
     if (ok && data.status === 'ok' && data.betrieb) { briefkopf = data.betrieb; }
+    markenLogoAktualisieren();
   }).catch(() => {});
+}
+
+// Betriebslogo oben rechts (ENT-410, siehe Kommentar bei .marke-hersteller):
+// Der Markenknopf zeigt das Logo des angemeldeten Betriebs, sobald eines
+// hinterlegt ist -- ohne Betriebslogo bleibt es beim mitgelieferten
+// Markenzeichen. Automatisch fuer jeden Mandanten, weil hier dieselbe
+// briefkopf.logo-Quelle greift wie beim Ausdruck: kein Sonderfall pro Konto.
+const MARKEN_LOGO_STANDARD = 'icons/guardops-192.png';
+function markenLogoAktualisieren() {
+  const img = $('btnMarkeLogo');
+  if (img) { img.src = briefkopf.logo || MARKEN_LOGO_STANDARD; }
 }
 
 // Fusszeile beider Ausdrucke (Kundenrapport und Arbeitsrapport, ENT-155 und
@@ -23868,7 +23880,7 @@ function bkLogoGewaehlt(datei) {
     body: { logo: inhalt, logo_mime: datei.type } }))
     .then(({ ok, data }) => {
       if (!ok || data.status !== 'ok') { return bkFehler(data.message || 'Hochladen fehlgeschlagen.'); }
-      briefkopf = data.betrieb; bkLogoStand(); toast('Logo gespeichert.');
+      briefkopf = data.betrieb; bkLogoStand(); markenLogoAktualisieren(); toast('Logo gespeichert.');
     }).catch(() => bkFehler('Hochladen fehlgeschlagen.'));
 }
 
@@ -23876,7 +23888,7 @@ function bkLogoWeg() {
   bkFehler('');
   api('betrieb.php', { method: 'POST', body: { logo_weg: true } }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') { return bkFehler(data.message || 'Entfernen fehlgeschlagen.'); }
-    briefkopf = data.betrieb; bkLogoStand(); toast('Logo entfernt.');
+    briefkopf = data.betrieb; bkLogoStand(); markenLogoAktualisieren(); toast('Logo entfernt.');
   }).catch(() => bkFehler('Entfernen fehlgeschlagen.'));
 }
 
