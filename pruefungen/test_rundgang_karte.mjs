@@ -731,9 +731,18 @@ check('KRITISCH: wird ein Kontrollpunkt erfasst, wechselt auch das Bild seiner M
     return vorher.length > 0 && nachher.join() !== vorher.join() && nachher.includes(soll);
   }));
 
-/* Ein Tipp auf die Marke fuehrt in die Liste -- dieselbe Verdrahtung wie
-   in der Browser-Fassung. Gemeldet wird dort, nicht auf der Karte. */
-check('KRITISCH: ein Tipp auf eine native Marke führt in die Kontrollpunkt-Liste',
+/* Ein Tipp auf die Marke oeffnet die Blase -- dieselbe Verdrahtung wie in
+   der Browser-Fassung (ENT-654).
+
+   REVIDIERT: Bis ENT-654 sprang der Tipp unmittelbar in die Liste, und
+   genau das stand hier. Die AUSSAGE bleibt und ist sogar schaerfer
+   geworden: Der Tipp muss verdrahtet sein, er muss den RICHTIGEN Punkt
+   treffen (das SDK meldet nur seine eigene Markenkennung zurueck -- ohne
+   die Zuordnung waere jede Marke dieselbe), und gemeldet wird weiterhin
+   nicht auf der Karte.
+
+   Der Reiter wechselt dabei NICHT mehr. Das ist der ganze Unterschied. */
+check('KRITISCH: ein Tipp auf eine native Marke oeffnet die Blase zu genau diesem Punkt',
   await page.evaluate(async () => {
     const merkN = window.KarteNativ, merkK = rgsNativKarte, merkE = rgsKarteEl;
     const merkS = rgsKartenSignatur, merkR = rgsReiter;
@@ -745,13 +754,19 @@ check('KRITISCH: ein Tipp auf eine native Marke führt in die Kontrollpunkt-List
       getMapBounds: async () => null, setOnCameraIdleListener: async () => {},
       removeMarkers: async () => {}, addMarkers: async (l) => l.map((_, i) => 'm' + i),
       setOnMarkerClickListener: async (cb) => { hoerer = cb; },
+      setOnMapClickListener: async () => {},
     };
     window.KarteNativ = { GoogleMap: { create: async () => attrappe } };
     await rgKarteNativBauen(rgKarteDaten(rundgangAktiv.kontrollpunkte), rgsKarteBauLauf);
     const verdrahtet = typeof hoerer === 'function';
+    // Die Attrappe vergibt ihre Kennungen der Reihe nach ("m0", "m1", ...),
+    // genau wie das SDK. 'm0' ist damit der erste darstellbare Punkt.
+    const ersterId = rgKarteDaten(rundgangAktiv.kontrollpunkte).zeigbar[0].id;
     if (verdrahtet) { hoerer({ markerId: 'm0' }); }
     await new Promise(r => setTimeout(r, 120));
-    const inListe = rgsReiter === 'punkte';
+    const richtigerPunkt = rgsBlasePunktId === ersterId;
+    const bleibtAufKarte = rgsReiter === 'karte';
+    rgKarteBlaseZu();
     await rgKarteNativAbbauen();
     window.KarteNativ = merkN; rgsNativKarte = merkK; rgsKarteEl = merkE;
     rgsKartenSignatur = merkS;
@@ -762,7 +777,7 @@ check('KRITISCH: ein Tipp auf eine native Marke führt in die Kontrollpunkt-List
     // dass an ihrer eigenen Sache etwas fehlt.
     if (merkR !== rgsReiter) { rgLaufReiter(merkR); }
     await new Promise(r => setTimeout(r, 400));
-    return verdrahtet && inListe;
+    return verdrahtet && richtigerPunkt && bleibtAufKarte;
   }));
 
 /* OP-610: Abbau und Aufbau tragen dieselbe Kartenkennung. Bis hierher
@@ -798,17 +813,43 @@ check('KRITISCH: eine neue native Karte entsteht erst, wenn die alte ganz abgeba
     document.body.classList.remove('karte-nativ');
     return abbauLief === true;
   }));
-// Ein Tipp auf die Marke fuehrt in die Liste: Die Bestaetigung haengt an
-// Standortpruefung, Ersatzscan und Aufgaben-Rueckfrage -- die alle in eine
-// Kartenblase zu holen hiesse, denselben Ablauf ein zweites Mal zu bauen.
-// dispatchEvent statt echtem Mausklick: Die Attrappe setzt ihre Marken frei
-// positioniert in den Kartencontainer, und der Zentrieren-Knopf liegt als
-// Ueberlagerung darueber. Geprueft werden soll hier die Verdrahtung
-// (Marke -> Liste), nicht die Treffergeometrie einer nachgebauten Karte.
+/* REVIDIERT durch ENT-654. Hier stand: "ein Tipp auf eine Marke fuehrt in
+   die Kontrollpunkt-Liste, nicht in eine zweite Maske". Der erste Teil
+   gilt nicht mehr -- der Tipp oeffnet jetzt eine Blase. Der ZWEITE Teil
+   ist der eigentliche Inhalt und gilt unveraendert: Gemeldet wird in der
+   Liste, nicht auf der Karte. Die Bestaetigung haengt an
+   Standortpruefung, Ersatzscan und Aufgaben-Rueckfrage -- die alle in
+   eine Kartenblase zu holen hiesse, denselben Ablauf ein zweites Mal zu
+   bauen.
+
+   Geprueft wird darum jetzt beides: dass die Blase KEINE zweite
+   Meldemaske ist, und dass der Weg in die Liste von dort aus weiterhin
+   offensteht. Ohne den zweiten Teil koennte die Blase den Weg in die
+   Liste ersatzlos verschlucken und diese Pruefung bliebe gruen.
+
+   dispatchEvent statt echtem Mausklick: Die Attrappe setzt ihre Marken
+   frei positioniert in den Kartencontainer, und der Zentrieren-Knopf
+   liegt als Ueberlagerung darueber. Geprueft wird hier die Verdrahtung,
+   nicht die Treffergeometrie einer nachgebauten Karte. */
 await page.dispatchEvent('#rgsKarte .gm-mock-marker', 'click');
 await page.waitForTimeout(300);
-check('KRITISCH: ein Tipp auf eine Marke führt in die Kontrollpunkt-Liste, nicht in eine zweite Maske',
-  await page.isVisible('#rdListe'));
+const blaseAuf = await page.evaluate(() => {
+  const b = document.getElementById('rgsBlase');
+  if (!b || b.hidden) { return null; }
+  return {
+    // Irgendetwas, das eine Meldung ausloesen wuerde? Die Blase darf
+    // zeigen und fuehren, nicht bestaetigen.
+    meldeknopf: !!b.querySelector('[onclick*="rdBestaetigen"], [onclick*="rdEsUm"], [onclick*="rdNvUm"]'),
+    wegZurListe: !!document.getElementById('rgsBlaseListe'),
+  };
+});
+check('KRITISCH: ein Tipp auf eine Marke oeffnet die Blase',
+  blaseAuf !== null);
+check('KRITISCH: die Blase ist KEINE zweite Meldemaske -- gemeldet wird weiterhin in der Liste',
+  !!blaseAuf && blaseAuf.meldeknopf === false);
+check('KRITISCH: und der Weg in die Liste steht von der Blase aus weiterhin offen',
+  !!blaseAuf && blaseAuf.wegZurListe === true);
+await page.evaluate(() => rgKarteBlaseZu());
 await page.click('#rgsRt-karte');
 await page.waitForTimeout(600);
 // ENT-131 nicht nur im Quelltext, sondern am Verhalten: Ohne Knopfdruck darf

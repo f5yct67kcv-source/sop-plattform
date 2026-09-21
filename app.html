@@ -1303,6 +1303,44 @@ body.karte-nativ .app { visibility: hidden; }
   background: var(--accent-soft); color: var(--accent); padding: 0;
   cursor: pointer; box-shadow: var(--sh-2); }
 .rgs-karte-punkte:active { background: var(--line-soft); }
+
+/* Die Blase am Kontrollpunkt (ENT-654). Sie sitzt UEBER den beiden
+   Kartenknoepfen und damit weit ueber der Anbieterleiste von Google --
+   die darf nach deren Nutzungsbedingungen weder entfernt noch verdeckt
+   werden (siehe Kommentar bei .rgs-karte-btn).
+
+   Unter dem Einstellungsblatt (z-index 6) und ueber den Marken: Wer das
+   Zahnrad oeffnet, will Einstellungen sehen, nicht eine Blase davor. */
+.rgs-blase { position: absolute; left: 12px; right: 12px; bottom: 84px; z-index: 4;
+  border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--surface); box-shadow: var(--sh-2); padding: 12px 12px 10px; }
+.rgs-blase[hidden] { display: none; }
+.rgs-blase-kopf { display: flex; align-items: flex-start; gap: 8px; }
+.rgs-blase-txt { flex: 1; min-width: 0; }
+/* Ueberschrift oben, Wert darunter (CLAUDE.md) -- die feine versalgesetzte
+   Zeile steht UEBER dem Namen, nicht darunter. */
+.rgs-blase-lb { font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-3); }
+.rgs-blase-name { font-size: 16px; font-weight: 650; color: var(--ink-1);
+  overflow-wrap: anywhere; }
+.rgs-blase-x { flex: none; width: 44px; height: 44px; margin: -10px -10px 0 0;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 0; padding: 0; color: var(--ink-3); cursor: pointer; }
+.rgs-blase-entf { margin-top: 2px; font-size: 14px; font-weight: 640; color: var(--ink-2); }
+/* "Unbekannt" und "pausiert" sind KEINE Entfernung und sehen darum anders
+   aus als eine -- zurueckgenommen, nicht fett (CLAUDE.md). */
+.rgs-blase-mut { margin-top: 2px; font-size: 13px; color: var(--ink-3); }
+.rgs-blase-akt { display: flex; gap: 8px; margin-top: 10px; }
+.rgs-blase-b { flex: 1; min-height: 44px; display: inline-flex; align-items: center;
+  justify-content: center; gap: 7px; padding: 0 10px; border: 1px solid var(--line);
+  border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink-2);
+  font: inherit; font-size: 13.5px; font-weight: 640; text-decoration: none;
+  cursor: pointer; }
+.rgs-blase-b .i { flex: none; }
+.rgs-blase-b span { overflow-wrap: anywhere; }
+.rgs-blase-b.haupt { border-color: var(--accent-line); background: var(--accent-soft);
+  color: var(--accent); }
+.rgs-blase-b:active { opacity: .7; }
 /* Beide Kartenknoepfe sitzen bewusst 28 px ueber der Kante, nicht 12
    (ENT-355). Darunter laeuft die Leiste des Kartenanbieters mit dem
    Kartendaten-Hinweis und dem Link auf seine Nutzungsbedingungen. Sie darf
@@ -2857,6 +2895,11 @@ const W = {
     rgsKarteLeer: 'Für diese Runde ist kein Kontrollpunkt auf der Karte darstellbar.',
     rgsKarteOhneOrt: 'ohne Koordinaten — nur in der Liste',
     rgsZentrieren: 'Zentrieren',
+    rgsBlaseNavi: 'Navigation öffnen',
+    rgsBlaseListe: 'In der Liste zeigen',
+    rgsBlaseZu: 'Schliessen',
+    rgsBlaseLb: 'Kontrollpunkt',
+    rgsBlasePausiert: 'Rundgang pausiert',
     rgsPunkteZeigen: 'Alle Kontrollpunkte ins Bild',
     rgsMeinStandort: 'Mein Standort',
     rgsRichtung: 'Bewegungsrichtung',
@@ -6141,6 +6184,7 @@ function rgSeiteZu() {
      (ENT-331). Eine Einstellung, die man einmal neugierig antippt, darf
      nicht monatelang jede Nachtrunde blenden. */
   rgsSatellit = false;
+  rgsBlasePunktId = null;
   /* Und die Karte gleich mit zuruecksetzen, nicht nur das Merkmal.
 
      Gemessen aufgefallen: Die Browser-Fassung wirft ihre Karte beim
@@ -6265,7 +6309,7 @@ function rgSeiteZeichnen(d) {
   $('rgsTitel').textContent = v.name || '';
 
   const adresse = [o.strasse, [o.ort, o.kanton].filter(Boolean).join(' ')].filter(Boolean);
-  const ziel = encodeURIComponent([o.name, o.strasse, o.ort].filter(Boolean).join(', '));
+  const ziel = rgNavUrl([o.name, o.strasse, o.ort].filter(Boolean).join(', '));
   const fenster = (v.fenster_von && v.fenster_bis)
     ? `${hm(v.fenster_von)}–${hm(v.fenster_bis)}` : w('rgsJederzeit');
 
@@ -6285,7 +6329,7 @@ function rgSeiteZeichnen(d) {
           <div class="rgs-obj-kunde${d.kunde_name ? '' : ' fehlt'}">${esc(d.kunde_name || w('rgsKeinKunde'))}</div>
           ${adresse.length ? `<div class="rgs-obj-adr">${adresse.map(esc).join('<br>')}</div>` : ''}
         </div>
-        ${adresse.length ? `<a class="rgs-route" href="https://www.google.com/maps/dir/?api=1&destination=${ziel}"
+        ${adresse.length && ziel ? `<a class="rgs-route" href="${ziel}"
              target="_blank" rel="noopener" aria-label="${esc(w('rgsRoute'))}">
           <svg class="i" viewBox="0 0 24 24"><polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21"/><line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/></svg>
         </a>` : ''}
@@ -7752,7 +7796,7 @@ function blattAuf(id) {
       ${e.objekt_name ? `<dt>${esc(w('objekt'))}</dt><dd>${esc(e.objekt_name)}</dd>` : ''}
       <dt>${esc(w('arbeitsort'))}</dt><dd>${e.strasse ? esc(e.strasse) + '<br>' : ''}${esc(e.ort)}${e.kanton ? ' ' + esc(e.kanton) : ''}${
         schichtAdresse(e) ? `<br><a class="route-knopf" target="_blank" rel="noopener"
-          href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(schichtAdresse(e))}"
+          href="${rgNavUrl(schichtAdresse(e))}"
           >${ROUTE_IKONE}${esc(w('route'))}</a>` : ''}</dd>
       ${e.treffpunkt ? `<dt>${esc(w('treffpunkt'))}</dt><dd>${esc(e.treffpunkt)}</dd>` : ''}
       ${dienstfahrzeugZeile(e)}
@@ -8501,6 +8545,9 @@ function rgLaufReiter(id) {
      traegt das Blatt ueber den Kartenneubau hinweg, den ein Wechsel
      zwischen Nachtsicht und Tagansicht ausloest. */
   if (id !== 'karte') { rgsEinstOffen = false; }
+  // Dasselbe fuer die Blase (ENT-654): Sie gehoert zu der Marke, die man
+  // eben angetippt hat, nicht zu der Karte von vorhin.
+  if (id !== 'karte') { rgsBlasePunktId = null; }
   rgsReiter = id;
   rgLaufReiterZeichnen();
   rgLaufZeichnen();
@@ -9559,6 +9606,7 @@ function rgKarteZeichnen() {
           onclick="rgKarteAufPunkteKnopf()">
         <svg class="i i-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/></svg>
       </button>
+      <div class="rgs-blase" id="rgsBlase" hidden></div>
       ${rgEinstHtml()}
     </div>${ortungHinweis}${hinweis}`;
 
@@ -9614,6 +9662,9 @@ function rgKarteZeichnen() {
        Drehung gilt gegenueber dem Bildschirm. Der Pfeil muss darum
        gegenhalten -- siehe rgRichtungAufKarte(). */
     try { rgsKarte.addListener('heading_changed', () => rgRichtungMarkeNachfuehren()); } catch (e) {}
+    // Ein Tipp neben die Marken legt die Blase wieder weg (ENT-654) --
+    // dasselbe Verhalten wie auf der nativen Karte.
+    try { rgsKarte.addListener('click', () => rgKarteBlaseZu()); } catch (e) {}
     /* Frisch gelesen, NICHT das d von oben (ENT-531): Zwischen dem Beginn
        dieser Funktion und dem Eintreffen der Kartenschluessel liegen
        Sekunden, und seit die Erfassung von selbst laeuft, faellt genau in
@@ -9766,10 +9817,20 @@ async function rgKarteNativBauen(d, bauLauf) {
   try { await rgsNativKarte.enableCurrentLocation(true); } catch (e) {}
   await rgKarteNativKreiseZeichnen(d.zeigbar);
   await rgKarteNativMarkenZeichnen(d.zeigbar);
-  // Ein Tipp auf die Marke fuehrt in die Liste -- gemeldet wird dort,
-  // genau wie in der Browser-Fassung. Welche Marke getippt wurde, spielt
-  // dabei keine Rolle: Die Liste zeigt ohnehin alle.
-  try { await rgsNativKarte.setOnMarkerClickListener(() => rgLaufReiter('punkte')); } catch (e) {}
+  /* Ein Tipp auf die Marke oeffnet die Blase (ENT-654), genau wie in der
+     Browser-Fassung. Hier zaehlt jetzt, WELCHE Marke getippt wurde: Das
+     SDK meldet nur seine eigene Markenkennung zurueck, darum haelt
+     rgsNativMarkenIds die Kontrollpunkt-Nummern in derselben Reihenfolge
+     wie rgsNativMarken. Findet sich nichts, bleibt der alte Weg in die
+     Liste -- lieber der zweitbeste Weg als gar keiner. */
+  try {
+    await rgsNativKarte.setOnMarkerClickListener(ereignis => {
+      const id = rgNativMarkeZuPunkt(ereignis);
+      if (id === null) { rgLaufReiter('punkte'); return; }
+      rgKarteBlaseAuf(id);
+    });
+    await rgsNativKarte.setOnMapClickListener(() => rgKarteBlaseZu());
+  } catch (e) {}
   // Den Stand merken, an dem spaetere Durchlaeufe erkennen, ob sich an
   // den Punkten etwas geaendert hat (OP-607) -- dieselbe Signatur und
   // dieselbe Variable wie in der Browser-Fassung.
@@ -9967,6 +10028,19 @@ function rgFuellungNativZeichnen(p, anteil) {
    der Browser-Fassung. */
 let rgsNativKreise = [];
 let rgsNativMarken = [];
+/* Die Kontrollpunkt-Nummern in derselben Reihenfolge wie rgsNativMarken
+   (ENT-654). Das SDK gibt beim Tippen nur seine eigene Markenkennung
+   zurueck; ohne diese Liste waere nicht zu sagen, welcher Punkt gemeint
+   ist. */
+let rgsNativMarkenIds = [];
+
+function rgNativMarkeZuPunkt(ereignis) {
+  const mid = ereignis && (ereignis.markerId || ereignis.id);
+  if (mid === undefined || mid === null) { return null; }
+  const i = rgsNativMarken.indexOf(mid);
+  if (i < 0 || i >= rgsNativMarkenIds.length) { return null; }
+  return rgsNativMarkenIds[i];
+}
 
 /* Die Marken der Kontrollpunkte auf der nativen Karte (ENT-609).
 
@@ -9992,6 +10066,7 @@ async function rgKarteNativMarkenZeichnen(punkte) {
     if (rgsNativMarken.length) {
       await rgsNativKarte.removeMarkers(rgsNativMarken);
       rgsNativMarken = [];
+      rgsNativMarkenIds = [];
     }
     if (!punkte || !punkte.length) { return; }
     rgsNativMarken = await rgsNativKarte.addMarkers(punkte.map(p => ({
@@ -10001,7 +10076,8 @@ async function rgKarteNativMarkenZeichnen(punkte) {
       iconSize: { width: RG_MARKE_PT, height: RG_MARKE_PT },
       iconAnchor: { x: RG_MARKE_PT / 2, y: RG_MARKE_PT / 2 },
     }))) || [];
-  } catch (e) { rgsNativMarken = []; }
+    rgsNativMarkenIds = punkte.map(p => Number(p.id));
+  } catch (e) { rgsNativMarken = []; rgsNativMarkenIds = []; }
 }
 
 async function rgKarteNativKreiseZeichnen(punkte) {
@@ -10154,6 +10230,12 @@ function rgKarteAktualisieren(d, ortungHinweis, hinweis) {
   }
   // 4. Der eigene Standort samt Richtungspfeil.
   rgStandortZeichnen();
+  /* 5. Die Blase (ENT-654). Sie traegt eine Entfernung, und die aendert
+        sich mit jeder Position -- ohne diesen Aufruf stuende in einer
+        offenen Blase die Zahl vom Zeitpunkt des Antippens. Genau der
+        Fehler, gegen den ENT-648 entschieden wurde, nur eine Ebene
+        hoeher. */
+  rgBlaseZeichnen();
 }
 
 /* Woran sich eine Aenderung an den Kontrollpunkten erkennen laesst: Nummer,
@@ -10313,11 +10395,13 @@ function rgKartePunkteZeichnen(punkte) {
         fillColor: farbe, fillOpacity: 1, strokeColor: '#0F1117', strokeWeight: 2,
       },
     });
-    // Ein Tipp auf die Marke fuehrt in die Liste -- gemeldet wird dort, nicht
-    // auf der Karte: Die Bestaetigung haengt an Standortpruefung, Ersatzscan
-    // und Aufgaben-Rueckfrage, und die alle in eine Kartenblase zu holen
-    // hiesse, denselben Ablauf ein zweites Mal zu bauen.
-    marke.addListener('click', () => rgLaufReiter('punkte'));
+    // Ein Tipp auf die Marke oeffnet die Blase (ENT-654). Der Weg in die
+    // Liste ist dort einer von zwei Knoepfen -- gemeldet wird weiterhin
+    // dort, nicht auf der Karte: Die Bestaetigung haengt an
+    // Standortpruefung, Ersatzscan und Aufgaben-Rueckfrage, und die alle
+    // in eine Kartenblase zu holen hiesse, denselben Ablauf ein zweites
+    // Mal zu bauen.
+    marke.addListener('click', () => rgKarteBlaseAuf(p.id));
     rgsKartenMarken.push(marke);
   });
 }
@@ -11405,6 +11489,157 @@ function rgKarteAufPunkte(d) {
   rgsKarte.fitBounds(grenzen, 48);
 }
 
+/* Der Weg in die Navigation des Geraets (ENT-654).
+
+   EINE Stelle fuer das ganze Haus. Vorher stand der Google-Maps-Link
+   zweimal woertlich im Quelltext -- an der Objektadresse und in den
+   Schichtdetails. Auf einem iPhone landet der Waechter damit in Safari
+   oder in Google Maps, nicht in Apple Karten. Genau das war der Befund
+   des Projektinhabers am Vorbild: Dort oeffnet sich die Navigation des
+   Geraets, nicht eine Webseite.
+
+   Kein Verkehrsmittel vorgegeben (Entscheidung des Projektinhabers): Auf
+   einer Revierrunde wechselt es staendig -- 30 km zum naechsten Objekt
+   mit dem Auto, 200 m ums Gebaeude zu Fuss. Wer vorgibt, liegt die
+   Haelfte der Zeit falsch; die Karten-App nimmt, was zuletzt galt.
+
+   maps.apple.com und nicht maps://: Das Schema muesste die Huelle
+   durchlassen, die https-Adresse tut iOS von sich aus in die Karten-App.
+   Beide Wege gehen ueber target="_blank" nach draussen, wie der
+   bestehende Routen-Knopf. */
+function rgNavPlattform() {
+  try {
+    return (window.Capacitor && window.Capacitor.getPlatform
+      && window.Capacitor.getPlatform()) || 'web';
+  } catch (e) { return 'web'; }
+}
+
+/* Ziel ist entweder eine Adresse ("Musterweg 4, 9999 Musterdorf") oder ein
+   Koordinatenpaar ("47.35,7.9"). Beide Dienste nehmen beides. Leeres Ziel
+   gibt eine leere Adresse zurueck -- der Aufrufer zeigt dann keinen Knopf,
+   statt einen zu zeigen, der ins Nichts fuehrt. */
+function rgNavUrl(ziel) {
+  const z = String(ziel === 0 || ziel ? ziel : '').trim();
+  if (!z) { return ''; }
+  /* Das Komma bleibt roh. Es ist im Abfrageteil einer Adresse erlaubt,
+     und ein Koordinatenpaar "47.36%2C7.9" wird nicht von jedem Dienst
+     gleich gut verstanden -- roh versteht es jeder. */
+  const q = encodeURIComponent(z).replace(/%2C/g, ',');
+  if (rgNavPlattform() === 'ios') { return 'https://maps.apple.com/?daddr=' + q; }
+  return 'https://www.google.com/maps/dir/?api=1&destination=' + q;
+}
+
+/* ══ Die Blase am Kontrollpunkt (ENT-654) ════════════════════════════
+
+   Anlass: Der Projektinhaber am Vorbild -- ein Tipp auf die Marke zeigt
+   den Punkt samt Entfernung und oeffnet auf Wunsch die Navigation des
+   Geraets.
+
+   Sie sitzt UNTEN AM KARTENRAND und nicht an der Marke. Der Grund ist
+   nicht Bequemlichkeit: Die native Karte meldet ihre Kamera erst, wenn
+   sie STEHT -- waehrend des Schiebens kommt kein Signal. Eine Blase an
+   der Marke bliebe beim Schieben stehen und spraenge danach nach. Genau
+   die Unruhe, gegen die ENT-639 gebaut wurde. Unten kann sie nicht
+   verrutschen, sie hat Platz fuer zwei Knoepfe mit 44 px, und sie
+   verdeckt auf einem kleinen Schirm nicht die halbe Karte.
+
+   Sie ersetzt den frueheren Sprung in die Liste NICHT, sie macht ihn zur
+   Wahl: "In der Liste zeigen" fuehrt weiterhin dorthin, wo gemeldet
+   wird. Die Bestaetigung bleibt in der Liste -- sie haengt an
+   Standortpruefung, Ersatzscan und Aufgaben-Rueckfrage, und die alle in
+   eine Kartenblase zu holen hiesse, denselben Ablauf ein zweites Mal zu
+   bauen.
+
+   Die Entfernung folgt ENT-648: Auf einer PAUSIERTEN Runde steht keine
+   Zahl. Die Ortung ist dann bewusst aus, die letzte Position steht aber
+   noch im Speicher -- eine Zahl daraus saehe aktuell aus und waere es
+   nicht. Die Blase sagt stattdessen, warum sie schweigt. */
+let rgsBlasePunktId = null;
+
+function rgKarteBlaseAuf(id) {
+  rgsBlasePunktId = Number(id);
+  rgBlaseZeichnen();
+}
+
+function rgKarteBlaseZu() {
+  if (rgsBlasePunktId === null) { return; }
+  rgsBlasePunktId = null;
+  rgBlaseZeichnen();
+}
+
+/* Der Punkt, den die Blase zeigt -- oder null. Getrennt, damit sich die
+   Weiche ohne Karte pruefen laesst: Eine Blase auf einen Punkt, den es
+   nicht mehr gibt (Runde beendet, Punkt ohne Koordinaten), darf nicht
+   stehenbleiben. */
+function rgBlasePunkt() {
+  if (rgsBlasePunktId === null || !rundgangAktiv) { return null; }
+  const d = rgKarteDaten(rundgangAktiv.kontrollpunkte);
+  return d.zeigbar.find(p => p.id === rgsBlasePunktId) || null;
+}
+
+function rgBlaseZeichnen() {
+  const el = $('rgsBlase');
+  if (!el) { return; }
+  const p = rgBlasePunkt();
+  if (!p) {
+    rgsBlasePunktId = null;
+    el.hidden = true;
+    el.innerHTML = '';
+    return;
+  }
+  const roh = rundgangAktiv.kontrollpunkte.find(k => Number(k.id) === p.id) || null;
+  const pausiert = rundgangAktiv.status === 'pausiert';
+  const dist = roh ? rdEntfernungZu(roh) : null;
+  // Drei Zustaende, nicht zwei (CLAUDE.md): pausiert schweigt mit Grund,
+  // unbekannt sagt unbekannt, und nur eine gemessene Zahl wird zur Zahl.
+  const entf = pausiert
+    ? `<div class="rgs-blase-mut">${esc(w('rgsBlasePausiert'))}</div>`
+    : dist === null
+      ? `<div class="rgs-blase-mut">${esc(w('rdOrtUnbekannt'))}</div>`
+      : `<div class="rgs-blase-entf">${esc(rdEntfernungText(dist))}</div>`;
+  const url = rgNavUrl(p.lat + ',' + p.lng);
+  el.hidden = false;
+  el.innerHTML = `
+    <div class="rgs-blase-kopf">
+      <div class="rgs-blase-txt">
+        <div class="rgs-blase-lb">${esc(w('rgsBlaseLb'))} #${p.nr}</div>
+        <div class="rgs-blase-name">${esc(p.bezeichnung)}</div>
+      </div>
+      <button type="button" class="rgs-blase-x" aria-label="${esc(w('rgsBlaseZu'))}"
+          onclick="rgKarteBlaseZu()">
+        <svg class="i i-sm" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    ${entf}
+    <div class="rgs-blase-akt">
+      ${url ? `<a class="rgs-blase-b haupt" id="rgsBlaseNavi" href="${url}"
+          target="_blank" rel="noopener">
+        <svg class="i i-sm" viewBox="0 0 24 24" aria-hidden="true"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        <span>${esc(w('rgsBlaseNavi'))}</span>
+      </a>` : ''}
+      <button type="button" class="rgs-blase-b" id="rgsBlaseListe" onclick="rgBlaseZurListe()">
+        <svg class="i i-sm" viewBox="0 0 24 24" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        <span>${esc(w('rgsBlaseListe'))}</span>
+      </button>
+    </div>`;
+}
+
+/* Von der Blase in die Liste. Die Zeile wird aufgeklappt mitgenommen --
+   wer auf der Karte einen Punkt ausgewaehlt hat, will ihn drueben nicht
+   erst suchen. Auf einer pausierten Runde gibt es nichts aufzuklappen
+   (die Koepfe sind dort keine Knoepfe); hingefuehrt wird trotzdem. */
+function rgBlaseZurListe() {
+  const id = rgsBlasePunktId;
+  rgKarteBlaseZu();
+  if (id === null) { return; }
+  rdAufgeklappt.add(Number(id));
+  rgLaufReiter('punkte');
+  const el = $('rdZeile' + Number(id));
+  if (el && el.scrollIntoView) {
+    try { el.scrollIntoView({ block: 'center' }); } catch (e) { el.scrollIntoView(); }
+  }
+}
+
 /* Der Knopf unten rechts: alle Kontrollpunkte ins Bild (ENT-647).
 
    Derselbe Weg wie der Rueckfall des Zentrieren-Knopfes, aber hier als
@@ -11939,7 +12174,8 @@ function rdZeile(k, gesperrt, naechsterId) {
         ${jetzt ? `<span class="vh">${esc(w('rgpNaechster'))}</span>` : ''}
       </span>
       <span class="rd-marke">${esc(typLabel)}</span>`;
-  return `<div class="rd-zeile rd-offen${jetzt ? ' rd-jetzt' : ''}${auf ? ' rd-auf' : ''}">
+  return `<div class="rd-zeile rd-offen${jetzt ? ' rd-jetzt' : ''}${auf ? ' rd-auf' : ''}"
+    id="rdZeile${Number(k.id)}">
     ${gesperrt
       // Pausiert oder abgebrochen gibt es nichts umzuklappen -- dann ist der
       // Kopf kein Knopf. Ein Knopf, der nichts tut, ist schlimmer als keiner.
