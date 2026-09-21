@@ -576,6 +576,36 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     /cat htaccess-demo-zusatz >> dist\/\.htaccess/.test(demoHtaccessBlock)
     && /cp robots-demo\.txt dist\/robots\.txt/.test(demoHtaccessBlock));
 
+  // Was demo.guardops.ch unter "/" ausliefert. Ohne DirectoryIndex nimmt
+  // Apache seinen Standard, und das ist index.html -- das Rapport-Tool.
+  // Dann sieht ein Interessent dessen nackte Anmeldekarte statt der Maske,
+  // die ihm den Demobereich erklärt (Logo mit Claim, Gruss, Impressum,
+  // Datenschutz). Genau so stand es bis zum 2026-09-21, ohne dass etwas
+  // rot wurde: Eine Startseite, die die falsche Datei zeigt, ist kein
+  // Fehler, sondern eine andere Seite.
+  //
+  // Gelesen wird die WIRKUNG der zusammengesetzten .htaccess und nicht der
+  // Wortlaut einer Zeile: htaccess-hostpoint, danach htaccess-demo-zusatz
+  // -- dieselbe Reihenfolge wie im Deploy --, und davon gilt die letzte
+  // DirectoryIndex-Angabe, so wie Apache es auch entscheidet. Production
+  // darf davon unberührt bleiben, dort gehört "/" weiter dem Rapport-Tool.
+  const startseiteAus = (hostpointText, zusatzText) => {
+    const treffer = [...`${hostpointText}\n${zusatzText}`
+      .matchAll(/^[^\S\n]*DirectoryIndex[^\S\n]+(\S+)/gm)];
+    return treffer.length ? treffer[treffer.length - 1][1] : null;
+  };
+  const hostpointText = readFileSync(`${WURZEL}/htaccess-hostpoint`, 'utf8');
+  const demoZusatzText = readFileSync(`${WURZEL}/htaccess-demo-zusatz`, 'utf8');
+
+  check('KRITISCH: die Demo-Instanz liefert unter "/" das Cockpit aus, nicht das Rapport-Tool',
+    startseiteAus(hostpointText, demoZusatzText) === 'dashboard.html');
+
+  check('Gegenprobe: dieselbe Ablesung liefert NICHT dashboard.html, wenn die DirectoryIndex-Zeile fehlt',
+    startseiteAus(hostpointText, demoZusatzText.replace(/^[^\S\n]*DirectoryIndex[^\n]*$/m, '')) !== 'dashboard.html');
+
+  check('KRITISCH: Production bleibt unberührt -- htaccess-hostpoint selbst legt keine Startseite fest',
+    !/^[^\S\n]*DirectoryIndex/m.test(hostpointText));
+
   const demoSuchmaschinenSchritt = (/Demo-Suchmaschinenausschluss verifizieren[\s\S]{0,2500}/.exec(workflow) ?? [''])[0];
 
   check('KRITISCH: der Schritt "Demo-Suchmaschinenausschluss verifizieren" existiert und läuft ausschliesslich für Demo',
