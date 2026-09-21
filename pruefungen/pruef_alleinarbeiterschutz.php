@@ -193,6 +193,99 @@ pruef('KRITISCH: fuer jedes seiner zwei Geraete wird ein Zustellversuch gezaehlt
 $z = $pdoLauf->query('SELECT stufe1_gemeldet_um FROM rundgang WHERE id = 1')->fetch();
 pruef('KRITISCH: die Runde traegt danach einen Meldezeitpunkt', $z['stufe1_gemeldet_um'] === $erstesJetzt);
 
+// ── LESEN STATT ERKENNEN: alleinarbeiterschutz_offene_alarme() ─────────
+// Eigene, kleine Datenbank MIT Vor-/Nachname an der Mitarbeitertabelle --
+// neue_pdo() oben braucht das nicht (dort geht es nur um die Ableitung der
+// Alarmempfaenger-Rollen und den Rechenkern), die Lese-Funktion fuer die
+// Cockpit-Anzeige dagegen gibt den Namen fuer die Anzeige heraus.
+function neue_pdo_mit_namen(): PDO
+{
+    $pdo = new PDO('sqlite::memory:', null, null, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]);
+    $pdo->exec('CREATE TABLE mitarbeiter (id INTEGER PRIMARY KEY, aktiv INTEGER, vorname TEXT, nachname TEXT)');
+    $pdo->exec('CREATE TABLE objekte (id INTEGER PRIMARY KEY, name TEXT)');
+    $pdo->exec('CREATE TABLE rundgang_vorlage (id INTEGER PRIMARY KEY, objekt_id INT, name TEXT,
+                erwartete_dauer_min INT)');
+    $pdo->exec('CREATE TABLE rundgang (id INTEGER PRIMARY KEY AUTOINCREMENT, einsatz_id INT,
+                mitarbeiter_id INT, objekt_id INT, rundgang_vorlage_id INT, status TEXT,
+                rohzeit_start TEXT, pause_minuten INT DEFAULT 0, stufe1_gemeldet_um TEXT)');
+    $pdo->exec("INSERT INTO objekte VALUES (1,'Lagerhaus Nord')");
+    return $pdo;
+}
+
+$pdoAlarme = neue_pdo_mit_namen();
+$pdoAlarme->exec("INSERT INTO mitarbeiter (id, aktiv, vorname, nachname) VALUES (1,1,'Erika','Muster')");
+$pdoAlarme->exec("INSERT INTO rundgang_vorlage VALUES (1,1,'Nachtrunde',60), (2,1,'Oeffnungsrunde',NULL)");
+$pdoAlarme->exec("INSERT INTO rundgang (id, einsatz_id, mitarbeiter_id, objekt_id, rundgang_vorlage_id, status, rohzeit_start, pause_minuten, stufe1_gemeldet_um) VALUES
+    (1, 900, 1, 1, 1, 'laeuft', '2030-05-01 22:00:00', 0, '2030-05-01 23:10:00'),
+    (2, 901, 1, 1, 1, 'abgeschlossen', '2030-05-01 20:00:00', 0, '2030-05-01 21:10:00'),
+    (3, 902, 1, 1, 1, 'laeuft', '2030-05-01 22:00:00', 0, NULL)");
+// Runde 1: gemeldet UND immer noch 'laeuft' -- gehoert in die Liste.
+// Runde 2: gemeldet, aber NICHT mehr 'laeuft' (abgeschlossen) -- verlaesst
+// die Liste von selbst, kein eigener "aufgeloest"-Zustand im Datenmodell.
+// Runde 3: laeuft noch, aber NICHT gemeldet -- (noch) kein Alarm.
+
+$jetztAlarme = '2030-05-01 23:25:00';
+$offen = alleinarbeiterschutz_offene_alarme($pdoAlarme, $jetztAlarme);
+pruef('KRITISCH: als eingerichtet erkannt', $offen['eingerichtet'] === true);
+pruef('KRITISCH: genau EIN offener Alarm -- die abgeschlossene Runde 2 und die nicht gemeldete Runde 3 fehlen',
+    count($offen['alarme']) === 1 && $offen['alarme'][0]['rundgang_id'] === 1);
+$a = $offen['alarme'][0];
+pruef('KRITISCH: Objekt, Vorlage und Name stehen da',
+    $a['objekt_name'] === 'Lagerhaus Nord' && $a['vorlage_name'] === 'Nachtrunde' && $a['name'] === 'Erika Muster');
+// "faellig_seit" = Start (22:00) + Sollzeit (60 Min) + Pause (0) = 23:00 --
+// AUSDRUECKLICH NICHT der Meldezeitpunkt (23:10, der liegt bereits
+// INKLUSIVE der 10-Minuten-Karenz) -- genau die Unterscheidung, die der
+// Auftrag als "aussagekraeftiger" vorgab.
+pruef('KRITISCH: faellig_seit ist der Moment der Sollzeit-Ueberschreitung, NICHT der spaetere Meldezeitpunkt',
+    $a['faellig_seit'] === '2030-05-01 23:00:00' && $a['faellig_seit'] !== $a['gemeldet_um']);
+pruef('KRITISCH: ueberfaellig_min rechnet serverseitig gegen $jetzt (25 Min seit 23:00, nicht gegen den Meldezeitpunkt)',
+    $a['ueberfaellig_min'] === 25);
+pruef('KRITISCH: gemeldet_um bleibt zusaetzlich erhalten', $a['gemeldet_um'] === '2030-05-01 23:10:00');
+
+// Gegenprobe: Pausenminuten verschieben "faellig_seit" nach hinten, exakt
+// wie sie die Laufzeit in alleinarbeiterschutz_laufzeit_min() verkuerzen
+// (spiegelbildliche Rechnung, keine zweite, abweichende Formel).
+$pdoAlarme->exec("INSERT INTO rundgang (id, einsatz_id, mitarbeiter_id, objekt_id, rundgang_vorlage_id, status, rohzeit_start, pause_minuten, stufe1_gemeldet_um) VALUES
+    (6, 905, 1, 1, 1, 'laeuft', '2030-05-01 22:00:00', 15, '2030-05-01 23:25:00')");
+$offenPause = alleinarbeiterschutz_offene_alarme($pdoAlarme, $jetztAlarme);
+$sechste = array_values(array_filter($offenPause['alarme'], fn($x) => $x['rundgang_id'] === 6))[0];
+pruef('KRITISCH: 15 Minuten abgeschlossene Pause verschieben faellig_seit um 15 Minuten nach hinten (23:15 statt 23:00)',
+    $sechste['faellig_seit'] === '2030-05-01 23:15:00' && $sechste['ueberfaellig_min'] === 10);
+
+// Gegenprobe: eine Vorlage ohne Sollzeit (kann in der Praxis nicht
+// vorkommen, da ohne Sollzeit nie gemeldet wird -- ist aber ein
+// Datenzustand, den die reine Lese-Funktion selbst nicht voraussetzen
+// darf) liefert kein faellig_seit, keinen geratenen Wert.
+$pdoAlarme->exec("INSERT INTO rundgang (id, einsatz_id, mitarbeiter_id, objekt_id, rundgang_vorlage_id, status, rohzeit_start, pause_minuten, stufe1_gemeldet_um) VALUES
+    (4, 903, 1, 1, 2, 'laeuft', '2030-05-01 22:00:00', 0, '2030-05-01 23:10:00')");
+$offen2 = alleinarbeiterschutz_offene_alarme($pdoAlarme, $jetztAlarme);
+$vierte = array_values(array_filter($offen2['alarme'], fn($x) => $x['rundgang_id'] === 4))[0];
+pruef('KRITISCH: ohne Sollzeit an der Vorlage bleibt faellig_seit null, kein geratener Wert',
+    $vierte['faellig_seit'] === null && $vierte['ueberfaellig_min'] === null);
+
+// Gegenprobe: eine Runde OHNE Vorlage (spontan gestartet, ENT-283) liefert
+// vorlage_name null statt eines Absturzes auf dem LEFT JOIN.
+$pdoAlarme->exec("INSERT INTO rundgang (id, einsatz_id, mitarbeiter_id, objekt_id, rundgang_vorlage_id, status, rohzeit_start, pause_minuten, stufe1_gemeldet_um) VALUES
+    (5, 904, 1, 1, NULL, 'laeuft', '2030-05-01 22:00:00', 0, '2030-05-01 23:10:00')");
+$offen3 = alleinarbeiterschutz_offene_alarme($pdoAlarme, $jetztAlarme);
+$fuenfte = array_values(array_filter($offen3['alarme'], fn($x) => $x['rundgang_id'] === 5))[0];
+pruef('KRITISCH: eine Runde ohne Vorlage liefert vorlage_name null statt eines Absturzes',
+    $fuenfte['vorlage_name'] === null);
+
+// ── KEIN STILLER RUECKFALL, auch hier: ohne die Spalte gilt die
+// Lese-Funktion ebenfalls als nicht eingerichtet -- nicht als "keine
+// Alarme", was wie "alles in Ordnung" aussaehe.
+$pdoAlarmeOhneSpalte = neue_pdo_mit_namen();
+$pdoAlarmeOhneSpalte->exec('ALTER TABLE rundgang RENAME COLUMN stufe1_gemeldet_um TO stufe1_gemeldet_um_alt');
+$ohneSpalte = alleinarbeiterschutz_offene_alarme($pdoAlarmeOhneSpalte, $jetztAlarme);
+pruef('KRITISCH: fehlt die Spalte, gilt die Lese-Funktion ausdruecklich als nicht eingerichtet',
+    $ohneSpalte['eingerichtet'] === false);
+pruef('KRITISCH: und NICHT als leere Alarmliste, die wie "alles ruhig" aussaehe -- beide Aussagen bleiben getrennt',
+    $ohneSpalte['alarme'] === []);
+
 // Gegenprobe "kein Doppel-Push": derselbe Zeitgeber-Lauf, spaeter, DARF
 // dieselbe Runde nicht ein zweites Mal melden.
 $bilanz2 = alleinarbeiterschutz_stufe1_pruefen($pdoLauf, '2030-04-01 23:35:00');

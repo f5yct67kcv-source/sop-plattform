@@ -315,3 +315,89 @@ function alleinarbeiterschutz_stufe1_pruefen(PDO $pdo, string $jetzt,
 
     return $bilanz;
 }
+
+/**
+ * LESEN statt ERKENNEN: die aktuell offenen Stufe-1-Alarme, fuer die
+ * Cockpit-Anzeige (Kachel "Alarme" in der Revierdienst-Uebersicht,
+ * dashboard.html). Anders als alleinarbeiterschutz_ueberfaellige_runden()
+ * oben (Rechenkern, entscheidet NEU, was ueberfaellig ist) liest diese
+ * Funktion nur das bereits VERMERKTE Ergebnis: eine laufende Runde mit
+ * gesetztem stufe1_gemeldet_um. Kein Versand, kein Schreiben, kein
+ * doppelter Berechnungsweg -- exakt dieselbe Zurueckhaltung wie
+ * alleinarbeiterschutz_ueberfaellige_runden() (reine Lese-Funktion, damit
+ * sie sich ohne Push-Infrastruktur prüfen laesst).
+ *
+ * Eine Runde verlaesst diese Liste von selbst, sobald ihr status nicht
+ * mehr 'laeuft' ist (beendet/abgebrochen) -- die WHERE-Klausel prueft das
+ * bei jedem Aufruf neu, es gibt keinen eigenen "aufgeloest"-Zustand im
+ * Datenmodell.
+ *
+ * "faellig_seit" ist NICHT der Meldezeitpunkt (stufe1_gemeldet_um),
+ * sondern der Moment, an dem die Sollzeit selbst ueberschritten wurde --
+ * VOR der Karenz. Aussagekraeftiger fuer die Einsatzleitung, weil er die
+ * tatsaechliche Ueberschreitung zeigt, nicht nur, wann der Server sie
+ * erkannt hat (Auftragsvorgabe: "nachschauen, was aussagekraeftiger ist").
+ * Rechnung spiegelbildlich zu alleinarbeiterschutz_laufzeit_min(): Start
+ * plus Sollzeit plus bereits abgeschlossene Pausenminuten (dieselbe
+ * Rausrechnung wie dort, nur vorwaerts statt rueckwaerts angewandt).
+ * "ueberfaellig_min" wird HIER, gegen $jetzt, fertig ausgerechnet -- nicht
+ * im Frontend gegen die Uhr des Browsers, die von der des Servers
+ * abweichen kann.
+ *
+ * Kein stiller Ruckfall (dieselbe Haltung wie
+ * alleinarbeiterschutz_stufe1_pruefen()): Fehlt die Spalte oder eine der
+ * beteiligten Tabellen, meldet der erste Rueckgabewert das ausdruecklich,
+ * statt eine leere Liste zurueckzugeben, die wie "keine Alarme" aussaehe.
+ */
+function alleinarbeiterschutz_offene_alarme(PDO $pdo, string $jetzt): array
+{
+    if (!hat_tabelle($pdo, 'rundgang') || !hat_tabelle($pdo, 'objekte')
+        || !hat_tabelle($pdo, 'mitarbeiter')
+        || !hat_spalte($pdo, 'rundgang', 'stufe1_gemeldet_um')) {
+        return ['eingerichtet' => false, 'alarme' => []];
+    }
+    $stmt = $pdo->query(
+        "SELECT r.id, r.objekt_id, r.rohzeit_start, r.pause_minuten, r.stufe1_gemeldet_um,
+                o.name AS objekt_name, v.name AS vorlage_name, v.erwartete_dauer_min,
+                m.id AS mitarbeiter_id, m.vorname, m.nachname
+           FROM rundgang r
+           JOIN objekte o ON o.id = r.objekt_id
+           JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
+      LEFT JOIN rundgang_vorlage v ON v.id = r.rundgang_vorlage_id
+          WHERE r.status = 'laeuft' AND r.stufe1_gemeldet_um IS NOT NULL
+       ORDER BY r.stufe1_gemeldet_um ASC"
+    );
+    $jetztTs = strtotime($jetzt);
+    $alarme = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $z) {
+        $start = trim((string)$z['rohzeit_start']);
+        $vonTs = $start !== '' ? strtotime($start) : false;
+        $faelligSeit = null;
+        $ueberfaelligMin = null;
+        // erwartete_dauer_min kann fehlen, wenn die Vorlage NACH dem Alarm
+        // geaendert wurde (die Sollzeit selbst ist nicht rueckwirkend) --
+        // "faellig_seit" bleibt dann null statt eines geratenen Werts,
+        // "gemeldet_um" traegt die Aussage in diesem Fall allein.
+        if ($vonTs !== false && $z['erwartete_dauer_min'] !== null) {
+            $faelligTs = $vonTs + ((float)$z['erwartete_dauer_min'] + max(0, (int)$z['pause_minuten'])) * 60;
+            $faelligSeit = date('Y-m-d H:i:s', (int)round($faelligTs));
+            if ($jetztTs !== false) {
+                $ueberfaelligMin = (int)max(0, round(($jetztTs - $faelligTs) / 60));
+            }
+        }
+        $alarme[] = [
+            'rundgang_id'      => (int)$z['id'],
+            'objekt_id'        => (int)$z['objekt_id'],
+            'objekt_name'      => $z['objekt_name'],
+            // null bei einer spontan gestarteten Runde ohne Vorlage
+            // (ENT-283) -- die Oberflaeche sagt "Ohne Vorlage", nicht "".
+            'vorlage_name'     => $z['vorlage_name'],
+            'mitarbeiter_id'   => (int)$z['mitarbeiter_id'],
+            'name'             => trim(($z['vorname'] ?? '') . ' ' . ($z['nachname'] ?? '')),
+            'gemeldet_um'      => $z['stufe1_gemeldet_um'],
+            'faellig_seit'     => $faelligSeit,
+            'ueberfaellig_min' => $ueberfaelligMin,
+        ];
+    }
+    return ['eingerichtet' => true, 'alarme' => $alarme];
+}

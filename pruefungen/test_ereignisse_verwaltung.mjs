@@ -135,12 +135,30 @@ check('KRITISCH: die Meldung ist als auffällig markiert (warn), nicht als Routi
 await page.click('#nav-revierdienst');
 await page.waitForTimeout(250);
 check('Die Übersicht bietet eine Kachel "Ereignisse" an', await page.isVisible('#rdKachelEreignisse'));
-check('KRITISCH: alle fünf Kacheln stehen nebeneinander, keine allein in einer zweiten Zeile',
+// Seit der sechsten Kachel "Alarme" (Mechanismus B Stufe 1, ENT-153/
+// ENT-644) passen bei dieser Fensterbreite nur noch fuenf auf eine Ebene --
+// dieselbe, bereits akzeptierte Umbruch-Mechanik wie bei den acht Reitern
+// unter Arbeitsergebnisse (ENT-326/test_arbeitsergebnisse.mjs): "der
+// Umbruch selbst ist kein Mangel", solange er sauber links unter die erste
+// Zeile faellt statt mittendrin zu brechen oder ueber den Rand zu laufen.
+// Nicht der Pruefgegenstand DIESER Suite (die eigentliche Kachel "Alarme"
+// prueft test_rundgang_uebersicht.mjs) -- hier zaehlt nur, dass "Ereignisse"
+// weiterhin in der ersten Zeile steht, nicht dass alle sechs es tun.
+check('KRITISCH: die ersten fünf Kacheln stehen weiterhin nebeneinander -- "Ereignisse" darunter',
   await page.evaluate(() => {
     const k = [...document.querySelectorAll('#rdUebersicht .bk-kachel-grid .bk-kachel')];
     if (k.length < 5) return false;
     const oben = k[0].getBoundingClientRect().top;
-    return k.every(x => Math.abs(x.getBoundingClientRect().top - oben) < 2);
+    return k.slice(0, 5).every(x => Math.abs(x.getBoundingClientRect().top - oben) < 2);
+  }));
+check('KRITISCH: eine sechste Kachel bricht sauber links unter die erste Zeile um, statt mittendrin zu brechen',
+  await page.evaluate(() => {
+    const k = [...document.querySelectorAll('#rdUebersicht .bk-kachel-grid .bk-kachel')];
+    if (k.length !== 6) return false;
+    const oben = k[0].getBoundingClientRect().top;
+    const sechste = k[5].getBoundingClientRect();
+    return Math.round(sechste.top) > Math.round(oben)
+      && Math.round(sechste.left) === Math.round(k[0].getBoundingClientRect().left);
   }));
 
 calls = [];

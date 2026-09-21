@@ -189,6 +189,10 @@ function setup(page) {
     if (path.includes('rundgang_scan_liste')) return send(SCANS);
     if (path.includes('rundgang_liste')) return send(RUNDGAENGE);
     if (path.includes('fahrzeug_uebernahme_liste')) return send(UEBERNAHMEN);
+    // Nicht der Pruefgegenstand dieser Suite (die Liste selbst prueft
+    // test_rundgang_uebersicht.mjs) -- nur, dass der Verweis-Reiter
+    // "Alarme" wirklich dorthin fuehrt und den Abruf ausloest.
+    if (path.includes('alleinarbeiterschutz_alarme')) return send({ status: 'ok', eingerichtet: true, alarme: [] });
     if (path.includes('mitarbeiter_list')) return send({ status: 'ok', mitarbeiter: [] });
     // kontrolleNavKlick() landet auf Pensen -- ohne dieses Fixture crasht
     // zeichnePensen() auf pensen.mitarbeiter.map() (gleiches Muster wie in
@@ -270,27 +274,32 @@ check('KRITISCH: die Ansicht startet auf einem verdrahteten Reiter',
 // ehrlich, aber fünfmal 41 px in einer Zeile, die auf EINE Ebene passen soll.
 // Geprüft wird die Aussage, nicht das Mittel -- gemessen an der tatsächlich
 // gerenderten Farbe, nicht an einer Klasse allein.
-check('KRITISCH: die noch nicht verdrahteten Reiter sind schon an der Kachel zu erkennen',
+check('KRITISCH: der noch nicht verdrahtete Reiter ist schon an der Kachel zu erkennen',
   await page.evaluate(() => {
-    // „ereignisse" steht seit ENT-547 NICHT mehr hier: Die Auswertung gibt
-    // es, nur an einem anderen Ort. Gedämpft bleibt, wofür es nichts gibt.
-    const mit = ['alarme', 'schluessel'];
+    // „ereignisse" steht seit ENT-547 NICHT mehr hier, „alarme" seit
+    // Mechanismus B Stufe 1 (ENT-153/ENT-644) ebenfalls nicht mehr: Fuer
+    // beide gibt es die Auswertung, nur an einem anderen Ort. Gedämpft
+    // bleibt allein, wofür es nichts gibt -- das ist seither nur noch
+    // "schluessel" (OP-426).
+    const mit = ['schluessel'];
     const ohne = ['wachbuch', 'scans', 'aufgaben', 'erledigung', 'fahrzeuguebernahmen'];
     const farbe = t => {
       const e = document.getElementById('ae-tab-' + t);
       return e ? getComputedStyle(e.querySelector('.rdkr-tab-lbl')).color : null;
     };
-    const gedaempft = farbe('alarme'), normal = farbe('erledigung');
+    const gedaempft = farbe('schluessel'), normal = farbe('erledigung');
     return !!gedaempft && !!normal && gedaempft !== normal
       && mit.every(t => farbe(t) === gedaempft)
       && ohne.every(t => farbe(t) === normal)
-      // Der Verweis-Reiter trägt die volle Farbe -- er führt ja irgendwohin.
-      && farbe('ereignisse') === normal;
+      // Die beiden Verweis-Reiter tragen die volle Farbe -- sie führen ja
+      // irgendwohin.
+      && farbe('ereignisse') === normal
+      && farbe('alarme') === normal;
   }));
 // Und dort, wo Farbe allein nicht ankommt -- Vorleseprogramm, Mauszeiger.
 check('KRITISCH: die Aussage steht auch im Text, nicht nur in der Farbe',
   await page.evaluate(() => {
-    const e = document.getElementById('ae-tab-alarme');
+    const e = document.getElementById('ae-tab-schluessel');
     const f = document.getElementById('ae-tab-erledigung');
     return !!e && (e.getAttribute('title') || '').includes('folgt später')
       && (e.getAttribute('aria-label') || '').includes('folgt später')
@@ -348,6 +357,38 @@ async function warteAufAufruf(teil, frist = 3000) {
 }
 check('Und dort wird die Liste dann auch wirklich geholt',
   await warteAufAufruf('ereignis_liste'));
+// Zurueck in die Auswertung fuer die weiteren Pruefungen.
+await page.evaluate(() => { go('arbeitsergebnisse'); arbeitsergebnisseOeffnen(); });
+await page.waitForTimeout(200);
+
+/* ══════════ DASSELBE FUER "ALARME" (Mechanismus B Stufe 1, ENT-153/
+   ENT-644, Berichtigung der ENT-480-Aussage "kein Datenmodell") ══════
+   Derselbe Verweis-Mechanismus wie bei "Ereignisse" oben (AE_ANDERSWO) --
+   keine zweite Bauart, nur ein zweiter Eintrag. Die eigentliche Liste
+   (Objekt, Kontrollrunde, Mitarbeitende, seit wann ueberfaellig) prueft
+   test_rundgang_uebersicht.mjs unter der Kachel "Alarme" -- hier geht es
+   nur um den Verweis von hier aus. */
+calls = [];
+await klick('#ae-tab-alarme');
+await page.waitForTimeout(150);
+const alVerweis = await page.textContent('#aeInhalt');
+check('KRITISCH: der Reiter sagt, WO die Alarme stehen -- nicht "folgt später"',
+  /Revierdienst/.test(alVerweis) && /Alarme/.test(alVerweis) && !/folgt später/.test(alVerweis));
+check('Der Verweis kostet keinen Abruf -- geholt wird erst drüben',
+  calls.length === 0);
+check('KRITISCH: der Knopf führt wirklich zur Alarme-Kachel der Revierdienst-Uebersicht',
+  await page.evaluate(() => {
+    const k = document.getElementById('aeAnderswoBtn');
+    if (!k) { return false; }
+    k.click();
+    const v = document.getElementById('view-rundgaenge');
+    const ab = document.getElementById('rdAb-alarme');
+    return !!v && v.classList.contains('on')
+      && !!ab && ab.getClientRects().length > 0
+      && document.getElementById('pgTitle').textContent === 'Alarme';
+  }));
+check('Und dort wird die Alarmliste dann auch wirklich geholt',
+  await warteAufAufruf('alleinarbeiterschutz_alarme'));
 // Zurueck in die Auswertung fuer die weiteren Pruefungen.
 await page.evaluate(() => { go('arbeitsergebnisse'); arbeitsergebnisseOeffnen(); });
 await page.waitForTimeout(200);
@@ -450,13 +491,17 @@ await klick('#ae-tab-aufgaben');
 await page.waitForTimeout(250);
 
 // ══════════ UNVERDRAHTETE REITER: BLEIBENDER HINWEIS, KEIN TOAST
+// "Alarme" war hier bis Mechanismus B Stufe 1 (ENT-153/ENT-644) das
+// Beispiel -- seither hat der Reiter ein Datenmodell und verweist
+// stattdessen (siehe Block weiter oben, "DASSELBE FUER ALARME"). Einzig
+// verbliebener unverdrahteter Reiter ist "Schluesselprotokoll" (OP-426).
 calls = [];
-await klick('#ae-tab-alarme');
+await klick('#ae-tab-schluessel');
 await page.waitForTimeout(150);
 // Der Name steht im Hinweis: Zwei Reiter hintereinander angetippt zeigten
 // sonst zweimal denselben Satz, und man wüsste nicht, ob sich etwas tat.
-check('KRITISCH: "Alarme" zeigt einen bleibenden Hinweis statt nichts zu tun',
-  (await page.textContent('#aeInhalt')).includes('Alarme folgt später'));
+check('KRITISCH: "Schlüsselprotokoll" zeigt einen bleibenden Hinweis statt nichts zu tun',
+  (await page.textContent('#aeInhalt')).includes('Schlüsselprotokoll folgt später'));
 check('Kein API-Aufruf fuer einen unverdrahteten Reiter', calls.length === 0);
 
 // Und das Gegenstueck: der verdrahtete Reiter ruft wirklich seinen Endpunkt.

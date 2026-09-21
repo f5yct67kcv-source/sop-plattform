@@ -1051,6 +1051,15 @@ tr.klickbar.gewaehlt td { background: var(--accent-soft); }
   color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .bk-kachel-ic svg.i { width: 28px; height: 28px; }
 .bk-kachel-lbl { font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+/* Eine Kachel faerbt sich bei einem anstehenden Zustand -- dieselbe Klasse
+   ("hat-update") und dieselbe Warnfarbe wie bei der Kachel "Einrichtung"
+   in der Seitenleiste (.nav-item.hat-update, siehe dort), hier nur auf die
+   Bauteile der Kachel-Bauart uebertragen: keine neue Farbvariable, kein
+   zweites Faerbe-Muster im Haus. svg.i nimmt die Farbe automatisch ueber
+   currentColor mit (stroke: currentColor, siehe svg.i oben), darum reicht
+   die Farbe auf .bk-kachel-ic selbst. */
+.bk-kachel.hat-update .bk-kachel-ic { background: var(--warn-soft); color: var(--warn); }
+.bk-kachel.hat-update .bk-kachel-lbl { color: var(--warn); }
 /* Verkleinerte Kachel-Variante -- Revision aus ENT-274, siehe ENT-275/276:
    der Projektinhaber fand die kleine Variante nach dem Ausliefern zu klein
    -- die Navigations-Kacheln sind die Hauptreiter dieser Seite und gingen
@@ -7235,6 +7244,24 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
             <span class="bk-kachel-lbl">Ereignisse</span>
           </button>
+          <!-- Sechste Kachel "Alarme" (Mechanismus B Stufe 1, ENT-153/
+               ENT-644): fuehrt auf die aktuell offenen Stufe-1-Alarme
+               (rdAb-alarme unten), gleiche Bauart und dasselbe
+               rdAbschnittZeigen()-Muster wie "Ereignisse" nebenan. Faerbt
+               sich bei mindestens einem offenen Alarm -- siehe
+               revierdienstUebersichtOeffnen() (Klasse "hat-update",
+               dasselbe Muster/dieselbe Farbe wie die Kachel "Einrichtung"
+               bei anstehendem Update, CLAUDE.md-Vorbild).
+               Sinnbild: ein Warnzeichen (Achteck mit Ausrufezeichen), NICHT
+               die Glocke (die steht im Haus schon fuer "Benachrichtigungen"
+               oben in der Werkzeugleiste, #btnGlocke) und NICHT das
+               Warndreieck (das steht schon fuer "Ereignisse", Kachel
+               daneben) -- sonst zwei Bilder fuer zwei verschiedene
+               Begriffe. -->
+          <button type="button" class="bk-kachel" id="rdKachelAlarme" onclick="rdAbschnittZeigen('alarme')">
+            <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86L7.86 2z"/><path d="M12 8v5"/><path d="M12 16.5h.01"/></svg></span>
+            <span class="bk-kachel-lbl">Alarme</span>
+          </button>
           <button type="button" class="bk-kachel" onclick="toast('Folgt in einem späteren Schritt.')">
             <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="18" y1="20" x2="18" y2="4"/></svg></span>
             <span class="bk-kachel-lbl">Auswertungen</span>
@@ -7313,6 +7340,29 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         </div>
         <div class="card">
           <div class="card-bd flush"><div class="tw" id="evfListe"><div class="sk" style="height:52px"></div></div></div>
+        </div>
+        </div>
+
+        <!-- Unterseite "Alarme" (Mechanismus B Stufe 1, ENT-153/ENT-644):
+             die aktuell offenen Stufe-1-Alarme -- laufende Kontrollrunden,
+             die ihre Sollzeit plus Karenz bereits ueberschritten haben.
+             Reine Anzeige eines servereitig LAENGST erkannten Zustands
+             (backend/alleinarbeiterschutz.php); hier entsteht kein eigener
+             Berechnungsweg, nur ein schlanker Lese-Endpunkt
+             (alleinarbeiterschutz_alarme.php) auf der neuen Funktion
+             alleinarbeiterschutz_offene_alarme(). Eine Runde verlaesst
+             diese Liste von selbst, sobald sie nicht mehr 'laeuft' ist
+             (beendet/abgebrochen) -- kein eigener "aufgeloest"-Zustand im
+             Datenmodell noetig, rundgang.status reicht.
+             Gleiches Karten-/Listenmuster wie "Ereignisse" nebenan
+             (ENT-297): keine neue Bauart nur fuer diese Unterseite. Ohne
+             Filterleiste -- anders als bei Ereignissen gibt es hier keinen
+             Zeitraum: es zaehlt ausschliesslich der JETZT offene Zustand. -->
+        <div class="bk-abschnitt" id="rdAb-alarme" style="display:none">
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="rdUebersichtZeigen()">Zurück</button>
+        <div class="card">
+          <div class="card-hd"><h3>Offene Alarme</h3><div class="sp"></div><span class="note" id="alAnzahl"></span></div>
+          <div class="card-bd flush"><div class="tw" id="alListe"><div class="sk" style="height:52px"></div></div></div>
         </div>
         </div>
 
@@ -19700,6 +19750,18 @@ function revierdienstUebersichtOeffnen() {
     rdKpisZeichnen();
   });
   ladeWaechterStatus();
+  // Kachel "Alarme" faerbt sich, solange mindestens ein offener Stufe-1-
+  // Alarm besteht (Mechanismus B Stufe 1, ENT-153/ENT-644) -- gleiche
+  // Klasse/Farbe wie die Kachel "Einrichtung" bei anstehendem Update
+  // (.hat-update, siehe CSS bei .bk-kachel-ic). Schlanker, eigener Aufruf:
+  // die Kachel-Uebersicht hat sonst keinen Sammel-Endpunkt, der das schon
+  // mitbrachte (anders als z.B. bei "Ereignisse", die keinen Zaehler auf
+  // der Kachel selbst tragen).
+  api('alleinarbeiterschutz_alarme.php').then(({ ok, data }) => {
+    const anzahl = ok && data.status === 'ok' && Array.isArray(data.alarme) ? data.alarme.length : 0;
+    const kachel = $('rdKachelAlarme');
+    if (kachel) { kachel.classList.toggle('hat-update', anzahl > 0); }
+  });
 }
 
 // ══════════════════════ KENNZAHLEN-KACHELN (ENT-274) ═══════════════════
@@ -21117,8 +21179,15 @@ const AE_REITER = [
     '<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M12 19h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/>'],
   ['aufgaben', 'Aufgabenerledigung',
     '<line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><polyline points="4 6 5 7 7 5"/><polyline points="4 12 5 13 7 11"/><polyline points="4 18 5 19 7 17"/>'],
+  // Sinnbild berichtigt (vormals die Glocke): Die Glocke steht im Haus
+  // bereits fuer "Benachrichtigungen" (#btnGlocke oben in der
+  // Werkzeugleiste) -- ein zweites Bild fuer zwei verschiedene Begriffe
+  // waere dieselbe Verwechslungsgefahr, vor der der Kommentar zwei Zeilen
+  // hoeher warnt. Dasselbe Warnzeichen wie die neue Kachel "Alarme" in der
+  // Revierdienst-Uebersicht (rdKachelAlarme): EIN Sinnbild je Begriff im
+  // ganzen Haus, nicht zwei.
   ['alarme', 'Alarme',
-    '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>'],
+    '<path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86L7.86 2z"/><path d="M12 8v5"/><path d="M12 16.5h.01"/>'],
   ['schluessel', 'Schlüsselprotokoll',
     '<circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 20 3"/><path d="M17 6l2 2"/><path d="M14.5 8.5l2 2"/>'],
   // ENT-346: nicht unter Einstellungen -> Dienstfahrzeuge (dort ausdruecklich
@@ -21153,6 +21222,21 @@ const AE_ANDERSWO = {
         + 'Objekt- und Artfilter und dem Foto zur Meldung.',
     knopf: 'Zu den Ereignissen',
     hin: () => { go('rundgaenge'); rdAbschnittZeigen('ereignisse'); },
+  },
+  // Seit Mechanismus B Stufe 1 (ENT-153/ENT-644) gibt es fuer "Alarme" ein
+  // Datenmodell UND eine eigene Unterseite -- die Berichtigung von ENT-480
+  // (Kommentar oben, "wirklich ohne Datengrundlage sind noch ZWEI: Alarme
+  // und Schluesselprotokoll") gilt fuer Alarme darum nicht mehr, fuer
+  // Schluesselprotokoll unveraendert weiter. Derselbe Verweis-Mechanismus
+  // wie bei "Ereignisse" oben: keine zweite Liste derselben Daten hier,
+  // nur ein Hinweis, wo sie steht (Optimierungsziel "kleinstmoegliche
+  // Software").
+  alarme: {
+    ort: 'Revierdienst › Alarme',
+    satz: 'Die aktuell offenen Stufe-1-Alarme des Alleinarbeiterschutzes haben dort ihre '
+        + 'eigene Liste — mit Objekt, Kontrollrunde, Mitarbeitendem und seit wann überfällig.',
+    knopf: 'Zu den Alarmen',
+    hin: () => { go('rundgaenge'); rdAbschnittZeigen('alarme'); },
   },
 };
 
@@ -28261,6 +28345,11 @@ function rdAbschnittZeigen(id) {
     $('pgCrumb').textContent = 'Gemeldete Vorfälle aus dem Revierdienst';
     evfOeffnen();
   }
+  if (id === 'alarme') {
+    $('pgTitle').textContent = 'Alarme';
+    $('pgCrumb').textContent = 'Offene Stufe-1-Alarme des Alleinarbeiterschutzes';
+    alOeffnen();
+  }
 }
 
 /* ══ EREIGNISSE IN DER VERWALTUNG (ENT-297) ════════════════════════════
@@ -28358,6 +28447,58 @@ function evfZeichnen(liste) {
 }
 
 let evfListeDaten = [];
+
+/* ══ ALARME IN DER VERWALTUNG (Mechanismus B Stufe 1, ENT-153/ENT-644) ═
+   Die aktuell offenen Stufe-1-Alarme -- reine Anzeige eines serverseitig
+   LAENGST erkannten Zustands (backend/alleinarbeiterschutz.php), kein
+   eigener Berechnungsweg hier. Kein Zeitraum-Filter wie bei Ereignissen:
+   es zaehlt ausschliesslich, was GERADE offen ist. */
+function alOeffnen() {
+  const ziel = $('alListe');
+  if (ziel) { ziel.innerHTML = '<div class="sk" style="height:52px"></div>'; }
+  api('alleinarbeiterschutz_alarme.php').then(({ ok, data }) => {
+    alZeichnen(ok && data.status === 'ok' ? data : null);
+  });
+}
+
+function alZeichnen(daten) {
+  const ziel = $('alListe'), zaehler = $('alAnzahl');
+  if (!ziel) { return; }
+  // Vier verschiedene Aussagen, vier verschiedene Texte (Hausregel,
+  // CLAUDE.md "Unbekannt darf nie wie keine aussehen"): eine Antwort ohne
+  // Liste (Netzwerkfehler o.ae.) ist etwas anderes als eine leere Liste,
+  // und "nicht eingerichtet" ist wiederum etwas anderes als beides.
+  const alarme = daten && Array.isArray(daten.alarme) ? daten.alarme : null;
+  if (!alarme) {
+    zaehler.textContent = '';
+    ziel.innerHTML = '<div class="leer">Die Alarme liessen sich nicht laden.</div>';
+    return;
+  }
+  if (daten.eingerichtet === false) {
+    zaehler.textContent = '';
+    ziel.innerHTML = '<div class="leer">Alleinarbeiterschutz Stufe 1 ist nicht eingerichtet — einmal „Einrichtung" ausführen.</div>';
+    return;
+  }
+  if (!alarme.length) {
+    zaehler.textContent = '';
+    ziel.innerHTML = '<div class="leer">Kein offener Alarm — alle laufenden Kontrollrunden liegen innerhalb ihrer Sollzeit.</div>';
+    return;
+  }
+  zaehler.textContent = alarme.length + (alarme.length === 1 ? ' offener Alarm' : ' offene Alarme');
+  ziel.innerHTML = `<table><thead><tr>
+      <th>Objekt</th><th>Kontrollrunde</th><th>Mitarbeitend</th><th class="num">Überfällig seit</th>
+    </tr></thead><tbody>${alarme.map(a => `
+      <tr>
+        <td>${esc(a.objekt_name || '')}</td>
+        <td>${a.vorlage_name ? esc(a.vorlage_name) : '<span class="mut">Ohne Vorlage</span>'}</td>
+        <td>${esc(a.name || '')}</td>
+        <td style="text-align:right">${a.faellig_seit
+          // Minuten sind serverseitig fertig gerechnet (gegen die Uhr des
+          // Servers, nicht die des Browsers) -- hier wird nur formatiert.
+          ? `${nf(a.ueberfaellig_min)} Min.<div class="mut">seit ${esc(String(a.faellig_seit).slice(11, 16))} Uhr</div>`
+          : '<span class="mut">unbekannt</span>'}</td>
+      </tr>`).join('')}</tbody></table>`;
+}
 
 // Detailansicht in der bestehenden Schublade (#drTitle/#drBody/#drFoot mit
 // showDrawer()) und im bestehenden .dl-Muster -- keine zweite Bauart nur

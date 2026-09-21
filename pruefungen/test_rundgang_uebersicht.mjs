@@ -62,6 +62,22 @@ const OBJEKTE = { status: 'ok', objekte: [
     aktiv: 1, bemerkung: null, masterschichten: 0, stunden_je_einsatz: 0 },
 ]};
 
+// Kachel "Alarme" (Mechanismus B Stufe 1, ENT-153/ENT-644): Standard-
+// Fixture OHNE offenen Alarm -- die Kachel-Faerbung ist eine eigene
+// Pruefung weiter unten und braucht einen bewussten Wechsel auf ALARME,
+// nicht einen zufaelligen Treffer aus der Grundausstattung.
+const ALARME_LEER = { status: 'ok', eingerichtet: true, alarme: [] };
+const ALARME = { status: 'ok', eingerichtet: true, alarme: [
+  { rundgang_id: 1, objekt_id: 1, objekt_name: 'Testliegenschaft Nord', vorlage_name: 'Nachtrunde',
+    mitarbeiter_id: 5, name: 'Erika Muster', gemeldet_um: `${HEUTE} 23:10:00`,
+    faellig_seit: `${HEUTE} 23:00:00`, ueberfaellig_min: 25 },
+  // Ohne Vorlage (spontan gestartete Runde, ENT-283) -- "Ohne Vorlage"
+  // muss erscheinen statt einer Luecke.
+  { rundgang_id: 2, objekt_id: 2, objekt_name: 'Testliegenschaft Süd', vorlage_name: null,
+    mitarbeiter_id: 6, name: 'Hans Beispiel', gemeldet_um: `${HEUTE} 22:40:00`,
+    faellig_seit: `${HEUTE} 22:30:00`, ueberfaellig_min: 55 },
+]};
+
 let calls = [];
 
 async function setup(page, rechte) {
@@ -83,6 +99,7 @@ async function setup(page, rechte) {
     if (path.includes('objekt_list')) return send(OBJEKTE);
     if (path.includes('masterschicht_list')) return send({ status: 'ok', masterschichten: [] });
     if (path.includes('rundgang_liste')) return send(RUNDGAENGE);
+    if (path.includes('alleinarbeiterschutz_alarme')) return send(ALARME_LEER);
     // Wird angesteuert, wenn 'plan' vorhanden ist (kontrolleNavKlick() landet
     // dann auf Pensen statt auf Rundgängen) -- ohne dieses Fixture crasht
     // zeichnePensen() auf pensen.mitarbeiter.map(), weil der generische
@@ -133,13 +150,127 @@ check('Die Kachel "Übersicht" ist unter Revierdienst sichtbar', await page.isVi
 const kachelLabels = await page.$$eval('#rdUebersicht .bk-kachel-lbl', els => els.map(e => e.textContent.trim()));
 // "Ereignisse" ist seit ENT-297 die fuenfte Kachel und steht bewusst VOR
 // "Auswertungen": Sie fuehrt auf echte, gemeldete Vorfaelle, waehrend
-// "Auswertungen" noch ohne Funktion ist.
-check('KRITISCH: alle fünf Kacheln stehen da, in der vorgegebenen Reihenfolge',
-  JSON.stringify(kachelLabels) === JSON.stringify(['Rundgänge', 'GPS', 'Aufgaben', 'Ereignisse', 'Auswertungen']));
+// "Auswertungen" noch ohne Funktion ist. "Alarme" ist seit Mechanismus B
+// Stufe 1 (ENT-153/ENT-644) die sechste, aus demselben Grund direkt
+// dahinter.
+check('KRITISCH: alle sechs Kacheln stehen da, in der vorgegebenen Reihenfolge',
+  JSON.stringify(kachelLabels) === JSON.stringify(['Rundgänge', 'GPS', 'Aufgaben', 'Ereignisse', 'Alarme', 'Auswertungen']));
 await page.click('#view-rundgaenge .bk-kachel:has-text("GPS")');
 await page.waitForTimeout(100);
 check('KRITISCH: eine Kachel ist noch ohne Funktion, sagt das aber statt nichts zu tun',
   await page.evaluate(() => document.getElementById('toast').classList.contains('on')));
+
+/* ══════════ KACHEL "ALARME" (Mechanismus B Stufe 1, ENT-153/ENT-644) ═══
+   Reine Anzeige eines servereitig laengst erkannten Zustands
+   (backend/alleinarbeiterschutz.php) -- kein eigener Berechnungsweg hier,
+   siehe pruef_alleinarbeiterschutz.php fuer den echten Rechenkern
+   (alleinarbeiterschutz_offene_alarme, echte SQLite-Ausfuehrung). Geprueft
+   wird hier nur, dass die Oberflaeche das Ergebnis richtig zeigt: die
+   Faerbung bei mindestens einem offenen Alarm, die Liste, und die
+   Gegenprobe ohne jeden Alarm. */
+check('KRITISCH: ohne offenen Alarm bleibt die Kachel "Alarme" ungefärbt (Grundausstattung: ALARME_LEER)',
+  !(await page.evaluate(() => document.getElementById('rdKachelAlarme').classList.contains('hat-update'))));
+const farbeOhneAlarm = await page.evaluate(() =>
+  getComputedStyle(document.querySelector('#rdKachelAlarme .bk-kachel-ic')).color);
+
+// Gegenprobe: dieselbe Seite, jetzt mit zwei offenen Alarmen -- die Kachel
+// MUSS sich faerben. Ein frischer Aufruf von revierdienstUebersichtOeffnen()
+// simuliert das erneute Betreten der Uebersicht (z.B. nach einem Wechsel
+// von einer anderen Ansicht).
+// Eigener Override statt eines Fixture-Zweigs im generischen Handler
+// (setup()): der wuerde JEDEN Aufruf im Rest der Suite auf ALARME
+// umstellen. route.fulfill() hier geht am generischen Handler VORBEI --
+// darum wird "calls" von Hand nachgefuehrt, sonst saehe die spaetere
+// Pruefung "wird tatsaechlich gerufen" den Aufruf nicht, obwohl er
+// stattgefunden hat (am gerenderten Ergebnis erkennbar).
+await page.route('**/api/alleinarbeiterschutz_alarme.php**', route => {
+  calls.push({ path: 'alleinarbeiterschutz_alarme.php', body: null, query: {} });
+  return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ALARME) });
+});
+await page.evaluate(() => revierdienstUebersichtOeffnen());
+await page.waitForTimeout(200);
+check('KRITISCH: mit mindestens einem offenen Alarm bekommt die Kachel die Klasse "hat-update" -- '
+  + 'dasselbe Muster wie die Kachel "Einrichtung" bei anstehendem Update',
+  await page.evaluate(() => document.getElementById('rdKachelAlarme').classList.contains('hat-update')));
+const farbeMitAlarm = await page.evaluate(() =>
+  getComputedStyle(document.querySelector('#rdKachelAlarme .bk-kachel-ic')).color);
+check('KRITISCH: die Faerbung ist am gerenderten Zustand messbar -- eine andere Farbe als ohne Alarm, '
+  + 'keine Klasse ohne Wirkung', farbeMitAlarm !== farbeOhneAlarm);
+check('Dieselbe Warnfarbe wie die Kachel "Einrichtung" (var(--warn)), keine neu erfundene Farbe',
+  await page.evaluate(() => {
+    const a = getComputedStyle(document.querySelector('#rdKachelAlarme .bk-kachel-ic')).color;
+    // Ein rein visueller Vergleich braucht eine echte Traegerin von
+    // "hat-update" im DOM -- die Seitenleiste hat "Einrichtung" nur am
+    // Desktop und unabhaengig vom Alarmzustand im Markup, ihre Farbe hier
+    // testweise ueber dieselbe Klasse auf einem Hilfselement zu vergleichen
+    // waere unnoetig kompliziert; stattdessen wird die CSS-VARIABLE selbst
+    // verglichen, die beide Regeln tragen.
+    const v = getComputedStyle(document.documentElement).getPropertyValue('--warn').trim();
+    // color: rgb(...) vs. die Hex-/Farbvariable direkt vergleichen ist
+    // browserabhaengig unzuverlaessig -- ueber ein Canvas normalisiert.
+    const canvas = document.createElement('canvas').getContext('2d');
+    canvas.fillStyle = v; const soll = canvas.fillStyle;
+    canvas.fillStyle = a; const ist = canvas.fillStyle;
+    return soll === ist;
+  }));
+
+// ── Klick auf die Kachel: eigene Unterseite mit der Liste
+// KEIN "calls = []" hier: die spaetere Pruefung "Letzte Rundgaenge" weiter
+// unten braucht den frueheren rundgang_liste-Aufruf noch im selben Array
+// (calls.find(...) findet ohnehin den ERSTEN Treffer) -- ein Reset hier
+// wuerde ihn unbemerkt loeschen. Stattdessen ein Merker-Index.
+const vorKlick = calls.length;
+await page.click('#rdKachelAlarme');
+await page.waitForSelector('#rdAb-alarme table');
+check('KRITISCH: die Kopfzeile sagt "Alarme"', await page.textContent('#pgTitle') === 'Alarme');
+check('KRITISCH: alleinarbeiterschutz_alarme.php wird tatsächlich gerufen',
+  calls.slice(vorKlick).some(c => c.path.includes('alleinarbeiterschutz_alarme')));
+const alarmText = await page.textContent('#rdAb-alarme');
+check('KRITISCH: Objekt, Kontrollrunde/Vorlage und Mitarbeitende stehen da',
+  alarmText.includes('Testliegenschaft Nord') && alarmText.includes('Nachtrunde')
+  && alarmText.includes('Erika Muster') && alarmText.includes('Testliegenschaft Süd')
+  && alarmText.includes('Hans Beispiel'));
+check('KRITISCH: "seit wann überfällig" steht als Zahl da, nicht nur der Meldezeitpunkt (server-berechnet)',
+  /25\s*Min/.test(alarmText) && /55\s*Min/.test(alarmText));
+check('Eine Runde ohne Vorlage (spontan gestartet) sagt das, statt eine Lücke zu lassen',
+  alarmText.includes('Ohne Vorlage'));
+check('Der Zähler nennt die Anzahl', /2\s*offene Alarme/.test(alarmText));
+
+// Gegenprobe: KEIN offener Alarm sagt das explizit -- nicht dieselbe leere
+// Fläche wie ein Ladefehler (Hausregel "unbekannt darf nie wie keine
+// aussehen").
+await page.route('**/api/alleinarbeiterschutz_alarme.php**', route =>
+  route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ALARME_LEER) }));
+await page.evaluate(() => alOeffnen());
+await page.waitForTimeout(150);
+check('KRITISCH: kein offener Alarm sagt das explizit',
+  (await page.textContent('#rdAb-alarme')).includes('Kein offener Alarm'));
+
+// Gegenprobe: ein Ladefehler sagt etwas ANDERES als "kein Alarm" -- sonst
+// sähe ein kaputter Abruf aus wie "alles in Ordnung".
+await page.route('**/api/alleinarbeiterschutz_alarme.php**', route =>
+  route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ status: 'fehler' }) }));
+await page.evaluate(() => alOeffnen());
+await page.waitForTimeout(150);
+const fehlerText = await page.textContent('#rdAb-alarme');
+check('KRITISCH: ein Ladefehler sagt das explizit und behauptet NICHT "kein Alarm"',
+  fehlerText.includes('liessen sich nicht laden') && !fehlerText.includes('Kein offener Alarm'));
+
+// Gegenprobe: "nicht eingerichtet" ist eine DRITTE, wieder andere Aussage.
+await page.route('**/api/alleinarbeiterschutz_alarme.php**', route =>
+  route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'ok', eingerichtet: false, alarme: [] }) }));
+await page.evaluate(() => alOeffnen());
+await page.waitForTimeout(150);
+const nichtEingerichtetText = await page.textContent('#rdAb-alarme');
+check('KRITISCH: "nicht eingerichtet" ist eine eigene, dritte Aussage -- weder "kein Alarm" noch "Ladefehler"',
+  nichtEingerichtetText.includes('nicht eingerichtet')
+  && !nichtEingerichtetText.includes('Kein offener Alarm') && !nichtEingerichtetText.includes('nicht laden'));
+
+// Zurück auf die Grundausstattung fuer die nachfolgenden Pruefungen.
+await page.route('**/api/alleinarbeiterschutz_alarme.php**', route =>
+  route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ALARME_LEER) }));
+await page.click('#rdAb-alarme .bk-zurueck');
+await page.waitForTimeout(100);
 
 // ── Letzte Rundgänge: derselbe Endpunkt wie zuvor, jetzt ohne Zeitraum-/
 // Objekt-Filter durch die Person -- ein fester Rueckblick.
