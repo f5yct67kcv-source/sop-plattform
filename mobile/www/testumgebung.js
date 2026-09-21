@@ -43,6 +43,20 @@
   // anzulegen, die die Deploy-sed-Zeile (siehe oben) erst noch kennen muesste.
   window.APP_UMGEBUNG_DEMO = istDemo;
 
+  // Zweite, engere Unterscheidung INNERHALB von "demo" (Befund des
+  // Projektinhabers, 2026-09-21): APP_ENV=demo traegt sowohl die eine
+  // ENT-523-Demo-Umgebung (gemeinsamer Zugang, naechtliches Leeren) als
+  // auch jeden der zehn Demo-Plaetze (ENT-600/601: eigene Datenbank,
+  // 14 Tage, ein Interessent). Beide brauchen denselben Warnaufkleber
+  // oben, aber unterschiedliche Rechtstexte (dashboard.html) -- darum ein
+  // EIGENER Platzhalter statt eines geratenen Unterschieds aus der
+  // Adresse. Eigene Ersetzung im Deploy je Demo-Platz (deploy-hostpoint.yml);
+  // ueberall sonst bleibt sie "0" -- fail-safe: ein unersetzter oder
+  // falscher Wert zeigt weiterhin den bisherigen ENT-523-Text, keinen
+  // neuen.
+  var IST_DEMO_PLATZ = '__IST_DEMO_PLATZ__';
+  window.APP_UMGEBUNG_DEMO_PLATZ = istDemo && IST_DEMO_PLATZ === '1';
+
   var hinweis = document.createElement('div');
   hinweis.textContent = istDemo ? 'DEMO — BEISPIELDATEN' : 'TESTUMGEBUNG';
   hinweis.setAttribute('role', 'status');

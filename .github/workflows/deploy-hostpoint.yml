@@ -932,6 +932,7 @@ jobs:
           # Quelle der Wahrheit verwenden.
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist/db.php
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist/testumgebung.js
+          sed -i "s|__IST_DEMO_PLATZ__|0|g" dist/testumgebung.js
           # Sparte Reinigung (ENT-650): NUR CUPI 24, und dist/ ist der
           # Bestandsmandant. Begruendung: dist-cupi24/ weiter unten.
           sed -i "s|__SPARTE_REINIGUNG__|1|g" dist/db.php
@@ -1924,6 +1925,8 @@ jobs:
           sed -i "s|__BETREIBER_DB_PASS__|$EFF_BETREIBER_DB_PASSWORD|g" dist-cupi24/betreiber.php
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-cupi24/db.php
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-cupi24/testumgebung.js
+          # Kein Demo-Platz -- dieselbe Begruendung wie bei dist/ oben.
+          sed -i "s|__IST_DEMO_PLATZ__|0|g" dist-cupi24/testumgebung.js
           # ── Sparte Reinigung: DER EINE PLATZ, AN DEM SIE ANGEHT ────────
           #
           # CUPI 24 ist der Bestandsmandant, fuer den die Sparte entstanden
@@ -2352,6 +2355,17 @@ jobs:
             # jeder der zehn Plaetze ein offener Weg dorthin.
             ersetze __APP_ENV__ "demo" "dist-demo/$PLATZ/db.php"
             ersetze __APP_ENV__ "demo" "dist-demo/$PLATZ/testumgebung.js"
+
+            # ── Demo-Platz, nicht die ENT-523-Demo-Umgebung ───────────────
+            #
+            # APP_ENV=demo allein sagt nur "irgendeine Demo" -- die eine
+            # ENT-523-Instanz und die zehn Plaetze teilen sich den Wert,
+            # obwohl sie unterschiedliche Rechtstexte brauchen (gemeinsamer
+            # Zugang mit naechtlichem Leeren dort, eigene Datenbank mit
+            # 14 Tagen hier). Dieser zweite Platzhalter macht den
+            # Unterschied im Deploy sichtbar, statt ihn aus der Adresse zu
+            # raten (Befund des Projektinhabers, 2026-09-21).
+            ersetze __IST_DEMO_PLATZ__ "1" "dist-demo/$PLATZ/testumgebung.js"
 
             # ── Keine Sparte Reinigung (ENT-650) ─────────────────────────
             #

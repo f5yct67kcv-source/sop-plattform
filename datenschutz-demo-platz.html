@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<!--
+  DATENSCHUTZERKLAERUNG FUER DEN DEMO-ZUGANG (demoN.guardops.ch, ENT-600/601).
+
+  EIGENE SEITE, NICHT EINE ERWEITERUNG VON datenschutz-demo.html: Jene
+  beschreibt die EINE ENT-523-Demo-Umgebung -- gemeinsamer Zugang, naechtliches
+  Leeren -- und sagt das im eigenen Kopfkommentar auch so. Die zehn Demo-Plaetze
+  sind seit ENT-600/601 ein ANDERES Modell: eigene Datenbank je Platz, ein
+  Interessent, 14 Tage. Beides in eine Seite zu zwingen hiesse wieder, jeden
+  Absatz mit "beim gemeinsamen Zugang ... bei einem Demo-Platz dagegen ..." zu
+  beginnen -- dieselbe Ueberlegung, mit der datenschutz-demo.html schon von
+  datenschutz.html getrennt wurde.
+
+  ANLASS: Befund des Projektinhabers (2026-09-21), dass der Datenschutzlink im
+  Dashboard eines Demo-Platzes bislang auf datenschutz-demo.html zeigte --
+  eine Seite, die vom gemeinsamen Zugang und vom naechtlichen Leeren erzaehlt,
+  keins von beidem trifft aber auf einen Demo-Platz zu. Behoben durch den
+  neuen Platzhalter __IST_DEMO_PLATZ__ in testumgebung.js (siehe dort) und die
+  entsprechende Verzweigung in dashboard.html.
+
+  JEDE AUSSAGE HIER IST AUS DEM CODE ODER DEN NUTZUNGSBEDINGUNGEN ABGELEITET:
+    - eigene Datenbank je Platz:  README.md, Abschnitt "Demo-Plaetze";
+                                  backend/demo_instanz.php (ENT-600)
+    - 14 Tage, volle Loeschung:   backend/demo_zugang.php (DEMO_ZUGANG_TAGE),
+                                  nutzungsbedingungen.html Ziffer 3
+    - kein naechtliches Leeren:   .github/workflows/deploy-hostpoint.yml --
+                                  __DEMO_RESET_TOKEN__ bleibt fuer jeden Platz
+                                  ausdruecklich leer, demo_reset.yml ruft nur
+                                  die eine ENT-523-Adresse (DEMO_DOMAIN) auf
+    - persoenliche Zugangsdaten:  nutzungsbedingungen.html Ziffer 5; je
+                                  E-Mail-Adresse nur ein Zugang (Ziffer 2)
+    - keine Cookies:              dashboard.html setzt keine, Sitzung im
+                                  lokalen Speicher (gleiche Bauart wie
+                                  datenschutz-demo.html)
+  Aendert sich einer dieser Punkte im Code, wird diese Seite falsch.
+
+  DER ABSCHNITT ZUR NUTZUNGSANALYSE BESCHREIBT EIN VORHABEN, KEINEN ZUSTAND --
+  wie schon in datenschutz-demo.html. Solange er in dieser Form dasteht, wird
+  nichts gemessen. Wird die Auswertung gebaut, muss dieser Abschnitt VORHER in
+  die Gegenwart gesetzt werden.
+
+  KEINE RECHTSBERATUNG. Der Text beschreibt, was die Software tut. Ob er als
+  Datenschutzerklaerung genuegt, ist eine juristische Frage und ausdruecklich
+  offen (wie bei datenschutz-demo.html, OP-564).
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Datenschutz im Demo-Zugang – GuardOpS</title>
+<meta name="description" content="Welche Daten bei einem persönlichen Demo-Zugang von GuardOpS anfallen – Anmeldung, Sitzung, Beispieldaten und die vollständige Löschung nach 14 Tagen.">
+<link rel="canonical" href="https://guardops.ch/datenschutz-demo-platz.html">
+<meta name="robots" content="index,follow">
+<link rel="icon" href="icons/guardops-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icons/guardops-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="icons/guardops-180.png">
+<link rel="stylesheet" href="recht.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="marke" viewBox="0 0 460 593">
+    <path fill="currentColor" d="M230 0 460 79 460 154 416 154 416 109.9 230 46 44 109.9 44 364.4 230 535 416 364.4 416 308 206 308 233 264 460 264 460 382 230 593 0 382 0 79Z"/>
+  </symbol>
+</svg>
+
+<header class="kopf">
+  <div class="innen">
+    <a class="marke" href="index.html">
+      <svg aria-hidden="true"><use href="#marke"></use></svg>
+      <span class="wortmarke" data-brand>GuardOpS</span>
+    </a>
+    <a class="zurueck" href="index.html">Zurück zur Startseite</a>
+  </div>
+</header>
+
+<main>
+  <p class="vorzeile">Rechtliches</p>
+  <h1>Datenschutz im Demo-Zugang</h1>
+  <p class="stand">Stand: 21. September 2026</p>
+
+  <h2>Kurz gefasst</h2>
+  <p>Ihr Demo-Zugang läuft auf einer <strong>eigenen Datenbank</strong>, die
+     ausschliesslich Ihnen gehört. Andere Interessenten sehen weder Ihre Eingaben
+     noch haben sie Zugriff auf Ihre Instanz. Der Zugang läuft <strong>14 Tage</strong>
+     ab Einrichtung, danach wird die gesamte Instanz vollständig gelöscht — Konto,
+     Datenbank, alles, was Sie eingetragen haben.</p>
+  <p><strong>Tragen Sie dort keine echten Personen-, Kunden- oder Objektdaten
+     ein.</strong> Weder Ihre eigenen noch die Ihrer Auftraggeber oder
+     Mitarbeitenden.</p>
+  <p>Für das Anfrageformular auf guardops.ch und die dort erhobenen Angaben
+     (Firma, Name, E-Mail-Adresse, Telefonnummer) gilt die
+     <a href="datenschutz.html">Datenschutzerklärung der Verkaufsseite</a>. Diese
+     Seite beschreibt, was ab dem Moment gilt, in dem Sie sich mit Ihren
+     Zugangsdaten anmelden. Für die vertraglichen Bedingungen des Zugangs selbst
+     gelten die <a href="nutzungsbedingungen.html">Nutzungsbedingungen für den
+     Demo-Zugang</a>.</p>
+  <p>Es gibt daneben eine einzelne, gemeinsam genutzte Vorführanlage
+     (<a href="datenschutz-demo.html">eigene Erklärung</a>) — anders aufgebaut
+     als Ihr persönlicher Demo-Zugang: gemeinsame Zugangsdaten, nächtliches
+     Leeren statt 14 Tagen. Beide laufen unabhängig voneinander.</p>
+
+  <h2>1. Wer verantwortlich ist</h2>
+  <p>Verantwortlich für die Bearbeitung der in Ihrem Demo-Zugang anfallenden
+     Daten ist die <strong>pzu consulting gmbh</strong>, Hochgasse 7, 4632
+     Trimbach, Schweiz. Die vollständigen Angaben stehen im
+     <a href="impressum.html">Impressum</a>.</p>
+  <p>Fragen zum Datenschutz gehen an
+     <a href="mailto:info@guardops.ch">info@guardops.ch</a>.</p>
+
+  <h2>2. Was der Demo-Zugang ist</h2>
+  <p>Ihr Demo-Zugang ist eine vollständig eingerichtete Beispielumgebung mit
+     erfundenen Daten (ein erfundener Bewachungsbetrieb, erfundene
+     Mitarbeitende, erfundene Kunden und Objekte). Keine dieser Angaben gehört
+     einem echten Menschen oder einem echten Betrieb.</p>
+  <p>Er läuft auf einer <strong>eigenen Datenbank</strong>, getrennt von jedem
+     anderen Demo-Zugang und von jeder produktiv genutzten Anlage. Nur Sie
+     kennen Ihre Zugangsdaten; wir vergeben sie nicht ein zweites Mal an
+     dieselbe E-Mail-Adresse.</p>
+
+  <h2>3. Laufzeit und vollständige Löschung</h2>
+  <p>Der Zugang läuft <strong>14 Tage</strong> ab Einrichtung. Danach wird die
+     Instanz vollständig zurückgesetzt: Das Konto wird entfernt, die Datenbank
+     geleert, alles, was Sie erfasst haben, ist unwiderruflich weg. Eine
+     Sicherung davon gibt es nicht.</p>
+  <p>Anders als bei der gemeinsamen Vorführanlage gibt es hier <strong>kein
+     nächtliches Leeren</strong>: Solange Ihr Zugang läuft, bleibt stehen, was
+     Sie eingetragen haben — bis zum Ablauf der 14 Tage oder bis wir den Zugang
+     nach den Nutzungsbedingungen vorzeitig beenden.</p>
+
+  <h2>4. Beim blossen Aufruf</h2>
+  <p>Ihr Demo-Zugang wird bei der Hostpoint AG in der Schweiz betrieben. Wie
+     jeder Webserver führt sie technische Zugriffsprotokolle: IP-Adresse,
+     Zeitpunkt des Abrufs, aufgerufene Datei, übertragene Datenmenge sowie
+     Browser- und Systemkennung. Sie dienen dem Betrieb und der Sicherheit des
+     Servers.</p>
+  <p>Was Ihr Demo-Zugang <strong>nicht</strong> tut:</p>
+  <ul>
+    <li>Er setzt keine Cookies.</li>
+    <li>Er bindet kein Analysewerkzeug ein und misst heute kein Verhalten
+        (siehe Abschnitt 8).</li>
+    <li>Er lädt nichts von fremden Servern nach.</li>
+    <li>Er bindet kein Werbenetzwerk ein und erstellt kein Profil.</li>
+  </ul>
+
+  <h2>5. Bei der Anmeldung</h2>
+  <h3>Was erhoben wird</h3>
+  <p>Ihr persönlicher Benutzername und Ihr persönliches Passwort. Sie erhalten
+     beides per E-Mail an die Adresse, mit der Sie den Zugang angefragt haben —
+     anders als bei der gemeinsamen Vorführanlage sind diese Zugangsdaten
+     ausschliesslich für Sie bestimmt.</p>
+  <h3>Die Sitzung</h3>
+  <p>Nach der Anmeldung erhalten Sie eine zufällige Zeichenfolge, die Ihren
+     Browser gegenüber dem Server ausweist. In der Datenbank liegt davon
+     <strong>nur ein Prüfwert</strong>, nie die Zeichenfolge selbst. Im Browser
+     liegt sie im lokalen Speicher, nicht in einem Cookie. Nach längerer
+     Untätigkeit werden Sie automatisch abgemeldet.</p>
+
+  <h2>6. Was Sie im Demo-Zugang eintragen</h2>
+  <p>Alles, was Sie dort anlegen — Schichten, Rapporte, Meldungen, hochgeladene
+     Bilder —, landet in Ihrer eigenen Demo-Datenbank und wird nach 14 Tagen
+     vollständig gelöscht.</p>
+  <p>Darum noch einmal: Tragen Sie dort nichts ein, was einen echten Menschen
+     betrifft. Wenn Sie ausprobieren wollen, wie sich Ihr eigener Betrieb
+     abbildet, fragen Sie uns — dafür ist eine Vorführung der richtige Weg.</p>
+
+  <h2>7. Was Ihr Browser sich merkt</h2>
+  <p>Im lokalen Speicher Ihres Browsers legt der Demo-Zugang Ihre Sitzung,
+     Ihren Anmeldenamen und Ihre Ansichtseinstellungen ab — Farbthema,
+     Anordnung der Kacheln und Ähnliches. Das bleibt auf Ihrem Gerät und wird
+     nicht an uns übermittelt. Sie können es jederzeit über die Einstellungen
+     Ihres Browsers löschen; die Abmeldung entfernt die Sitzung ebenfalls.</p>
+
+  <h2>8. Auswertung der Nutzung — geplant, heute nicht in Betrieb</h2>
+  <p><strong>Heute wird nichts davon gemessen.</strong> Ausser den
+     Zugriffsprotokollen des Webservers (Abschnitt 4) entsteht keine Aufzeichnung
+     darüber, was Sie in Ihrem Demo-Zugang anschauen oder anklicken.</p>
+  <p>Geplant ist es aber, und wir sagen das lieber vorher als nachher: Wir
+     möchten künftig auswerten, <strong>welche Bereiche der Software geöffnet
+     werden, wie lange sie betrachtet werden und wo geklickt wird</strong> —
+     angebunden an den Demo-Platz, den Sie erhalten haben, damit wir beim
+     vereinbarten Rückruf (siehe Nutzungsbedingungen Ziffer 8) gezielt auf das
+     eingehen können, was Sie tatsächlich ausprobiert haben, statt es zu
+     vermuten. Veröffentlichte oder weitergegebene Auswertungen sollen dagegen
+     keine Angaben enthalten, die sich einer Person oder einem Betrieb zuordnen
+     lassen.</p>
+  <p>Wie das technisch aussieht, ist offen: ob im eigenen Haus gemessen wird
+     oder über einen Dienst, und wie lange eine solche Aufzeichnung aufbewahrt
+     wird. Auch die rechtliche Prüfung steht aus.</p>
+  <p>Bis dahin gilt der erste Satz dieses Abschnitts. Bevor eine solche Messung
+     eingeschaltet wird, wird diese Seite geändert, und das Datum oben sagt
+     Ihnen, welche Fassung gerade gilt.</p>
+
+  <h2>9. Weitergabe</h2>
+  <p>Wir geben diese Daten nicht zu Werbezwecken weiter und verkaufen sie nicht.
+     Technisch beteiligt ist die <strong>Hostpoint AG</strong> als Betreiberin des
+     Servers und der Datenbank.</p>
+
+  <h2>10. Wo die Daten liegen</h2>
+  <p>Server und Datenbank werden in der Schweiz betrieben. Eine Übermittlung ins
+     Ausland findet von unserer Seite aus nicht statt.</p>
+
+  <h2>11. Ihre Rechte</h2>
+  <p>Sie können jederzeit Auskunft darüber verlangen, welche Daten wir über Sie
+     bearbeiten, und deren Berichtigung oder Löschung verlangen. Eine E-Mail an
+     <a href="mailto:info@guardops.ch">info@guardops.ch</a> genügt. Zum Schutz vor
+     unberechtigten Auskünften können wir dabei einen Identitätsnachweis
+     verlangen.</p>
+  <p>Anders als bei der gemeinsamen Vorführanlage gehört Ihr Demo-Zugang
+     ausschliesslich Ihnen — wir können Ihre Eingaben also zuordnen, solange
+     die 14 Tage laufen. Nach Ablauf ist die Instanz bereits gelöscht.</p>
+
+  <h2>12. Änderungen</h2>
+  <p>Es gilt die jeweils auf dieser Seite veröffentlichte Fassung. Das oben
+     genannte Datum sagt, welche das ist.</p>
+</main>
+
+<footer class="fuss">
+  <div class="innen">
+    <span>© 2026 <span data-brand>GuardOpS</span></span>
+    <a href="impressum.html">Impressum</a>
+    <a href="datenschutz.html">Datenschutz (Verkaufsseite)</a>
+    <a href="index.html">Startseite</a>
+  </div>
+</footer>
+</body>
+</html>

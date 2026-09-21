@@ -476,6 +476,18 @@ jede 14 Tage lang einem einzelnen Interessenten gehört. Beides läuft
 nebeneinander und teilt sich nichts — weder Datenbank noch Mailziel noch
 Adresse.
 
+**Beide tragen trotzdem denselben `APP_ENV=demo`** — die Unterscheidung
+"welche der beiden Demo-Anlagen läuft hier gerade" braucht darum einen
+zweiten, eigenen Platzhalter: `__IST_DEMO_PLATZ__` in `testumgebung.js`,
+nur bei den zehn Plätzen auf `"1"` gesetzt, überall sonst auf `"0"`
+(Befund des Projektinhabers, 2026-09-21 — bis dahin zeigte das Dashboard
+eines Demo-Platzes fälschlich die Datenschutzseite der ENT-523-Umgebung,
+die vom gemeinsamen Zugang und vom nächtlichen Leeren erzählt, keins von
+beidem trifft aber auf einen Demo-Platz zu). `window.APP_UMGEBUNG_DEMO_PLATZ`
+steuert in `dashboard.html`, welche der beiden Seiten
+(`datenschutz-demo.html` oder `datenschutz-demo-platz.html`) der
+Datenschutzlink im Anmelde-Tor öffnet.
+
 Ein Interessent trägt sich auf guardops.ch ein, `api/demo_anfordern.php`
 sucht den ersten freien Platz, leert dessen Instanz, füllt sie mit dem
 Musterbetrieb, legt ein Konto an und verschickt die Zugangsdaten. Damit

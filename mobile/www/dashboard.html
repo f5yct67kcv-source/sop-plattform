@@ -33251,8 +33251,20 @@ if (window.APP_UMGEBUNG_DEMO) {
   // beschreibt ("Diese Seite setzt keine Cookies, misst kein Verhalten...").
   // Umgehaengt statt zweiter Zeile im Markup: Ein zweiter Verweis stuende
   // in jedem anderen Buendel mit daneben, wo es keinen Demobereich gibt.
+  //
+  // ZWEI VERSCHIEDENE TEXTE FUER ZWEI VERSCHIEDENE ANLAGEN (Befund des
+  // Projektinhabers, 2026-09-21): APP_UMGEBUNG_DEMO allein unterscheidet
+  // nicht zwischen der einen ENT-523-Demo-Umgebung (gemeinsamer Zugang,
+  // naechtliches Leeren) und einem der zehn Demo-Plaetze (ENT-600/601:
+  // eigene Datenbank, 14 Tage, persoenlicher Zugang) -- beide tragen
+  // APP_ENV=demo. Ohne diese Verzweigung laese ein Demo-Platz-Besucher
+  // den falschen Text, wie es bis zu diesem Fund der Fall war.
   const ds = $('gateDatenschutz');
-  if (ds) { ds.href = 'https://guardops.ch/datenschutz-demo.html'; }
+  if (ds) {
+    ds.href = window.APP_UMGEBUNG_DEMO_PLATZ
+      ? 'https://guardops.ch/datenschutz-demo-platz.html'
+      : 'https://guardops.ch/datenschutz-demo.html';
+  }
 }
 
 // Wer automatisch abgemeldet wurde, steht sonst vor einer leeren
