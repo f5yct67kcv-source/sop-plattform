@@ -65,8 +65,9 @@
       <a href="hb-kunden.php">Kunden</a> verwaltet — hier nur, was daran anschliesst.</p>
 
       <h2 id="uebersicht-monatsmatrix">Übersicht (Monatsmatrix)</h2>
-      <p>Ein Raster: eine Zeile je Objekt (bei gemischter Sparte auch zweimal, je mit
-      eigenem Sparten-Chip), Spalten = Tage. Eine Zelle zeigt die Anzahl eingeteilter
+      <p>Ein Raster: eine Zeile je Objekt<?= reinigung_angeboten()
+      ? ' (bei gemischter Sparte auch zweimal, je mit eigenem Sparten-Chip)' : '' ?>,
+      Spalten = Tage. Eine Zelle zeigt die Anzahl eingeteilter
       Personen, farbcodiert nach „voll besetzt" / „teilweise besetzt" / „niemand
       eingeteilt" / „provisorisch" / „abgesagt". Auf den Objektnamen klicken springt
       in die Objektplanung, auf eine Tageszelle in den Tagesplan dieses Tages.</p>
@@ -78,10 +79,10 @@
       ergeben.</p>
 
       <ol class="hb-schritte">
-        <li>„Neuer Einsatz": Kunde, Einsatzart, Sparte, Zeitraum (ein Bis-Datum
+        <li>„Neuer Einsatz": Kunde, Einsatzart,<?= reinigung_angeboten() ? ' Sparte,' : '' ?> Zeitraum (ein Bis-Datum
         erzeugt <b>einen Einsatz je Tag</b>, keinen Mehrtages-Datensatz),
         Arbeitsort (Strasse, PLZ, Ort, Kanton — Pflicht), benötigte Mitarbeitende.</li>
-        <li>Bei Sparte Sicherheit: Wegstrecke ab Hauptanstellungsort und Fahrzeit
+        <li><?= reinigung_angeboten() ? 'Bei Sparte Sicherheit: Wegstrecke' : 'Wegstrecke' ?> ab Hauptanstellungsort und Fahrzeit
         (Art. 18 GAV) — die Route öffnet sich nur als Link in Google Maps, ohne
         automatische Übernahme, weil der GAV die kürzeste, nicht die schnellste
         Strecke verlangt.</li>
@@ -147,8 +148,8 @@
       unverändert".</p>
 
       <ol class="hb-schritte">
-        <li>„Masterschicht hinzufügen": Bezeichnung, Kürzel, Art (Arbeit/Fahrtzeit),
-        Sparte, Zeiten, Pause, Wochenmuster (Bedarf je Wochentag <i>und</i>
+        <li>„Masterschicht hinzufügen": Bezeichnung, Kürzel, Art (Arbeit/Fahrtzeit),<?=
+        reinigung_angeboten() ? ' Sparte,' : '' ?> Zeiten, Pause, Wochenmuster (Bedarf je Wochentag <i>und</i>
         Feiertag getrennt — am Feiertag gilt dessen Wert statt des
         Wochentagswerts) oder ein festes Intervall („jeden n-ten Tag").</li>
         <li>Gültig ab (Pflicht) / Gültig bis (leer = offen) — für saisonale

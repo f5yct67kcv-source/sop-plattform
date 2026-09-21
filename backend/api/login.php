@@ -4,6 +4,8 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../anmeldung.php';
 require __DIR__ . '/../zweifaktor.php';
+// Fuer sparten_erlaubt() -- welche Sparten dieser Mandant anbietet (ENT-650).
+require_once __DIR__ . '/../planung.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
@@ -136,4 +138,9 @@ json_response(['status' => 'ok', 'token' => $token, 'name' => $name,
     'ist_admin' => in_array('rechte_' . STUFE_SCHREIBEN, $rechte, true),
     'rollen'    => $rollen,
     'rechte'    => $rechte,
+    // Aus demselben Grund wie Rollen und Rechte gleich mit (ENT-650): Sonst
+    // baute die Maske sich nach jedem Anmelden erst nach der Antwort von
+    // me.php um -- und eine Sparte, die dieser Mandant gar nicht anbietet,
+    // blitzte dazwischen auf.
+    'sparten'   => sparten_erlaubt(),
     'geraet' => $geraetWert]);

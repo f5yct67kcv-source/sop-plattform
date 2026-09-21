@@ -134,13 +134,14 @@
       <ol class="hb-schritte">
         <li>„Neues Objekt": Bezeichnung, Kunde (mit Autovervollständigung aus dem
         Kundenstamm) und Ort sind Pflicht.</li>
-        <li>Sparte (Sicherheit/Reinigung) und Einsatzart (Standard: Revierdienst)
-        wählen.</li>
+        <li><?= reinigung_angeboten() ? 'Sparte (Sicherheit/Reinigung) und Einsatzart'
+          : 'Einsatzart' ?> (Standard: Revierdienst) wählen.</li>
         <li><b>Wegstrecke ab Anstellungsort (Art. 18 GAV):</b> je hinterlegtem
         Anstellungsort die Distanz in km eintragen. Fehlt sie, zeigt das Werkzeug
         ausdrücklich „Wegstrecke fehlt — nicht beurteilbar, ob Auslagenersatz anfällt"
-        (nicht „keine Entschädigung"). Bei Sparte „Reinigung" entfällt die Frage: Der
-        GAV für private Sicherheitsdienstleistungen gilt dort nicht.</li>
+        (nicht „keine Entschädigung").<?= reinigung_angeboten()
+          ? ' Bei Sparte „Reinigung" entfällt die Frage: Der GAV für private'
+            . ' Sicherheitsdienstleistungen gilt dort nicht.' : '' ?></li>
         <li>Speichern — bei Neuanlage direkter Sprung zur neuen Objekt-Detailseite
         (Masterschichten).</li>
       </ol>

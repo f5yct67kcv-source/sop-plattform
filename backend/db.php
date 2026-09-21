@@ -138,6 +138,52 @@ function ist_demo(): bool
     return umgebung_ist_demo(APP_ENV);
 }
 
+// ── Bietet dieser Mandant die Sparte Reinigung an? (ENT-650) ──────────
+//
+// ANLASS: Mit den Demo-Plaetzen (ENT-600) ist die Anlage zum ersten Mal an
+// mehr als einem Ort gelaufen -- und hat dabei alles mitgenommen, auch die
+// Sparte Reinigung. Die ist aber ausschliesslich fuer CUPI 24 entstanden
+// (ENT-037, ENT-061, ENT-062).
+//
+// WARUM DAS NICHT NUR EINE ANZEIGEFRAGE IST: Fuer die Reinigung gilt NICHT
+// der GAV der privaten Sicherheitsdienstleistungen, sondern ein eigener,
+// bislang ungepruefter Gesamtarbeitsvertrag (so schon im Kopf von
+// planung.php und in gavzeit_gilt()). Das Regelwerk in 90-gav/ deckt ihn
+// nicht ab. Einem fremden Mandanten eine Sparte anzubieten, deren
+// Lohnregeln wir nicht umgesetzt haben, hiesse, seine Leute nach dem
+// falschen Vertrag abzurechnen -- und das faellt dort auf, wo es am
+// teuersten ist. Darum wird die Sparte nicht versteckt, sondern gibt es
+// nicht: keine Auswahl, keine Einsatzart, keine Texte.
+//
+// AUS DEM DEPLOY, NIE AUS DER ANFRAGE -- dieselbe Bauart und derselbe Grund
+// wie bei APP_ENV und basis_url() (ENT-501). Der Deploy-Lauf weiss
+// zweifelsfrei, welches Buendel er gerade baut; ein Hostname oder ein
+// Kopf aus der Anfrage wuesste es nicht.
+//
+// FAIL-SAFE AUS: wahr NUR beim exakten Wert "1". Ein leerer, ein noch
+// unersetzter ("__SPARTE_REINIGUNG__") oder sonst irgendein Wert heisst
+// NEIN. Die Richtung ist hier eindeutig: "Ein Bestandsmandant sieht eine
+// Sparte nicht mehr" ist ein sichtbarer Fehler, den jemand sofort meldet;
+// "ein fremder Mandant rechnet nach dem falschen GAV ab" ist der stille,
+// teure. Bewusst KEIN Rueckfall ueber ist_produktion(): der Betreiber-
+// Bereich, das Kundenportal und die Marketingseite laufen ebenfalls unter
+// "production" und haben mit der Sparte nichts zu tun.
+const SPARTE_REINIGUNG = '__SPARTE_REINIGUNG__';
+
+// Eigene, reine Funktion statt eines Inline-Vergleichs -- gleiche
+// Ueberlegung wie bei umgebung_ist_produktion(): eine PHP-Konstante laesst
+// sich nach der Definition nicht mehr veraendern, ein Test kaeme sonst nur
+// an EINEM Zustand vorbei (siehe pruefungen/pruef_reinigung_sparte.php).
+function sparte_reinigung_frei(string $wert): bool
+{
+    return $wert === '1';
+}
+
+function reinigung_angeboten(): bool
+{
+    return sparte_reinigung_frei(SPARTE_REINIGUNG);
+}
+
 // Wache fuer Endpunkte, die AUSSCHLIESSLICH in der Demo-Umgebung existieren
 // duerfen (ENT-523, erster Verwender: demo_daten_erzeugen.php). Antwortet
 // 404, nicht 403: Wer in Produktion oder Staging nach einem

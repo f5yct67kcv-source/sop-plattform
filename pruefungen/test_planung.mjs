@@ -101,7 +101,10 @@ async function setup(page) {
     try { body = req.postData() ? JSON.parse(req.postData()) : null; } catch {}
     calls.push({ path, body });
     const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
-    if (path.includes('login')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
+    // Dieser Mandant ist CUPI 24 -- nur dort gibt es die Sparte Reinigung
+    // (ENT-650). Ohne diese Angabe baut das Cockpit die Spartenauswahl aus.
+    if (path.includes('login')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true,
+      sparten: ['sicherheit', 'reinigung'] });
     if (path.includes('dashboard_stats')) return send(STATS);
     if (path.includes('rapport_list')) return send(RAPPORTE);
     if (path.includes('mitarbeiter_list')) return send(MA);

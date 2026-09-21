@@ -932,6 +932,9 @@ jobs:
           # Quelle der Wahrheit verwenden.
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist/db.php
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist/testumgebung.js
+          # Sparte Reinigung (ENT-650): NUR CUPI 24, und dist/ ist der
+          # Bestandsmandant. Begruendung: dist-cupi24/ weiter unten.
+          sed -i "s|__SPARTE_REINIGUNG__|1|g" dist/db.php
           # Eigene Adresse (ENT-501). Bleibt sie leer -- bei Staging ohne
           # gesetzte STAGING_DOMAIN --, steht weiterhin woertlich
           # "__APP_BASIS_URL__" in dist/db.php; basis_url() erkennt das und
@@ -1204,6 +1207,10 @@ jobs:
           # Die Zugangsdaten der produktiven Datenbank liegen damit an genau
           # einer Stelle statt an zweien.
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-guardops/db.php
+          # Sparte Reinigung (ENT-650): aus. Die Marketingseite plant nichts,
+          # aber db.php traegt den Platzhalter, und die Pruefung auf
+          # uebrig gebliebene Platzhalter weiter unten wuerde ihn finden.
+          sed -i "s|__SPARTE_REINIGUNG__|0|g" dist-guardops/db.php
 
           # EIGENES POSTFACH, NICHT DAS GETEILTE PRODUKTIONS-POSTFACH
           # (ENT-569/OP-569, sop-projekt). Bis hierher bekam mailer.php in
@@ -1482,6 +1489,9 @@ jobs:
           sed -i "s|__BETREIBER_DB_USER__|$EFF_BETREIBER_DB_USER|g" dist-betreiber/betreiber.php
           sed -i "s|__BETREIBER_DB_PASS__|$EFF_BETREIBER_DB_PASSWORD|g" dist-betreiber/betreiber.php
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-betreiber/db.php
+          # Sparte Reinigung (ENT-650): aus -- der Betreiber-Bereich
+          # verwaltet Mandanten, er plant keine Einsaetze.
+          sed -i "s|__SPARTE_REINIGUNG__|0|g" dist-betreiber/db.php
 
           # Eigene Adresse (ENT-501, ENT-580) -- FESTES LITERAL, kein Secret
           # und keine Environment-Variable: betreiber.guardops.ch ist die
@@ -1699,6 +1709,8 @@ jobs:
           sed -i "s|__DB_USER__|$EFF_DB_USER|g" dist-portal/db.php
           sed -i "s|__DB_PASS__|$EFF_DB_PASSWORD|g" dist-portal/db.php
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-portal/db.php
+          # Sparte Reinigung (ENT-650): aus -- das Kundenportal liest nur.
+          sed -i "s|__SPARTE_REINIGUNG__|0|g" dist-portal/db.php
 
           # Eigene Adresse (ENT-501, ENT-580) -- FESTES LITERAL, kein Secret
           # und keine Environment-Variable: portal.guardops.ch ist die
@@ -1912,6 +1924,15 @@ jobs:
           sed -i "s|__BETREIBER_DB_PASS__|$EFF_BETREIBER_DB_PASSWORD|g" dist-cupi24/betreiber.php
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-cupi24/db.php
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-cupi24/testumgebung.js
+          # ── Sparte Reinigung: DER EINE PLATZ, AN DEM SIE ANGEHT ────────
+          #
+          # CUPI 24 ist der Bestandsmandant, fuer den die Sparte entstanden
+          # ist (ENT-037, ENT-061, ENT-062). Fuer die Reinigung gilt ein
+          # eigener, bislang ungepruefter GAV -- einem fremden Mandanten
+          # duerfen wir sie darum nicht anbieten (ENT-650, Begruendung bei
+          # reinigung_angeboten() in backend/db.php). Jedes andere Buendel
+          # bekommt hier "0", die zehn Demo-Plaetze weiter unten ebenfalls.
+          sed -i "s|__SPARTE_REINIGUNG__|1|g" dist-cupi24/db.php
 
           # Eigene Adresse (ENT-501, ENT-589) -- FESTES LITERAL, kein Secret
           # und keine Environment-Variable: cupi24.guardops.ch ist die
@@ -2331,6 +2352,20 @@ jobs:
             # jeder der zehn Plaetze ein offener Weg dorthin.
             ersetze __APP_ENV__ "demo" "dist-demo/$PLATZ/db.php"
             ersetze __APP_ENV__ "demo" "dist-demo/$PLATZ/testumgebung.js"
+
+            # ── Keine Sparte Reinigung (ENT-650) ─────────────────────────
+            #
+            # Ein Demo-Platz traegt einen Interessenten, also einen
+            # KUENFTIGEN FREMDEN MANDANTEN. Fuer die Reinigung gilt ein
+            # eigener GAV, den niemand geprueft hat; ihm eine Sparte
+            # vorzufuehren, deren Lohnregeln wir nicht umgesetzt haben,
+            # hiesse, ein Versprechen zu zeigen, das die Anlage nicht
+            # halten kann. Die Vorlage erbt hier den unersetzten
+            # Platzhalter aus dist/ (die Kopie entsteht VOR der dortigen
+            # Ersetzung) -- der waere schon fail-safe "aus", wird aber
+            # ausdruecklich gesetzt, damit im Buendel kein Platzhalter
+            # stehen bleibt und niemand raten muss, was gilt.
+            ersetze __SPARTE_REINIGUNG__ "0" "dist-demo/$PLATZ/db.php"
 
             # ── Eigene Adresse (ENT-501) ─────────────────────────────────
             # Aus dem Deploy, nie aus der Anfrage -- und je Platz eine
