@@ -1366,7 +1366,7 @@ jobs:
           # Das Logo der Signatur -- flach neben die Vorlage, die es von dort liest.
           cp backend/guardops-signatur.png     dist-betreiber/guardops-signatur.png
           # Die helle Fassung fuer den Dunkelmodus -- ohne sie stuende das Logo
-          # dort dunkel auf dunkel (ENT-648).
+          # dort dunkel auf dunkel (ENT-651).
           cp backend/guardops-signatur-hell.png dist-betreiber/guardops-signatur-hell.png
           # Der Griff in eine Demo-Instanz (ENT-600) und was er braucht.
           # demo_instanz.php bindet demo_reset.php ein, demo_reset.php
