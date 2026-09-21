@@ -230,6 +230,9 @@ const zeilen = await page.evaluate(() => [...document.querySelectorAll('#rdListe
   zeit: ((z.querySelector('.rd-zeit') || {}).textContent || '').trim(),
   marke: ((z.querySelector('.rd-marke') || {}).textContent || '').trim(),
   meta: ((z.querySelector('.rd-meta') || {}).textContent || '').trim(),
+  // Seit ENT-638 stehen die Aufgaben nicht mehr als Unterzeile im
+  // Zeilenkopf, sondern als eigener Block darunter.
+  aufg: ((z.querySelector('.rd-aufg') || {}).textContent || '').trim(),
   ort: ((z.querySelector('.rd-ort') || {}).textContent || '').trim(),
   knoepfe: z.querySelectorAll('.rd-akt button').length,
   jetzt: z.classList.contains('rd-jetzt'),
@@ -255,8 +258,18 @@ check('KRITISCH: genau ein Punkt ist als naechster ausgewiesen',
 check('Der naechste Punkt traegt einen Pfeil statt eines Strichs', zeilen[5].zeit === '→');
 check('Spaetere Punkte tragen einen Strich -- kein leeres Feld, das wie ein Fehler aussieht',
   zeilen[6].zeit === '–');
+/* Die AUSSAGE ist unveraendert: Wer auf die Liste sieht, weiss vor dem
+   Hingehen, dass an diesem Punkt etwas zu tun ist. Nur der Ort hat sich
+   mit ENT-638 geaendert -- aus der grauen Unterzeile „Aufgabe: X" im
+   Zeilenkopf wurde ein eigener Block darunter, der zusaetzlich den
+   Erklaertext hergibt. Die alte Fassung dieser Pruefung las das Element
+   .rd-meta und den Wortlaut „Aufgabe: " mit; beides ist Verpackung. */
 check('KRITISCH: die Aufgabe am naechsten Punkt steht da, bevor man hingeht',
-  /Aufgabe: Fenster pruefen/.test(zeilen[5].meta));
+  /Fenster pruefen/.test(zeilen[5].aufg));
+check('KRITISCH: und zwar ohne Antippen -- sie steht in der zugeklappten Zeile',
+  !zeilen[5].jetzt || /Fenster pruefen/.test(zeilen[5].aufg));
+check('Ein Punkt ohne Aufgabe bekommt keinen leeren Block, der wie ein Fehler aussieht',
+  zeilen[6].aufg === '');
 
 // ══════════ KNOEPFE NUR, WO SIE GEBRAUCHT WERDEN ═════════════════════
 /* Seit ENT-531 sind es am naechsten Punkt ZWEI statt drei: Solange die

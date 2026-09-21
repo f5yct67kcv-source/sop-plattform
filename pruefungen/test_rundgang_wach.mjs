@@ -70,8 +70,8 @@ const PROFIL = { status: 'ok', monat: { anzahl: 0, stunden: 0 },
 
 const browser = await chromium.launch({ executablePath: browserPfad() });
 
-async function seite(hoehe) {
-  const page = await browser.newPage({ viewport: { width: 390, height: hoehe }, deviceScaleFactor: 2,
+async function seite(hoehe, breite = 390) {
+  const page = await browser.newPage({ viewport: { width: breite, height: hoehe }, deviceScaleFactor: 2,
     permissions: ['geolocation'], geolocation: { latitude: 47.35, longitude: 7.9, accuracy: 8 } });
   // Eigene Wachsperre statt der echten: So laesst sich zaehlen, ob
   // angefordert und freigegeben wird -- unabhaengig davon, ob der
@@ -134,7 +134,7 @@ const masse = page => page.evaluate(() => {
            chip: g('#rgsOrtChip'), kopf: g('.rgs-kopf'), reiter: g('.rgs-reiter'),
            zVerankerung: (() => { const e = document.getElementById('rgsZchips');
              return e ? getComputedStyle(e).position : null; })(),
-           huelle: g('.rgs-karte-huelle'), zen: g('#rgsZentrieren'), nacht: g('#rgsNachtsicht'),
+           huelle: g('.rgs-karte-huelle'), zen: g('#rgsZentrieren'), zahn: g('#rgsEinstKnopf'),
            zeile: !!document.getElementById('rgsOrtungHinweis') };
 });
 
@@ -152,7 +152,7 @@ let m = await masse(page);
 for (const [nm, el] of [['Titel', m.titel], ['Zaehler', m.zaehler], ['Laufzeit', m.timer],
     ['Zaehler-Chip', m.zChip], ['Laufzeit-Chip', m.tChip], ['Chipzeile', m.zeilen],
     ['Ortungsmarke', m.chip], ['Kartenhuelle', m.huelle], ['Kopf', m.kopf],
-    ['Reiterleiste', m.reiter], ['Zentrieren', m.zen], ['Nachtsicht', m.nacht]]) {
+    ['Reiterleiste', m.reiter], ['Zentrieren', m.zen], ['Zahnrad', m.zahn]]) {
   check(`KRITISCH: das Bauteil "${nm}" ist auf dem Bildschirm vorhanden`, !!el);
 }
 
@@ -208,16 +208,90 @@ check('KRITISCH: die Ortungsmarke steht auf der Karte',
   !!m.chip && m.chip.h > 16 && m.chip.t >= m.huelle?.t && m.chip.b <= m.huelle?.b);
 check('KRITISCH: die Ortungsmarke verdeckt die beiden Zahlen nicht',
   m.chip?.t >= m.zChip?.b && m.chip?.t >= m.tChip?.b);
-check('KRITISCH: beide Kartenknoepfe halten Abstand zur Anbieterleiste am unteren Rand',
-  m.huelle?.b - m.zen?.b >= 24 && m.huelle?.b - m.nacht?.b >= 24);
-check('Die Knoepfe sitzen trotzdem tief -- weiter unten als die halbe Karte',
-  m.zen?.t > m.huelle?.t + m.huelle?.h / 2 && m.nacht?.t > m.huelle?.t + m.huelle?.h / 2);
-check('Beide Kartenknoepfe behalten 44 px Trefferflaeche (CLAUDE.md)',
-  m.zen?.h >= 44 && m.nacht?.h >= 44);
-check('Marke und Knoepfe ueberlappen sich nicht',
-  m.chip?.b < m.zen?.t && m.chip?.b < m.nacht?.t);
-check('Die Zahlen und die Knoepfe ueberlappen sich nicht',
-  m.zChip?.b < m.zen?.t && m.tChip?.b < m.nacht?.t);
+/* Bis ENT-640 standen hier ZWEI Knoepfe nebeneinander am unteren Rand:
+   „Zentrieren" links, „Nachtsicht" rechts. Das Kartenbild ist seither eine
+   Wahl unter mehreren Einstellungen und wohnt im Blatt hinter dem Zahnrad
+   -- unten steht nur noch „Zentrieren", oben rechts das Zahnrad.
+
+   Die Aussagen bleiben, sie gelten nur fuer andere Bauteile: Was unten
+   liegt, haelt Abstand zur Anbieterleiste; was oben liegt, faellt den
+   Zahlen nicht ins Gehege; beide bleiben in der Karte und bei 44 px. */
+check('KRITISCH: der Zentrieren-Knopf haelt Abstand zur Anbieterleiste am unteren Rand',
+  m.huelle?.b - m.zen?.b >= 24);
+check('Er sitzt trotzdem tief -- weiter unten als die halbe Karte',
+  m.zen?.t > m.huelle?.t + m.huelle?.h / 2);
+check('KRITISCH: das Zahnrad steht oben rechts, in der oberen Haelfte und am rechten Rand',
+  m.zahn?.t < m.huelle?.t + m.huelle?.h / 2
+  && m.zahn?.l > m.huelle?.l + m.huelle?.w / 2);
+check('Beide Bedienelemente behalten 44 px Trefferflaeche (CLAUDE.md)',
+  m.zen?.h >= 44 && m.zahn?.h >= 44 && m.zahn?.w >= 44);
+check('Beide bleiben innerhalb der Karte',
+  m.zen?.l >= m.huelle?.l && m.zen?.b <= m.huelle?.b
+  && m.zahn?.r <= m.huelle?.r && m.zahn?.t >= m.huelle?.t);
+check('Marke und Zentrieren-Knopf ueberlappen sich nicht',
+  m.chip?.b < m.zen?.t);
+check('KRITISCH: die Zahlen und das Zahnrad ueberlappen sich nicht -- beide liegen oben',
+  m.zChip?.r < m.zahn?.l && m.tChip?.r < m.zahn?.l);
+
+// ══════════ DIE REITERLEISTE: ZEICHEN GROSS, LEISTE SCHLANK ═══════════
+/* Nachgemessen an einem Bildschirmfoto des Wettbewerbers (ENT-642), Pixel
+   fuer Pixel auf demselben Geraet -- beide Aufnahmen 1179 px breit, also
+   dreifach. Das Ergebnis war das Gegenteil der Vermutung: Die fremde
+   Leiste ist NICHT hoeher (rund 57 gegen unsere 56 px) und ihre
+   Beschriftung nicht groesser (11,3 gegen 11,0 pt Tinte). Groesser wirkt
+   sie allein wegen der ZEICHEN -- 23 gegen unsere damaligen 14,3 pt.
+
+   Geprueft wird darum genau das, und am gerenderten Zustand: Die Zeichen
+   der Leiste sind deutlich groesser als die Zeichen sonst im Haus, der
+   Inhaltsblock trifft das Mass der Vorlage, und die Leiste bleibt
+   trotzdem schlank. Absichtlich als Spanne und nicht auf den Pixel: Eine
+   Pruefung, die 28.0 verlangt, geht bei jeder Schriftaenderung kaputt,
+   ohne dass jemand etwas falsch gemacht haette. */
+const leiste = await page.evaluate(() => {
+  const sv = document.querySelector('.rgs-reiter button svg');
+  const lb = document.querySelector('.rgs-reiter button span:last-child');
+  const bar = document.querySelector('.rgs-reiter');
+  // Ein Zeichen aus dem uebrigen Haus als Vergleich -- irgendeines mit
+  // .i-sm ausserhalb der Leiste.
+  const klein = [...document.querySelectorAll('svg.i-sm')]
+    .find(e => !e.closest('.rgs-reiter'));
+  const h = e => e ? e.getBoundingClientRect().height : null;
+  return { ikon: h(sv), klein: h(klein), leiste: h(bar),
+           block: sv && lb ? lb.getBoundingClientRect().bottom - sv.getBoundingClientRect().top : null };
+});
+check('Vorbedingung: es gibt ein Vergleichszeichen ausserhalb der Leiste',
+  leiste.klein !== null && leiste.klein > 0);
+check('KRITISCH: die Zeichen der Reiterleiste sind deutlich groesser als die Zeichen sonst im Haus',
+  leiste.ikon >= leiste.klein * 1.4);
+/* Achtung, zwei verschiedene Masse: Die 38 pt der Vorlage sind an der
+   TINTE gemessen (am Bildschirmfoto, heller Punkt gegen Hintergrund),
+   hier misst der Browser KAESTEN. Der Kasten ist rund 3,5 px groesser,
+   weil Zeichenrahmen und Zeilendurchschuss Luft mittragen. Gemessen am
+   eigenen Ergebnis: Kasten 41,5 px entspricht 38,0 pt Tinte -- genau dem
+   Wert der Vorlage. Die Spanne unten gilt fuer den KASTEN. */
+check('KRITISCH: der Inhaltsblock trifft das Mass der Vorlage (Kasten 40-43 px, entspricht 38 pt Tinte)',
+  leiste.block >= 40 && leiste.block <= 43);
+check('KRITISCH: die Leiste bleibt dabei schlank -- hoechstens 60 px, und nicht unter der Trefferflaeche von 44',
+  leiste.leiste >= 44 && leiste.leiste <= 60);
+
+// Die Beschriftungen muessen auf dem schmalsten Geraet einzeilig bleiben.
+// Bei drei Reitern teilt sich die Breite durch drei, und
+// „Kontrollpunkte" ist das laengste Wort der Leiste.
+{
+  const schmal = await seite(568, 320);
+  await schmal.evaluate(() => ladeSchichten().then(() => rundgangFortsetzen(71)));
+  await schmal.waitForTimeout(1500);
+  const lab = await schmal.evaluate(() =>
+    [...document.querySelectorAll('.rgs-reiter button')].map(b => {
+      const t = b.querySelector('span:last-child').getBoundingClientRect();
+      return { breite: t.width, zelle: b.getBoundingClientRect().width, hoehe: t.height };
+    }));
+  check('KRITISCH: auf 320 px bleibt jede Beschriftung einzeilig',
+    lab.length === 3 && lab.every(l => l.hoehe < 18));
+  check('KRITISCH: und jede passt in ihre Zelle, ohne an den Rand zu stossen',
+    lab.every(l => l.breite <= l.zelle - 8));
+  await schmal.close();
+}
 
 // ══════════ REITER OHNE KARTE ════════════════════════════════════════
 // Dort gibt es nichts zu ueberlagern -- die Chips stehen im Fluss, und der
@@ -261,27 +335,44 @@ check('Und sie klebt auch nicht am linken Rand',
   liste.links >= 12);
 
 // ══════════ WACH HALTEN ═══════════════════════════════════════════════
+/* Der Schalter ist mit ENT-640 aus dem Funktionen-Reiter in das
+   Einstellungsblatt der Karte gezogen -- Vorgabe des Projektinhabers, der
+   dort alles versammelt haben wollte, was die Runde einstellt. Die
+   Aussagen dieser Pruefung bleiben Wort fuer Wort dieselben; nur der Weg
+   dorthin ist ein anderer. Dazu kommt eine neue: Er steht NUR dort.
+   Dieselbe Einstellung an zwei Orten waere zweimal zu pflegen. */
+const blattAuf = async () => {
+  await page.click('#rgsRt-karte'); await page.waitForTimeout(700);
+  await page.click('#rgsEinstKnopf'); await page.waitForTimeout(300);
+};
 await page.click('#rgsRt-funktionen'); await page.waitForTimeout(500);
-check('KRITISCH: der Schalter "Bildschirm wach halten" steht unter Funktionen',
-  await page.isVisible('#rgsLaufWach'));
+check('KRITISCH: der Schalter steht NICHT mehr im Funktionen-Reiter',
+  await page.evaluate(() => !document.getElementById('rgsLaufWach')));
+await blattAuf();
+check('KRITISCH: der Schalter "Bildschirm wach halten" steht im Einstellungsblatt der Karte',
+  await page.isVisible('#rgsEinstWach'));
 check('Er steht auf AUS, ohne dass jemand etwas eingestellt hat',
-  (await page.textContent('#rgsLaufWachZust')).trim() === 'Aus'
-  && await page.getAttribute('#rgsLaufWach', 'aria-pressed') === 'false');
+  (await page.textContent('#rgsEinstWach')).includes('Aus')
+  && await page.getAttribute('#rgsEinstWach', 'aria-checked') === 'false');
 check('KRITISCH: solange er aus ist, wird keine Sperre angefordert',
   await page.evaluate(() => window.__wach.anfragen) === 0);
 check('Daneben steht, was die Einstellung bringt und was sie kostet',
-  (await page.textContent('#rgsLaufWachTxt')).includes('Akku'));
+  await page.evaluate(() => {
+    const b = document.getElementById('rgsEinstWach');
+    const t = b && b.nextElementSibling;
+    return !!t && t.classList.contains('rgs-einst-txt') && t.textContent.includes('Akku');
+  }));
 const wachBtn = await page.evaluate(() => {
-  const r = document.getElementById('rgsLaufWach').getBoundingClientRect(); return r.height; });
+  const r = document.getElementById('rgsEinstWach').getBoundingClientRect(); return r.height; });
 check('Der Schalter hat 44 px Trefferflaeche', wachBtn >= 44);
 
-await page.click('#rgsLaufWach'); await page.waitForTimeout(500);
+await page.click('#rgsEinstWach'); await page.waitForTimeout(500);
 check('KRITISCH: Einschalten fordert die Sperre tatsaechlich an',
   await page.evaluate(() => window.__wach.anfragen) >= 1
   && await page.evaluate(() => window.__wach.offen) === 1);
 check('Der Schalter zeigt danach EIN -- mit Wort, nicht nur mit Farbe',
-  (await page.textContent('#rgsLaufWachZust')).trim() === 'Ein'
-  && await page.getAttribute('#rgsLaufWach', 'aria-pressed') === 'true');
+  (await page.textContent('#rgsEinstWach')).includes('Ein')
+  && await page.getAttribute('#rgsEinstWach', 'aria-checked') === 'true');
 check('Die Wahl bleibt auf dem Geraet',
   await page.evaluate(() => localStorage.getItem('sop_rundgang_wachhalten')) === 'an');
 
@@ -304,13 +395,13 @@ check('Die Wahl bleibt auf dem Geraet',
     && await page.evaluate(() => window.__wach.offen) === 1);
 }
 
-await page.click('#rgsLaufWach'); await page.waitForTimeout(500);
+await page.click('#rgsEinstWach'); await page.waitForTimeout(500);
 check('KRITISCH: Ausschalten gibt die Sperre wieder frei',
   await page.evaluate(() => window.__wach.freigaben) >= 1
   && await page.evaluate(() => window.__wach.offen) === 0);
 
 // Wieder ein, dann Runde verlassen: die Sperre darf die Runde nicht ueberdauern.
-await page.click('#rgsLaufWach'); await page.waitForTimeout(400);
+await page.click('#rgsEinstWach'); await page.waitForTimeout(400);
 check('Vor dem Verlassen ist die Sperre offen',
   await page.evaluate(() => window.__wach.offen) === 1);
 await page.evaluate(() => rgSeiteZu()); await page.waitForTimeout(600);
@@ -382,8 +473,12 @@ for (const h of [720, 660, 600]) {
     k.zaehler?.fs >= 15 && k.timer?.fs >= 15 && k.zChip?.h >= 30);
   check(`${h} px: die Karte bekommt weiterhin den ganzen Rumpf`,
     Math.abs(k.huelle?.t - k.kopf?.b) <= 2 && Math.abs(k.reiter?.t - k.huelle?.b) <= 2);
-  check(`${h} px: die Knoepfe halten weiterhin Abstand zur Anbieterleiste`,
-    k.huelle?.b - k.zen?.b >= 24 && k.huelle?.b - k.nacht?.b >= 24);
+  check(`${h} px: der Zentrieren-Knopf haelt weiterhin Abstand zur Anbieterleiste`,
+    k.huelle?.b - k.zen?.b >= 24);
+  // Auch auf einem knappen Bildschirm darf das Zahnrad den Zahlen nicht
+  // ins Gehege kommen -- beide liegen oben, und oben wird es zuerst eng.
+  check(`${h} px: das Zahnrad ueberlappt die Zahlen nicht`,
+    k.zahn?.l > k.zChip?.r && k.zahn?.r <= k.huelle?.r);
   check(`${h} px: Zahlen und Ortungsmarke liegen im Bild und ueberlappen sich nicht`,
     !!k.chip && k.chip.t >= k.huelle?.t && k.chip.b <= k.huelle?.b
     && k.chip.t >= k.zChip?.b && k.zChip?.b < k.zen?.t);
