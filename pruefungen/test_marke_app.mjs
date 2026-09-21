@@ -61,7 +61,7 @@ const MESSEN = () => {
   const sig = document.querySelector('.gate-sig .go-sig');
   const label = document.querySelector('.gate-sig .go-label');
   const mitte = document.querySelector('.gate-mitte');
-  const logo = document.querySelector('.gate-oben img');
+  const logo = document.querySelector('.gate-oben .gate-marke');
   const gate = document.getElementById('gate');
   if (!wrap || !sig || !mitte) { return null; }
   const rs = sig.getBoundingClientRect();
