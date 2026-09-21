@@ -289,6 +289,46 @@ await klick(pausePage, '#rdAufg2');
 await pausePage.waitForTimeout(250);
 check('KRITISCH: und der Erklaertext erscheint auch pausiert',
   /Bei Alarm Meldung an die Einsatzzentrale/.test((await zeile(pausePage, 2)).listeText || ''));
+
+/* ══════════ KEINE ENTFERNUNG AUF EINER PAUSIERTEN RUNDE (ENT-648) ═════
+   Die offene Frage aus ENT-638, vom Projektinhaber entschieden: nicht
+   zeigen. Das Datum steht im Protokoll und ausdruecklich NICHT hier --
+   ein festes Datum nahe beim heutigen Tag kippt beim Datumswechsel, und
+   test_datumsfest.mjs hat es prompt gefunden.
+
+   Der Grund ist nicht Platzmangel. Waehrend der Pause ist die Ortung
+   BEWUSST aus (ENT-131: keine fortlaufende Verfolgung ohne laufende
+   Runde). Die zuletzt gemessene Position bleibt aber im Speicher stehen
+   -- rgOrtungStoppen raeumt nur die Richtung weg, nicht den Ort. Eine
+   Entfernung daraus waere eine Zahl, die aktuell AUSSIEHT und es nicht
+   ist. Wer in der Pause 300 m weitergeht, liest weiterhin den alten Wert.
+
+   Genau das wird hier geprueft, und zwar in der Lage, die nach dem
+   Pausieren einer laufenden Runde tatsaechlich herrscht: Position im
+   Speicher, Ortung aus. Ohne das Vorlegen der Position waere die Pruefung
+   wertlos -- sie wuerde auch gruen, wenn nur zufaellig keine Position da
+   ist. Die beiden Vorbedingungen unten sichern das ab. */
+const pausiertOrt = await pausePage.evaluate(ort => {
+  rgsMeinOrt = { lat: ort.lat, lng: ort.lng, genauigkeit: 8, zeit: Date.now(),
+                 richtung: null, richtungZeit: 0, anker: null };
+  rundgangListeZeichnen();
+  const geo = rundgangAktiv.kontrollpunkte.filter(k => k.typ === 'geofence');
+  return {
+    ortungAus: rgsOrtWache === null,
+    messbar: geo.length > 0 && geo.every(k => rdEntfernungZu(k) !== null),
+    texte: [...document.querySelectorAll('#rdListe .rd-ort')].map(e => e.textContent.trim()),
+    zeilen: document.querySelectorAll('#rdListe .rd-zeile').length,
+  };
+}, ORT);
+check('Vorbedingung: pausiert laeuft keine Ortung mehr',
+  pausiertOrt.ortungAus === true);
+check('Vorbedingung: die letzte Position liegt trotzdem noch im Speicher -- sonst prueft der naechste Punkt nichts',
+  pausiertOrt.messbar === true);
+check('Vorbedingung: die Liste zeigt ueberhaupt Zeilen',
+  pausiertOrt.zeilen >= 5);
+check('KRITISCH: pausiert steht an keiner Zeile eine Entfernung -- eine Zahl aus einer abgeschalteten Ortung saehe aktuell aus und waere es nicht',
+  pausiertOrt.texte.length === 0);
+
 await pausePage.screenshot({ path: `${OUT}/aufgaben-punkt-02-pausiert.png` });
 await pausePage.close();
 
