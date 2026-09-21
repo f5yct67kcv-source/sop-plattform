@@ -32,6 +32,7 @@ require_once __DIR__ . '/../push.php';
 require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../mailer.php';
 require_once __DIR__ . '/../supportvorgang.php';
+require_once __DIR__ . '/../alleinarbeiterschutz.php';
 
 // Beim Deploy ersetzt. Ungesetzt heisst: Der Zeitgeber-Weg ist zu.
 const PUSH_ZEITGEBER_SCHLUESSEL = '__PUSH_CRON_SCHLUESSEL__';
@@ -98,9 +99,34 @@ try {
                         'fehler' => db_fehlermeldung($e)];
 }
 
+/* ── Dritte Aufgabe desselben Zeitgebers: Alleinarbeiterschutz Stufe 1
+   (ENT-153, ENT-644) ──
+
+   WARUM HIER UND NICHT IN EINEM EIGENEN ENDPUNKT: derselbe Grund wie beim
+   Support-Nachlauf direkt darueber -- ein zweiter Cronjob ist ein zweiter
+   Handgriff, an den sich jemand erinnern muss.
+
+   WARUM VOR DEN PUSH-AUSSTEIGERN darunter: Die beiden fruehen
+   json_response()-Antworten unten sagen nichts ueber Ueberfaelligkeit aus.
+   Staende dieser Block dahinter, liefe er nie, solange z. B. der
+   Push-Schluessel fehlt -- und das faellt nicht auf, weil nichts rot wird.
+
+   EIGENES try/catch, ANALOG ZUM SUPPORT-NACHLAUF: ein Fehler hier darf den
+   Mitteilungs-Versand nicht aufhalten. Die Ueberfaelligkeitspruefung selbst
+   entscheidet nicht ueber Push an die Belegschaft -- beide haben nur die
+   Uhr gemeinsam. */
+$alleinarbeiterschutzBilanz = ['eingerichtet' => false, 'ueberfaellig' => 0, 'gemeldet' => 0];
+try {
+    $alleinarbeiterschutzBilanz = alleinarbeiterschutz_stufe1_pruefen($pdo, $jetzt);
+} catch (Throwable $e) {
+    $alleinarbeiterschutzBilanz = ['eingerichtet' => false, 'ueberfaellig' => 0, 'gemeldet' => 0,
+                                    'fehler' => db_fehlermeldung($e)];
+}
+
 if (!hat_tabelle($pdo, 'mitteilungen') || !hat_tabelle($pdo, 'push_abo')) {
     json_response(['status' => 'ok', 'eingerichtet' => false, 'verschickt' => 0,
         'support' => $supportNachlauf,
+        'alleinarbeiterschutz' => $alleinarbeiterschutzBilanz,
         'meldung' => 'Die Tabellen fehlen — einmal „Einrichtung" ausführen.']);
 }
 if (!push_konfiguriert()) {
@@ -110,6 +136,7 @@ if (!push_konfiguriert()) {
     // nichts eingerichtet ist.
     json_response(['status' => 'ok', 'eingerichtet' => false, 'verschickt' => 0,
         'support' => $supportNachlauf,
+        'alleinarbeiterschutz' => $alleinarbeiterschutzBilanz,
         'meldung' => 'Auf dem Server fehlt der Push-Schlüssel.']);
 }
 
@@ -125,9 +152,10 @@ foreach ($faellig as $m) {
 }
 
 json_response([
-    'status'       => 'ok',
-    'eingerichtet' => true,
-    'verschickt'   => count($bilanzen),
-    'mitteilungen' => $bilanzen,
-    'support'      => $supportNachlauf,
+    'status'               => 'ok',
+    'eingerichtet'         => true,
+    'verschickt'           => count($bilanzen),
+    'mitteilungen'         => $bilanzen,
+    'support'              => $supportNachlauf,
+    'alleinarbeiterschutz' => $alleinarbeiterschutzBilanz,
 ]);

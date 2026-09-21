@@ -2603,6 +2603,29 @@ function kern_spalten(): array {
     // waffentragberechtigt: eine bewusst gesetzte Berechtigung statt einer
     // Vermutung aus vergangenen Einsaetzen.
     ['mitarbeiter', 'revierdienst_berechtigt', 'ALTER TABLE mitarbeiter ADD COLUMN revierdienst_berechtigt TINYINT(1) NOT NULL DEFAULT 0'],
+
+    // Alleinarbeiterschutz Mechanismus B, Stufe 1 (ENT-153, ENT-644):
+    // Überfälligkeitserkennung einer laufenden Kontrollrunde.
+    //
+    // erwartete_dauer_min: die Sollzeit EINER Kontrollrunde, in Minuten.
+    // NEU -- im bisherigen Datenmodell gab es dafür kein Feld (nachgesehen,
+    // nicht angenommen: fenster_von/fenster_bis oben ist das START-Fenster,
+    // ENT-279, ein anderes Konzept; einsaetze.von/bis ist die ganze
+    // Schicht, die mehrere, unterschiedlich lange Runden enthalten kann,
+    // siehe Beispiel "Oeffnungsrunde" weiter oben in dieser Datei). NULL
+    // (Default fuer alle bestehenden Vorlagen) heisst ausdruecklich "keine
+    // Sollzeit hinterlegt" -- eine solche Runde wird NICHT auf
+    // Ueberfaelligkeit geprueft, kein geratener Ersatzwert. Siehe
+    // backend/alleinarbeiterschutz.php fuer die ausfuehrliche Begruendung
+    // und den Hinweis, dass diese Spalte noch einen Eintrag im
+    // Entscheidungsprotokoll braucht.
+    ['rundgang_vorlage', 'erwartete_dauer_min',
+     'ALTER TABLE rundgang_vorlage ADD COLUMN erwartete_dauer_min INT NULL AFTER fenster_bis'],
+    // stufe1_gemeldet_um: Sperre gegen einen zweiten Stufe-1-Push fuer
+    // dieselbe Ueberfaelligkeit -- gleiches Prinzip wie
+    // mitteilungen.push_gesendet_am (haelt die ERKENNUNG fest, nicht den
+    // Erfolg der Zustellung). NULL heisst "noch nicht gemeldet".
+    ['rundgang', 'stufe1_gemeldet_um', 'ALTER TABLE rundgang ADD COLUMN stufe1_gemeldet_um DATETIME NULL'],
     ];
 }
 }

@@ -834,7 +834,7 @@ jobs:
           cp backend/lohnlauf.php dist/lohnlauf.php
           cp backend/mitteilungen.php dist/mitteilungen.php
           cp backend/push.php dist/push.php
-          # Zwei Rechenkerne, die kein Endpunkt ist und die darum leicht
+          # Drei Rechenkerne, die kein Endpunkt sind und die darum leicht
           # vergessen gehen: Sie werden nur per require_once aus
           # backend/api/*.php gezogen. Die Endpunkte selbst kommen unten
           # pauschal mit ("cp backend/api/*.php"), die Module hier einzeln --
@@ -847,6 +847,10 @@ jobs:
           # auf, bekam 500, und der Einrichtungs-Punkt blieb dauerhaft grau
           # -- "unbekannt" sah aus wie "nichts nachzutragen".
           cp backend/planung_einrichten_kern.php dist/planung_einrichten_kern.php
+          # Alleinarbeiterschutz Stufe 1 (ENT-153, ENT-644): wird nur per
+          # require_once aus backend/api/push_versand.php gezogen, genau die
+          # Falle von oben.
+          cp backend/alleinarbeiterschutz.php dist/alleinarbeiterschutz.php
           cp backend/demo_instanz.php dist/demo_instanz.php
           # Schutzeinstellungen (ENT-075). Im Repository heisst die Datei
           # bewusst ohne fuehrenden Punkt -- sonst uebersieht man sie. Wird
@@ -1872,7 +1876,7 @@ jobs:
           cp backend/lohnlauf.php dist-cupi24/lohnlauf.php
           cp backend/mitteilungen.php dist-cupi24/mitteilungen.php
           cp backend/push.php dist-cupi24/push.php
-          # Zwei Rechenkerne, die kein Endpunkt ist und die darum leicht
+          # Drei Rechenkerne, die kein Endpunkt sind und die darum leicht
           # vergessen gehen: Sie werden nur per require_once aus
           # backend/api/*.php gezogen. Die Endpunkte selbst kommen unten
           # pauschal mit ("cp backend/api/*.php"), die Module hier einzeln --
@@ -1885,6 +1889,10 @@ jobs:
           # auf, bekam 500, und der Einrichtungs-Punkt blieb dauerhaft grau
           # -- "unbekannt" sah aus wie "nichts nachzutragen".
           cp backend/planung_einrichten_kern.php dist-cupi24/planung_einrichten_kern.php
+          # Alleinarbeiterschutz Stufe 1 (ENT-153, ENT-644): wird nur per
+          # require_once aus backend/api/push_versand.php gezogen, genau die
+          # Falle von oben.
+          cp backend/alleinarbeiterschutz.php dist-cupi24/alleinarbeiterschutz.php
           cp backend/demo_instanz.php dist-cupi24/demo_instanz.php
           cp htaccess-cupi24 dist-cupi24/.htaccess
           cp backend/api/*.php dist-cupi24/api/
