@@ -43,7 +43,7 @@ const DEMO_BESTAETIGUNG_STUNDEN = 24;
 // sobald der Text einmal geaendert wird -- dann laesst sich nicht mehr
 // sagen, wem welcher Wortlaut vorlag. Bei jeder inhaltlichen Aenderung an
 // nutzungsbedingungen.html wird dieses Datum hochgesetzt.
-const DEMO_BEDINGUNGEN_FASSUNG = '2026-09-19';
+const DEMO_BEDINGUNGEN_FASSUNG = '2026-09-21';
 
 // ── Der Bestaetigungswert ────────────────────────────────────────────
 //

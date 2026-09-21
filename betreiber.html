@@ -1712,6 +1712,38 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       </div>
       <div id="demo-inhalt"></div>
     </div>
+
+    <!-- Dritte Karte auf demselben Reiter, nicht daneben (Antwort des
+         Projektinhabers, 2026-09-21, auf die Gestaltungsfrage vor dieser
+         Karte): anonymisierte Summe ueber ALLE bisher geleerten
+         Demo-Plaetze, aus be_demo_nutzung_archiv (ENT-653). Die Live-
+         Ansicht EINES laufenden Platzes haengt dagegen an dessen eigener
+         Zeile in der Karte "Demo — Zugänge" oben, nicht hier -- diese
+         Karte zeigt nie einen einzelnen Platz oder Interessenten. -->
+    <div class="karte">
+      <div class="karte-kopf">
+        <div>
+          <h2>Demo — Nutzung</h2>
+          <div class="sub">Anonym, über alle bisherigen Interessenten hinweg — archiviert beim Leeren eines Platzes</div>
+        </div>
+      </div>
+      <div id="demo-nutzung-archiv"></div>
+    </div>
+    </div>
+
+    <!-- Live-Nutzung EINES laufenden Demo-Platzes (ENT-653) -- geoeffnet
+         ueber den Knopf "Nutzung" bei "Demo — Zugänge". Gleiche Bauart wie
+         #sup-karte daneben: eine Karte neben den Reitern, aus mehreren
+         Zeilen erreichbar, statt eines Dialogs. -->
+    <div class="karte versteckt" id="nu-karte">
+      <div class="karte-kopf">
+        <div>
+          <h2 id="nu-titel">Nutzung</h2>
+          <div class="sub">Welcher Reiter, wie lange — nur während dieser Platz noch läuft</div>
+        </div>
+        <button class="klein" id="knopf-nu-zu">Schliessen</button>
+      </div>
+      <div id="nu-inhalt"></div>
     </div>
 
     <!-- Formular und Supportzugriff liegen NEBEN den Reitern, nicht in
@@ -4171,6 +4203,11 @@ function demoPlatzKnoepfeVerdrahten(wurzel) {
 }
 
 async function ladeDemo() {
+  // Unabhaengig von der Zugangsliste unten geladen (ENT-653): Das Archiv
+  // fuehrt auch dann Zeilen, wenn gerade kein Zugang laeuft, und ein
+  // Ladefehler dort soll die Zugangsliste nicht mitreissen.
+  ladeDemoNutzungArchiv();
+
   const a = await ruf('betreiber_demo_list.php');
   const inhalt = $('demo-inhalt');
   const plaetze = $('demo-plaetze');
@@ -4251,6 +4288,12 @@ async function ladeDemo() {
               + demoNachfassZelle(z, kenntNachfassen) + '</td>'
         + '<td>' + demoRestZelle(z) + '</td>'
         + '<td style="text-align:right;white-space:nowrap">'
+          /* Nutzung ganz vorne: reine Ansicht, kein Risiko, anders als die
+             drei folgenden Knoepfe. Nur bei laufenden Zugaengen -- bei
+             einem beendeten ist die Instanz bereits geleert (ENT-653). */
+          + (z.status === 'aktiv'
+              ? '<button class="klein" data-demo-nutzung="' + z.platz + '" title="Welcher Reiter, wie lange -- nur während dieser Platz noch läuft">Nutzung</button> '
+              : '')
           /* Der Nachfass-Knopf steht VOR dem Not-Aus: Er ist der, den man
              oft drueckt, und der andere loescht eine Instanz. */
           + (kenntNachfassen
@@ -4271,6 +4314,8 @@ async function ladeDemo() {
       + '</tr>').join('')
     + '</tbody></table></div>';
 
+  inhalt.querySelectorAll('[data-demo-nutzung]').forEach(b =>
+    b.onclick = () => nutzungHolen(demoPlatzMandant(b.dataset.demoNutzung)));
   inhalt.querySelectorAll('[data-demo-beenden]').forEach(b =>
     b.onclick = () => demoBeenden(liste.find(z => z.id === +b.dataset.demoBeenden)));
   inhalt.querySelectorAll('[data-demo-nachgefasst]').forEach(b =>
@@ -4279,6 +4324,67 @@ async function ladeDemo() {
     b.onclick = () => demoNachgefasst(+b.dataset.demoOffen, false));
   inhalt.querySelectorAll('[data-demo-erneut]').forEach(b =>
     b.onclick = () => demoErneut(b, liste.find(z => z.id === +b.dataset.demoErneut)));
+}
+
+/* Zeilenweise Darstellung Reiter/Dauer/Aufrufe -- eine kleine Tabelle statt
+   eines Balkendiagramms (ENT-653): Zahlen genau lesen zu koennen wiegt hier
+   mehr als eine Grafik, und beide Karten (Live und Archiv) brauchen genau
+   dieselbe Form -- eine Definition, nicht zwei. */
+function nutzungTabelle(zeilen, leerText) {
+  zeilen = zeilen || [];
+  if (!zeilen.length) { return '<div class="zweit">' + text(leerText) + '</div>'; }
+  return '<div class="tab-huelle"><table><thead><tr>'
+    + '<th>Reiter</th><th>Dauer</th><th>Aufrufe</th></tr></thead><tbody>'
+    + zeilen.map(z => '<tr>'
+        + '<td>' + text(z.reiter) + '</td>'
+        + '<td>' + dauerText(z.dauer_s) + '</td>'
+        + '<td>' + z.aufrufe + '</td>'
+      + '</tr>').join('')
+    + '</tbody></table></div>';
+}
+/* Minuten runden statt Sekunden zeigen -- die Zahl beantwortet "womit
+   verbringt jemand Zeit", nicht "auf die Sekunde genau wie lange". Unter
+   einer Minute steht das ausdruecklich, statt "0 Min." zu behaupten. */
+function dauerText(dauerS) {
+  const min = Math.round(dauerS / 60);
+  return min > 0 ? min + ' Min.' : '< 1 Min.';
+}
+
+/* Live-Nutzung EINES Platzes (ENT-653). OHNE Support-Freigabe -- bewusste
+   Abweichung von supportHolen() daneben, siehe Kopfkommentar von
+   backend/api/betreiber_demo_nutzung.php. */
+async function nutzungHolen(m) {
+  if (!m) { return; }
+  stumm($('haus-meldung'));
+  $('nu-titel').textContent = 'Nutzung: ' + m.name;
+  $('nu-inhalt').textContent = 'Lädt …';
+  zeig($('nu-karte'), true);
+  const a = await ruf('betreiber_demo_nutzung.php?id=' + m.id);
+  if (a.status !== 'ok') {
+    $('nu-inhalt').innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
+    return;
+  }
+  $('nu-inhalt').innerHTML = nutzungTabelle(a.reiter,
+    'Noch keine Meldung — der Interessent hat den Reiter noch nicht gewechselt.');
+}
+
+/* Archiv ueber ALLE bisher geleerten Plaetze (ENT-653), anonym. Laeuft
+   unabhaengig von ladeDemo() durch -- ein Fehler hier bleibt in dieser
+   einen Karte, statt die Zugangsliste mitzureissen. */
+async function ladeDemoNutzungArchiv() {
+  const ziel = $('demo-nutzung-archiv');
+  const a = await ruf('betreiber_demo_nutzung_archiv.php');
+  if (a.code === 503) {
+    ziel.innerHTML = leerBlock('⚙', 'Noch nicht eingerichtet',
+      'Das Nutzungsarchiv ist auf diesem Server noch nicht angelegt.');
+    return;
+  }
+  if (a.status !== 'ok') {
+    ziel.innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
+    return;
+  }
+  ziel.innerHTML = nutzungTabelle(a.reiter,
+    'Noch nichts archiviert — erst wenn der erste Platz geleert wird, entsteht hier eine Zeile.');
 }
 
 /* Zugangsdaten erneut senden (ENT-649).
@@ -7585,6 +7691,7 @@ $('knopf-demo-ablauf').onclick    = demoAblauf;
 $('knopf-speichern').onclick  = mandantSpeichern;
 $('knopf-abbrechen').onclick  = () => zeig($('m-form-karte'), false);
 $('knopf-sup-zu').onclick      = () => zeig($('sup-karte'), false);
+$('knopf-nu-zu').onclick       = () => zeig($('nu-karte'), false);
 $('knopf-sv-zu').onclick       = () => zeig($('sv-karte'), false);
 $('knopf-sv-senden').onclick   = svAntworten;
 $('knopf-sv-arbeit').onclick   = () => svStatus('in_arbeit');

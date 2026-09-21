@@ -481,6 +481,14 @@ const DARF_VERBINDEN = {
   // ENT-612: legt Schema an (Tabellen/Spalten ueber planung_einrichten_ausfuehren),
   // liest und schreibt keine Betriebsdaten -- siehe Begruendung oben.
   'betreiber_schema_pruefen.php':  'richtet Tabellen/Spalten JEDER Mandanten-Datenbank zentral ein (ENT-612)',
+  // ENT-653: OHNE Support-Freigabe, anders als betreiber_support.php --
+  // bewusste, im Code begruendete Abweichung. Vertretbar nur, weil erstens
+  // demo_nutzung serverseitig ausschliesslich bei Demo-Plaetzen entsteht
+  // (ist_demo_platz()-Sperre beim Schreiben) und zweitens dieser Endpunkt
+  // selbst zusaetzlich jeden Mandanten abweist, der nicht in DEMO_PLAETZE
+  // steht -- ein echter Mandant liefert hier nie etwas, auf zwei
+  // unabhaengigen Wegen abgesichert.
+  'betreiber_demo_nutzung.php':    'liest Reiter/Dauer NUR eines Demo-Platzes, nie eines echten Mandanten (ENT-653)',
 };
 const heimlich = nutztMandantDb.filter(f => !DARF_VERBINDEN[f]);
 check('KRITISCH: nur namentlich genannte Endpunkte verbinden zu einer Mandantendatenbank',

@@ -824,6 +824,7 @@ const NUR_EIGENE_DATEN = [
   'meine_verfuegbarkeit.php',  // eigene Sperrtage
   'meine_zusage.php',          // eigene Zu-/Absage
   'meine_gesehen.php',         // eigene Schicht als angesehen vermerken
+  'demo_nutzung_melden.php',   // Reiter/Dauer der eigenen Sitzung (ENT-653, nur Demo-Plaetze)
   'rapport_create.php',        // eigenen Rapport erfassen
   'rapport_list.php',          // eigene Rapporte -- mehr nur mit Recht "abgleich"
   'kunden_list.php',           // Kundenliste fuer die App; Zusatzangaben nur mit Recht

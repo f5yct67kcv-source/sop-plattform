@@ -10364,6 +10364,42 @@ function api(path, opts) {
   }).then(r => r.json().then(data => ({ ok: r.ok, status: r.status, data })).catch(() => ({ ok: false, status: r.status, data: {} })));
 }
 
+// ══════════════════════════════════════════ NUTZUNGSAUSWERTUNG (ENT-653)
+// Nur bei einem Demo-Platz -- nie bei einem echten Betrieb, nie bei der
+// einen ENT-523-Demo-Umgebung. window.APP_UMGEBUNG_DEMO_PLATZ kommt aus
+// testumgebung.js, aus dem Deploy, nicht aus der Anfrage. Serverseitig
+// nochmals geprueft (ist_demo_platz() in api/demo_nutzung_melden.php) --
+// eine Sperre, die nur hier steht, waere keine (CLAUDE.md).
+//
+// Gemessen wird ausschliesslich, WELCHER Reiter offen war und WIE LANGE --
+// kein Klick auf einzelne Elemente (ENT-653, Entscheidung des
+// Projektinhabers gegen die aufwendigere Alternative).
+let dpReiter = null, dpSeit = 0;
+// anhalten=false: ein Zwischenstand wird gemeldet, aber derselbe Reiter
+// laeuft weiter (Tab in den Hintergrund, nicht verlassen). anhalten=true:
+// der Reiter endet wirklich (Wechsel oder Verlassen der Seite).
+function dpNutzungMelden(anhalten) {
+  if (!window.APP_UMGEBUNG_DEMO_PLATZ || !dpReiter) return;
+  const dauerS = Math.round((Date.now() - dpSeit) / 1000);
+  const reiter = dpReiter;
+  if (anhalten) { dpReiter = null; } else { dpSeit = Date.now(); }
+  // Ein sofortiger Wechsel (0 Sekunden) sagt nichts ueber Interesse aus,
+  // und der Endpunkt weist eine Dauer von 0 ohnehin ab.
+  if (dauerS < 1) return;
+  try {
+    fetch(API + 'demo_nutzung_melden.php', {
+      method: 'POST', keepalive: true,
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token },
+      body: JSON.stringify({ reiter, dauer_s: dauerS }),
+    }).catch(() => {});
+  } catch (e) { /* z.B. Browser ohne fetch-keepalive -- verzichten statt Fehler */ }
+}
+function dpReiterWechsel(neu) {
+  if (!window.APP_UMGEBUNG_DEMO_PLATZ) return;
+  dpNutzungMelden(true);
+  dpReiter = neu; dpSeit = Date.now();
+}
+
 // ══════════════════════════════════════════ HANDBUCH
 // handbuch/ ist eine eigene, statische Dateisammlung ausserhalb des SPA
 // (siehe handbuch/index.php) -- der Knopf im Seitenfuss holt zuerst ein
@@ -11844,6 +11880,7 @@ function weiteAnsicht(an) {
 }
 
 function go(view) {
+  dpReiterWechsel(view);
   if (huelleKompakt()) { navGruppenZu(); }
   document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('on'));
@@ -33187,6 +33224,19 @@ function gateHilfeUmschalten() {
   feld.hidden = !zu;
   knopf.setAttribute('aria-expanded', zu ? 'true' : 'false');
 }
+
+// Nutzungsauswertung (ENT-653): ein Tab im Hintergrund oder eine
+// verlassene Seite soll den zuletzt offenen Reiter nicht stillschweigend
+// verlieren. "visibilitychange" auf verborgen haelt den Zwischenstand
+// fest, ohne den Reiter zu beenden -- kommt der Tab zurueck, laeuft
+// derselbe Reiter unbemerkt weiter. "pagehide" beendet ihn wirklich.
+// dpNutzungMelden() selbst prueft APP_UMGEBUNG_DEMO_PLATZ und tut sonst
+// nichts -- diese beiden Listener stehen darum immer, auch ausserhalb
+// eines Demo-Platzes.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { dpNutzungMelden(false); }
+});
+window.addEventListener('pagehide', () => { dpNutzungMelden(true); });
 
 // ══════════════════════════════════════════ START
 document.addEventListener('keydown', e => {

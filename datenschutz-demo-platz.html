@@ -26,9 +26,10 @@
     - 14 Tage, volle Loeschung:   backend/demo_zugang.php (DEMO_ZUGANG_TAGE),
                                   nutzungsbedingungen.html Ziffer 3
     - kein naechtliches Leeren:   .github/workflows/deploy-hostpoint.yml --
-                                  __DEMO_RESET_TOKEN__ bleibt fuer jeden Platz
-                                  ausdruecklich leer, demo_reset.yml ruft nur
-                                  die eine ENT-523-Adresse (DEMO_DOMAIN) auf
+                                  der Zeitgeber-Schluessel des naechtlichen
+                                  Resets bleibt fuer jeden Platz ausdruecklich
+                                  leer, demo_reset.yml ruft nur die eine
+                                  ENT-523-Adresse (DEMO_DOMAIN) auf
     - persoenliche Zugangsdaten:  nutzungsbedingungen.html Ziffer 5; je
                                   E-Mail-Adresse nur ein Zugang (Ziffer 2)
     - keine Cookies:              dashboard.html setzt keine, Sitzung im
@@ -36,10 +37,14 @@
                                   datenschutz-demo.html)
   Aendert sich einer dieser Punkte im Code, wird diese Seite falsch.
 
-  DER ABSCHNITT ZUR NUTZUNGSANALYSE BESCHREIBT EIN VORHABEN, KEINEN ZUSTAND --
-  wie schon in datenschutz-demo.html. Solange er in dieser Form dasteht, wird
-  nichts gemessen. Wird die Auswertung gebaut, muss dieser Abschnitt VORHER in
-  die Gegenwart gesetzt werden.
+  NACHTRAG 2026-09-21 (ENT-653): Die Nutzungsauswertung in Abschnitt 8 ist
+  jetzt in Betrieb, in genau dem Umfang, den der Abschnitt beschreibt --
+  nur Reiter und Dauer, keine einzelnen Klicks, live nur waehrend der 14
+  Tage und nur dem eigenen Zugang zugeordnet, danach ausschliesslich als
+  anonyme Summe (backend/api/demo_nutzung_melden.php schreibt, backend/
+  demo_instanz.php archiviert anonymisiert beim Leeren). Aendert sich der
+  tatsaechliche Umfang, muss dieser Abschnitt VORHER angepasst werden --
+  nicht erst danach.
 
   KEINE RECHTSBERATUNG. Der Text beschreibt, was die Software tut. Ob er als
   Datenschutzerklaerung genuegt, ist eine juristische Frage und ausdruecklich
@@ -170,25 +175,26 @@
      nicht an uns übermittelt. Sie können es jederzeit über die Einstellungen
      Ihres Browsers löschen; die Abmeldung entfernt die Sitzung ebenfalls.</p>
 
-  <h2>8. Auswertung der Nutzung — geplant, heute nicht in Betrieb</h2>
-  <p><strong>Heute wird nichts davon gemessen.</strong> Ausser den
-     Zugriffsprotokollen des Webservers (Abschnitt 4) entsteht keine Aufzeichnung
-     darüber, was Sie in Ihrem Demo-Zugang anschauen oder anklicken.</p>
-  <p>Geplant ist es aber, und wir sagen das lieber vorher als nachher: Wir
-     möchten künftig auswerten, <strong>welche Bereiche der Software geöffnet
-     werden, wie lange sie betrachtet werden und wo geklickt wird</strong> —
-     angebunden an den Demo-Platz, den Sie erhalten haben, damit wir beim
-     vereinbarten Rückruf (siehe Nutzungsbedingungen Ziffer 8) gezielt auf das
-     eingehen können, was Sie tatsächlich ausprobiert haben, statt es zu
-     vermuten. Veröffentlichte oder weitergegebene Auswertungen sollen dagegen
-     keine Angaben enthalten, die sich einer Person oder einem Betrieb zuordnen
-     lassen.</p>
-  <p>Wie das technisch aussieht, ist offen: ob im eigenen Haus gemessen wird
-     oder über einen Dienst, und wie lange eine solche Aufzeichnung aufbewahrt
-     wird. Auch die rechtliche Prüfung steht aus.</p>
-  <p>Bis dahin gilt der erste Satz dieses Abschnitts. Bevor eine solche Messung
-     eingeschaltet wird, wird diese Seite geändert, und das Datum oben sagt
-     Ihnen, welche Fassung gerade gilt.</p>
+  <h2>8. Auswertung der Nutzung</h2>
+  <p>Wir werten aus, <strong>welchen Bereich der Software Sie öffnen und wie
+     lange</strong> — nicht mehr. Es wird nicht erfasst, worauf Sie im
+     Einzelnen klicken, welche Angaben Sie eintragen oder welche Daten Sie
+     sich ansehen; gezählt wird ausschliesslich der Wechsel zwischen den
+     grossen Bereichen des Cockpits (etwa „Kunden" oder „Revierdienst") und
+     die Zeit dazwischen.</p>
+  <p>Solange Ihr Zugang läuft, bleibt diese Auswertung Ihrem Zugang
+     zugeordnet — selbstverständlich in unserem eigenen Haus verarbeitet,
+     nicht über einen fremden Dienst —, damit wir beim vereinbarten Rückruf
+     (siehe Nutzungsbedingungen, Ziffer 8) gezielt auf das eingehen können,
+     was Sie tatsächlich ausprobiert haben, statt es zu vermuten. Mit dem
+     Ablauf Ihres Zugangs wird diese Zuordnung gelöscht wie alles andere in
+     Ihrer Instanz (Abschnitt 3).</p>
+  <p>Was darüber hinaus bleibt, ist eine <strong>anonyme Summe</strong> je
+     Bereich (Gesamtdauer, Anzahl Aufrufe) über alle bisherigen Demo-Zugänge
+     hinweg, ohne jeden Bezug zu Ihrem Zugang, Ihrer Firma oder einer Person.
+     Wie lange diese Summe aufbewahrt wird, ist noch nicht entschieden.</p>
+  <p>Veröffentlichte oder weitergegebene Auswertungen enthalten ohnehin keine
+     Angaben, die sich einer Person oder einem Betrieb zuordnen lassen.</p>
 
   <h2>9. Weitergabe</h2>
   <p>Wir geben diese Daten nicht zu Werbezwecken weiter und verkaufen sie nicht.

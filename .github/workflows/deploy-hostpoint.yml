@@ -933,9 +933,9 @@ jobs:
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist/db.php
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist/testumgebung.js
           sed -i "s|__IST_DEMO_PLATZ__|0|g" dist/testumgebung.js
-          # Sparte Reinigung (ENT-650): NUR CUPI 24, und dist/ ist der
-          # Bestandsmandant. Begruendung: dist-cupi24/ weiter unten.
+          # Sparte Reinigung (ENT-650): NUR CUPI 24 -- Begruendung bei dist-cupi24/.
           sed -i "s|__SPARTE_REINIGUNG__|1|g" dist/db.php
+          sed -i "s|__IST_DEMO_PLATZ__|0|g" dist/db.php
           # Eigene Adresse (ENT-501). Bleibt sie leer -- bei Staging ohne
           # gesetzte STAGING_DOMAIN --, steht weiterhin woertlich
           # "__APP_BASIS_URL__" in dist/db.php; basis_url() erkennt das und
@@ -1178,6 +1178,11 @@ jobs:
           # an EINER Adresse stehen, mit einem Stil und einem Deploy-Weg.
           # Der Demobereich verweist absolut darauf (dashboard.html).
           cp datenschutz-demo.html       dist-guardops/datenschutz-demo.html
+          # Eigene Erklaerung fuer die zehn Demo-Plaetze (ENT-653) -- ein
+          # anderes Modell als die ENT-523-Demo-Umgebung darueber, siehe
+          # Kopfkommentar der Datei. Aus demselben Grund hier: eine Adresse,
+          # ein Stil, ein Deploy-Weg fuer alle Rechtsseiten.
+          cp datenschutz-demo-platz.html dist-guardops/datenschutz-demo-platz.html
           # Nutzungsbedingungen und Bestaetigungsseite (ENT-624). Beide
           # teilen sich recht.css mit Impressum und Datenschutz -- darum
           # steht der Stil dort und nicht zweimal inline.
@@ -1212,6 +1217,7 @@ jobs:
           # aber db.php traegt den Platzhalter, und die Pruefung auf
           # uebrig gebliebene Platzhalter weiter unten wuerde ihn finden.
           sed -i "s|__SPARTE_REINIGUNG__|0|g" dist-guardops/db.php
+          sed -i "s|__IST_DEMO_PLATZ__|0|g" dist-guardops/db.php  # kein Demo-Platz
 
           # EIGENES POSTFACH, NICHT DAS GETEILTE PRODUKTIONS-POSTFACH
           # (ENT-569/OP-569, sop-projekt). Bis hierher bekam mailer.php in
@@ -1493,6 +1499,7 @@ jobs:
           # Sparte Reinigung (ENT-650): aus -- der Betreiber-Bereich
           # verwaltet Mandanten, er plant keine Einsaetze.
           sed -i "s|__SPARTE_REINIGUNG__|0|g" dist-betreiber/db.php
+          sed -i "s|__IST_DEMO_PLATZ__|0|g" dist-betreiber/db.php  # kein Demo-Platz
 
           # Eigene Adresse (ENT-501, ENT-580) -- FESTES LITERAL, kein Secret
           # und keine Environment-Variable: betreiber.guardops.ch ist die
@@ -1712,6 +1719,7 @@ jobs:
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-portal/db.php
           # Sparte Reinigung (ENT-650): aus -- das Kundenportal liest nur.
           sed -i "s|__SPARTE_REINIGUNG__|0|g" dist-portal/db.php
+          sed -i "s|__IST_DEMO_PLATZ__|0|g" dist-portal/db.php  # kein Demo-Platz
 
           # Eigene Adresse (ENT-501, ENT-580) -- FESTES LITERAL, kein Secret
           # und keine Environment-Variable: portal.guardops.ch ist die
@@ -1936,6 +1944,7 @@ jobs:
           # reinigung_angeboten() in backend/db.php). Jedes andere Buendel
           # bekommt hier "0", die zehn Demo-Plaetze weiter unten ebenfalls.
           sed -i "s|__SPARTE_REINIGUNG__|1|g" dist-cupi24/db.php
+          sed -i "s|__IST_DEMO_PLATZ__|0|g" dist-cupi24/db.php
 
           # Eigene Adresse (ENT-501, ENT-589) -- FESTES LITERAL, kein Secret
           # und keine Environment-Variable: cupi24.guardops.ch ist die
@@ -2380,6 +2389,7 @@ jobs:
             # ausdruecklich gesetzt, damit im Buendel kein Platzhalter
             # stehen bleibt und niemand raten muss, was gilt.
             ersetze __SPARTE_REINIGUNG__ "0" "dist-demo/$PLATZ/db.php"
+            ersetze __IST_DEMO_PLATZ__ "1" "dist-demo/$PLATZ/db.php"
 
             # ── Eigene Adresse (ENT-501) ─────────────────────────────────
             # Aus dem Deploy, nie aus der Anfrage -- und je Platz eine

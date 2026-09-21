@@ -2029,6 +2029,30 @@ CREATE TABLE IF NOT EXISTS lohnlauf_zeile (
   KEY idx_support_zugriff_freigabe (freigabe_id, zeitpunkt)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// ── Nutzungsauswertung der Demo-Plaetze (ENT-653) ──────────────────────
+//
+// Steht in JEDER Mandanten-Datenbank, wie support_freigabe oben -- nicht
+// nur, weil eine Tabelle nach Mandant getrennt sein muss (ENT-045-Logik),
+// sondern weil ein zweites, gepflegtes Schema nur fuer Demo-Plaetze die
+// Regel "eine Definition, nicht zwei" braechen wuerde. Bei einem echten
+// Betrieb bleibt sie leer: api/demo_nutzung_melden.php schreibt nur, wenn
+// ist_demo_platz() zutrifft (backend/db.php) -- serverseitig geprueft,
+// nicht nur im Browser verborgen (CLAUDE.md: Sperren gehoeren in den
+// Server).
+//
+// KEINE PERSONENBEZOGENEN ANGABEN: nur welcher Reiter, wie lange, wann --
+// nie ein Name, nie eine Kennung, die sich auf die anmeldende Person
+// zurueckfuehren liesse (die Demo-Plaetze haben ohnehin nur ein einziges
+// Konto). Deckt sich mit der Zusage in datenschutz-demo-platz.html
+// Abschnitt 8 und den Nutzungsbedingungen Ziffer 8 (sop-plattform).
+'demo_nutzung' => "CREATE TABLE IF NOT EXISTS demo_nutzung (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  reiter VARCHAR(40) NOT NULL,
+  dauer_s INT UNSIGNED NOT NULL,
+  erfasst_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_demo_nutzung_reiter (reiter, erfasst_am)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
     ];
 }
 }

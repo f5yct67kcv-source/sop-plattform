@@ -25,6 +25,7 @@ const check = (n, c) => (c ? ok : bad).push(n);
 const tu = readFileSync(`${WURZEL}/testumgebung.js`, 'utf8');
 const wf = readFileSync(`${WURZEL}/.github/workflows/deploy-hostpoint.yml`, 'utf8');
 const db = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
+const backendDb = readFileSync(`${WURZEL}/backend/db.php`, 'utf8');
 
 // ── 1. Der Platzhalter selbst ──────────────────────────────────────────
 check('KRITISCH: testumgebung.js traegt den Platzhalter __IST_DEMO_PLATZ__',
@@ -32,28 +33,43 @@ check('KRITISCH: testumgebung.js traegt den Platzhalter __IST_DEMO_PLATZ__',
 check('KRITISCH: das Flag gilt nur INNERHALB von "demo" -- ein Demo-Platz '
     + 'ausserhalb der Demo waere ein Widerspruch in sich',
   /window\.APP_UMGEBUNG_DEMO_PLATZ\s*=\s*istDemo\s*&&\s*IST_DEMO_PLATZ\s*===\s*'1'/.test(tu));
+check('KRITISCH: backend/db.php traegt denselben Platzhalter server-seitig '
+    + '(ist_demo_platz(), fuer die Sperre in demo_nutzung_melden.php)',
+  backendDb.includes("const IST_DEMO_PLATZ = '__IST_DEMO_PLATZ__';")
+    && /function ist_demo_platz\(\): bool/.test(backendDb));
 
-// ── 2. Der Deploy: GENAU die Buendel, die testumgebung.js mitfuehren ────
-//
-// Dieselben drei Stellen wie bei __APP_ENV__ in testumgebung.js (dist/,
-// dist-cupi24/, die zehn Demo-Plaetze) -- guardops/betreiber/portal
-// liefern gar kein testumgebung.js aus und brauchen darum auch diesen
-// Platzhalter nicht.
+// ── 2. Der Deploy: GENAU die Buendel, die testumgebung.js ODER db.php ───
+//     mitfuehren -- und fuer jede Datei einzeln, nicht nur irgendwo im Text.
 const nullGesetzt = (ziel) => new RegExp(
-  `__IST_DEMO_PLATZ__\\|0\\|g"\\s+${ziel.replace(/[/$]/g, m => '\\' + m)}`).test(wf);
+  `__IST_DEMO_PLATZ__\\|0\\|g"\\s+${ziel.replace(/[/$.]/g, m => '\\' + m)}`).test(wf);
 for (const ziel of ['dist/testumgebung.js', 'dist-cupi24/testumgebung.js']) {
   check(`KRITISCH: __IST_DEMO_PLATZ__ wird in ${ziel} ausdruecklich auf "0" gesetzt`,
     nullGesetzt(ziel));
 }
-check('KRITISCH: jeder Demo-Platz bekommt den Schalter ausdruecklich auf "1" gesetzt',
+// db.php steckt in FUENF Buendeln (wie SPARTE_REINIGUNG) -- guardops,
+// betreiber und portal brauchen ist_demo_platz() serverseitig nie, aber
+// db.php reist dort mit, und ein unersetzter Platzhalter darin waere
+// eine Behauptung ohne Wert (dieselbe Regel wie bei SPARTE_REINIGUNG).
+for (const ziel of ['dist/db.php', 'dist-guardops/db.php', 'dist-betreiber/db.php',
+                    'dist-portal/db.php', 'dist-cupi24/db.php']) {
+  check(`KRITISCH: __IST_DEMO_PLATZ__ wird in ${ziel} ausdruecklich auf "0" gesetzt`,
+    nullGesetzt(ziel));
+}
+check('KRITISCH: jeder Demo-Platz bekommt den Schalter in testumgebung.js '
+    + 'ausdruecklich auf "1" gesetzt',
   /ersetze __IST_DEMO_PLATZ__ "1" "dist-demo\/\$PLATZ\/testumgebung\.js"/.test(wf));
+check('KRITISCH: jeder Demo-Platz bekommt den Schalter auch in db.php '
+    + 'ausdruecklich auf "1" gesetzt',
+  /ersetze __IST_DEMO_PLATZ__ "1" "dist-demo\/\$PLATZ\/db\.php"/.test(wf));
 
-// Die gefaehrliche Richtung: KEIN anderes Buendel darf "1" bekommen --
+// Die gefaehrliche Richtung: NUR die Demo-Plaetze duerfen "1" bekommen --
 // sonst haelt sich z.B. der Bestandsmandant faelschlich fuer einen
-// Demo-Platz.
-const einsen = [...wf.matchAll(/__IST_DEMO_PLATZ__[^\n]*"1"/g)];
-check('KRITISCH: NUR die Demo-Plaetze bekommen die "1" -- kein zweiter Ort',
-  einsen.length === 1);
+// Demo-Platz. Zwei Treffer sind richtig (db.php UND testumgebung.js je
+// Platz), beide muessen auf dist-demo/$PLATZ/ zeigen.
+const einsen = [...wf.matchAll(/__IST_DEMO_PLATZ__[^\n]*"1"[^\n]*/g)].map(m => m[0]);
+check('KRITISCH: NUR die Demo-Plaetze bekommen die "1" -- genau zwei Stellen, '
+    + 'beide fuer dist-demo/$PLATZ/',
+  einsen.length === 2 && einsen.every(z => z.includes('dist-demo/$PLATZ/')));
 
 // ── 3. Das Dashboard verzweigt tatsaechlich ──────────────────────────────
 check('KRITISCH: dashboard.html liest APP_UMGEBUNG_DEMO_PLATZ, um den '
@@ -94,7 +110,24 @@ if (existsSync(seite)) {
     inhalt.includes('nutzungsbedingungen.html'));
   check('Verlinkt auf die eigene Erklaerung der ENT-523-Umgebung, statt sie zu verschweigen',
     inhalt.includes('datenschutz-demo.html'));
+
+  // ── ENT-653: die Nutzungsauswertung ist jetzt gebaut -- der Text darf
+  // das nicht mehr als Vorhaben behaupten, und er darf nicht mehr
+  // versprechen, als tatsaechlich erfasst wird (nur Reiter/Dauer, keine
+  // Klicks -- Entscheidung des Projektinhabers gegen die Klick-Variante).
+  check('KRITISCH: behauptet NICHT mehr "geplant, heute nicht in Betrieb"',
+    !/geplant,?\s*heute nicht in Betrieb/i.test(inhalt));
+  check('KRITISCH: verspricht KEINE Klick-Erfassung (nur Reiter/Dauer wurde entschieden)',
+    !/wo geklickt wird/i.test(inhalt));
+  check('Nennt ausdruecklich, dass NICHT auf einzelne Klicks/Eingaben gemessen wird',
+    /nicht erfasst[\s\S]{0,80}klick/i.test(inhalt) || /keine einzelnen Klicks/i.test(inhalt));
 }
+
+// ── ENT-653: nutzungsbedingungen.html verweist jetzt auf die richtige
+// Datenschutzseite fuer den Demo-Zugang, nicht nur auf die allgemeine.
+const nutzungsbedingungen = readFileSync(`${WURZEL}/nutzungsbedingungen.html`, 'utf8');
+check('KRITISCH: nutzungsbedingungen.html verlinkt datenschutz-demo-platz.html',
+  nutzungsbedingungen.includes('datenschutz-demo-platz.html'));
 
 // Gegenprobe (Anleitung, nicht automatisiert): Wer testen will, ob diese
 // Pruefung wirklich etwas bewacht, haengt in dashboard.html testweise wieder

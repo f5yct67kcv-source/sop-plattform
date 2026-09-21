@@ -65,9 +65,51 @@ function demo_instanz_leeren(PDO $betreiber, string $platz): ?string
         return "Der Platz „$platz“ ist nicht erreichbar. Es wurde nichts geleert.";
     }
 
+    // VOR dem Leeren archivieren (ENT-653), nicht danach -- die Rohdaten
+    // sind nach demo_reset_alle_tabellen_leeren() weg. Fehlschlagen darf
+    // das Archivieren den Ablauf/das Beenden/Freigeben eines Platzes nicht
+    // aufhalten: Ein Interessent, dessen Frist ablaeuft, wartet nicht auf
+    // eine Statistik.
+    try {
+        demo_nutzung_archivieren($instanz, $betreiber);
+    } catch (Throwable $e) {
+        // Absichtlich verschluckt, nicht gemeldet: Diese eine Zeile darf
+        // eine sonst erfolgreiche Leerung nicht in einen Fehlerzustand
+        // ziehen. Fehlt die Archivtabelle beim Betreiber (be_tabellen()
+        // noch nicht eingerichtet), ist das kein Grund, den Platz nicht
+        // freizugeben.
+    }
+
     demo_reset_alle_tabellen_leeren($instanz);
     demo_reset_systemrollen_saeen($instanz);
     return null;
+}
+
+// Fasst demo_nutzung EINER Instanz je Reiter zusammen (Summe der Dauer,
+// Anzahl Meldungen) und schreibt nur dieses Ergebnis ins Archiv der
+// Betreiber-Datenbank -- ohne jeden Bezug zur Instanz, zur Firma oder zur
+// Person (siehe Kopfkommentar von be_demo_nutzung_archiv, backend/
+// betreiber.php). Tut nichts, wenn eine der beiden Tabellen fehlt: ein
+// Platz mit aelterem Schema oder eine Betreiber-Datenbank, in der
+// be_tabellen_anlegen() noch nicht gelaufen ist, sollen sich trotzdem
+// leeren lassen.
+function demo_nutzung_archivieren(PDO $instanz, PDO $betreiber): void
+{
+    if (!hat_tabelle($instanz, 'demo_nutzung') || !hat_tabelle($betreiber, 'be_demo_nutzung_archiv')) {
+        return;
+    }
+    $zeilen = $instanz->query(
+        'SELECT reiter, SUM(dauer_s) AS dauer_s_summe, COUNT(*) AS aufrufe
+           FROM demo_nutzung GROUP BY reiter'
+    )->fetchAll(PDO::FETCH_ASSOC);
+    if (!$zeilen) { return; }
+
+    $einfuegen = $betreiber->prepare(
+        'INSERT INTO be_demo_nutzung_archiv (reiter, dauer_s_summe, aufrufe) VALUES (?, ?, ?)'
+    );
+    foreach ($zeilen as $z) {
+        $einfuegen->execute([(string)$z['reiter'], (int)$z['dauer_s_summe'], (int)$z['aufrufe']]);
+    }
 }
 
 // Neues Passwort fuer ein BESTEHENDES Demo-Konto (ENT-601, Punkt 6/7).

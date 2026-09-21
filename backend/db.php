@@ -138,6 +138,20 @@ function ist_demo(): bool
     return umgebung_ist_demo(APP_ENV);
 }
 
+// ── Demo-Platz statt der einen ENT-523-Demo-Umgebung (ENT-653) ────────
+//
+// APP_ENV=demo allein sagt nur "irgendeine Demo" -- die eine ENT-523-
+// Instanz und die zehn Demo-Plaetze (ENT-600/601) tragen denselben Wert.
+// Gleiche Bauart wie SPARTE_REINIGUNG: aus dem Deploy, nie aus der
+// Anfrage, fail-safe "0". Braucht api/demo_nutzung_melden.php, um die
+// Nutzungsauswertung serverseitig auf Demo-Plaetze zu beschraenken --
+// eine Sperre im Browser allein waere keine (CLAUDE.md).
+const IST_DEMO_PLATZ = '__IST_DEMO_PLATZ__';
+function ist_demo_platz(): bool
+{
+    return IST_DEMO_PLATZ === '1';
+}
+
 // ── Bietet dieser Mandant die Sparte Reinigung an? (ENT-650) ──────────
 //
 // ANLASS: Mit den Demo-Plaetzen (ENT-600) ist die Anlage zum ersten Mal an

@@ -1406,6 +1406,31 @@ function be_tabellen(): array
   logo MEDIUMTEXT NULL,
   geaendert_am DATETIME NULL ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// ── Archiv der Demo-Nutzungsauswertung (ENT-653) ───────────────────────
+//
+// EINE Zeile je Reiter UND je geleerter Instanz -- nicht je einzelner
+// Meldung. demo_instanz_leeren() (backend/demo_instanz.php) fasst die
+// Rohdaten aus demo_nutzung (der Datenbank des Platzes) VOR dem Leeren
+// selbst zusammen (SUM/COUNT je Reiter) und schreibt nur das Ergebnis
+// hierher.
+//
+// KEIN Bezug zu Platz, Firma oder Person -- absichtlich nicht vorhanden,
+// nicht nur ungenutzt. Die Rohdaten (demo_nutzung im Platz selbst) kennen
+// den Interessenten ohnehin nur ueber die Instanz, in der sie stehen; wird
+// diese Zeile hier mit einer Instanz-Kennung verknuepft, waere das Archiv
+// nicht mehr anonym. Deckt sich mit der Zusage in den Nutzungsbedingungen
+// (sop-plattform, Ziffer 8): "Auswertungen, die wir veroeffentlichen oder
+// weitergeben, enthalten keine Angaben, die sich einer Person oder einem
+// Betrieb zuordnen lassen."
+'be_demo_nutzung_archiv' => "CREATE TABLE IF NOT EXISTS be_demo_nutzung_archiv (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  reiter VARCHAR(40) NOT NULL,
+  dauer_s_summe INT UNSIGNED NOT NULL,
+  aufrufe INT UNSIGNED NOT NULL,
+  archiviert_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_be_demo_nutzung_archiv_reiter (reiter)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
     ];
 }
 
