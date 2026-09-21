@@ -454,16 +454,52 @@ check('KRITISCH: "Zentrieren" führt auf den eigenen Standort',
     return Math.abs(lat - rgsMeinOrt.lat) < 0.0005
       && Math.abs(lng - rgsMeinOrt.lng) < 0.0005;
   }));
-// Ohne bekannten Standort -- Keller, Tiefgarage -- darf der Knopf nicht
-// einfach nichts tun. Dann zeigt er die Kontrollpunkte.
-check('Ohne bekannten Standort zeigt er die Kontrollpunkte, statt nichts zu tun',
-  await page.evaluate(() => {
+/* Ohne bekannten Standort -- Keller, Tiefgarage, pausierte Runde, eben
+   erst geoeffnete Karte -- darf der Knopf nicht einfach nichts tun.
+
+   Was er dann tut, hat ENT-639 geaendert, und darum ist diese Pruefung
+   umgeschrieben und nicht bloss angepasst: Bis dahin sprang er SOFORT auf
+   die Kontrollpunkte, ohne den Standort auch nur zu erfragen -- genau der
+   vom Projektinhaber gemeldete Fehler („Zentrieren geht nicht zurück zum
+   Standort"). Jetzt fragt er zuerst. Die Aussage „nie einfach nichts tun"
+   bleibt und wird weiter geprueft; sie wird nur am Ende des Weges
+   gemessen statt am Anfang. */
+check('KRITISCH: ohne bekannten Standort FRAGT der Knopf danach, statt woanders hinzuspringen',
+  await page.evaluate(async () => {
     const merk = rgsMeinOrt;
     rgsMeinOrt = null;
     rgsKarte.setCenter({ lat: 40, lng: 0 });
+    let gefragt = false;
+    const echt = navigator.geolocation.getCurrentPosition;
+    navigator.geolocation.getCurrentPosition = (gut) => {
+      gefragt = true;
+      setTimeout(() => gut({ coords: { latitude: 46.9480, longitude: 7.4474, accuracy: 9 } }), 40);
+    };
     rgKarteZentrieren();
+    // Vor der Antwort steht die Karte still -- zwei Fahrten waeren genau
+    // die Unruhe, ueber die der Bericht handelt.
+    const m0 = rgsKarte.getCenter();
+    const lat0 = typeof m0.lat === 'function' ? m0.lat() : m0.lat;
+    await new Promise(r => setTimeout(r, 220));
     const m = rgsKarte.getCenter();
     const lat = typeof m.lat === 'function' ? m.lat() : m.lat;
+    navigator.geolocation.getCurrentPosition = echt;
+    rgsMeinOrt = merk;
+    return gefragt && Math.abs(lat0 - 40) < 0.001 && Math.abs(lat - 46.9480) < 0.001;
+  }));
+check('Und schlaegt die Abfrage fehl, zeigt er die Kontrollpunkte -- nie einfach nichts',
+  await page.evaluate(async () => {
+    const merk = rgsMeinOrt;
+    rgsMeinOrt = null;
+    rgsKarte.setCenter({ lat: 40, lng: 0 });
+    const echt = navigator.geolocation.getCurrentPosition;
+    navigator.geolocation.getCurrentPosition = (_gut, schlecht) =>
+      setTimeout(() => schlecht({ code: 1 }), 20);
+    rgKarteZentrieren();
+    await new Promise(r => setTimeout(r, 200));
+    const m = rgsKarte.getCenter();
+    const lat = typeof m.lat === 'function' ? m.lat() : m.lat;
+    navigator.geolocation.getCurrentPosition = echt;
     rgsMeinOrt = merk;
     return Math.abs(lat - 40) > 1;
   }));

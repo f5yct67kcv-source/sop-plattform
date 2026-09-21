@@ -863,13 +863,26 @@ check('Der Rand des Rumpfes bleibt für alles andere erhalten',
 await klick(page, '#rgsRt-karte');
 await page.waitForTimeout(700);
 
-// ── Nachtsicht ────────────────────────────────────────────────────────
-const nachtDa = await page.$('#rgsNachtsicht') !== null;
-check('KRITISCH: es gibt überhaupt einen Nachtsicht-Knopf', nachtDa);
+// ── Kartenbild: Nachtsicht / Tagansicht / Satellit ────────────────────
+/* Bis ENT-640 war das ein einzelner Umschalter „Nachtsicht" unten rechts
+   auf der Karte. Es ist jetzt eine Dreierwahl im Einstellungsblatt hinter
+   dem Zahnrad -- Vorgabe des Projektinhabers. Die Aussagen dieses Blocks
+   bleiben dieselben (Nachtsicht ist die Vorgabe, die Karte wird wirklich
+   dunkel, es geht in beide Richtungen, die Wahl ueberdauert Reiterwechsel
+   und Runde); nur der Weg dorthin fuehrt jetzt ueber das Zahnrad. */
+const zahnDa = await page.$('#rgsEinstKnopf') !== null;
+check('KRITISCH: es gibt ein Zahnrad, das die Einstellungen oeffnet', zahnDa);
+await klick(page, '#rgsEinstKnopf');
+await page.waitForTimeout(300);
+const nachtDa = await page.$('#rgsKb-nacht') !== null;
+check('KRITISCH: darin steht die Wahl des Kartenbildes', nachtDa);
 check('KRITISCH: Nachtsicht ist die VORGABE — die Runde läuft nachts',
   nachtDa && await page.evaluate(() =>
-    document.getElementById('rgsNachtsicht').getAttribute('aria-pressed') === 'true'
-    && document.getElementById('rgsNachtsicht').classList.contains('an')));
+    document.getElementById('rgsKb-nacht').getAttribute('aria-checked') === 'true'
+    && document.getElementById('rgsKb-nacht').classList.contains('an')));
+check('KRITISCH: immer genau EINE Wahl ist aktiv — „Nachtsicht und Satellit" gibt es nicht',
+  await page.evaluate(() =>
+    [...document.querySelectorAll('.rgs-seg-b')].filter(b => b.classList.contains('an')).length === 1));
 // Der eigentliche Beweis: Die Karte wird dadurch wirklich dunkel. Die
 // Attrappe faerbt ihren Container mit der Grundfarbe des uebergebenen
 // Stils -- ohne das waere nur belegt, dass irgendein Array uebergeben wurde.
@@ -883,49 +896,57 @@ check('KRITISCH: die Karte nimmt den dunklen Stil tatsächlich an (gemessen)',
        if (h.length !== 6) return false;
        const hell = (parseInt(h.slice(0,2),16) + parseInt(h.slice(2,4),16) + parseInt(h.slice(4,6),16)) / 3;
        return hell < 90; })());
-check('Der Knopf hat die geforderte Trefferfläche von 44px (CLAUDE.md)',
+check('Jede der drei Wahlen hat eine brauchbare Trefferfläche (CLAUDE.md)',
   nachtDa && await page.evaluate(() =>
-    document.getElementById('rgsNachtsicht').getBoundingClientRect().height >= 44));
-check('Er überdeckt den Zentrieren-Knopf nicht',
-  nachtDa && await page.evaluate(() => {
-    const a = document.getElementById('rgsZentrieren').getBoundingClientRect();
-    const b = document.getElementById('rgsNachtsicht').getBoundingClientRect();
-    return b.left >= a.right + 8;
-  }));
-check('Beide Knöpfe stehen innerhalb der Karte, nicht darüber hinaus',
-  nachtDa && await page.evaluate(() => {
-    const k = document.querySelector('.rgs-karte-huelle').getBoundingClientRect();
-    const b = document.getElementById('rgsNachtsicht').getBoundingClientRect();
-    const a = document.getElementById('rgsZentrieren').getBoundingClientRect();
-    return a.left >= k.left && b.right <= k.right && a.bottom <= k.bottom && b.bottom <= k.bottom;
+    [...document.querySelectorAll('.rgs-seg-b')]
+      .every(b => b.getBoundingClientRect().height >= 44)));
+check('KRITISCH: das Blatt verdeckt die Reiterleiste nicht — wer sich verklickt, kommt weiter',
+  await page.evaluate(() => {
+    const bl = document.getElementById('rgsEinst').getBoundingClientRect();
+    const rt = document.querySelector('.rgs-reiter');
+    return !!rt && bl.bottom <= rt.getBoundingClientRect().top + 1;
   }));
 await page.screenshot({ path: `${OUT}/karte-05-nachtsicht.png` });
 
 // Abschalten muss auch wirklich abschalten -- sonst waere der Knopf eine
 // Behauptung. Und die Wahl muss die Runde ueberdauern: Wer sie bei jedem
 // Reiterwechsel neu treffen muesste, wuerde sie nicht treffen.
-await klick(page, '#rgsNachtsicht');
-await page.waitForTimeout(300);
+await klick(page, '#rgsKb-tag');
+await page.waitForTimeout(400);
 check('KRITISCH: Abschalten macht die Karte wieder hell (gemessen)',
   await page.evaluate(() => {
     const el = document.getElementById('rgsKarte');
     return !!el && el.dataset.kartenstil === 'standard';
   }));
-check('Der Knopf zeigt den neuen Zustand an, nicht den alten',
+check('Die Wahl zeigt den neuen Zustand an, nicht den alten',
   await page.evaluate(() => {
-    const b = document.getElementById('rgsNachtsicht');
-    return !!b && b.getAttribute('aria-pressed') === 'false' && !b.classList.contains('an');
+    const n = document.getElementById('rgsKb-nacht'), t = document.getElementById('rgsKb-tag');
+    return !!n && !!t && n.getAttribute('aria-checked') === 'false'
+      && t.getAttribute('aria-checked') === 'true';
   }));
 await klick(page, '#rgsRt-punkte');
 await page.waitForTimeout(200);
 await klick(page, '#rgsRt-karte');
 await page.waitForTimeout(700);
+/* Das Blatt schliesst seit ENT-640 beim Reiterwechsel (es gehoert zur
+   Karte). Geprueft wird darum zweierlei: die KARTE traegt die Wahl noch,
+   und das Blatt zeigt sie nach dem Wiederoeffnen unveraendert an. Nur das
+   zweite allein waere zu wenig -- ein Blatt kann die richtige Wahl zeigen
+   und die Karte trotzdem falsch stehen. */
 check('KRITISCH: die Wahl überdauert den Reiterwechsel',
   await page.evaluate(() => {
-    const el = document.getElementById('rgsKarte'), b = document.getElementById('rgsNachtsicht');
-    return !!el && !!b && el.dataset.kartenstil === 'standard'
-      && b.getAttribute('aria-pressed') === 'false';
+    const el = document.getElementById('rgsKarte');
+    return !!el && el.dataset.kartenstil === 'standard';
   }));
+await klick(page, '#rgsEinstKnopf');
+await page.waitForTimeout(300);
+check('Und das Blatt zeigt sie nach dem Wiederöffnen unverändert an',
+  await page.evaluate(() => {
+    const t = document.getElementById('rgsKb-tag');
+    return !!t && t.getAttribute('aria-checked') === 'true';
+  }));
+await klick(page, '#rgsEinstX');
+await page.waitForTimeout(150);
 check('Sie überdauert auch das Verlassen und erneute Öffnen der Runde',
   await page.evaluate(async () => {
     rgSeiteZu();
@@ -936,13 +957,15 @@ check('Sie überdauert auch das Verlassen und erneute Öffnen der Runde',
     return !!el && el.dataset.kartenstil === 'standard';
   }));
 // Wieder einschalten und dabei pruefen, dass es in BEIDE Richtungen geht.
-await klick(page, '#rgsNachtsicht');
+await klick(page, '#rgsEinstKnopf');
 await page.waitForTimeout(300);
-check('KRITISCH: Einschalten geht ebenso — der Schalter kennt beide Richtungen',
+await klick(page, '#rgsKb-nacht');
+await page.waitForTimeout(400);
+check('KRITISCH: Einschalten geht ebenso — die Wahl kennt beide Richtungen',
   await page.evaluate(() => {
-    const el = document.getElementById('rgsKarte'), b = document.getElementById('rgsNachtsicht');
-    return !!el && !!b && el.dataset.kartenstil !== 'standard'
-      && b.getAttribute('aria-pressed') === 'true';
+    const el = document.getElementById('rgsKarte'), n = document.getElementById('rgsKb-nacht');
+    return !!el && !!n && el.dataset.kartenstil !== 'standard'
+      && n.getAttribute('aria-checked') === 'true';
   }));
 
 // ── Der Kartenreiter steht beim Start von selbst offen ────────────────
