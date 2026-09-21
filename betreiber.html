@@ -1791,6 +1791,17 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <div class="karte-leib">
         <div id="sup-freigabe"></div>
         <div id="sup-inhalt"></div>
+        <!-- Der Sprung ins Cockpit (ENT-631). Unten in diesem Dialog und
+             NICHT als vierter Knopf in der Mandantenzeile -- so festgelegt
+             vom Projektinhaber: Der Dialog zeigt die Lage der Freigabe
+             ohnehin an, der Weg ist also vor dem Klick als offen oder
+             verschlossen erkennbar. Ein Knopf in der Zeile fuehrte bei
+             einem Mandanten ohne Freigabe ins Leere. -->
+        <div id="sup-sprung" class="versteckt"
+             style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)">
+          <button class="haupt" id="knopf-sup-sprung">Ins Cockpit wechseln</button>
+          <div class="zweit" id="sup-sprung-hinweis" style="margin-top:8px"></div>
+        </div>
       </div>
     </div>
     </section>
@@ -3322,8 +3333,65 @@ const SUPPORT_LAGE_TEXT = {
   nicht_eingerichtet: 'Bei diesem Betrieb ist die Support-Freigabe noch nicht eingerichtet.',
 };
 
+/* ── Der Sprung ins Cockpit (ENT-631) ───────────────────────────────
+   Der Knopf steht unten im Support-Dialog und richtet sich danach, WAS
+   fuer ein Mandant offen ist:
+
+     Demo-Platz  -> immer. Er gehoert dem Betreiber, die Daten darin sind
+                    erfunden, und es gibt keinen Kunden, der eine Freigabe
+                    erteilen koennte.
+     Mandant     -> nur bei gueltiger Freigabe nach ENT-526.
+
+   Entschieden wird das nicht hier, sondern im Server
+   (api/betreiber_support_sprung.php). Die Oberflaeche zeigt oder verbirgt
+   nur den Knopf -- eine Sperre, die man am Browser vorbei umgehen kann,
+   ist keine (Hausregel). */
+let supSprungMandant = null;
+
+function supSprungSetzen(m, erlaubt, hinweis) {
+  supSprungMandant = erlaubt ? m : null;
+  zeig($('sup-sprung'), erlaubt);
+  $('sup-sprung-hinweis').textContent = hinweis || '';
+}
+
+async function supSprungAusloesen() {
+  const m = supSprungMandant;
+  if (!m) { return; }
+  /* Das Fenster wird SOFORT beim Klick geoeffnet, noch vor der Anfrage,
+     und erst danach mit der Adresse versehen. Ein window.open() nach dem
+     Warten auf eine Antwort gilt dem Browser nicht mehr als Folge eines
+     Klicks -- es landet im Blocker, und der Betreiber sieht nichts als
+     einen Knopf, der nichts tut. */
+  const fenster = window.open('', '_blank');
+  const knopf = $('knopf-sup-sprung');
+  knopf.disabled = true;
+  let a;
+  try {
+    a = await ruf('betreiber_support_sprung.php', { id: m.id }, 'POST');
+  } catch (e) {
+    a = null;
+  }
+  knopf.disabled = false;
+  if (!a || a.status !== 'ok' || !a.ziel) {
+    if (fenster) { fenster.close(); }
+    melde($('haus-meldung'), 'fehler',
+      (a && a.message) || 'Der Sprung liess sich nicht ausstellen.');
+    return;
+  }
+  if (fenster) {
+    fenster.location.replace(a.ziel);
+  } else {
+    /* Blocker trotzdem dazwischen: Dann wird der Schluessel nicht
+       verschwendet -- er gilt 60 Sekunden, und dieselbe Lasche traegt
+       ihn ans Ziel. */
+    location.href = a.ziel;
+  }
+}
+
 async function supportHolen(m) {
   stumm($('haus-meldung'));
+  const istDemo = !!(m && m.ist_demo);
+  supSprungSetzen(null, false, '');
   const a = await ruf('betreiber_support.php?id=' + m.id);
 
   if (a.grund === 'keine_freigabe' || a.grund === 'nicht_eingerichtet') {
@@ -3331,6 +3399,21 @@ async function supportHolen(m) {
     melde($('haus-meldung'), 'warn',
       lage + ' Die Freigabe wird im Cockpit des Betriebs erteilt und ist befristet — '
       + 'sie lässt sich von hier aus nicht setzen.');
+    /* Bei einem Demo-Platz bleibt die Karte stehen (ENT-631): Die
+       DIAGNOSE braucht eine Freigabe, der Sprung nicht. Sie hier
+       auszublenden hiesse, den einen Weg zu verstellen, der fuer diesen
+       Platz offen ist -- und genau fuer ihn ist er gebaut. */
+    if (istDemo) {
+      $('sup-titel').textContent = 'Support: ' + (m.name || '');
+      $('sup-freigabe').innerHTML = '';
+      $('sup-inhalt').innerHTML = '<div class="zweit">Für die Diagnosedaten fehlt die '
+        + 'Freigabe. Der Wechsel ins Cockpit steht trotzdem offen — ein Demo-Platz '
+        + 'gehört dem Betreiber, es gibt dort keinen Kunden, der freigeben könnte.</div>';
+      supSprungSetzen(m, true, 'Der Zugriff wird im Platz protokolliert.');
+      zeig($('sup-karte'), true);
+      $('sup-karte').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      return;
+    }
     zeig($('sup-karte'), false);
     return;
   }
@@ -3371,6 +3454,9 @@ async function supportHolen(m) {
        : a.profile.map(p => '<span class="merker m-ruhe" style="margin:0 6px 6px 0">'
            + text(p.name) + ' · ' + p.traeger + '</span>').join(''))
     + '</div>';
+  supSprungSetzen(m, true, istDemo
+    ? 'Der Zugriff wird im Platz protokolliert.'
+    : 'Stützt sich auf die Freigabe oben. Jede Änderung wird beim Betrieb protokolliert.');
   zeig($('sup-karte'), true);
   $('sup-karte').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -7081,6 +7167,7 @@ $('knopf-demo-ablauf').onclick    = demoAblauf;
 $('knopf-speichern').onclick  = mandantSpeichern;
 $('knopf-abbrechen').onclick  = () => zeig($('m-form-karte'), false);
 $('knopf-sup-zu').onclick      = () => zeig($('sup-karte'), false);
+$('knopf-sup-sprung').onclick  = supSprungAusloesen;   // ENT-631
 $('knopf-sv-zu').onclick       = () => zeig($('sv-karte'), false);
 $('knopf-sv-senden').onclick   = svAntworten;
 $('knopf-sv-arbeit').onclick   = () => svStatus('in_arbeit');
