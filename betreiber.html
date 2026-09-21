@@ -4261,6 +4261,13 @@ async function ladeDemo() {
                   ? '<button class="klein" data-demo-offen="' + z.id + '" title="Den Vermerk zurücknehmen — der Zugang gilt danach wieder als offen">Zurücknehmen</button> '
                   : '<button class="klein" data-demo-nachgefasst="' + z.id + '" title="Vermerken, dass bei diesem Interessenten jemand nachgefasst hat">Nachgefasst</button> ')
               : '')
+          /* Erneut senden steht VOR dem Not-Aus, aus demselben Grund wie
+             der Nachfass-Knopf: Der gefaehrliche bleibt aussen. Nur bei
+             laufenden Zugaengen -- bei einem beendeten ist die Instanz
+             geleert, es gaebe kein Konto fuer ein neues Passwort. */
+          + (z.status === 'aktiv'
+              ? '<button class="klein" data-demo-erneut="' + z.id + '" title="Neues Passwort erzeugen und die Zugangsdaten noch einmal an ' + text(z.email) + ' schicken">Erneut senden</button> '
+              : '')
           + (z.status === 'aktiv'
               ? '<button class="klein" data-demo-beenden="' + z.id + '" title="Not-Aus: leert die Instanz sofort und gibt den Platz frei">Beenden</button>'
               : '') + '</td>'
@@ -4273,6 +4280,47 @@ async function ladeDemo() {
     b.onclick = () => demoNachgefasst(+b.dataset.demoNachgefasst, true));
   inhalt.querySelectorAll('[data-demo-offen]').forEach(b =>
     b.onclick = () => demoNachgefasst(+b.dataset.demoOffen, false));
+  inhalt.querySelectorAll('[data-demo-erneut]').forEach(b =>
+    b.onclick = () => demoErneut(b, liste.find(z => z.id === +b.dataset.demoErneut)));
+}
+
+/* Zugangsdaten erneut senden (ENT-649).
+
+   MIT RUECKFRAGE, anders als beim Nachfassen: Dabei entsteht ein NEUES
+   Passwort, das bisherige gilt danach nicht mehr. Wer versehentlich
+   klickt, sperrt einen Interessenten mitten in der Demo aus, ohne es zu
+   merken -- und die Rueckfrage sagt genau das, statt nur "sind Sie
+   sicher".
+
+   DIE RUECKMELDUNG BLEIBT AN DER ZEILE, wo der Blick ohnehin ist, und
+   verschwindet nach ein paar Sekunden wieder. Kein Datum in einer eigenen
+   Spalte: Der Vorgang ist eine Handlung, kein Zustand des Zugangs.
+   Nachvollziehbar bleibt er trotzdem -- der Endpunkt schreibt ihn ins
+   Logbuch des Mandanten.
+
+   Ein Fehlschlag geht NICHT an die Zeile, sondern in die Hausmeldung: Er
+   braucht mehr Platz als ein Wort, und beim Versandfehler steht dort das
+   Wichtigste -- das Passwort ist trotzdem schon neu. */
+async function demoErneut(knopf, z) {
+  if (!z) { return; }
+  const ja = confirm('Zugangsdaten von ' + z.firma + ' erneut senden?\n\n'
+    + 'Dabei entsteht ein NEUES Passwort. Das bisherige gilt danach nicht '
+    + 'mehr, und offene Sitzungen werden abgemeldet. Die Mail geht an '
+    + z.email + '.');
+  if (!ja) { return; }
+  const vorher = knopf.textContent;
+  knopf.disabled = true;
+  knopf.textContent = 'Sendet …';
+  const a = await ruf('betreiber_demo_erneut.php', { id: z.id }, 'POST');
+  if (a.status !== 'ok') {
+    knopf.disabled = false;
+    knopf.textContent = vorher;
+    melde($('haus-meldung'), 'fehler',
+      a.message || 'Die Zugangsdaten liessen sich nicht senden.');
+    return;
+  }
+  knopf.textContent = 'Gesendet';
+  setTimeout(() => { knopf.disabled = false; knopf.textContent = vorher; }, 4000);
 }
 
 /* Der Weg zurueck nach dem Ablauf (ENT-634).

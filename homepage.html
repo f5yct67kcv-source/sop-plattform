@@ -538,6 +538,12 @@ p{margin:0 0 1em}
 /* Fallenfeld (siehe backend/demo_anfrage.php): fuer Menschen nicht erreichbar,
    fuer Skripte ein normales Feld. Bewusst nicht display:none. */
 .formular .falle{position:absolute;left:-9999px;top:0;width:1px;height:1px;overflow:hidden}
+/* Der zweite Weg bleibt zugeklappt und leiser als das Hauptformular --
+   er richtet sich an jemanden, der ihn sucht, nicht an den Erstbesuch. */
+.nochmal{margin-top:22px;max-width:520px}
+.nochmal>summary{cursor:pointer;font-size:15px;opacity:.75;padding:8px 0;min-height:44px;display:flex;align-items:center}
+.nochmal>summary:hover{opacity:1}
+.nochmal .formular{margin-top:6px}
 .formular.gesendet .felder{display:none}
 .formular .danke{display:none}
 .formular.gesendet .danke{display:block}
@@ -1202,6 +1208,32 @@ p{margin:0 0 1em}
         </div>
         <div class="danke" id="demoDanke" role="status"><b>Fast geschafft.</b><p id="demoDankeText">Vielen Dank. Wir haben Ihnen eine E-Mail geschickt — bitte bestätigen Sie darin Ihre Anfrage.</p></div>
       </form>
+
+      <!-- Zugangsdaten noch einmal anfordern (ENT-649).
+
+           UNAUFFAELLIG UND ZUGEKLAPPT: Wer hier zum ersten Mal ist, soll
+           das Anforderungsformular sehen und nicht zwei Wege nebeneinander.
+           Gebraucht wird das hier nur von jemandem, der schon einmal da
+           war -- der sucht danach und findet es aufgeklappt.
+
+           Die Antwort lautet IMMER gleich, auch wenn die Adresse gar
+           keinen Zugang hat. Das ist Absicht und steht so im Endpunkt
+           (backend/api/demo_erneut_senden.php): Alles andere verriete,
+           welche Adressen einen Demo-Zugang haben. -->
+      <details class="nochmal" id="demoNochmal">
+        <summary>Zugangsdaten nicht erhalten?</summary>
+        <p class="hinweis">Wir schicken sie noch einmal an dieselbe Adresse.
+          Dabei entsteht ein neues Passwort — das aus der ersten Mail gilt
+          danach nicht mehr.</p>
+        <form class="formular" id="nochmalFormular" novalidate
+              action="https://betreiber.guardops.ch/api/demo_erneut_senden.php" method="post">
+          <div class="falle" aria-hidden="true"><label>Webseite (bitte leer lassen)<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+          <label for="n-email">E-Mail-Adresse</label>
+          <input type="email" id="n-email" name="email" autocomplete="email" inputmode="email">
+          <button class="btn" type="submit" id="nochmalKnopf">Noch einmal senden</button>
+          <div class="meldung" id="nochmalMeldung" role="status" aria-live="polite"></div>
+        </form>
+      </details>
     </div>
   </div>
 </section>
@@ -1402,6 +1434,50 @@ p{margin:0 0 1em}
       melde('Keine Verbindung zum Server. Bitte versuchen Sie es später noch einmal oder rufen Sie uns an.', true);
     }).then(function(){ demoKnopf.disabled = false; });
   });
+
+  /* Zugangsdaten noch einmal anfordern.
+
+     DIESELBE MELDUNG BEI ERFOLG UND BEI "KENNEN WIR NICHT" -- die liefert
+     der Server, und sie lautet immer gleich. Hier wird sie nur angezeigt,
+     nicht ausgewertet: Eine Unterscheidung an dieser Stelle wuerde genau
+     das preisgeben, was der Endpunkt verbirgt.
+
+     Ein Netzfehler ist etwas anderes als eine Absage und bekommt darum
+     seinen eigenen Text (Hausregel). */
+  var nochmal = document.getElementById('nochmalFormular');
+  if (nochmal) {
+    var nKnopf = document.getElementById('nochmalKnopf');
+    var nMeldung = document.getElementById('nochmalMeldung');
+    var nFeld = document.getElementById('n-email');
+    var nMelde = function (text, schlecht) {
+      nMeldung.textContent = text;
+      nMeldung.classList.toggle('schlecht', !!schlecht);
+      nMeldung.classList.add('zeigen');
+    };
+    nochmal.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var wert = nFeld.value.trim();
+      if (!wert || wert.indexOf('@') < 1) {
+        nFeld.setAttribute('aria-invalid', 'true');
+        nMelde('Bitte eine gültige E-Mail-Adresse angeben.', true);
+        nFeld.focus();
+        return;
+      }
+      nFeld.setAttribute('aria-invalid', 'false');
+      nKnopf.disabled = true;
+      fetch(nochmal.getAttribute('action'), {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ email: wert, website: nochmal.website.value })
+      }).then(function (r) {
+        return r.json().then(function (j) { return {ok: r.ok, json: j}; });
+      }).then(function (a) {
+        nMelde((a.json && a.json.message)
+          || 'Falls diese Adresse einen aktiven Demo-Zugang hat, wurde soeben eine E-Mail verschickt.');
+      }).catch(function () {
+        nMelde('Keine Verbindung zum Server. Bitte versuchen Sie es später noch einmal.', true);
+      }).then(function () { nKnopf.disabled = false; });
+    });
+  }
 })();
 </script>
 </body>

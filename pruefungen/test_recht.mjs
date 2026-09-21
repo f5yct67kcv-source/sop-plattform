@@ -155,11 +155,14 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
   const ungenannt = erhoben.filter(n => WORT_ZUM_FELD[n] && !datenschutz.includes(WORT_ZUM_FELD[n]));
   // Seit ENT-601 sind es vier Pflichtangaben, keine optionalen mehr
   // (Mitarbeitende/Nachricht sind mit dem Kontaktformular weggefallen).
-  // Fuenf Bedienelemente, weil die Telefonnummer aus Vorwahl und Nummer
-  // besteht -- die feste Zahl haelt fest, dass ein weiteres Feld nicht
-  // stillschweigend dazukommt.
+  // Die Telefonnummer besteht aus Vorwahl und Nummer, dazu die beiden
+  // Haken -- und seit ENT-649 die E-Mail-Adresse ein zweites Mal, im
+  // zugeklappten Formular "Zugangsdaten nicht erhalten?". Dasselbe Datum,
+  // schon in der Erklaerung genannt; gezaehlt wird es trotzdem, weil die
+  // feste Zahl sonst nicht mehr faengt, was dazukommt. Genau dafuer ist
+  // sie da: Beim Einbau jenes Formulars ist sie angeschlagen.
   check('KRITISCH: jedes Feld, das das Formular erhebt, steht in der Datenschutzerklaerung',
-    erhoben.length === 7 && ohneZuordnung.length === 0 && ungenannt.length === 0);
+    erhoben.length === 8 && ohneZuordnung.length === 0 && ungenannt.length === 0);
   if (ohneZuordnung.length) { bad.push('Feld ohne Zuordnung in dieser Pruefung: ' + ohneZuordnung.join(', ')); }
   if (ungenannt.length) { bad.push('Feld fehlt in der Datenschutzerklaerung: ' + ungenannt.join(', ')); }
 }

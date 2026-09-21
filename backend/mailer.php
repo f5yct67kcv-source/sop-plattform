@@ -186,7 +186,7 @@ function smtp_befehl($fp, string $befehl, array $erwarteteCodes): string
 
 // Setzt die fertige MIME-Nachricht zusammen -- Kopfzeilen und Rumpf.
 //
-// EIGENE, REINE FUNKTION (ENT-645): Der Aufbau einer Mail mit Klartext,
+// EIGENE, REINE FUNKTION (ENT-648): Der Aufbau einer Mail mit Klartext,
 // HTML, eingebettetem Bild und Anhang ist die fehleranfaelligste Stelle
 // dieser Datei -- eine falsch verschachtelte Grenze macht aus dem Logo
 // einen Anhang oder aus dem Text eine unlesbare Wand. In smtp_senden()
@@ -215,7 +215,7 @@ function smtp_nachricht_bauen(string $von, string $an, string $betreff, string $
         . chunk_split(base64_encode($html)) . "\r\n"
         . '--' . $grenze . "--\r\n";
 
-    // ── Eingebettete Bilder (ENT-645) ─────────────────────────────
+    // ── Eingebettete Bilder (ENT-648) ─────────────────────────────
     //
     // Ein Bild in der Signatur ist weder eine zweite Darstellung der
     // Nachricht noch ein Anhang daneben: Es GEHOERT zum HTML-Teil und
@@ -317,7 +317,7 @@ function smtp_nachricht_bauen(string $von, string $an, string $betreff, string $
    (ENT-192) laeuft produktiv und soll von dieser Erweiterung nichts
    merken.
 
-   $bilder (ENT-645): Liste von ['cid' => 'logo', 'mime' => 'image/png',
+   $bilder (ENT-648): Liste von ['cid' => 'logo', 'mime' => 'image/png',
    'inhalt' => <Rohbytes>] -- Bilder, die IM HTML stehen und dort ueber
    src="cid:logo" angesprochen werden, nicht Anhaenge daneben. Begruendung
    der Bauart bei der Zusammensetzung weiter unten. Auch hier gilt: Ohne

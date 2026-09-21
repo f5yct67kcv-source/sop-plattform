@@ -610,6 +610,80 @@ await wSeite.close();
 
 await browser.close();
 
+// ══════════ ZUGANGSDATEN ERNEUT SENDEN -- ZWEI WEGE (ENT-649) ═════════
+//
+// ANLASS: api/demo_erneut_senden.php war seit ENT-601 gebaut, ausgeliefert
+// und tot -- keine einzige Seite rief ihn auf. Das faellt von selbst
+// niemandem auf, weil ein Endpunkt, den niemand aufruft, auch nie
+// fehlschlaegt. Diese Pruefungen halten beide Wege daran fest, dass sie
+// erreichbar sind UND ihre jeweilige Eigenart behalten.
+{
+  const homepage  = lies('homepage.html');
+  // OHNE KOMMENTARE gelesen. Beide Dateien erklaeren im Kopf ausfuehrlich,
+  // was sie tun -- eine Suche im rohen Text faende die Aussage dort statt
+  // im Code und bliebe gruen, wenn der Code verschwindet.
+  const ohneKommentar = t => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const oeff      = ohneKommentar(lies('backend/api/demo_erneut_senden.php'));
+  const betr      = ohneKommentar(lies('backend/api/betreiber_demo_erneut.php'));
+  const betrSeite = lies('betreiber.html');
+
+  // ── Der oeffentliche Weg ist erreichbar ─────────────────────────────
+  check('KRITISCH: die Homepage bietet den oeffentlichen Weg an -- der Endpunkt ist nicht mehr tot',
+    /action="https:\/\/betreiber\.guardops\.ch\/api\/demo_erneut_senden\.php"/.test(homepage));
+  // Der Honigtopf gehoert mitgeschickt: Der Endpunkt prueft ihn, und ein
+  // Formular ohne das Feld liefert ihn nie -- die Falle waere wirkungslos.
+  check('das Fallenfeld wird mitgeschickt, sonst prueft der Endpunkt ins Leere',
+    /nochmal\.website\.value/.test(homepage));
+
+  // ── Und er behaelt seine Eigenart: eine Antwort fuer jeden Fall ──────
+  // Geprueft an der AUSSAGE, nicht am Wortlaut: Der Endpunkt darf nach
+  // der Pruefung der Adresse keine unterschiedlichen Texte kennen. Es
+  // gibt genau eine Konstante dafuer, und es darf bei einer bleiben.
+  // AB DEM MOMENT, IN DEM DIE ADRESSE GELESEN WIRD. Davor steht die
+  // Methodenpruefung ("nur POST"), und die darf einen eigenen Text haben:
+  // Sie sieht keine Adresse und verraet darum auch keine. Erst danach
+  // muss jede Antwort gleich lauten -- ob die Adresse einen Zugang hat,
+  // ob der Versand klappt, ob die Bremse greift.
+  const abAdresse = oeff.slice(oeff.search(/\$email\s*=/));
+  // Jeden Fund einzeln ansehen statt mit einem negativen Blick nach vorn:
+  // Der laesst sich durch Zurueckspringen aushebeln (\s* darf leer
+  // treffen), und die Pruefung war dadurch beim ersten Anlauf rot,
+  // obwohl der Code stimmte.
+  const antworten = [...abAdresse.matchAll(/'message'\s*=>\s*([A-Za-z_'][^,\]]*)/g)]
+    .map(m => m[1].trim());
+  check('KRITISCH: der oeffentliche Weg kennt nur EINE Antwort -- sonst verraet er, welche Adresse einen Zugang hat',
+    abAdresse.length > 200
+    && antworten.length >= 3 && antworten.every(a => a === 'DEMO_ERNEUT_DANKE'));
+  check('und er hat eine eigene Bremse', /demo_bremse_pruefen\(/.test(oeff));
+  // Die Oberflaeche darf die Antwort nicht auswerten -- taete sie es,
+  // gaebe sie preis, was der Endpunkt verbirgt.
+  check('KRITISCH: die Homepage wertet die Antwort NICHT aus',
+    !/nochmal[\s\S]{0,1600}json\.status\s*===/.test(homepage));
+
+  // ── Der Betreiber-Weg: das genaue Gegenteil, und das mit Absicht ─────
+  check('KRITISCH: der Betreiber-Weg verlangt eine Anmeldung', /require_betreiber_voll\(/.test(betr));
+  check('er nimmt nur POST', /REQUEST_METHOD'\]\s*!==\s*'POST'/.test(betr));
+  check('KRITISCH: er sendet nur bei laufenden Zugaengen -- sonst gibt es kein Konto',
+    /\$zugang\['status'\]\s*!==\s*'aktiv'/.test(betr));
+  check('KRITISCH: er setzt das Passwort ueber dieselbe Funktion wie der oeffentliche Weg',
+    /demo_zugang_neues_passwort\(/.test(betr) && /demo_zugang_neues_passwort\(/.test(oeff));
+  // Der Fall, der wirklich wehtut: Passwort neu, Mail weg. Wer das
+  // verschweigt, laesst einen Interessenten ausgesperrt zurueck, ohne
+  // dass jemand den Grund kennt.
+  check('KRITISCH: scheitert der Versand, sagt er, dass das Passwort trotzdem schon neu ist',
+    /catch[\s\S]{0,600}Passwort wurde neu gesetzt/.test(betr));
+  // Die einzige Spur: Es gibt bewusst keine Spalte dafuer.
+  check('KRITISCH: der Vorgang steht im Logbuch -- es ist die einzige Spur',
+    /be_log\(/.test(betr));
+
+  // ── Und der Knopf dazu ──────────────────────────────────────────────
+  check('KRITISCH: die Demo-Zeile hat den Knopf', /data-demo-erneut/.test(betrSeite));
+  check('KRITISCH: er fragt vorher nach -- dabei entsteht ein neues Passwort',
+    /async function demoErneut\([\s\S]{0,900}confirm\(/.test(betrSeite));
+  check('und die Rueckfrage sagt, was geschieht, nicht nur "sind Sie sicher"',
+    /async function demoErneut\([\s\S]{0,900}NEUES Passwort/.test(betrSeite));
+}
+
 // ── Ergebnis ──────────────────────────────────────────────────────────
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden`);
 if (bad.length) { bad.forEach(n => console.log('  ✗ ' + n)); process.exit(1); }

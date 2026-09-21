@@ -409,7 +409,7 @@ function demo_zugang_mail(string $firma, string $person, string $adresse,
     // Die Kennung nur setzen, wenn es das Bild wirklich gibt -- ein
     // cid-Verweis ins Leere zeigt im Mailprogramm ein zerbrochenes Bild.
     // Zwei Fassungen: die dunkle fuer den hellen Modus, die helle fuer den
-    // Dunkelmodus (ENT-645). Fehlt eine, faellt nur sie weg.
+    // Dunkelmodus (ENT-648). Fehlt eine, faellt nur sie weg.
     $logo     = mail_logo();
     $logoHell = mail_logo_hell();
     $kennung     = $logo === null ? '' : (string)$logo['cid'];
