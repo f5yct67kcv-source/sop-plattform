@@ -1997,6 +1997,48 @@ textarea.inp { resize: vertical; min-height: 92px; font-family: inherit; line-he
 .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(10px); background: var(--shell); color: #fff; padding: 10px 18px; border-radius: var(--r-sm); font-size: 13px; font-weight: 550; box-shadow: var(--sh-2); z-index: 200; opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s; }
 .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* Tutorial-Tour: Kaestchen neben dem echten Bedienelement, KEINE
+   Verdunkelung -- anders als .dlg-scrim bleibt die Oberflaeche darunter
+   sichtbar und bedienbar, weil man genau dort etwas lernen soll. Eigenes,
+   neues Element statt eines abgewandelten .dlg-scrim (Projektinhaber-
+   Entscheid): ein Vollbild-Dialog verdeckt das Ziel, auf das er zeigen soll. */
+.tour-ziel { position: relative; z-index: 76; border-radius: var(--r-sm); box-shadow: 0 0 0 3px var(--accent-line); }
+.tour-box { position: fixed; z-index: 77; width: 302px; max-width: calc(100vw - 40px); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-2); padding: 16px 18px; display: none; }
+.tour-box.on { display: block; }
+.tour-box .tour-schritt { font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+.tour-box h3 { font-size: 15px; font-weight: 660; letter-spacing: -.2px; margin: 0 22px 6px 0; }
+.tour-box p { font-size: 13px; line-height: 1.55; color: var(--ink-2); margin: 0; }
+.tour-box .tour-schliessen { position: absolute; top: 10px; right: 10px; padding: 5px; }
+.tour-box .tour-ft { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; gap: 8px; }
+.tour-box .tour-punkte { display: flex; gap: 5px; }
+.tour-box .tour-punkt { width: 5px; height: 5px; border-radius: 50%; background: var(--nix); }
+.tour-box .tour-punkt.aktiv { background: var(--accent); }
+.tour-box .tour-knoepfe { display: flex; gap: 8px; }
+.tour-box .tour-pfeil { position: absolute; width: 12px; height: 12px; background: var(--surface); border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); transform: rotate(45deg); display: none; }
+.tour-box.pfeil-links .tour-pfeil { left: -7px; top: 26px; display: block; }
+.tour-box .tour-nicht-mehr { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+
+/* Demo-Hinweis: EIGENE Huelle statt .dlg-scrim (Projektinhaber-Auftrag,
+   2026-09-21). Absichtlich NICHT .dlg-scrim: Jeder ".dlg-scrim" schliesst
+   sich per Klick daneben oder Escape (siehe die beiden globalen Listener
+   weiter unten im Skript) -- eine Absicherung, die sich so wegklicken
+   liesse, waere keine. Kein X, kein Klick-weg, nur der Knopf am Ende. Innen
+   dieselben Bausteine wie ein Dialog (.dlg/.dlg-hd/.dlg-bd/.dlg-ft), damit
+   es trotzdem wie ein Teil des Cockpits aussieht. Groesser als .dlg.wide
+   (580px statt regulaer 460px), auf ausdruecklichen Wunsch. */
+.blockier-scrim { position: fixed; inset: 0; z-index: 90; background: rgba(16,18,22,.55); display: none; align-items: center; justify-content: center; padding: 20px; }
+.blockier-scrim.on { display: flex; }
+.blockier-scrim .dlg { max-width: 580px; }
+.blockier-scrim .dlg-bd p { margin: 0 0 12px; line-height: 1.6; }
+.blockier-scrim .dlg-bd p:last-child { margin-bottom: 0; }
+/* Fest statt vh: Bei diesem kurzen Text wuerde ein Anteil der Bildschirmhoehe
+   auf den meisten Desktop-Fenstern gar kein Scrollen verlangen -- die
+   Freigabe erst nach dem Scrollen waere dann wirkungslos. 200px zwingt das
+   Scrollen zuverlaessig, unabhaengig von der Fensterhoehe. */
+.blockier-scrim .dlg-bd { max-height: 200px; }
+.blockier-scrim .dhBestaetigung { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line-soft); }
+.blockier-scrim .dhScrollHinweis { font-size: 12px; color: var(--ink-3); margin-top: 8px; text-align: center; }
+
 /* Druck */
 #printArea { display: none; }
 @media print {
@@ -5561,6 +5603,15 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <button class="nav-item nur-desktop" id="nav-handbuch" title="Handbuch" onclick="handbuchOeffnen()">
         <svg class="i" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
         <span class="lbl">Handbuch</span>
+      </button>
+      <!-- Tutorial-Tour: Wiederaufruf-Punkt direkt neben dem Handbuch, gleicher
+           Ort, gleiche Erwartungshaltung ("wo finde ich Hilfe"). Nur Desktop
+           wie Einrichtung/Handbuch selbst -- am Handy gibt es das Cockpit-
+           Tutorial (noch) nicht, siehe Gestaltungsregel zu mobilen Zuschnitten. -->
+      <button class="nav-item nur-desktop" id="nav-tutorial" title="Tutorial" onclick="tourStart()">
+        <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.8c0 1.7-2.4 2-2.4 3.7"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span class="lbl">Tutorial</span>
+      </button>
       <!-- Supportanfrage (ENT-538). Neben der Einrichtung und nicht bei "Zur
            App": Beides sind Wege zur ANLAGE, "Zur App" und "Desktop-Ansicht"
            sind Ortswechsel. Der Fussteil folgt damit weiter seiner Ordnung --
@@ -9981,6 +10032,55 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Demo-Hinweis: siehe CSS-Kommentar bei .blockier-scrim. Erscheint vor der
+     Tour, nur in Demo-Instanzen, und blockiert bis zur Bestaetigung -- der
+     Knopf am Fuss bleibt gesperrt, bis der Text bis zum Ende gescrollt
+     wurde (dhScrollPruefen()). -->
+<div class="blockier-scrim" id="dlgDemoHinweis">
+  <div class="dlg wide">
+    <div class="dlg-hd"><h2>Bevor Sie loslegen</h2></div>
+    <div class="dlg-bd" id="dhKoerper" onscroll="dhScrollPruefen()">
+      <p>Diese Demo zeigt einen erfundenen Betrieb mit frei erfundenen Inhalten. Übereinstimmungen mit echten Personen, Firmen oder Objekten sind dabei nicht auszuschliessen und rein zufällig.</p>
+      <p>Bitte tragen Sie hier ausschliesslich erfundene Daten ein — keine echten Namen, Adressen, Telefonnummern oder sonstigen Personendaten, weder Ihre eigenen noch die von Dritten.</p>
+      <p>Die <a href="nutzungsbedingungen.html" target="_blank" rel="noopener">Nutzungsbedingungen</a> und die <a href="datenschutz-demo.html" target="_blank" rel="noopener">Datenschutzerklärung</a> wurden bereits bei der Anfrage dieses Demo-Zugangs bestätigt. Hier können Sie sie nochmals nachlesen.</p>
+      <div class="dhBestaetigung">
+        <label class="check">
+          <input type="checkbox" id="dhCheckbox" disabled onchange="dhCheckboxGeaendert()">
+          Ich habe das gelesen und verstanden.
+        </label>
+      </div>
+    </div>
+    <div class="dlg-ft" style="justify-content:center; flex-direction:column; align-items:stretch">
+      <button class="btn btn-primary btn-wide" id="dhWeiterBtn" disabled onclick="dhBestaetigen()">Verstanden, weiter</button>
+      <div class="dhScrollHinweis" id="dhScrollHinweis">Bitte bis zum Ende lesen, um fortzufahren.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tutorial-Tour: siehe CSS-Kommentar bei .tour-box. Der Pfeil zeigt per
+     Klasse "pfeil-links" auf das jeweilige Sidebar-Element; ohne Ziel
+     (Start-/Schlussschritt) steht das Kaestchen mittig, siehe tourPositionieren(). -->
+<div class="tour-box" id="tourBox">
+  <span class="tour-pfeil"></span>
+  <button class="btn btn-quiet btn-sm tour-schliessen" onclick="tourSchliessen()" title="Tutorial schliessen">
+    <svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </button>
+  <div class="tour-schritt" id="tourSchrittLbl">Schritt 1 von 10</div>
+  <h3 id="tourTitel"></h3>
+  <p id="tourText"></p>
+  <div class="tour-nicht-mehr" id="tourNichtMehrWrap" style="display:none">
+    <label class="check"><input type="checkbox" id="tourNichtMehr"> Nicht mehr automatisch anzeigen</label>
+  </div>
+  <div class="tour-ft">
+    <div class="tour-punkte" id="tourPunkte"></div>
+    <div class="tour-knoepfe">
+      <button class="btn btn-plain btn-sm" id="tourZurueckBtn" onclick="tourZurueck()">Zurück</button>
+      <button class="btn btn-primary btn-sm" id="tourWeiterBtn" onclick="tourWeiter()">Weiter</button>
+    </div>
+  </div>
+</div>
+
 <div id="printArea"></div>
 
 <!-- Glocke (ENT-197): das Dropdown steht hier auf Ebene von toast/dlgConfirm,
@@ -10353,6 +10453,150 @@ function toast(msg) {
   clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('on'), 2600);
 }
 
+/* Tutorial-Tour fuers Cockpit, zunaechst fuer die Rolle Verwaltung (ENT-XXX).
+   Kaestchen zeigt per CSS-Pfeil auf das echte Sidebar-Element -- kein
+   abgedunkelter Vollbild-Dialog, siehe CSS-Kommentar bei .tour-box. */
+const TOUR_SCHRITTE = [
+  { titel: 'Willkommen im Cockpit', text: 'Eine kurze Tour zeigt dir die wichtigsten Bereiche. Du kannst jederzeit abbrechen und sie später über „Tutorial" unten in der Seitenleiste erneut starten.' },
+  { ziel: 'nav-uebersicht', titel: 'Übersicht', text: 'Hier landest du nach der Anmeldung. Die Kennzahlen zeigen den aktuellen Stand des Betriebs.' },
+  { ziel: 'nav-planung', titel: 'Planung', text: 'Einsätze anlegen, die Objektplanung und den Tagesplan führst du hier.' },
+  { ziel: 'nav-abgleich', titel: 'Abgleich', text: 'Geleistete Schichten gleichst du hier mit der Planung ab. Eine abgeglichene Schicht ist danach festgeschrieben.' },
+  { ziel: 'nav-kunden', titel: 'Kunden', text: 'Adressen, Objekte, Rapporte, Offerten und Rechnungen deiner Kundschaft.' },
+  { ziel: 'nav-revierdienst', titel: 'Revierdienst', text: 'Kontrollpunkte und Kontrollrunden für den Wächtereinsatz.' },
+  { ziel: 'nav-kontrolle', titel: 'Auswertung', text: 'Pensen, Auslagenersatz, Abwesenheiten und Arbeitsergebnisse im Überblick.' },
+  { ziel: 'nav-lohn', titel: 'Lohn', text: 'Lohnläufe, Lohnarten und das Regelwerk für die Abrechnung.' },
+  { ziel: 'nav-admin', titel: 'Administration', text: 'Mitarbeitende, Leistungen, Einstellungen, Mitteilungen und Kundenzugänge.' },
+  { ziel: 'nav-einrichtung', titel: 'Einrichtung & Handbuch', text: 'Ein farbiger Punkt hier zeigt, wenn ein Update aussteht. Das Handbuch findest du direkt darunter, dieses Tutorial jederzeit über den Punkt daneben.', letzter: true },
+];
+let tourIdx = 0;
+let tourAktivesZiel = null;
+
+function tourStart() {
+  tourIdx = 0;
+  tourRender();
+}
+
+function tourRender() {
+  const schritt = TOUR_SCHRITTE[tourIdx];
+  const box = $('tourBox');
+  if (tourAktivesZiel) { tourAktivesZiel.classList.remove('tour-ziel'); tourAktivesZiel = null; }
+  $('tourSchrittLbl').textContent = `Schritt ${tourIdx + 1} von ${TOUR_SCHRITTE.length}`;
+  $('tourTitel').textContent = schritt.titel;
+  $('tourText').textContent = schritt.text;
+  $('tourZurueckBtn').style.visibility = tourIdx === 0 ? 'hidden' : 'visible';
+  $('tourWeiterBtn').textContent = schritt.letzter ? 'Fertig' : 'Weiter';
+  $('tourNichtMehrWrap').style.display = schritt.letzter ? 'block' : 'none';
+  $('tourPunkte').innerHTML = TOUR_SCHRITTE.map((_, i) =>
+    `<span class="tour-punkt${i === tourIdx ? ' aktiv' : ''}"></span>`).join('');
+  box.classList.add('on');
+  tourPositionieren(schritt.ziel);
+}
+
+function tourPositionieren(zielId) {
+  const box = $('tourBox');
+  const ziel = zielId ? document.getElementById(zielId) : null;
+  if (!ziel) {
+    box.classList.remove('pfeil-links');
+    box.style.left = '50%'; box.style.top = '50%';
+    box.style.transform = 'translate(-50%, -50%)';
+    return;
+  }
+  ziel.classList.add('tour-ziel');
+  tourAktivesZiel = ziel;
+  box.classList.add('pfeil-links');
+  box.style.transform = 'none';
+  const r = ziel.getBoundingClientRect();
+  let top = r.top + r.height / 2 - box.offsetHeight / 2;
+  top = Math.max(12, Math.min(top, window.innerHeight - box.offsetHeight - 12));
+  box.style.left = (r.right + 18) + 'px';
+  box.style.top = top + 'px';
+}
+
+function tourWeiter() {
+  if (TOUR_SCHRITTE[tourIdx].letzter) { tourAbschliessen(); return; }
+  tourIdx = Math.min(tourIdx + 1, TOUR_SCHRITTE.length - 1);
+  tourRender();
+}
+
+function tourZurueck() {
+  tourIdx = Math.max(tourIdx - 1, 0);
+  tourRender();
+}
+
+function tourAufraeumen() {
+  $('tourBox').classList.remove('on');
+  if (tourAktivesZiel) { tourAktivesZiel.classList.remove('tour-ziel'); tourAktivesZiel = null; }
+}
+
+function tourAbschliessen() {
+  tourAufraeumen();
+  tourAlsGesehenMerken();
+}
+
+function tourSchliessen() {
+  const nichtMehr = TOUR_SCHRITTE[tourIdx].letzter && $('tourNichtMehr').checked;
+  tourAufraeumen();
+  if (nichtMehr) tourAlsGesehenMerken();
+}
+
+function tourAlsGesehenMerken() {
+  api('tutorial_gesehen.php', { method: 'POST', body: { tutorial: 'cockpit_verwaltung' } });
+}
+
+// Demo-Hinweis (Projektinhaber-Auftrag, 2026-09-21): siehe CSS-Kommentar bei
+// .blockier-scrim. Blockiert vor der Tour, nur in Demo-Instanzen, solange
+// nicht bestaetigt.
+let dhWeiterCallback = null;
+
+function dhZeigen(weiter) {
+  dhWeiterCallback = weiter || null;
+  $('dhCheckbox').checked = false;
+  $('dhCheckbox').disabled = true;
+  $('dhWeiterBtn').disabled = true;
+  $('dhScrollHinweis').style.display = '';
+  $('dhKoerper').scrollTop = 0;
+  $('dlgDemoHinweis').classList.add('on');
+  // Passt der Text ohne zu scrollen schon ganz ins Fenster (schmaler
+  // Bildschirm, grosse Schrift), soll das nicht ewig gesperrt bleiben --
+  // einmal sofort pruefen, nicht erst beim ersten Scroll-Ereignis.
+  dhScrollPruefen();
+}
+
+function dhScrollPruefen() {
+  const el = $('dhKoerper');
+  const amEnde = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
+  if (amEnde) {
+    $('dhCheckbox').disabled = false;
+    $('dhScrollHinweis').style.display = 'none';
+  }
+}
+
+function dhCheckboxGeaendert() {
+  $('dhWeiterBtn').disabled = !$('dhCheckbox').checked;
+}
+
+function dhBestaetigen() {
+  if ($('dhWeiterBtn').disabled) { return; }
+  api('demo_hinweis_bestaetigen.php', { method: 'POST' }).finally(() => {
+    $('dlgDemoHinweis').classList.remove('on');
+    if (dhWeiterCallback) { const fn = dhWeiterCallback; dhWeiterCallback = null; fn(); }
+  });
+}
+
+// Einstieg nach jeder me.php-Antwort (siehe enter()): Demo-Hinweis geht vor
+// der Tour auf, nicht gleichzeitig -- zwei blockierende Kaestchen
+// uebereinander waeren unlesbar, und der Hinweis ist der wichtigere.
+function tutorialAutostartPruefen(data) {
+  if (data && data.ist_demo && !data.demo_hinweis_bestaetigt) {
+    dhZeigen(() => tutorialAutostartPruefen({ ...data, demo_hinweis_bestaetigt: true }));
+    return;
+  }
+  if (Array.isArray(me.rollen) && me.rollen.includes('verwaltung')
+      && data && data.tutorial_gesehen && !data.tutorial_gesehen.cockpit_verwaltung) {
+    tourStart();
+  }
+}
+
 function api(path, opts) {
   opts = opts || {};
   const headers = { 'Content-Type': 'application/json' };
@@ -10648,6 +10892,7 @@ function enter() {
     $('uRole').textContent = (me.rollen && me.rollen.length)
       ? me.rollen.map(rolleTitel).join(' · ') : 'Administration';
     rechteAnwenden();
+    tutorialAutostartPruefen(data);
   }).catch(() => {});
   ordLaden('uebersicht');
   sprachBereit('rt');

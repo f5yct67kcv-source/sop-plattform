@@ -1521,6 +1521,41 @@ CREATE TABLE IF NOT EXISTS mitteilung_gelesen (
   FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Wer welche Cockpit-Tour schon gesehen hat (ENT-XXX). Eine Zeile je Person
+// und Tour-Schluessel -- so wie bei mitteilung_gelesen darueber, aus
+// demselben Grund: ein zweiter Aufruf legt keine zweite Zeile an.
+//
+// Liegt bewusst in der Instanz-Datenbank, nicht beim Betreiber: Fuer
+// Demo-Plaetze bedeutet das, dass der naechtliche Reset (ENT-523) auch
+// diesen Stand mitnimmt -- eine neue Interessentin am naechsten Morgen soll
+// die Tour wieder von vorne sehen, nicht "schon gesehen" vorfinden, weil
+// eine fremde Person sie am Vortag durchgeklickt hat.
+'tutorial_gesehen' => "
+CREATE TABLE IF NOT EXISTS tutorial_gesehen (
+  tutorial VARCHAR(60) NOT NULL,
+  mitarbeiter_id INT NOT NULL,
+  gesehen_am DATETIME NOT NULL,
+  PRIMARY KEY (tutorial, mitarbeiter_id),
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Der Demo-Hinweis: erfundene Daten, keine echten Personendaten eintragen
+// (Projektinhaber-Auftrag). ANDERE SACHE als die Zustimmung zu den
+// Nutzungsbedingungen bei der Demo-Anfrage (demo_bestaetigung, liegt beim
+// Betreiber und ueberlebt den Reset bewusst als Beleg): Diese Zeile
+// bestaetigt nicht dieselbe Rechtserklaerung ein zweites Mal, sondern haelt
+// fest, dass GENAU DIESES Mitarbeiterkonto den Hinweis gesehen hat -- die
+// Person am Bildschirm muss nicht dieselbe sein, die den Demo-Zugang
+// angefordert hat. Liegt darum wie tutorial_gesehen in der Instanz-
+// Datenbank und wird mit ihr taeglich zurueckgesetzt.
+'demo_hinweis_bestaetigung' => "
+CREATE TABLE IF NOT EXISTS demo_hinweis_bestaetigung (
+  mitarbeiter_id INT NOT NULL PRIMARY KEY,
+  fassung VARCHAR(20) NOT NULL,
+  bestaetigt_am DATETIME NOT NULL,
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 // Push-Abos je Geraet (ENT-424). Eine Person kann mehrere haben -- Telefon
 // und Tablet sind zwei Geraete und bekommen beide eine Benachrichtigung.
 //

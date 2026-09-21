@@ -12,8 +12,12 @@ require_once __DIR__ . '/../rechte.php';
 // Fuer sparten_erlaubt() -- welche Sparten dieser Mandant ueberhaupt
 // benutzen darf (ENT-650).
 require_once __DIR__ . '/../planung.php';
+// Fuer den Stand der Cockpit-Tour und des Demo-Hinweises.
+require_once __DIR__ . '/../tutorial.php';
 
 $user = require_session();
+$pdo  = db();
+$ich  = (int)$user['id'];
 json_response([
     'status'    => 'ok',
     'name'      => $user['name'],
@@ -27,4 +31,12 @@ json_response([
     // sparte_pruefen() in planung.php laesst einen nicht erlaubten Wert
     // gar nicht erst in die Datenbank.
     'sparten'   => sparten_erlaubt(),
+    // Cockpit-Tour und Demo-Hinweis (Projektinhaber-Auftrag, 2026-09-21):
+    // dieselbe Bequemlichkeits-Logik wie oben -- die Oberflaeche entscheidet
+    // damit ohne Zusatzanfrage, ob sie beim Laden etwas automatisch zeigt.
+    'ist_demo'  => ist_demo(),
+    'demo_hinweis_bestaetigt' => ist_demo() ? demo_hinweis_bestaetigt($pdo, $ich) : true,
+    'tutorial_gesehen' => [
+        'cockpit_verwaltung' => tutorial_gesehen($pdo, $ich, 'cockpit_verwaltung'),
+    ],
 ]);
