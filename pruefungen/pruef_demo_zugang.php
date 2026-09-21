@@ -241,7 +241,7 @@ $pruef('KRITISCH: die automatische Einfaerbung von Apple Mail ist ueberschrieben
     && preg_match('/x-apple-data-detectors[^}]*color:\s*inherit\s*!important/', $mail['html']) === 1
     && preg_match('/x-apple-data-detectors[^}]*text-decoration:\s*none\s*!important/', $mail['html']) === 1);
 
-// ── Das Logo in der Signatur (ENT-619) ───────────────────────────────
+// ── Das Logo in der Signatur (ENT-645) ───────────────────────────────
 //
 // Eingebettet, nicht verlinkt: Outlook und die meisten Programme laden ein
 // extern verlinktes Bild erst auf Erlaubnis -- bis dahin stuende unter der

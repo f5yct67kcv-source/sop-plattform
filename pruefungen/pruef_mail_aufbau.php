@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Der MIME-Aufbau der Mails, wirklich ausgefuehrt (ENT-619).
+// Der MIME-Aufbau der Mails, wirklich ausgefuehrt (ENT-645).
 //
 // WARUM ECHT UND NICHT ALS TEXTVERGLEICH: Der Zusammenbau einer Nachricht
 // aus Klartext, HTML, eingebettetem Bild und Anhang ist die
@@ -26,7 +26,7 @@ $html = '<p>Guten Tag</p><img src="cid:guardops-logo">';
 $bild = ['cid' => 'guardops-logo', 'mime' => 'image/png', 'inhalt' => "\x89PNG-Rohbytes"];
 $anhang = ['name' => 'rapport.pdf', 'mime' => 'application/pdf', 'inhalt' => '%PDF-Rohbytes'];
 
-// ── 1. Ohne Bild und ohne Anhang: unveraendert wie vor ENT-619 ───────
+// ── 1. Ohne Bild und ohne Anhang: unveraendert wie vor ENT-645 ───────
 // Der Offert-Versand (ENT-192) laeuft produktiv und darf von der
 // Erweiterung nichts merken.
 $schlicht = smtp_nachricht_bauen('a@bsp.ch', 'b@bsp.ch', 'Betreff', $html, 'Klartext');

@@ -99,7 +99,7 @@ check('KRITISCH: mit Anhang wird die Nachricht als multipart/mixed gebaut',
   /multipart\/mixed; boundary=/.test(MAILER));
 check('KRITISCH: die Text-/HTML-Auswahl bleibt darin als multipart/alternative erhalten',
   /multipart\/alternative; boundary="' \. \$grenze/.test(MAILER));
-// Diese Aussage wird seit ENT-619 ECHT geprüft statt am Quelltext
+// Diese Aussage wird seit ENT-645 ECHT geprüft statt am Quelltext
 // gelesen: pruef_mail_aufbau.php ruft smtp_nachricht_bauen() mit und ohne
 // Anhang auf und misst den erzeugten Aufbau nach (test_mail_aufbau.mjs).
 // Hier stand vorher ein Muster über die Zeilenfolge in smtp_senden() —
