@@ -17,7 +17,7 @@ declare(strict_types=1);
 // Ueberlegung wie in der Oberflaeche gilt trotzdem: Beschriftung oben,
 // Wert darunter (CLAUDE.md, Gestaltung).
 //
-// DAS LOGO STEHT IN DER SIGNATUR, EINGEBETTET (ENT-619). Nicht ueber eine
+// DAS LOGO STEHT IN DER SIGNATUR, EINGEBETTET (ENT-645). Nicht ueber eine
 // externe Adresse: Outlook und die meisten Programme laden solche Bilder
 // erst auf Erlaubnis, bis dahin stuende unter der Unterschrift ein leerer
 // Rahmen. Eingebettet per Content-ID (multipart/related, siehe

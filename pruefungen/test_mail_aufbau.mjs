@@ -1,4 +1,4 @@
-// Der MIME-Aufbau der Mails, wirklich ausgefuehrt (ENT-619).
+// Der MIME-Aufbau der Mails, wirklich ausgefuehrt (ENT-645).
 //
 // Anlass: Das Logo in der Signatur wird als eingebettetes Bild verschickt
 // (Content-ID, multipart/related) -- derselbe Weg, den Outlook fuer seine
