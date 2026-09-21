@@ -1287,6 +1287,22 @@ body.karte-nativ .app { visibility: hidden; }
    saehe das aus wie ein Knopf, der nicht reagiert -- und genau das war der
    Ausgangsbefund. */
 .rgs-karte-btn.laeuft { opacity: .62; }
+/* Der Gegenpol zu „Zentrieren" (ENT-647): Der Pfeil unten links fuehrt
+   zum eigenen Standort, die Nadel unten rechts holt alle Kontrollpunkte
+   ins Bild. Vorbild ist der Wettbewerber, der an derselben Stelle einen
+   solchen Knopf hat -- das ZEICHEN ist ausdruecklich unseres: dieselbe
+   Nadel wie im Reiter „Kontrollpunkte". Pfeil = ich, Nadel = die Punkte,
+   auf dem ganzen Bildschirm dasselbe.
+
+   Quadratisch und ohne Beschriftung wie das Zahnrad: „Kontrollpunkte" ist
+   das laengste Wort der App und stiesse auf einem 320er Geraet mit dem
+   Zentrieren-Knopf zusammen. Die Aussage traegt das aria-label. */
+.rgs-karte-punkte { position: absolute; right: 12px; bottom: 28px; z-index: 2;
+  width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--accent-line); border-radius: var(--r-sm);
+  background: var(--accent-soft); color: var(--accent); padding: 0;
+  cursor: pointer; box-shadow: var(--sh-2); }
+.rgs-karte-punkte:active { background: var(--line-soft); }
 /* Beide Kartenknoepfe sitzen bewusst 28 px ueber der Kante, nicht 12
    (ENT-355). Darunter laeuft die Leiste des Kartenanbieters mit dem
    Kartendaten-Hinweis und dem Link auf seine Nutzungsbedingungen. Sie darf
@@ -1402,7 +1418,7 @@ body.karte-nativ .app { visibility: hidden; }
    Bedienlogiken lernen muss. */
 .rgs-reiter { display: flex; flex: none; border-top: 1px solid var(--line); background: var(--surface); padding-bottom: calc(env(safe-area-inset-bottom) + var(--sockel)); }
 .rgs-reiter[hidden] { display: none; }
-.rgs-reiter button { flex: 1; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: none; border: 0; border-top: 2px solid transparent; margin-top: -1px; color: var(--ink-3); font: inherit; font-size: 11.5px; font-weight: 620; line-height: 1; cursor: pointer; }
+.rgs-reiter button { flex: 1; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: none; border: 0; border-top: 2px solid transparent; border-bottom: 2px solid transparent; margin-top: -1px; color: var(--ink-3); font: inherit; font-size: 11.5px; font-weight: 620; line-height: 1; cursor: pointer; }
 /* Die Zeichen der Reiterleiste sind groesser als ueberall sonst (ENT-642).
    Nachgemessen an einem Bildschirmfoto des Wettbewerbers, Pixel fuer Pixel
    auf demselben Geraet (beide Aufnahmen 1179 px breit, also 3x): Dort ist
@@ -1418,6 +1434,12 @@ body.karte-nativ .app { visibility: hidden; }
    wirkungslos, ohne dass etwas kaputtginge. */
 .rgs-reiter button svg.i { width: 28px; height: 28px; }
 /* Der aktive Reiter traegt Farbe UND einen Balken -- nicht nur Farbe. */
+/* Der durchsichtige Gegenstreifen unten ist kein Zierrat, sondern die
+   Mitte (ENT-646, Nachtrag zu ENT-642): Der Akzentbalken oben ist 2 px
+   hoch und gehoert zum Kasten, der Inhalt sitzt darunter. Ohne Gegengewicht steht er um genau diese 2 px zu
+   tief -- gemessen 8,25 px Luft ueber dem Zeichen gegen 6,25 px unter der
+   Beschriftung. Mit dem Gegenstreifen sind es beidseits 7,25 px. Die
+   Leiste bleibt dabei gleich hoch, weil der Kasten nach aussen misst. */
 .rgs-reiter button.an { color: var(--accent); border-top-color: var(--accent); }
 .rgs-reiter .zahl { position: absolute; transform: translate(14px, -10px); min-width: 17px; height: 17px; padding: 0 5px; border-radius: 9px; background: var(--warn); color: var(--auf-farbe); font-size: 10.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
@@ -2835,6 +2857,7 @@ const W = {
     rgsKarteLeer: 'Für diese Runde ist kein Kontrollpunkt auf der Karte darstellbar.',
     rgsKarteOhneOrt: 'ohne Koordinaten — nur in der Liste',
     rgsZentrieren: 'Zentrieren',
+    rgsPunkteZeigen: 'Alle Kontrollpunkte ins Bild',
     rgsMeinStandort: 'Mein Standort',
     rgsRichtung: 'Bewegungsrichtung',
     rgsOrtungLaeuft: 'Standort wird während der Runde verfolgt — Punkte werden im Bereich selbst erfasst',
@@ -9531,6 +9554,11 @@ function rgKarteZeichnen() {
         <svg class="i i-sm" viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
         <span>${esc(w('rgsZentrieren'))}</span>
       </button>
+      <button type="button" class="rgs-karte-punkte" id="rgsPunkteZeigen"
+          aria-label="${esc(w('rgsPunkteZeigen'))}" title="${esc(w('rgsPunkteZeigen'))}"
+          onclick="rgKarteAufPunkteKnopf()">
+        <svg class="i i-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/></svg>
+      </button>
       ${rgEinstHtml()}
     </div>${ortungHinweis}${hinweis}`;
 
@@ -11375,6 +11403,21 @@ function rgKarteAufPunkte(d) {
   const grenzen = new google.maps.LatLngBounds();
   d.zeigbar.forEach(p => grenzen.extend({ lat: p.lat, lng: p.lng }));
   rgsKarte.fitBounds(grenzen, 48);
+}
+
+/* Der Knopf unten rechts: alle Kontrollpunkte ins Bild (ENT-647).
+
+   Derselbe Weg wie der Rueckfall des Zentrieren-Knopfes, aber hier als
+   ausdrueckliche Absicht. Bis hierher kam der Waechter nur an diese
+   Ansicht, wenn seine Ortung scheiterte -- wer zentriert hatte und danach
+   wissen wollte, wo die Punkte liegen, musste die Karte von Hand
+   herausziehen.
+
+   Keine Pruefung auf leere Listen noetig: rgKarteZeichnen baut gar keine
+   Karte, solange kein Punkt Koordinaten hat, und ohne Karte gibt es auch
+   diesen Knopf nicht. */
+function rgKarteAufPunkteKnopf() {
+  rgKarteAufPunkte(rgKarteDaten(rundgangAktiv ? rundgangAktiv.kontrollpunkte : []));
 }
 
 /* Der Ausschnitt, mit dem eine frisch gebaute Karte anfaengt.
