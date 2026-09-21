@@ -848,9 +848,6 @@ jobs:
           # -- "unbekannt" sah aus wie "nichts nachzutragen".
           cp backend/planung_einrichten_kern.php dist/planung_einrichten_kern.php
           cp backend/demo_instanz.php dist/demo_instanz.php
-          # Ebenfalls kein Endpunkt, nur per require_once aus login.php und
-          # api/me.php gezogen (Cockpit-Tour und Demo-Hinweis) -- derselbe
-          # Grund wie bei planung_einrichten_kern.php zwei Zeilen darueber.
           cp backend/tutorial.php dist/tutorial.php
           # Schutzeinstellungen (ENT-075). Im Repository heisst die Datei
           # bewusst ohne fuehrenden Punkt -- sonst uebersieht man sie. Wird
