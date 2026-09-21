@@ -25,6 +25,10 @@ const workflowDatei = `${WURZEL}/.github/workflows/deploy-hostpoint.yml`;
 const zugangDatei   = `${WURZEL}/backend/demo_zugang.php`;
 const workflow = readFileSync(workflowDatei, 'utf8');
 const zugang   = readFileSync(zugangDatei, 'utf8');
+// Die beiden Teile, aus denen die .htaccess eines Platzes zusammengesetzt
+// wird (siehe startseiteAus() weiter unten).
+const hostpoint = readFileSync(`${WURZEL}/htaccess-hostpoint`, 'utf8');
+const demoZusatz = readFileSync(`${WURZEL}/htaccess-demo-zusatz`, 'utf8');
 
 // Der Abschnitt des Workflows, der die Buendel der Plaetze baut. Alles,
 // was diese Suite ueber die Plaetze aussagt, bezieht sich darauf -- damit
@@ -46,6 +50,21 @@ function plaetzeAusCode(text) {
 function plaetzeAusWorkflow(text) {
   const m = platzBlock(text).match(/^\s*PLAETZE="([^"]+)"/m);
   return m ? m[1].trim().split(/\s+/) : [];
+}
+
+// Welche Datei ein Platz unter "/" ausliefert. Gelesen wird die WIRKUNG am
+// fertigen Buendel und nicht der Wortlaut einer Zeile: Die beiden Quellen
+// werden in derselben Reihenfolge aneinandergehaengt wie im Deploy
+// (htaccess-hostpoint, danach htaccess-demo-zusatz), und davon gilt die
+// LETZTE DirectoryIndex-Angabe -- so entscheidet es auch Apache, wenn
+// mehrere im selben Geltungsbereich stehen.
+// Die beiden Texte kommen als Parameter herein, damit die Gegenprobe ganz
+// unten denselben Leser gegen eine veraenderte Fassung laufen lassen kann
+// statt einen nachgebauten.
+function startseiteAus(hostpointText, zusatzText) {
+  const treffer = [...`${hostpointText}\n${zusatzText}`
+    .matchAll(/^[^\S\n]*DirectoryIndex[^\S\n]+(\S+)/gm)];
+  return treffer.length ? treffer[treffer.length - 1][1] : null;
 }
 
 // ── Die Pruefungen, als Funktionen ueber den Workflow-Text ───────────────
@@ -217,6 +236,28 @@ const PRUEFUNGEN = {
       && !/hole smtp_/.test(b);
   },
 
+  // Was ein Interessent unter "/" zu sehen bekommt. Ohne DirectoryIndex
+  // nimmt Apache seinen Standard, und das ist index.html -- das
+  // Rapport-Tool. Der Interessent landet dann in dessen nackter
+  // Anmeldekarte statt in der Maske, die ihm den Demobereich erklaert:
+  // ohne Video, ohne Logo mit Claim, ohne Gruss, ohne Impressum und
+  // Datenschutz. Genau so stand es bis zum 2026-09-21 auf allen zehn
+  // Plaetzen, ohne dass etwas rot wurde: Eine Startseite, die die falsche
+  // Datei zeigt, ist kein Fehler, sondern eine andere Seite.
+  //
+  // Zwei Aussagen zusammen, weil eine allein nichts wert ist: Die
+  // Zusatzdatei muss die Startseite wirklich auf dashboard.html stellen
+  // (gelesen ueber startseiteAus(), nicht als Wortlaut), UND der
+  // Bau-Schritt muss genau diese beiden Dateien in dieser Reihenfolge
+  // zusammensetzen. Faellt das Anhaengen weg, gilt wieder der Standard.
+  startseite_ist_das_cockpit(text) {
+    const b = platzBlock(text);
+    const zusammengesetzt =
+      /cp htaccess-hostpoint "dist-demo\/\$PLATZ\/\.htaccess"/.test(b)
+      && /cat htaccess-demo-zusatz >> "dist-demo\/\$PLATZ\/\.htaccess"/.test(b);
+    return zusammengesetzt && startseiteAus(hostpoint, demoZusatz) === 'dashboard.html';
+  },
+
   // Eine Demo-Instanz unter dem Firmennamen eines Interessenten bei
   // Google ist ein Datenschutzvorfall mit Ansage. Beide Dateien, wie bei
   // der Demo-Umgebung aus ENT-523.
@@ -310,6 +351,8 @@ const GEGENPROBEN = [
               'ersetze __SMTP_HOST__ "$(hole smtp_host)"')],
   ['kein_suchmaschinen_eintrag', t =>
     t.replace('cat htaccess-demo-zusatz >> "dist-demo/$PLATZ/.htaccess"', ': # kein Zusatz')],
+  ['startseite_ist_das_cockpit', t =>
+    t.replace('cp htaccess-hostpoint "dist-demo/$PLATZ/.htaccess"', ': # keine Grundlage')],
   ['werte_immer_maskiert', t =>
     t.replace('ersetze __DB_PASS__ "$DB_PASS" "dist-demo/$PLATZ/db.php"',
               'sed -i "s|__DB_PASS__|$DB_PASS|g" "dist-demo/$PLATZ/db.php"')],
@@ -322,6 +365,15 @@ for (const [name, kaputt] of GEGENPROBEN) {
   check(`Gegenprobe: "${name.replace(/_/g, ' ')}" schlaegt an, wenn man es kaputt macht`,
     hatSichGeaendert && wirdRot);
 }
+
+// Die zweite Haelfte der Startseiten-Pruefung haengt nicht am Workflow,
+// sondern am Inhalt der Zusatzdatei -- die Gegenprobe oben kann sie darum
+// nicht erreichen. Hier wird sie einzeln gefuehrt: Nimmt man die
+// DirectoryIndex-Zeile heraus, muss derselbe Leser etwas anderes
+// herausbekommen als dashboard.html. Faende er sie auch ohne die Zeile,
+// laese er sie nicht.
+check('Gegenprobe: "startseite ist das cockpit" schlaegt an, wenn die DirectoryIndex-Zeile fehlt',
+  startseiteAus(hostpoint, demoZusatz.replace(/^[^\S\n]*DirectoryIndex[^\n]*$/m, '')) !== 'dashboard.html');
 
 // Beim echten Workflow wird auch gesagt, WELCHER Platzhalter fehlt --
 // sonst weiss niemand, wo er suchen soll.

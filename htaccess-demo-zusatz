@@ -17,3 +17,25 @@
 <IfModule mod_headers.c>
   Header always set X-Robots-Tag "noindex, nofollow, noarchive"
 </IfModule>
+
+# ── Startseite: das Cockpit, nicht das Rapport-Tool ─────────────────────
+#
+# Ohne diese Zeile liefert Apache seinen Standard aus, und das ist
+# index.html -- das Rapport-Tool fuer den Verkehrsdienst. Wer
+# demo3.guardops.ch ohne Pfad aufruft, sieht dann dessen nackte
+# Anmeldekarte: kein Hintergrundvideo, kein Logo, kein Gruss, kein
+# Impressum, kein Datenschutz. Der Demo-Anmeldebildschirm in
+# dashboard.html (Skizze 2026-09-17) war gebaut, aber unter "/" nicht zu
+# erreichen; gefunden am 2026-09-21 auf allen zehn Plaetzen und auf
+# demo.guardops.ch.
+#
+# Genau dieselbe Zeile und dieselbe Begruendung wie in htaccess-cupi24:
+# Dort gehoert "/" dem Cockpit, damit ein Planer nicht in der
+# Waechter-Anmeldung landet. Hier gehoert "/" dem Cockpit, damit ein
+# Interessent die Maske sieht, die ihm den Demobereich erklaert. Nur die
+# Zuordnung von "/" aendert sich -- /index.html, /app.html und
+# /portal.html bleiben unter ihrem Pfad abrufbar wie bisher.
+#
+# NICHT nach htaccess-hostpoint: Der gilt auch fuer Produktion, und dort
+# gehoert "/" weiterhin dem Rapport-Tool.
+DirectoryIndex dashboard.html
