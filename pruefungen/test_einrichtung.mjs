@@ -68,6 +68,26 @@ check('Der Punkt ist sichtbar', await page.isVisible('#updatePunkt'));
 check('Es gibt keinen zweiten Mechanismus -- derselbe Endpunkt wie die Einrichtung',
   rufe.filter(r => r.p.includes('planung_einrichten')).every(r => r.methode === 'GET' || r.methode === 'POST'));
 
+// ══════════ TOAST BEIM ECHTEN UPDATE (Rueckmeldung des Projektinhabers) --
+// der Punkt am Konto-Logo faellt nicht auf, solange niemand dort
+// hinschaut. Derselbe Toast wie ueberall sonst im Cockpit.
+check('Ein echtes Update meldet sich zusaetzlich per Toast',
+  await page.evaluate(() => document.getElementById('toast').classList.contains('on')));
+check('Der Toast nennt das Wort „Update“',
+  (await page.textContent('#toast')).includes('Update'));
+
+// Am Handy ist "Einrichtung" .nur-desktop (ENT-235) -- ein Toast dazu zeigte
+// dort auf einen Menuepunkt, den es gar nicht gibt.
+await page.evaluate(() => { document.getElementById('toast').classList.remove('on'); });
+await page.setViewportSize({ width: 400, height: 800 });
+await page.waitForTimeout(150);
+await page.evaluate(() => pruefeUpdate());
+await page.waitForTimeout(300);
+check('Am Handy bleibt der Toast aus, auch wenn ein Update aussteht',
+  !(await page.evaluate(() => document.getElementById('toast').classList.contains('on'))));
+await page.setViewportSize({ width: 1400, height: 900 });
+await page.waitForTimeout(150);
+
 // ══════════ DIALOG
 await page.click('#nav-einrichtung');
 await page.waitForTimeout(300);

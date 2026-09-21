@@ -2607,6 +2607,46 @@ function kern_spalten(): array {
 }
 }
 
+// Verweise, die erst per ALTER TABLE nachkommen -- je Eintrag Tabelle,
+// Spalte und der ALTER-Befehl. Eigene Funktion statt einer lokalen Variablen
+// im Lauf weiter unten: kern_verweise_fehlend() prueft dieselbe Liste, ohne
+// den ganzen Pruefmodus von planung_einrichten_ausfuehren() anzustossen --
+// "eine Definition, nicht zwei", wie bei kern_tabellen()/kern_spalten().
+if (!function_exists('kern_verweise')) {
+function kern_verweise(): array {
+    return [
+        ['einsaetze', 'objekt_id',        'ALTER TABLE einsaetze ADD FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE SET NULL'],
+        ['einsaetze', 'masterschicht_id', 'ALTER TABLE einsaetze ADD FOREIGN KEY (masterschicht_id) REFERENCES masterschichten(id) ON DELETE SET NULL'],
+        ['einsaetze', 'abgeglichen_von',  'ALTER TABLE einsaetze ADD FOREIGN KEY (abgeglichen_von) REFERENCES mitarbeiter(id) ON DELETE SET NULL'],
+        // Verliert die Schicht spaeter ihren Datensatz, bleibt der Rapport als
+        // Beleg stehen -- er ist ein Dokument ueber einen bestimmten Tag, kein
+        // Verweis, der mit der Schicht sterben darf (ENT-082).
+        ['rapporte', 'einsatz_id', 'ALTER TABLE rapporte ADD FOREIGN KEY (einsatz_id) REFERENCES einsaetze(id) ON DELETE SET NULL'],
+        // Kontrollrunden (ENT-204).
+        ['rundgang', 'rundgang_vorlage_id', 'ALTER TABLE rundgang ADD FOREIGN KEY (rundgang_vorlage_id) REFERENCES rundgang_vorlage(id) ON DELETE SET NULL'],
+    ];
+}
+}
+
+// Welche Verweise aus kern_verweise() noch fehlen -- fuer denselben Zweck wie
+// kern_schema_fehlend(): das Update-Kriterium im Dashboard (ENT-033) zaehlt
+// nur echtes Schema (Tabellen, Spalten, Verweise), nicht die laufende
+// Datenpflege weiter unten im Lauf (fehlende Rolle, Kundennummer,
+// "abgeschlossen"-Nachtrag usw.) -- die entsteht im Alltag jederzeit neu,
+// ganz ohne Deploy.
+if (!function_exists('kern_verweise_fehlend')) {
+function kern_verweise_fehlend(PDO $pdo): array {
+    $fehlend = [];
+    foreach (kern_verweise() as [$tabelle, $spalte, ]) {
+        if (!hat_spalte($pdo, $tabelle, $spalte) || hat_fremdschluessel($pdo, $tabelle, $spalte)) {
+            continue;
+        }
+        $fehlend[] = "$tabelle.$spalte";
+    }
+    return $fehlend;
+}
+}
+
 // Was einer Anlage zum vollstaendigen Schema fehlt -- mit EINER Abfrage.
 //
 // ANLASS (2026-09-19): Jede Pruefung im System zaehlte Tabellen. Ein
@@ -3176,19 +3216,10 @@ if (hat_tabelle_jetzt($pdo, 'einsaetze') && hat_tabelle_jetzt($pdo, 'einsatz_zut
     }
 }
 
-// ── 3. Verweise und Index nachtragen, wenn die Spalten neu dazugekommen sind
-$verweise = [
-    ['einsaetze', 'objekt_id',        'ALTER TABLE einsaetze ADD FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE SET NULL'],
-    ['einsaetze', 'masterschicht_id', 'ALTER TABLE einsaetze ADD FOREIGN KEY (masterschicht_id) REFERENCES masterschichten(id) ON DELETE SET NULL'],
-    ['einsaetze', 'abgeglichen_von',  'ALTER TABLE einsaetze ADD FOREIGN KEY (abgeglichen_von) REFERENCES mitarbeiter(id) ON DELETE SET NULL'],
-    // Verliert die Schicht spaeter ihren Datensatz, bleibt der Rapport als
-    // Beleg stehen -- er ist ein Dokument ueber einen bestimmten Tag, kein
-    // Verweis, der mit der Schicht sterben darf (ENT-082).
-    ['rapporte', 'einsatz_id', 'ALTER TABLE rapporte ADD FOREIGN KEY (einsatz_id) REFERENCES einsaetze(id) ON DELETE SET NULL'],
-    // Kontrollrunden (ENT-204).
-    ['rundgang', 'rundgang_vorlage_id', 'ALTER TABLE rundgang ADD FOREIGN KEY (rundgang_vorlage_id) REFERENCES rundgang_vorlage(id) ON DELETE SET NULL'],
-];
-foreach ($verweise as [$tabelle, $spalte, $sql]) {
+// ── 3. Verweise und Index nachtragen, wenn die Spalten neu dazugekommen sind.
+// Liste steht in kern_verweise() (siehe dort), damit kern_verweise_fehlend()
+// dieselbe Quelle prueft.
+foreach (kern_verweise() as [$tabelle, $spalte, $sql]) {
     if (!hat_spalte($pdo, $tabelle, $spalte) || hat_fremdschluessel($pdo, $tabelle, $spalte)) {
         continue;
     }
@@ -3241,6 +3272,19 @@ foreach (array_keys($tabellen) as $name) {
     }
 }
 
+// 'ausstehend' faerbt den Update-Knopf im Dashboard (ENT-033) -- darum
+// zaehlt hier bewusst NUR echte Schema-Differenz: fehlende Tabellen, Spalten
+// und Verweise, also das, was ausschliesslich ein Deploy nachtraegt.
+// $getan haelt daneben auch laufende Datenpflege fest (fehlende Rolle,
+// Kundennummer, Nulldaten, "abgeschlossen"-Nachtrag, unerfasste
+// Lohnsaetze usw.) -- die entsteht im normalen Betrieb jederzeit neu, ganz
+// ohne Deploy, und faerbte den Knopf bis hierher jedesmal wieder gelb, auch
+// direkt NACH einer erfolgreichen Einrichtung. kern_schema_fehlend() ist
+// dieselbe Tabellen/Spalten-Pruefung, die auch demo_instanz.php fuer die
+// Platzwahl nutzt, kern_verweise_fehlend() dieselbe Verweisliste wie
+// Abschnitt 3 oben -- eine Definition, nicht zwei.
+$schemaOffen = count(kern_schema_fehlend($pdo)) + count(kern_verweise_fehlend($pdo));
+
 return [
     'status' => (!$nurPruefen && ($fehlt || $fehler)) ? 'error' : 'ok',
     'message' => $nurPruefen
@@ -3253,7 +3297,7 @@ return [
     'getan' => $getan,
     'unveraendert' => $schon,
     'fehler' => $fehler,
-    'ausstehend' => count($getan),
+    'ausstehend' => $schemaOffen,
 ];
 }
 }

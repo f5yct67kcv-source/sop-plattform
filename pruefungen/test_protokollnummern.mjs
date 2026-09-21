@@ -14,6 +14,7 @@
 // die freie ENT-Nummer noch die Auslegungen kennt". Fehlt das Verzeichnis
 // (z. B. ein Klon ohne diesen Nachbarn), wird übersprungen statt rot: Das
 // Fehlen sagt nichts über den Code in diesem Repository aus.
+import { execFileSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { WURZEL } from './pfade.mjs';
@@ -72,6 +73,56 @@ check('Das Entscheidungsprotokoll ist lesbar und enthält Einträge', entIds.len
 const entDoppelt = doppelte(entIds);
 check('KRITISCH: keine ENT-Nummer köpft zwei Einträge', entDoppelt.length === 0);
 entDoppelt.forEach(id => bad.push(`${id} doppelt vergeben in entscheidungsprotokoll.md`));
+
+// ── Kein Eintrag wird unter seiner Nummer ausgetauscht ────────────────
+//
+// ANLASS (2026-09-21): Zwei Sitzungen vergaben ENT-648 im Abstand von 74
+// Sekunden. Beim Merge loeste ein `git checkout --ours` den Konflikt
+// zugunsten des eigenen Standes -- und haette damit den fremden Eintrag
+// vollstaendig ueberschrieben, dazu eine Zeile in ENT-638, die auf ihn
+// verweist. Die Nummernpruefung oben blieb gruen: Die Nummer stand
+// weiterhin genau einmal da, nur hinter ihr ein anderer Text.
+//
+// GEPRUEFT WIRD DIE HAUSREGEL, nicht der Wortlaut: "Eine bestehende
+// Entscheidung wird nicht ueberschrieben, sondern durch einen neuen
+// Eintrag revidiert" (CLAUDE.md sop-projekt). Ein Titel, der sich
+// gegenueber `origin/main` aendert, ist genau dieses Ueberschreiben.
+// Ergaenzungen INNERHALB eines Eintrags bleiben erlaubt -- ein Nachtrag
+// oder ein Rueckverweis aendert den Titel nicht.
+//
+// Ohne erreichbares `origin/main` (flacher Klon, kein Netz) wird die
+// Frage nicht beantwortet. Das wird dann auch so gesagt und nicht als
+// bestanden gezaehlt: "nicht pruefbar" ist keine Unbedenklichkeit.
+const titel = (text) => {
+  const m = new Map();
+  for (const t of text.matchAll(/^## (ENT-\d+(?:-N\d+)?)(.*)$/gm)) {
+    m.set(t[1], t[2].trim());
+  }
+  return m;
+};
+
+let mainText = null;
+try {
+  mainText = execFileSync('git', ['show', 'origin/main:00-projekt/entscheidungsprotokoll.md'],
+    // maxBuffer: Das Protokoll ist groesser als Nodes Standardpuffer von 1 MiB.
+    // Ohne diese Zeile wirft git ENOBUFS, und die Pruefung meldete auf ewig
+    // "nicht pruefbar" -- eine Pruefung, die nie laeuft, ist keine.
+    { cwd: dirname(PROJEKT), encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'ignore'] });
+} catch { /* kein origin/main erreichbar */ }
+
+if (mainText === null) {
+  console.log('Hinweis: origin/main im Projekt-Repository nicht erreichbar --');
+  console.log('  ob ein Eintrag unter seiner Nummer ausgetauscht wurde, ist NICHT geprüft.');
+} else {
+  const alt = titel(mainText), jetzt = titel(entText);
+  const getauscht = [...alt].filter(([id, tx]) => jetzt.has(id) && jetzt.get(id) !== tx);
+  check('KRITISCH: kein Eintrag ist unter einer bereits vergebenen Nummer ausgetauscht worden',
+    getauscht.length === 0);
+  getauscht.forEach(([id, tx]) => bad.push(
+    `${id} traegt einen anderen Titel als auf origin/main -- dort "${tx}", `
+    + `hier "${jetzt.get(id)}". Ein Eintrag wird revidiert, nicht ersetzt.`));
+}
 
 // ── OP-Nummern: Zeilen der Haupttabelle in offene-punkte.md.
 //
