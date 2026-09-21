@@ -77,8 +77,8 @@
       <h2 id="ist-zeiten">Ist-Zeiten</h2>
       <p>Zeigt Schichten der Vergangenheit, unabhängig vom Status — eine
       abgeglichene Zeile verschwindet nicht aus der Liste, sie wird nur
-      festgeschrieben. Filter: Zeitraum, Status (Alle/Nur offene/Nur abgeglichene),
-      Sparte, Suche. Kopfzeile meldet, wie viele Zeilen noch auf den Abgleich
+      festgeschrieben. Filter: Zeitraum, Status (Alle/Nur offene/Nur abgeglichene),<?=
+      reinigung_angeboten() ? ' Sparte,' : '' ?> Suche. Kopfzeile meldet, wie viele Zeilen noch auf den Abgleich
       warten.</p>
 
       <ol class="hb-schritte">

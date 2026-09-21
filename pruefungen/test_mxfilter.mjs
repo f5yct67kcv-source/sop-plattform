@@ -55,7 +55,10 @@ page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
 await page.route('**/api/**', route => {
   const req = route.request(), p = req.url().split('/api/')[1].split('?')[0];
   const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
-  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'a', ist_admin: true });
+  // Dieser Mandant ist CUPI 24 -- nur dort gibt es die Sparte Reinigung
+  // (ENT-650). Ohne diese Angabe baut das Cockpit die Spartenauswahl aus.
+  if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'a', ist_admin: true,
+    sparten: ['sicherheit', 'reinigung'] });
   if (p.includes('objekt_list')) return send({ status: 'ok', objekte: OBJEKTE });
   if (p.includes('einsatz_list')) return send({ status: 'ok', einsaetze: EINS });
   if (p.includes('planung_einrichten')) return send({ status: 'ok', message: 'ok', getan: [], unveraendert: [], ausstehend: 0 });

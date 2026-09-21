@@ -81,9 +81,10 @@
       <div class="hb-eintrag" id="auslagenersatz">
         <h3>Auslagenersatz <span class="hb-eintrag-kapitel">→ Kunden, Planung, Abgleich</span></h3>
         <p>Fahrzeit-/Fahrkostenersatz nach Art. 18 GAV, abhängig von der
-        Wegstrecke zwischen Anstellungsort und Einsatzort. Gilt nur für die Sparte
-        Sicherheit — bei Reinigung entfällt die Frage, weil der GAV für private
-        Sicherheitsdienstleistungen dort nicht gilt. Der Frankenbetrag entsteht als
+        Wegstrecke zwischen Anstellungsort und Einsatzort.<?= reinigung_angeboten()
+        ? ' Gilt nur für die Sparte Sicherheit — bei Reinigung entfällt die Frage,'
+          . ' weil der GAV für private Sicherheitsdienstleistungen dort nicht gilt.'
+        : '' ?> Der Frankenbetrag entsteht als
         unveränderlicher Schnappschuss im Moment des Abgleichs, sobald eine Schicht
         auf „Anwesend" gesetzt wird.</p>
       </div>

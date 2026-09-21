@@ -1707,6 +1707,21 @@ th.sortbar.aktiv .pf { opacity: 1; color: var(--accent); }
 .chip { display: inline-flex; align-items: center; border-radius: var(--r-xs); padding: 2px 8px; font-size: 11px; font-weight: 620; letter-spacing: .1px; white-space: nowrap; }
 .chip-n { background: var(--line-soft); color: var(--ink-2); }
 .chip-rein { background: var(--accent-soft); color: var(--accent); margin-left: 4px; }
+
+/* ── Die Sparte "Reinigung" gibt es nur bei CUPI 24 (ENT-650) ─────────
+   Die Klasse "hat-reinigung" setzt spartenAnwenden() weiter unten, sobald
+   der Server gesagt hat, welche Sparten dieser Mandant anbietet.
+
+   BEWUSST HERUM: verborgen ist der Grundzustand, sichtbar die Ausnahme.
+   Andersherum -- eine Klasse, die ausblendet -- zeigte die Reinigung bei
+   jedem Laden kurz an und bei einer ausbleibenden Antwort dauerhaft. So
+   ist der stille Fehlerfall der harmlose.
+
+   Nur die Anzeige. Entschieden wird auf dem Server: sparte_pruefen() in
+   backend/planung.php laesst einen nicht erlaubten Wert gar nicht erst in
+   die Datenbank, egal was der Browser schickt. */
+html:not(.hat-reinigung) option[data-sparte="reinigung"] { display: none; }
+html:not(.hat-reinigung) [data-sparte-feld] { display: none !important; }
 .chip-a { background: var(--accent-soft); color: var(--accent); }
 .chip-p { background: var(--pos-soft); color: var(--pos); }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pos); flex: none; box-shadow: 0 0 0 3px var(--pos-soft); }
@@ -5968,10 +5983,10 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
               <select class="inp" id="mxObj" style="width:127px" onchange="renderMatrix()" aria-label="Einzelnes Objekt anzeigen">
                 <option value="">Alle Objekte</option>
               </select>
-              <select class="inp" id="mxSparte" style="width:137px" onchange="renderMatrix()" aria-label="Nach Sparte filtern">
+              <select class="inp" id="mxSparte" data-sparte-feld style="width:137px" onchange="renderMatrix()" aria-label="Nach Sparte filtern">
                 <option value="">Beide Sparten</option>
                 <option value="sicherheit">Nur Sicherheit</option>
-                <option value="reinigung">Nur Reinigung</option>
+                <option value="reinigung" data-sparte="reinigung">Nur Reinigung</option>
               </select>
               <select class="inp" id="mxBeleg" style="width:145px" onchange="renderMatrix()" aria-label="Nach Belegung filtern">
                 <option value="">Jede Belegung</option>
@@ -6038,9 +6053,9 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
               <option value="einsatz" selected>Nur Einsätze</option>
               <option value="objekt">Nur Objektschichten</option>
             </optgroup>
-            <optgroup label="Sparte">
+            <optgroup label="Sparte" data-sparte-feld>
               <option value="sicherheit">Nur Sicherheit</option>
-              <option value="reinigung">Nur Reinigung</option>
+              <option value="reinigung" data-sparte="reinigung">Nur Reinigung</option>
             </optgroup>
           </select>
           <select class="inp" id="pStatus" style="width:auto" onchange="renderPlanung()">
@@ -6174,9 +6189,9 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                 <option value="einsatz">Nur Einsätze</option>
                 <option value="objekt">Nur Objektschichten</option>
               </optgroup>
-              <optgroup label="Sparte">
+              <optgroup label="Sparte" data-sparte-feld>
                 <option value="sicherheit">Nur Sicherheit</option>
-                <option value="reinigung">Nur Reinigung</option>
+                <option value="reinigung" data-sparte="reinigung">Nur Reinigung</option>
               </optgroup>
             </select>
             <select class="inp" id="tgStatus" onchange="renderTagesplan()" aria-label="Nach Status filtern">
@@ -6230,10 +6245,10 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             <option value="offen">Nur offene</option>
             <option value="fertig">Nur abgeglichene</option>
           </select>
-          <select class="inp" id="agSparte" style="width:auto" onchange="renderAbgleich()" aria-label="Sparte">
+          <select class="inp" id="agSparte" data-sparte-feld style="width:auto" onchange="renderAbgleich()" aria-label="Sparte">
             <option value="">Alle Sparten</option>
             <option value="sicherheit">Sicherheit</option>
-            <option value="reinigung">Reinigung</option>
+            <option value="reinigung" data-sparte="reinigung">Reinigung</option>
           </select>
           <div class="search">
             <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -7755,13 +7770,13 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             <option>Verkehrsdienst</option>
             <option>Revierdienst</option>
             <option>Sicherheitsdienst</option>
-            <option>Reinigung</option>
+            <option data-sparte="reinigung">Reinigung</option>
           </select>
         </div>
-        <div class="f"><label for="enNSparte">Sparte</label>
+        <div class="f" data-sparte-feld><label for="enNSparte">Sparte</label>
           <select class="inp" id="enNSparte" onchange="spartenKonflikt('enN');enWegZone()">
             <option value="sicherheit">Sicherheit</option>
-            <option value="reinigung">Reinigung</option>
+            <option value="reinigung" data-sparte="reinigung">Reinigung</option>
           </select>
           <div id="enNSparteHint"></div>
         </div>
@@ -9052,10 +9067,10 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <div class="f"><label for="obPlz">PLZ</label><input class="inp" id="obPlz" inputmode="numeric" maxlength="10"></div>
         <div class="f"><label for="obOrt">Ort *</label><input class="inp" id="obOrt"></div>
         <div class="f"><label for="obKanton">Kanton</label><input class="inp" id="obKanton" value="SO" maxlength="2" style="text-transform:uppercase"></div>
-        <div class="f"><label for="obSparte">Sparte</label>
+        <div class="f" data-sparte-feld><label for="obSparte">Sparte</label>
           <select class="inp" id="obSparte" onchange="obZoneAktualisieren(); spartenKonflikt('ob')">
             <option value="sicherheit">Sicherheit</option>
-            <option value="reinigung">Reinigung</option>
+            <option value="reinigung" data-sparte="reinigung">Reinigung</option>
           </select>
           <div id="obSparteHint"></div>
         </div>
@@ -9235,7 +9250,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <div class="f wide"><label for="msName">Bezeichnung *</label><input class="inp" id="msName" placeholder="z. B. Schliessrunde"></div>
         <div class="f"><label for="msKuerzel">Kürzel</label><input class="inp" id="msKuerzel" maxlength="10" placeholder="SR"></div>
         <div class="f"><label for="msArt">Art</label><select class="inp" id="msArt"><option value="arbeit">Arbeit</option><option value="fahrtzeit">Fahrtzeit</option></select></div>
-        <div class="f"><label for="msSparte">Sparte</label><select class="inp" id="msSparte"><option value="sicherheit">Sicherheit</option><option value="reinigung">Reinigung</option></select></div>
+        <div class="f" data-sparte-feld><label for="msSparte">Sparte</label><select class="inp" id="msSparte"><option value="sicherheit">Sicherheit</option><option value="reinigung" data-sparte="reinigung">Reinigung</option></select></div>
         <div class="f"><label for="msVon">Von *</label><input class="inp" id="msVon" type="time" onchange="msRechne()"></div>
         <div class="f"><label for="msBis">Bis *</label><input class="inp" id="msBis" type="time" onchange="msRechne()"></div>
         <div class="f"><label for="msPauseMin">Pause (Minuten)</label><input class="inp" id="msPauseMin" type="number" min="0" max="1440" value="0" oninput="msRechne()"></div>
@@ -9603,7 +9618,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
      Wird von loadProdukte() gefuellt; archivierte Produkte stehen bewusst
      nicht drin -- sie sollen sich nicht in neue Belege zurueckschleichen. -->
 <datalist id="dlProdukte"></datalist>
-<datalist id="dlEinsatzarten"><option>Verkehrsdienst</option><option>Revierdienst</option><option>Sicherheitsdienst</option><option>Reinigung</option></datalist>
+<datalist id="dlEinsatzarten"><option>Verkehrsdienst</option><option>Revierdienst</option><option>Sicherheitsdienst</option><option data-sparte="reinigung">Reinigung</option></datalist>
 
 <!-- Einrichtung: Tabellen der Planung und Verfügbarkeit anlegen -->
 <div class="dlg-scrim" id="dlgEinrichtung">
@@ -10259,6 +10274,51 @@ function belegSummen(positionen, rabattBp) {
 // bekommt darum keinen Chip -- sonst traegt jede Zeile eine Marke, die
 // nichts unterscheidet. Nur die Reinigung wird ausgezeichnet.
 const SPARTE_NAME = { sicherheit: 'Sicherheit', reinigung: 'Reinigung' };
+
+// ── Welche Sparten bietet DIESER Mandant an? (ENT-650) ────────────────
+//
+// Reinigung ist fuer CUPI 24 entstanden und bleibt dort. Jeder andere
+// Mandant -- Demo-Platz wie kuenftiger Kunde -- kennt nur Sicherheit, weil
+// fuer die Reinigung ein eigener, bislang ungepruefter GAV gilt, den die
+// Anlage nicht umgesetzt hat. Die Auskunft kommt aus me.php, also vom
+// Server; hier steht sie nur, damit die Oberflaeche nichts anbietet, was
+// hinterher doch abgewiesen wuerde.
+//
+// Vorbelegt mit NUR Sicherheit: Solange niemand etwas anderes gesagt hat,
+// gilt die engere Annahme.
+let SPARTEN_ERLAUBT = ['sicherheit'];
+const reinigungAngeboten = () => SPARTEN_ERLAUBT.includes('reinigung');
+
+// Nimmt die Liste entgegen und richtet die Oberflaeche danach.
+//
+// Eine fehlende oder unbrauchbare Liste aendert NICHTS am bisherigen
+// Stand -- dieselbe Ueberlegung wie bei der Rechteliste weiter oben: ein
+// Server, der waehrend eines Deploys ohne Sparten antwortet, soll nicht
+// die halbe Planungsmaske umbauen.
+//
+// ZWEI STUFEN, und der Unterschied ist wichtig:
+//   bestaetigt=false -- der abgelegte Stand aus dem letzten Besuch. Nur
+//     die Klasse wird gesetzt, also nur aus- und wieder eingeblendet. Das
+//     ist umkehrbar.
+//   bestaetigt=true  -- die Antwort von me.php. Erst jetzt wird wirklich
+//     ausgebaut.
+// Der Grund ist ein Fehler, der beim Messen auffiel: Wer die Optionen
+// schon nach dem abgelegten Stand entfernt, kann sie nicht mehr
+// zurueckholen, wenn der Server gleich darauf "doch, beide Sparten" sagt
+// -- ein CUPI-24-Zugang haette seine Sparte beim ersten Anmelden auf
+// einem neuen Geraet verloren, bis jemand die Seite neu laedt.
+function spartenAnwenden(liste, bestaetigt) {
+  if (Array.isArray(liste) && liste.length) { SPARTEN_ERLAUBT = liste.slice(); }
+  const an = reinigungAngeboten();
+  document.documentElement.classList.toggle('hat-reinigung', an);
+  if (an || !bestaetigt) { return; }
+  // Nicht nur ausblenden, sondern ausbauen: Eine bloss unsichtbare Option
+  // liesse sich per Tastatur und ueber das Skript weiterhin waehlen, und
+  // die Einsatzart-Liste wird an mehreren Stellen ausgelesen.
+  document.querySelectorAll('option[data-sparte="reinigung"]').forEach(o => o.remove());
+  const i = EINSATZARTEN.indexOf('Reinigung');
+  if (i >= 0) { EINSATZARTEN.splice(i, 1); }
+}
 const sparteVon = x => (x && x.sparte) === 'reinigung' ? 'reinigung' : 'sicherheit';
 const sparteChip = x => sparteVon(x) === 'reinigung'
   ? ' <span class="chip chip-rein">Reinigung</span>' : '';
@@ -10370,6 +10430,12 @@ function doLogin() {
     me = { name: data.name, ist_admin: data.ist_admin };
     if (Array.isArray(data.rollen)) { me.rollen = data.rollen; }
     if (Array.isArray(data.rechte)) { me.rechte = data.rechte; }
+    // Die Sparten dieses Mandanten kommen schon mit der Anmeldung (ENT-650)
+    // -- aus demselben Grund wie Rollen und Rechte. Als bestaetigt gewertet:
+    // die Auskunft stammt aus derselben Antwort, die auch die Sitzung
+    // eroeffnet hat, nicht aus einem abgelegten Stand.
+    if (Array.isArray(data.sparten) && data.sparten.length) { me.sparten = data.sparten; }
+    spartenAnwenden(me.sparten, true);
     localStorage.setItem('rv3_token', token);
     localStorage.setItem('rv3_user', JSON.stringify(me));
     // Merkmal des vertrauenswuerdigen Geraets aufbewahren, falls eines kam.
@@ -10467,6 +10533,11 @@ function doLogout() {
 }
 
 function enter() {
+  // Sparten aus dem letzten Besuch (ENT-650), bevor irgendetwas gezeichnet
+  // wird. me.php bestaetigt sie gleich -- dies hier erspart nur das kurze
+  // Aufblitzen einer Sparte, die dieser Mandant gar nicht anbietet. Ohne
+  // abgelegten Wert bleibt es bei "nur Sicherheit".
+  spartenAnwenden(me && me.sparten, false);
   // Der Wert steht schon am Dokument -- hier nur Schalter und Systemleiste
   // nachziehen.
   themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell');
@@ -10530,6 +10601,11 @@ function enter() {
         || !Array.isArray(data.rechte)) { return; }
     me = { name: data.name, ist_admin: data.ist_admin,
            rollen: Array.isArray(data.rollen) ? data.rollen : [], rechte: data.rechte };
+    // Welche Sparten dieser Mandant anbietet (ENT-650) -- mit ablegen,
+    // damit der naechste Start die Maske sofort richtig aufbaut und die
+    // Reinigung nicht kurz aufblitzt, bevor die Antwort da ist.
+    if (Array.isArray(data.sparten) && data.sparten.length) { me.sparten = data.sparten; }
+    spartenAnwenden(me.sparten, true);
     // (data.rechte ist oben schon als Array geprueft -- ohne das wird gar
     // nichts uebernommen.)
     localStorage.setItem('rv3_user', JSON.stringify(me));

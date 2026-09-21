@@ -9,6 +9,9 @@
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
+// Fuer sparten_erlaubt() -- welche Sparten dieser Mandant ueberhaupt
+// benutzen darf (ENT-650).
+require_once __DIR__ . '/../planung.php';
 
 $user = require_session();
 json_response([
@@ -17,4 +20,11 @@ json_response([
     'ist_admin' => (bool)$user['ist_admin'],
     'rollen'    => $user['rollen'] ?? [],
     'rechte'    => $user['rechte'] ?? [],
+    // Welche Sparten dieser Mandant anbietet (ENT-650). Dieselbe
+    // Bequemlichkeits-Logik wie bei der Rechteliste oben: Die Oberflaeche
+    // traegt damit die Auswahl "Reinigung" nach, statt sie fest im HTML
+    // stehen zu haben. Entschieden wird auch hier auf dem Server --
+    // sparte_pruefen() in planung.php laesst einen nicht erlaubten Wert
+    // gar nicht erst in die Datenbank.
+    'sparten'   => sparten_erlaubt(),
 ]);

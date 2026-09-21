@@ -21,12 +21,53 @@ declare(strict_types=1);
 // anderer, bislang ungepruefter GAV. Diese Angabe ist genau der Schluessel,
 // an dem eine spaetere Berechnung ihr Regelwerk auswaehlen muss -- sie ist
 // keine blosse Anzeigehilfe (siehe OP-32).
+//
+// NUR BEI CUPI 24 (ENT-650). Reinigung ist fuer den Bestandsmandanten
+// entstanden und bleibt dort. Jeder andere Mandant -- Demo-Platz wie
+// kuenftiger echter Kunde -- kennt ausschliesslich Sicherheit, weil der
+// Reinigungs-GAV nie geprueft wurde (Begruendung ausfuehrlich bei
+// reinigung_angeboten() in db.php). SPARTEN bleibt die vollstaendige
+// Liste dessen, was die Anlage ueberhaupt kennt; was ein Mandant davon
+// benutzen darf, sagt sparten_erlaubt().
 const SPARTEN = ['sicherheit', 'reinigung'];
+const SPARTE_VORGABE = 'sicherheit';
 
-function sparte_pruefen($wert, string $vorgabe = 'sicherheit'): string
+// Die Sparten, die DIESER Mandant benutzen darf.
+//
+// reinigung_angeboten() steht in db.php. Diese Datei bindet db.php
+// bewusst NICHT ein: sie ist reine Fachlogik ohne Datenbank, und db.php
+// setzt beim Laden Kopfzeilen (cors_kopfzeilen_setzen()) -- ein
+// require_once hier machte jede Pruefung, die nur die Fachlogik laden
+// will, von einem echten Request abhaengig. Jeder Endpunkt laedt db.php
+// ohnehin als Erstes. Fehlt sie doch einmal, gilt NUR Sicherheit -- die
+// fail-safe Richtung, dieselbe wie bei der Konstante selbst.
+function sparten_erlaubt(): array
 {
+    if (function_exists('reinigung_angeboten') && reinigung_angeboten()) {
+        return SPARTEN;
+    }
+    return [SPARTE_VORGABE];
+}
+
+// Die EINE Stelle, die einen Spartenwert annimmt oder verwirft.
+//
+// Ein nicht erlaubter Wert faellt STILL auf die Vorgabe zurueck, statt
+// einen Fehler zu werfen -- genau wie jeder andere unbekannte Wert es
+// hier seit jeher tut. Wer mit einem alten Reiter oder einem alten
+// App-Stand noch "reinigung" schickt, soll seine Schicht gespeichert
+// bekommen und keine Fehlermeldung ueber eine Sparte lesen, die es bei
+// ihm nicht gibt. Die Richtung ist ausserdem die vorsichtige: Sicherheit
+// rechnet den GAV, unterdrueckt also keinen Zeitbonus (siehe
+// gavzeit_gilt()).
+function sparte_pruefen($wert, string $vorgabe = SPARTE_VORGABE): string
+{
+    $erlaubt = sparten_erlaubt();
     $w = strtolower(trim((string)$wert));
-    return in_array($w, SPARTEN, true) ? $w : $vorgabe;
+    if (in_array($w, $erlaubt, true)) { return $w; }
+    // Auch die VORGABE muss erlaubt sein: sonst traegt ein Objekt, das
+    // frueher auf Reinigung stand, seinen alten Wert ueber diesen Weg
+    // weiter in jede neue Schicht hinein.
+    return in_array($vorgabe, $erlaubt, true) ? $vorgabe : SPARTE_VORGABE;
 }
 
 // Ostersonntag nach der anonymen gregorianischen Berechnung. Bewusst selbst

@@ -51,7 +51,10 @@ async function seite(w, h) {
   await p.route('**/api/**', r => {
     const pf = r.request().url().split('/api/')[1].split('?')[0];
     const send = b => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
-    if (pf.includes('login')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
+    // Dieser Mandant ist CUPI 24 -- nur dort gibt es die Sparte Reinigung
+    // (ENT-650). Ohne diese Angabe baut das Cockpit die Spartenauswahl aus.
+    if (pf.includes('login')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true,
+      sparten: ['sicherheit', 'reinigung'] });
     if (pf.includes('einsatz_list')) return send({ status: 'ok', einsaetze: EINS });
     if (pf.includes('feiertag')) return send({ status: 'ok', kanton: 'SO', feiertage: [], gepflegt: {} });
     return send({ status: 'ok', kpi: {}, verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [],

@@ -17,7 +17,11 @@ const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 page.setDefaultTimeout(5000);
 await page.route('**/api/**', r => r.fulfill({ status: 200, contentType: 'application/json',
-  body: JSON.stringify({ status: 'ok', token: 't', name: 'a', ist_admin: true, kpi: {}, verlauf: [],
+  // Dieser Mandant ist CUPI 24 -- nur dort gibt es die Sparte Reinigung
+  // (ENT-650). Ohne diese Angabe baut das Cockpit die Spartenauswahl aus, und
+  // diese ganze Reihe pruefte einen Zustand, den es so nicht mehr gibt.
+  body: JSON.stringify({ status: 'ok', token: 't', name: 'a', ist_admin: true,
+    sparten: ['sicherheit', 'reinigung'], kpi: {}, verlauf: [],
     angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [], mitarbeiter: [], kunden: [], einsaetze: [],
     objekte: [], rapporte: [], orte: [], feiertage: [], gepflegt: {} }) }));
 await page.goto(`file://${WURZEL}/dashboard.html`);
