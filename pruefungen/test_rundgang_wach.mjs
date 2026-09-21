@@ -135,6 +135,7 @@ const masse = page => page.evaluate(() => {
            zVerankerung: (() => { const e = document.getElementById('rgsZchips');
              return e ? getComputedStyle(e).position : null; })(),
            huelle: g('.rgs-karte-huelle'), zen: g('#rgsZentrieren'), zahn: g('#rgsEinstKnopf'),
+           punkte: g('#rgsPunkteZeigen'),
            zeile: !!document.getElementById('rgsOrtungHinweis') };
 });
 
@@ -152,7 +153,8 @@ let m = await masse(page);
 for (const [nm, el] of [['Titel', m.titel], ['Zaehler', m.zaehler], ['Laufzeit', m.timer],
     ['Zaehler-Chip', m.zChip], ['Laufzeit-Chip', m.tChip], ['Chipzeile', m.zeilen],
     ['Ortungsmarke', m.chip], ['Kartenhuelle', m.huelle], ['Kopf', m.kopf],
-    ['Reiterleiste', m.reiter], ['Zentrieren', m.zen], ['Zahnrad', m.zahn]]) {
+    ['Reiterleiste', m.reiter], ['Zentrieren', m.zen], ['Zahnrad', m.zahn],
+    ['Kontrollpunkte-Knopf', m.punkte]]) {
   check(`KRITISCH: das Bauteil "${nm}" ist auf dem Bildschirm vorhanden`, !!el);
 }
 
@@ -233,6 +235,86 @@ check('Marke und Zentrieren-Knopf ueberlappen sich nicht',
 check('KRITISCH: die Zahlen und das Zahnrad ueberlappen sich nicht -- beide liegen oben',
   m.zChip?.r < m.zahn?.l && m.tChip?.r < m.zahn?.l);
 
+// ══════════ DER GEGENPOL ZU „ZENTRIEREN" (ENT-647) ═══════════════════
+/* Unten links fuehrt der Pfeil zum eigenen Standort (ENT-639). Es fehlte
+   der Weg zurueck: Wer zentriert hatte, kam nur noch durch Herausziehen
+   von Hand an die Uebersicht ueber seine Kontrollpunkte. Der Knopf unten
+   rechts holt sie ins Bild.
+
+   Geprueft wird die WIRKUNG, nicht der Aufruf: Die Karte wird vorher
+   absichtlich weit weggefahren, bis keine Marke mehr im Bild liegt --
+   danach muessen alle drin sein. Eine Pruefung, die nur nachsaehe, ob
+   rgKarteAufPunkte aufgerufen wird, bliebe gruen, wenn die Funktion
+   nichts mehr bewegt. */
+check('KRITISCH: der Kontrollpunkt-Knopf haelt Abstand zur Anbieterleiste am unteren Rand',
+  m.huelle?.b - m.punkte?.b >= 24);
+check('Er sitzt unten rechts -- gegenueber vom Zentrieren-Knopf',
+  m.punkte?.t > m.huelle?.t + m.huelle?.h / 2
+  && m.punkte?.l > m.huelle?.l + m.huelle?.w / 2);
+check('KRITISCH: er behaelt 44 px Trefferflaeche (CLAUDE.md)',
+  m.punkte?.h >= 44 && m.punkte?.w >= 44);
+check('KRITISCH: er ueberlappt den Zentrieren-Knopf nicht',
+  m.punkte?.l > m.zen?.r);
+check('Er bleibt innerhalb der Karte',
+  m.punkte?.r <= m.huelle?.r && m.punkte?.b <= m.huelle?.b);
+
+/* Zwei Dinge, die sich nur MESSEN lassen: Liegt wirklich nichts ueber dem
+   Knopf (die Marken der Karte tragen eigene Stapelwerte -- genau daran ist
+   bei ENT-640 schon einmal etwas haengengeblieben), und sagt er blind
+   bedient, was er tut? Ohne Beschriftung traegt allein das aria-label die
+   Aussage. */
+const knopfLage = await page.evaluate(() => {
+  const b = document.getElementById('rgsPunkteZeigen');
+  if (!b) { return null; }
+  const r = b.getBoundingClientRect();
+  const oben = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  return { frei: !!(oben && oben.closest('#rgsPunkteZeigen')),
+           text: (b.getAttribute('aria-label') || '').trim() };
+});
+check('KRITISCH: nichts liegt ueber dem Knopf -- er ist tatsaechlich treffbar',
+  knopfLage?.frei === true);
+check('KRITISCH: er sagt ohne Beschriftung, was er tut',
+  (knopfLage?.text || '').length >= 10);
+
+/* Der Knopf wird HIER geholt und sein Fehlen gemeldet, statt blind
+   geklickt zu werden. Eine Gegenprobe, die ihn entfernte, liess die ganze
+   Suite in einen Fehler laufen -- und eine abgestuerzte Suite meldet keine
+   rote Pruefung, sie meldet nichts. Derselbe Fall ist in diesem Projekt
+   schon zweimal aufgetreten. */
+const wirkung = await page.evaluate(async () => {
+  const knopf = document.getElementById('rgsPunkteZeigen');
+  if (!knopf) { return { fehlt: true, gesamt: 0, vorher: -1, nachher: -1 }; }
+  const huelle = document.querySelector('.rgs-karte-huelle').getBoundingClientRect();
+  /* AUSDRUECKLICH nur die Kontrollpunkt-Marken -- sie sind die
+     nummerierten. Die eigene Standortmarke faehrt bei jeder Kamerafahrt
+     mit und liegt darum immer mitten im Bild; zaehlte man sie mit, waere
+     die Vorbedingung „keine im Bild" nie erfuellt und die Pruefung haette
+     sich selbst entschaerft. Dass die Auswahl greift, sichert die
+     Vorbedingung unten ab: Sie verlangt alle vier. */
+  const marken = [...document.querySelectorAll('.gm-mock-marker')]
+    .filter(e => e.dataset.zeichen);
+  const drin = () => marken.filter(e => {
+    const r = e.getBoundingClientRect();
+    return r.left >= huelle.left && r.right <= huelle.right
+      && r.top >= huelle.top && r.bottom <= huelle.bottom;
+  }).length;
+  const gesamt = marken.length;
+  // Weit weg -- rund 30 km suedwestlich der Runde, bei Zoomstufe 17 ist
+  // damit garantiert keine Marke mehr im Bild.
+  rgKarteAufOrt(47.10, 7.50);
+  await new Promise(r => setTimeout(r, 100));
+  const vorher = drin();
+  knopf.click();
+  await new Promise(r => setTimeout(r, 200));
+  return { fehlt: false, gesamt, vorher, nachher: drin() };
+});
+check('Vorbedingung: die Karte traegt eine nummerierte Marke je Kontrollpunkt',
+  wirkung.gesamt === 4);
+check('Vorbedingung: nach der Fahrt in die Ferne ist keine davon im Bild',
+  wirkung.vorher === 0);
+check('KRITISCH: ein Tipp holt alle Kontrollpunkte zurueck ins Bild',
+  wirkung.nachher >= 4);
+
 // ══════════ DIE REITERLEISTE: ZEICHEN GROSS, LEISTE SCHLANK ═══════════
 /* Nachgemessen an einem Bildschirmfoto des Wettbewerbers (ENT-642), Pixel
    fuer Pixel auf demselben Geraet -- beide Aufnahmen 1179 px breit, also
@@ -256,8 +338,14 @@ const leiste = await page.evaluate(() => {
   const klein = [...document.querySelectorAll('svg.i-sm')]
     .find(e => !e.closest('.rgs-reiter'));
   const h = e => e ? e.getBoundingClientRect().height : null;
+  const rb = bar.getBoundingClientRect();
   return { ikon: h(sv), klein: h(klein), leiste: h(bar),
-           block: sv && lb ? lb.getBoundingClientRect().bottom - sv.getBoundingClientRect().top : null };
+           block: sv && lb ? lb.getBoundingClientRect().bottom - sv.getBoundingClientRect().top : null,
+           // Luft oben und unten, an der LEISTE gemessen und nicht am
+           // Knopf: Der Knopf ragt um seinen Minusrand ueber die Leiste
+           // hinaus, und was der Waechter sieht, ist die Leiste.
+           luftOben: sv ? sv.getBoundingClientRect().top - rb.top : null,
+           luftUnten: lb ? rb.bottom - lb.getBoundingClientRect().bottom : null };
 });
 check('Vorbedingung: es gibt ein Vergleichszeichen ausserhalb der Leiste',
   leiste.klein !== null && leiste.klein > 0);
@@ -273,6 +361,17 @@ check('KRITISCH: der Inhaltsblock trifft das Mass der Vorlage (Kasten 40-43 px, 
   leiste.block >= 40 && leiste.block <= 43);
 check('KRITISCH: die Leiste bleibt dabei schlank -- hoechstens 60 px, und nicht unter der Trefferflaeche von 44',
   leiste.leiste >= 44 && leiste.leiste <= 60);
+/* Und der Inhalt steht MITTIG darin (ENT-646). Vom Projektinhaber am
+   Geraet beanstandet, nachdem die Zeichen gewachsen waren. Der Grund war
+   nicht die Groesse: Der Akzentbalken des aktiven Reiters ist 2 px hoch
+   und gehoert zum Kasten, also sass der Inhalt in jedem Reiter um genau
+   diese 2 px zu tief -- gemessen 8,25 px oben gegen 6,25 px unten. Ein
+   halber Millimeter, den man nicht benennen kann und trotzdem sieht.
+   Toleranz 1 px, weil halbe Pixel bei anderen Schriftgroessen anders
+   runden. */
+check('KRITISCH: der Inhalt der Reiterleiste steht senkrecht mittig',
+  leiste.luftOben !== null && leiste.luftUnten !== null
+  && Math.abs(leiste.luftOben - leiste.luftUnten) <= 1);
 
 // Die Beschriftungen muessen auf dem schmalsten Geraet einzeilig bleiben.
 // Bei drei Reitern teilt sich die Breite durch drei, und
@@ -482,6 +581,37 @@ for (const h of [720, 660, 600]) {
   check(`${h} px: Zahlen und Ortungsmarke liegen im Bild und ueberlappen sich nicht`,
     !!k.chip && k.chip.t >= k.huelle?.t && k.chip.b <= k.huelle?.b
     && k.chip.t >= k.zChip?.b && k.zChip?.b < k.zen?.t);
+  check(`${h} px: der Kontrollpunkt-Knopf haelt ebenfalls Abstand und bleibt frei vom Zentrieren-Knopf`,
+    k.huelle?.b - k.punkte?.b >= 24 && k.punkte?.l > k.zen?.r);
+  await page.close();
+}
+
+/* Die beiden Kartenknoepfe stehen einander gegenueber. Eng wird es auf dem
+   SCHMALSTEN Geraet -- und weit auseinander auf dem breitesten. Beides
+   wird gemessen: 320 px (kleinstes noch gebautes Handy) und 1280 px
+   (Schreibtisch; CLAUDE.md verlangt beide Richtungen). Die Aussage ist
+   dieselbe: Sie ueberlappen sich nie, und beide bleiben in der Karte. */
+for (const br of [320, 1280]) {
+  page = await seite(br === 320 ? 568 : 800, br);
+  await page.evaluate(() => ladeSchichten().then(() => rundgangFortsetzen(71)));
+  await page.waitForTimeout(1500);
+  await page.click('#rgsRt-karte'); await page.waitForTimeout(900);
+  const k = await masse(page);
+  check(`${br} px breit: die beiden Kartenknoepfe ueberlappen sich nicht`,
+    k.punkte?.l > k.zen?.r);
+  check(`${br} px breit: beide bleiben innerhalb der Karte`,
+    k.zen?.l >= k.huelle?.l && k.punkte?.r <= k.huelle?.r
+    && k.zen?.b <= k.huelle?.b && k.punkte?.b <= k.huelle?.b);
+  const mitte = await page.evaluate(() => {
+    const bar = document.querySelector('.rgs-reiter');
+    const sv = bar.querySelector('button svg');
+    const lb = bar.querySelector('button span:last-child');
+    const rb = bar.getBoundingClientRect();
+    return { o: sv.getBoundingClientRect().top - rb.top,
+             u: rb.bottom - lb.getBoundingClientRect().bottom };
+  });
+  check(`${br} px breit: die Reiterleiste bleibt senkrecht mittig`,
+    Math.abs(mitte.o - mitte.u) <= 1);
   await page.close();
 }
 
