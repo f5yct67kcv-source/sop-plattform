@@ -894,6 +894,12 @@ const NUR_EIGENE_DATEN = [
   // 'mitteilungen' oder am Zeitgeber-Schluessel und steht darum bewusst
   // NICHT hier.
   'push_einrichtung.php',
+  // Cockpit-Tour und Demo-Hinweis (Projektinhaber-Auftrag, 2026-09-21). Kein
+  // Recht: JEDE angemeldete Person darf fuer sich selbst vermerken, eine
+  // Tour gesehen oder den Demo-Hinweis bestaetigt zu haben. Die
+  // mitarbeiter_id stammt ausnahmslos aus der Sitzung, nie aus der Anfrage.
+  'tutorial_gesehen.php',
+  'demo_hinweis_bestaetigen.php',
 ];
 const ohnePruefung = apiDateien.filter(f => {
   const q = ohneKommentar(f);

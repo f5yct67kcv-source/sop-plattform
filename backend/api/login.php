@@ -6,6 +6,8 @@ require __DIR__ . '/../anmeldung.php';
 require __DIR__ . '/../zweifaktor.php';
 // Fuer sparten_erlaubt() -- welche Sparten dieser Mandant anbietet (ENT-650).
 require_once __DIR__ . '/../planung.php';
+// Fuer den Stand der Cockpit-Tour und des Demo-Hinweises.
+require_once __DIR__ . '/../tutorial.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
@@ -143,4 +145,11 @@ json_response(['status' => 'ok', 'token' => $token, 'name' => $name,
     // me.php um -- und eine Sparte, die dieser Mandant gar nicht anbietet,
     // blitzte dazwischen auf.
     'sparten'   => sparten_erlaubt(),
+    // Aus demselben Grund wie Rollen, Rechte und Sparten gleich mit: siehe
+    // me.php. $person ist dieselbe Mitarbeiter-Id wie $user['id'].
+    'ist_demo'  => ist_demo(),
+    'demo_hinweis_bestaetigt' => ist_demo() ? demo_hinweis_bestaetigt(db(), $person) : true,
+    'tutorial_gesehen' => [
+        'cockpit_verwaltung' => tutorial_gesehen(db(), $person, 'cockpit_verwaltung'),
+    ],
     'geraet' => $geraetWert]);
