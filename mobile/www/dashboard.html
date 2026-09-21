@@ -9107,8 +9107,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             placeholder="Erscheint als Vorschlag in der Offerte und lässt sich dort je Position anpassen."></textarea></div>
         <div class="f"><label for="prod_preis">Einzelpreis (CHF)</label>
           <input class="inp" id="prod_preis" inputmode="decimal" placeholder="42.00"></div>
-        <div class="f"><label for="prod_einheit">Einheit</label>
-          <input class="inp" id="prod_einheit" list="dlEinheiten" placeholder="Std."></div>
+        <div class="f" id="prod_einheit_feld"></div>
         <div class="f"><label for="prod_mwst">MWST-Satz</label>
           <select class="inp" id="prod_mwst"></select></div>
         <div class="f"><label for="prod_sortierung">Reihenfolge</label>
@@ -9121,10 +9120,10 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     </div>
   </div>
 </div>
-<datalist id="dlEinheiten">
-  <option>Std.</option><option>Stk.</option><option>Pauschal</option>
-  <option>km</option><option>Tag</option><option>Monat</option><option>m²</option>
-</datalist>
+<!-- Die Einheiten standen frueher hier als <datalist>. Eine datalist
+     filtert nach dem Feldinhalt und zeigte darum neben dem vorbelegten
+     "Std." nichts weiter an (ENT-645). Sie kommen jetzt aus EINHEITEN und
+     stehen in einem Auswahlfeld -- dieselbe Liste wie im Betreiberbereich. -->
 
 <!-- Kundenzugang zum Portal anlegen oder aendern (ENT-441).
      Die E-Mail-Adresse IST die Anmeldung -- es gibt kein Passwortfeld, weil
@@ -13398,7 +13397,8 @@ function pdNeu() {
   $('prod_name').value = '';
   $('prod_beschreibung').value = '';
   $('prod_preis').value = '';
-  $('prod_einheit').value = 'Std.';
+  $('prod_einheit_feld').innerHTML = '<label for="prod_einheit">Einheit</label>'
+    + einheitHtml('prod_einheit', 'Std.', '');
   // Naechste freie Reihenfolge vorschlagen, damit ein neues Produkt hinten
   // landet statt sich vor die bestehenden zu setzen.
   $('prod_sortierung').value = String(produkte.reduce((m, p) => Math.max(m, Number(p.sortierung) || 0), 0) + 10);
@@ -13435,7 +13435,8 @@ function pdBearbeiten(id) {
   $('prod_name').value = p.name || '';
   $('prod_beschreibung').value = p.beschreibung || '';
   $('prod_preis').value = rappenZuChf(p.einzelpreis_rappen);
-  $('prod_einheit').value = p.einheit || 'Std.';
+  $('prod_einheit_feld').innerHTML = '<label for="prod_einheit">Einheit</label>'
+    + einheitHtml('prod_einheit', p.einheit || 'Std.', '');
   $('prod_sortierung').value = String(Number(p.sortierung) || 0);
   pdMwstFuellen(p.mwst_satz_bp);
   openDlg('dlgProdukt');
@@ -14329,6 +14330,77 @@ function ofZeilenZeichnen() {
   ofSummenZeichnen();
 }
 
+/* ── Einheit: Auswahlfeld statt Vorschlagsliste ─────────────────────────
+   Vorher stand hier ein Textfeld mit einer <datalist>. Eine datalist
+   filtert ihre Vorschlaege nach dem, was im Feld steht -- und weil das
+   Feld mit "Std." vorbelegt ankommt, blieb genau EIN Vorschlag uebrig.
+   Die uebrigen Einheiten waren vorhanden, aber unerreichbar, solange man
+   nicht darauf kam, den Text zuerst zu loeschen. Genau so ist der Eindruck
+   entstanden, es gebe nur Stunden.
+   Darum ein Auswahlfeld: Beim Klick stehen alle Einheiten da. Der Server
+   nimmt weiterhin jede Einheit bis 20 Zeichen entgegen, also bleibt ueber
+   "andere ..." ein freier Eintrag moeglich; eine so eingetippte Einheit
+   wird zur Option und ist danach wieder waehlbar. */
+const EINHEITEN = ['Std.', 'Stk.', 'Pauschal', 'Tag', 'Monat', 'Jahr', 'km', 'Einsatz'];
+const EINHEIT_ANDERE = '__andere__';
+
+/* Gibt ZWEI Elemente zurueck: das Auswahlfeld und daneben das zunaechst
+   verborgene Feld fuer den freien Eintrag. Beide tragen die Klasse .inp,
+   die kein display setzt -- darum wirkt das hidden-Attribut. */
+function einheitHtml(id, wert, ruf) {
+  const w = String(wert || EINHEITEN[0]);
+  const liste = EINHEITEN.includes(w) ? EINHEITEN : EINHEITEN.concat([w]);
+  return `<select class="inp" id="${id}" data-zuletzt="${esc(w)}"
+            onchange="if (einheitAndere(this)) { ${ruf} }">
+      ${liste.map(e => `<option value="${esc(e)}"${e === w ? ' selected' : ''}>${esc(e)}</option>`).join('')}
+      <option value="${EINHEIT_ANDERE}">andere …</option>
+    </select>
+    <input class="inp" id="${id}_frei" hidden maxlength="20" placeholder="eigene Einheit"
+           onblur="einheitFrei(this)"
+           onkeydown="if (event.key === 'Enter') { event.preventDefault(); this.blur(); }">`;
+}
+
+/* true  = eine echte Einheit steht da, der Aufrufer darf sie uebernehmen.
+   false = "andere ..." wurde gewaehlt. Dann steht jetzt das freie Feld da,
+   und der Wert aendert sich erst, wenn dort etwas getippt wurde -- bis
+   dahin bleibt die zuletzt gewaehlte Einheit gueltig. */
+function einheitAndere(sel) {
+  if (sel.value !== EINHEIT_ANDERE) { sel.dataset.zuletzt = sel.value; return true; }
+  const frei = document.getElementById(sel.id + '_frei');
+  if (!frei) { return false; }
+  sel.hidden = true;
+  frei.hidden = false;
+  frei.value = '';
+  frei.focus();
+  return false;
+}
+
+/* Zurueck zur Liste. Leer eingetippt heisst "doch nicht" und nicht "keine
+   Einheit" -- dann gilt wieder, was vorher gewaehlt war. */
+function einheitFrei(frei) {
+  const sel = document.getElementById(frei.id.slice(0, -5));
+  if (!sel) { return; }
+  const w = frei.value.trim().slice(0, 20);
+  frei.hidden = true;
+  sel.hidden = false;
+  einheitSetzen(sel.id, (w && w !== EINHEIT_ANDERE) ? w : (sel.dataset.zuletzt || EINHEITEN[0]));
+  sel.dispatchEvent(new Event('change'));
+}
+
+/* Eine unbekannte Einheit wird vorher als Option angelegt. Ohne das waere
+   select.value = "m²" still wirkungslos und das Feld stuende auf der
+   ersten Option -- aus einer alten Leistung wuerden unbemerkt Stunden. */
+function einheitSetzen(id, wert) {
+  const sel = document.getElementById(id);
+  if (!sel) { return; }
+  const w = String(wert || EINHEITEN[0]);
+  if (!Array.from(sel.options).some(o => o.value === w)) {
+    sel.add(new Option(w, w), sel.options[sel.options.length - 1]);
+  }
+  sel.value = w;
+  sel.dataset.zuletzt = w;
+}
+
 function ofZeileHtml(p, i, produktListe) {
   const s = belegSummen([p], 0);
   return `<div class="of-pos">
@@ -14341,8 +14413,7 @@ function ofZeileHtml(p, i, produktListe) {
         <input class="inp num" id="ofp_menge${i}" inputmode="decimal" value="${esc(String(p.menge))}"
                oninput="ofZeileFeld(${i}, 'menge', this.value)"></div>
       <div class="f"><label for="ofp_einheit${i}">Einheit</label>
-        <input class="inp" id="ofp_einheit${i}" list="dlEinheiten" value="${esc(p.einheit)}"
-               oninput="ofZeileFeld(${i}, 'einheit', this.value)"></div>
+        ${einheitHtml('ofp_einheit' + i, p.einheit, `ofZeileFeld(${i}, 'einheit', this.value)`)}</div>
       <div class="f"><label for="ofp_preis${i}">Einzelpreis</label>
         <input class="inp num" id="ofp_preis${i}" inputmode="decimal" value="${rappenZuChf(p.einzelpreis_rappen)}"
                oninput="ofZeileFeld(${i}, 'einzelpreis_rappen', this.value)"></div>
@@ -14414,7 +14485,7 @@ function ofProduktUebernehmen(i, name) {
   setz('ofp_name' + i, z.produkt_name);
   setz('ofp_text' + i, z.beschreibung);
   setz('ofp_preis' + i, rappenZuChf(z.einzelpreis_rappen));
-  setz('ofp_einheit' + i, z.einheit);
+  einheitSetzen('ofp_einheit' + i, z.einheit);
   setz('ofp_mwst' + i, String(z.mwst_satz_bp));
   const zs = belegSummen([z], 0);
   const zelle = $('ofp_summe' + i);
