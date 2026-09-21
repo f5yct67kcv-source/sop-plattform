@@ -934,8 +934,7 @@ jobs:
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist/db.php
           sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist/testumgebung.js
           sed -i "s|__IST_DEMO_PLATZ__|0|g" dist/testumgebung.js
-          # Sparte Reinigung (ENT-650): NUR CUPI 24 -- Begruendung bei dist-cupi24/.
-          sed -i "s|__SPARTE_REINIGUNG__|1|g" dist/db.php
+          sed -i "s|__SPARTE_REINIGUNG__|1|g" dist/db.php  # nur CUPI 24, siehe dist-cupi24/
           sed -i "s|__IST_DEMO_PLATZ__|0|g" dist/db.php
           # Eigene Adresse (ENT-501). Bleibt sie leer -- bei Staging ohne
           # gesetzte STAGING_DOMAIN --, steht weiterhin woertlich
