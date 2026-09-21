@@ -342,14 +342,25 @@ check('KRITISCH: der Kopfzähler zählt echte Mandanten, nicht die Demo-Plätze'
    hier sieht: Ueber 1210 px hebt unterreiterZeichnen() die Leiste in die
    Werkzeugleiste (dieselbe Mechanik wie im Cockpit), darunter bleibt sie
    im Inhalt. Beide Wege muessen zum selben Ergebnis fuehren. */
+/* Geprueft wird, dass die Kopie oben DIESELBEN Reiter traegt wie die Leiste
+   im Inhalt -- nicht eine feste Namensliste. Mit ENT-637 ist ein dritter
+   Reiter dazugekommen, und eine abgeschriebene Aufzaehlung waere daran
+   zerbrochen, ohne dass an der Sache etwas falsch gewesen waere. */
 const obenSichtbar = await seite.evaluate(() => {
   const leiste = document.getElementById('topSub');
-  return !!leiste && leiste.offsetHeight > 0
-    && [...leiste.querySelectorAll('button')].map(b => b.textContent.trim()).join('|') === 'Mandanten|Demo';
+  const innen = document.getElementById('mandTabs');
+  if (!leiste || !innen || leiste.offsetHeight === 0) { return false; }
+  const namen = el => [...el.querySelectorAll('button')].map(b => b.textContent.trim()).join('|');
+  return namen(leiste) === namen(innen) && namen(leiste).split('|').length >= 2;
 });
 check('KRITISCH: am breiten Bildschirm stehen die Reiter in der Werkzeugleiste, wie im Cockpit',
   obenSichtbar);
-await seite.click(obenSichtbar ? '#topSub button:nth-child(2)' : '#mtab-demo');
+/* Ueber die Beschriftung angesprochen und nicht ueber die Position: Ein
+   neuer Reiter davor verschoebe sonst stillschweigend, was hier geklickt
+   wird -- und die Pruefung liefe gruen an etwas anderem. */
+await seite.click(obenSichtbar
+  ? '#topSub button:text-is("Demo")'
+  : '#mtab-demo');
 await seite.waitForTimeout(250);
 
 const demoReiter = await seite.evaluate(() => ({

@@ -909,6 +909,14 @@ tbody tr.aus td { opacity: .55; }
 .of-summe-z.matt { color: var(--ink-3); }
 .of-summe-z.total { margin-top: 8px; padding-top: 10px; border-top: 1.5px solid var(--ink);
   font-size: 15px; font-weight: 750; }
+/* Ueberschrift ueber einem Summenblock, nur wenn ein Beleg mehrere Perioden
+   traegt (ENT-637). Versal und fein wie jede andere Beschriftung in diesem
+   Bereich -- Ueberschrift oben, Wert darunter (Hausregel Gestaltung).
+   Der erste Block bekommt keinen Abstand nach oben; sonst stuende er tiefer
+   als das Rabattfeld darueber. */
+.of-summe-kopf { font-size: 11px; font-weight: 650; letter-spacing: .4px;
+  text-transform: uppercase; color: var(--ink-2); margin: 18px 0 2px; }
+.of-summe-kopf:first-child { margin-top: 0; }
 .of-detail-hd { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .of-detail-hd h2 { font-size: 20px; margin: 0; }
 .of-detail-hd .sub { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
@@ -1629,6 +1637,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
          das ist zweierlei Arbeit an einem Ort. -->
     <div class="tabs haupt" id="mandTabs" style="margin-bottom:10px">
       <button type="button" class="tab on" id="mtab-mandanten" onclick="mandGo('mandanten')">Mandanten</button>
+      <button type="button" class="tab" id="mtab-vertraege" onclick="mandGo('vertraege')">Verträge</button>
       <button type="button" class="tab" id="mtab-demo" onclick="mandGo('demo')">Demo</button>
     </div>
 
@@ -1646,6 +1655,30 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <div id="m-inhalt"></div>
     </div>
 
+    </div>
+
+    <!-- ── Reiter: Verträge (ENT-637) ──────────────────────────────
+         EINE ZEILE JE VERTRAGSVERHAELTNIS, nicht je Dokument. „Vertrag"
+         heisst hier zweierlei: die Laufzeit am Mandanten (ENT-617), oft
+         ohne Papier, und seit ENT-637 das unterschriebene Blatt, teils fuer
+         Betriebe, die noch gar kein Mandant sind. Wer nur eines zeigt,
+         sieht die Luecken des anderen nicht.
+
+         Der Reiter sitzt bei den Mandanten und nicht neben Offerten und
+         Rechnungen, obwohl das Dokument dieselbe Maschine benutzt: Was hier
+         zaehlt, ist das Verhaeltnis zum Betrieb, und das steht im
+         Mandantenstamm. -->
+    <div class="m-tab" id="mv-vertraege">
+    <div class="karte">
+      <div class="karte-kopf">
+        <div>
+          <h2>Verträge</h2>
+          <div class="sub">Was ansteht, zuoberst</div>
+        </div>
+        <button class="klein" id="knopf-vertrag-neu">Vertrag erstellen</button>
+      </div>
+      <div id="vertrag-inhalt"></div>
+    </div>
     </div>
 
     <!-- ── Reiter: Demo ──────────────────────────────────────────
@@ -2211,6 +2244,34 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         </div></div>
       </div>
 
+      <!-- Laufzeit, nur beim Vertrag (ENT-637). Eigene Karte unter dem
+           Kopfraster: Empfaenger und Datum gehoeren zu jedem Beleg, die
+           Laufzeit nur zu diesem einen -- und der Leser soll sehen, dass hier
+           etwas anderes beginnt. Dieselben vier Felder und dieselben Texte
+           wie am Mandanten (ENT-617); wer beides kennt, soll nicht zweimal
+           lernen. -->
+      <div class="card versteckt" id="ofLaufzeitKarte" style="margin-bottom:14px"><div class="card-bd">
+        <div style="font-size:11px;font-weight:650;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-2);margin-bottom:4px">
+          Laufzeit
+        </div>
+        <div class="of-hinweis" style="margin-bottom:12px">
+          Steht auf dem Vertrag und sagt, bis wann gekündigt werden kann.
+          Was leer bleibt, erscheint dort gar nicht.
+        </div>
+        <div class="of-kopf-zwei" style="margin-bottom:0">
+          <div class="f"><label for="of_vbeginn">Vertragsbeginn</label>
+            <input class="inp" type="date" id="of_vbeginn"></div>
+          <div class="f"><label for="of_vmindest">Mindestlaufzeit (Monate)</label>
+            <input class="inp" type="number" min="0" max="600" inputmode="numeric" id="of_vmindest">
+            <div class="of-hinweis">Leer heisst unbefristet.</div></div>
+          <div class="f"><label for="of_vfrist">Kündigungsfrist (Monate)</label>
+            <input class="inp" type="number" min="0" max="600" inputmode="numeric" id="of_vfrist"></div>
+          <div class="f" style="margin-bottom:0"><label for="of_vverlaengerung">Verlängerung (Monate)</label>
+            <input class="inp" type="number" min="0" max="600" inputmode="numeric" id="of_vverlaengerung">
+            <div class="of-hinweis">0 heisst: verlängert sich nicht. Leer heisst: nicht geregelt.</div></div>
+        </div>
+      </div></div>
+
       <div class="card" style="margin-bottom:14px"><div class="card-bd">
         <div class="f" style="margin-bottom:0"><label for="of_titel">Titel</label>
           <input class="inp" id="of_titel" placeholder="z. B. Nutzung GuardOpS"></div>
@@ -2660,6 +2721,7 @@ function bereichZeigen(welcher) {
    weil das Abzeichen am Reiter seine Zahl braucht. */
 const MANDANTEN_REITER = {
   mandanten: 'Betriebe, die diese Plattform nutzen',
+  vertraege: 'Abmachungen mit den Betrieben und ihre Fristen',
   demo:      'Plätze der Demo-Anlage und ihre Zugänge',
 };
 let mandTab = 'mandanten';
@@ -2678,6 +2740,10 @@ function mandGo(t) {
      dasteht, ist eines, dessen Herkunft nirgends mehr steht. */
   zeig($('m-form-karte'), false);
   zeig($('sup-karte'), false);
+  /* Erst beim Oeffnen geladen, nicht schon beim Betreten des Bereichs: Der
+     Endpunkt liest Belege, Mandanten und Adressen zusammen, und wer nur in
+     den Mandantenstamm will, soll das nicht bezahlen. */
+  if (t === 'vertraege') { ladeVertraege(); }
   /* Die Reiter stehen ueber 1210 px oben in der Werkzeugleiste. Wird hier
      umgeschaltet, muss die Kopie dort mitkommen. */
   unterreiterZeichnen();
@@ -3240,6 +3306,166 @@ function vertragZelle(m) {
   }
   return '<span class="merker ' + klasse + '">' + wort + '</span>'
        + (zweit ? '<div class="zweit">' + zweit + '</div>' : '');
+}
+
+/* ── Verträge (ENT-637) ──────────────────────────────────────────────── */
+
+/* Die vier Lagen eines Vertragsverhaeltnisses. Jede hat ihren eigenen Text,
+   und keine sieht aus wie eine andere (Hausregel: „unbekannt" darf nie wie
+   „keine" aussehen). Benannt werden sie im Server, hier nur uebersetzt. */
+const VZ_LAGE_TEXT = {
+  vollstaendig:  ['m-pos',  'abgemacht'],
+  im_versand:    ['m-warn', 'unterwegs'],
+  ohne_dokument: ['m-ruhe', 'ohne Dokument'],
+  ohne_mandant:  ['m-warn', 'nicht aufgeschaltet'],
+};
+const VZ_DOK_TEXT = {
+  entwurf:    ['m-ruhe', 'Entwurf'],
+  versendet:  ['m-warn', 'versendet'],
+  angeschaut: ['m-warn', 'angeschaut'],
+  bestaetigt: ['m-pos',  'angenommen'],
+  abgelehnt:  ['m-neg',  'abgelehnt'],
+};
+
+let vertragZeilen = [];
+
+async function ladeVertraege() {
+  /* Der Knopf „Mandant" in der Liste braucht die Mandantenzeile, und die
+     steht nur in mandantenAlle. Sie ist beim Start ueber die Uebersicht
+     meist schon da -- wer aber direkt hierher springt, saehe sonst einen
+     Knopf, der nichts tut. */
+  if (!mandantenAlle.length) { await ladeMandanten(); }
+  const a = await ruf('betreiber_vertrag_list.php');
+  const inhalt = $('vertrag-inhalt');
+
+  if (a.status !== 'ok') {
+    inhalt.innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
+    return;
+  }
+  if (!a.eingerichtet) {
+    /* Nicht eingerichtet ist etwas anderes als „keine Verträge". */
+    inhalt.innerHTML = leerBlock('⚙', 'Noch nicht eingerichtet',
+      'Der Vertragsteil ist auf diesem Server noch nicht angelegt. '
+      + 'Die Einrichtung läuft über das Zahnrad oben.');
+    return;
+  }
+
+  vertragZeilen = a.zeilen || [];
+  if (!vertragZeilen.length) {
+    inhalt.innerHTML = leerBlock('◇', 'Noch kein Vertragsverhältnis',
+      'Sobald ein Betrieb im Stamm steht oder ein Vertrag geschrieben ist, '
+      + 'erscheint er hier.');
+    return;
+  }
+
+  /* Der Hinweis steht NUR, solange die Spalten fehlen -- danach waere er
+     eine Warnung vor etwas, das es nicht mehr gibt. */
+  const nachtrag = a.kennt_laufzeit === false
+    ? '<div class="hinweis" style="margin-bottom:10px">Die Laufzeitfelder am '
+      + 'Vertrag sind in dieser Anlage noch nicht nachgetragen. Bis dahin '
+      + 'zeigt die Spalte Laufzeit nur, was am Mandanten steht.</div>'
+    : '';
+
+  inhalt.innerHTML = nachtrag
+    + '<div class="tab-huelle"><table><thead><tr>'
+    + '<th>Betrieb</th><th>Lage</th><th>Dokument</th><th>Preis</th><th>Laufzeit</th><th></th>'
+    + '</tr></thead><tbody>'
+    + vertragZeilen.map((z, i) => '<tr>'
+        + '<td><strong>' + text(z.firma || 'Ohne Namen') + '</strong>'
+          + '<div class="zweit">' + (z.subdomain
+              ? text(z.subdomain) + '.guardops.ch'
+              : (z.mandant_id ? 'Keine Subdomain gesetzt' : 'Noch kein Mandant'))
+            + '</div></td>'
+        + '<td>' + merker(VZ_LAGE_TEXT, z.lage)
+          + (z.mandant_status && z.mandant_status !== 'aktiv'
+              ? '<div class="zweit">Mandant ' + text(z.mandant_status) + '</div>' : '')
+          + '</td>'
+        + '<td>' + vzDokumentZelle(z) + '</td>'
+        + '<td>' + vzPreisZelle(z) + '</td>'
+        + '<td>' + vzLaufzeitZelle(z) + '</td>'
+        + '<td style="text-align:right;white-space:nowrap">' + vzKnoepfe(z, i) + '</td>'
+      + '</tr>').join('')
+    + '</tbody></table></div>';
+
+  inhalt.querySelectorAll('[data-vz-oeffnen]').forEach(b =>
+    b.onclick = () => ofOeffnen(+b.dataset.vzOeffnen));
+  inhalt.querySelectorAll('[data-vz-neu]').forEach(b =>
+    b.onclick = () => ofNeuFuerAdresse(+b.dataset.vzNeu, 'vertrag'));
+  inhalt.querySelectorAll('[data-vz-mandant]').forEach(b =>
+    b.onclick = () => {
+      const m = mandantenAlle.find(x => Number(x.id) === Number(b.dataset.vzMandant));
+      if (m) { formularOeffnen(m); }
+    });
+}
+
+/* Kein Dokument ist eine Aussage und kein leeres Feld: Der Betrieb laeuft,
+   das Blatt fehlt -- meist, weil er aus der Zeit vor diesem Bereich stammt. */
+function vzDokumentZelle(z) {
+  if (!z.dokument) {
+    return '<span class="zweit">kein Dokument hinterlegt</span>';
+  }
+  const d = z.dokument;
+  return '<strong>' + text(d.nummer) + '</strong>'
+       + '<div style="margin-top:3px">' + merker(VZ_DOK_TEXT, d.status) + '</div>'
+       + '<div class="zweit">' + text(String(d.datum).slice(0, 10))
+       + (d.aktiv ? '' : ' · archiviert') + '</div>';
+}
+
+/* JE PERIODE EINE ZEILE, nie eine Summe darueber: Eine einmalige
+   Einrichtung und eine Monatsgebuehr zusammenzuzaehlen ergaebe einen
+   Betrag, den niemand bezahlt (Hausregel: Einheiten nie vermischen). */
+function vzPreisZelle(z) {
+  if (!z.dokument) { return '<span class="zweit">—</span>'; }
+  const d = z.dokument;
+  const teile = [];
+  if (d.total_rappen)       { teile.push('CHF ' + chf(d.total_rappen) + ' einmalig'); }
+  if (d.total_monat_rappen) { teile.push('CHF ' + chf(d.total_monat_rappen) + ' pro Monat'); }
+  if (d.total_jahr_rappen)  { teile.push('CHF ' + chf(d.total_jahr_rappen) + ' pro Jahr'); }
+  if (!teile.length) { return '<span class="zweit">kein Betrag erfasst</span>'; }
+  return teile.map((t, i) => i === 0
+    ? '<strong>' + text(t) + '</strong>'
+    : '<div class="zweit">' + text(t) + '</div>').join('');
+}
+
+/* Die Laufzeit kommt vom Mandanten, wo es einen gibt -- das Blatt sagt, was
+   unterschrieben wurde, der Mandant, was heute gilt. Woher sie stammt,
+   steht dabei: Sonst liest sich eine Laufzeit aus einem noch nicht
+   angenommenen Vertrag wie eine geltende Abmachung. */
+function vzLaufzeitZelle(z) {
+  const v = z.laufzeit || { lage: 'unbekannt' };
+  const [klasse, wort] = VERTRAG_TEXT[v.lage] || VERTRAG_TEXT.unbekannt;
+  let zweit = '';
+  if (v.lage === 'gekuendigt') {
+    zweit = (v.beendet ? 'beendet am ' : 'endet am ') + String(v.ende).slice(0, 10);
+  } else if (v.lage === 'laeuft') {
+    zweit = 'kündbar bis ' + String(v.spaetestens).slice(0, 10);
+  } else if (v.lage === 'laeuft_aus') {
+    zweit = (v.beendet ? 'Ende war ' : 'endet am ') + String(v.ende).slice(0, 10);
+  } else if (v.lage === 'ohne_ende') {
+    zweit = 'keine Mindestlaufzeit';
+  }
+  return '<span class="merker ' + klasse + '">' + wort + '</span>'
+       + (zweit ? '<div class="zweit">' + text(zweit) + '</div>' : '')
+       + (v.lage !== 'unbekannt' && z.laufzeit_quelle === 'dokument'
+           ? '<div class="zweit">laut Dokument, noch nicht am Mandanten</div>' : '');
+}
+
+function vzKnoepfe(z, i) {
+  const knoepfe = [];
+  if (z.dokument) {
+    knoepfe.push('<button class="klein" data-vz-oeffnen="' + z.dokument.id + '">Öffnen</button>');
+  } else if (z.kunde_id) {
+    knoepfe.push('<button class="klein" data-vz-neu="' + z.kunde_id + '">Vertrag</button>');
+  } else {
+    /* Ohne Adresseintrag laesst sich kein Beleg schreiben -- er braucht
+       einen Empfaenger. Das steht da, statt einen Knopf anzubieten, der
+       danach nicht weiterkommt. */
+    knoepfe.push('<span class="zweit">keine Adresse</span>');
+  }
+  if (z.mandant_id) {
+    knoepfe.push('<button class="klein" data-vz-mandant="' + z.mandant_id + '">Mandant</button>');
+  }
+  return knoepfe.join(' ');
 }
 
 function formularOeffnen(m) {
@@ -4680,6 +4906,18 @@ async function ladeBelegeRoh() {
   renderOfferten();
 }
 
+/* Nur die naechste Vertragsnummer, ohne Liste. Die Vertragsliste im
+   Mandantenbereich holt ihre Zeilen aus einem eigenen Endpunkt und braucht
+   die Belegliste nicht -- diese Zahl aber schon: Ohne sie stuende im Kopf
+   des neuen Formulars "Neuer Vertrag" statt VE-0004 (ENT-637). */
+let veNaechsteNummer = '';
+async function ladeVertragsnummer() {
+  try {
+    const a = await ruf('betreiber_beleg_list.php?art=vertrag');
+    if (a.status === 'ok') { veNaechsteNummer = a.naechste_nummer || ''; }
+  } catch (e) { /* Ohne Nummer bleibt der Platzhalter stehen */ }
+}
+
 async function ladeRechnungenRoh() {
   const a = await ruf('betreiber_beleg_list.php?art=rechnung');
   if (a.status !== 'ok') {
@@ -6035,7 +6273,13 @@ function ofFormMenuOeffnen(ev) {
 /* Welche Liste nach einer Aenderung nachzuladen ist. EINE Stelle statt
    einer Verzweigung an jedem Aufrufort. */
 async function belegListeAktualisieren(art) {
-  if (art === 'rechnung') { await ladeRechnungen(); } else { await ladeBelege(); }
+  if (art === 'rechnung') { await ladeRechnungen(); return; }
+  /* Der Vertrag hat keine eigene Belegliste -- er steht in der
+     Verhaeltnisliste im Mandantenbereich. Die Nummernreihe muss trotzdem
+     nachziehen, sonst schlaegt das naechste neue Formular dieselbe Nummer
+     noch einmal vor. */
+  if (art === 'vertrag') { await ladeVertragsnummer(); await ladeVertraege(); return; }
+  await ladeBelege();
 }
 
 async function ofStatusSetzen(id, neu, art) {
@@ -6136,7 +6380,56 @@ const OF_ART_TEXT = {
     versandText: 'Der Empfänger erhält eine E-Mail mit einem Link zur Rechnung.',
     versandErfolg: 'Rechnung per E-Mail verschickt.',
   },
+  /* Der Vertrag (ENT-637). Dieselbe Maske wie Offerte und Rechnung -- was
+     ihn unterscheidet, sind die Laufzeit und die Perioden, und beides
+     haengt an dieser einen Art.
+
+     zweitFeld bleibt 'gueltig_bis' und heisst hier "Angebot gültig bis":
+     Ein Vertragsentwurf, den man verschickt, hat sehr wohl eine Frist, bis
+     zu der er gilt -- danach wird neu gerechnet. Das Feld einfach
+     auszublenden hiesse, diese Frist gaebe es nicht. */
+  vertrag: {
+    dokument: 'Vertrag', neu: 'Neuer Vertrag', liste: 'Vertragsliste',
+    bereich: 'mandanten',
+    datumLabel: 'Vertragsdatum', nummerLabel: 'Vertragsnummer', zweitLabel: 'Angebot gültig bis',
+    zweitFeld: 'gueltig_bis',
+    fehlerDatum: 'Ein Vertragsdatum ist erforderlich.',
+    fehlerZweit: '„Angebot gültig bis" liegt vor dem Vertragsdatum.',
+    angelegt: 'Vertrag angelegt.', gespeichert: 'Vertrag gespeichert.',
+    versandFrage: 'Vertrag per E-Mail versenden?',
+    versandText: 'Der Empfänger erhält eine E-Mail mit einem Link zum Vertrag. Dort kann er ihn direkt annehmen oder ablehnen.',
+    versandErfolg: 'Vertrag per E-Mail verschickt.',
+  },
 };
+
+/* Wie oft eine Position anfaellt (ENT-637). Muss mit BELEG_PERIODEN in
+   backend/belege.php uebereinstimmen -- test_php.mjs wacht darueber.
+   'einmalig' traegt ABSICHTLICH keinen Zusatz: Auf einer Offerte ist alles
+   einmalig, und "Total einmalig" behauptete dort eine Unterscheidung, die
+   das Blatt gar nicht macht. */
+const BELEG_PERIODEN = [
+  { wert: 'einmalig',  text: 'einmalig',   zusatz: '' },
+  { wert: 'monatlich', text: 'pro Monat',  zusatz: 'pro Monat' },
+  { wert: 'jaehrlich', text: 'pro Jahr',   zusatz: 'pro Jahr' },
+];
+function periodeZusatz(wert) {
+  const p = BELEG_PERIODEN.find(x => x.wert === wert);
+  return p ? p.zusatz : '';
+}
+
+/* Je Periode eine eigene Rechnung -- mit derselben Funktion wie sonst, nur
+   mehrfach aufgerufen. Kein zweiter Rechenkern im Browser, aus demselben
+   Grund wie im Server: Zwei Formeln laufen irgendwann auseinander.
+   Leere Perioden kommen NICHT vor; ein Block "einmalig CHF 0.00" saehe aus
+   wie ein Preis und nicht wie eine fehlende Zeile. */
+function belegSummenPerioden(positionen, rabattBp) {
+  return BELEG_PERIODEN
+    .map(per => {
+      const teil = positionen.filter(p => (p.periode || 'einmalig') === per.wert);
+      return teil.length ? { periode: per, summen: belegSummen(teil, rabattBp) } : null;
+    })
+    .filter(Boolean);
+}
 
 /* Beschriftungen und Zurueck-Ziel auf die aktuelle Belegart umstellen.
    Eigene Funktion, weil sowohl ofNeu() als auch ofOeffnen() sie brauchen. */
@@ -6148,6 +6441,13 @@ function ofFormLabelZeichnen() {
   $('ofBtnPlus10').title = '10 Tage ab ' + t.datumLabel;
   $('ofBtnPlus30').title = '30 Tage ab ' + t.datumLabel;
   $('ofBtnZurueck').setAttribute('aria-label', 'Zurück zur ' + t.liste);
+}
+
+/* Die Laufzeitkarte gehoert zum Vertrag und sonst zu nichts (ENT-637).
+   Ausgeblendet und nicht bloss leer: Ein leerer Laufzeitblock auf einer
+   Offerte saehe aus, als muesste man ihn ausfuellen. */
+function ofLaufzeitZeigen() {
+  zeig($('ofLaufzeitKarte'), ofArt === 'vertrag');
 }
 
 /* Das Formular ist eine eigene Ansicht NEBEN den Bereichen, nicht in einem
@@ -6177,11 +6477,19 @@ function ofZurueck() {
   ofFormularZeigen(false);
   bereichZeigen(OF_ART_TEXT[ofArt].bereich);
   if (ofArt === 'offerte') { ofHauptTab('liste'); }
+  /* Der Vertrag kommt aus dem Mandantenbereich und gehoert dort in seinen
+     eigenen Reiter -- ohne das landete man nach dem Zurueck im
+     Mandantenstamm, also woanders, als man losgegangen ist. */
+  if (ofArt === 'vertrag') { mandGo('vertraege'); }
 }
 
 function ofLeereZeile() {
+  /* 'einmalig' auch beim Vertrag: Eine neue Zeile behauptet nichts. Wer
+     eine Monatsgebuehr will, sagt es -- das Gegenteil, eine voreingestellte
+     Wiederkehr, koennte unbemerkt auf dem Dokument landen. */
   return { produkt_id: null, produkt_name: '', beschreibung: '', menge: 1,
-           einheit: 'Std.', einzelpreis_rappen: 0, rabatt_bp: 0, mwst_satz_bp: 810 };
+           einheit: 'Std.', einzelpreis_rappen: 0, rabatt_bp: 0, mwst_satz_bp: 810,
+           periode: 'einmalig' };
 }
 
 /* Ein Datum um n Tage verschieben, ohne Bibliothek und ohne Zeitzonenfalle:
@@ -6279,7 +6587,8 @@ function ofNeu(art) {
   ofFormBezahlt = 0;
   ofFormBezahltAm = null;
   const heute = isoTag();
-  const naechsteNummer = ofArt === 'rechnung' ? reNaechsteNummer : ofNaechsteNummer;
+  const naechsteNummer = ofArt === 'rechnung' ? reNaechsteNummer
+                      : ofArt === 'vertrag'  ? veNaechsteNummer : ofNaechsteNummer;
   $('ofFormNummer').textContent = naechsteNummer || OF_ART_TEXT[ofArt].neu;
   $('ofFormSub').textContent = 'Entwurf · noch nicht gespeichert';
   zeig($('ofFormErr'), false);
@@ -6294,6 +6603,12 @@ function ofNeu(art) {
   $('of_datum').value = heute;
   $('of_datum').dataset.vorher = heute;
   $('of_gueltig').value = ofTagePlus(heute, OF_GUELTIG_TAGE);
+  /* Die Laufzeit startet leer und NICHT mit Vorgabewerten (ENT-617/ENT-637):
+     Ein vorausgefuelltes "12" waere eine Abmachung, die niemand getroffen
+     hat, und stuende danach auf dem Vertrag. */
+  ['of_vbeginn', 'of_vmindest', 'of_vfrist', 'of_vverlaengerung']
+    .forEach(f => { $(f).value = ''; });
+  ofLaufzeitZeigen();
   ofPersonenFuellen(null);
   /* Vorschau, Drucken, Herunterladen und das Dreipunkt-Menue ergeben vor
      dem ersten Speichern keinen Sinn -- es gibt noch keinen Beleg, den der
@@ -6324,6 +6639,8 @@ async function ofNeuFuerAdresse(kundeId, art) {
   if (!produkte.length) { await ladeProdukte(); }
   if (art === 'rechnung') {
     if (!reNaechsteNummer) { await ladeRechnungen(); }
+  } else if (art === 'vertrag') {
+    if (!veNaechsteNummer) { await ladeVertragsnummer(); }
   } else if (!ofNaechsteNummer) { await ladeBelege(); }
   ofNeu(art);
   const k = adressen.find(x => Number(x.id) === Number(kundeId));
@@ -6368,6 +6685,10 @@ function ofZeileHtml(p, i) {
         <select class="inp" id="ofp_mwst${i}" onchange="ofZeileFeld(${i}, 'mwst_satz_bp', this.value)">
           ${MWST_SAETZE.map(m => `<option value="${m.bp}"${Number(m.bp) === Number(p.mwst_satz_bp) ? ' selected' : ''}>${esc(m.text.split(' ')[0])}</option>`).join('')}
         </select></div>
+      ${ofArt === 'vertrag' ? `<div class="f"><label for="ofp_periode${i}">Fällt an</label>
+        <select class="inp" id="ofp_periode${i}" onchange="ofZeileFeld(${i}, 'periode', this.value)">
+          ${BELEG_PERIODEN.map(per => `<option value="${per.wert}"${per.wert === (p.periode || 'einmalig') ? ' selected' : ''}>${esc(per.text)}</option>`).join('')}
+        </select></div>` : ''}
       <div class="of-pos-weg">
         <button type="button" class="btn btn-quiet btn-sm" onclick="ofZeileWeg(${i})" title="Position entfernen" aria-label="Position entfernen">
           <svg class="i i-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -6376,7 +6697,7 @@ function ofZeileHtml(p, i) {
     </div>
     <textarea class="inp" id="ofp_text${i}" rows="2" placeholder="Beschreibung — erscheint so auf dem Dokument"
               oninput="ofZeileFeld(${i}, 'beschreibung', this.value)">${esc(p.beschreibung)}</textarea>
-    <div class="of-pos-summe" id="ofp_summe${i}">CHF ${chf(s.zwischensumme_rappen)}</div>
+    <div class="of-pos-summe" id="ofp_summe${i}">CHF ${chf(s.zwischensumme_rappen)}${esc(ofZeileZusatz(p))}</div>
   </div>`;
 }
 
@@ -6398,10 +6719,29 @@ function ofZeileFeld(i, feld, wert) {
       : (Number.isFinite(n) ? Math.max(0, Math.min(10000, Math.round(n * 100))) : 0);
   } else { ofPos[i][feld] = wert; }
 
+  /* Die Periode aendert nicht nur diese Zeile: Ob ueberhaupt ein Zusatz
+     hinter den Betraegen steht, haengt davon ab, ob der Beleg MEHRERE
+     Perioden mischt -- und das kann dieser eine Wechsel gerade umgeworfen
+     haben. Also alle Zeilen neu. Der Cursor geht dabei nicht verloren, weil
+     die Periode aus einem Auswahlfeld kommt und nicht getippt wird. */
+  if (feld === 'periode') { ofZeilenZeichnen(); return; }
+
   const z = belegSummen([ofPos[i]], 0);
   const zelle = $('ofp_summe' + i);
-  if (zelle) { zelle.textContent = 'CHF ' + chf(z.zwischensumme_rappen); }
+  if (zelle) { zelle.textContent = 'CHF ' + chf(z.zwischensumme_rappen) + ofZeileZusatz(ofPos[i]); }
   ofSummenZeichnen();
+}
+
+/* "pro Monat" hinter dem Zeilenbetrag -- aber nur, wenn der Beleg
+   tatsaechlich mehrere Perioden mischt. Traegt ein Vertrag ausschliesslich
+   Monatsgebuehren, sagt der Summenblock das einmal fuer alle, und die
+   Wiederholung an jeder Zeile waere Laerm. */
+function ofZeileZusatz(p) {
+  if (ofArt !== 'vertrag') { return ''; }
+  const arten = new Set(ofPos.map(x => x.periode || 'einmalig'));
+  if (arten.size < 2) { return ''; }
+  const zusatz = periodeZusatz(p.periode || 'einmalig');
+  return zusatz ? ' ' + zusatz : '';
 }
 
 /* Eine Leistung aus den Stammdaten in die Zeile uebernehmen. Nur bei
@@ -6474,31 +6814,53 @@ function ofRabattEinheitSetzen(neu) {
   ofSummenZeichnen();
 }
 
+/* JE PERIODE EIN BLOCK, und keine Zahl darueber (ENT-637). Eine einmalige
+   Einrichtung und eine Monatsgebuehr in einer Summe waere ein Betrag, den
+   niemand bezahlt (Hausregel: Einheiten nie vermischen). Bei Offerte und
+   Rechnung gibt es genau einen Block, und die Vorschau sieht aus wie
+   vorher -- die Ueberschrift kommt erst, wenn es etwas zu unterscheiden
+   gibt. */
 function ofSummenZeichnen() {
   const rabattBp = ofRabattBp();
-  const s = belegSummen(ofPos, rabattBp);
+  const bloecke = belegSummenPerioden(ofPos, rabattBp);
   const zeile = (label, wert, klasse) =>
     `<div class="of-summe-z${klasse ? ' ' + klasse : ''}"><span>${label}</span><span class="wert">${wert}</span></div>`;
 
-  let html = zeile('Zwischensumme', 'CHF ' + chf(s.zwischensumme_rappen));
-  if (s.rabatt_rappen > 0) {
-    html += zeile(`${esc(bpText(rabattBp))} % Rabatt`, '−CHF ' + chf(s.rabatt_rappen));
+  if (!bloecke.length) {
+    /* Kein Block heisst: keine Position. Das ist etwas anderes als eine
+       Summe von null, und es steht darum auch nicht als solche da. */
+    $('ofSummen').innerHTML = zeile('Noch keine Position', '', 'matt');
+    return;
   }
-  /* Die MWST-Grundlage steht mit dabei, nicht nur der Betrag: Bei
-     gemischten Saetzen ist "8.10 % = 221.47" ohne die Grundlage nicht
-     nachvollziehbar. */
-  s.mwst.forEach(m => {
-    html += zeile(`MWST ${esc(bpText(m.satz_bp))} % auf CHF ${chf(m.grundlage_rappen)}`,
-                  'CHF ' + chf(m.betrag_rappen));
+
+  const mehrere = bloecke.length > 1;
+  let html = '';
+  bloecke.forEach(b => {
+    const s = b.summen;
+    if (mehrere) {
+      html += `<div class="of-summe-kopf">${esc(b.periode.text)}</div>`;
+    }
+    html += zeile('Zwischensumme', 'CHF ' + chf(s.zwischensumme_rappen));
+    if (s.rabatt_rappen > 0) {
+      html += zeile(`${esc(bpText(rabattBp))} % Rabatt`, '−CHF ' + chf(s.rabatt_rappen));
+    }
+    /* Die MWST-Grundlage steht mit dabei, nicht nur der Betrag: Bei
+       gemischten Saetzen ist "8.10 % = 221.47" ohne die Grundlage nicht
+       nachvollziehbar. */
+    s.mwst.forEach(m => {
+      html += zeile(`MWST ${esc(bpText(m.satz_bp))} % auf CHF ${chf(m.grundlage_rappen)}`,
+                    'CHF ' + chf(m.betrag_rappen));
+    });
+    if (!s.mwst.length && s.zwischensumme_rappen > 0) {
+      html += zeile('Ohne MWST', 'CHF 0.00', 'matt');
+    }
+    if (s.rundung_rappen !== 0) {
+      html += zeile('Rundungsdifferenz',
+        (s.rundung_rappen > 0 ? '+' : '−') + 'CHF ' + chf(Math.abs(s.rundung_rappen)), 'matt');
+    }
+    const zusatz = mehrere && b.periode.zusatz ? ' ' + b.periode.zusatz : '';
+    html += zeile('Total' + esc(zusatz), 'CHF ' + chf(s.total_rappen), 'total');
   });
-  if (!s.mwst.length && s.zwischensumme_rappen > 0) {
-    html += zeile('Ohne MWST', 'CHF 0.00', 'matt');
-  }
-  if (s.rundung_rappen !== 0) {
-    html += zeile('Rundungsdifferenz',
-      (s.rundung_rappen > 0 ? '+' : '−') + 'CHF ' + chf(Math.abs(s.rundung_rappen)), 'matt');
-  }
-  html += zeile('Total', 'CHF ' + chf(s.total_rappen), 'total');
   $('ofSummen').innerHTML = html;
 }
 
@@ -6525,6 +6887,7 @@ async function ofOeffnen(id) {
     einzelpreis_rappen: Number(p.einzelpreis_rappen) || 0,
     rabatt_bp: Number(p.rabatt_bp) || 0,
     mwst_satz_bp: Number(p.mwst_satz_bp) || 0,
+    periode: p.periode || 'einmalig',
   }));
   ofFormStatus = b.status;
   ofFormAktiv = Number(b.aktiv);
@@ -6552,6 +6915,15 @@ async function ofOeffnen(id) {
   $('of_datum').dataset.vorher = $('of_datum').value;
   const zweitWert = b[OF_ART_TEXT[ofArt].zweitFeld];
   $('of_gueltig').value = leeresDatum(zweitWert) ? '' : String(zweitWert).slice(0, 10);
+  /* Die Laufzeit (ENT-637). null bleibt ein leeres Feld und wird nicht zu
+     einer 0 -- sonst stuende beim naechsten Speichern eine Abmachung da,
+     die nie getroffen wurde. */
+  $('of_vbeginn').value = leeresDatum(b.vertrag_beginn) ? '' : String(b.vertrag_beginn).slice(0, 10);
+  [['of_vmindest', 'mindestlaufzeit_monate'], ['of_vfrist', 'kuendigungsfrist_monate'],
+   ['of_vverlaengerung', 'verlaengerung_monate']].forEach(([feld, quelle]) => {
+    $(feld).value = (b[quelle] === null || b[quelle] === undefined) ? '' : String(b[quelle]);
+  });
+  ofLaufzeitZeigen();
   ofPersonenFuellen(b.person_id);
   ['ofFormVorschauBtn', 'ofFormDruckBtn', 'ofFormMenuBtn']
     .forEach(x => { $(x).style.display = ''; });
@@ -6591,6 +6963,21 @@ async function ofSpeichern() {
     rabatt_bp: ofRabattBp(),
     positionen: ofPos,
   };
+  /* Die Laufzeit nur beim Vertrag mitschicken (ENT-637). Ein leeres Feld
+     wird zu null und nicht zu 0: Eine nicht erfasste Frist ist unbekannt,
+     keine Frist von null Monaten. */
+  if (ofArt === 'vertrag') {
+    const zahlOderNull = id => {
+      const v = ($(id).value || '').trim();
+      if (v === '') { return null; }
+      const n = parseInt(v, 10);
+      return Number.isFinite(n) ? Math.max(0, Math.min(600, n)) : null;
+    };
+    koerper.vertrag_beginn          = $('of_vbeginn').value || null;
+    koerper.mindestlaufzeit_monate  = zahlOderNull('of_vmindest');
+    koerper.kuendigungsfrist_monate = zahlOderNull('of_vfrist');
+    koerper.verlaengerung_monate    = zahlOderNull('of_vverlaengerung');
+  }
   $('ofFormSaveBtn').disabled = true;
   const a = await ruf('betreiber_beleg_speichern.php', koerper);
   $('ofFormSaveBtn').disabled = false;
@@ -7077,6 +7464,7 @@ $('knopf-einrichtung').onclick     = einrichtungOeffnen;
 $('knopf-einrichtung-zu').onclick  = einrichtungSchliessen;
 $('knopf-einrichtung-lauf').onclick = einrichtungLauf;
 $('knopf-neu').onclick        = () => formularOeffnen(null);
+$('knopf-vertrag-neu').onclick = () => ofNeuStarten('vertrag');
 $('knopf-demo-ablauf').onclick    = demoAblauf;
 $('knopf-speichern').onclick  = mandantSpeichern;
 $('knopf-abbrechen').onclick  = () => zeig($('m-form-karte'), false);

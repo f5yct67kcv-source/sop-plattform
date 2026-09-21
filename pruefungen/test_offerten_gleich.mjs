@@ -315,6 +315,22 @@ async function betreiber(breite, hoehe, thema, glas, was) {
 const wieText = m => `${m.s} | ${m.h.toFixed(1)}h`;
 const passt = (a, b) => a.s === b.s && Math.abs(a.h - b.h) <= 1;
 
+/* Bausteine, die es NUR im Betreiber-Formular gibt -- namentlich und mit
+   Grund, gleiche Haltung wie OHNE_ANMELDUNG in test_php.mjs. Ohne diese
+   Liste bliebe nur, die Pruefung aufzuweichen, und dann faenden auch
+   versehentliche Unterschiede nie wieder jemanden.
+
+   Die Laufzeit (ENT-637) gehoert zum Vertrag, und den schreibt allein die
+   Betreiberin: Die Tabelle `belege` des Mandanten kennt die Belegart gar
+   nicht. Im Cockpit waeren diese Felder darum kein fehlender Baustein,
+   sondern einer ohne Zweck.
+
+   WICHTIG: Sie stehen hier trotzdem unter Beobachtung -- der Test prueft
+   unten, dass sie bei Offerte und Rechnung tatsaechlich VERBORGEN sind.
+   Eine Ausnahme, die nicht mehr geprueft wird, ist ein Loch. */
+const NUR_BETREIBER = ['#ofLaufzeitKarte', '#of_vbeginn', '#of_vmindest',
+                       '#of_vfrist', '#of_vverlaengerung'];
+
 function formularVergleichen(was, co, be) {
   check(`${was}: beide Seiten zeigen das Formular ohne JS-Fehler`,
     co.fehler.length === 0 && be.fehler.length === 0);
@@ -329,13 +345,26 @@ function formularVergleichen(was, co, be) {
   // oder dazukommt, ist keine Gestaltungsfrage mehr, sondern ein anderes
   // Formular.
   const nurCo = Object.keys(co.m.nachId).filter(k => !(k in be.m.nachId));
-  const nurBe = Object.keys(be.m.nachId).filter(k => !(k in co.m.nachId));
+  const nurBe = Object.keys(be.m.nachId)
+    .filter(k => !(k in co.m.nachId) && !NUR_BETREIBER.includes(k));
   check(`KRITISCH ${was}: dieselben Bausteine, keiner fehlt und keiner ist zuviel`,
     nurCo.length === 0 && nurBe.length === 0);
   if (nurCo.length) { bad.push(`${was}: fehlt im Betreiber-Bereich: ` + nurCo.join(', ')); }
   if (nurBe.length) { bad.push(`${was}: nur im Betreiber-Bereich: ` + nurBe.join(', ')); }
 
-  const gleich = Object.keys(co.m.nachId).filter(k => k in be.m.nachId);
+  /* Die Ausnahmen sind nur ausgenommen, solange sie WEG sind. Steht die
+     Laufzeitkarte auf einer Offerte offen da, ist es kein Sonderfall mehr,
+     sondern ein zweites Formular. */
+  const sichtbareAusnahmen = NUR_BETREIBER
+    .filter(k => be.m.nachId[k] && be.m.nachId[k].h > 0);
+  check(`KRITISCH ${was}: die Vertragsfelder bleiben verborgen`,
+    sichtbareAusnahmen.length === 0);
+  if (sichtbareAusnahmen.length) {
+    bad.push(`${was}: sichtbar, obwohl nur fuer den Vertrag: ` + sichtbareAusnahmen.join(', '));
+  }
+
+  const gleich = Object.keys(co.m.nachId)
+    .filter(k => k in be.m.nachId && !NUR_BETREIBER.includes(k));
   const anders = gleich.filter(k => !passt(co.m.nachId[k], be.m.nachId[k]));
   check(`KRITISCH ${was}: jeder Baustein ist gleich gestaltet (${gleich.length} verglichen)`,
     gleich.length >= 20 && anders.length === 0);

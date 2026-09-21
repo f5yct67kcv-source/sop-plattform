@@ -1262,7 +1262,10 @@ function be_tabellen(): array
 // Ein Abdruck liesse sich nicht mehr verschicken.
 'be_belege' => "CREATE TABLE IF NOT EXISTS be_belege (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  art ENUM('offerte','rechnung') NOT NULL DEFAULT 'offerte',
+  -- 'vertrag' seit ENT-637. Die Tabelle `belege` der Mandantenseite fuehrt
+  -- den Wert bewusst NICHT: Ob eine Sicherheitsfirma ihren eigenen Kunden
+  -- Vertraege schreibt, ist eine eigene Frage und nicht entschieden.
+  art ENUM('offerte','rechnung','vertrag') NOT NULL DEFAULT 'offerte',
   nummer VARCHAR(20) NOT NULL,
   kunde_id INT UNSIGNED NULL,
   person_id INT UNSIGNED NULL,
@@ -1287,6 +1290,29 @@ function be_tabellen(): array
   total_rappen INT NOT NULL DEFAULT 0,
   bezahlt TINYINT(1) NOT NULL DEFAULT 0,
   bezahlt_am DATE NULL,
+  -- Laufzeit, nur beim Vertrag gefuellt (ENT-637). Gleiche Bauart wie
+  -- gueltig_bis, das nur die Offerte betrifft, und faellig_bis, das nur die
+  -- Rechnung betrifft.
+  --
+  -- ABSICHTLICH DIESELBEN NAMEN wie in der Tabelle `mandant`: be_vertrag_lage()
+  -- rechnet den naechsten Kuendigungstermin aus genau diesen Feldern (ENT-617)
+  -- und arbeitet damit auf beiden Saetzen, ohne eine einzige Zeile Umbau.
+  --
+  -- ALLE NULL-BAR, und das ist eine Aussage: Ein Vertrag ohne eingetragene
+  -- Laufzeit hat keine Laufzeit von null Monaten, er ist unbekannt.
+  -- `gekuendigt_per` steht hier NICHT -- eine Kuendigung betrifft das
+  -- laufende Verhaeltnis, nicht das unterschriebene Blatt.
+  vertrag_beginn DATE NULL,
+  mindestlaufzeit_monate INT NULL,
+  kuendigungsfrist_monate INT NULL,
+  verlaengerung_monate INT NULL,
+  -- Die wiederkehrenden Summen (ENT-637). `total_rappen` daneben traegt
+  -- IMMER die einmalige Periode -- bei Offerte und Rechnung ist das alles,
+  -- was es gibt. Getrennte Spalten, weil eine gemeinsame Zahl aus Einrichtung
+  -- und Monatsgebuehr niemandem etwas sagt (Hausregel: Einheiten nie
+  -- vermischen). Zwischen Monat und Jahr wird nicht umgerechnet.
+  total_monat_rappen INT NOT NULL DEFAULT 0,
+  total_jahr_rappen INT NOT NULL DEFAULT 0,
   versand_token CHAR(64) NULL,
   entscheidung_am DATETIME NULL,
   entscheidung_ip VARCHAR(64) NULL,
@@ -1314,6 +1340,10 @@ function be_tabellen(): array
   einzelpreis_rappen INT NOT NULL DEFAULT 0,
   rabatt_bp INT NOT NULL DEFAULT 0,
   mwst_satz_bp INT NOT NULL DEFAULT 0,
+  -- Wie oft diese Zeile anfaellt (ENT-637). 'einmalig' ist der Vorgabewert,
+  -- damit Offerte und Rechnung unveraendert weiterlaufen -- ihre Positionen
+  -- fallen genau einmal an.
+  periode ENUM('einmalig','monatlich','jaehrlich') NOT NULL DEFAULT 'einmalig',
   KEY idx_be_beleg_pos_beleg (beleg_id, sortierung)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
@@ -1458,6 +1488,19 @@ function be_spalten(): array
         ['demo_zugang', 'ende_mail_am',   "ALTER TABLE demo_zugang ADD COLUMN ende_mail_am DATETIME NULL AFTER ende_abdruck"],
         ['demo_zugang', 'weiter_am',      "ALTER TABLE demo_zugang ADD COLUMN weiter_am DATETIME NULL AFTER ende_mail_am"],
         ['demo_zugang', 'weiter_groesse', "ALTER TABLE demo_zugang ADD COLUMN weiter_groesse VARCHAR(20) NOT NULL DEFAULT '' AFTER weiter_am"],
+        // Der Vertrag als dritte Belegart (ENT-637). Die vier Laufzeitfelder
+        // bleiben NULL-bar -- aus demselben Grund wie oben am Mandanten: Was
+        // nicht erfasst ist, ist unbekannt und nicht null Monate.
+        ['be_belege', 'vertrag_beginn',          "ALTER TABLE be_belege ADD COLUMN vertrag_beginn DATE NULL AFTER bezahlt_am"],
+        ['be_belege', 'mindestlaufzeit_monate',  "ALTER TABLE be_belege ADD COLUMN mindestlaufzeit_monate INT NULL AFTER vertrag_beginn"],
+        ['be_belege', 'kuendigungsfrist_monate', "ALTER TABLE be_belege ADD COLUMN kuendigungsfrist_monate INT NULL AFTER mindestlaufzeit_monate"],
+        ['be_belege', 'verlaengerung_monate',    "ALTER TABLE be_belege ADD COLUMN verlaengerung_monate INT NULL AFTER kuendigungsfrist_monate"],
+        // Die wiederkehrenden Summen dagegen sind NICHT NULL mit 0: Eine
+        // Belegart ohne wiederkehrende Positionen hat tatsaechlich null
+        // Franken pro Monat, das ist kein fehlender Wert.
+        ['be_belege', 'total_monat_rappen',      "ALTER TABLE be_belege ADD COLUMN total_monat_rappen INT NOT NULL DEFAULT 0 AFTER verlaengerung_monate"],
+        ['be_belege', 'total_jahr_rappen',       "ALTER TABLE be_belege ADD COLUMN total_jahr_rappen INT NOT NULL DEFAULT 0 AFTER total_monat_rappen"],
+        ['be_beleg_positionen', 'periode',       "ALTER TABLE be_beleg_positionen ADD COLUMN periode ENUM('einmalig','monatlich','jaehrlich') NOT NULL DEFAULT 'einmalig' AFTER mwst_satz_bp"],
     ];
 }
 
@@ -1518,6 +1561,66 @@ function be_namen_nachtragen(PDO $pdo): int
     }
 }
 
+// Werte, die einer BESTEHENDEN Auswahlspalte fehlen koennen.
+//
+// Warum das nicht ueber be_spalten() geht: Dort wird eine fehlende Spalte
+// ANGELEGT. Hier steht die Spalte laengst, ihr fehlt nur ein Wert, und das
+// braucht ein MODIFY statt eines ADD COLUMN. Bis ENT-637 kam das nicht vor --
+// `art` war seit ihrer Anlage offerte und rechnung, und mehr wurde nie
+// gebraucht.
+//
+// GEPRUEFT WIRD DER TATSAECHLICHE SPALTENTYP, nicht ein Merker: Ob der Wert
+// schon erlaubt ist, weiss die Datenbank selbst, und eine zweite Buchhaltung
+// darueber koennte von ihr abweichen.
+//
+// Das MODIFY muss den VOLLSTAENDIGEN Spaltentyp nennen -- MySQL kennt kein
+// "einen Wert hinzufuegen". Darum steht die ganze Aufzaehlung hier, und sie
+// muss mit der CREATE-TABLE-Fassung oben uebereinstimmen. test_php.mjs
+// wacht darueber.
+function be_auswahlwerte(): array
+{
+    return [
+        // Die dritte Belegart (ENT-637).
+        ['be_belege', 'art', 'vertrag',
+         "ALTER TABLE be_belege MODIFY COLUMN art "
+         . "ENUM('offerte','rechnung','vertrag') NOT NULL DEFAULT 'offerte'"],
+    ];
+}
+
+// Traegt fehlende Auswahlwerte nach. Laeuft wie be_namen_nachtragen() aus
+// be_spalten_anlegen() heraus und nicht als vierter Aufruf an drei
+// Einrichtungsstellen -- aus genau demselben Grund.
+function be_auswahlwerte_nachtragen(PDO $pdo, bool $nurPruefen = false): array
+{
+    $getan = []; $offen = []; $fehler = [];
+    foreach (be_auswahlwerte() as [$tabelle, $spalte, $wert, $sql]) {
+        if (!hat_tabelle($pdo, $tabelle) || !hat_spalte($pdo, $tabelle, $spalte)) { continue; }
+        try {
+            $s = $pdo->prepare(
+                'SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+            );
+            $s->execute([$tabelle, $spalte]);
+            $typ = (string)($s->fetchColumn() ?: '');
+            // Auf den Wert IN ANFUEHRUNGSZEICHEN geprueft: Ein blosses
+            // strpos auf 'vertrag' traefe auch eine Spalte, die
+            // 'vertragsentwurf' kennt und 'vertrag' gerade nicht.
+            if ($typ === '' || strpos($typ, "'" . $wert . "'") !== false) { continue; }
+        } catch (Throwable $e) {
+            $fehler[] = 'Auswahl ' . $tabelle . '.' . $spalte . ' — ' . $e->getMessage();
+            continue;
+        }
+        if ($nurPruefen) { $offen[] = 'Auswahlwert ' . $tabelle . '.' . $spalte . ' = ' . $wert; continue; }
+        try {
+            $pdo->exec($sql);
+            $getan[] = 'Auswahlwert ' . $tabelle . '.' . $spalte . ' = ' . $wert . ' ergaenzt';
+        } catch (Throwable $e) {
+            $fehler[] = 'Auswahl ' . $tabelle . '.' . $spalte . ' — ' . $e->getMessage();
+        }
+    }
+    return ['getan' => $getan, 'offen' => $offen, 'fehler' => $fehler];
+}
+
 function be_spalten_anlegen(PDO $pdo, bool $nurPruefen = false): array
 {
     $getan = []; $offen = []; $fehler = [];
@@ -1537,6 +1640,13 @@ function be_spalten_anlegen(PDO $pdo, bool $nurPruefen = false): array
         $zahl = be_namen_nachtragen($pdo);
         if ($zahl > 0) { $getan[] = 'Namensteile fuer ' . $zahl . ' Betreiber-Konten nachgetragen'; }
     }
+    // Und die Auswahlwerte, die einer bestehenden Spalte fehlen (ENT-637).
+    // NACH den Spalten: Eine Spalte, die dieser Lauf erst angelegt hat,
+    // traegt ihre Werte bereits.
+    $aw = be_auswahlwerte_nachtragen($pdo, $nurPruefen);
+    $getan  = array_merge($getan,  $aw['getan']);
+    $offen  = array_merge($offen,  $aw['offen']);
+    $fehler = array_merge($fehler, $aw['fehler']);
     return ['getan' => $getan, 'offen' => $offen, 'fehler' => $fehler];
 }
 
