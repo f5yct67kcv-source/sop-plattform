@@ -36,6 +36,31 @@ const doppelte = (ids) => {
   return [...zaehler].filter(([, n]) => n > 1).map(([id]) => id);
 };
 
+// ── Zuerst: keine Konfliktmarke in den Protokolldateien ───────────────
+//
+// ANLASS (2026-09-21): Ein Merge hat zwei unaufgelöste Konfliktblöcke ins
+// Entscheidungsprotokoll committet und ist gepusht worden. `git merge`
+// hatte beide betroffenen Dateien genannt; die Ausgabe war durch `tail`
+// geschickt worden, und genau diese Zeile fiel weg (dieselbe Lehre wie
+// OP-527, nur an der Merge-Ausgabe statt am Regressionslauf).
+//
+// Gemerkt hat es niemand, weil keine Prüfung die Dateien ansieht: Die
+// Nummernprüfung unten zählt Überschriften, und eine Konfliktmarke ist
+// keine. Das Protokoll blieb formal in Ordnung und war trotzdem kaputt.
+//
+// Geprüft wird am Zeilenanfang, wie Git sie schreibt -- so trifft es
+// keinen Fliesstext, der zufällig solche Zeichen enthält. Die Trennlinie
+// mit sieben Gleichheitszeichen steht ausdrücklich dabei: Sie ist die
+// unauffälligste der drei und überlebt am ehesten.
+for (const datei of ['entscheidungsprotokoll.md', 'offene-punkte.md']) {
+  const t = readFileSync(join(PROJEKT, datei), 'utf8');
+  const marken = [...t.matchAll(/^(<{7} |={7}$|>{7} )/gm)].map(m => m[1].trim());
+  check(`KRITISCH: keine Konfliktmarke in ${datei}`, marken.length === 0);
+  if (marken.length) {
+    bad.push(`${datei}: ${marken.length} Konfliktmarke(n) -- ein Merge ist nicht zu Ende gebracht worden`);
+  }
+}
+
 // ── ENT-Nummern: jede Überschrift "## ENT-xxx" im Entscheidungsprotokoll.
 // "ENT-077-N1" (ein Nachtrag) zählt als eigene ID, nicht als Duplikat von
 // ENT-077 -- beide dürfen nebeneinander stehen.
