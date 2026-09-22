@@ -87,6 +87,20 @@ function portal_seite(string $titel, string $inhalt): void
             .zf-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
                       color:#6B7280;margin:18px 0 6px}
             .zf-label:first-of-type{margin-top:0}
+            /* Der Faden am Beleg (ENT-677). Der dritte Weg ist bewusst
+               zurueckhaltend gesetzt: Annehmen und Ablehnen bleiben die
+               beiden Hauptwege. */
+            .knopf-still{background:#fff;color:#14161A;border:1px solid #D6DAE0;
+                   font-weight:600}
+            .faden{margin-top:24px;border-top:1px solid #E5E8EC;padding-top:18px}
+            .nachricht{margin-bottom:14px;font-size:13px;line-height:1.5}
+            .nachricht .wer{font-size:11px;color:#6B7280;margin-bottom:2px}
+            .nachricht .was{white-space:pre-line}
+            .nachricht-betreiber .was{background:#F4F5F7;border-radius:8px;padding:10px 12px}
+            .faden textarea{width:100%;box-sizing:border-box;font:inherit;font-size:16px;
+                   border:1px solid #D6DAE0;border-radius:8px;padding:10px;min-height:110px}
+            .faden input[type=text]{width:100%;box-sizing:border-box;font:inherit;font-size:16px;
+                   border:1px solid #D6DAE0;border-radius:8px;padding:10px;margin-bottom:8px}
             @media print{body{background:#fff;padding:0}.buehne{display:block}
                          #dokumentSeite{min-height:960px}
                          .zusammenfassung{display:none}.karte{box-shadow:none;padding:0}
@@ -205,6 +219,12 @@ try {
         $pdo->prepare("UPDATE be_belege SET status = 'angeschaut' WHERE id = ?")->execute([(int)$b['id']]);
         $b['status'] = 'angeschaut';
     }
+
+    // Der Faden am Beleg (ENT-677). Fehlt die Tabelle, ist er leer -- und
+    // dann wird auch kein Eingabefeld angeboten, statt eines zu zeigen, das
+    // nichts entgegennimmt.
+    $fadenDa      = be_beleg_nachricht_tabelle_da($pdo);
+    $nachrichten  = be_beleg_nachrichten($pdo, (int)$b['id']);
 
     $titel = BELEG_ARTEN[$b['art']]['titel'] ?? 'Beleg';
     $datumLabel  = BELEG_ARTEN[$b['art']]['datum_label'] ?? 'Datum';
@@ -356,6 +376,62 @@ try {
             . '</form>';
     }
 
+    // ── Der Faden in der Entscheidungskarte (ENT-677) ─────────────────
+    //
+    // Geschrieben werden darf, solange nicht entschieden und nicht
+    // abgelaufen ist -- dieselbe Bedingung wie im Endpunkt, der die
+    // Nachricht entgegennimmt. Die Wache dort ist die, die traegt; was hier
+    // steht, erspart nur den Weg (CLAUDE.md).
+    $schreibenOffen = $fadenDa && !$entschieden && !$abgelaufen;
+
+    // Die Rueckmeldung nach dem Abschicken. Vier Lagen, vier Texte -- "leer"
+    // und "nicht eingerichtet" sind verschiedene Aussagen und duerfen nicht
+    // beide wie "nichts passiert" aussehen (Hausregel).
+    $lageText = [
+        'gesendet' => ['hinweis-an', 'Ihre Rückmeldung ist angekommen. Wir melden uns.'],
+        'leer' => ['hinweis-versendet', 'Es war kein Text im Feld — bitte noch einmal.'],
+        'nicht_eingerichtet' => ['hinweis-versendet',
+            'Rückmeldungen sind hier gerade nicht möglich. Bitte antworten Sie auf die E-Mail.'],
+    ][(string)($_GET['lage'] ?? '')] ?? null;
+
+    $fadenHtml = '';
+    if ($fadenDa && ($nachrichten || $schreibenOffen)) {
+        $liste = '';
+        foreach ($nachrichten as $n) {
+            $liste .= '<div class="nachricht nachricht-' . portal_esc((string)$n['seite']) . '">'
+                . '<div class="wer">' . portal_esc(be_beleg_nachricht_absender($n))
+                . ' · ' . portal_dmy(substr((string)$n['erstellt_am'], 0, 10)) . '</div>'
+                . '<div class="was">' . nl2br(portal_esc((string)$n['text'])) . '</div>'
+                . '</div>';
+        }
+        // Das Formular steht im Quelltext, aber zugeklappt: Ein Feld, das
+        // immer offen dasteht, ruecke sich neben Annehmen und Ablehnen als
+        // gleichwertiger dritter Weg. Ohne JavaScript bleibt es offen --
+        // dann ist es sichtbar statt unerreichbar.
+        $formular = '';
+        if ($schreibenOffen) {
+            $formular = '<div id="fadenForm" class="keindruck">'
+                . '<form method="post" action="betreiber_beleg_nachricht_oeffentlich.php">'
+                . '<input type="hidden" name="token" value="' . portal_esc($token) . '">'
+                . '<input type="text" name="name" maxlength="120" placeholder="Ihr Name (freiwillig)">'
+                . '<textarea name="text" maxlength="' . BE_NACHRICHT_ZEICHEN . '" required '
+                . 'placeholder="Was soll geändert werden?"></textarea>'
+                . '<div style="margin-top:10px"><button type="submit" class="knopf knopf-still">Absenden</button></div>'
+                . '</form></div>'
+                . '<button type="button" id="fadenAuf" class="knopf knopf-still keindruck" '
+                . 'style="display:none;width:100%" onclick="fadenOeffnen()">Änderungen anbringen</button>'
+                . '<script>(function(){var f=document.getElementById("fadenForm");'
+                . 'var k=document.getElementById("fadenAuf");if(!f||!k){return;}'
+                . 'f.style.display="none";k.style.display="";'
+                . 'window.fadenOeffnen=function(){f.style.display="";k.style.display="none";'
+                . 'var t=f.querySelector("textarea");if(t){t.focus();}};})();</script>';
+        }
+        $fadenHtml = '<div class="faden">'
+            . ($liste !== '' ? '<div class="zf-label" style="margin-top:0">Verlauf</div>' . $liste : '')
+            . $formular
+            . '</div>';
+    }
+
     $zusammenfassung = '<div class="zf-titel">' . portal_esc($titel) . ' ' . portal_esc($b['nummer']) . '</div>'
         . $hinweis
         . '<div class="zf-label">Absender</div>'
@@ -380,7 +456,12 @@ try {
         // zeigt. Eine Zahl allein saehe sonst aus wie der ganze Preis.
         . ($mehrPerioden ? '<div style="font-size:11.5px;color:#6B7280;margin-top:2px">'
             . 'Weitere Beträge im Dokument</div>' : '')
-        . $knoepfe;
+        . $knoepfe
+        . ($lageText !== null
+            ? '<div class="hinweis ' . $lageText[0] . '" style="margin:20px 0 0">'
+              . portal_esc($lageText[1]) . '</div>'
+            : '')
+        . $fadenHtml;
 
     // Das Logo steht links aussen und traegt 130 px Breite -- dieselbe
     // Groesse wie die Wortmarke in der E-Mail-Signatur, damit Mail und

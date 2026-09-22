@@ -50,4 +50,14 @@ if ($beleg['person_id']) {
     $person = $s->fetch() ?: null;
 }
 
-json_response(['status' => 'ok', 'beleg' => $beleg, 'kunde' => $kunde, 'person' => $person]);
+// Der Faden am Beleg kommt mit (ENT-677). Kein eigener Aufruf: Wer den
+// Beleg oeffnet, sieht das Gespraech an derselben Stelle -- und eine zweite
+// Anfrage waere ein zweiter Weg, auf dem sie auseinanderlaufen koennen.
+//
+// `faden_da` sagt, ob die Tabelle ueberhaupt steht. Ohne diese Angabe waere
+// "noch nicht eingerichtet" von "noch nichts geschrieben" nicht zu
+// unterscheiden, und die Oberflaeche boete ein Eingabefeld an, das nichts
+// entgegennimmt (Hausregel: Unbekannt darf nie wie keine aussehen).
+json_response(['status' => 'ok', 'beleg' => $beleg, 'kunde' => $kunde, 'person' => $person,
+    'faden_da' => be_beleg_nachricht_tabelle_da($pdo),
+    'nachrichten' => be_beleg_nachrichten($pdo, $id)]);

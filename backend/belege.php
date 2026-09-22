@@ -627,6 +627,91 @@ function beleg_mail(array $beleg, string $firma, string $link, string $person,
         'html' => mail_rahmen($inhalt), 'bilder' => $bilder];
 }
 
+// ── Die beiden Mails zum Faden (ENT-677) ──────────────────────────────
+//
+// Beide laufen ueber dieselbe Vorlage wie die Versandmail (ENT-674). Zwei
+// eigene Gestaltungen fuer denselben Absender waeren genau der Zustand, den
+// ENT-674 beendet hat.
+
+// An die Betreiber-Konten: Am Beleg ist ein Aenderungswunsch eingegangen.
+//
+// OHNE DEN WORTLAUT DES KUNDEN? Nein -- er steht drin. Die Mail geht an die
+// eigenen Konten, nicht nach aussen, und wer den Wunsch schon im Postfach
+// liest, muss sich nicht erst anmelden, um zu wissen, worum es geht. Der
+// Faden bleibt trotzdem die massgebliche Stelle; die Mail sagt das auch.
+function beleg_nachricht_mail_betreiber(array $beleg, string $kundeName,
+                                        string $absender, string $text,
+                                        string $link): array
+{
+    $angabe = BELEG_ARTEN[(string)($beleg['art'] ?? 'offerte')] ?? BELEG_ARTEN['offerte'];
+    $titel  = (string)$angabe['titel'];
+    $nummer = (string)($beleg['nummer'] ?? '');
+
+    $betreff = "Änderungswunsch zu $titel $nummer";
+
+    $textFassung = "Guten Tag\n\n"
+        . "Zur $titel $nummer ist ein Änderungswunsch eingegangen.\n\n"
+        . "Von: $absender\n"
+        . ($kundeName !== '' ? "Empfänger: $kundeName\n" : '')
+        . "\n" . $text . "\n\n"
+        . "Antworten im Betreiber-Bereich:\n$link\n";
+
+    $inhalt = mail_absatz('Guten Tag')
+        . mail_absatz('Zur <b>' . mail_e($titel . ' ' . $nummer) . '</b> ist ein '
+            . 'Änderungswunsch eingegangen.')
+        . mail_block(
+            mail_feld('Von', mail_e($absender))
+            . ($kundeName !== '' ? mail_feld('Empfänger', mail_e($kundeName)) : '')
+            . mail_feld('Wunsch', nl2br(mail_e($text))), true)
+        . mail_knopf('Im Betreiber-Bereich antworten', $link, false);
+
+    return ['betreff' => $betreff, 'text' => $textFassung,
+        'html' => mail_rahmen($inhalt), 'bilder' => []];
+}
+
+// An den Kunden: Antwort auf seinen Änderungswunsch, mit demselben Link.
+//
+// DERSELBE LINK, NICHT EIN NEUER: Der Versand-Token bleibt ueber
+// Ueberarbeitungen hinweg derselbe (ENT-605). Der Empfaenger kehrt also an
+// die Stelle zurueck, an der Beleg UND Gespraech stehen -- das ist der ganze
+// Sinn der Sache.
+function beleg_nachricht_mail_kunde(array $beleg, string $firma, string $person,
+                                    string $text, string $link,
+                                    array $signaturZeilen): array
+{
+    $angabe = BELEG_ARTEN[(string)($beleg['art'] ?? 'offerte')] ?? BELEG_ARTEN['offerte'];
+    $titel  = (string)$angabe['titel'];
+    $nummer = (string)($beleg['nummer'] ?? '');
+    $gruss  = $signaturZeilen === [] ? [$firma] : $signaturZeilen;
+
+    $person = trim($person);
+    $anrede = ($person === '' ? 'Guten Tag' : 'Guten Tag ' . $person) . ',';
+    $betreff = "Antwort zu $titel $nummer";
+
+    $textFassung = "$anrede\n\n"
+        . "vielen Dank für Ihre Rückmeldung zur $titel $nummer. Unsere Antwort:\n\n"
+        . $text . "\n\n"
+        . "Die $titel mit dem ganzen Verlauf:\n$link\n\n"
+        . "Mit freundlichen Grüssen\n" . implode("\n", $gruss);
+
+    $logo     = mail_logo();
+    $logoHell = mail_logo_hell();
+    $bilder   = array_values(array_filter([$logo, $logoHell]));
+
+    $inhalt = mail_absatz(mail_e($anrede))
+        . mail_absatz('vielen Dank für Ihre Rückmeldung zur <b>'
+            . mail_e($titel . ' ' . $nummer) . '</b>. Unsere Antwort:')
+        . mail_block(mail_feld('Antwort', nl2br(mail_e($text))), true)
+        . mail_absatz('Die ' . mail_e($titel) . ' mit dem ganzen Verlauf:')
+        . mail_knopf($titel . ' öffnen', $link, false)
+        . mail_signatur($gruss,
+            $logo === null ? '' : (string)$logo['cid'],
+            $logoHell === null ? '' : (string)$logoHell['cid']);
+
+    return ['betreff' => $betreff, 'text' => $textFassung,
+        'html' => mail_rahmen($inhalt), 'bilder' => $bilder];
+}
+
 // Ein Datum aus der Datenbank als Tag.Monat.Jahr -- oder '' , wenn keines
 // da ist. MySQL liefert ein nicht gesetztes DATE je nach Modus als NULL,
 // als Leerzeichenkette oder als '0000-00-00'; alle drei heissen dasselbe

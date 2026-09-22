@@ -2459,6 +2459,29 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
               dieselbe Seite, nicht auf ein eigenes Blatt (ENT-425).
             </div>
           </div></div>
+
+          <!-- Der Faden am Beleg (ENT-677). Er steht hier und nicht in einem
+               eigenen Posteingang: Wer den Beleg offen hat, hat den
+               Aenderungswunsch daneben und muss nicht suchen, worauf sich
+               die Nachricht bezieht. Die Karte bleibt weg, solange niemand
+               geschrieben hat -- ein leeres Gespraech an einem Entwurf waere
+               ein Feld ohne Gegenueber. -->
+          <div class="card versteckt" id="ofFadenKarte"><div class="card-bd">
+            <div style="font-size:11px;font-weight:650;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-2);margin-bottom:12px">
+              Änderungswünsche
+            </div>
+            <div id="ofFadenListe"></div>
+            <div class="f versteckt" id="ofFadenAntwort" style="margin:12px 0 0">
+              <label for="of_antwort">Antwort an den Empfänger</label>
+              <textarea class="inp" id="of_antwort" rows="3" style="min-height:70px"
+                placeholder="Geht per E-Mail hinaus und bleibt hier stehen."></textarea>
+              <div style="margin-top:10px">
+                <button type="button" class="btn btn-primary btn-sm" id="ofFadenSendenBtn"
+                  onclick="ofAntwortSenden()">Antwort senden</button>
+              </div>
+            </div>
+            <div class="sec versteckt" id="ofFadenHinweis" style="margin-top:10px"></div>
+          </div></div>
         </div>
       </div>
     </div>
@@ -3447,6 +3470,7 @@ const VZ_DOK_TEXT = {
   entwurf:    ['m-ruhe', 'Entwurf'],
   versendet:  ['m-warn', 'versendet'],
   angeschaut: ['m-warn', 'angeschaut'],
+  aenderung:  ['m-warn', 'Änderungswunsch'],
   bestaetigt: ['m-pos',  'angenommen'],
   abgelehnt:  ['m-neg',  'abgelehnt'],
 };
@@ -5180,6 +5204,10 @@ const OF_STATUS = [
   { wert: 'entwurf',    text: 'Entwurf',    chip: 'chip-n' },
   { wert: 'versendet',  text: 'Versendet',  chip: 'chip-a' },
   { wert: 'angeschaut', text: 'Angeschaut', chip: 'chip-w' },
+  /* Der sechste Zustand (ENT-677): Der Empfaenger hat am Link einen
+     Aenderungswunsch geschrieben. Eigene Farbe, weil hier der Ball bei uns
+     liegt -- "angeschaut" sagt das Gegenteil. */
+  { wert: 'aenderung',  text: 'Änderungswunsch', chip: 'chip-a' },
   { wert: 'bestaetigt', text: 'Bestätigt',  chip: 'chip-p' },
   { wert: 'abgelehnt',  text: 'Abgelehnt',  chip: 'chip-x' },
 ];
@@ -7406,7 +7434,75 @@ async function ofOeffnen(id) {
   ['ofFormVorschauBtn', 'ofFormDruckBtn', 'ofFormMenuBtn']
     .forEach(x => { $(x).style.display = ''; });
   ofZeilenZeichnen();
+  ofFadenZeichnen(a.nachrichten || [], !!a.faden_da);
   ofFormularZeigen(true);
+}
+
+/* ── Der Faden am Beleg (ENT-677) ───────────────────────────────────── */
+
+let ofFadenId = 0;
+
+/* Zeichnet den Verlauf und entscheidet, ob geantwortet werden kann.
+   DREI LAGEN, DREI TEXTE (Hausregel „Unbekannt darf nie wie keine
+   aussehen"): Die Tabelle fehlt noch, es hat noch niemand geschrieben, oder
+   es steht ein Wunsch da. Die Karte bleibt ganz weg, solange nichts davon
+   zutrifft -- ein leeres Gespraech an einem frischen Entwurf waere ein Feld
+   ohne Gegenueber. */
+function ofFadenZeichnen(nachrichten, fadenDa) {
+  ofFadenId = ofFormId || 0;
+  const liste = $('ofFadenListe');
+  const hat = nachrichten.length > 0;
+  zeig($('ofFadenKarte'), hat || (fadenDa && ofFormStatus === 'aenderung'));
+  liste.innerHTML = hat
+    ? nachrichten.map(n => `
+        <div style="margin-bottom:12px">
+          <div class="sec" style="margin-bottom:2px">${esc(ofFadenWer(n))} · ${dmy(String(n.erstellt_am).slice(0, 10))}</div>
+          <div style="white-space:pre-line;font-size:13px;line-height:1.5${
+            n.seite === 'betreiber'
+              ? ';background:var(--line-soft);border-radius:8px;padding:9px 11px'
+              : ''}">${esc(n.text)}</div>
+        </div>`).join('')
+    : '<div class="sec">Noch keine Rückmeldung des Empfängers.</div>';
+  zeig($('ofFadenAntwort'), fadenDa && hat);
+  $('of_antwort').value = '';
+  zeig($('ofFadenHinweis'), !fadenDa && hat);
+  $('ofFadenHinweis').textContent = fadenDa ? ''
+    : 'Der Rückkanal ist in dieser Anlage noch nicht nachgetragen. Ein Lauf der Einrichtung holt das nach.';
+}
+
+/* Wer geschrieben hat. Ohne Namen wird die HERKUNFT genannt und kein
+   Absender behauptet -- die oeffentliche Seite kennt nur den Token, und der
+   Link kann weitergeleitet worden sein (ENT-677). Gleicher Wortlaut wie
+   be_beleg_nachricht_absender() im Server. */
+function ofFadenWer(n) {
+  const autor = String(n.autor || '').trim();
+  if (n.seite === 'betreiber') { return autor || 'Absender der Offerte'; }
+  return autor ? autor + ' — über den Link zur Offerte' : 'Über den Link zur Offerte';
+}
+
+/* Sendet die Antwort. Die Lage des Mailversands wird GENANNT und nicht
+   verschwiegen: „abgelegt, aber nicht verschickt" ist etwas anderes als
+   „verschickt", und nur der Server weiss, was davon zutrifft. */
+async function ofAntwortSenden() {
+  const text = ($('of_antwort').value || '').trim();
+  if (!text) { kurzmeldung('Bitte zuerst eine Antwort schreiben.'); return; }
+  const btn = $('ofFadenSendenBtn');
+  btn.disabled = true;
+  try {
+    const a = await ruf('betreiber_beleg_nachricht.php', { id: ofFadenId, text });
+    if (a.status !== 'ok') { kurzmeldung(a.message || 'Die Antwort ging nicht hinaus.'); return; }
+    ofFadenZeichnen(a.nachrichten || [], true);
+    kurzmeldung({
+      gesendet: 'Antwort verschickt.',
+      kein_versand: 'Antwort abgelegt — der E-Mail-Versand ist nicht eingerichtet.',
+      nie_versendet: 'Antwort abgelegt — der Beleg wurde nie versendet, es gibt keinen Link.',
+      keine_adresse: 'Antwort abgelegt — beim Empfänger ist keine brauchbare E-Mail hinterlegt.',
+      keine_adresse_der_anlage: 'Antwort abgelegt — die Adresse dieser Anlage fehlt auf dem Server.',
+      fehlgeschlagen: 'Antwort abgelegt — die E-Mail ging nicht hinaus.',
+    }[a.lage] || 'Antwort abgelegt.');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function ofSpeichern() {
