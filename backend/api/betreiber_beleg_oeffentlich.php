@@ -88,6 +88,7 @@ function portal_seite(string $titel, string $inhalt): void
                       color:#6B7280;margin:18px 0 6px}
             .zf-label:first-of-type{margin-top:0}
             @media print{body{background:#fff;padding:0}.buehne{display:block}
+                         #dokumentSeite{min-height:960px}
                          .zusammenfassung{display:none}.karte{box-shadow:none;padding:0}
                          .keindruck{display:none}}
             @media (max-width:720px){.buehne{display:block}.zusammenfassung{margin-bottom:20px}}
@@ -359,11 +360,20 @@ try {
         . $hinweis
         . '<div class="zf-label">Absender</div>'
         . '<div style="line-height:1.5;font-size:13px">' . portal_esc($firma !== '' ? $firma : 'Absender') . '</div>'
-        . '<div class="zf-label">Details</div>'
-        . '<div style="line-height:1.7;font-size:13px">'
-        . portal_esc($datumLabel) . '<br><span style="color:#6B7280">' . portal_dmy($b['datum']) . '</span>'
-        . (!portal_leeres_datum($b['gueltig_bis']) ? '<br><br>Gültig bis<br><span style="color:#6B7280">' . portal_dmy($b['gueltig_bis']) . '</span>' : '')
-        . '</div>'
+        // Zwei Angaben, zwei Beschriftungen -- jede mit ihrer eigenen
+        // Beschriftung oben und dem Wert darunter, wie ueberall im Haus.
+        // Vorher hingen beide unter einer Sammelueberschrift "Details" und
+        // waren nur durch einen doppelten Zeilenumbruch getrennt.
+        . '<div class="zf-label">' . portal_esc($datumLabel) . '</div>'
+        . '<div style="font-size:13px">' . portal_dmy($b['datum']) . '</div>'
+        . (!portal_leeres_datum($b['gueltig_bis'])
+            ? '<div class="zf-label">Gültig bis</div>'
+              . '<div style="font-size:13px">' . portal_dmy($b['gueltig_bis']) . '</div>'
+            : '')
+        . (!portal_leeres_datum($b['faellig_bis'] ?? null)
+            ? '<div class="zf-label">Fällig bis</div>'
+              . '<div style="font-size:13px">' . portal_dmy($b['faellig_bis']) . '</div>'
+            : '')
         . '<div class="zf-label">' . portal_esc($leitLabel) . '</div>'
         . '<div style="font-size:20px;font-weight:700">' . portal_chf($leitBetrag) . ' CHF</div>'
         // Bei mehreren Perioden sagt die Seitenspalte, dass sie nicht alles
@@ -372,8 +382,19 @@ try {
             . 'Weitere Beträge im Dokument</div>' : '')
         . $knoepfe;
 
+    // Das Logo steht links aussen und traegt 130 px Breite -- dieselbe
+    // Groesse wie die Wortmarke in der E-Mail-Signatur, damit Mail und
+    // Dokument die Marke gleich gross zeigen. Vorher stand es rechts und
+    // war mit bis zu 200 px so gross, dass es den Brief dominierte
+    // (Befund des Projektinhabers, 2026-09-22, an der Ansicht, die ein
+    // Interessent bekommt).
+    //
+    // max-width statt width: Ein Mandantenlogo kann schmaler sein als 130
+    // px; dann wird es nicht kuenstlich aufgezogen. max-height begrenzt
+    // zusaetzlich ein hochformatiges Zeichen.
     $logoHtml = $logoDatenUrl
-        ? '<img src="' . portal_esc($logoDatenUrl) . '" alt="" style="max-height:96px;max-width:200px;display:block;margin-left:auto">'
+        ? '<img src="' . portal_esc($logoDatenUrl) . '" alt="" style="max-width:130px;max-height:60px;'
+          . 'display:block;margin-bottom:14px">'
         : '';
 
     // Unterschriftsblock, gleiche Feldnamen und gleicher Aufbau wie im
@@ -436,10 +457,14 @@ try {
         . '<button type="button" class="knopf knopf-plain" id="btnHerunterladen" onclick="portalHerunterladen()">Herunterladen</button>'
         . '</div>'
         . '<div id="dokumentGanz">'
-        . '<div id="dokumentSeite" style="display:flex;flex-direction:column;min-height:960px">'
-        . '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:40px">'
+        // Die Mindesthoehe gilt nur noch im DRUCK (siehe @media print):
+        // Am Bildschirm riss sie bei einem kurzen Beleg eine Luecke
+        // zwischen Inhalt und Fusszeile auf, die wie ein Fehler aussah.
+        . '<div id="dokumentSeite" style="display:flex;flex-direction:column">'
+        // Logo und Absender stehen untereinander, links aussen.
+        . '<div style="margin-bottom:36px">'
+        . $logoHtml
         . '<div style="line-height:1.45;font-size:12px">' . implode('<br>', array_map('portal_esc', $absenderZeilen)) . '</div>'
-        . '<div>' . $logoHtml . '</div>'
         . '</div>'
         . '<div style="display:flex;justify-content:space-between;gap:40px;margin-bottom:40px;flex-wrap:wrap">'
         . '<table style="line-height:1.5;width:auto"><tr><td style="' . $spalte . '">' . portal_esc($titel) . 'nummer</td><td style="padding:2px 0;font-size:12px">' . portal_esc($b['nummer']) . '</td></tr>'
@@ -456,9 +481,16 @@ try {
         // etwas anderes als "nicht vereinbart".
         . $laufzeitZeilen
         . '</table>'
-        . '<div style="line-height:1.5;font-size:12px;min-width:200px;text-align:right;margin-left:auto">' . implode('<br>', array_map('portal_esc', $empfaenger)) . '</div>'
+        // Der Block steht rechts (Schweizer Anordnung, Fensterkuvert), sein
+        // TEXT aber linksbuendig: Eine Anschrift im rechten Flattersatz
+        // bricht an jeder Zeile anders und liest sich unruhig.
+        . '<div style="line-height:1.5;font-size:12px;min-width:200px;margin-left:auto">' . implode('<br>', array_map('portal_esc', $empfaenger)) . '</div>'
         . '</div>'
-        . '<div style="font-size:19px;font-weight:700;margin-bottom:14px">' . portal_esc($b['titel'] ?: $titel) . ' ' . portal_esc($b['nummer']) . '</div>'
+        // OHNE die Nummer: Sie steht drei Zeilen darueber in der
+        // Kopftabelle. Traegt der Beleg keinen eigenen Titel, bleibt die
+        // Art stehen ("Offerte") -- das ist eine Ueberschrift, keine
+        // Wiederholung.
+        . '<div style="font-size:19px;font-weight:700;margin-bottom:14px">' . portal_esc($b['titel'] ?: $titel) . '</div>'
         . '<table><thead><tr>'
         . '<th style="padding:7px 8px;text-align:left;font-size:11px;font-weight:700;background:#EDEFF2">Leistung</th>'
         . '<th style="padding:7px 8px;text-align:left;font-size:11px;font-weight:700;background:#EDEFF2">Beschreibung</th>'
