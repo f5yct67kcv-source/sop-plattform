@@ -1503,10 +1503,16 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <button type="button" class="nav-item" data-bereich="offerten" aria-current="false">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
         <span class="lbl">Offerten</span>
+        <!-- Offene Aenderungswuensche (ENT-677). Am Reiter, an dem man sie
+             findet -- und die Zahl allein waere hier mehrdeutig, darum sagt
+             das aria-label, WAS sie zaehlt. Gleiche Bauart wie das
+             Abzeichen am Support. -->
+        <span class="abz" id="nav-of-abz" hidden>0</span>
       </button>
       <button type="button" class="nav-item" data-bereich="rechnungen" aria-current="false">
         <svg viewBox="0 0 24 24"><path d="M4 3h16v18l-2.5-1.5L15 21l-2.5-1.5L10 21l-2.5-1.5L5 21 4 21z"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h4"/></svg>
         <span class="lbl">Rechnungen</span>
+        <span class="abz" id="nav-re-abz" hidden>0</span>
       </button>
       <button type="button" class="nav-item" data-bereich="support" aria-current="false">
         <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -1647,6 +1653,26 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           <div id="u-sv-hinweis" class="zone-note"></div>
           <div class="knopfzeile" style="margin-top:10px">
             <button type="button" class="haupt" data-springe="support">Zum Arbeitsvorrat</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Aenderungswuensche (ENT-677). Sie stehen hier aus demselben Grund
+           wie der Support darueber: Es wartet jemand. Bis hierher sah man
+           sie nur, wenn man die Offertenliste ohnehin offen hatte --
+           ausdruecklicher Befund des Projektinhabers (2026-09-22). -->
+      <div class="karte">
+        <div class="karte-kopf">
+          <div>
+            <h2>Änderungswünsche</h2>
+            <div class="sub">Rückmeldungen von Empfängern zu Offerten, Rechnungen und Verträgen</div>
+          </div>
+        </div>
+        <div class="zahlen" id="u-aw-zahlen"></div>
+        <div class="karte-leib">
+          <div id="u-aw-hinweis" class="zone-note"></div>
+          <div class="knopfzeile" style="margin-top:10px">
+            <button type="button" class="haupt" data-springe="offerten">Zu den Offerten</button>
           </div>
         </div>
       </div>
@@ -5329,6 +5355,62 @@ async function ladeProdukteRoh() {
   pdZeichnen();
 }
 
+/* ── Offene Aenderungswuensche anzeigen (ENT-677) ───────────────────
+   Bis hierher sah man einen Wunsch nur, wenn die Offertenliste ohnehin
+   offen war. Er wartet aber auf eine Antwort -- genau wie eine
+   Supportanfrage, und die hat ihr Abzeichen seit ENT-538.
+
+   ZWEI ZAHLEN, ZWEI AUSSAGEN: Am Reiter steht, was DORT liegt; auf der
+   Uebersicht steht die Gesamtzahl ueber alle Belegarten. Beide kommen vom
+   Server -- aus der geladenen Liste gerechnet zaehlte der Reiter etwas
+   anderes, sobald ein Filter greift, und die Vertraege fehlten ganz, weil
+   sie erst beim Oeffnen geladen werden. */
+const awZahlen = { offerten: 0, rechnungen: 0 };
+let awGesamt = 0;
+
+function awSetzen(bereich, antwort) {
+  awZahlen[bereich] = Number(antwort.aenderung || 0);
+  /* Der Gesamtstand kommt vom Server und wird nicht aus den beiden Zahlen
+     oben summiert: Vertraege stehen in keiner der beiden. */
+  awGesamt = Number(antwort.aenderung_gesamt || 0);
+  awAbzeichenSetzen(bereich === 'offerten' ? 'nav-of-abz' : 'nav-re-abz',
+    awZahlen[bereich], bereich === 'offerten' ? 'Offerten' : 'Rechnungen');
+  awUebersichtSetzen();
+}
+
+/* Angesagt, nicht nur eingefaerbt -- gleiche Bauart wie svAbzeichenSetzen():
+   Wer die Seite hoert statt sieht, erfaehrt aus einer roten Scheibe nichts. */
+function awAbzeichenSetzen(id, zahl, reiter) {
+  const el = $(id);
+  if (!el) { return; }
+  el.hidden = !zahl;
+  el.textContent = zahl > 99 ? '99+' : String(zahl);
+  const knopf = el.closest('.nav-item');
+  if (knopf) {
+    knopf.setAttribute('aria-label', zahl
+      ? reiter + ' — ' + zahl + ' ' + (zahl === 1 ? 'Änderungswunsch wartet' : 'Änderungswünsche warten')
+      : reiter);
+  }
+}
+
+function awUebersichtSetzen() {
+  const zahlen = $('u-aw-zahlen');
+  if (!zahlen) { return; }
+  /* Drei Zahlen, und die dritte ist kein Rest: Was weder Offerte noch
+     Rechnung ist, ist ein Vertrag -- eine Zahl ohne Bezug saehe aus wie
+     der ganze Stand. */
+  const andere = Math.max(0, awGesamt - awZahlen.offerten - awZahlen.rechnungen);
+  zahlen.innerHTML =
+      zahlBlock('Offen', awGesamt, awGesamt ? 'über alle Belegarten' : null)
+    + zahlBlock('Offerten', awZahlen.offerten, null)
+    + zahlBlock('Rechnungen', awZahlen.rechnungen, null)
+    + zahlBlock('Verträge', andere, null);
+  $('u-aw-hinweis').textContent = awGesamt
+    ? (awGesamt === 1 ? 'Ein Empfänger wartet auf eine Antwort.'
+                      : awGesamt + ' Empfänger warten auf eine Antwort.')
+    : 'Nichts offen.';
+}
+
 async function ladeBelegeRoh() {
   const a = await ruf('betreiber_beleg_list.php?art=offerte');
   if (a.status !== 'ok') {
@@ -5338,6 +5420,7 @@ async function ladeBelegeRoh() {
   if (a.eingerichtet === false) { nichtEingerichtet('ofTable', 'Die Offerten'); return; }
   belege = a.belege || [];
   ofNaechsteNummer = a.naechste_nummer || '';
+  awSetzen('offerten', a);
   renderOfferten();
 }
 
@@ -5362,6 +5445,7 @@ async function ladeRechnungenRoh() {
   if (a.eingerichtet === false) { nichtEingerichtet('reTable', 'Die Rechnungen'); return; }
   rechnungen = a.belege || [];
   reNaechsteNummer = a.naechste_nummer || '';
+  awSetzen('rechnungen', a);
   renderRechnungen();
   kassenstandZeichnen();
 }

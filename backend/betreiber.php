@@ -281,6 +281,54 @@ function be_konten_zahl(PDO $pdo, int $ausser = 0): int
 // Laenge einer Nachricht. Kein Schutz vor Boesartigkeit -- der Token ist
 // der Ausweis --, sondern eine Grenze gegen das versehentlich
 // hineinkopierte Dokument. Wer mehr zu sagen hat, schreibt zweimal.
+// Wer eine Meldung dieser Ebene bekommt (ENT-677).
+//
+// ZWEI QUELLEN, EINE LISTE: die aktiven Betreiber-Konten UND die Adresse
+// aus dem Briefkopf -- das Sammelpostfach, das auf jedem Beleg steht
+// (info@guardops.ch). Wer ein Konto hat, arbeitet am Vorrat; das
+// Sammelpostfach faengt auf, wenn gerade niemand hineinschaut. Ausdruecklich
+// so entschieden vom Projektinhaber (2026-09-22).
+//
+// KEINE ADRESSE AUS DEM DEPLOY: Sie stuende dann an einer zweiten Stelle,
+// und die Fusszeile jedes Belegs zeigt ohnehin die aus dem Briefkopf. Eine
+// Adresse, zwei Orte -- das ist der Anfang jeder veralteten Angabe.
+//
+// OHNE DOPPEL: Ist die Briefkopf-Adresse auch an einem Konto hinterlegt,
+// geht EINE Mail hinaus, nicht zwei. Verglichen wird ohne
+// Gross-/Kleinschreibung, weil Postfaecher das auch nicht unterscheiden.
+function be_melde_empfaenger(PDO $pdo): array
+{
+    $liste = [];
+    $gesehen = [];
+    try {
+        $s = $pdo->query('SELECT name, email FROM betreiber WHERE aktiv = 1 ORDER BY id ASC');
+        foreach ($s->fetchAll(PDO::FETCH_ASSOC) ?: [] as $k) {
+            $mail = trim((string)($k['email'] ?? ''));
+            $schluessel = mb_strtolower($mail);
+            if ($mail === '' || isset($gesehen[$schluessel])) { continue; }
+            $gesehen[$schluessel] = true;
+            $liste[] = ['name' => (string)($k['name'] ?? ''), 'email' => $mail];
+        }
+    } catch (Throwable $e) {
+        // Ohne Kontotabelle bleibt das Sammelpostfach -- besser eine
+        // Meldung an eine Stelle als gar keine.
+    }
+    try {
+        if (hat_tabelle($pdo, 'be_briefkopf')) {
+            $bk = $pdo->query('SELECT firma, email FROM be_briefkopf WHERE id = 1')->fetch();
+            $mail = trim((string)($bk['email'] ?? ''));
+            $schluessel = mb_strtolower($mail);
+            if ($mail !== '' && !isset($gesehen[$schluessel])
+                && filter_var($mail, FILTER_VALIDATE_EMAIL)) {
+                $liste[] = ['name' => trim((string)($bk['firma'] ?? '')), 'email' => $mail];
+            }
+        }
+    } catch (Throwable $e) {
+        // Siehe oben.
+    }
+    return $liste;
+}
+
 const BE_NACHRICHT_ZEICHEN = 4000;
 
 function be_beleg_nachricht_tabelle_da(PDO $pdo): bool

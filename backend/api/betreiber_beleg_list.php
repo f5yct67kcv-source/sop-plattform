@@ -46,10 +46,35 @@ $s = $pdo->prepare(
 );
 $s->execute([$art]);
 
+// Offene Aenderungswuensche (ENT-677). Zwei Zahlen, und sie sagen
+// verschiedene Dinge: `aenderung` zaehlt die Belege DIESER Art -- das ist
+// die Zahl am Reiter, an dem man sie findet. `aenderung_gesamt` zaehlt alle
+// Arten und traegt die Uebersicht; ein Vertrag wird erst beim Oeffnen
+// geladen und fehlte dort sonst lautlos.
+//
+// VOM SERVER GEZAEHLT und nicht aus der gelieferten Liste: Die Liste
+// blendet Vorlagen aus und kann gefiltert werden. Eine Zahl, die etwas
+// anderes zaehlt als sie sagt, ist schlimmer als keine.
+$wunsch = ['aenderung' => 0, 'aenderung_gesamt' => 0];
+try {
+    $z = $pdo->prepare("SELECT SUM(art = ?) AS eigene, COUNT(*) AS alle
+                          FROM be_belege WHERE status = 'aenderung' AND ist_vorlage = 0");
+    $z->execute([$art]);
+    $zeile = $z->fetch() ?: [];
+    $wunsch = ['aenderung' => (int)($zeile['eigene'] ?? 0),
+               'aenderung_gesamt' => (int)($zeile['alle'] ?? 0)];
+} catch (Throwable $e) {
+    // Kennt die Spalte den Wert noch nicht (Anlage vor dem
+    // Einrichtungslauf), bleibt es bei null -- eine fehlende Zahl darf die
+    // Liste nicht ausfallen lassen.
+}
+
 json_response([
     'status'          => 'ok',
     'eingerichtet'    => true,
     'belege'          => $s->fetchAll(),
+    'aenderung'        => $wunsch['aenderung'],
+    'aenderung_gesamt' => $wunsch['aenderung_gesamt'],
     'kennt_perioden'  => $kenntPerioden,
     'kennt_laufzeit'  => $kenntLaufzeit,
     'naechste_nummer' => beleg_naechste_nummer($pdo, $art, 'be_'),

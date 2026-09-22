@@ -143,8 +143,9 @@ try {
             $absender = be_beleg_nachricht_absender(['seite' => 'kunde', 'autor' => $name]);
             $mail = beleg_nachricht_mail_betreiber($b, $kundeName, $absender, $text, $link);
 
-            $e = $pdo->query('SELECT name, email FROM betreiber WHERE aktiv = 1 ORDER BY id ASC');
-            foreach ($e->fetchAll(PDO::FETCH_ASSOC) ?: [] as $konto) {
+            // Konten UND Sammelpostfach aus dem Briefkopf (ENT-677),
+            // ohne Doppel -- siehe be_melde_empfaenger().
+            foreach (be_melde_empfaenger($pdo) as $konto) {
                 try {
                     smtp_senden((string)$konto['email'], (string)$konto['name'],
                         $mail['betreff'], $mail['html'], $mail['text']);

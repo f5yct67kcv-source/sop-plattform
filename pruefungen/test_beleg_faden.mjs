@@ -157,6 +157,42 @@ check('KRITISCH: Server und Oberflaeche nennen den namenlosen Absender gleich',
 check('KRITISCH: leer und nicht eingerichtet sind zwei verschiedene Texte',
   /Noch keine Rückmeldung/.test(seite) && /noch nicht nachgetragen/.test(seite));
 
+// ── 9. Die Meldung erreicht auch das Sammelpostfach ───────────────────
+const liste = nurCode(lies(API + 'betreiber_beleg_list.php'));
+check('KRITISCH: der oeffentliche Weg meldet an Konten UND Sammelpostfach',
+  /be_melde_empfaenger\(\$pdo\)/.test(oeff)
+  && !/FROM betreiber WHERE aktiv = 1/.test(oeff));
+check('KRITISCH: die Adresse kommt aus dem Briefkopf, nicht aus dem Deploy',
+  /be_briefkopf/.test(modul.slice(modul.indexOf('function be_melde_empfaenger')))
+  && !/__[A-Z_]+__/.test(modul.slice(modul.indexOf('function be_melde_empfaenger'),
+                                     modul.indexOf('function be_melde_empfaenger') + 2000)));
+
+// ── 10. Ein Wunsch ist von der Uebersicht aus sichtbar ────────────────
+//
+// Er wartet auf eine Antwort -- genau wie eine Supportanfrage, und die hat
+// ihr Abzeichen seit ENT-538. Bis hierher sah man ihn nur, wenn die
+// Offertenliste ohnehin offen war.
+check('KRITISCH: der Server zaehlt die offenen Wuensche, je Art und ueber alle',
+  /'aenderung'\s*=>/.test(liste) && /'aenderung_gesamt'\s*=>/.test(liste));
+check('KRITISCH: gezaehlt wird in der Datenbank, nicht in der gelieferten Liste',
+  /SELECT SUM\(art = \?\)[\s\S]{0,200}WHERE status = 'aenderung'/.test(liste));
+// Eine fehlende Zahl darf die Liste nicht ausfallen lassen -- vor dem
+// Einrichtungslauf kennt die Spalte den Wert nicht.
+check('KRITISCH: eine fehlende Zahl laesst die Belegliste nicht ausfallen',
+  /try \{[\s\S]{0,400}status = 'aenderung'[\s\S]{0,400}?\} catch \(Throwable/.test(liste));
+check('KRITISCH: beide Reiter tragen ein Abzeichen',
+  /id="nav-of-abz"/.test(seite) && /id="nav-re-abz"/.test(seite));
+check('… und es ist angesagt, nicht nur eingefaerbt',
+  /setAttribute\('aria-label'[\s\S]{0,200}Änderungswunsch wartet/.test(seite));
+check('KRITISCH: die Uebersicht zeigt den Stand auf der Startseite',
+  /id="u-aw-zahlen"/.test(seite) && /awUebersichtSetzen\(/.test(seite));
+check('KRITISCH: die Gesamtzahl kommt vom Server, statt aus zwei Reitern summiert zu werden',
+  /awGesamt = Number\(antwort\.aenderung_gesamt/.test(seite));
+// "Nichts offen" und "eine Zahl ohne Bezug" sind zwei verschiedene
+// Aussagen -- die Karte sagt, worueber sie zaehlt.
+check('KRITISCH: die Zahl auf der Uebersicht nennt ihren Bezug',
+  /zahlBlock\('Offen', awGesamt, awGesamt \? 'über alle Belegarten'/.test(seite));
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');
