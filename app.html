@@ -335,10 +335,33 @@ svg.i-sm { width: 17px; height: 17px; }
   display: flex; flex-direction: column; overflow-y: auto;
   padding: 32px 22px calc(32px + env(safe-area-inset-bottom) + var(--sockel));
   color: var(--ink);
-  /* Ein sehr flacher Schein hinter dem Logo. Seit die Karte als
-     Begrenzung fehlt, ist er das Einzige, was der Flaeche Tiefe gibt --
-     bewusst so schwach, dass er als Licht und nicht als Farbfeld liest. */
-  background: radial-gradient(112% 62% at 50% 12%, #1A2334 0%, rgba(26,35,52,0) 60%), #0F1117;
+  /* Derselbe Verlauf wie das App-Symbol (ENT-658), auf Wunsch des
+     Projektinhabers: "Ich favorisiere fuer das App-Icon das Bild mit dem
+     Schwarz/Blau-Verlauf. Ebenso dann auch die Anmeldemaske der App."
+
+     Die Stufen sind an seiner Vorlage ABGETASTET, nicht geschaetzt: An
+     den Raendern des Bildes (dort liegt keine Marke) alle 12,5 % entlang
+     der Diagonale. Ein glatter Verlauf von #080E17 nach #304F79 waere
+     etwas anderes -- die Vorlage ist gedaempft, ihre Mitte liegt bei
+     27 % der Helligkeitsstrecke und nicht bei 50 %. Gemessen: quer zur
+     Diagonale ist die Farbe an jeder Stelle gleich (#122034), der
+     Verlauf haengt also allein von dieser einen Achse ab.
+
+     "to top right" statt eines festen Winkels: Die Eckpunkte wandern mit
+     dem Seitenverhaeltnis, dunkel bleibt unten links und hell oben
+     rechts -- auf jedem Geraet und im Querformat.
+
+     Der frueher hier stehende radiale Schein hinter dem Logo ist damit
+     ueberfluessig: Der Verlauf selbst gibt der Flaeche Tiefe, und zwei
+     Lichtquellen uebereinander heben sich gegenseitig auf.
+
+     Die Desktop-Fassung ab 900 px bleibt UNANGETASTET -- dort liegt das
+     Foto aus ENT-392 und darueber das Video aus ENT-394, beide eigens
+     entschieden und auf Kontrast gemessen. Der Auftrag lautete auf die
+     Anmeldemaske der APP. */
+  background: linear-gradient(to top right,
+    #080E17 0%, #0A121E 13%, #0D1625 25%, #0F1B2B 38%, #122034 50%,
+    #1A2C45 63%, #213756 75%, #294368 88%, #304F79 100%);
 
   /* Die dunklen Werte stehen seit ENT-398 einmal weiter oben, fuer
      html[data-thema="dunkel"], #gate und .rgs gemeinsam -- #gate bleibt
