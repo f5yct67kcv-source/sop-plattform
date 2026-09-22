@@ -114,12 +114,16 @@ Jeder Push auf `main` loest den Workflow
 Produktion: Platzhalter (`__DB_HOST__`, `__ANTHROPIC_API_KEY__` usw.)
 werden aus GitHub Secrets ersetzt, danach FTPS-Upload zu Hostpoint.
 Ein Deploy nach Staging läuft über **denselben Workflow, dieselbe
-Dateiliste**, aber ausschliesslich manuell gegen einen `qa-*`-Tag statt
-per Push — kein dauerhafter Branch `staging` mehr (ENT-372, revidiert
-ENT-341 Punkt 5). Welches GitHub Environment (`production`/`staging`,
-siehe `Settings → Environments`) greift und damit welche Werte hinter den
-Secret-Namen stehen, entscheidet in beiden Fällen der Ref (Branch `main`
-oder `qa-*`-Tag). Siehe „Staging" weiter unten.
+Dateiliste** und hat seit ENT-679 zwei Wege: manuell gegen einen
+`qa-*`-Tag (wie bisher, ENT-372) **oder** automatisch per Push auf den
+Branch `test`. Der Branch `test` ist ein Wegwerf-Branch für Code, der noch
+nicht auf `main` ist; er wird nie nach `main` gemergt, sondern vor jedem
+neuen Versuch frisch von `main` gesetzt. Einen dauerhaften Branch
+`staging` gibt es weiterhin nicht. Welches GitHub Environment
+(`production`/`staging`, siehe `Settings → Environments`) greift und damit
+welche Werte hinter den Secret-Namen stehen, entscheidet in allen Fällen
+der Ref: **nur** der Branch `main` ergibt `production`. Siehe „Staging"
+weiter unten.
 
 **Im Quellcode stehen nie echte Zugangsdaten** — nur Platzhalter. Wer die Dateien
 lokal oeffnet, sieht keine Geheimnisse.
@@ -264,7 +268,7 @@ die noetigen Schritte.
 Chat, ein Bildschirmfoto: **neu erzeugen, nicht loeschen.** Loeschen hilft nicht,
 der alte Wert bleibt in der Git-Historie und in Zwischenspeichern stehen.
 
-## Staging (ENT-341, Deploy-Mechanismus revidiert durch ENT-372)
+## Staging (ENT-341, Deploy-Mechanismus revidiert durch ENT-372, erweitert durch ENT-679)
 
 Eine vollstaendig getrennte Testinstanz — dieselbe Codebasis, eigene
 Datenbank, eigenes FTP-Ziel, eigene Secrets unter eigenen Namen, keine
@@ -276,25 +280,48 @@ Empfaenger-Umleitung unten macht das unkritisch. Adresse und genaue
 Hostpoint-Einrichtung stehen im Entscheidungsprotokoll des
 Projekt-Repositories (ENT-341); hier nur, was den Code betrifft:
 
-- **Kein dauerhafter Branch `staging`.** Ein Push auf `main` loest
-  ausschliesslich den Production-Deploy aus. Ein Staging-Deploy entsteht
-  **ausschliesslich manuell** ("Run workflow" in GitHub Actions) gegen
-  einen **Git-Tag** der Form `qa-JJJJ-MM-TT-NNN` (z. B. `qa-2026-09-04-001`),
-  der exakt auf einem bestehenden `main`-Commit liegt — nie gegen einen
-  Branch. Grund (ENT-372): `main` bleibt alleinige Source of Truth, es darf
-  keinen Staging-spezifischen Code geben, der spaeter zurueckgemergt werden
-  muesste. Ein Tag ist dafuer die richtige Wahl, weil sich git-technisch
-  kein Commit "auf" einen Tag pushen laesst — anders als bei einem Branch
-  ist das kein Konventions-, sondern ein struktureller Schutz. Das
-  GitHub-Environment `staging` ist zusaetzlich ueber "Deployment branches
-  and tags" auf das Muster `qa-*` beschraenkt; der Workflow selbst bricht
-  ausserdem ab, wenn ein Staging-Lauf gegen einen Ref ohne dieses Muster
-  ausgeloest wird.
+- **Zwei Wege nach Staging, kein dauerhafter Branch `staging`.** Ein Push
+  auf `main` loest ausschliesslich den Production-Deploy aus. Ein
+  Staging-Deploy entsteht entweder **manuell** ("Run workflow" in GitHub
+  Actions) gegen einen **Git-Tag** der Form `qa-JJJJ-MM-TT-NNN` (z. B.
+  `qa-2026-09-04-001`), der exakt auf einem bestehenden `main`-Commit
+  liegt, **oder automatisch** durch einen Push auf den Branch `test`
+  (ENT-679). Der Tag-Weg war urspruenglich der einzige (ENT-372): `main`
+  bleibt alleinige Source of Truth, es darf keinen Staging-spezifischen
+  Code geben, der spaeter zurueckgemergt werden muesste, und auf einen Tag
+  laesst sich git-technisch kein Commit pushen — ein struktureller statt
+  eines Konventionsschutzes. Genau darum kann ein `qa-*`-Tag aber nur
+  zeigen, was **schon auf `main` ist**. Fuer alles davor gibt es seit
+  ENT-679 den Branch `test`.
   ```
   git tag qa-2026-09-04-001 <main-commit>
   git push origin qa-2026-09-04-001
   # danach in GitHub Actions: "Run workflow" -> Use workflow from: dieser Tag
   ```
+- **Der Branch `test` (ENT-679).** Wegwerf-Branch fuer Code, der noch
+  nicht auf `main` ist. Ein Push dorthin deployt automatisch nach Staging,
+  ohne Tag und ohne "Run workflow". Er wird **nie nach `main` gemergt** —
+  der Weg nach `main` laeuft unveraendert ueber den Feature-Branch und
+  seinen Pull Request. Vor jedem neuen Versuch frisch von `main` setzen:
+  ```
+  git checkout -B test main
+  git merge --no-ff <feature-branch>      # oder cherry-pick
+  git push -u --force-with-lease origin test
+  ```
+  Dass `test` nicht zurueckgemergt wird, ist eine **Disziplinregel, kein
+  struktureller Schutz** — das ist der bewusst akzeptierte Preis von
+  ENT-679. Production bleibt davon unberuehrt: `production` haengt
+  ausschliesslich am Ref-Namen `main`, ein Push auf `test` kann die echte
+  Anlage nicht erreichen (geprueft in `test_deploy.mjs`).
+- **Beide Wege sind im Workflow abgesichert.** Das GitHub-Environment
+  `staging` ist ueber "Deployment branches and tags" beschraenkt; dort
+  muessen seit ENT-679 **beide** Eintraege stehen (Muster `qa-*` **und**
+  Branch `test`), sonst blockiert GitHub den `test`-Lauf. Zusaetzlich
+  bricht der Workflow selbst ab, wenn ein Staging-Lauf gegen einen Ref
+  laeuft, der weder `qa-*`-Tag noch exakt `test` ist. In
+  `qa-version.json` steht bei einem `test`-Push folgerichtig `"test"`
+  statt eines Tags; unterscheidbar bleiben die Staende ueber
+  `commit_sha`.
 - **Kein Rueckfall auf Production-Secrets:** Staging-Secrets tragen eigene
   Namen (`STAGING_DB_HOST` statt `DB_HOST` usw., siehe Tabelle oben). Der
   erste Schritt des Workflows loest fuer die aktive Umgebung den richtigen

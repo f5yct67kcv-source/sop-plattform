@@ -30,22 +30,43 @@ name: Deploy Rapport-Tool zu Hostpoint
 # Staging-Testpostfach und umgekehrt.
 #
 # Kein dauerhafter Branch "staging" oder "demo" (ENT-372, revidiert
-# ENT-341 Punkt 5): Die neue, vom Projektinhaber als "hoechste
+# ENT-341 Punkt 5): Die vom Projektinhaber als "hoechste
 # Architekturvorgabe" bezeichnete Regel verlangt, dass main alleinige
 # Source of Truth bleibt und kein umgebungsspezifischer Code entstehen
 # kann, der spaeter zurueckgemergt werden muesste. Ein beschreibbarer
 # Branch waere genau das -- ein Tag ist es strukturell nicht, es laesst
 # sich kein Commit "auf" einen Tag pushen. main wird deshalb
-# ausschliesslich per Push deployt (immer Production); Staging entsteht
+# ausschliesslich per Push deployt (immer Production); Staging entstand
 # ausschliesslich durch einen manuellen "Run workflow" gegen einen Tag der
 # Form qa-JJJJ-MM-TT-NNN, Demo ausschliesslich gegen einen Tag der Form
 # demo-JJJJ-MM-TT-NNN, beide exakt auf einem bestehenden main-Commit.
 # github.ref_name liefert in diesem Fall den Tag-Namen -- die
 # Umgebungs-Logik weiter unten unterscheidet dadurch zwischen main
 # (Production), einem qa-*-Tag (Staging) und einem demo-*-Tag (Demo).
+#
+# ZUSATZ ENT-679 (2026-09-22): Der Branch "test" deployt zusaetzlich und
+# AUTOMATISCH nach Staging -- ein Push dorthin genuegt, kein Tag, kein
+# manueller "Run workflow". Damit laesst sich Code ANSEHEN, der noch nicht
+# auf main ist; das konnte die qa-*-Tag-Systematik strukturell nicht, weil
+# ein qa-Tag per Definition auf einem bestehenden main-Commit liegt.
+# ENT-372 ist damit in einem Punkt revidiert: Es gibt wieder einen
+# deploybaren Branch. Der Zweck der alten Regel bleibt trotzdem gewahrt,
+# weil "test" ein Wegwerf-Branch ist und NIE nach main gemergt wird --
+# vor jedem neuen Versuch frisch von main gesetzt
+# ("git checkout -B test main"), der Weg nach main laeuft unveraendert
+# ueber den Feature-Branch und seinen Pull Request. Dass das eine
+# Disziplin- und keine strukturelle Sicherung mehr ist, ist der bewusst
+# akzeptierte Preis (ENT-679, Risiken).
+#
+# WICHTIG, was "test" NICHT kann: Production haengt weiterhin
+# ausschliesslich am Ref-Namen "main" (siehe environment: unten). Ein Push
+# auf "test" kann die echte Anlage weder erreichen noch ueberschreiben,
+# auch nicht bei einem Tippfehler im Branch-Namen -- ein unbekannter
+# Branch-Name loest gar keinen Lauf aus, und ein Lauf, der ihn doch
+# erreicht, bricht im Staging-Guard weiter unten ab.
 on:
   push:
-    branches: [main]
+    branches: [main, test]
   workflow_dispatch:
 
 jobs:
@@ -534,16 +555,19 @@ jobs:
             [ -z "$EFF_STAGING_TESTMAIL" ]       && PFLICHT_FEHLT="$PFLICHT_FEHLT STAGING_TESTMAIL"
           fi
 
-          # ENT-372: Staging deployt ausschliesslich gegen einen Tag der Form
-          # qa-JJJJ-MM-TT-NNN, nie gegen einen Branch. Ohne diese Pruefung
-          # wuerde ein Dispatch gegen IRGENDEINEN Branch, der nicht "main"
-          # heisst, klaglos mit Staging-Secrets bespielt -- dieselbe Pruefung,
-          # die das GitHub-Environment "staging" ueber "Deployment branches
-          # and tags" (Muster qa-*) zusaetzlich extern erzwingt.
+          # ENT-372, erweitert ENT-679: Staging deployt gegen einen qa-*-Tag
+          # oder den Branch "test" -- sonst nichts. Ohne diese Pruefung
+          # wuerde ein Dispatch gegen IRGENDEINEN Nicht-main-Branch klaglos
+          # mit Staging-Secrets bespielt. Dasselbe erzwingt das
+          # GitHub-Environment "staging" ueber "Deployment branches and
+          # tags"; dort muessen seit ENT-679 BEIDE Eintraege stehen
+          # (Muster qa-* UND Branch test). Begruendung oben im Kopf.
           if [ "$UMGEBUNG" = "staging" ]; then
             case "${{ github.ref_name }}" in
               qa-*) ;;
-              *) echo "::error::Staging-Deploy abgebrochen -- Ref '${{ github.ref_name }}' ist kein qa-*-Tag (ENT-372). Staging deployt ausschliesslich gegen einen Tag der Form qa-JJJJ-MM-TT-NNN, nie gegen einen Branch."
+              # Exakt dieser Name, kein Muster: "tests" faellt durch.
+              test) ;;
+              *) echo "::error::Staging-Deploy abgebrochen -- Ref '${{ github.ref_name }}' ist weder qa-*-Tag noch Branch 'test' (ENT-372/ENT-679)."
                  exit 1 ;;
             esac
           fi
@@ -1056,6 +1080,11 @@ jobs:
       # strukturell unveraendert, nicht nur der Absicht nach.
       - name: qa-version.json erzeugen (nur Staging)
         if: ${{ env.UMGEBUNG == 'staging' }}
+        # Bei einem Push auf den Branch "test" (ENT-679) steht in "qa_tag"
+        # folgerichtig "test" statt eines qa-*-Tags. Unterscheidbar bleiben
+        # die Staende ueber "commit_sha", das sich bei jedem Push aendert.
+        # Dieser Kommentar steht bewusst VOR "run: |" -- alles danach
+        # zaehlt zur Blockgrenze weiter unten in test_deploy.mjs.
         run: |
           cat > dist/qa-version.json << EOF
           {
