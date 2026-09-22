@@ -57,6 +57,17 @@ async function huelle({ mandant = null, token = null, nativ = true } = {}) {
   return { page, ziele };
 }
 
+/* Fragt die Seite nach dem Ergebnis von apiBasis(). Gibt es die Funktion
+   nicht, kommt null zurueck -- NICHT ein Absturz. Genau daran ist die
+   erste Fassung dieser Datei gescheitert: In der Gegenprobe (Funktion
+   absichtlich entfernt) warf page.evaluate einen ReferenceError und riss
+   die ganze Suite mit, statt die Pruefung rot zu faerben. Eine Gegenprobe,
+   die abstuerzt statt rot zu werden, belegt gar nichts (OP-655). */
+const basisVon = page => page.evaluate(() => {
+  try { return typeof apiBasis === 'function' ? apiBasis() : null; }
+  catch (e) { return null; }
+});
+
 const sichtbar = (page, sel) => page.evaluate(s => {
   const e = document.querySelector(s);
   return !!e && e.style.display !== 'none' && e.offsetParent !== null;
@@ -237,6 +248,160 @@ const sichtbar = (page, sel) => page.evaluate(s => {
     !/Passwort falsch/.test(meldung));
   check('KRITISCH: und das Feld geht wieder auf, damit ein Vertipper zu beheben ist',
     (await sichtbar(page, '#gMandantFeld')) === true);
+  await page.close();
+}
+
+/* ══════════ DAS COCKPIT IM SELBEN BUENDEL ════════════════════════════
+   "Zum Cockpit" im Menue der App (nur fuer Verwaltung sichtbar) oeffnet
+   dashboard.html aus DEMSELBEN Buendel. Bis ENT-669 stand dort dieselbe
+   fest verdrahtete Adresse, die ENT-663 aus app.html entfernt hatte: Die
+   App war halb mandantenfaehig -- Waechter-Ansicht richtig, Cockpit
+   weiterhin auf CUPI 24. Ein Admin eines zweiten Mandanten haette sich
+   richtig angemeldet und im Cockpit nur Fehler gesehen.
+
+   Geprueft wird nicht, ob die Zeile im Quelltext anders aussieht,
+   sondern WOHIN das Cockpit tatsaechlich spricht. */
+{
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const ziele = [];
+  /* "Failed to fetch" ist hier ERWARTET und kein Befund dieser Pruefung:
+     api() in dashboard.html faengt einen Netzfehler nicht ab, die
+     Zurueckweisung bleibt unbehandelt stehen. Das ist ein eigener,
+     bestehender Mangel (OP-670) -- er gehoert nicht in diese Datei, und
+     er darf sie auch nicht rot faerben. Jede ANDERE Fehlermeldung zaehlt
+     weiterhin. */
+  page.on('pageerror', e => {
+    if (!/Failed to fetch/i.test(e.message)) { bad.push('JS-Fehler (Cockpit): ' + e.message); }
+  });
+  await page.addInitScript(() => {
+    window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios' };
+    try {
+      localStorage.clear();
+      localStorage.setItem('sop_mandant', 'musterag');
+      localStorage.setItem('rv3_token', 'tok');
+      // Ohne gemerkten Benutzer bleibt das Cockpit im Anmeldetor stehen
+      // und fragt nichts ab -- dann pruefte der Abschnitt nichts.
+      localStorage.setItem('rv3_user', JSON.stringify({
+        id: 1, name: 'm.muster', ist_admin: true, rollen: ['verwaltung'] }));
+    } catch (e) {}
+  });
+  /* Anfragen werden mitgeschrieben und ABGEBROCHEN, nicht beantwortet.
+     Zwei Sackgassen liegen daneben, beide selbst hineingelaufen:
+     Ein "ok" mit leerem Rumpf laesst das Cockpit ueber fehlende Felder
+     stolpern -- ein Fehler meiner Attrappe, nicht der Sache. Und ein 401
+     fuehrt dazu, dass das Cockpit die Seite VERLAESST; die Messung danach
+     traf dann mal die alte, mal die neue Seite und war wackelig: dreimal
+     hintereinander gelaufen, zweimal gruen, einmal rot. Eine wacklige
+     Pruefung ist schlimmer als gar keine. Der Abbruch haelt die Seite
+     stehen und beantwortet trotzdem genau die Frage: WOHIN spricht sie? */
+  await page.route('**/*.php*', route => {
+    ziele.push(route.request().url());
+    route.abort();
+  });
+  await page.goto(`file://${WURZEL}/dashboard.html`);
+  await page.waitForTimeout(1200);
+  check('KRITISCH: das gebuendelte Cockpit spricht mit dem Server des gemerkten Betriebs',
+    (await basisVon(page)) === 'https://musterag.guardops.ch/api/');
+  check('KRITISCH: und nicht mehr mit der fest verdrahteten Adresse',
+    ziele.every(u => !u.includes('cupi24.guardops.ch')));
+  check('KRITISCH: es hat ueberhaupt gesprochen -- sonst pruefte die Zeile davor nichts',
+    ziele.length > 0);
+  check('KRITISCH: jede einzelne Anfrage ging an den gemerkten Betrieb',
+    ziele.every(u => u.startsWith('https://musterag.guardops.ch/api/')));
+  await page.close();
+}
+
+/* ══════════ OHNE BETRIEB SCHICKT DAS COCKPIT NICHTS ══════════════════
+   Der Fall kann heute nicht eintreten -- wer im Cockpit landet, hat sich
+   in app.html angemeldet und dabei den Betrieb gesetzt. Geprueft wird er
+   trotzdem, weil die Folge sonst schweigend waere: eine Anfrage MIT
+   Anmeldetoken an einen relativen Pfad unter capacitor://localhost. */
+{
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const ziele = [];
+  page.on('pageerror', e => bad.push('JS-Fehler (Cockpit ohne Betrieb): ' + e.message));
+  await page.addInitScript(() => {
+    window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios' };
+    try { localStorage.clear(); localStorage.setItem('rv3_token', 'tok'); } catch (e) {}
+  });
+  await page.route('**/*.php*', route => { ziele.push(route.request().url()); route.abort(); });
+  await page.goto(`file://${WURZEL}/dashboard.html`);
+  await page.waitForTimeout(800);
+  check('KRITISCH: ohne gemerkten Betrieb bleibt die Basis leer',
+    (await basisVon(page)) === '');
+  check('KRITISCH: und es geht keine einzige Anfrage samt Token hinaus',
+    ziele.length === 0);
+  check('Die Anfrage schlaegt ehrlich fehl, statt stillzuschweigen',
+    (await page.evaluate(() => {
+      try {
+        return Promise.resolve(api('irgendwas.php'))
+          .then(a => !!a && a.ok === false && a.status === 0, () => false);
+      } catch (e) { return false; }
+    })) === true);
+  await page.close();
+}
+
+/* ══════════ FREMDE ADRESSE, ZWEITE TUER ═══════════════════════════════
+   In app.html wird der gefaehrliche Wert EINGETIPPT und dort geprueft.
+   Im Cockpit gibt es kein Feld -- der Wert kommt allein aus dem Speicher.
+   Das macht die Pruefung nicht ueberfluessig, sondern verschiebt nur die
+   Quelle: Wer an den Speicher kommt, kommt an beide Tueren. Ohne diese
+   Pruefung baute das Cockpit aus jedem Speicherwert eine URL und schickte
+   das Anmeldetoken dorthin.
+   Gefunden, weil eine Gegenprobe (Pruefung durch "return !!m" ersetzt)
+   GRUEN blieb -- die Regel stand da, aber nichts hielt sie fest. */
+for (const boese of ['boese.example/x', 'cupi24.guardops.ch.boese.example',
+                     'cupi24/../evil', 'cupi24:8080', '../../evil', 'CUPI24',
+                     '-cupi24', 'cupi24@boese.example', 'a'.repeat(80),
+                     'cupi24.boese.example', 'cupi24%2Eboese', 'cupi24?x=1']) {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const ziele = [];
+  page.on('pageerror', e => {
+    if (!/Failed to fetch/i.test(e.message)) { bad.push('JS-Fehler (boese): ' + e.message); }
+  });
+  await page.addInitScript(m => {
+    window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios' };
+    try {
+      localStorage.clear();
+      localStorage.setItem('sop_mandant', m);
+      localStorage.setItem('rv3_token', 'tok');
+      localStorage.setItem('rv3_user', JSON.stringify({
+        id: 1, name: 'm.muster', ist_admin: true, rollen: ['verwaltung'] }));
+    } catch (e) {}
+  }, boese);
+  await page.route('**/*', route => {
+    const u = route.request().url();
+    if (!u.startsWith('file://')) { ziele.push(u); route.abort(); return; }
+    route.continue();
+  });
+  await page.goto(`file://${WURZEL}/dashboard.html`);
+  await page.waitForTimeout(700);
+  check(`KRITISCH: das Cockpit baut aus »${boese.trim().slice(0, 24)}« keine Adresse`,
+    (await basisVon(page)) === '');
+  check(`KRITISCH: und schickt nichts dorthin -- auch nicht das Anmeldetoken`,
+    ziele.length === 0);
+  await page.close();
+}
+
+/* Umgebende Leerzeichen sind keine Gefahr, sondern ein Vertipper beim
+   Abtippen. Sie werden getrimmt und NICHT abgewiesen -- sonst stuende
+   jemand vor "Nur Kleinbuchstaben, Ziffern und Bindestriche", ohne den
+   Unterschied sehen zu koennen. Stand faelschlich in der Liste oben und
+   hat sie rot gefaerbt; hier steht jetzt, was wirklich gilt. */
+{
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  page.on('pageerror', e => {
+    if (!/Failed to fetch/i.test(e.message)) { bad.push('JS-Fehler (Leerzeichen): ' + e.message); }
+  });
+  await page.addInitScript(() => {
+    window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios' };
+    try { localStorage.clear(); localStorage.setItem('sop_mandant', '  musterag  '); } catch (e) {}
+  });
+  await page.route('**/*.php*', route => route.abort());
+  await page.goto(`file://${WURZEL}/dashboard.html`);
+  await page.waitForTimeout(400);
+  check('Umgebende Leerzeichen werden getrimmt, nicht abgewiesen',
+    (await basisVon(page)) === 'https://musterag.guardops.ch/api/');
   await page.close();
 }
 
