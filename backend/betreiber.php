@@ -263,6 +263,57 @@ function be_konten_zahl(PDO $pdo, int $ausser = 0): int
     return (int)$s->fetchColumn();
 }
 
+// ── Einladung eines neuen Kontos (ENT-663) ────────────────────────────
+//
+// 48 STUNDEN, und die Zahl steht nur hier. Die Ruecksetzung eines
+// Mitarbeiterpassworts laeuft nach 30 Minuten ab (ENT-373) -- dort hat die
+// Person den Link selbst angefordert und wartet darauf. Eine Einladung
+// kommt unangekuendigt und wird oft erst am naechsten Arbeitstag gesehen;
+// eine halbe Stunde erzeugte fast nur tote Links, und jedes Erneuern ist
+// ein weiterer Versand an ein Postfach. Zwei Tage sind der Ausgleich.
+const BE_EINLADUNG_STUNDEN = 48;
+
+function be_einladung_tabelle_da(PDO $pdo): bool
+{
+    return hat_tabelle($pdo, 'betreiber_einladung');
+}
+
+// Ein Konto MIT offener Einladung ist eines, das noch niemand eingeloest
+// hat. Zwei Dinge sind daran gebunden und beide stehen nur hier:
+// Es darf sich nicht anmelden, und es darf nicht von Hand aktiviert werden.
+function be_einladung_offen(PDO $pdo, int $betreiberId): bool
+{
+    if (!be_einladung_tabelle_da($pdo)) { return false; }
+    $s = $pdo->prepare('SELECT 1 FROM betreiber_einladung WHERE betreiber_id = ?');
+    $s->execute([$betreiberId]);
+    return $s->fetchColumn() !== false;
+}
+
+// Sucht das Konto zu einem rohen Token -- oder gibt null zurueck.
+//
+// ABGELAUFEN UND UNBEKANNT SIND HIER DASSELBE: Beide geben null. Die
+// Unterscheidung trifft der Aufrufer nicht, weil sie nichts austraegt --
+// in beiden Faellen muss eine neue Einladung her. Was der Aufrufer NICHT
+// tun darf, ist die beiden verschieden zu beantworten: "abgelaufen"
+// bestaetigte, dass es diesen Link einmal gab.
+//
+// Die Frist wird in der Datenbank verglichen (NOW()), nicht in PHP: Sonst
+// entschiede die Uhr des Webservers, und bei getrennten Datenbanken
+// (OP-518) sind das zwei verschiedene Uhren.
+function be_einladung_konto(PDO $pdo, string $tokenRoh): ?array
+{
+    if ($tokenRoh === '' || !be_einladung_tabelle_da($pdo)) { return null; }
+    $s = $pdo->prepare(
+        'SELECT b.id, b.name, b.anrede, b.vorname, b.nachname, b.email
+           FROM betreiber_einladung e
+           JOIN betreiber b ON b.id = e.betreiber_id
+          WHERE e.token = ? AND e.gueltig_bis > NOW()'
+    );
+    $s->execute([hash('sha256', $tokenRoh)]);
+    $r = $s->fetch(PDO::FETCH_ASSOC);
+    return $r === false ? null : $r;
+}
+
 // ── Mandant: was von aussen geschrieben werden darf ───────────────────
 //
 // Eine geschlossene Liste statt "alles, was ankommt". Ohne sie traegt der
@@ -1073,6 +1124,48 @@ function be_tabellen(): array
   letztes_fenster BIGINT NULL,
   notfallcodes TEXT NULL,
   angelegt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// ── Die offene Einladung (ENT-663) ────────────────────────────────────
+//
+// WARUM ES DIESE TABELLE GIBT: Bis ENT-663 tippte derjenige, der ein Konto
+// anlegt, dessen Passwort selbst und gab es weiter. Drei Folgen, alle mit
+// derselben Wurzel -- das Konto entstand fertig, mit einem Geheimnis, das
+// jemand anderes gewaehlt hatte:
+//   1. Der Anlegende kannte das Passwort. Bis zur Einrichtung des zweiten
+//      Faktors konnte er sich als die andere Person anmelden, und das
+//      Logbuch (ENT-614) schrieb dann DEREN Namen. Eine Ebene, auf der
+//      jedes Konto jeden Mandanten erreicht, verliert damit die einzige
+//      Auskunft darueber, wer gehandelt hat.
+//   2. Die E-Mail-Adresse wurde nie nachgewiesen. Ein Tippfehler erzeugte
+//      ein Konto unter einer Adresse, die niemandem gehoert -- und nichts
+//      machte darauf aufmerksam, weil nie eine Nachricht dorthin ging.
+//   3. Zwischen Anlegen und erster Anmeldung schuetzte nur das Passwort,
+//      ohne Frist. Wer zuerst kam, richtete den zweiten Faktor auf seinem
+//      Geraet ein.
+//
+// EIN ABDRUCK, KEIN ROHWERT (ENT-501). Anders als `versand_token` beim
+// Beleg-Link, der roh bleiben darf: Jener oeffnet die Ansicht EINES
+// Dokuments, dieser setzt das Passwort auf der maechtigsten Ebene der
+// Anlage. Er wird darum verwahrt wie eine Sitzung.
+//
+// DER SCHLUESSEL IST DIE KONTO-ID, nicht eine eigene Nummer: Damit gibt es
+// je Konto hoechstens EINE offene Einladung. Ein erneutes Einladen ersetzt
+// die Zeile und entwertet den alten Link im selben Schritt -- zwei
+// gleichzeitig gueltige Links waeren zwei offene Tueren statt einer
+// (dieselbe Ueberlegung wie bei passwort_reset in passwort_vergessen.php).
+//
+// EINGELOEST WIRD DURCH LOESCHEN, nicht durch einen Vermerk. Solange die
+// Zeile steht, ist die Einladung offen; ist sie weg, ist das Konto ein
+// gewoehnliches. Ein `benutzt_am`-Feld waere ein zweiter Ort, an dem
+// dasselbe steht wie in `betreiber.aktiv`, und zwei Orte laufen auseinander.
+'betreiber_einladung' => "CREATE TABLE IF NOT EXISTS betreiber_einladung (
+  betreiber_id INT UNSIGNED NOT NULL PRIMARY KEY,
+  token CHAR(64) NOT NULL,
+  gueltig_bis DATETIME NOT NULL,
+  erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  erstellt_von INT UNSIGNED NOT NULL,
+  UNIQUE KEY uq_be_einladung_token (token)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
 // ── Supportvorgaenge (ENT-538) ────────────────────────────────────────

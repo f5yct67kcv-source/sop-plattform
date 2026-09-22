@@ -776,12 +776,30 @@ sie ist hier **Pflicht**, nicht freiwillig wie im Cockpit. QR-Code scannen
 oder den Schluessel abtippen, mit einem Code bestaetigen, dann erscheinen
 die **zehn Notfallcodes**. Sie werden nur einmal angezeigt.
 
-> **Bevor es weitergeht: ein zweites Betreiber-Konto anlegen.**
+> **Bevor es weitergeht: ein zweites Betreiber-Konto einrichten.**
 > Wer Telefon **und** Notfallcodes verliert, kommt sonst nicht mehr hinein —
 > der Weg zurueck fuehrt ausschliesslich ueber ein zweites Konto
 > (`betreiber_zf_zuruecksetzen.php`), und eine Hintertuer gibt es
 > absichtlich nicht. Das zweite Konto ist keine Bequemlichkeit, sondern
-> Betriebsvoraussetzung.
+> Betriebsvoraussetzung (ENT-659).
+>
+> **Seit ENT-663 geschieht das ueber eine EINLADUNG**, nicht ueber ein hier
+> vergebenes Passwort: Konten → *Neues Konto* → Anrede, Name, E-Mail. Der
+> Server verschickt einen Link, die eingeladene Person setzt ihr Passwort
+> selbst und richtet danach den zweiten Faktor ein. Bis dahin steht das
+> Konto in der Liste als **eingeladen** und kommt nirgends hinein.
+>
+> **Zwei Dinge, die dabei schiefgehen koennen:**
+> - **Ohne funktionierenden E-Mail-Versand geht gar nichts.** Der Endpunkt
+>   sagt das deutlich (503), statt ein unbrauchbares Konto zu hinterlassen.
+>   Auf einer frischen Anlage also zuerst SMTP pruefen.
+> - **Der Link gilt 48 Stunden.** Laeuft er ab, laesst sich die Einladung
+>   heute nicht erneuern (OP-664) — das Konto muesste stillgelegt und unter
+>   einer anderen Adresse neu eingeladen werden. Darum den Link zeitnah
+>   einloesen.
+>
+> Das **allererste** Konto entsteht weiterhin mit Passwort (Schritt 4): Dort
+> gibt es noch keinen Betreiber und keine erprobte Versandstrecke.
 
 ### 6. Auf Staging durchspielen
 

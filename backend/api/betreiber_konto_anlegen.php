@@ -57,7 +57,24 @@ if ($vorhanden === 0) {
     require_verwaltung($user);
     $ich = null;
 } else {
-    $ich = require_betreiber_voll();
+    // AB DEM ZWEITEN KONTO FUEHRT NUR NOCH DIE EINLADUNG (ENT-663).
+    //
+    // Bis hierher tippte der Anlegende das Passwort des neuen Kontos und gab
+    // es weiter -- er kannte es also. Bis zur Einrichtung des zweiten
+    // Faktors konnte er sich als die andere Person anmelden, und das
+    // Logbuch schrieb dann DEREN Namen. Dazu wurde die Adresse nie
+    // nachgewiesen: Ein Tippfehler erzeugte ein Konto, in das niemand kam,
+    // ohne dass irgendetwas darauf aufmerksam machte.
+    //
+    // Der Weg bleibt als Endpunkt bestehen, WEIL DER BOOTSTRAP ihn braucht
+    // (Zweig oben): Beim allerersten Konto gibt es weder einen Betreiber
+    // noch eine erprobte Versandstrecke, und eine Einladung, die an einem
+    // ungetesteten SMTP scheitert, liesse den Bereich gar nicht erst
+    // anlaufen. Ab dem zweiten Konto gilt dieser Grund nicht mehr.
+    require_betreiber_voll();
+    json_response(['status' => 'error',
+        'message' => 'Ein weiteres Betreiber-Konto entsteht über eine Einladung, nicht über '
+                   . 'ein hier vergebenes Passwort. Die eingeladene Person setzt es selbst.'], 409);
 }
 
 $daten = json_decode(file_get_contents('php://input') ?: '', true) ?: [];
