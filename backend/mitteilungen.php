@@ -43,6 +43,8 @@
 //     Mitteilung, die ewig steht.
 declare(strict_types=1);
 
+
+require_once __DIR__ . '/mitarbeiter.php';   // ma_nur_menschen() (ENT-631)
 // Die beiden Zielgruppen. EINE Liste -- Speichern und Lesen befragen sie,
 // statt je eine eigene zu fuehren.
 const MITTEILUNG_ZIELGRUPPEN = ['alle', 'revier'];
@@ -369,5 +371,5 @@ function mitteilung_empfaengerzahl(PDO $pdo, string $zielgruppe): int
     // machen.
     $wo = mitteilung_empfaenger_wo($pdo, $zielgruppe);
     if ($wo === null) { return -1; }
-    return (int)$pdo->query("SELECT COUNT(*) FROM mitarbeiter WHERE $wo")->fetchColumn();
+    return (int)$pdo->query("SELECT COUNT(*) FROM mitarbeiter WHERE $wo AND " . ma_nur_menschen($pdo))->fetchColumn();
 }

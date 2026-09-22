@@ -172,7 +172,11 @@ function demo_daten_erzeugen(PDO $pdo): array
         // gleich mit -- schlaegt der Rest dieser Transaktion fehl, kommt
         // mit dem ROLLBACK auch die Sitzung zurueck, niemand bleibt ohne
         // Zugang stranden.
-        $pdo->exec('DELETE FROM mitarbeiter');
+        // Das Support-Konto bleibt stehen (ENT-631). Ohne die Bedingung
+        // fiele es mit -- und per ON DELETE CASCADE gleich die Sitzung
+        // dessen, der womoeglich GERADE per Supportzugang zusieht, wie
+        // die Demo neu befuellt wird.
+        $pdo->exec('DELETE FROM mitarbeiter WHERE ' . ma_nur_menschen($pdo));
         demo_betrieb_setzen($pdo);
         $funktionen = demo_funktionen_abteilungen($pdo);
         $mitarbeitende = demo_mitarbeitende_erzeugen($pdo, $funktionen);

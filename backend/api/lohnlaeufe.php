@@ -61,6 +61,7 @@ function lauf_personen(PDO $pdo, string $von, string $bis): array
          FROM mitarbeiter
          WHERE (aktiv = 1 OR austritt IS NULL OR austritt >= ?)
            AND (eintritt IS NULL OR eintritt <= ?)
+           AND ' . ma_nur_menschen(db()) . '
          ORDER BY nachname, vorname, name'
     );
     $st->execute([$von, $bis]);
@@ -162,6 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 }
 
 require_recht($user, 'lohn_schreiben');
+require_once __DIR__ . '/../mitarbeiter.php';   // ma_nur_menschen() (ENT-631)
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur GET oder POST'], 405);
 }

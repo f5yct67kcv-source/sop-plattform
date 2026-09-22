@@ -532,6 +532,8 @@ check('es gibt ueberhaupt einen Endpunkt, der die Mandantenlage prueft',
 const DARF_VERBINDEN = {
   'betreiber_mandant_stand.php':   'zaehlt Tabellen, liest nichts',
   'betreiber_support.php':         'nur auf Freigabe, befristet, protokolliert (ENT-526)',
+  'betreiber_support_sprung.php':  'stellt den Einmal-Schluessel fuer den Sprung ins Cockpit aus; '
+                                 + 'Demo-Platz ohne, echter Mandant nur mit Freigabe (ENT-631)',
   // ENT-600/ENT-601. Eine Demo-Instanz ist kein Betrieb: Sie traegt
   // Musterdaten und wird beim Anfordern, beim erneuten Senden und beim
   // Ablaufen restlos geleert bzw. neu befuellt. Der Zugriff bleibt
@@ -642,6 +644,60 @@ check('KRITISCH: keine vertraulichen Personalfelder im Supportzugriff',
 // Der Treiberfehler geht auch hier nicht nach aussen.
 check('der Verbindungsfehler nennt die Lage statt den Treibertext',
   /catch \(Throwable \$e\)[\s\S]{0,400}mandant_verbindung_bereit/.test(sup));
+
+// 4. Die Diagnose-Abfragen muessen das Schema des Mandanten treffen.
+//
+// ANLASS: Live am 2026-09-22 gemeldet. Die Rechteprofil-Abfrage nannte
+// `rollen.name` -- eine Spalte, die diese Tabelle nie hatte (sie heisst
+// `schluessel` und `titel`). MySQL meldet eine unbekannte Spalte als
+// Fehler, nicht als Leerwert, also fiel nicht das Rechteprofil aus,
+// sondern der GANZE Supportzugriff: Der Betreiber bekam "Eine benoetigte
+// Spalte fehlt in der Datenbank" zu sehen -- also den Hinweis auf einen
+// Einrichtungslauf, der nichts geholfen haette -- und beim Mandanten
+// stand trotzdem ein Zugriff im Protokoll, weil der VOR der Auslieferung
+// geschrieben wird.
+//
+// GEPRUEFT WIRD DIE AUSSAGE, nicht der Wortlaut: Jede Spalte, die diese
+// Datei ueber einen Tabellen-Alias anspricht, muss es im Schema aus
+// kern_tabellen()/kern_spalten() geben. Eine Suche nach "name" waere
+// wertlos, sobald die naechste Abfrage eine andere Spalte erfindet.
+const SCHEMA = JSON.parse(
+  execFileSync('php', [`${HIER}/kern_schema_json.php`], { encoding: 'utf8' }));
+check('das Mandanten-Schema laesst sich auslesen',
+  Object.keys(SCHEMA).length > 10 && Array.isArray(SCHEMA.rollen));
+
+const aliasse = {};
+for (const t of sup.matchAll(/\b(?:FROM|JOIN)\s+`?([a-z_][a-z0-9_]*)`?\s+(?:AS\s+)?([a-z][a-z0-9_]*)\b/gi)) {
+  const alias = t[2].toLowerCase();
+  // "FROM rollen ORDER" ist kein Alias -- Schluesselwoerter zaehlen nicht.
+  if (['where', 'on', 'order', 'group', 'having', 'limit', 'join', 'inner',
+       'left', 'right', 'union', 'set', 'using'].includes(alias)) { continue; }
+  aliasse[alias] = t[1].toLowerCase();
+}
+const erfunden = [];
+for (const t of sup.matchAll(/\b([a-z][a-z0-9_]*)\.([a-z_][a-z0-9_]*)\b/g)) {
+  const tabelle = aliasse[t[1].toLowerCase()];
+  if (!tabelle) { continue; }
+  const spalten = SCHEMA[tabelle];
+  // Eine Tabelle, die das Kern-Schema nicht kennt, ist ein eigener Befund
+  // und wird nicht stillschweigend durchgelassen.
+  if (!spalten) { erfunden.push(t[1] + ' -> Tabelle ' + tabelle + ' gibt es im Schema nicht'); continue; }
+  if (!spalten.includes(t[2].toLowerCase())) {
+    erfunden.push(tabelle + '.' + t[2]);
+  }
+}
+check('KRITISCH: die Diagnose nennt nur Spalten, die es im Mandanten-Schema gibt',
+  erfunden.length === 0);
+if (erfunden.length) { bad.push('nicht im Schema: ' + [...new Set(erfunden)].join(', ')); }
+// Und die Oberflaeche liest genau die Felder, die der Endpunkt liefert --
+// sonst steht dort ein leeres Abzeichen statt eines Profilnamens.
+{
+  // Nur der Block, der die Profile zeichnet -- "p.name" steht anderswo in
+  // dieser Datei voellig zu Recht (Produkte).
+  const block = (lies('betreiber.html').match(/a\.profile\.map\([\s\S]{0,400}?\.join\(''\)/) || [''])[0];
+  check('die Rechteprofile werden mit dem Feld angezeigt, das der Endpunkt liefert',
+    /p\.titel/.test(block) && !/\bp\.name\b/.test(block));
+}
 
 // ── Die Seite des Betriebs: die Freigabe gehoert ihm ─────────────────
 const frei = nurCode(lies('backend/api/support_freigabe.php'));

@@ -11,6 +11,7 @@ require __DIR__ . '/../ai.php';
 
 $user = require_session();
 require_recht($user, 'einsaetze_schreiben');
+require_once __DIR__ . '/../mitarbeiter.php';   // ma_nur_menschen() (ENT-631)
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
@@ -42,7 +43,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $heute)) {
 
 $kunden = db()->query('SELECT name FROM kunden ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
 $mitarbeiter = db()->query(
-    'SELECT name, vorname, nachname FROM mitarbeiter WHERE aktiv = 1 ORDER BY name'
+    'SELECT name, vorname, nachname FROM mitarbeiter WHERE aktiv = 1 AND ' . ma_nur_menschen(db()) . ' ORDER BY name'
 )->fetchAll();
 
 $e = anthropic_extract_einsatz_bild($bild, $mimeType, $kunden, $mitarbeiter, $heute);

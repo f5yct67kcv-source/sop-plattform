@@ -25,6 +25,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../anmeldung.php';
 require __DIR__ . '/../mailer.php';
+require_once __DIR__ . '/../mitarbeiter.php';   // ma_nur_menschen() (ENT-631)
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
@@ -78,7 +79,10 @@ function versuch_link_zu_verschicken(PDO $pdo, string $name): void
         return;
     }
 
-    $s = $pdo->prepare('SELECT id, ist_admin, email, email_privat, vorname, nachname FROM mitarbeiter WHERE name = ? AND aktiv = 1');
+    // Ohne das Support-Konto (ENT-631) -- derselbe Grund wie bei der
+    // Ruecksetzung durch die Verwaltung: Wer ihm ein Passwort verschaffen
+    // kann, kann unter seinem Namen arbeiten.
+    $s = $pdo->prepare('SELECT id, ist_admin, email, email_privat, vorname, nachname FROM mitarbeiter WHERE name = ? AND aktiv = 1 AND ' . ma_nur_menschen($pdo));
     $s->execute([$name]);
     $person = $s->fetch(PDO::FETCH_ASSOC);
     if (!$person) { return; }
