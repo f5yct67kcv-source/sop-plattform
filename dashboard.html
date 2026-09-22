@@ -293,16 +293,21 @@ svg.i-sm { width: 15px; height: 15px; }
      Am Vormittag desselben Tages war er auf Ansage entfallen (Skizze,
      Punkt 9) -- die spaetere Ansage geht vor. Beide Masken zeigen dieselbe
      Szene, also soll sie auch gleich gedaempft sein.
-     Einmal definiert, zweimal gebraucht (wie app.html): als Schicht im
+     Einmal definiert, dreimal gebraucht (wie app.html): als Schicht im
      CSS-background von #gate (die Ausweichebene ohne Video) UND als eigene
      Flaeche .gate-schleier UEBER dem <video> -- ein Video deckt das
      darunterliegende background vollstaendig ab, der Schleier braucht also
      eine eigene Ebene, aber denselben Wert.
      Ob der Text darauf lesbar bleibt, ist keine Geschmacksfrage:
      test_cockpit_gate.mjs misst den Kontrast an fuenf Zeitpunkten des
-     laufenden Videos und noch einmal am Standbild. */
-  --gate-schleier: linear-gradient(rgba(10,11,15,.66), rgba(10,11,15,.82));
+     laufenden Videos und noch einmal am Standbild.
+     Die dritte Verwendung ist der Kopf des Demo-Hinweises (.dw-hero), der
+     dieselbe Szene zeigt. Darum steht die Variable in :root und nicht hier
+     im #gate-Block: von dort aus waere sie ausserhalb der Anmeldemaske
+     nicht sichtbar, und eine abgeschriebene Kopie des Werts liefe beim
+     naechsten Mal auseinander. */
 }
+:root { --gate-schleier: linear-gradient(rgba(10,11,15,.66), rgba(10,11,15,.82)); }
 /* margin:auto statt align-items/justify-content:center (wie app.html):
    reicht die Hoehe nicht (kleines Geraet, offene Tastatur, 2FA-Feld
    zusaetzlich eingeblendet), bleibt der obere Rand erreichbar, statt dass
@@ -2026,18 +2031,93 @@ textarea.inp { resize: vertical; min-height: 92px; font-family: inherit; line-he
    dieselben Bausteine wie ein Dialog (.dlg/.dlg-hd/.dlg-bd/.dlg-ft), damit
    es trotzdem wie ein Teil des Cockpits aussieht. Groesser als .dlg.wide
    (580px statt regulaer 460px), auf ausdruecklichen Wunsch. */
-.blockier-scrim { position: fixed; inset: 0; z-index: 90; background: rgba(16,18,22,.55); display: none; align-items: center; justify-content: center; padding: 20px; }
-.blockier-scrim.on { display: flex; }
-.blockier-scrim .dlg { max-width: 580px; }
-.blockier-scrim .dlg-bd p { margin: 0 0 12px; line-height: 1.6; }
-.blockier-scrim .dlg-bd p:last-child { margin-bottom: 0; }
-/* Fest statt vh: Bei diesem kurzen Text wuerde ein Anteil der Bildschirmhoehe
-   auf den meisten Desktop-Fenstern gar kein Scrollen verlangen -- die
-   Freigabe erst nach dem Scrollen waere dann wirkungslos. 200px zwingt das
-   Scrollen zuverlaessig, unabhaengig von der Fensterhoehe. */
-.blockier-scrim .dlg-bd { max-height: 200px; }
-.blockier-scrim .dhBestaetigung { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line-soft); }
-.blockier-scrim .dhScrollHinweis { font-size: 12px; color: var(--ink-3); margin-top: 8px; text-align: center; }
+/* Vollbild-Empfang statt Kaestchen (Projektinhaber-Auftrag, 2026-09-21,
+   zweite Runde: "der Startbereich darf einen gewissen Stolz zeigen").
+   Dieselbe dunkle Buehne wie #gate (Anmeldemaske) -- eigene Variablen statt
+   der Cockpit-Palette, "gleiches Muster als Vorbild" statt einer neuen
+   Farbwelt. Der Scrim SELBST ist der Scroll-Container (nicht ein Kaestchen
+   darin): Logo, Hero-Bild und Text scrollen gemeinsam weg, der Fuss bleibt
+   als Teil desselben Containers "position: sticky" am unteren Rand stehen
+   -- kein zweites, ueberlagerndes Element, das mit dem Inhalt
+   auseinanderlaufen koennte. */
+.blockier-scrim {
+  position: fixed; inset: 0; z-index: 90; display: none; overflow-y: auto;
+  background: radial-gradient(112% 46% at 50% 0%, #1A2334 0%, rgba(26,35,52,0) 60%), #0F1117;
+  color: #F2F4F8;
+}
+.blockier-scrim.on { display: block; }
+/* Der Kopf ist derselbe Bildaufbau wie die Anmeldemaske (#gate): dasselbe
+   Foto, derselbe Schleier darueber, dasselbe Logo mit Claim, derselbe
+   Gruss. Ansage des Projektinhabers (2026-09-22): "durch den milchigen
+   Hintergrund haben wir einen sauberen Verlauf und der Text liegt gut
+   darueber". Nachgebaut statt als Bildschirmfoto abgelegt -- ein Foto der
+   Maske waere eine zweite Quelle, die beim naechsten Umbau der Maske
+   stillschweigend veraltet; so aendert sich beides zusammen.
+   Der Schleier steckt hier im background statt in einer eigenen Ebene,
+   weil kein Video darunter laeuft (bei #gate deckt genau das den
+   CSS-Hintergrund ab -- darum dort das zusaetzliche Element).
+   Als Kopfbild, nicht als Vollbild -- Wunsch des Projektinhabers: "muss
+   nicht so breit sein vertikal". */
+.dw-hero {
+  padding: calc(44px + env(safe-area-inset-top)) 22px 40px; text-align: center;
+  background:
+    radial-gradient(80% 68% at 50% 14%, #1C2639 0%, rgba(28,38,57,0) 66%),
+    var(--gate-schleier),
+    url('img/anmeldung-nacht.webp') 62% center / cover no-repeat,
+    #0F1117;
+  /* Untere Kante weich auslaufen lassen, statt das Foto abzuschneiden: Der
+     Schleier endet zwar dunkel, aber an hellen Stellen im Bild (Fassade
+     rechts) bliebe eine sichtbare Kante. Als Maske und nicht als weitere
+     Farbschicht, weil die Flaeche darunter je nach Scrollstand eine andere
+     Farbe hat (Farbverlauf der .blockier-scrim) -- eine aufgemalte Kante
+     muesste diese Farbe raten. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 74%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 74%, transparent 100%);
+}
+/* Eigene Klasse, NICHT .marke: Die Deploy-Ersetzung fuers Mandanten-Buendel
+   trifft genau EINE <svg class="marke">-Zeile (deploy-hostpoint.yml). Eine
+   zweite bliebe dort unersetzt stehen. Dieser Bildschirm erscheint zwar nur
+   in Demo-Instanzen, aber die Zeile stuende trotzdem in jedem Buendel.
+   Breite wie in der Maske am Desktop (255 px), Schattenwurf gleich.
+   Die Farbe kommt aus dem geerbten color der .blockier-scrim, nicht aus
+   var(--ink): --ink wird im #gate-Block auf Hell umgestellt und steht hier
+   ausserhalb davon wieder auf dem hellen Thema -- ein dunkles Logo auf
+   dunklem Foto. Genau der Fehler, der sich nur am gerenderten Zustand
+   zeigt (CLAUDE.md), hier beim Bauen tatsaechlich passiert. */
+.dw-hero .dw-marke { width: 255px; max-width: 78%; height: auto;
+  filter: drop-shadow(0 22px 44px rgba(0,0,0,.8)); }
+.dw-hero h1 { margin: 20px 0 0; font-size: 17px; font-weight: 650; letter-spacing: 0; }
+.dw-inhalt { max-width: 640px; margin: 0 auto; padding: 36px 22px 140px; }
+.dw-inhalt p { font-size: 15px; line-height: 1.65; color: #B6BCC8; margin: 0 0 16px; }
+.dw-inhalt a { color: #7098F7; }
+/* Die vollstaendigen Nutzungsbedingungen und die Datenschutzerklaerung
+   werden zur Laufzeit aus nutzungsbedingungen.html/datenschutz-demo.html
+   NACHGELADEN (dhRechtstextLaden()), nicht hier zusaetzlich abgeschrieben
+   -- sonst gaebe es den Wortlaut an zwei Stellen, die auseinanderlaufen
+   koennten (derselbe Grund wie bei skizze.js/dashboard.html). Die Regeln
+   hier gestalten nur, was von dort hereinkommt (eigene <h1>/<h2>/<h3>/<ul>,
+   keine Klassen aus recht.css, das hier nicht eingebunden ist). */
+.dw-rechtstext { margin-top: 12px; padding-top: 28px; border-top: 1px solid rgba(255,255,255,.12); }
+.dw-rechtstext h1 { font-size: 19px; text-align: left; margin: 0 0 4px; }
+.dw-rechtstext .stand { font-size: 12.5px; color: #868D9A; margin: 0 0 20px; }
+.dw-rechtstext .vorzeile { display: none; }
+.dw-rechtstext h2 { font-size: 15.5px; font-weight: 650; margin: 26px 0 8px; color: #F2F4F8; }
+.dw-rechtstext h2:first-of-type { margin-top: 0; }
+.dw-rechtstext h3 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: #F2F4F8; }
+.dw-rechtstext ul { margin: 0 0 16px; padding-left: 20px; color: #B6BCC8; font-size: 15px; line-height: 1.65; }
+.dw-rechtstext li { margin-bottom: 6px; }
+/* Sticky statt fixed: bleibt Kind desselben Scroll-Containers wie Logo/Hero/
+   Text -- misst darum ganz von selbst dieselbe Scrollposition, ohne eigene
+   Scroll-Ereignis-Kopplung an ein zweites Element. */
+.dw-fuss {
+  position: sticky; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(rgba(15,17,23,0) 0%, #0F1117 34%);
+  padding: 60px 20px calc(22px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.dw-fuss .check { color: #F2F4F8; font-size: 13.5px; }
+.dw-fuss .dhScrollHinweis { font-size: 12px; color: #868D9A; }
+.dw-fuss .btn-primary { width: 100%; max-width: 360px; padding: 13px; font-size: 14.5px; }
 
 /* Druck */
 #printArea { display: none; }
@@ -10035,26 +10115,28 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 
 <!-- Demo-Hinweis: siehe CSS-Kommentar bei .blockier-scrim. Erscheint vor der
      Tour, nur in Demo-Instanzen, und blockiert bis zur Bestaetigung -- der
-     Knopf am Fuss bleibt gesperrt, bis der Text bis zum Ende gescrollt
-     wurde (dhScrollPruefen()). -->
-<div class="blockier-scrim" id="dlgDemoHinweis">
-  <div class="dlg wide">
-    <div class="dlg-hd"><h2>Bevor Sie loslegen</h2></div>
-    <div class="dlg-bd" id="dhKoerper" onscroll="dhScrollPruefen()">
-      <p>Diese Demo zeigt einen erfundenen Betrieb mit frei erfundenen Inhalten. Übereinstimmungen mit echten Personen, Firmen oder Objekten sind dabei nicht auszuschliessen und rein zufällig.</p>
-      <p>Bitte tragen Sie hier ausschliesslich erfundene Daten ein — keine echten Namen, Adressen, Telefonnummern oder sonstigen Personendaten, weder Ihre eigenen noch die von Dritten.</p>
-      <p>Die <a href="nutzungsbedingungen.html" target="_blank" rel="noopener">Nutzungsbedingungen</a> und die <a href="datenschutz-demo.html" target="_blank" rel="noopener">Datenschutzerklärung</a> wurden bereits bei der Anfrage dieses Demo-Zugangs bestätigt. Hier können Sie sie nochmals nachlesen.</p>
-      <div class="dhBestaetigung">
-        <label class="check">
-          <input type="checkbox" id="dhCheckbox" disabled onchange="dhCheckboxGeaendert()">
-          Ich habe das gelesen und verstanden.
-        </label>
-      </div>
-    </div>
-    <div class="dlg-ft" style="justify-content:center; flex-direction:column; align-items:stretch">
-      <button class="btn btn-primary btn-wide" id="dhWeiterBtn" disabled onclick="dhBestaetigen()">Verstanden, weiter</button>
-      <div class="dhScrollHinweis" id="dhScrollHinweis">Bitte bis zum Ende lesen, um fortzufahren.</div>
-    </div>
+     Knopf am Fuss bleibt gesperrt, bis diese Seite bis ans Ende gescrollt
+     wurde (dhScrollPruefen(), gebunden an den Scrim selbst statt an ein
+     Kaestchen darin -- siehe CSS-Kommentar). -->
+<div class="blockier-scrim" id="dlgDemoHinweis" onscroll="dhScrollPruefen()">
+  <div class="dw-hero">
+    <svg class="dw-marke" viewBox="0.00 0.00 649.83 211.46" role="img" aria-label="Guard OpS — Security Operations Software"><use href="#go-wort-claim"/></svg>
+    <h1>Willkommen im Demobereich</h1>
+  </div>
+  <div class="dw-inhalt">
+    <p>Diese Demo zeigt einen erfundenen Betrieb mit frei erfundenen Inhalten. Übereinstimmungen mit echten Personen, Firmen oder Objekten sind dabei nicht auszuschliessen und rein zufällig.</p>
+    <p>Bitte tragen Sie hier ausschliesslich erfundene Daten ein — keine echten Namen, Adressen, Telefonnummern oder sonstigen Personendaten, weder Ihre eigenen noch die von Dritten.</p>
+    <p>Nachfolgend finden Sie die Nutzungsbedingungen und die Datenschutzerklärung, die Sie bereits bei der Anfrage dieses Demo-Zugangs bestätigt haben.</p>
+    <div class="dw-rechtstext" id="dhNutzungsbedingungen" aria-busy="true">Nutzungsbedingungen werden geladen …</div>
+    <div class="dw-rechtstext" id="dhDatenschutz" aria-busy="true">Datenschutzerklärung wird geladen …</div>
+  </div>
+  <div class="dw-fuss">
+    <label class="check">
+      <input type="checkbox" id="dhCheckbox" disabled onchange="dhCheckboxGeaendert()">
+      Ich habe das gelesen und verstanden.
+    </label>
+    <button class="btn btn-primary" id="dhWeiterBtn" disabled onclick="dhBestaetigen()">Verstanden, weiter</button>
+    <div class="dhScrollHinweis" id="dhScrollHinweis">Bitte bis zum Ende lesen, um fortzufahren.</div>
   </div>
 </div>
 
@@ -10554,16 +10636,48 @@ function dhZeigen(weiter) {
   $('dhCheckbox').disabled = true;
   $('dhWeiterBtn').disabled = true;
   $('dhScrollHinweis').style.display = '';
-  $('dhKoerper').scrollTop = 0;
+  $('dlgDemoHinweis').scrollTop = 0;
   $('dlgDemoHinweis').classList.add('on');
+  dhRechtstextLaden();
   // Passt der Text ohne zu scrollen schon ganz ins Fenster (schmaler
   // Bildschirm, grosse Schrift), soll das nicht ewig gesperrt bleiben --
   // einmal sofort pruefen, nicht erst beim ersten Scroll-Ereignis.
   dhScrollPruefen();
 }
 
+// Die vollstaendigen Nutzungsbedingungen und die Datenschutzerklaerung
+// werden HIER NICHT ZWEITE MAL ABGESCHRIEBEN, sondern zur Laufzeit aus den
+// tatsaechlichen Seiten nachgeladen -- sonst gaebe es denselben Wortlaut an
+// zwei Stellen, die bei der naechsten Aenderung an einer der beiden
+// auseinanderlaufen koennten. Einmal geladen, bleibt es stehen (kein
+// erneuter Abruf bei jedem dhZeigen()).
+let dhRechtstextGeladen = false;
+function dhRechtstextLaden() {
+  if (dhRechtstextGeladen) { return; }
+  dhRechtstextGeladen = true;
+  const laden = (datei, zielId) => {
+    fetch(datei).then(r => r.text()).then(html => {
+      const main = new DOMParser().parseFromString(html, 'text/html').querySelector('main');
+      $(zielId).innerHTML = main ? main.innerHTML
+        : 'Konnte nicht geladen werden -- bitte <a href="' + datei + '" target="_blank" rel="noopener">' + datei + '</a> direkt aufrufen.';
+      $(zielId).removeAttribute('aria-busy');
+      // Das Laden aendert die Seitenhoehe -- ein bereits gesperrter Stand
+      // bleibt gesperrt, das ist richtig; hier geht es nur um den seltenen
+      // Fall, dass die Seite dadurch ERST jetzt laenger wird als der
+      // Bildschirm (vorher passte der kurze "wird geladen"-Platzhalter noch
+      // hinein).
+      dhScrollPruefen();
+    }).catch(() => {
+      $(zielId).innerHTML = 'Konnte nicht geladen werden -- bitte <a href="' + datei + '" target="_blank" rel="noopener">' + datei + '</a> direkt aufrufen.';
+      $(zielId).removeAttribute('aria-busy');
+    });
+  };
+  laden('nutzungsbedingungen.html', 'dhNutzungsbedingungen');
+  laden('datenschutz-demo.html', 'dhDatenschutz');
+}
+
 function dhScrollPruefen() {
-  const el = $('dhKoerper');
+  const el = $('dlgDemoHinweis');
   const amEnde = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
   if (amEnde) {
     $('dhCheckbox').disabled = false;
