@@ -3707,8 +3707,12 @@ async function supportHolen(m) {
        etwas anderes als ein Betrieb, dessen Rollentabellen fehlen. */
     + (!a.profile ? '<div class="zweit">nicht abrufbar</div>'
        : a.profile.length === 0 ? '<div class="zweit">keine Profile angelegt</div>'
+       /* titel ist der Anzeigename des Profils; schluessel steht nur in der
+          Zuteilung. Faellt der Titel aus, wird der Schluessel gezeigt statt
+          nichts -- ein leeres Abzeichen saehe aus wie ein Profil ohne
+          Namen. */
        : a.profile.map(p => '<span class="merker m-ruhe" style="margin:0 6px 6px 0">'
-           + text(p.name) + ' · ' + p.traeger + '</span>').join(''))
+           + text(p.titel || p.schluessel) + ' · ' + p.traeger + '</span>').join(''))
     + '</div>';
   zeig($('sup-karte'), true);
   $('sup-karte').scrollIntoView({ behavior: 'smooth', block: 'nearest' });

@@ -97,14 +97,23 @@ foreach (MANDANT_KERNTABELLEN as $t) {
 
 // Rechteprofile: wie sie heissen und wie viele sie tragen. Ohne Namen --
 // für eine Störungssuche zählt die Struktur, nicht wer darin steht.
+//
+// ZWEI SPALTEN, ZWEI AUFGABEN: `titel` ist der Anzeigename, `schluessel` die
+// Zeichenfolge, unter der eine Zuteilung in mitarbeiter_rollen.rolle steht.
+// Eine Tabelle `rollen` mit einer Spalte `name` hat es hier nie gegeben --
+// bis zum 2026-09-22 stand sie trotzdem in dieser Abfrage, und weil MySQL eine
+// unbekannte Spalte als Fehler meldet und nicht als Leerwert, fiel damit
+// der GANZE Supportzugriff aus: Der Betreiber sah "Eine benoetigte Spalte
+// fehlt in der Datenbank" statt der Diagnose, und beim Mandanten stand
+// trotzdem ein Zugriff im Protokoll.
 $profile = [];
 if (hat_tabelle($pdo, 'rollen') && hat_tabelle($pdo, 'mitarbeiter_rollen')) {
     $profile = $pdo->query(
-        'SELECT r.name,
+        'SELECT r.schluessel, r.titel,
                 (SELECT COUNT(*) FROM mitarbeiter_rollen mr
                   JOIN mitarbeiter m ON m.id = mr.mitarbeiter_id
-                 WHERE mr.rolle = r.name AND m.aktiv = 1) AS traeger
-           FROM rollen r ORDER BY r.name'
+                 WHERE mr.rolle = r.schluessel AND m.aktiv = 1) AS traeger
+           FROM rollen r ORDER BY r.titel'
     )->fetchAll(PDO::FETCH_ASSOC);
 }
 
