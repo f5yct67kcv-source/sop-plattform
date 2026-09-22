@@ -2064,6 +2064,12 @@ textarea.inp { resize: vertical; min-height: 92px; font-family: inherit; line-he
   color: #F2F4F8;
 }
 .blockier-scrim.on { display: block; }
+/* Die Seite dahinter steht still, solange ein blockierender Bildschirm
+   offen ist -- sonst hat der Browser zwei scrollbare Ebenen uebereinander
+   und zeigt rechts zwei Balken. Am <html> und nicht am <body>: Das Cockpit
+   setzt den Bildlauf je nach Ansicht mal auf das eine, mal auf das andere,
+   und <html> deckt beide Faelle ab. */
+html.kein-scroll { overflow: hidden; }
 /* Der Kopf traegt nur noch Logo, Claim und Gruss -- wie auf der
    Anmeldemaske. Das Foto darunter gehoert dem ganzen Bildschirm (siehe
    .blockier-scrim), darum hier kein eigener Hintergrund und keine
@@ -2116,7 +2122,6 @@ textarea.inp { resize: vertical; min-height: 92px; font-family: inherit; line-he
   padding: 60px 20px calc(22px + env(safe-area-inset-bottom));
   display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
-.dw-fuss .check { color: #F2F4F8; font-size: 13.5px; }
 .dw-fuss .dhScrollHinweis { font-size: 12px; color: #868D9A; }
 .dw-fuss .btn-primary { width: 100%; max-width: 360px; padding: 13px; font-size: 14.5px; }
 
@@ -10140,10 +10145,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     <div class="dw-rechtstext" id="dhDatenschutz" aria-busy="true">Datenschutzerklärung wird geladen …</div>
   </div>
   <div class="dw-fuss">
-    <label class="check">
-      <input type="checkbox" id="dhCheckbox" disabled onchange="dhCheckboxGeaendert()">
-      Ich habe das gelesen und verstanden.
-    </label>
     <button class="btn btn-primary" id="dhWeiterBtn" disabled onclick="dhBestaetigen()">Verstanden, weiter</button>
     <div class="dhScrollHinweis" id="dhScrollHinweis">Bitte bis zum Ende lesen, um fortzufahren.</div>
   </div>
@@ -10675,12 +10676,16 @@ let dhWeiterCallback = null;
 
 function dhZeigen(weiter) {
   dhWeiterCallback = weiter || null;
-  $('dhCheckbox').checked = false;
-  $('dhCheckbox').disabled = true;
   $('dhWeiterBtn').disabled = true;
   $('dhScrollHinweis').style.display = '';
   $('dlgDemoHinweis').scrollTop = 0;
   $('dlgDemoHinweis').classList.add('on');
+  // Die Seite dahinter stillstellen: Der Scrim ist ein eigener
+  // Scroll-Container, das Cockpit darunter blieb aber seinerseits
+  // scrollbar -- rechts standen zwei Balken nebeneinander, und das Rad
+  // bewegte mal die eine, mal die andere Ebene. Befund des
+  // Projektinhabers, 2026-09-22.
+  document.documentElement.classList.add('kein-scroll');
   dhRechtstextLaden();
   // Passt der Text ohne zu scrollen schon ganz ins Fenster (schmaler
   // Bildschirm, grosse Schrift), soll das nicht ewig gesperrt bleiben --
@@ -10695,6 +10700,9 @@ function dhZeigen(weiter) {
 // auseinanderlaufen koennten. Einmal geladen, bleibt es stehen (kein
 // erneuter Abruf bei jedem dhZeigen()).
 let dhRechtstextGeladen = false;
+// Wie viele Rechtstexte noch nicht dastehen. Solange das nicht 0 ist, gibt
+// dhScrollPruefen() nichts frei -- siehe dort.
+let dhTexteOffen = 0;
 function dhRechtstextLaden() {
   if (dhRechtstextGeladen) { return; }
   dhRechtstextGeladen = true;
@@ -10716,6 +10724,7 @@ function dhRechtstextLaden() {
       if (!main) { throw new Error('kein <main>'); }
       $(zielId).innerHTML = main.innerHTML;
       $(zielId).removeAttribute('aria-busy');
+      dhTexteOffen--;
       // Das Laden aendert die Seitenhoehe -- ein bereits gesperrter Stand
       // bleibt gesperrt, das ist richtig; hier geht es nur um den seltenen
       // Fall, dass die Seite dadurch ERST jetzt laenger wird als der
@@ -10725,30 +10734,48 @@ function dhRechtstextLaden() {
     }).catch(() => {
       $(zielId).innerHTML = ersatz;
       $(zielId).removeAttribute('aria-busy');
+      // Auch ein gescheiterter Abruf zaehlt herunter: Sonst bliebe der
+      // Knopf fuer immer gesperrt, und niemand kaeme mehr in die Demo.
+      dhTexteOffen--;
       dhScrollPruefen();
     });
   };
-  laden('nutzungsbedingungen.html', 'dhNutzungsbedingungen', 'Nutzungsbedingungen');
-  laden('datenschutz-demo.html', 'dhDatenschutz', 'Datenschutzerklärung');
+  const texte = [
+    ['nutzungsbedingungen.html', 'dhNutzungsbedingungen', 'Nutzungsbedingungen'],
+    ['datenschutz-demo.html', 'dhDatenschutz', 'Datenschutzerklärung'],
+  ];
+  dhTexteOffen = texte.length;
+  texte.forEach(t => laden(...t));
 }
 
+// Der Knopf ist das EINZIGE Bedienelement, und er wird allein durchs Lesen
+// frei -- kein Kontrollkaestchen mehr daneben. Ansage des Projektinhabers
+// (2026-09-22): "Ziel war es mit dem Zeigen des vollen Texts, dass man
+// runterscrollen MUSS. Aktuell kann man den Haken setzen und kommt direkt
+// weiter." Ein Kaestchen, das man vor dem Text ankreuzen kann, hebt genau
+// die Sperre auf, um derentwillen der Text ueberhaupt dasteht.
+//
+// ZWEI BEDINGUNGEN, und beide werden bei JEDEM Aufruf neu gesetzt -- auch
+// zurueck. Die erste Fassung schaltete nur frei und nie wieder zu, und
+// dhZeigen() rief sie auf, solange erst die Platzhalter dastanden: Der
+// kurze Text passte ins Fenster, galt damit als "zu Ende gelesen", und die
+// Freigabe blieb, als der echte Text nachkam und die Seite lang wurde.
+// Live war der Knopf darum von Anfang an offen.
 function dhScrollPruefen() {
   const el = $('dlgDemoHinweis');
   const amEnde = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
-  if (amEnde) {
-    $('dhCheckbox').disabled = false;
-    $('dhScrollHinweis').style.display = 'none';
-  }
-}
-
-function dhCheckboxGeaendert() {
-  $('dhWeiterBtn').disabled = !$('dhCheckbox').checked;
+  // Solange ein Text noch unterwegs ist, sagt "am Ende" nichts: Man ist am
+  // Ende des Platzhalters, nicht am Ende der Bedingungen.
+  const frei = amEnde && dhTexteOffen === 0;
+  $('dhWeiterBtn').disabled = !frei;
+  $('dhScrollHinweis').style.display = frei ? 'none' : '';
 }
 
 function dhBestaetigen() {
   if ($('dhWeiterBtn').disabled) { return; }
   api('demo_hinweis_bestaetigen.php', { method: 'POST' }).finally(() => {
     $('dlgDemoHinweis').classList.remove('on');
+    document.documentElement.classList.remove('kein-scroll');
     if (dhWeiterCallback) { const fn = dhWeiterCallback; dhWeiterCallback = null; fn(); }
   });
 }

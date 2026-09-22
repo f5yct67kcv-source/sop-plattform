@@ -212,6 +212,14 @@ for (const [name, breite, hoehe] of [['Desktop', 1440, 900], ['Handy', 390, 844]
 // fetch() dort nicht zu) -- geprueft wird darum der Mechanismus an einem
 // eingesetzten langen Text, nicht der Inhalt. Dass der richtige Inhalt
 // ankommt, sichert Teil 1 oben ab.
+//
+// NACHGESTELLT WIRD DER FALL, DER LIVE SCHIEFGING: Beim Oeffnen stehen
+// erst die kurzen Platzhalter da, der Text kommt nachtraeglich. Die erste
+// Fassung schaltete in diesem Moment frei ("passt ins Fenster, also zu
+// Ende gelesen") und sperrte nie wieder zu -- auf demo3 war der Knopf
+// darum von Anfang an offen, und man kam ohne einen Blick in die
+// Bedingungen durch. Die Reihenfolge hier ist deshalb Absicht: erst
+// oeffnen, dann wachsen lassen.
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 page.setDefaultTimeout(5000);
 await page.goto(`file://${WURZEL}/dashboard.html`);
@@ -219,8 +227,40 @@ await page.waitForTimeout(400);
 await ev(page, () => {
   document.getElementById('gate').style.display = 'none';
   dhZeigen(null);
+});
+await page.waitForTimeout(200);
+
+// Kein Kontrollkaestchen mehr: Wer eines ankreuzen kann, bevor er gelesen
+// hat, braucht den Text nicht zu scrollen -- genau die Abkuerzung, die der
+// Projektinhaber am 2026-09-22 beanstandet hat.
+check('KRITISCH: es gibt kein Kontrollkaestchen, das die Sperre abkuerzt',
+  (await ev(page, () => !document.querySelector('#dlgDemoHinweis input[type=checkbox]'))) === true);
+
+// Solange die Texte noch unterwegs sind, ist nichts frei -- und zwar auch
+// dann nicht, wenn man am Ende des Platzhalters steht. Darum hier
+// ausdruecklich ans Ende scrollen: Ohne das haengt die Pruefung davon ab,
+// wie hoch das Fenster gerade ist, und sie erreicht die Bedingung, die sie
+// pruefen will, womoeglich gar nicht. Genau das ist ihr beim Schreiben
+// passiert -- sie blieb gruen, als der Ladezaehler versuchsweise ausgebaut
+// wurde.
+const amEndeMitLuecke = await ev(page, () => {
+  dhTexteOffen = 2;
+  const s = document.getElementById('dlgDemoHinweis');
+  s.scrollTop = s.scrollHeight;
+  dhScrollPruefen();
+  return s.scrollTop + s.clientHeight >= s.scrollHeight - 4;
+});
+check('die Pruefung steht wirklich am Ende -- sonst sagt der naechste Punkt nichts',
+  amEndeMitLuecke === true);
+check('KRITISCH: solange ein Rechtstext fehlt, bleibt der Knopf gesperrt -- am Ende des Platzhalters ist man nicht am Ende der Bedingungen',
+  (await ev(page, () => document.getElementById('dhWeiterBtn').disabled)) === true);
+
+// Jetzt kommen die Texte an, die Seite wird lang. Der Knopf muss gesperrt
+// BLEIBEN, obwohl er beim Oeffnen kurz haette freigegeben werden koennen.
+await ev(page, () => {
   document.getElementById('dhNutzungsbedingungen').innerHTML =
     Array.from({ length: 200 }, (_, i) => '<p>Zeile ' + i + '</p>').join('');
+  dhTexteOffen = 0;
   dhScrollPruefen();
 });
 await page.waitForTimeout(300);
@@ -234,20 +274,30 @@ check('KRITISCH: der lange Text macht den Bildschirm ueberhaupt scrollbar', oben
 check('KRITISCH: oben ist der Knopf gesperrt', oben && oben.gesperrt === true);
 check('oben steht der Hinweis, dass bis zum Ende zu lesen ist', oben && oben.hinweis === true);
 
+// Ans Ende scrollen -- erst hier wird frei.
 await ev(page, () => { const s = document.getElementById('dlgDemoHinweis');
   s.scrollTop = s.scrollHeight; s.dispatchEvent(new Event('scroll')); });
 await page.waitForTimeout(300);
 const unten = await ev(page, () => ({
-  kasten: document.getElementById('dhCheckbox').disabled,
   knopf: document.getElementById('dhWeiterBtn').disabled,
+  hinweis: getComputedStyle(document.getElementById('dhScrollHinweis')).display !== 'none',
 }));
-check('KRITISCH: unten angekommen ist das Kaestchen freigegeben', unten && unten.kasten === false);
-check('KRITISCH: der Knopf bleibt gesperrt, solange nicht angekreuzt ist', unten && unten.knopf === true);
+check('KRITISCH: unten angekommen wird der Knopf frei', unten && unten.knopf === false);
+check('unten ist der Scroll-Hinweis weg', unten && unten.hinweis === false);
 
-await ev(page, () => { document.getElementById('dhCheckbox').checked = true; dhCheckboxGeaendert(); });
-await page.waitForTimeout(150);
-check('KRITISCH: erst mit Haken wird der Knopf frei',
-  (await ev(page, () => document.getElementById('dhWeiterBtn').disabled)) === false);
+// Und wieder hinauf: Die Pruefung muss auch zurueck sperren. Sonst genuegt
+// ein einziges Mal ganz nach unten, und danach zaehlt nichts mehr -- etwa
+// wenn spaeter noch Text nachgeladen wird.
+await ev(page, () => { const s = document.getElementById('dlgDemoHinweis');
+  s.scrollTop = 0; s.dispatchEvent(new Event('scroll')); });
+await page.waitForTimeout(300);
+check('KRITISCH: zurueck nach oben sperrt wieder -- die Pruefung schaltet in beide Richtungen',
+  (await ev(page, () => document.getElementById('dhWeiterBtn').disabled)) === true);
+
+// Die Seite dahinter steht still, solange der Hinweis offen ist: sonst
+// zwei Bildlaufleisten nebeneinander.
+check('KRITISCH: die Seite hinter dem Hinweis ist stillgestellt -- keine zweite Bildlaufleiste',
+  (await ev(page, () => getComputedStyle(document.documentElement).overflowY)) === 'hidden');
 await page.close();
 
 await browser.close();
