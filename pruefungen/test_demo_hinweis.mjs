@@ -46,29 +46,75 @@ const rumpf = (() => {
 check('KRITISCH: der Demo-Hinweis hat eine Funktion, die die Rechtstexte nachlaedt',
   rumpf.length > 200);
 
-// ── 1b. Der Abdruck datiert auf den Text, der wirklich dastand ──────────
+// ── 1b. Der Abdruck datiert auf die Texte, die wirklich dastanden ──────
 //
-// Der Abdruck haelt fest, WELCHE Fassung jemand bestaetigt hat. Bleibt die
-// Konstante beim naechsten Textwechsel stehen, datiert er die Zustimmung
-// auf einen Text, den niemand gesehen hat -- er beweist dann das Gegenteil
-// dessen, wofuer er da ist. nutzungsbedingungen.html warnt im eigenen Kopf
-// davor, und test_recht.mjs fuehrt dieselbe Pruefung fuer die Zustimmung
-// auf der Homepage. Dem Hinweis fehlte sie bis zum 2026-09-22: Die
-// Konstante stand frei da und war an nichts gebunden.
+// Der Abdruck haelt fest, WELCHE Fassungen jemand bestaetigt hat. Bleibt
+// eine Konstante beim naechsten Textwechsel stehen, datiert er die
+// Zustimmung auf einen Text, den niemand gesehen hat -- er beweist dann das
+// Gegenteil dessen, wofuer er da ist. nutzungsbedingungen.html warnt im
+// eigenen Kopf davor, und test_recht.mjs fuehrt dieselbe Pruefung fuer die
+// Zustimmung auf der Homepage. Dem Hinweis fehlte sie bis zum 2026-09-22.
 //
-// Geprueft wird die Uebereinstimmung, nicht der Wortlaut der Konstante.
+// DREI DATEN, NICHT EINES: Der Hinweis legt zwei Texte vor, und von der
+// Datenschutzerklaerung gibt es zwei Fassungen -- eine fuer einen
+// Demo-Platz, eine fuer die gemeinsame Umgebung. Ein Abdruck, der nur die
+// Nutzungsbedingungen datiert, beweist fuer den Rest nichts.
+//
+// Geprueft wird die Uebereinstimmung, nicht der Wortlaut der Konstanten.
 {
   const MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli',
     'August', 'September', 'Oktober', 'November', 'Dezember'];
-  const seite = readFileSync(`${WURZEL}/nutzungsbedingungen.html`, 'utf8');
+  const datumAusSeite = (datei, muster) => {
+    const t = readFileSync(`${WURZEL}/${datei}`, 'utf8').match(muster);
+    return t ? `${t[3]}-${String(MONATE.indexOf(t[2]) + 1).padStart(2, '0')}-${t[1].padStart(2, '0')}` : null;
+  };
   const kern = readFileSync(`${WURZEL}/backend/api/demo_hinweis_bestaetigen.php`, 'utf8');
-  const t = seite.match(/<p class="stand">Fassung vom (\d{1,2})\. (\p{L}+) (\d{4})<\/p>/u);
-  const k = kern.match(/const DEMO_HINWEIS_FASSUNG = '(\d{4}-\d{2}-\d{2})'/);
-  const ausSeite = t
-    ? `${t[3]}-${String(MONATE.indexOf(t[2]) + 1).padStart(2, '0')}-${t[1].padStart(2, '0')}`
-    : null;
-  check('KRITISCH: der Abdruck des Demo-Hinweises traegt die Fassung, die in den Nutzungsbedingungen steht',
-    ausSeite !== null && k !== null && ausSeite === k[1]);
+  const konstante = name => {
+    const m = kern.match(new RegExp(`const ${name}\\s*=\\s*'(\\d{4}-\\d{2}-\\d{2})'`));
+    return m ? m[1] : null;
+  };
+  const paare = [
+    ['DEMO_HINWEIS_FASSUNG', 'nutzungsbedingungen.html',
+     /<p class="stand">Fassung vom (\d{1,2})\. (\p{L}+) (\d{4})<\/p>/u, 'die Nutzungsbedingungen'],
+    ['DEMO_HINWEIS_DS_PLATZ', 'datenschutz-demo-platz.html',
+     /<p class="stand">Stand: (\d{1,2})\. (\p{L}+) (\d{4})<\/p>/u, 'die Datenschutzerklaerung fuer einen Platz'],
+    ['DEMO_HINWEIS_DS_GEMEINSAM', 'datenschutz-demo.html',
+     /<p class="stand">Stand: (\d{1,2})\. (\p{L}+) (\d{4})<\/p>/u, 'die Datenschutzerklaerung der gemeinsamen Umgebung'],
+  ];
+  for (const [name, datei, muster, was] of paare) {
+    const ausSeite = datumAusSeite(datei, muster);
+    check(`KRITISCH: der Abdruck traegt das Datum, das in ${datei} steht (${was})`,
+      ausSeite !== null && konstante(name) !== null && ausSeite === konstante(name));
+  }
+
+  // Beide Texte muessen IM Abdruck stehen, nicht nur als Konstante daneben.
+  check('KRITISCH: der Abdruck nennt beide Texte -- eine Fassungsangabe, die nur die Bedingungen datiert, beweist fuer die Datenschutzerklaerung nichts',
+    /DEMO_HINWEIS_FASSUNG/.test(kern) && /DEMO_HINWEIS_DS_PLATZ/.test(kern)
+    && /DEMO_HINWEIS_DS_GEMEINSAM/.test(kern)
+    && /ist_demo_platz\(\)/.test(kern));
+
+  // Und er muss ins Feld passen. Eine zu kurze Spalte faellt nicht beim
+  // Bauen auf, sondern erst beim Bestaetigen -- mitten in dem Bildschirm,
+  // den ein Interessent zum Weiterkommen bestaetigen muss.
+  const laengste = Math.max(
+    ...['DEMO_HINWEIS_DS_PLATZ', 'DEMO_HINWEIS_DS_GEMEINSAM'].map(n =>
+      `nb:${konstante('DEMO_HINWEIS_FASSUNG')},ds-platz:${konstante(n)}`.length));
+  const kernTab = readFileSync(`${WURZEL}/backend/planung_einrichten_kern.php`, 'utf8');
+  const breite = (() => {
+    const i = kernTab.indexOf('CREATE TABLE IF NOT EXISTS demo_hinweis_bestaetigung');
+    const m = i < 0 ? null : kernTab.slice(i, i + 400).match(/fassung VARCHAR\((\d+)\)/);
+    return m ? Number(m[1]) : 0;
+  })();
+  check(`KRITISCH: das Fassungsfeld ist breit genug fuer beide Angaben (braucht ${laengste}, hat ${breite})`,
+    breite >= laengste);
+
+  // Eine bestehende Anlage hat die Spalte schon -- schmal. CREATE TABLE IF
+  // NOT EXISTS aendert daran nichts, und kern_spalten() traegt nur FEHLENDE
+  // Spalten nach. Ohne einen eigenen Nachtrag liefe der naechste Eintrag in
+  // "Data too long".
+  check('KRITISCH: bestehende Anlagen bekommen die groessere Breite nachgetragen',
+    /ALTER TABLE demo_hinweis_bestaetigung MODIFY fassung VARCHAR\(60\)/.test(kernTab)
+    && /CHARACTER_MAXIMUM_LENGTH/.test(kernTab));
 }
 
 // ── 2. Der gerenderte Bildschirm ─────────────────────────────────────────

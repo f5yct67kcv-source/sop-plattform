@@ -28,6 +28,28 @@ require __DIR__ . '/../db.php';
 // genau dafuer gibt es die Zwillingspruefung in test_recht.mjs.
 const DEMO_HINWEIS_FASSUNG = '2026-09-21';
 
+// Die Datenschutzerklaerung ist ein ZWEITER Text mit EIGENEM Datum, und es
+// gibt zwei davon: datenschutz-demo-platz.html fuer einen Demo-Platz
+// (ENT-600/601) und datenschutz-demo.html fuer die eine ENT-523-Umgebung.
+// Eine Fassungsangabe, die nur die Nutzungsbedingungen nennt, beweist fuer
+// die Datenschutzerklaerung nichts -- und welche der beiden jemand gesehen
+// hat, schon gar nicht. Beide Daten und die Kennung des Dokuments stehen
+// darum mit im Abdruck.
+const DEMO_HINWEIS_DS_PLATZ     = '2026-09-21';
+const DEMO_HINWEIS_DS_GEMEINSAM = '2026-09-17';
+
+// WELCHES DOKUMENT GEZEIGT WURDE, ENTSCHEIDET DER SERVER -- nicht der
+// Browser und auch nicht ein mitgeschicktes Feld. Der Abdruck ist ein
+// Beleg; was darin steht, darf nicht von dem abhaengen, was der Aufrufer
+// behauptet. ist_demo_platz() kommt aus dem Deploy (db.php), also aus
+// derselben Quelle, aus der dashboard.html seine Verzweigung speist.
+function demo_hinweis_fassung(): string
+{
+    return ist_demo_platz()
+        ? 'nb:' . DEMO_HINWEIS_FASSUNG . ',ds-platz:' . DEMO_HINWEIS_DS_PLATZ
+        : 'nb:' . DEMO_HINWEIS_FASSUNG . ',ds-demo:' . DEMO_HINWEIS_DS_GEMEINSAM;
+}
+
 $user = require_session();
 $ich  = (int)$user['id'];
 $pdo  = db();
@@ -47,6 +69,6 @@ $st = $pdo->prepare(
      VALUES (?, ?, ?)
      ON DUPLICATE KEY UPDATE fassung = VALUES(fassung), bestaetigt_am = VALUES(bestaetigt_am)'
 );
-$st->execute([$ich, DEMO_HINWEIS_FASSUNG, date('Y-m-d H:i:s')]);
+$st->execute([$ich, demo_hinweis_fassung(), date('Y-m-d H:i:s')]);
 
 json_response(['status' => 'ok']);

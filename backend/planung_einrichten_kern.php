@@ -1547,11 +1547,21 @@ CREATE TABLE IF NOT EXISTS tutorial_gesehen (
 // fest, dass GENAU DIESES Mitarbeiterkonto den Hinweis gesehen hat -- die
 // Person am Bildschirm muss nicht dieselbe sein, die den Demo-Zugang
 // angefordert hat. Liegt darum wie tutorial_gesehen in der Instanz-
-// Datenbank und wird mit ihr taeglich zurueckgesetzt.
+// Datenbank -- auf der einen ENT-523-Umgebung nimmt der naechtliche Reset
+// sie mit, auf einem Demo-Platz (ENT-600/601) die vollstaendige Loeschung
+// nach 14 Tagen. "Wird taeglich zurueckgesetzt" stand hier bis zum
+// 2026-09-22 unbedingt und traf auf einen Platz nie zu.
+//
+// fassung haelt BEIDE Texte fest, die der Hinweis vorlegt -- die
+// Nutzungsbedingungen UND die Datenschutzerklaerung, und bei letzterer
+// auch, welche der beiden es war (Platz oder gemeinsame Umgebung). Eine
+// Fassungsangabe, die nur den einen Text nennt, beweist fuer den anderen
+// nichts. Darum 60 statt 20 Zeichen; aeltere Anlagen bekommen die Breite
+// weiter unten nachgetragen.
 'demo_hinweis_bestaetigung' => "
 CREATE TABLE IF NOT EXISTS demo_hinweis_bestaetigung (
   mitarbeiter_id INT NOT NULL PRIMARY KEY,
-  fassung VARCHAR(20) NOT NULL,
+  fassung VARCHAR(60) NOT NULL,
   bestaetigt_am DATETIME NOT NULL,
   FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
@@ -2932,6 +2942,45 @@ foreach ($spalten as [$tabelle, $spalte, $sql]) {
     }
     if ($nurPruefen) { $getan[] = "Spalte $tabelle.$spalte fehlt noch"; continue; }
     schritt($pdo, $sql, "Spalte $tabelle.$spalte", $getan, $fehler);
+}
+
+// ── 2a. Fassungsfeld des Demo-Hinweises verbreitern (2026-09-22)
+//
+// Es haelt seit heute zwei Fassungen statt einer fest (siehe Kommentar bei
+// demo_hinweis_bestaetigung in kern_tabellen()); in 20 Zeichen passt das
+// nicht mehr. Eine laufende Anlage hat die Tabelle laengst -- CREATE TABLE
+// IF NOT EXISTS aendert an ihr nichts, und der naechste Eintrag liefe in
+// "Data too long", also mitten in den Bildschirm, den ein Interessent zum
+// Weiterkommen bestaetigen muss.
+//
+// EIGENER SCHRITT UND NICHT kern_spalten(): Jene Liste traegt FEHLENDE
+// Spalten nach und erkennt sie daran, dass es sie nicht gibt. Diese Spalte
+// gibt es, sie ist nur zu kurz -- dieselbe Pruefung wuerde sie nie anfassen.
+// Gemessen wird darum die tatsaechliche Breite, nicht ihr Vorhandensein.
+if (hat_tabelle_jetzt($pdo, 'demo_hinweis_bestaetigung')
+    && hat_spalte($pdo, 'demo_hinweis_bestaetigung', 'fassung')) {
+    $breite = 0;
+    try {
+        $breite = (int)$pdo->query(
+            "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'demo_hinweis_bestaetigung'
+                AND COLUMN_NAME = 'fassung'")->fetchColumn();
+    } catch (Throwable $e) {
+        // Kein Zugriff auf information_schema: Dann bleibt es beim alten
+        // Stand, statt blind ein ALTER auf eine Tabelle loszulassen, deren
+        // Zustand wir nicht kennen.
+        $breite = 0;
+    }
+    if ($breite > 0 && $breite < 60) {
+        if ($nurPruefen) {
+            $getan[] = 'Spalte demo_hinweis_bestaetigung.fassung ist noch zu kurz';
+        } else {
+            schritt($pdo,
+                'ALTER TABLE demo_hinweis_bestaetigung MODIFY fassung VARCHAR(60) NOT NULL',
+                'Fassungsfeld des Demo-Hinweises verbreitern', $getan, $fehler);
+        }
+    }
 }
 
 // Betreiber-eigene Spalten-Nachtraege (be_spalten() in backend/betreiber.php,
