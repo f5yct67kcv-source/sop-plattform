@@ -370,12 +370,12 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
 }
 
 // ── Staging deployt nur gegen qa-*-Tags oder den Branch "test" (ENT-372,
-// revidiert ENT-341 Punkt 5, erweitert ENT-677) ───────────────────────────
+// revidiert ENT-341 Punkt 5, erweitert ENT-679) ───────────────────────────
 //
 // Warum diese Prüfung: Der dauerhafte Branch "staging" wurde ersatzlos
 // gestrichen -- ein beschreibbarer Branch widerspricht der Vorgabe "main
 // ist alleinige Source of Truth, kein Staging-spezifischer Code, der
-// zurückgemerged werden müsste". ENT-677 lässt davon GENAU EINEN Branch
+// zurückgemerged werden müsste". ENT-679 lässt davon GENAU EINEN Branch
 // wieder zu ("test", als Wegwerf-Branch, nie nach main gemergt) und sonst
 // keinen. Geprüft wird die AUSSAGE ("Push löst nur für main und test aus,
 // ein Staging-Deploy gegen irgendeinen anderen Ref bricht ab, und test
@@ -388,13 +388,13 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   // Leerzeichen.
   const pushListe = (/push:\s*\n\s*branches:\s*\[([^\]]*)\]/.exec(workflow) ?? [])[1];
   const pushBranches = (pushListe ?? '').split(',').map((b) => b.trim()).filter(Boolean);
-  check('KRITISCH: Push löst für genau zwei Branches aus -- main und test (ENT-677), kein Branch "staging"',
+  check('KRITISCH: Push löst für genau zwei Branches aus -- main und test (ENT-679), kein Branch "staging"',
     pushBranches.length === 2
     && pushBranches.includes('main')
     && pushBranches.includes('test')
     && !pushBranches.includes('staging'));
 
-  // Der eigentliche Schutz hinter ENT-677: Ein Push auf "test" darf die
+  // Der eigentliche Schutz hinter ENT-679: Ein Push auf "test" darf die
   // echte Anlage nie erreichen. Production hängt ausschliesslich am
   // Ref-Namen "main" -- geprüft am environment:-Ausdruck selbst, nicht an
   // einem Kommentar. Ein Ausdruck, der Production auch aus startsWith()
@@ -414,13 +414,13 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   check('KRITISCH: ein Staging-Deploy gegen einen Ref, der weder qa-*-Tag noch der Branch test ist, bricht ab (exit 1)',
     qaTagAbbruch.test(workflow));
 
-  // Und die Kehrseite von ENT-677: "test" ist ein exakter Name, kein
+  // Und die Kehrseite von ENT-679: "test" ist ein exakter Name, kein
   // Muster. Stünde dort "test*" oder "test-*", wäre jeder beliebige
   // Branch mit diesem Anfang ein Staging-Deploy -- genau der Zustand, den
   // ENT-372 verhindern wollte. Geprüft wird der case-Zweig innerhalb des
   // staging-Guards, nicht das Wort "test" irgendwo im Workflow.
   const stagingGuard = (/if\s*\[\s*"\$UMGEBUNG"\s*=\s*"staging"\s*\][\s\S]{0,1200}?esac/.exec(workflow) ?? [''])[0];
-  check('KRITISCH: der Branch-Zweig im Staging-Guard trifft exakt "test", nicht ein Muster wie test* (ENT-677)',
+  check('KRITISCH: der Branch-Zweig im Staging-Guard trifft exakt "test", nicht ein Muster wie test* (ENT-679)',
     /\n\s*test\)\s*;;/.test(stagingGuard)
     && !/\n\s*test[^)\s]+\)\s*;;/.test(stagingGuard));
 }
