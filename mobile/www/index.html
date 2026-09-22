@@ -3632,25 +3632,54 @@ function sockelSetzen() {
 // liegt, ist etwas anderes (aufgeklappte Tastatur ...) und wird nicht
 // angefasst" -- hier wird genau dieser Fall behandelt, mit derselben
 // Grenze als Wasserscheide.
+/* NACHTRAG ENT-660 -- der dritte Bericht zu derselben Sache, diesmal
+   praeziser: "Maske zuckt immer noch ein wenig, wenn die Tastatur
+   droppt." Also beim SCHLIESSEN, nicht beim Oeffnen.
+
+   Gemessen, nicht vermutet: Waehrend die Tastatur zufaehrt, laeuft diese
+   Funktion sechsmal durch die Animation (visualViewport meldet resize
+   UND scroll, und beides mehrfach). Jeder Durchlauf rief
+   window.scrollTo(0,0) und scrollIntoView auf dem fokussierten Feld.
+
+   Und das Entscheidende: --tastatur bleibt dabei die ganze Zeit 0. Wo
+   die Huelle das FENSTER verkleinert statt nur den sichtbaren
+   Ausschnitt, misst sich gar keine Tastatur (innerHeight schrumpft
+   mit) -- der Mechanismus von ENT-635 greift in diesem Fall nicht, die
+   Scrollbefehle liefen aber trotzdem. Sie richteten nichts aus und
+   erzeugten nur Bewegung, mitten in einer laufenden Animation. Genau
+   das ist das Zucken.
+
+   Ab jetzt wird nur eingegriffen, solange eine Tastatur wirklich
+   MESSBAR im Weg ist. Kein Messwert, kein Eingriff -- und beim
+   Schliessen gibt es nichts mehr zu tun, weil der Platz von selbst
+   zurueckkommt. */
 function tastaturVerfolgen() {
   const vv = window.visualViewport;
   if (!vv) { return; }
   const hoehe = Math.round(window.innerHeight - vv.height);
-  document.documentElement.style.setProperty('--tastatur', (hoehe > 80 ? hoehe : 0) + 'px');
+  // Dieselbe Wasserscheide wie bei sockelMessen(): Was darunter liegt,
+  // ist eine Systemleiste und keine Tastatur.
+  const offen = hoehe > 80;
+  document.documentElement.style.setProperty('--tastatur', (offen ? hoehe : 0) + 'px');
+  if (!offen) { return; }
   // Die Verschiebung, die den Fehler ausmacht, hat iOS zu diesem
   // Zeitpunkt schon vorgenommen -- sie wird hier rueckgaengig gemacht.
   // #gate passt sich stattdessen ueber die neue Groesse an (siehe die
   // CSS-Regel) und rollt seinen EIGENEN Rumpf (overflow-y:auto), statt
   // dass iOS das ganze Fenster verschiebt.
   window.scrollTo(0, 0);
-  // Das fokussierte Feld selbst muss dabei sichtbar bleiben -- die
-  // automatische Fokus-Verschiebung wird ja gerade aufgehoben. Ohne das
-  // stuende die Tastatur zwar korrekt, aber unter Umstaenden genau ueber
-  // dem Feld, das man gerade ausfuellt.
+  /* Das fokussierte Feld muss sichtbar bleiben -- die automatische
+     Fokus-Verschiebung wird ja gerade aufgehoben. Aber NUR, wenn es
+     tatsaechlich verdeckt ist: scrollIntoView auf einem Feld, das schon
+     frei steht, ist auf dem Geraet kein Nichtstun, sondern ein Ruck.
+     Darum vorher nachsehen, und zwar gegen den SICHTBAREN Ausschnitt
+     (vv.height), nicht gegen das Layout-Fenster -- unter der Tastatur
+     ist das Feld im Layout sehr wohl da, nur sieht es niemand. */
   const fokus = document.activeElement;
-  if (fokus && fokus !== document.body && typeof fokus.scrollIntoView === 'function') {
-    fokus.scrollIntoView({ block: 'nearest' });
-  }
+  if (!fokus || fokus === document.body || typeof fokus.scrollIntoView !== 'function') { return; }
+  const r = fokus.getBoundingClientRect();
+  if (r.top >= 0 && r.bottom <= vv.height) { return; }
+  fokus.scrollIntoView({ block: 'nearest' });
 }
 if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', tastaturVerfolgen);

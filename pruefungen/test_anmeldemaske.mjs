@@ -259,6 +259,132 @@ const mitte = await mass('.gate-mitte');
     }));
 }
 
+/* ══════════ WANN DIE TASTATURLOGIK EINGREIFT (ENT-660) ═════════════
+   Der dritte Bericht zu derselben Sache, und diesmal praeziser: "Maske
+   zuckt immer noch ein wenig, wenn die Tastatur droppt." Also beim
+   SCHLIESSEN.
+
+   Gemessen: Waehrend die Tastatur zufaehrt, laeuft tastaturVerfolgen
+   sechsmal durch die Animation -- visualViewport meldet resize UND
+   scroll, und beides mehrfach. Jeder Durchlauf rief window.scrollTo(0,0)
+   und scrollIntoView auf dem fokussierten Feld. Dabei blieb --tastatur
+   die ganze Zeit 0: Wo die Huelle das FENSTER verkleinert statt nur den
+   sichtbaren Ausschnitt, misst sich gar keine Tastatur. Der Mechanismus
+   griff also nicht, die Scrollbefehle liefen trotzdem -- Bewegung ohne
+   Zweck, mitten in einer Animation.
+
+   Geprueft wird die ganze Wahrheitstafel, nicht nur der behobene Fall.
+   Die vierte Zeile ist die unauffaellige: Ein scrollIntoView auf ein
+   Feld, das ohnehin frei steht, ist am Schreibtisch ein Nichtstun und
+   auf dem Geraet ein Ruck. */
+{
+  /* Auf einem grossen Bildschirm steht selbst das untere Feld mit
+     Tastatur noch frei -- dort liesse sich "verdecktes Feld wird geholt"
+     gar nicht pruefen. Darum fuer diesen Block ein knappes Geraet
+     (390x640), auf dem die Tastatur wirklich etwas verdeckt. Am Ende
+     wird die alte Groesse wiederhergestellt. */
+  const vorherGroesse = page.viewportSize();
+  await page.setViewportSize({ width: 390, height: 640 });
+  await page.waitForTimeout(150);
+  const zaehler = () => ev(() => {
+    window.__tz = { scrollTo: 0, intoView: 0 };
+    const echt = window.scrollTo.bind(window);
+    window.scrollTo = (...a) => { window.__tz.scrollTo++; return echt(...a); };
+    const proto = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (...a) {
+      window.__tz.intoView++; return proto.apply(this, a);
+    };
+  });
+  const stand = () => ev(() => JSON.parse(JSON.stringify(window.__tz)));
+
+  // ── Zeile 1: keine Tastatur messbar -> kein Eingriff ───────────────
+  await zaehler();
+  await ev(() => { document.getElementById('gName').focus(); tastaturVerfolgen(); });
+  const ohne = await stand();
+  check('KRITISCH: ohne messbare Tastatur wird gar nicht gescrollt',
+    ohne.scrollTo === 0 && ohne.intoView === 0);
+  check('Und --tastatur steht dann auf 0',
+    (await ev(() => getComputedStyle(document.documentElement)
+      .getPropertyValue('--tastatur').trim())) === '0px');
+
+  // ── Zeile 2: Tastatur messbar, Feld verdeckt -> ins Bild holen ─────
+  /* Der sichtbare Ausschnitt wird verkleinert, OHNE das Fenster zu
+     aendern -- so verhaelt es sich, wenn die Huelle die Ansicht stehen
+     laesst. Nur dann misst sich ueberhaupt eine Tastatur. */
+  const verdeckt = await page.evaluate(async () => {
+    const feld = document.getElementById('gPass');
+    feld.focus();
+    const echt = Object.getOwnPropertyDescriptor(VisualViewport.prototype, 'height');
+    Object.defineProperty(VisualViewport.prototype, 'height', {
+      configurable: true, get() { return window.innerHeight - 336; } });
+    const vorher = Math.round(feld.getBoundingClientRect().top);
+    window.__tz = { scrollTo: 0, intoView: 0 };
+    tastaturVerfolgen();
+    await new Promise(r => setTimeout(r, 120));
+    const sicht = window.innerHeight - 336;
+    const kasten = feld.getBoundingClientRect();
+    const raus = {
+      tast: getComputedStyle(document.documentElement).getPropertyValue('--tastatur').trim(),
+      vorher, nachher: Math.round(kasten.top),
+      imBild: kasten.bottom <= sicht + 1 && kasten.top >= -1,
+      log: JSON.parse(JSON.stringify(window.__tz)),
+    };
+    Object.defineProperty(VisualViewport.prototype, 'height', echt);
+    tastaturVerfolgen();
+    return raus;
+  });
+  check('Vorbedingung: mit verkleinertem Ausschnitt misst sich eine Tastatur',
+    verdeckt.tast === '336px');
+  check('KRITISCH: ein von der Tastatur verdecktes Feld wird ins Bild geholt',
+    verdeckt.imBild === true && verdeckt.nachher < verdeckt.vorher);
+
+  // ── Zeile 3: Tastatur messbar, Feld aber frei -> NICHT scrollen ────
+  const frei = await page.evaluate(async () => {
+    // Das oberste Feld steht auch mit Tastatur weit oben im Bild.
+    const feld = document.getElementById('gName');
+    feld.focus();
+    const echt = Object.getOwnPropertyDescriptor(VisualViewport.prototype, 'height');
+    Object.defineProperty(VisualViewport.prototype, 'height', {
+      configurable: true, get() { return window.innerHeight - 336; } });
+    tastaturVerfolgen();              // einmal einschwingen lassen
+    await new Promise(r => setTimeout(r, 120));
+    const sicht = window.innerHeight - 336;
+    const k = feld.getBoundingClientRect();
+    const stehtFrei = k.top >= 0 && k.bottom <= sicht;
+    window.__tz = { scrollTo: 0, intoView: 0 };
+    tastaturVerfolgen();              // und jetzt zaehlen
+    const raus = { stehtFrei, log: JSON.parse(JSON.stringify(window.__tz)) };
+    Object.defineProperty(VisualViewport.prototype, 'height', echt);
+    tastaturVerfolgen();
+    return raus;
+  });
+  check('Vorbedingung: das oberste Feld steht auch mit Tastatur frei',
+    frei.stehtFrei === true);
+  check('KRITISCH: ein frei stehendes Feld wird NICHT ins Bild geholt -- das waere auf dem Geraet ein Ruck',
+    frei.log.intoView === 0);
+
+  // ── Zeile 4: die Tastatur faehrt zu -> gar kein Eingriff ───────────
+  /* Der eigentliche Bericht. Die Huelle laesst das Fenster mitwachsen;
+     dabei feuert visualViewport mehrfach. Keiner dieser Durchlaeufe darf
+     noch scrollen -- es gibt nichts zu korrigieren, der Platz kommt von
+     selbst zurueck. */
+  const voll = page.viewportSize();
+  await page.setViewportSize({ width: voll.width, height: voll.height - 336 });
+  await page.waitForTimeout(150);
+  await zaehler();
+  for (const h of [voll.height - 250, voll.height - 150, voll.height - 60, voll.height]) {
+    await page.setViewportSize({ width: voll.width, height: h });
+    await page.waitForTimeout(60);
+  }
+  await page.waitForTimeout(200);
+  const zu = await stand();
+  check('KRITISCH: waehrend die Tastatur zufaehrt wird kein einziges Mal gescrollt',
+    zu.scrollTo === 0 && zu.intoView === 0);
+  await ev(() => { document.activeElement.blur(); });
+  await page.setViewportSize(vorherGroesse);
+  await page.waitForTimeout(150);
+}
+
 check('Die Marke steht waagrecht wirklich mittig, nicht nur ungefaehr',
   logo !== null && mitte !== null
   && Math.abs((logo.x + logo.w / 2) - (mitte.x + mitte.w / 2)) <= 2);
