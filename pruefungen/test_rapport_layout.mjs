@@ -162,6 +162,73 @@ await p.waitForTimeout(150);
 await p.screenshot({ path: `${OUT}/rl-02-formular-desktop.png` });
 await p.close();
 
+/* ══════════ DER PFEIL BLEIBT EIN PFEIL (ENT-676) ══════════════════════
+   Gemeldet: "Bei Anklicken eines Feldes kommt dieses komische
+   Zickzack-Muster, das wieder verschwindet nach paar Sekunden."
+
+   Es war kein Muster, sondern der 12x8 grosse Auswahlpfeil, der sich
+   ueber das ganze Feld kachelte. Ursache war die KURZFORM "background"
+   in der Fokusregel: Sie setzt background-image, -repeat und -position
+   implizit mit zurueck. Im Dunkelmodus holte die Themenregel danach nur
+   das BILD zurueck, nicht das "no-repeat" -- Ergebnis: Kachelung. Im
+   Hellmodus fiel dieselbe Ursache niemandem auf, weil dort der Pfeil
+   beim Fokus schlicht verschwand. Beides war falsch.
+
+   Derselbe Fehler war schon einmal im RUHEzustand behoben worden (siehe
+   den Kommentar bei der Pfeilregel in index.html und ENT-676). Dass er im
+   Fokus- und im Fehlerzustand weiterlebte, hat keine Pruefung gemerkt --
+   weil keine ihn in diesen Zustaenden gemessen hat. Genau das steht hier
+   jetzt.
+
+   Geprueft wird die Aussage, nicht die CSS-Regel: In JEDEM Zustand und
+   in BEIDEN Themen steht genau EIN Pfeil, rechts, ohne Wiederholung.
+   Und die Farbe wechselt trotzdem -- sonst waere die Behebung nur ein
+   Wegnehmen. */
+{
+  const p = await formular(390, 844);
+  const messe = () => p.evaluate(() => {
+    const s = document.querySelector('.field select');
+    if (!s) { return null; }
+    const c = getComputedStyle(s);
+    return { repeat: c.backgroundRepeat, lage: c.backgroundPosition,
+             bild: c.backgroundImage !== 'none', farbe: c.backgroundColor };
+  });
+  const setze = (thema, zustand) => p.evaluate(([t, z]) => {
+    document.documentElement.setAttribute('data-thema', t);
+    const s = document.querySelector('.field select');
+    s.classList.toggle('error', z === 'fehler');
+    if (z === 'ruhe') { s.blur(); } else { s.focus(); }
+  }, [thema, zustand]);
+
+  const farben = {};
+  for (const thema of ['hell', 'dunkel']) {
+    for (const zustand of ['ruhe', 'fokus', 'fehler']) {
+      await setze(thema, zustand);
+      // Die Farbe laeuft in .15s hinueber -- erst danach messen, sonst
+      // trifft die Messung den Zwischenstand der Animation.
+      await p.waitForTimeout(350);
+      const m = await messe();
+      const fall = `${thema}/${zustand}`;
+      check(`Vorbedingung ${fall}: das Feld ist messbar`, m !== null);
+      if (!m) { continue; }
+      check(`KRITISCH ${fall}: der Pfeil wiederholt sich nicht`, m.repeat === 'no-repeat');
+      check(`KRITISCH ${fall}: er steht rechts und nicht in der Ecke`,
+        /right 14px/.test(m.lage));
+      check(`KRITISCH ${fall}: und er ist ueberhaupt da`, m.bild === true);
+      farben[fall] = m.farbe;
+    }
+  }
+  // Die Behebung darf die Rueckmeldung nicht mitnehmen: Fokus und Fehler
+  // muessen sich von der Ruhe weiterhin farblich unterscheiden.
+  for (const thema of ['hell', 'dunkel']) {
+    check(`${thema}: der Fokus faerbt das Feld weiterhin um`,
+      farben[`${thema}/ruhe`] !== farben[`${thema}/fokus`]);
+    check(`${thema}: der Fehler faerbt das Feld weiterhin um`,
+      farben[`${thema}/ruhe`] !== farben[`${thema}/fehler`]);
+  }
+  await p.close();
+}
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
