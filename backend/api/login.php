@@ -8,6 +8,13 @@ require __DIR__ . '/../zweifaktor.php';
 require_once __DIR__ . '/../planung.php';
 // Fuer den Stand der Cockpit-Tour und des Demo-Hinweises.
 require_once __DIR__ . '/../tutorial.php';
+// Fuer ma_nur_menschen() und ma_stempel(). GANZ OBEN und nicht erst weiter
+// unten bei ma_stempel(): ma_nur_menschen() steht schon in der Abfrage, mit
+// der die Anmeldung beginnt. Ein require, das nach seinem ersten Aufruf
+// steht, ist kein spaeter Ladezeitpunkt, sondern gar keiner -- PHP bricht
+// mit "Call to undefined function" ab, und weil das keine PDOException ist,
+// bleibt beim Anmeldenden nur "Unerwarteter Serverfehler" uebrig.
+require_once __DIR__ . '/../mitarbeiter.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
@@ -97,7 +104,6 @@ if (password_needs_rehash($user['password_hash'], PASSWORD_DEFAULT, ['cost' => P
 $token = bin2hex(random_bytes(32));
 // Wann war diese Person zuletzt da? Die Angabe steht im Mitarbeiterbereich
 // (ENT-072) und ist die einzige Spur, ob ein Zugang ueberhaupt genutzt wird.
-require_once __DIR__ . '/../mitarbeiter.php';
 ma_stempel(db(), 'letzter_zugriff', 'id', (int)$user['id']);
 
 // letzte_nutzung gleich mitsetzen (ENT-075): Eine frische Sitzung darf nicht
