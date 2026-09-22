@@ -18,14 +18,20 @@ $pdo = betreiber_db();
 // Ein Endpunkt, der in diesem Moment mit einem SQL-Fehler abbricht, macht aus
 // einer fehlenden Spalte einen unbenutzbaren Bereich.
 $geteilt = hat_spalte($pdo, 'betreiber', 'vorname');
+// Dieselbe Ueberlegung wie bei den Namensteilen eine Zeile darueber, fuer
+// das Archiv (ENT-672): Zwischen Deploy und Einrichtungslauf gibt es die
+// Spalte noch nicht, und ein Endpunkt, der dann mit einem SQL-Fehler
+// abbricht, macht aus einer fehlenden Spalte einen unbenutzbaren Bereich.
+$hatArchiv = hat_spalte($pdo, 'betreiber', 'archiviert_am');
 $felder  = $geteilt
     ? 'id, name, anrede, vorname, nachname, email, aktiv, angelegt_am, letzte_anmeldung'
     : 'id, name, email, aktiv, angelegt_am, letzte_anmeldung';
+if ($hatArchiv) { $felder .= ', archiviert_am'; }
 
 $zeilen = $pdo->query('SELECT ' . $felder . ' FROM betreiber ORDER BY id')
               ->fetchAll(PDO::FETCH_ASSOC);
 
-$liste = array_map(static function (array $k) use ($ich, $pdo, $geteilt): array {
+$liste = array_map(static function (array $k) use ($ich, $pdo, $geteilt, $hatArchiv): array {
     $k['id']       = (int)$k['id'];
     $k['aktiv']    = (int)$k['aktiv'] === 1;
     $k['ich']      = $k['id'] === (int)$ich['id'];
@@ -51,6 +57,10 @@ $liste = array_map(static function (array $k) use ($ich, $pdo, $geteilt): array 
     // boete einen Schalter "aktivieren" an, den der Server zu Recht
     // zurueckweist. "Unbekannt darf nie wie keine aussehen" (CLAUDE.md).
     $k['eingeladen'] = be_einladung_offen($pdo, $k['id']);
+    // Archiviert heisst: aus der Liste genommen, nicht geloescht (ENT-672).
+    // Ohne die Spalte gilt "nicht archiviert" -- das ist der Zustand, den
+    // eine Anlage vor dem Nachtrag tatsaechlich hat, keine Annahme.
+    $k['archiviert'] = $hatArchiv && ($k['archiviert_am'] ?? null) !== null;
     return $k;
 }, $zeilen);
 
@@ -63,4 +73,9 @@ json_response([
     // selbst -- eine Sperre, die man am Browser vorbei umgehen kann, ist
     // keine (CLAUDE.md).
     'aktive'  => count(array_filter($liste, static fn($k) => $k['aktiv'])),
+    // Damit die Oberflaeche den Reiter "Archiviert" nur dann zeigt, wenn es
+    // dort etwas zu sehen gibt -- und ihn zeigt, SOBALD es das gibt. Ein
+    // archiviertes Konto, das nirgends mehr auftaucht, waere geloescht in
+    // allem ausser dem Namen (ENT-672, Risiken).
+    'archivierte' => count(array_filter($liste, static fn($k) => $k['archiviert'])),
 ]);
