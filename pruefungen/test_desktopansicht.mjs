@@ -17,10 +17,28 @@
 //
 // NICHT geprueft, weil hier nicht pruefbar: der Abstand zum unteren Rand
 // unter der iOS-Adressleiste (env(safe-area-inset-bottom) ist im Testbrowser
-// immer 0) und ob das Zoomen mit zwei Fingern auf einem echten Geraet
-// angenehm ist. Beides gehoert am Geraet angesehen.
+// immer 0) und ob die Zweifinger-Geste auf einem echten Geraet TATSAECHLICH
+// greift -- das haengt an der nativen Huelle, nicht am Browser.
+//
+// Was seit ENT-671 sehr wohl geprueft wird, sind die drei Riegel, die das
+// Zoomen bis dahin ZU DRITT verhindert haben. Der Projektinhaber meldete:
+// "es laesst sich am Handy nichts zoomen oder auf der Seite verschieben".
+// Bei 30 % Darstellung ist eine Ansicht ohne Zoom zwar da, aber unlesbar.
+//   (1) Die Viewport-Angabe der Desktop-Ansicht darf keine Zoomgrenze
+//       tragen -- kein maximum-scale, kein user-scalable=no. Das war schon
+//       so gedacht und wird jetzt festgehalten.
+//   (2) "touch-action: manipulation" am <html> galt fuer die ganze Datei
+//       und nahm der Geste die Grundlage. Es gilt jetzt nur noch in der
+//       Handy-Ansicht.
+//   (3) Capacitor schaltet das Zoomen in der Huelle von sich aus AB
+//       (zoomingEnabled = NO ist der Standard) und faengt die Geste am
+//       ScrollView ab, bevor die Seite ueberhaupt gefragt wird. Dagegen
+//       hilft kein CSS -- nur capacitor.config.json.
+// Punkt 3 ist reine Konfiguration und laesst sich nur als solche pruefen;
+// ob die Geste am Geraet ankommt, bleibt eine Sache fuers Geraet.
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
+import { readFileSync } from 'fs';
 
 const EXE = browserPfad();
 const ok = [], bad = [];
@@ -285,6 +303,68 @@ await tippe(page, '#desktopZurueck', 'der Rueckweg auf der Anmeldemaske');
 l = await lage(page);
 check('Er fuehrt auch von dort zurueck', l.breite === GERAET && !l.zurueckSichtbar);
 await browser.close();
+
+// ══════════════ 6. ZOOMEN IST IN DER DESKTOP-ANSICHT ERLAUBT (ENT-671)
+// Gemessen wird der WIRKSAME Zustand: die Viewport-Angabe, wie sie nach dem
+// Umschalten im Dokument steht, und die BERECHNETE touch-action am <html>.
+// Eine CSS-Regel kann wirkungslos bleiben, ohne dass etwas kaputtgeht.
+({ browser, page } = await starte({}));
+{
+  const vorher = await page.evaluate(() => ({
+    meta: document.getElementById('metaViewport').getAttribute('content'),
+    touch: getComputedStyle(document.documentElement).touchAction,
+  }));
+  check('Vorbedingung Handy-Ansicht: die Angabe sperrt das Zoomen',
+    /user-scalable\s*=\s*no/.test(vorher.meta) && /maximum-scale/.test(vorher.meta));
+  check('Vorbedingung Handy-Ansicht: Doppeltippen zoomt nicht',
+    vorher.touch === 'manipulation');
+
+  // Der Umschalter sitzt in der Schublade -- die muss erst auf.
+  await page.click('#btnBurger'); await page.waitForTimeout(350);
+  await tippe(page, '#nav-desktop', 'der Umschalter im Menue');
+  const nachher = await page.evaluate(() => ({
+    touch: getComputedStyle(document.documentElement).touchAction,
+    kennung: document.documentElement.getAttribute('data-desktop'),
+  }));
+  check('Vorbedingung: die Desktop-Ansicht ist an', nachher.kennung === 'an');
+  /* Die Viewport-Angabe selbst prueft Abschnitt 1 bereits ("Zoomen ist
+     wieder erlaubt"). Sie war auch nie das Problem -- das CSS darueber
+     war es. Genau das steht hier. */
+  check('KRITISCH: touch-action gibt die Geste am <html> wieder frei',
+    nachher.touch === 'auto');
+
+  // Und zurueck: In der Handy-Ansicht bleibt es gesperrt wie bisher.
+  await tippe(page, '#desktopZurueck', 'der Rueckweg');
+  const zurueck = await page.evaluate(() => ({
+    meta: document.getElementById('metaViewport').getAttribute('content'),
+    touch: getComputedStyle(document.documentElement).touchAction,
+  }));
+  check('KRITISCH: in der Handy-Ansicht ist das Zoomen wieder gesperrt',
+    /user-scalable\s*=\s*no/.test(zurueck.meta) && zurueck.touch === 'manipulation');
+}
+await browser.close();
+
+// ══════════════ 7. DIE HUELLE LAESST DIE GESTE DURCH (ENT-671)
+// Capacitor schaltet das Zoomen von sich aus ab -- der Standard in
+// CAPInstanceDescriptor ist zoomingEnabled = NO, und der ScrollView-Delegat
+// schaltet den Zweifinger-Erkenner beim ersten Ansatz wieder aus. Kein CSS
+// und keine Viewport-Angabe kommt dagegen an. Geprueft wird darum die
+// Konfiguration selbst -- die ist hier die Sache, nicht ihre Beschreibung.
+{
+  const konfig = JSON.parse(readFileSync(`${WURZEL}/mobile/capacitor.config.json`, 'utf8'));
+  check('KRITISCH: die Huelle gibt das Zoomen unter iOS frei',
+    konfig.ios && konfig.ios.zoomEnabled === true);
+  // Die Seite entscheidet danach selbst, wo gezoomt werden darf: Die
+  // Waechter-Ansicht und die Handy-Ansicht des Cockpits tragen weiterhin
+  // user-scalable=no in ihrer Viewport-Angabe und bleiben gesperrt. Ohne
+  // diese Pruefung waere die Freigabe eine pauschale.
+  for (const datei of ['app.html', 'dashboard.html']) {
+    const kopf = readFileSync(`${WURZEL}/${datei}`, 'utf8').slice(0, 4000);
+    const m = kopf.match(/<meta name="viewport"[^>]*content="([^"]*)"/);
+    check(`KRITISCH: ${datei} sperrt das Zoomen im Ausgangszustand weiterhin selbst`,
+      !!m && /user-scalable\s*=\s*no/.test(m[1]));
+  }
+}
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
