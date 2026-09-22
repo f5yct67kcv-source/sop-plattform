@@ -34,6 +34,19 @@ if (!$konto) {
     json_response(['status' => 'error', 'message' => 'Dieses Konto gibt es nicht.'], 404);
 }
 
+// EIN EINGELADENES KONTO LAESST SICH NICHT VON HAND FREISCHALTEN
+// (ENT-667). Sonst entstuende ein aktives Konto ohne Passwort: Es kaeme
+// zwar niemand hinein (betreiber_anmelden.php prueft den leeren Hash), aber
+// die Kontenliste zeigte es als gewoehnliches Konto, und die offene
+// Einladung bliebe unbemerkt gueltig. "Eingeladen" ist ein eigener Zustand
+// und kein stillgelegtes Konto -- die Hausregel, dass Unbekanntes nie wie
+// Keines aussehen darf, gilt auch in diese Richtung.
+if ($aktiv && be_einladung_offen($pdo, $id)) {
+    json_response(['status' => 'error',
+        'message' => 'Dieses Konto ist eingeladen, aber noch nicht eingelöst. Es wird von '
+                   . 'selbst aktiv, sobald die eingeladene Person ihr Passwort gesetzt hat.'], 409);
+}
+
 if (!$aktiv && be_konten_zahl($pdo, $id) === 0) {
     json_response(['status' => 'error',
         'message' => 'Das ist das letzte aktive Betreiber-Konto. Ohne es käme niemand mehr '

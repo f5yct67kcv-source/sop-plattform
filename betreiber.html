@@ -594,8 +594,12 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
    mittig -- zusammen aber nicht mehr in der Mitte des Bildschirms. Darum
    bekommt .tor bei der Anmeldung eine Spalte, in der beide als EIN Block
    stehen. */
-#tor { grid-auto-flow: row; align-content: center; justify-items: center; }
-#tor > .tor-marke, #tor > .tor-karte { width: 100%; max-width: 420px; }
+/* #ein-tor (ENT-667) traegt dieselbe Marke ueber derselben Karte und
+   braucht darum dieselbe Spalte -- sonst stuenden Marke und Karte in zwei
+   Rasterzeilen, jede fuer sich mittig, zusammen aber nicht. */
+#tor, #ein-tor { grid-auto-flow: row; align-content: center; justify-items: center; }
+#tor > .tor-marke, #tor > .tor-karte,
+#ein-tor > .tor-marke, #ein-tor > .tor-karte { width: 100%; max-width: 420px; }
 .code-feld { letter-spacing: .35em; text-align: center; font-size: 22px; font-variant-numeric: tabular-nums; }
 .geheim {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px;
@@ -1370,6 +1374,58 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   </div>
 </div>
 
+<!-- ── Einladung einloesen (ENT-667) ──────────────────────────────
+     KEINE EIGENE SEITE, sondern ein dritter Zustand desselben Tors. Eine
+     zweite Datei haette dasselbe CSS ein zweites Mal gebraucht, und zwei
+     Fassungen derselben Anmeldekarte laufen auseinander, sobald jemand nur
+     eine davon anfasst (dieselbe Falle wie OP-606 a). Das Haus hat dafuer
+     schon ein Muster: app.html?reset=... bei der Passwort-Ruecksetzung.
+
+     Der Kopf sagt "Zugang einrichten" statt "Betreiber-Bereich": Wer hier
+     landet, hat noch keinen Zugang, und die Karte soll sagen, was sie tut,
+     nicht wo sie steht. -->
+<div id="ein-tor" class="tor versteckt">
+  <div class="tor-marke" aria-hidden="true">
+    <svg viewBox="0.00 0.00 649.83 153.56" role="img" aria-label="Guard OpS"><use href="#go-wort"/></svg>
+  </div>
+  <div class="karte tor-karte">
+    <div class="karte-kopf">
+      <div>
+        <h2>Zugang einrichten</h2>
+        <div class="sub" id="ein-sub">Einladung wird geprüft …</div>
+      </div>
+    </div>
+    <div class="karte-leib">
+      <div id="ein-meldung" class="meldung fehler versteckt"></div>
+
+      <div id="ein-form" class="versteckt">
+        <div class="feld">
+          <label for="ein-pass">Passwort</label>
+          <input id="ein-pass" type="password" autocomplete="new-password">
+          <div class="hinweis" id="ein-hinweis"></div>
+        </div>
+        <div class="feld">
+          <label for="ein-pass2">Passwort wiederholen</label>
+          <input id="ein-pass2" type="password" autocomplete="new-password">
+        </div>
+        <div class="knopfzeile">
+          <button id="knopf-einloesen" class="haupt">Passwort setzen</button>
+        </div>
+      </div>
+
+      <!-- Nach dem Setzen: KEIN automatisches Anmelden. Der Weg fuehrt
+           ueber das gewoehnliche Tor, mitsamt Bremse und der Einrichtung
+           des zweiten Faktors -- Begruendung im Kopf von
+           betreiber_einladung_einloesen.php. -->
+      <div id="ein-fertig" class="versteckt">
+        <div class="knopfzeile">
+          <button id="knopf-ein-weiter" class="haupt">Weiter zur Anmeldung</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Zwei-Faktor einrichten ────────────────────────────────────── -->
 <div id="zf-tor" class="tor versteckt">
   <div class="karte tor-karte">
@@ -1613,12 +1669,20 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         </div>
         <div class="karte-leib">
           <ul class="fehlt">
-            <li><b>Offerten und Rechnungen</b> sind ein Gerüst. Was abgerechnet
-              wird — Grundgebühr, Zahl der Mitarbeitenden, Einsätze —, ist noch
-              nicht entschieden, und davon hängt der Datenaufbau ab.</li>
-            <li><b>Dieses Konto hat keinen Weg zurück.</b> Geht das Passwort
-              verloren, hilft heute nur ein Eingriff in der Datenbank — und der
-              geht nur, solange höchstens ein Mandant eingetragen ist.</li>
+            <li><b>Die wiederkehrende Rechnung rechnet sich noch nicht
+              selbst.</b> Offerten und Rechnungen lassen sich erfassen,
+              versenden und abhaken. Was fehlt, ist die monatliche Rechnung aus
+              der Betriebsgrösse: Dafür braucht es die Definition von „ein
+              Mitarbeiter", die Stufengrenzen und die Preise.</li>
+            <li><b>Bezahlt ist ein Häkchen von Hand.</b> Ein Abgleich mit dem
+              Zahlungseingang und ein Mahnwesen sind bewusst zurückgestellt. Wer
+              das Häkchen vergisst, sieht eine Forderung, die längst beglichen
+              ist.</li>
+            <li><b>Der Weg zurück hängt an einem zweiten Konto.</b> Ein
+              Zurücksetzen per E-Mail gibt es nicht. Solange ein zweites
+              Betreiber-Konto gepflegt ist, führt es zurück; sonst bleibt nur
+              ein Eingriff in der Datenbank — und der geht nur, solange
+              höchstens ein Mandant eingetragen ist.</li>
             <li><b>Eine eigene Datenbank für diese Ebene</b> steht noch aus.
               Heute liegen Mandantenstamm und Betreiber-Konten in derselben
               Datenbank wie die Betriebsdaten des ersten Mandanten.</li>
@@ -2530,10 +2594,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <div class="f"><label for="k_email">E-Mail *</label>
           <input class="inp" id="k_email" type="email" autocomplete="off"></div>
       </div>
-      <div class="f versteckt" id="kPassFeld" style="margin-bottom:0">
-        <label for="k_pass">Passwort *</label>
-        <input class="inp" id="k_pass" type="password" autocomplete="new-password">
-        <div class="of-hinweis" id="kPassHinweis"></div>
+      <!-- KEIN PASSWORTFELD MEHR (ENT-667). Bis dahin stand hier eines,
+           und wer ein Konto anlegte, kannte damit dessen Passwort. Was an
+           seine Stelle tritt, ist kein Feld, sondern eine Auskunft: was
+           nach dem Speichern passiert. -->
+      <div class="ki-hint web on versteckt" id="kEinladungHinweis" style="margin-bottom:0">
+        <span id="kEinladungText"></span>
       </div>
     </div>
     <div class="of-dlg-ft">
@@ -3715,7 +3781,14 @@ function kZfMerker(k) {
   if (k.zwei_faktor === false) { return '<span class="merker m-warn">noch offen</span>'; }
   return '<span style="color:var(--ink-3)" title="Die Tabelle für den zweiten Faktor ist auf diesem Server noch nicht angelegt.">keine Angabe</span>';
 }
+/* DREI Zustaende, nicht zwei (ENT-667). "Eingeladen" ist weder aktiv noch
+   stillgelegt: Ein stillgelegtes Konto hatte einmal Zugang und hat ihn
+   nicht mehr, ein eingeladenes hatte ihn nie. Die beiden unter einer
+   Darstellung zu fuehren waere genau die Verwechslung, die die Hausregel
+   meint -- und sie haette praktische Folgen, weil der Server das
+   Freischalten eines eingeladenen Kontos zurueckweist. */
 function kZustandMerker(k) {
+  if (k.eingeladen) { return '<span class="merker m-warn">eingeladen</span>'; }
   return k.aktiv ? '<span class="merker m-pos">aktiv</span>'
                  : '<span class="merker m-ruhe">stillgelegt</span>';
 }
@@ -3779,7 +3852,8 @@ function kdZeichnen() {
   if (!k) { kGoListe(); return; }
 
   $('kdName').textContent = k.name || '–';
-  $('kdSub').textContent = [k.email, k.aktiv ? 'aktiv' : 'stillgelegt',
+  $('kdSub').textContent = [k.email,
+    k.eingeladen ? 'eingeladen, noch nicht eingelöst' : (k.aktiv ? 'aktiv' : 'stillgelegt'),
     k.ich ? 'das bin ich' : ''].filter(Boolean).join(' · ');
 
   if (kdTab === 'uebersicht') {
@@ -3913,10 +3987,12 @@ function kDlgOeffnen(id) {
   $('k_vorname').value  = k ? (k.vorname || '') : '';
   $('k_nachname').value = k ? (k.nachname || k.name || '') : '';
   $('k_email').value    = k ? (k.email || '') : '';
-  $('k_pass').value     = '';
-  $('kPassHinweis').textContent = 'Mindestens 12 Zeichen. Dieses Konto darf jeden Mandanten — '
-    + 'es fällt nie unter die Schwelle der Verwaltung.';
-  zeig($('kPassFeld'), !k);
+  $('kEinladungText').innerHTML = '<b>Es wird eine Einladung verschickt.</b> '
+    + 'Die eingeladene Person setzt ihr Passwort selbst und richtet danach die '
+    + 'Zwei-Faktor-Anmeldung ein. Bis dahin steht das Konto hier als „eingeladen“ '
+    + 'und kommt nirgends hinein. Stimmt die Adresse nicht, kommt nichts an — '
+    + 'und es entsteht auch kein Konto.';
+  zeig($('kEinladungHinweis'), !k);
   $('kSaveBtn').dataset.id = k ? String(k.id) : '';
   dlgAuf('dlgKonto');
   setTimeout(() => $('k_vorname').focus(), 30);
@@ -3938,13 +4014,21 @@ async function kSpeichern() {
   if (id) {
     a = await ruf('betreiber_konto_speichern.php', Object.assign({ id: id }, daten));
   } else {
-    a = await ruf('betreiber_konto_anlegen.php', Object.assign({ passwort: $('k_pass').value }, daten));
+    /* EINLADEN STATT ANLEGEN (ENT-667): Hier wird kein Passwort mehr
+       vergeben. Die eingeladene Person setzt es selbst ueber einen Link an
+       ihre Adresse -- damit kennt der Einladende es nie, und ein Tippfehler
+       in der Adresse faellt sofort auf, weil nichts ankommt. */
+    a = await ruf('betreiber_einladen.php', daten);
   }
   if (a.status !== 'ok') { melde($('kErr'), 'fehler', a.message || 'Unbekannter Fehler.'); return; }
   dlgZu('dlgKonto');
   kdVerlaufFuer = 0;
   await ladeKonten();
-  kurzmeldung(id ? 'Konto gespeichert.' : 'Konto angelegt.');
+  /* Die Frist kommt vom Server, damit hier keine zweite Zahl steht, die
+     beim naechsten Bemessen falsch wird. */
+  kurzmeldung(id ? 'Konto gespeichert.'
+                 : 'Einladung verschickt an ' + daten.email
+                   + ' — ' + (a.gueltig_stunden || 48) + ' Stunden gültig.');
 }
 
 /* ── Eigenes Passwort ──────────────────────────────────────────── */
@@ -3981,6 +4065,7 @@ const K_BEREICH_NAMEN = {
    Beschriftung und faellt auf, wenn es stoert. */
 const K_FELD_NAMEN = {
   angelegt: 'Angelegt', zustand: 'Zustand', status: 'Status', passwort: 'Passwort',
+  eingeladen: 'Eingeladen', eingeloest: 'Einladung eingelöst',
   email: 'E-Mail', vorname: 'Vorname', nachname: 'Nachname', anrede: 'Anrede',
   bezahlt: 'Bezahlt', versendet: 'Versendet', import: 'Import', logo: 'Logo',
   zwei_faktor_eingerichtet: 'Zwei-Faktor eingerichtet',
@@ -7715,10 +7800,98 @@ document.querySelectorAll('[data-springe]').forEach(b => {
 themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell');
 glasSetzen(document.documentElement.getAttribute('data-glas') !== 'aus');
 
+/* ── Einladung einloesen (ENT-667) ─────────────────────────────────
+   Der Token steht in der URL, weil er aus einer E-Mail kommt -- anders als
+   ein Sitzungstoken, der niemals dorthin gehoert. Er wird aus der
+   Adresszeile ENTFERNT, sobald die Seite ihn gelesen hat: Sonst steht er im
+   Browserverlauf und wandert beim naechsten Klick als Referrer mit. */
+let einToken = '';
+
+function einLinkAufraeumen() {
+  try {
+    const u = new URL(location.href);
+    u.searchParams.delete('einladung');
+    history.replaceState(null, '', u.pathname + (u.search || '') + u.hash);
+  } catch (e) { /* aelterer Browser -- der Link bleibt stehen, mehr nicht */ }
+}
+
+async function einladungPruefen(t) {
+  einToken = t;
+  einLinkAufraeumen();
+  zeig($('tor'), false);
+  zeig($('ein-tor'), true);
+
+  const a = await ruf('betreiber_einladung_pruefen.php', { token: t });
+  if (a.status !== 'ok') {
+    $('ein-sub').textContent = 'Diese Einladung lässt sich nicht öffnen';
+    melde($('ein-meldung'), 'fehler', a.message || 'Dieser Link gilt nicht mehr.');
+    return;
+  }
+  /* Name UND Adresse: Wer zwei Postfächer hat, soll sehen, für welches der
+     Zugang gilt -- und ein Tippfehler in der Adresse faellt genau hier auf,
+     solange er sich noch billig beheben laesst. */
+  $('ein-sub').textContent = a.name + ' · ' + a.email;
+  $('ein-hinweis').textContent = 'Mindestens ' + a.mindestlaenge
+    + ' Zeichen. Dieses Konto erreicht jeden Mandanten — es ist das mächtigste der Anlage.';
+  zeig($('ein-form'), true);
+  $('ein-pass').focus();
+}
+
+async function einladungEinloesen() {
+  const knopf = $('knopf-einloesen');
+  const p1 = $('ein-pass').value;
+  const p2 = $('ein-pass2').value;
+  stumm($('ein-meldung'));
+  /* Im Browser geprueft, WEIL es den Weg zum Server spart -- nicht als
+     Sperre. Die Mindestlaenge und alles Weitere prueft der Server selbst
+     (CLAUDE.md: eine Sperre, die man am Browser vorbei umgehen kann, ist
+     keine). Die Wiederholung dagegen gibt es nur hier: Sie soll einen
+     Tippfehler fangen, nicht etwas verhindern. */
+  if (p1 !== p2) {
+    melde($('ein-meldung'), 'fehler', 'Die beiden Eingaben stimmen nicht überein.');
+    $('ein-pass2').focus();
+    return;
+  }
+  knopf.disabled = true;
+  try {
+    const a = await ruf('betreiber_einladung_einloesen.php', { token: einToken, passwort: p1 });
+    if (a.status !== 'ok') {
+      melde($('ein-meldung'), 'fehler', a.message || 'Das Passwort konnte nicht gesetzt werden.');
+      return;
+    }
+    zeig($('ein-form'), false);
+    $('ein-sub').textContent = 'Der Zugang steht';
+    melde($('ein-meldung'), 'gut',
+      'Das Passwort ist gesetzt. Beim ersten Anmelden richtest du die '
+      + 'Zwei-Faktor-Anmeldung ein — sie ist hier Pflicht.');
+    zeig($('ein-fertig'), true);
+    /* Die Adresse gleich eintragen: Sie steht in der Einladung, und wer sie
+       hier noch einmal abtippen muss, tippt sie moeglicherweise anders. */
+    $('e-mail').value = a.email || '';
+    einToken = '';
+  } finally {
+    knopf.disabled = false;
+  }
+}
+
+$('knopf-einloesen').onclick = einladungEinloesen;
+$('knopf-ein-weiter').onclick = () => {
+  zeig($('ein-tor'), false);
+  stumm($('ein-meldung'));
+  zeig($('tor'), true);
+  $('e-pass').focus();
+};
+
 /* Beim Laden: Liegt ein Token in dieser Registerkarte, wird er benutzt.
    Traegt er nicht mehr, faellt die Seite auf die Anmeldung zurueck --
    ohne Fehlermeldung, denn eine abgelaufene Sitzung ist kein Fehler. */
 (async function start() {
+  /* Die Einladung geht VOR einer bestehenden Sitzung: Wer einen Zugang
+     einrichtet, sitzt moeglicherweise an einem Geraet, an dem noch jemand
+     anderes angemeldet ist -- dann soll der Link trotzdem tun, wofuer er
+     verschickt wurde, statt stillschweigend in fremde Sitzung zu fallen. */
+  const ausUrl = new URLSearchParams(location.search).get('einladung') || '';
+  if (ausUrl) { await einladungPruefen(ausUrl); return; }
   if (!token) { return; }
   const a = await ruf('betreiber_zf_status.php');
   if (a.status !== 'ok') { sessionStorage.removeItem(SCHLUESSEL); token = ''; return; }

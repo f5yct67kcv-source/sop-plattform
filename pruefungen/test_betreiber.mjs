@@ -77,11 +77,31 @@ const OEFFENTLICH = {
   'betreiber_beleg_oeffentlich.php': 'Ansicht der Offerte am Link, Ausweis ist der versand_token',
   'betreiber_beleg_entscheidung.php': 'Annehmen/Ablehnen am selben Link, nur POST',
 };
+// DRITTE Kategorie (ENT-667), und wieder aus einem anderen Grund als die
+// beiden oben. Ein Einstieg erzeugt die Sitzung, die er nicht verlangen
+// kann. Eine oeffentliche Beleg-Seite gehoert einem Empfaenger, der kein
+// Konto hat und auch keines bekommen soll. Diese beiden gehoeren jemandem,
+// der GERADE EINES BEKOMMT -- eine Anmeldung zu verlangen hiesse, den
+// Zugang zur Vorbedingung seiner eigenen Einrichtung zu machen.
+//
+// Der Unterschied zu OEFFENTLICH ist nicht bloss begrifflich: Dort ist der
+// Ausweis ein ROHER versand_token, hier ein ABDRUCK (ENT-501). Ein
+// Beleg-Link oeffnet die Ansicht eines Dokuments, dieser setzt ein Passwort
+// auf der maechtigsten Ebene der Anlage -- er wird darum verwahrt wie eine
+// Sitzung. Genau deshalb stehen sie NICHT in OEFFENTLICH: Die dortige
+// Pruefung verlangt einen versand_token, und ihn hier zu finden waere ein
+// Rueckschritt, kein Nachweis. Beide stehen zusaetzlich in OHNE_ANMELDUNG
+// in test_php.mjs.
+const EINLADUNG = {
+  'betreiber_einladung_pruefen.php': 'zeigt die offene Einladung, Ausweis ist der Abdruck des Tokens',
+  'betreiber_einladung_einloesen.php': 'setzt das Passwort am selben Link, nur POST',
+};
 // Beide Formen zaehlen: require_betreiber() weist aus, wer jemand ist,
 // require_betreiber_voll() zusaetzlich, dass sein zweiter Faktor steht.
 const WACHE = /require_betreiber(?:_voll)?\s*\(/;
 const ohneWache = endpunkte.filter(f =>
-  !EINSTIEG[f] && !OEFFENTLICH[f] && !WACHE.test(nurCode(lies(`backend/api/${f}`))));
+  !EINSTIEG[f] && !OEFFENTLICH[f] && !EINLADUNG[f]
+  && !WACHE.test(nurCode(lies(`backend/api/${f}`))));
 check('KRITISCH: jeder betreiber_*-Endpunkt ruft require_betreiber() oder steht namentlich da',
   ohneWache.length === 0);
 if (ohneWache.length) { bad.push('ohne Wache: ' + ohneWache.join(', ')); }
@@ -95,7 +115,8 @@ if (ohneWache.length) { bad.push('ohne Wache: ' + ohneWache.join(', ')); }
 // dagegen ohne Bedingung ruft, ist kein Einstiegspunkt mehr und gehoert
 // aus der Liste.
 const WACHE_IMMER = /^require_betreiber(?:_voll)?\s*\(/m;
-const unnoetigBefreit = [...Object.keys(EINSTIEG), ...Object.keys(OEFFENTLICH)].filter(f =>
+const unnoetigBefreit = [...Object.keys(EINSTIEG), ...Object.keys(OEFFENTLICH),
+                         ...Object.keys(EINLADUNG)].filter(f =>
   endpunkte.includes(f) && WACHE_IMMER.test(nurCode(lies(`backend/api/${f}`))));
 check('kein Einstiegspunkt steht unnoetig in der Ausnahmeliste',
   unnoetigBefreit.length === 0);
@@ -108,6 +129,48 @@ const ohneVersandToken = Object.keys(OEFFENTLICH).filter(f =>
 check('KRITISCH: jede oeffentliche Beleg-Seite weist sich ueber versand_token aus',
   ohneVersandToken.length === 0);
 if (ohneVersandToken.length) { bad.push('ohne versand_token: ' + ohneVersandToken.join(', ')); }
+
+// Dieselbe Ueberlegung fuer die Einladungsseiten (ENT-667): Die Ausnahme
+// traegt nur, solange ihr Ausweis wirklich der Einladungstoken ist -- und
+// zwar ueber be_einladung_konto(), die einzige Stelle, die den ABDRUCK
+// vergleicht. Wuerde einer der beiden den Token selbst in der Tabelle
+// suchen oder sich an einer Kennung aus der URL festmachen, waere die
+// Begruendung fuer die fehlende Wache hinfaellig.
+const ohneEinladungsausweis = Object.keys(EINLADUNG).filter(f =>
+  endpunkte.includes(f) && !nurCode(lies(`backend/api/${f}`)).includes('be_einladung_konto'));
+check('KRITISCH: jede Einladungsseite weist sich ueber den Abdruck des Tokens aus',
+  ohneEinladungsausweis.length === 0);
+if (ohneEinladungsausweis.length) {
+  bad.push('ohne Einladungsausweis: ' + ohneEinladungsausweis.join(', '));
+}
+// Und die Kehrseite, die bei OEFFENTLICH fehlen darf und hier nicht: Der
+// Token darf an genau EINER Stelle verglichen werden, und die bildet vorher
+// den Abdruck. Ein zweiter Vergleich anderswo waere die Gelegenheit, ihn
+// versehentlich roh zu suchen -- und damit das, was ENT-501 gerade
+// ausschliesst.
+//
+// GEPRUEFT WIRD DER LESEZUGRIFF, nicht jeder Zugriff: Das Einloesen MUSS
+// die Zeile loeschen, sonst bliebe der Link nach dem Einloesen gueltig.
+// Dieses DELETE ist kein Ausweis-Vergleich -- es geht ueber die Konto-ID,
+// die zu dem Zeitpunkt laengst feststeht. Eine Pruefung, die es mit
+// verboete, zwaenge dazu, entweder die Sperre aufzuweichen oder den Link
+// offen zu lassen. (Diese Unterscheidung stand hier zuerst nicht drin und
+// hat die Suite beim ersten Lauf zu Recht rot gemacht.)
+const mitEigenerAbfrage = Object.keys(EINLADUNG).filter(f => {
+  if (!endpunkte.includes(f)) { return false; }
+  const q = nurCode(lies(`backend/api/${f}`));
+  return /SELECT[\s\S]*?FROM\s+betreiber_einladung/i.test(q)
+      || /betreiber_einladung[\s\S]{0,120}?WHERE[^;]*token/i.test(q);
+});
+check('KRITISCH: keine Einladungsseite vergleicht den Token an be_einladung_konto() vorbei',
+  mitEigenerAbfrage.length === 0);
+if (mitEigenerAbfrage.length) { bad.push('eigener Tokenvergleich: ' + mitEigenerAbfrage.join(', ')); }
+
+// Das Loeschen selbst gehoert dazu und wird darum positiv verlangt: Bliebe
+// die Zeile stehen, setzte derselbe Link das Passwort ein zweites Mal.
+const einloesenQ = nurCode(lies('backend/api/betreiber_einladung_einloesen.php'));
+check('KRITISCH: das Einloesen entfernt die Einladung, und zwar ueber die Konto-ID',
+  /DELETE FROM betreiber_einladung WHERE betreiber_id/.test(einloesenQ));
 
 // Die Einrichtung darf nicht ohne JEDE Anmeldung laufen -- ein Endpunkt,
 // der sich selbst freischaltet, solange eine Tabelle leer ist, ist offen,
@@ -364,7 +427,7 @@ const NUR_EINFACHE_WACHE = {
 };
 const VOLLWACHE = /require_betreiber_voll\s*\(/;
 const brauchtVoll = endpunkte.filter(f =>
-  !EINSTIEG[f] && !OEFFENTLICH[f] && !NUR_EINFACHE_WACHE[f]);
+  !EINSTIEG[f] && !OEFFENTLICH[f] && !EINLADUNG[f] && !NUR_EINFACHE_WACHE[f]);
 const ohneVoll = brauchtVoll.filter(f => !VOLLWACHE.test(nurCode(lies(`backend/api/${f}`))));
 check('KRITISCH: jeder Betreiber-Endpunkt verlangt den zweiten Faktor oder steht namentlich da',
   ohneVoll.length === 0);

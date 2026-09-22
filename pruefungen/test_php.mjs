@@ -959,6 +959,18 @@ const OHNE_ANMELDUNG = [
   // Zeitmessung und die gleichlautende Antwort fuer "gibt es nicht" und
   // "Passwort falsch". Eigene Pruefung: test_betreiber.mjs.
   'betreiber_anmelden.php',
+  // Die beiden Schritte der Einladung (ENT-667). Wer eingeladen ist, hat
+  // naturgemaess noch keinen Zugang -- der Ausweis ist der Token aus der
+  // Nachricht. Anders als der versand_token beim Beleg-Link liegt er als
+  // ABDRUCK in der Datenbank (ENT-501): Dieser Link setzt ein Passwort auf
+  // der maechtigsten Ebene der Anlage, er ist kein Lesezugriff auf ein
+  // Dokument. Eigene Bremse unter dem Namensraum "be-einladung:",
+  // gleichlautende Antwort fuer abgelaufen, eingeloest und erfunden, und
+  // das Einloesen meldet NICHT an -- es setzt nur das Passwort, der Weg
+  // hinein fuehrt danach durch betreiber_anmelden.php mitsamt der
+  // Zwei-Faktor-Pflicht. Eigene Pruefung: test_betreiber_einladung.mjs.
+  'betreiber_einladung_pruefen.php',
+  'betreiber_einladung_einloesen.php',
   // Die drei Eingaenge des Kundenportals -- stehen zusaetzlich in
   // PORTAL_EINGAENGE weiter unten, weil dort die Portal-Regel greift.
   'portal_anmelden.php',

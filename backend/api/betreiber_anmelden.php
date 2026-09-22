@@ -61,7 +61,16 @@ if (!$konto) {
     json_response(['status' => 'error', 'message' => 'Anmeldung nicht möglich.'], 401);
 }
 
-if (!password_verify($pass, (string)$konto['passwort_hash'])) {
+// LEERER HASH heisst "eingeladen, noch nicht eingeloest" (ENT-667). Die
+// Abfrage oben faengt diesen Fall schon ueber aktiv = 1 ab -- das hier ist
+// der zweite, unabhaengige Riegel. Er steht da, weil sich `aktiv` von Hand
+// setzen laesst und ein Konto ohne Passwort sonst allein davon abhinge,
+// dass niemand diesen Schalter umlegt. password_verify() gaebe gegen einen
+// leeren Hash ohnehin false, auch fuer ein leeres Passwort; ausdruecklich
+// geprueft wird es trotzdem, damit die Absicht im Code steht und nicht in
+// einer Eigenschaft der Bibliothek.
+if ((string)$konto['passwort_hash'] === ''
+    || !password_verify($pass, (string)$konto['passwort_hash'])) {
     anmeld_fehlversuch(db(), $bremsName, $adresse);
     json_response(['status' => 'error', 'message' => 'Anmeldung nicht möglich.'], 401);
 }

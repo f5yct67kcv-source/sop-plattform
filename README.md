@@ -776,12 +776,30 @@ sie ist hier **Pflicht**, nicht freiwillig wie im Cockpit. QR-Code scannen
 oder den Schluessel abtippen, mit einem Code bestaetigen, dann erscheinen
 die **zehn Notfallcodes**. Sie werden nur einmal angezeigt.
 
-> **Bevor es weitergeht: ein zweites Betreiber-Konto anlegen.**
+> **Bevor es weitergeht: ein zweites Betreiber-Konto einrichten.**
 > Wer Telefon **und** Notfallcodes verliert, kommt sonst nicht mehr hinein —
 > der Weg zurueck fuehrt ausschliesslich ueber ein zweites Konto
 > (`betreiber_zf_zuruecksetzen.php`), und eine Hintertuer gibt es
 > absichtlich nicht. Das zweite Konto ist keine Bequemlichkeit, sondern
-> Betriebsvoraussetzung.
+> Betriebsvoraussetzung (ENT-659).
+>
+> **Seit ENT-663 geschieht das ueber eine EINLADUNG**, nicht ueber ein hier
+> vergebenes Passwort: Konten → *Neues Konto* → Anrede, Name, E-Mail. Der
+> Server verschickt einen Link, die eingeladene Person setzt ihr Passwort
+> selbst und richtet danach den zweiten Faktor ein. Bis dahin steht das
+> Konto in der Liste als **eingeladen** und kommt nirgends hinein.
+>
+> **Zwei Dinge, die dabei schiefgehen koennen:**
+> - **Ohne funktionierenden E-Mail-Versand geht gar nichts.** Der Endpunkt
+>   sagt das deutlich (503), statt ein unbrauchbares Konto zu hinterlassen.
+>   Auf einer frischen Anlage also zuerst SMTP pruefen.
+> - **Der Link gilt 48 Stunden.** Laeuft er ab, laesst sich die Einladung
+>   heute nicht erneuern (OP-664) — das Konto muesste stillgelegt und unter
+>   einer anderen Adresse neu eingeladen werden. Darum den Link zeitnah
+>   einloesen.
+>
+> Das **allererste** Konto entsteht weiterhin mit Passwort (Schritt 4): Dort
+> gibt es noch keinen Betreiber und keine erprobte Versandstrecke.
 
 ### 6. Auf Staging durchspielen
 
@@ -821,9 +839,107 @@ Nicht fuer die Inbetriebnahme noetig, aber vorher zu klaeren:
 
 | | |
 |---|---|
-| **OP-518** | Eigene Datenbank fuer die Betreiber-Ebene. Heute liegen ihre Tabellen in derselben Datenbank wie die Betriebsdaten — beim zweiten Mandanten laege der Mandantenstamm sonst in der Datenbank eines Kunden |
-| **OP-526** | Deploy-Schritt fuer `__MANDANT_SECRETS__`. Ohne ihn laesst sich kein Mandant mit eigener Datenbank erreichen |
+| **OP-518** | Eigene Datenbank fuer die Betreiber-Ebene. Heute liegen ihre Tabellen in derselben Datenbank wie die Betriebsdaten — beim zweiten Mandanten laege der Mandantenstamm sonst in der Datenbank eines Kunden. **Schrittweise Anleitung:** Abschnitt „Die Betreiber-Ebene auf eine eigene Datenbank ziehen" weiter unten |
+| ~~**OP-526**~~ | Deploy-Schritt fuer `__MANDANT_SECRETS__` — **erledigt.** Der Platzhalter wird in `dist-betreiber` und `dist-cupi24` ersetzt, auf den Demo-Plaetzen absichtlich geleert |
 | **DSG** | Auftragsbearbeitungsvertrag. Sobald fremde Personendaten verarbeitet werden, ist er Pflicht (ENT-524, Risiken) |
+
+---
+
+## Die Betreiber-Ebene auf eine eigene Datenbank ziehen (OP-518)
+
+Einmaliger Vorgang, **bevor der zweite Mandant aufgenommen wird**. Danach ist
+es kein Umzug mehr, sondern eine Trennung von Kundendaten — ungleich teurer.
+
+### Warum
+
+Heute liegen die 16 Betreiber-Tabellen in derselben Datenbank wie die
+Betriebsdaten des ersten Mandanten. Solange dieser Mandant dem Betreiber
+selbst gehoert, ist das folgenlos. Kommt ein zweiter dazu, laege der
+**Mandantenstamm mitsamt allen anderen Kunden in der Datenbank eines
+Kunden** — genau die Vermischung, die die getrennte Datenhaltung verhindern
+soll.
+
+### Was schon steht — und was wirklich fehlt
+
+**Kein Codeeingriff noetig.** Die Trennung ist gebaut:
+
+- `betreiber_db()` in `backend/betreiber.php` ist eine eigene Verbindung.
+  Faellt `__BETREIBER_DB_NAME__` leer aus, faellt sie bewusst auf `db()`
+  zurueck — der heutige Zustand, ausdruecklich kein Fehler.
+- Der Deploy ersetzt die vier Platzhalter bereits in **allen** Zielen
+  (`dist`, `dist-betreiber`, `dist-cupi24`; auf den Demo-Plaetzen
+  absichtlich leer).
+- Die beiden frueher hier genannten Vorbedingungen sind erledigt:
+  **OP-526** (`__MANDANT_SECRETS__` wird seit dem Deploy-Lauf ersetzt) und
+  **OP-606 (b)** (`hat_tabelle()` merkt sich sein Ergebnis seit dem
+  2026-09-19 per `WeakMap` an der Verbindung, nicht mehr am Tabellennamen —
+  ohne das haette eine Tabelle, die es nur auf einer Seite gibt, auf der
+  anderen als vorhanden gegolten).
+
+**Es fehlt also nur:** eine zweite Datenbank, vier Secrets, ein Umzug der
+Daten.
+
+### Die 16 Tabellen
+
+```
+betreiber                betreiber_sessions       betreiber_zwei_faktor
+mandant                  mandant_zaehlstand
+support_vorgang          support_nachricht
+be_kunden                be_kunden_person         be_kunden_kontaktweg
+be_produkte              be_belege                be_beleg_positionen
+be_aenderungslog         be_briefkopf             be_demo_nutzung_archiv
+```
+
+Alles mit Praefix `be_` gehoert zum Belegteil des Betreibers und hat nichts
+mit den gleichnamigen Tabellen ohne Praefix zu tun — jene sind Kundendaten
+des Mandanten und bleiben, wo sie sind.
+
+### Reihenfolge
+
+**Erst auf Staging.** Der Umzug laesst sich dort vollstaendig durchspielen.
+
+1. **Zweite Datenbank bei Hostpoint anlegen.** Eigener Datenbankbenutzer,
+   eigenes Passwort — nicht derselbe Benutzer wie fuer die Betriebsdaten,
+   sonst ist die Trennung eine Buchhaltung ohne Wirkung.
+2. **Die 16 Tabellen exportieren**, aus der heutigen Datenbank, mit Daten.
+   In phpMyAdmin: Export → *Angepasst* → nur diese 16 auswaehlen.
+   Struktur **und** Daten.
+3. **In die neue Datenbank einspielen.** Danach zaehlen: 16 Tabellen, und
+   die Zeilenzahl in `betreiber`, `mandant` und `be_belege` muss mit der
+   alten uebereinstimmen.
+4. **Die vier Secrets setzen** — GitHub → Settings → Environments →
+   `production` (bzw. `staging`):
+   `BETREIBER_DB_HOST`, `BETREIBER_DB_NAME`, `BETREIBER_DB_USER`,
+   `BETREIBER_DB_PASSWORD`.
+   Der Platzhalter im Code heisst `__BETREIBER_DB_PASS__`, das Secret
+   `BETREIBER_DB_PASSWORD` — die Zuordnung steht im Deploy, das ist kein
+   Tippfehler.
+5. **Deploy ausloesen.** Ab dem naechsten Lauf zeigt `betreiber_db()` auf die
+   neue Datenbank.
+6. **Nachsehen, nicht annehmen:** Im Betreiber-Bereich anmelden (die Sitzung
+   liegt in `betreiber_sessions` und ist mitgezogen — bleibt die Anmeldung
+   haengen, ist etwas schiefgelaufen), Mandantenliste oeffnen, eine Rechnung
+   aufrufen. Im Cockpit pruefen, dass der Betrieb unveraendert laeuft.
+7. **Die alten 16 Tabellen erst danach loeschen**, und nicht am selben Tag.
+   Solange sie stehen, ist der Rueckweg ein Zuruecksetzen der vier Secrets
+   und ein Deploy. Sind sie weg, ist er ein Wiedereinspielen aus dem Export.
+
+### Fallen
+
+- **Zwischen Schritt 3 und 5 wird zweigleisig geschrieben.** Was in dieser
+  Zeit im Betreiber-Bereich entsteht, landet in der alten Datenbank und
+  fehlt in der neuen. Den Umzug darum zu einer Zeit machen, in der niemand
+  dort arbeitet — und Schritt 2 und 3 unmittelbar vor Schritt 4 ausfuehren,
+  nicht Tage vorher.
+- **`mandant.id = 1` bleibt richtig.** Der Bestandsbetrieb wird nicht
+  bewegt, nur der Stamm zieht um.
+- **Die Einrichtung legt fehlende Tabellen selbst an.** Wird Schritt 2/3
+  uebersprungen, entstehen die 16 Tabellen in der neuen Datenbank **leer** —
+  inklusive eines wieder offenen Bootstraps. Das sieht aus wie ein frischer
+  Betreiber-Bereich und ist in Wahrheit ein verlorener.
+- **Der Export enthaelt Zugangsdaten** (Passwort-Hashes, Zwei-Faktor-
+  Schluessel, Sitzungsabdruecke). Er gehoert nicht ins Repository und nicht
+  in einen Chat.
 
 ---
 
