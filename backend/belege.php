@@ -2,6 +2,11 @@
 declare(strict_types=1);
 // Belege: Offerten heute, Rechnungen spaeter (ENT-181).
 //
+// Bindet die gemeinsame Mailgestaltung ein (ENT-674): beleg_mail() weiter
+// unten baut die Versandmail aus denselben Bausteinen wie die Demo-Mail.
+// Jedes Buendel, das diese Datei bekommt, bekommt auch mail_vorlage.php --
+// test_deploy.mjs haelt die beiden zusammen.
+//
 // Die EINZIGE Stelle, die aus Positionen einen Frankenbetrag macht --
 // dieselbe Haltung wie auslagen.php (ENT-125): Was auf einem Dokument steht,
 // das an einen Kunden geht, wird auf dem Server gerechnet. Der Browser
@@ -23,6 +28,8 @@ declare(strict_types=1);
 // Wieviel Nachkommastellen die Menge fuehrt. Auch sie wird intern
 // ganzzahlig gerechnet (70.00 -> 7000), damit 0.1 * 4200 nicht als
 // 420.00000000000006 durch die Rechnung laeuft.
+require_once __DIR__ . '/mail_vorlage.php';
+
 const BELEG_MENGE_FAKTOR = 100;
 
 // Die Belegarten. 'offerte' ist heute die einzige gebaute; 'rechnung' steht
@@ -34,11 +41,17 @@ const BELEG_MENGE_FAKTOR = 100;
 // "Rechnungdatum" -- beides falsch, und beides stand so auf den
 // oeffentlichen Seiten, die der Empfaenger am Link sieht. Das Fugen-n
 // laesst sich nicht rechnen, also steht das Wort da.
+// frist_feld/frist_label stehen aus demselben Grund hier wie datum_label:
+// Eine Offerte ist "Gültig bis", eine Rechnung "Fällig bis" -- zwei Woerter,
+// zwei Spalten, und beides laesst sich aus der Art nicht rechnen. Ein
+// leeres frist_feld heisst: Diese Art fuehrt keine Frist (ENT-674).
 const BELEG_ARTEN = [
     'offerte'  => ['praefix' => 'OF', 'titel' => 'Offerte',
-                   'datum_label' => 'Offertendatum', 'nummer_label' => 'Offertennummer'],
+                   'datum_label' => 'Offertendatum', 'nummer_label' => 'Offertennummer',
+                   'frist_feld' => 'gueltig_bis', 'frist_label' => 'Gültig bis'],
     'rechnung' => ['praefix' => 'RE', 'titel' => 'Rechnung',
-                   'datum_label' => 'Rechnungsdatum', 'nummer_label' => 'Rechnungsnummer'],
+                   'datum_label' => 'Rechnungsdatum', 'nummer_label' => 'Rechnungsnummer',
+                   'frist_feld' => 'faellig_bis', 'frist_label' => 'Fällig bis'],
     // Dritte Art seit ENT-637. Sie erbt Versand, oeffentliche Ansicht und
     // Annahme unveraendert -- die unterscheiden die Art gar nicht. Was sie
     // zusaetzlich hat, ist eine Laufzeit und ein Preis je Periode.
@@ -47,8 +60,13 @@ const BELEG_ARTEN = [
     // den Wert in ihrem ENUM nicht, dort laesst sich also kein Vertrag
     // ablegen. Ob eine Sicherheitsfirma ihren eigenen Kunden Vertraege
     // schreiben soll, ist eine eigene Frage und nicht entschieden.
+    // Der Vertrag fuehrt bewusst KEINE Frist in der Mail: Seine Laufzeit ist
+    // etwas anderes als eine Antwort- oder Zahlungsfrist und steht mit Beginn,
+    // Ende und Kuendigungsfrist auf dem Dokument selbst (ENT-637). Ein
+    // einzelnes Datum daraus waere im Postfach die halbe Auskunft.
     'vertrag'  => ['praefix' => 'VE', 'titel' => 'Vertrag',
-                   'datum_label' => 'Vertragsdatum', 'nummer_label' => 'Vertragsnummer'],
+                   'datum_label' => 'Vertragsdatum', 'nummer_label' => 'Vertragsnummer',
+                   'frist_feld' => '', 'frist_label' => ''],
 ];
 
 // Wie oft eine Position anfaellt (ENT-637). Eine Einrichtungsgebuehr faellt
@@ -498,4 +516,116 @@ function beleg_lesen(PDO $pdo, int $id, string $tabPraefix = ''): ?array
     // Fallunterscheidung.
     $b['perioden'] = beleg_summen_perioden($b['positionen'], (int)$b['rabatt_bp']);
     return $b;
+}
+
+// ── Die Versandmail eines Belegs (ENT-674) ────────────────────────────
+//
+// WARUM HIER UND NICHT IM ENDPUNKT: Bis hierher baute
+// betreiber_beleg_versenden.php sein HTML selbst -- ein <div> mit vier
+// Absaetzen, ohne Rahmen, ohne Fuss, ohne Logo. Die gemeinsame Gestaltung
+// aus mail_vorlage.php (ENT-624, ENT-651) gab es da laengst; der Versand
+// hat sie nur nie geerbt. Genau die Sorte Regelbruch, die in CLAUDE.md
+// steht. Als eigene Funktion laesst sie sich ausserdem pruefen, ohne einen
+// Endpunkt samt Anmeldung, Datenbank und SMTP zu stellen.
+//
+// GIBT NICHTS AUS UND SCHICKT NICHTS: Sie liefert Betreff, Textfassung,
+// HTML und die Bilder fuer smtp_senden() zurueck -- gleiche Bauart wie
+// demo_zugang_mail().
+//
+// $signaturZeilen kommen aus dem Deploy (mail_signatur_zeilen()) und NICHT
+// aus dieser Datei: Ein Personenname gehoert nicht ins Repository
+// (Vertraulichkeitsregel in CLAUDE.md). Sind sie leer, zeichnet die Firma
+// aus dem Briefkopf -- nie ein leerer Gruss und nie ein Platzhaltername.
+//
+// KEIN BETRAG IN DER MAIL (ENT-674, Punkt 4, Entscheid des
+// Projektinhabers): Nummer, Datum und die Frist, sonst nichts. Eine
+// weitergeleitete Mail traegt damit keine Preise; der Betrag steht auf der
+// verlinkten Seite, die den Link kennt.
+function beleg_mail(array $beleg, string $firma, string $link, string $person,
+                    array $signaturZeilen): array
+{
+    $art    = (string)($beleg['art'] ?? 'offerte');
+    $angabe = BELEG_ARTEN[$art] ?? BELEG_ARTEN['offerte'];
+    $titel  = (string)$angabe['titel'];
+    $nummer = (string)($beleg['nummer'] ?? '');
+
+    $gruss = $signaturZeilen === [] ? [$firma] : $signaturZeilen;
+    // Die Anrede traegt die Kontaktperson, wenn eine hinterlegt ist, und
+    // sonst nichts weiter (ENT-674, Punkt 3). Ein leeres Feld darf nie als
+    // halber Name in einer Mail an einen Kunden ankommen.
+    $person   = trim($person);
+    $anrede   = $person === '' ? 'Guten Tag' : 'Guten Tag ' . $person;
+
+    // Die Felder des Blocks. Beschriftungen aus BELEG_ARTEN, nicht
+    // zusammengesetzt: "Offerte" + "nummer" ergaebe "Offertenummer".
+    $felder = [[(string)$angabe['nummer_label'], $nummer]];
+    $datum = beleg_mail_datum($beleg['datum'] ?? null);
+    if ($datum !== '') { $felder[] = [(string)$angabe['datum_label'], $datum]; }
+    $fristFeld = (string)($angabe['frist_feld'] ?? '');
+    if ($fristFeld !== '') {
+        $frist = beleg_mail_datum($beleg[$fristFeld] ?? null);
+        // Eine nicht gesetzte Frist wird weggelassen und nicht als Strich
+        // gezeigt: "keine Frist gesetzt" und "Frist unbekannt" sind zwei
+        // Aussagen, und im Postfach laesst sich die zweite nicht aufloesen.
+        if ($frist !== '') { $felder[] = [(string)$angabe['frist_label'], $frist]; }
+    }
+
+    // Nur die Offerte laesst sich am Link beantworten -- die Rechnung und
+    // der Vertrag werden dort angesehen. Zwei Saetze, weil ein "direkt
+    // beantworten" unter einer Rechnung eine Zusage verspricht, die die
+    // Seite nicht einloest.
+    $ansehen = $art === 'offerte'
+        ? "Sie können die $titel hier ansehen und direkt beantworten:"
+        : "Sie können die $titel hier ansehen:";
+
+    $betreff = "Neue $titel $nummer von $firma";
+
+    $zeilen = '';
+    foreach ($felder as [$b, $w]) { $zeilen .= "$b: $w\n"; }
+    $text = "$anrede\n\n"
+          . "$firma hat Ihnen eine neue $titel erstellt.\n\n"
+          . $zeilen . "\n"
+          . "$ansehen\n$link\n\n"
+          . "Bei Fragen oder Unklarheiten melden Sie sich jederzeit bei uns.\n\n"
+          . "Mit freundlichen Grüssen\n" . implode("\n", $gruss);
+
+    // Die Kennung nur setzen, wenn es das Bild wirklich gibt -- ein
+    // cid-Verweis ins Leere zeigt im Mailprogramm ein zerbrochenes Bild.
+    $logo     = mail_logo();
+    $logoHell = mail_logo_hell();
+    $bilder   = array_values(array_filter([$logo, $logoHell]));
+
+    $block = '';
+    foreach ($felder as [$b, $w]) { $block .= mail_feld($b, mail_e($w)); }
+
+    $inhalt = mail_absatz(mail_e($anrede))
+        // GROSS geschrieben. Bis ENT-674 stand hier mb_strtolower($titel)
+        // und damit "eine neue offerte erstellt" im Postfach -- ein
+        // Substantiv, klein geschrieben, in der ersten Mail an einen
+        // kuenftigen Mandanten.
+        . mail_absatz('<b>' . mail_e($firma) . '</b> hat Ihnen eine neue '
+            . mail_e($titel) . ' erstellt.')
+        . mail_block($block)
+        . mail_absatz(mail_e($ansehen))
+        . mail_knopf($titel . ' anschauen', $link)
+        . mail_absatz('Bei Fragen oder Unklarheiten melden Sie sich jederzeit bei uns.')
+        . mail_signatur($gruss,
+            $logo === null ? '' : (string)$logo['cid'],
+            $logoHell === null ? '' : (string)$logoHell['cid']);
+
+    return ['betreff' => $betreff, 'text' => $text,
+        'html' => mail_rahmen($inhalt), 'bilder' => $bilder];
+}
+
+// Ein Datum aus der Datenbank als Tag.Monat.Jahr -- oder '' , wenn keines
+// da ist. MySQL liefert ein nicht gesetztes DATE je nach Modus als NULL,
+// als Leerzeichenkette oder als '0000-00-00'; alle drei heissen dasselbe
+// und duerfen nie als "01.01.1970" oder "30.11.-0001" in einer Mail an
+// einen Kunden landen.
+function beleg_mail_datum($roh): string
+{
+    $roh = trim((string)($roh ?? ''));
+    if ($roh === '' || str_starts_with($roh, '0000-00-00')) { return ''; }
+    $zeit = strtotime($roh);
+    return $zeit === false ? '' : date('d.m.Y', $zeit);
 }

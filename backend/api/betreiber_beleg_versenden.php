@@ -1,7 +1,7 @@
 <?php
 // Offerte der Betreiberin per E-Mail an den kuenftigen Mandanten (ENT-605).
 //
-// Gleicher Aufbau wie beleg_versenden.php im Cockpit, mit zwei
+// Gleicher Aufbau wie beleg_versenden.php im Cockpit, mit drei
 // Unterschieden, die aus der Ebene folgen:
 //
 //   1. Der Absendername kommt aus `be_briefkopf` und nicht aus `betrieb` --
@@ -10,6 +10,10 @@
 //   2. Der Link zeigt auf betreiber_beleg_oeffentlich.php und damit auf
 //      betreiber.guardops.ch. Die Adresse kommt aus dem Deploy (ENT-501,
 //      basis_url()), nie aus dem Host-Kopf der Anfrage.
+//   3. Die Mail traegt die gemeinsame Gestaltung aus mail_vorlage.php
+//      (ENT-674) -- dieselbe wie die Demo-Mail, samt Signatur und Logo der
+//      Betreiberin. Im Cockpit zeichnet eine Mandantin, und deren Briefkopf
+//      in dieser Vorlage ist eine eigene Frage (OP-675).
 //
 // Verschickt KEINE PDF-Anhaenge -- es gibt in diesem Projekt keine
 // PDF-Bibliothek auf dem Server (siehe backend/mailer.php). Die Mail traegt
@@ -20,6 +24,10 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../belege.php';
 require_once __DIR__ . '/../mailer.php';
+// Die gemeinsame Mailgestaltung. belege.php bindet sie selbst ein; hier
+// steht sie, weil mail_signatur_zeilen() aus mailer.php und die Vorlage
+// zusammengehoeren.
+require_once __DIR__ . '/../mail_vorlage.php';
 
 $ich = require_betreiber_voll();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -46,7 +54,9 @@ if (!$beleg['kunde_id']) {
     json_response(['status' => 'error', 'message' => 'Die Offerte hat noch keinen Empfänger.'], 400);
 }
 
-$s = $pdo->prepare('SELECT name, email FROM be_kunden WHERE id = ?');
+// `kontaktperson` fuer die Anrede (ENT-674). Sie darf fehlen -- dann
+// gruesst die Mail ohne Namen, statt mit einem halben.
+$s = $pdo->prepare('SELECT name, email, kontaktperson FROM be_kunden WHERE id = ?');
 $s->execute([(int)$beleg['kunde_id']]);
 $kunde = $s->fetch();
 if (!$kunde) {
@@ -103,39 +113,21 @@ if ($basis === null) {
 }
 $link = $basis . '/api/betreiber_beleg_oeffentlich.php?token=' . urlencode($token);
 
-$titel   = BELEG_ARTEN[$beleg['art']]['titel'] ?? 'Beleg';
-$betreff = "Neue $titel {$beleg['nummer']} von $firma";
-
-$ansehenText = $beleg['art'] === 'offerte'
-    ? "Sie können die $titel hier ansehen und direkt beantworten:"
-    : "Sie können die $titel hier ansehen:";
-
-$text = "Guten Tag\n\n"
-    . "$firma hat Ihnen eine neue $titel erstellt: {$beleg['nummer']}.\n\n"
-    . "$ansehenText\n$link\n\n"
-    . "Freundliche Grüsse\n$firma";
-
-// Jedes textfuehrende Element bekommt sein EIGENES font-family: Outlook
-// Desktop vererbt font-family in HTML-Mails nicht zuverlaessig und faellt
-// sonst auf eine Serifenschrift zurueck.
-$schrift = "font-family:-apple-system,'Segoe UI',Arial,sans-serif";
-$e = static fn(string $w): string => htmlspecialchars($w, ENT_QUOTES, 'UTF-8');
-$html = '<div style="' . $schrift . ';color:#14161A;max-width:520px">'
-    . '<p style="' . $schrift . ';margin:0 0 16px">Guten Tag</p>'
-    . '<p style="' . $schrift . ';margin:0 0 16px"><strong>' . $e($firma) . '</strong> hat Ihnen eine neue '
-    . $e(mb_strtolower($titel)) . ' erstellt: <strong>' . $e((string)$beleg['nummer']) . '</strong>.</p>'
-    . '<p style="' . $schrift . ';margin:28px 0">'
-    . '<a href="' . $e($link) . '" '
-    . 'style="' . $schrift . ';background:#2F5BD7;color:#fff;padding:12px 24px;border-radius:8px;'
-    . 'font-weight:700;text-decoration:none;display:inline-block">'
-    . $e("$titel anschauen") . '</a></p>'
-    . '<p style="' . $schrift . ';color:#6B7280;font-size:12px;margin:0 0 16px">Funktioniert der Knopf nicht? Diesen Link in den Browser kopieren:<br>'
-    . $e($link) . '</p>'
-    . '<p style="' . $schrift . ';margin:0">Freundliche Grüsse<br>' . $e($firma) . '</p>'
-    . '</div>';
+// Betreff, Text, HTML und die Bilder der Signatur kommen aus einer Hand
+// (ENT-674): beleg_mail() in belege.php baut sie aus derselben Vorlage wie
+// die Demo-Mail -- Rahmen, Werteblock, Knopf, Signatur mit eingebettetem
+// Logo, Dunkelmodus. Hier steht bewusst KEIN HTML mehr: Zwei Gestaltungen
+// nebeneinander waren der Befund, der zu ENT-674 gefuehrt hat.
+//
+// Die Signaturzeilen kommen aus dem Deploy und nicht aus dem Repository
+// (Vertraulichkeitsregel). Sind keine hinterlegt, zeichnet die Firma aus
+// dem Briefkopf -- das entscheidet beleg_mail().
+$mail = beleg_mail($beleg, $firma, $link,
+    (string)($kunde['kontaktperson'] ?? ''), mail_signatur_zeilen());
 
 try {
-    smtp_senden($anEmail, (string)$kunde['name'], $betreff, $html, $text);
+    smtp_senden($anEmail, (string)$kunde['name'], $mail['betreff'],
+                $mail['html'], $mail['text'], [], $mail['bilder']);
 } catch (Throwable $ex) {
     json_response(['status' => 'error', 'message' => 'Versand fehlgeschlagen: ' . $ex->getMessage()], 502);
 }
