@@ -10140,7 +10140,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   <div class="dw-inhalt">
     <p>Diese Demo zeigt einen erfundenen Betrieb mit frei erfundenen Inhalten. Übereinstimmungen mit echten Personen, Firmen oder Objekten sind dabei nicht auszuschliessen und rein zufällig.</p>
     <p>Bitte tragen Sie hier ausschliesslich erfundene Daten ein — keine echten Namen, Adressen, Telefonnummern oder sonstigen Personendaten, weder Ihre eigenen noch die von Dritten.</p>
-    <p>Nachfolgend finden Sie die Nutzungsbedingungen und die Datenschutzerklärung, die Sie bereits bei der Anfrage dieses Demo-Zugangs bestätigt haben.</p>
+    <p id="dhHerkunft"></p>
     <div class="dw-rechtstext" id="dhNutzungsbedingungen" aria-busy="true">Nutzungsbedingungen werden geladen …</div>
     <div class="dw-rechtstext" id="dhDatenschutz" aria-busy="true">Datenschutzerklärung wird geladen …</div>
   </div>
@@ -10740,9 +10740,40 @@ function dhRechtstextLaden() {
       dhScrollPruefen();
     });
   };
+  // ZWEI VERSCHIEDENE TEXTE FUER ZWEI VERSCHIEDENE ANLAGEN -- dieselbe
+  // Verzweigung wie beim Datenschutzverweis auf der Anmeldemaske, und aus
+  // demselben Grund (Befund des Projektinhabers, 2026-09-21):
+  // APP_UMGEBUNG_DEMO allein unterscheidet nicht zwischen der einen
+  // ENT-523-Demo-Umgebung (gemeinsamer Zugang, naechtliches Leeren) und
+  // einem der zehn Demo-Plaetze (ENT-600/601: eigene Datenbank, ein
+  // Interessent, 14 Tage, kein naechtliches Leeren). Beide tragen
+  // APP_ENV=demo.
+  //
+  // Dass die Unterscheidung hier fehlte, ist am 2026-09-22 aufgefallen:
+  // Auf einem Demo-Platz stand in Ziffer 3 das naechtliche Leeren, das es
+  // dort nicht gibt -- und zwar in einem Text, den man zum Weiterkommen
+  // erst durchscrollen muss. Ein Dokument, das man jemandem ausdruecklich
+  // zu lesen gibt, darf nicht die falsche Anlage beschreiben.
+  const datenschutz = window.APP_UMGEBUNG_DEMO_PLATZ
+    ? 'datenschutz-demo-platz.html'
+    : 'datenschutz-demo.html';
+
+  // Derselbe Unterschied noch einmal, diesmal im eigenen Text: "die Sie
+  // bereits bestaetigt haben" trifft auf einem Platz zu (persoenlicher
+  // Zugang, derselbe Mensch hat ihn angefragt), auf der gemeinsamen
+  // Umgebung nicht -- dort kann jedes der Mitarbeitendenkonten von
+  // irgendwem bedient werden. Genau das ist der Grund, aus dem es diesen
+  // Bildschirm ueberhaupt gibt (ENT-656); ihn mit einem Satz zu eroeffnen,
+  // der das Gegenteil behauptet, hebt seine Begruendung auf.
+  $('dhHerkunft').textContent = window.APP_UMGEBUNG_DEMO_PLATZ
+    ? 'Nachfolgend finden Sie die Nutzungsbedingungen und die Datenschutzerklärung, '
+      + 'die Sie bei der Anfrage dieses Demo-Zugangs bestätigt haben.'
+    : 'Nachfolgend finden Sie die Nutzungsbedingungen und die Datenschutzerklärung '
+      + 'für diesen Demo-Zugang. Der Zugang wird von mehreren Personen benutzt — '
+      + 'angefragt und bestätigt hat ihn möglicherweise jemand anderes.';
   const texte = [
     ['nutzungsbedingungen.html', 'dhNutzungsbedingungen', 'Nutzungsbedingungen'],
-    ['datenschutz-demo.html', 'dhDatenschutz', 'Datenschutzerklärung'],
+    [datenschutz, 'dhDatenschutz', 'Datenschutzerklärung'],
   ];
   dhTexteOffen = texte.length;
   texte.forEach(t => laden(...t));

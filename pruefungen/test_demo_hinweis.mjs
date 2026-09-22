@@ -32,10 +32,13 @@ const ev = (page, fn, ...a) => page.evaluate(fn, ...a).catch(() => null);
 const dashboard = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
 const workflow = readFileSync(`${WURZEL}/.github/workflows/deploy-hostpoint.yml`, 'utf8');
 
-// ── 1. Was der Hinweis nachlaedt, muss im Cockpit-Buendel liegen ─────────
+// ── 1. Was der Hinweis nachlaedt ─────────────────────────────────────────
 //
-// Gelesen wird der Rumpf der ladenden Funktion, nicht die ganze Datei: Eine
-// Suche ueber dashboard.html faende auch jeden Verweis in einem Kommentar.
+// Welche Dateien abgerufen werden, wird weiter unten GEMESSEN (fetch wird
+// mitgeschrieben), nicht aus dem Quelltext gelesen: Seit dem 2026-09-22
+// haengt die Datenschutzerklaerung an einer Verzweigung, und eine Suche
+// ueber den Quelltext faende beide Zweige, ohne zu wissen, welcher greift.
+// Hier steht nur, DASS es die Funktion gibt.
 const rumpf = (() => {
   const a = dashboard.indexOf('function dhRechtstextLaden()');
   return a < 0 ? '' : dashboard.slice(a, dashboard.indexOf('\n}\n', a));
@@ -43,43 +46,29 @@ const rumpf = (() => {
 check('KRITISCH: der Demo-Hinweis hat eine Funktion, die die Rechtstexte nachlaedt',
   rumpf.length > 200);
 
-const nachgeladen = [...rumpf.matchAll(/'([A-Za-z0-9_-]+\.html)'/g)].map(m => m[1])
-  .filter((q, i, arr) => arr.indexOf(q) === i);
-check('KRITISCH: der Hinweis laedt mindestens zwei Rechtstexte nach (Bedingungen und Datenschutz)',
-  nachgeladen.length >= 2);
+// ── 1b. Der Abdruck datiert auf den Text, der wirklich dastand ──────────
 //
-// Kopiert wird in die Demo-Plaetze, nicht nach dist/: Der Hinweis geht nur
-// in einer Demo-Instanz auf, und ein Mandant haette sonst die
-// Demo-Bedingungen unter seiner eigenen Adresse liegen.
+// Der Abdruck haelt fest, WELCHE Fassung jemand bestaetigt hat. Bleibt die
+// Konstante beim naechsten Textwechsel stehen, datiert er die Zustimmung
+// auf einen Text, den niemand gesehen hat -- er beweist dann das Gegenteil
+// dessen, wofuer er da ist. nutzungsbedingungen.html warnt im eigenen Kopf
+// davor, und test_recht.mjs fuehrt dieselbe Pruefung fuer die Zustimmung
+// auf der Homepage. Dem Hinweis fehlte sie bis zum 2026-09-22: Die
+// Konstante stand frei da und war an nichts gebunden.
 //
-// Verlangt wird das Ziel "dist-demo/$PLATZ/" und nicht bloss "dist-demo/":
-// Eine Zeile mit einem festen Platznamen darin waere still falsch -- sie
-// liefe durch, der Deploy bliebe gruen, und neun von zehn Plaetzen zeigten
-// weiter "konnte nicht geladen werden". Ausdrueckliche Ansage des
-// Projektinhabers (2026-09-22): "nicht nur auf demo3 anwenden, sondern auf
-// allen 10 und auch kuenftigen". Die Platzliste selbst haelt
-// test_demo_plaetze.mjs mit DEMO_PLAETZE in backend/demo_zugang.php
-// zusammen; ein elfter Platz erbt die Zeilen damit von selbst.
-for (const datei of nachgeladen) {
-  const q = datei.replace(/\./g, '\\.');
-  check(`KRITISCH: ${datei} wird auf die Demo-Plaetze kopiert -- sonst laeuft der Abruf auf der Instanz in den 404`,
-    new RegExp(`cp\\s+${q}\\s+"dist-demo/`).test(workflow));
-  check(`KRITISCH: ${datei} geht an JEDEN Platz ($PLATZ), nicht an einen bestimmten`,
-    new RegExp(`cp\\s+${q}\\s+"dist-demo/\\$PLATZ/`).test(workflow));
-}
-
-// Und die Schleife drumherum: Die Zeilen muessen im Rumpf von
-// "for PLATZ in $PLAETZE" stehen. Stuenden sie davor oder dahinter, waere
-// $PLATZ leer oder der letzte Platz -- auch das liefe durch.
-const schleife = (() => {
-  const a = workflow.indexOf('for PLATZ in $PLAETZE; do');
-  if (a < 0) return '';
-  const b = workflow.indexOf('\n          done', a);
-  return b < 0 ? '' : workflow.slice(a, b);
-})();
-for (const datei of nachgeladen) {
-  check(`KRITISCH: die Kopierzeile fuer ${datei} steht in der Schleife ueber alle Plaetze`,
-    schleife.includes(`cp ${datei}`) || new RegExp(`cp\\s+${datei.replace(/\./g, '\\.')}\\s`).test(schleife));
+// Geprueft wird die Uebereinstimmung, nicht der Wortlaut der Konstante.
+{
+  const MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli',
+    'August', 'September', 'Oktober', 'November', 'Dezember'];
+  const seite = readFileSync(`${WURZEL}/nutzungsbedingungen.html`, 'utf8');
+  const kern = readFileSync(`${WURZEL}/backend/api/demo_hinweis_bestaetigen.php`, 'utf8');
+  const t = seite.match(/<p class="stand">Fassung vom (\d{1,2})\. (\p{L}+) (\d{4})<\/p>/u);
+  const k = kern.match(/const DEMO_HINWEIS_FASSUNG = '(\d{4}-\d{2}-\d{2})'/);
+  const ausSeite = t
+    ? `${t[3]}-${String(MONATE.indexOf(t[2]) + 1).padStart(2, '0')}-${t[1].padStart(2, '0')}`
+    : null;
+  check('KRITISCH: der Abdruck des Demo-Hinweises traegt die Fassung, die in den Nutzungsbedingungen steht',
+    ausSeite !== null && k !== null && ausSeite === k[1]);
 }
 
 // ── 2. Der gerenderte Bildschirm ─────────────────────────────────────────
@@ -204,6 +193,97 @@ for (const [name, breite, hoehe] of [['Desktop', 1440, 900], ['Handy', 390, 844]
   // ausdruecklich "Bild durchgehend zeigen".
   check(`${name}: der Schleier deckt das Foto nicht vollstaendig zu`,
     m.bild.mittel > 0.004);
+}
+
+// ── 2b. Welche Rechtstexte ein Demo-Platz wirklich abruft ────────────────
+//
+// GEMESSEN, NICHT GELESEN: fetch wird mitgeschrieben, waehrend der Hinweis
+// aufgeht -- einmal als Demo-Platz (ENT-600/601: eigene Datenbank, ein
+// Interessent, 14 Tage, KEIN naechtliches Leeren) und einmal als die eine
+// ENT-523-Umgebung (gemeinsamer Zugang, naechtliches Leeren). Beide tragen
+// APP_ENV=demo, es gibt also zwei richtige Antworten, und welche gilt,
+// entscheidet erst window.APP_UMGEBUNG_DEMO_PLATZ.
+//
+// ANLASS (Projektinhaber, 2026-09-22, an der laufenden Anlage): Auf einem
+// Demo-Platz stand in Ziffer 3 das naechtliche Leeren -- in einem Text, den
+// man zum Weiterkommen erst durchscrollen muss. Derselbe Fehler war am
+// 2026-09-21 schon einmal am Datenschutzverweis der Anmeldemaske behoben
+// worden; der Hinweis hat die Verzweigung nicht geerbt. Genau die Sorte
+// Fehler, vor der CLAUDE.md warnt: eine Regel, die etwas NEUES nicht
+// mitbekommen hat.
+const abrufe = async (alsPlatz) => {
+  const p = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  p.setDefaultTimeout(5000);
+  await p.goto(`file://${WURZEL}/dashboard.html`);
+  await p.waitForTimeout(400);
+  const liste = await ev(p, flag => {
+    window.APP_UMGEBUNG_DEMO_PLATZ = flag;
+    const gesehen = [];
+    const echt = window.fetch;
+    window.fetch = (u, ...rest) => { gesehen.push(String(u)); return echt(u, ...rest); };
+    document.getElementById('gate').style.display = 'none';
+    dhZeigen(null);
+    window.fetch = echt;
+    return gesehen;
+  }, alsPlatz);
+  const satz = await ev(p, () => document.getElementById('dhHerkunft').textContent.trim());
+  await p.close();
+  return { dateien: liste || [], satz: satz || '' };
+};
+
+const alsPlatz = await abrufe(true);
+const alsGemeinsam = await abrufe(false);
+const platzAbrufe = alsPlatz.dateien;
+const gemeinsamAbrufe = alsGemeinsam.dateien;
+
+// Derselbe Unterschied im eigenen Text des Hinweises. "Die Sie bereits
+// bestaetigt haben" trifft auf einem Platz zu -- persoenlicher Zugang,
+// derselbe Mensch hat ihn angefragt. Auf der gemeinsamen Umgebung nicht:
+// Dort kann jedes der Mitarbeitendenkonten von irgendwem bedient werden,
+// und GENAU DAS ist der Grund, aus dem es diesen Bildschirm gibt
+// (ENT-656). Ein Eroeffnungssatz, der das Gegenteil behauptet, hebt seine
+// eigene Begruendung auf. Stand bis zum 2026-09-22 unbedingt da.
+check('KRITISCH: der Hinweis sagt auf einem Platz etwas anderes als auf der gemeinsamen Umgebung',
+  alsPlatz.satz.length > 40 && alsGemeinsam.satz.length > 40 && alsPlatz.satz !== alsGemeinsam.satz);
+check('KRITISCH: auf der gemeinsamen Umgebung behauptet der Hinweis NICHT, der Lesende habe selbst zugestimmt',
+  !/\bSie\b[^.]{0,60}\bbest(ä|ae)tigt\b/.test(alsGemeinsam.satz));
+check('auf einem Platz darf er es sagen -- dort stimmt es',
+  /\bSie\b[^.]{0,60}\bbest(ä|ae)tigt\b/.test(alsPlatz.satz));
+
+check('KRITISCH: ein Demo-Platz laedt die Bedingungen', platzAbrufe.includes('nutzungsbedingungen.html'));
+check('KRITISCH: ein Demo-Platz laedt die Datenschutzerklaerung FUER EINEN PLATZ -- nicht die des gemeinsamen Zugangs, die vom naechtlichen Leeren erzaehlt',
+  platzAbrufe.includes('datenschutz-demo-platz.html') && !platzAbrufe.includes('datenschutz-demo.html'));
+check('KRITISCH: die eine ENT-523-Umgebung laedt weiterhin ihren eigenen Text',
+  gemeinsamAbrufe.includes('datenschutz-demo.html') && !gemeinsamAbrufe.includes('datenschutz-demo-platz.html'));
+
+// Und was ein Platz abruft, muss auf dem Platz auch liegen.
+//
+// Kopiert wird in die Demo-Plaetze, nicht nach dist/: Der Hinweis geht nur
+// in einer Demo-Instanz auf, und ein Mandant haette sonst die
+// Demo-Bedingungen unter seiner eigenen Adresse liegen.
+//
+// Verlangt wird das Ziel "dist-demo/$PLATZ/" und nicht bloss "dist-demo/":
+// Eine Zeile mit einem festen Platznamen darin waere still falsch -- sie
+// liefe durch, der Deploy bliebe gruen, und neun von zehn Plaetzen zeigten
+// weiter "konnte nicht geladen werden". Ausdrueckliche Ansage des
+// Projektinhabers (2026-09-22): "nicht nur auf demo3 anwenden, sondern auf
+// allen 10 und auch kuenftigen". Die Platzliste selbst haelt
+// test_demo_plaetze.mjs mit DEMO_PLAETZE in backend/demo_zugang.php
+// zusammen; ein elfter Platz erbt die Zeilen damit von selbst.
+const schleife = (() => {
+  const a = workflow.indexOf('for PLATZ in $PLAETZE; do');
+  if (a < 0) return '';
+  const b = workflow.indexOf('\n          done', a);
+  return b < 0 ? '' : workflow.slice(a, b);
+})();
+for (const datei of platzAbrufe.filter(d => /^[A-Za-z0-9_-]+\.html$/.test(d))) {
+  const q = datei.replace(/\./g, '\\.');
+  check(`KRITISCH: ${datei} wird auf die Demo-Plaetze kopiert -- sonst laeuft der Abruf auf der Instanz in den 404`,
+    new RegExp(`cp\\s+${q}\\s+"dist-demo/`).test(workflow));
+  check(`KRITISCH: ${datei} geht an JEDEN Platz ($PLATZ), nicht an einen bestimmten`,
+    new RegExp(`cp\\s+${q}\\s+"dist-demo/\\$PLATZ/`).test(workflow));
+  check(`KRITISCH: die Kopierzeile fuer ${datei} steht in der Schleife ueber alle Plaetze`,
+    new RegExp(`cp\\s+${q}\\s`).test(schleife));
 }
 
 // ── 3. Die Sperre ────────────────────────────────────────────────────────

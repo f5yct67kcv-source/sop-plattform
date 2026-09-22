@@ -14,10 +14,18 @@ declare(strict_types=1);
 // erfunden, der Hinweis waere dort falsch.
 require __DIR__ . '/../db.php';
 
-// Fassung des Hinweistexts, den dashboard.html gerade anzeigt (siehe dort,
-// #demoHinweisText). Wie DEMO_BEDINGUNGEN_FASSUNG in demo_bestaetigung.php:
-// eine spaetere Textaenderung aendert diesen Wert, alte Bestaetigungen
-// bleiben dadurch auf die Fassung datiert, der tatsaechlich zugestimmt wurde.
+// Fassung der Nutzungsbedingungen, die der Hinweis vorlegt. Wie
+// DEMO_BEDINGUNGEN_FASSUNG in demo_bestaetigung.php: Eine spaetere
+// Textaenderung aendert diesen Wert, alte Bestaetigungen bleiben dadurch
+// auf die Fassung datiert, der tatsaechlich zugestimmt wurde.
+//
+// GEHALTEN WIRD DER WERT VON test_demo_hinweis.mjs gegen die Fassung in
+// nutzungsbedingungen.html -- bis zum 2026-09-22 stand er frei und ohne
+// Pruefung da. Ein Abdruck, dessen Fassungsangabe beim naechsten
+// Textwechsel stehen bleibt, datiert die Zustimmung auf einen Text, den
+// niemand gesehen hat; er beweist dann das Gegenteil dessen, wofuer er da
+// ist. Genau davor warnt nutzungsbedingungen.html im eigenen Kopf, und
+// genau dafuer gibt es die Zwillingspruefung in test_recht.mjs.
 const DEMO_HINWEIS_FASSUNG = '2026-09-21';
 
 $user = require_session();
