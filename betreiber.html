@@ -7404,8 +7404,13 @@ function ofSummenAusServer(s) {
 function ofBlatt(b, kunde, person) {
   const s = b.summen || belegSummen(b.positionen || [], Number(b.rabatt_bp) || 0);
   const absender = bkAbsenderZeilen();
+  /* Logo links aussen, 130 px breit -- dieselbe Groesse wie in der
+     E-Mail-Signatur und auf der oeffentlichen Ansicht
+     (betreiber_beleg_oeffentlich.php). Wer dieselbe Offerte einmal von
+     innen und einmal ueber den Link sieht, soll nicht zwei verschiedene
+     Blaetter bekommen. */
   const logo = briefkopf.logo
-    ? `<img src="${esc(briefkopf.logo)}" alt="" style="max-height:96px;max-width:200px;display:block;margin-left:auto">`
+    ? `<img src="${esc(briefkopf.logo)}" alt="" style="max-width:130px;max-height:60px;display:block;margin-bottom:14px">`
     : '';
 
   const empfaenger = [
@@ -7481,9 +7486,9 @@ function ofBlatt(b, kunde, person) {
 
   return `
     <div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#14161A;max-width:700px;margin:0 auto;font-size:12px">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:56px">
+      <div style="margin-bottom:56px">
+        ${logo}
         <div style="line-height:1.45">${absender.map(z => esc(z)).join('<br>')}</div>
-        <div>${logo}</div>
       </div>
 
       <div style="display:flex;justify-content:space-between;gap:40px;margin-bottom:52px">
@@ -7498,8 +7503,11 @@ function ofBlatt(b, kunde, person) {
         <div style="line-height:1.5;min-width:230px">${empfaenger.map(z => esc(z)).join('<br>')}</div>
       </div>
 
+      <!-- Ohne die Nummer: Sie steht drei Zeilen darueber in der
+           Kopftabelle. Traegt der Beleg keinen eigenen Titel, bleibt die
+           Art stehen -- eine Ueberschrift, keine Wiederholung. -->
       <div style="font-size:19px;font-weight:700;margin-bottom:14px">
-        ${esc(b.titel || '')} ${esc(b.nummer)}
+        ${esc(b.titel || (OF_ART_TEXT[b.art] || OF_ART_TEXT.offerte).dokument)}
       </div>
 
       <table style="width:100%;border-collapse:collapse">
