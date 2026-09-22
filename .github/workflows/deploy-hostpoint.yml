@@ -2352,6 +2352,20 @@ jobs:
 
             cp -a dist-demoplatz-vorlage "dist-demo/$PLATZ"
 
+            # Die beiden Rechtstexte gibt es NUR auf den Demo-Plaetzen, nicht
+            # in dist/ und nicht bei einem Mandanten: Der Demo-Hinweis laedt
+            # sie nach und laesst erst bestaetigen, wenn man durch ist -- das
+            # geht nur gleicher Herkunft (ein Abruf zu guardops.ch scheitert
+            # an der Ursprungspruefung des Browsers, ein <iframe> von dort
+            # liesse sich nicht auf "zu Ende gelesen" pruefen). Aufgeht der
+            # Hinweis aber ausschliesslich in einer Demo-Instanz, und ein
+            # Mandant haette sonst die Demo-Bedingungen von guardops.ch unter
+            # seiner eigenen Adresse liegen. Abgeschrieben wird nichts: Es
+            # ist dieselbe Datei, ihr canonical zeigt weiter auf guardops.ch.
+            # test_demo_hinweis.mjs haelt Aufruf und Kopierzeile zusammen.
+            cp nutzungsbedingungen.html "dist-demo/$PLATZ/nutzungsbedingungen.html"
+            cp datenschutz-demo.html    "dist-demo/$PLATZ/datenschutz-demo.html"
+
             # ── Die eigene Datenbank des Platzes (ENT-600, Punkt 2) ──────
             ersetze __DB_HOST__ "$DB_HOST" "dist-demo/$PLATZ/db.php"
             ersetze __DB_NAME__ "$DB_NAME" "dist-demo/$PLATZ/db.php"

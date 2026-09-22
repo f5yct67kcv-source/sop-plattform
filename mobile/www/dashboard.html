@@ -2042,37 +2042,35 @@ textarea.inp { resize: vertical; min-height: 92px; font-family: inherit; line-he
    auseinanderlaufen koennte. */
 .blockier-scrim {
   position: fixed; inset: 0; z-index: 90; display: none; overflow-y: auto;
-  background: radial-gradient(112% 46% at 50% 0%, #1A2334 0%, rgba(26,35,52,0) 60%), #0F1117;
+  /* Das Foto der Anmeldemaske traegt den ganzen Bildschirm, nicht nur
+     einen Kopfstreifen (Ansage des Projektinhabers, 2026-09-22: "Bild
+     durchgehend zeigen, aber so gedaempft, dass man den Text gut lesen
+     kann"). Es liegt darum hier auf dem Scrim und nicht auf dem Kopf.
+     Der Hintergrund eines Elements haengt an dessen Rahmenkasten -- und
+     der ist hier der Bildschirm (position:fixed; inset:0). Das Bild bleibt
+     beim Scrollen also von selbst stehen, waehrend der Inhalt darueber
+     laeuft; background-attachment:fixed braucht es dafuer nicht (das ist
+     auf iOS unzuverlaessig).
+     Der Schleier ist kraeftiger als der der Anmeldemaske: Dort liegen ein
+     paar Zeilen darauf, hier mehrere Bildschirmseiten Flaechentext, und
+     die hellen Stellen des Fotos (Fassade rechts) wandern beim Scrollen
+     unter jede davon. Wie dunkel es sein muss, ist nicht geschaetzt --
+     test_demo_hinweis.mjs misst den Kontrast am gerenderten Bild. */
+  background:
+    radial-gradient(112% 46% at 50% 0%, rgba(26,35,52,.55) 0%, rgba(26,35,52,0) 60%),
+    linear-gradient(rgba(11,13,18,.80), rgba(11,13,18,.92)),
+    url('img/anmeldung-nacht.webp') 62% center / cover no-repeat,
+    #0F1117;
   color: #F2F4F8;
 }
 .blockier-scrim.on { display: block; }
-/* Der Kopf ist derselbe Bildaufbau wie die Anmeldemaske (#gate): dasselbe
-   Foto, derselbe Schleier darueber, dasselbe Logo mit Claim, derselbe
-   Gruss. Ansage des Projektinhabers (2026-09-22): "durch den milchigen
-   Hintergrund haben wir einen sauberen Verlauf und der Text liegt gut
-   darueber". Nachgebaut statt als Bildschirmfoto abgelegt -- ein Foto der
-   Maske waere eine zweite Quelle, die beim naechsten Umbau der Maske
-   stillschweigend veraltet; so aendert sich beides zusammen.
-   Der Schleier steckt hier im background statt in einer eigenen Ebene,
-   weil kein Video darunter laeuft (bei #gate deckt genau das den
-   CSS-Hintergrund ab -- darum dort das zusaetzliche Element).
-   Als Kopfbild, nicht als Vollbild -- Wunsch des Projektinhabers: "muss
-   nicht so breit sein vertikal". */
+/* Der Kopf traegt nur noch Logo, Claim und Gruss -- wie auf der
+   Anmeldemaske. Das Foto darunter gehoert dem ganzen Bildschirm (siehe
+   .blockier-scrim), darum hier kein eigener Hintergrund und keine
+   Abschlusskante: Eine solche Kante war die erste Fassung und sah aus wie
+   ein abgeschnittenes Banner. */
 .dw-hero {
-  padding: calc(44px + env(safe-area-inset-top)) 22px 40px; text-align: center;
-  background:
-    radial-gradient(80% 68% at 50% 14%, #1C2639 0%, rgba(28,38,57,0) 66%),
-    var(--gate-schleier),
-    url('img/anmeldung-nacht.webp') 62% center / cover no-repeat,
-    #0F1117;
-  /* Untere Kante weich auslaufen lassen, statt das Foto abzuschneiden: Der
-     Schleier endet zwar dunkel, aber an hellen Stellen im Bild (Fassade
-     rechts) bliebe eine sichtbare Kante. Als Maske und nicht als weitere
-     Farbschicht, weil die Flaeche darunter je nach Scrollstand eine andere
-     Farbe hat (Farbverlauf der .blockier-scrim) -- eine aufgemalte Kante
-     muesste diese Farbe raten. */
-  -webkit-mask-image: linear-gradient(to bottom, #000 74%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 74%, transparent 100%);
+  padding: calc(52px + env(safe-area-inset-top)) 22px 44px; text-align: center;
 }
 /* Eigene Klasse, NICHT .marke: Die Deploy-Ersetzung fuers Mandanten-Buendel
    trifft genau EINE <svg class="marke">-Zeile (deploy-hostpoint.yml). Eine
@@ -2111,7 +2109,10 @@ textarea.inp { resize: vertical; min-height: 92px; font-family: inherit; line-he
    Scroll-Ereignis-Kopplung an ein zweites Element. */
 .dw-fuss {
   position: sticky; bottom: 0; left: 0; right: 0;
-  background: linear-gradient(rgba(15,17,23,0) 0%, #0F1117 34%);
+  /* Bis fast deckend, aber nicht ganz: Das Foto laeuft hinter dem Fuss
+     weiter, sonst saesse dort ein Balken in einem anderen Ton als der
+     Rest des Bildschirms. */
+  background: linear-gradient(rgba(11,13,18,0) 0%, rgba(11,13,18,.93) 38%);
   padding: 60px 20px calc(22px + env(safe-area-inset-bottom));
   display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
@@ -10655,11 +10656,23 @@ let dhRechtstextGeladen = false;
 function dhRechtstextLaden() {
   if (dhRechtstextGeladen) { return; }
   dhRechtstextGeladen = true;
-  const laden = (datei, zielId) => {
-    fetch(datei).then(r => r.text()).then(html => {
+  // Der Ersatz zeigt auf guardops.ch und nicht auf die Datei daneben: Wenn
+  // der Abruf scheitert, ist der wahrscheinlichste Grund, dass genau diese
+  // Datei hier fehlt -- ein Verweis darauf fuehrte ins selbe Nichts. Der
+  // Knopf bleibt trotzdem freischaltbar: Beide Texte sind bei der Anfrage
+  // des Zugangs schon bestaetigt worden, und wer wegen einer fehlenden
+  // Datei gar nicht mehr in die Demo kaeme, waere schlechter dran als wer
+  // sie auf guardops.ch liest.
+  const laden = (datei, zielId, titel) => {
+    const ersatz = '<h2>' + titel + '</h2><p>Dieser Text liess sich gerade nicht laden. '
+      + 'Sie finden ihn auf <a href="https://guardops.ch/' + datei + '" target="_blank" rel="noopener">guardops.ch/' + datei + '</a>.</p>';
+    fetch(datei).then(r => {
+      if (!r.ok) { throw new Error(r.status); }
+      return r.text();
+    }).then(html => {
       const main = new DOMParser().parseFromString(html, 'text/html').querySelector('main');
-      $(zielId).innerHTML = main ? main.innerHTML
-        : 'Konnte nicht geladen werden -- bitte <a href="' + datei + '" target="_blank" rel="noopener">' + datei + '</a> direkt aufrufen.';
+      if (!main) { throw new Error('kein <main>'); }
+      $(zielId).innerHTML = main.innerHTML;
       $(zielId).removeAttribute('aria-busy');
       // Das Laden aendert die Seitenhoehe -- ein bereits gesperrter Stand
       // bleibt gesperrt, das ist richtig; hier geht es nur um den seltenen
@@ -10668,12 +10681,13 @@ function dhRechtstextLaden() {
       // hinein).
       dhScrollPruefen();
     }).catch(() => {
-      $(zielId).innerHTML = 'Konnte nicht geladen werden -- bitte <a href="' + datei + '" target="_blank" rel="noopener">' + datei + '</a> direkt aufrufen.';
+      $(zielId).innerHTML = ersatz;
       $(zielId).removeAttribute('aria-busy');
+      dhScrollPruefen();
     });
   };
-  laden('nutzungsbedingungen.html', 'dhNutzungsbedingungen');
-  laden('datenschutz-demo.html', 'dhDatenschutz');
+  laden('nutzungsbedingungen.html', 'dhNutzungsbedingungen', 'Nutzungsbedingungen');
+  laden('datenschutz-demo.html', 'dhDatenschutz', 'Datenschutzerklärung');
 }
 
 function dhScrollPruefen() {

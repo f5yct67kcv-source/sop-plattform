@@ -67,8 +67,8 @@ const sichtbar = (page, sel) => page.evaluate(s => {
   const { page } = await huelle({ nativ: false });
   check('KRITISCH: im Browser erscheint kein Betriebsfeld -- dort entscheidet die Adresszeile',
     (await sichtbar(page, '#gMandantFeld')) === false);
-  check('Und auch keine Zeile zum Wechseln',
-    (await sichtbar(page, '#gMandantWechsel')) === false);
+  check('Und auch sonst keine Betriebszeile',
+    (await page.$('#gMandantWechsel')) === null);
   check('Der API-Pfad bleibt im Browser relativ',
     (await page.evaluate(() => apiBasis())) === 'api/');
   await page.close();
@@ -154,21 +154,61 @@ const sichtbar = (page, sel) => page.evaluate(s => {
   await page.close();
 }
 
-// ══════════ WER SCHON GEWAEHLT HAT, SIEHT ES UND KANN WECHSELN ════════
+/* ══════════ WER SCHON GEWAEHLT HAT, SIEHT DAVON NICHTS MEHR ══════════
+   Bis ENT-665 stand hier eine Dauerzeile "Betrieb: musterag -- aendern".
+   Sie ist ersatzlos weg: Der Betrieb wird pro Geraet einmal gesetzt, und
+   eine Einstellung, die man einmal im Leben braucht, gehoert nicht auf
+   jeden Anmeldebildschirm.
+   Der Rueckweg haengt damit ganz am Fehlerfall weiter unten -- darum
+   steht hier zusaetzlich, dass es wirklich KEIN zweites Bauteil mehr
+   gibt, das ihn tragen koennte. Waere diese Pruefung nur "unsichtbar",
+   bliebe offen, ob da noch etwas Totes im Bildschirm haengt. */
 {
   const { page } = await huelle({ mandant: 'musterag' });
   check('Mit gemerktem Betrieb ist das Feld weg',
     (await sichtbar(page, '#gMandantFeld')) === false);
-  check('KRITISCH: dafuer steht da, welcher Betrieb gilt -- sonst waere ein Vertipper nur mit Neuinstallation zu beheben',
-    (await sichtbar(page, '#gMandantWechsel')) === true
-    && (await page.textContent('#gMandantWechsel')).includes('musterag'));
-  await page.click('#gMandantWechsel');
-  await page.waitForTimeout(200);
-  check('KRITISCH: ein Tipp darauf oeffnet das Feld wieder',
-    (await sichtbar(page, '#gMandantFeld')) === true);
-  check('Und es ist mit dem bisherigen Wert vorbelegt',
-    (await page.inputValue('#gMandant')) === 'musterag');
+  check('KRITISCH: und es steht auch keine Zeile zum Wechseln mehr da',
+    (await page.$('#gMandantWechsel')) === null);
+  check('KRITISCH: der gemerkte Betrieb wirkt trotzdem -- die Adresse zeigt auf ihn',
+    (await page.evaluate(() => apiBasis())) === 'https://musterag.guardops.ch/api/');
+  /* innerText, nicht textContent: textContent liest auch ausgeblendete
+     Knoten mit -- und der Hinweistext des versteckten Feldes fuehrt
+     "musterag" als Beispiel. Gefragt ist aber, was die Wachperson
+     SIEHT. Die erste Fassung dieser Pruefung ist genau darueber
+     gestolpert und hat einen Fehler gemeldet, den es nicht gab. */
+  check('KRITISCH: auf dem Anmeldebildschirm ist vom Betrieb nichts mehr zu sehen',
+    !(await page.innerText('#gate-login') || '').includes('musterag'));
   await page.close();
+}
+
+/* ══════════ BEIDE SEITEN SAGEN DASSELBE WORT ═════════════════════════
+   Den Kurznamen traegt der Betreiber beim Mandanten ein und gibt ihn
+   weiter; die Wachperson tippt ihn in die App. Stehen an den beiden
+   Enden verschiedene Woerter -- frueher "Subdomain" hier, "Betrieb"
+   dort --, sucht sie am Telefon etwas, das es unter dem Namen nicht
+   gibt. Geprueft wird nicht der Wortlaut, sondern dass beide Enden
+   denselben Begriff tragen: Wer eine Seite umbenennt, faellt auf. */
+{
+  const { page } = await huelle({});
+  const appWort = await page.evaluate(() => w('betrieb'));
+  await page.close();
+  const seite = await browser.newPage();
+  await seite.goto(`file://${WURZEL}/betreiber.html`);
+  const label = (await seite.textContent('label[for="m-subdomain"]')) || '';
+  const hinweis = (await seite.evaluate(() => {
+    const e = document.querySelector('#m-subdomain');
+    const h = e && e.parentElement.querySelector('.hinweis');
+    return h ? h.textContent : '';
+  })) || '';
+  await seite.close();
+  check('KRITISCH: die Betreiberseite beschriftet das Feld mit demselben Begriff wie die App',
+    label.toLowerCase().includes(appWort.toLowerCase()));
+  check('KRITISCH: und sie sagt, dass der Wert an den Mandanten weitergegeben wird',
+    /weiter/i.test(hinweis));
+  check('KRITISCH: sie sagt auch, dass die Leute des Mandanten ihn in die App eintragen',
+    /app/i.test(hinweis));
+  check('Das alte Technikwort steht dort nicht mehr allein als Beschriftung',
+    label.trim().toLowerCase() !== 'subdomain');
 }
 
 // ══════════ KEINE ANTWORT IST NICHT DASSELBE WIE FALSCHES PASSWORT ════

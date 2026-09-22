@@ -2262,12 +2262,6 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
                 onclick="togglePw('gPass', this)">👁</button></div></div>
     <button class="btn btn-primary btn-wide" id="gBtn" onclick="anmelden()">Anmelden</button>
     <button type="button" class="gate-link" id="lb-pwvergessen" onclick="pwVergessenZeigen()">Passwort vergessen?</button>
-    <!-- Wer den Betrieb schon gewaehlt hat, sieht ihn hier und kann ihn
-         wechseln. Leise, weil es der seltene Fall ist -- aber sichtbar,
-         weil ein Vertipper sonst nur mit einer Neuinstallation zu
-         beheben waere. -->
-    <button type="button" class="gate-link" id="gMandantWechsel"
-            style="display:none" onclick="gateBetriebOeffnen()"></button>
   </div>
 
   <!-- "Passwort vergessen" (ENT-373): Anmeldename eingeben, ein Link geht
@@ -2543,7 +2537,6 @@ const W = {
     fehlerAnmeldung: 'Name oder Passwort falsch.', beidesNoetig: 'Name und Passwort erforderlich.',
     betrieb: 'Betrieb',
     betriebHinweis: 'Kurzname deines Betriebs, z. B. musterag. Du bekommst ihn von deiner Einsatzleitung.',
-    betriebIst: 'Betrieb: {m} — ändern',
     betriebNoetig: 'Bitte den Betrieb eintragen.',
     betriebUngueltig: 'Nur Kleinbuchstaben, Ziffern und Bindestriche.',
     betriebNichtErreichbar: 'Betrieb »{m}« nicht erreichbar — entweder gibt es ihn nicht, oder der Server antwortet gerade nicht. Bitte die Schreibweise prüfen.',
@@ -3494,25 +3487,31 @@ function gateBetriebOeffnen() {
 }
 
 function gateBetriebZeichnen() {
-  const feld = $('gMandantFeld'), wechsel = $('gMandantWechsel');
-  if (!feld || !wechsel) { return; }
+  const feld = $('gMandantFeld');
+  if (!feld) { return; }
   if (!nativeAppHuelle()) {
-    // Im Browser sagt die Adresszeile, wo man ist. Beide Bauteile weg --
-    // nicht nur unsichtbar, sondern ohne Inhalt, damit sie auch nicht
-    // versehentlich mit abgeschickt werden.
-    feld.style.display = 'none'; wechsel.style.display = 'none';
+    // Im Browser sagt die Adresszeile, wo man ist. Das Feld nicht nur
+    // unsichtbar, sondern weg, damit es auch nicht versehentlich
+    // mitgeschickt wird.
+    feld.style.display = 'none';
     return;
   }
+  /* Steht der Betrieb fest, verschwindet die Frage vollstaendig -- es gibt
+     auch keine Dauerzeile zum Wechseln mehr (ENT-665). Sie stand fuer eine
+     Einstellung, die man pro Geraet genau einmal im Leben braucht, und
+     nahm auf jedem Anmeldebildschirm Platz weg.
+     Der Rueckweg bleibt trotzdem offen und ist geprueft: Antwortet der
+     gemerkte Betrieb nicht -- der Fall eines Vertippers oder einer
+     abgeschalteten Adresse -- oeffnet anmelden() dieses Feld wieder,
+     vorbelegt mit dem bisherigen Wert. */
   const m = mandantGemerkt();
   const offen = !m || gateBetriebOffen;
   feld.style.display = offen ? '' : 'none';
-  wechsel.style.display = offen ? 'none' : '';
   const hinweis = $('gMandantHinweis');
   if (hinweis) { hinweis.textContent = w('betriebHinweis'); }
   const lb = $('lb-betrieb');
   if (lb) { lb.textContent = w('betrieb'); }
   if (offen && m && !$('gMandant').value) { $('gMandant').value = m; }
-  if (!offen) { wechsel.textContent = w('betriebIst').replace('{m}', m); }
 }
 
 function anmelden() {
