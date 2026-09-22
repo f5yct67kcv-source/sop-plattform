@@ -3663,6 +3663,14 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
    nicht: iOS ignoriert user-scalable=no. touch-action nimmt der Geste die
    Grundlage, ohne das Scrollen anzutasten. */
 html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
+/* ...ausser in der Desktop-Ansicht (ENT-671). Dort steht die Seite auf
+   1280 px und damit auf einem 390-px-Geraet bei rund 30 % -- lesbar wird
+   sie erst durch Zoomen. Doppeltippen ist dort nicht die Stoerung, die es
+   in der Handy-Ansicht waere, sondern der schnellste Weg in eine Tabelle
+   hinein. Dass die Viewport-Angabe der Desktop-Ansicht (VP_DESKTOP) weder
+   maximum-scale noch user-scalable=no traegt, war von Anfang an so
+   gedacht; diese Regel hier hat es bis ENT-671 zunichte gemacht. */
+html[data-desktop="an"] { touch-action: auto; }
 /* Sperrt den Hintergrund, solange das Aufklappmenue offen ist (ENT-067).
    Greift nur dort, wo es ein Aufklappmenue gibt. */
 @media (max-width: 900px) {
