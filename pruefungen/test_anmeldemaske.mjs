@@ -51,11 +51,66 @@ check('KRITISCH: die weisse Karte ist weg -- der Formularblock hat keine eigene 
 check('KRITISCH: und auch keinen Schatten mehr, der eine Kartenkante andeuten wuerde',
   form !== null && form.schatten === 'none');
 
-// ══════════ FARBIGKEIT DER DESKTOP-VARIANTE ═══════════════════════════
-// Zeichen fuer Zeichen die Werte aus dashboard.html, html[data-thema="dunkel"].
-const grund = await ev(() => getComputedStyle(document.getElementById('gate')).backgroundColor);
-check('KRITISCH: der Grund traegt den --bg des Dashboard-Dunkelmodus (#0F1117)',
-  grund === 'rgb(15, 17, 23)');
+/* ══════════ DER GRUND TRAEGT DIE TEXTE DARAUF ═══════════════════════
+   REVIDIERT durch ENT-658. Hier stand ein Vergleich auf die Hexzahl
+   #0F1117 -- der Grund war eine einzige Farbe, also liess er sich so
+   pruefen. Seit der Grund ein VERLAUF ist (derselbe wie das App-Symbol,
+   dunkel unten links nach hell oben rechts), sagt eine einzelne Zahl
+   nichts mehr: Sie waere entweder an einer Stelle richtig und an allen
+   anderen falsch, oder sie muesste weggelassen werden.
+
+   Die Aussage dahinter war nie die Zahl, sondern: Der Grund ist dunkel
+   genug fuer alles, was ohne eigene Flaeche darauf steht. Genau das wird
+   jetzt gemessen, und zwar am BILDPUNKT hinter jedem einzelnen Text --
+   aufgenommen mit ausgeblendeten Texten, damit die Schrift die Messung
+   nicht faelscht.
+
+   Das ist strenger als vorher: Ein Verlauf kann an einer Stelle
+   durchfallen und an einer anderen bestehen, und genau diese eine Stelle
+   findet die Pruefung. 4,5:1 ist die Schwelle aus WCAG AA fuer
+   Fliesstext. */
+{
+  const ziele = ['.gate-oben .sub', '#lb-name', '#lb-pass', '#lb-pwvergessen',
+                 '.gate-sig .go-label'];
+  const lagen = await ev(sel => sel.map(s => {
+    const e = document.querySelector(s);
+    if (!e) { return null; }
+    const r = e.getBoundingClientRect();
+    return { s, x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2),
+             farbe: getComputedStyle(e).color };
+  }), ziele);
+  check('Vorbedingung: alle fuenf Texte ohne eigene Flaeche sind vorhanden',
+    lagen.every(l => l !== null));
+  // Die Texte ausblenden und den nackten Grund aufnehmen.
+  await ev(sel => sel.forEach(s => {
+    const e = document.querySelector(s); if (e) { e.style.visibility = 'hidden'; }
+  }), ziele);
+  const auf = (await page.screenshot()).toString('base64');
+  await ev(sel => sel.forEach(s => {
+    const e = document.querySelector(s); if (e) { e.style.visibility = ''; }
+  }), ziele);
+  const gruende = await page.evaluate(async ({ d, punkte, skala }) => {
+    const im = new Image(); im.src = 'data:image/png;base64,' + d; await im.decode();
+    const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+    const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+    return punkte.map(p => {
+      if (!p) { return null; }
+      const i = ((p.y * skala | 0) * c.width + (p.x * skala | 0)) * 4;
+      const px = x.getImageData(0, 0, c.width, c.height).data;
+      return { s: p.s, farbe: p.farbe,
+               grund: `rgb(${px[i]}, ${px[i+1]}, ${px[i+2]})` };
+    });
+  }, { d: auf, punkte: lagen, skala: 1 });
+  const schwach = gruende.filter(g => g && kontrast(g.farbe, g.grund) < 4.5);
+  check('KRITISCH: jeder Text ohne eigene Flaeche haelt 4.5:1 gegen den Verlauf an SEINER Stelle',
+    schwach.length === 0);
+  // Und der Verlauf ist wirklich einer -- sonst waere die Pruefung oben
+  // ein aufwendiger Weg, eine einzige Farbe zu bestaetigen.
+  const verlauf = await ev(() =>
+    getComputedStyle(document.getElementById('gate')).backgroundImage);
+  check('Der Grund ist ein Verlauf und keine Flaeche',
+    /linear-gradient/.test(verlauf || ''));
+}
 const feld = await mass('#gName');
 check('Das Eingabefeld hebt sich vom Grund ab (--surface-2 #1E2535)',
   feld !== null && feld.grund === 'rgb(30, 37, 53)');
@@ -228,11 +283,13 @@ check('"Passwort vergessen?" hat die volle 44-px-Trefferflaeche',
 // Dunkelmodus (#7098F7) traegt weisse Schrift nur mit 2.8:1.
 check('KRITISCH: die Schrift auf dem Anmeldeknopf erreicht mindestens 4.5:1 Kontrast',
   cta !== null && kontrast(cta.farbe, cta.grund) >= 4.5);
-check('Auch die Beschriftungen ueber den Feldern bleiben gut lesbar (>= 4.5:1)',
-  await ev(g => {
-    const c = getComputedStyle(document.getElementById('lb-name'));
-    return { farbe: c.color, grund: g };
-  }, grund).then(r => r !== null && kontrast(r.farbe, r.grund) >= 4.5));
+/* Die Beschriftungen ueber den Feldern sind hier ENTFALLEN und nicht
+   weggefallen: Sie stehen jetzt weiter oben in der Messung am Bildpunkt,
+   zusammen mit den vier anderen Texten ohne eigene Flaeche. Die alte
+   Fassung rechnete gegen die EINE Hintergrundfarbe des Zugangs -- die
+   gibt es seit dem Verlauf nicht mehr, und gegen einen Mittelwert zu
+   rechnen waere schwaecher als gegen die Stelle, an der der Text
+   wirklich steht. */
 
 // ══════════ CLAUDE.md: UEBERSCHRIFT OBEN, WERT DARUNTER ═══════════════
 const lbl = await mass('#lb-name');
