@@ -123,7 +123,7 @@ function mail_absatz(string $html): string
 // Knoepfe verschluckt oder Bilder blockt, laesst den Empfaenger sonst vor
 // einer Mail ohne Weiterweg sitzen -- und die reine Textfassung hat den
 // Knopf ohnehin nie.
-function mail_knopf(string $beschriftung, string $ziel): string
+function mail_knopf(string $beschriftung, string $ziel, bool $ersatzlink = true): string
 {
     return '<table role="presentation" cellpadding="0" cellspacing="0" border="0"'
         . ' style="margin:0 0 18px 0;"><tr>'
@@ -132,12 +132,27 @@ function mail_knopf(string $beschriftung, string $ziel): string
         . 'padding:13px 24px;font-size:15px;font-weight:600;line-height:1.2;'
         . 'color:#FFFFFF;text-decoration:none;">' . mail_e($beschriftung) . '</a>'
         . '</td></tr></table>'
-        // DER ERSATZLINK TRITT ZURUECK (Befund des Projektinhabers,
-        // 2026-09-22): Er ist die Notloesung fuer ein Mailprogramm, das
-        // Knoepfe verschluckt, und soll auch danach aussehen -- kleiner als
-        // der Fliesstext, leise, die Adresse ohne Unterstreichung. Weg
-        // darf er nicht: Die reine Textfassung hat nie einen Knopf.
-        . '<p class="d-leise" style="margin:0 0 20px 0;font-size:11px;line-height:1.5;'
+        . ($ersatzlink ? mail_ersatzlink($ziel) : '');
+}
+
+// Die Adresse in Klarschrift unter dem Knopf -- die Notloesung fuer ein
+// Mailprogramm, das den Knopf verschluckt.
+//
+// SIE IST NICHT IMMER NOETIG (Befund des Projektinhabers, 2026-09-22:
+// optisch stoerend, und andere Anbieter fuehren sie nicht). Jede Mail geht
+// als HTML UND als reiner Text hinaus, und die Textfassung traegt die
+// Adresse ohnehin; der Knopf selbst ist ein gewoehnlicher Verweis, kein
+// Bild und kein Skript. Weglassen darf sie darum, wer eine gewoehnliche
+// Geschaeftsmail schreibt -- beleg_mail() tut das.
+//
+// WO SIE BLEIBT: bei der Bestaetigungsmail zum Demo-Zugang. Dort haengt
+// der ganze Vorgang an genau einem Klick innerhalb einer Frist, und wer
+// dort nicht weiterkommt, hat keinen zweiten Weg.
+//
+// Sie tritt zurueck: kleiner als der Fliesstext, leise, ohne Betonung.
+function mail_ersatzlink(string $ziel): string
+{
+    return '<p class="d-leise" style="margin:0 0 20px 0;font-size:11px;line-height:1.5;'
         . 'color:' . MAIL_FARBE_LEISE . ';">Falls der Knopf nicht funktioniert, '
         . 'kopieren Sie diese Adresse in Ihren Browser:<br>'
         . '<span style="word-break:break-all;opacity:0.8;">' . mail_e($ziel) . '</span></p>';

@@ -612,7 +612,12 @@ function beleg_mail(array $beleg, string $firma, string $link, string $person,
         . mail_absatz(mail_e($ansehen))
         // "oeffnen" statt "anschauen": klarer und geschaeftlicher
         // (Befund des Projektinhabers, 2026-09-22).
-        . mail_knopf($titel . ' öffnen', $link)
+        //
+        // OHNE DIE ADRESSE IN KLARSCHRIFT DARUNTER: Der Knopf ist ein
+        // gewoehnlicher Verweis, und die Textfassung dieser Mail traegt den
+        // Link ohnehin (geprueft). Ein Geschaeftsbrief zeigt seine URL
+        // nicht zweimal.
+        . mail_knopf($titel . ' öffnen', $link, false)
         . mail_absatz('Bei Fragen oder Unklarheiten melden Sie sich jederzeit bei uns.')
         . mail_signatur($gruss,
             $logo === null ? '' : (string)$logo['cid'],

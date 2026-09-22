@@ -132,8 +132,18 @@ $pruef('… und nur die Offerte wird am Link beantwortet',
 // ── 4. Der Link steht auch als Text ───────────────────────────────────
 $pruef('KRITISCH: die Textfassung traegt den Link',
     str_contains($m['text'], $LINK));
-$pruef('KRITISCH: das HTML traegt ihn zweimal — im Knopf und lesbar darunter',
-    substr_count($m['html'], htmlspecialchars($LINK, ENT_QUOTES, 'UTF-8')) >= 2);
+// Im HTML steht er GENAU EINMAL, im Knopf (2026-09-22). Die Adresse in
+// Klarschrift darunter ist hier weggelassen -- ein Geschaeftsbrief zeigt
+// seine URL nicht zweimal, und die Textfassung oben traegt sie ohnehin.
+// Die Pruefung haelt beide Seiten fest: der Knopf verweist wirklich auf
+// den Link, und darunter steht er nicht noch einmal.
+$html = $m['html'];
+$ziel = htmlspecialchars($LINK, ENT_QUOTES, 'UTF-8');
+$pruef('KRITISCH: der Knopf verweist auf den Link',
+    str_contains($html, 'href="' . $ziel . '"'));
+$pruef('… und die Adresse steht im HTML nicht ein zweites Mal',
+    substr_count($html, $ziel) === 1
+    && !str_contains($html, 'Falls der Knopf nicht funktioniert'));
 
 // ── 5. Betreff und Ueberschriften ─────────────────────────────────────
 $pruef('der Betreff nennt Art, Nummer und Absender',
