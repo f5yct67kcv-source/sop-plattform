@@ -70,8 +70,11 @@ check('KRITISCH: und auch keinen Schatten mehr, der eine Kartenkante andeuten wu
    findet die Pruefung. 4,5:1 ist die Schwelle aus WCAG AA fuer
    Fliesstext. */
 {
-  const ziele = ['.gate-oben .sub', '#lb-name', '#lb-pass', '#lb-pwvergessen',
-                 '.gate-sig .go-label'];
+  /* Vier statt fuenf seit ENT-668: Das Etikett "powered by" der
+     Herstellersignatur ist aus der Anmeldemaske verschwunden. Die
+     uebrigen vier stehen unveraendert ohne eigene Flaeche auf dem
+     Verlauf und werden weiterhin einzeln am Bildpunkt gemessen. */
+  const ziele = ['.gate-oben .sub', '#lb-name', '#lb-pass', '#lb-pwvergessen'];
   const lagen = await ev(sel => sel.map(s => {
     const e = document.querySelector(s);
     if (!e) { return null; }
@@ -79,7 +82,7 @@ check('KRITISCH: und auch keinen Schatten mehr, der eine Kartenkante andeuten wu
     return { s, x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2),
              farbe: getComputedStyle(e).color };
   }), ziele);
-  check('Vorbedingung: alle fuenf Texte ohne eigene Flaeche sind vorhanden',
+  check('Vorbedingung: alle vier Texte ohne eigene Flaeche sind vorhanden',
     lagen.every(l => l !== null));
   // Die Texte ausblenden und den nackten Grund aufnehmen.
   await ev(sel => sel.forEach(s => {
