@@ -145,6 +145,44 @@ $pruef('… und ohne hinterlegte Signatur zeichnet die Firma',
 $pruef('KRITISCH: auch diese Mail traegt keinen Betrag',
     !preg_match('/\d+[.,]\d\d/', $anKunde['text']));
 
+// ── 6. Wer eine Meldung bekommt ───────────────────────────────────────
+//
+// Konten UND Sammelpostfach (ENT-677, Nachtrag): Wer ein Konto hat,
+// arbeitet am Vorrat; das Sammelpostfach faengt auf, wenn gerade niemand
+// hineinschaut. Und zwar ohne Doppel.
+$db->exec("CREATE TABLE betreiber (id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL, email TEXT NOT NULL, aktiv INTEGER NOT NULL DEFAULT 1)");
+$db->exec("INSERT INTO betreiber (name, email, aktiv) VALUES
+  ('Eins', 'eins@example.org', 1),
+  ('Zwei', 'zwei@example.org', 1),
+  ('Stillgelegt', 'weg@example.org', 0)");
+
+$empf = be_melde_empfaenger($db);
+$adressen = array_column($empf, 'email');
+$pruef('KRITISCH: nur aktive Konten bekommen Post',
+    in_array('eins@example.org', $adressen, true)
+    && in_array('zwei@example.org', $adressen, true)
+    && !in_array('weg@example.org', $adressen, true));
+
+$db->exec("CREATE TABLE be_briefkopf (id INTEGER PRIMARY KEY, firma TEXT, email TEXT)");
+$db->exec("INSERT INTO be_briefkopf (id, firma, email) VALUES (1, 'Musterfirma', 'sammel@example.org')");
+$adressen = array_column(be_melde_empfaenger($db), 'email');
+$pruef('KRITISCH: das Sammelpostfach aus dem Briefkopf bekommt es auch',
+    in_array('sammel@example.org', $adressen, true) && count($adressen) === 3);
+
+// GEGENPROBE: Dieselbe Adresse an Konto und Briefkopf ergibt EINE Mail.
+$db->exec("UPDATE be_briefkopf SET email = 'EINS@example.org' WHERE id = 1");
+$adressen = array_column(be_melde_empfaenger($db), 'email');
+$pruef('KRITISCH: GEGENPROBE — dieselbe Adresse zweimal ergibt eine Mail, nicht zwei',
+    count($adressen) === 2);
+
+// Eine unbrauchbare Adresse im Briefkopf faellt weg, statt den Versand zu
+// zerlegen -- und die Konten bekommen ihre Post trotzdem.
+$db->exec("UPDATE be_briefkopf SET email = 'kein-postfach' WHERE id = 1");
+$adressen = array_column(be_melde_empfaenger($db), 'email');
+$pruef('KRITISCH: eine unbrauchbare Briefkopf-Adresse haelt die uebrigen nicht auf',
+    count($adressen) === 2 && !in_array('kein-postfach', $adressen, true));
+
 echo count($bad) === 0
     ? "$ok bestanden, 0 nicht bestanden\n"
     : "$ok bestanden, " . count($bad) . " nicht bestanden\n";
