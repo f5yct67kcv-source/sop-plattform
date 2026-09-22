@@ -1545,6 +1545,15 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           </span>
           <span class="lbl">Einrichtung</span>
         </button>
+        <!-- Passwort wechseln (ENT-672). Es gab den Weg schon seit ENT-615,
+             aber unter Konten -> eigenes Konto -> Zugang, also drei Klicks
+             tief und an einer Stelle, an der man FREMDE Konten verwaltet.
+             Gesucht wurde er hier -- in dem Menue, das den eigenen Namen
+             traegt. Derselbe Dialog, nur von zwei Seiten erreichbar. -->
+        <button type="button" class="menue-eintrag" id="knopf-passwort">
+          <svg class="i" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span class="lbl">Passwort wechseln</span>
+        </button>
         <button type="button" class="menue-eintrag" id="knopf-abmelden">
           <svg class="i" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
           <span class="lbl">Abmelden</span>
@@ -1993,6 +2002,15 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 
       <!-- ── Liste ───────────────────────────────────────────────── -->
       <div class="k-tab on" id="kv-liste">
+        <!-- Archiv-Reiter (ENT-672), dieselbe Bauart wie #reArchivTabs bei
+             den Rechnungen. Er erscheint NUR, sobald es archivierte Konten
+             gibt -- vorher waere er ein Reiter auf ein leeres Fach. Sobald
+             es sie gibt, steht er da: Ein archiviertes Konto, das nirgends
+             mehr auftaucht, waere geloescht in allem ausser dem Namen. -->
+        <div class="tabs versteckt" id="kArchivTabs" style="margin-bottom:10px">
+          <button type="button" class="tab on" id="katab-liste" onclick="kArchivGo('liste')">Konten</button>
+          <button type="button" class="tab" id="katab-archiv" onclick="kArchivGo('archiv')">Archiviert</button>
+        </div>
         <div class="bar-tools">
           <div class="search">
             <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -3706,8 +3724,12 @@ async function supportHolen(m) {
    entscheidet kAnsichtSetzen() und sonst niemand -- verteilte
    Sichtbarkeitsschalter sind die Stelle, an der zwei Ansichten gleichzeitig
    offen stehen. */
-let konten = [], kontenAktive = 0;
+let konten = [], kontenAktive = 0, kontenArchivierte = 0;
 let kSortFeld = 'nachname', kSortRichtung = 'auf';
+/* Welches Fach der Kontenliste offen ist (ENT-672): die gewoehnliche Liste
+   oder das Archiv. Getrennt von kontenTab (Konten/Logbuch), weil es eine
+   andere Frage beantwortet. */
+let kArchivTab = 'liste';
 let kdId = 0, kdTab = 'uebersicht', kontenTab = 'konten';
 let kdVerlauf = null, kdVerlaufFuer = 0;
 let kLogDaten = null;
@@ -3723,6 +3745,12 @@ async function ladeKontenRoh() {
   }
   konten       = a.konten || [];
   kontenAktive = Number(a.aktive || 0);
+  kontenArchivierte = Number(a.archivierte || 0);
+  /* Verschwindet das letzte archivierte Konto, waehrend man im Archiv
+     steht, fuehrt der Weg zurueck in die Liste -- sonst bliebe ein Reiter
+     stehen, den es nicht mehr gibt, und dahinter eine leere Flaeche. */
+  if (!kontenArchivierte && kArchivTab === 'archiv') { kArchivTab = 'liste'; }
+  kArchivReiterZeichnen();
   kZeichnen();
   kAkteureFuellen();
   if (kdId) { kdZeichnen(); }
@@ -3742,6 +3770,16 @@ function kontenGo(t) {
   kontenTab = t;
   kAnsichtSetzen();
   if (t === 'logbuch') { kLogLaden(); }
+}
+function kArchivGo(t) {
+  kArchivTab = t;
+  kArchivReiterZeichnen();
+  kZeichnen();
+}
+function kArchivReiterZeichnen() {
+  zeig($('kArchivTabs'), kontenArchivierte > 0);
+  ['liste', 'archiv'].forEach(n =>
+    $('katab-' + n).classList.toggle('on', n === kArchivTab));
 }
 function kOeffnen(id) {
   kdId = Number(id);
@@ -3789,6 +3827,10 @@ function kZfMerker(k) {
    Freischalten eines eingeladenen Kontos zurueckweist. */
 function kZustandMerker(k) {
   if (k.eingeladen) { return '<span class="merker m-warn">eingeladen</span>'; }
+  /* Archiviert setzt stillgelegt voraus und sagt zusaetzlich, dass das
+     Konto aus der Liste genommen wurde -- beides steht da, weil das eine
+     das andere nicht ersetzt (ENT-672). */
+  if (k.archiviert) { return '<span class="merker m-ruhe">stillgelegt · archiviert</span>'; }
   return k.aktiv ? '<span class="merker m-pos">aktiv</span>'
                  : '<span class="merker m-ruhe">stillgelegt</span>';
 }
@@ -3811,7 +3853,11 @@ function kKarte(k) {
 
 function kZeichnen() {
   const q = ($('kQ').value || '').toLowerCase().trim();
-  const d = konten.filter(k => !q ||
+  /* Erst das Fach, dann die Suche: Gesucht wird IN dem, was gerade offen
+     ist. Eine Suche, die auch archivierte Konten faende, liesse den Reiter
+     daneben bedeutungslos werden. */
+  const imFach = konten.filter(k => !!k.archiviert === (kArchivTab === 'archiv'));
+  const d = imFach.filter(k => !q ||
     [k.vorname, k.nachname, k.name, k.email].some(f => String(f || '').toLowerCase().includes(q)));
 
   d.sort((a, b) => {
@@ -3821,10 +3867,18 @@ function kZeichnen() {
   });
 
   if (!d.length) {
-    /* "Kein Treffer" und "nichts vorhanden" sind verschiedene Aussagen. */
-    $('kTable').innerHTML = konten.length
-      ? LEER('Keine Treffer', 'Für diese Suche gibt es kein Konto.')
-      : LEER('Noch keine Konten', 'Über „Neues Konto“ oben rechts anlegen.');
+    /* Vier Aussagen, vier Texte (CLAUDE.md): kein Treffer im Fach, leeres
+       Archiv, leere Liste bei vollem Archiv, und gar keine Konten. Sie
+       unter einem Text zu fuehren hiesse, "nicht gefunden" wie "gibt es
+       nicht" aussehen zu lassen. */
+    const imArchiv = kArchivTab === 'archiv';
+    $('kTable').innerHTML = imFach.length
+      ? LEER('Keine Treffer', 'Für diese Suche gibt es hier kein Konto.')
+      : (imArchiv
+          ? LEER('Nichts archiviert', 'Hier stehen stillgelegte Konten, die aus der Liste genommen wurden.')
+          : (konten.length
+              ? LEER('Alle Konten archiviert', 'In der Liste steht nichts mehr — unter „Archiviert“ schon.')
+              : LEER('Noch keine Konten', 'Über „Neues Konto“ oben rechts anlegen.')));
     return;
   }
 
@@ -3853,7 +3907,8 @@ function kdZeichnen() {
 
   $('kdName').textContent = k.name || '–';
   $('kdSub').textContent = [k.email,
-    k.eingeladen ? 'eingeladen, noch nicht eingelöst' : (k.aktiv ? 'aktiv' : 'stillgelegt'),
+    k.eingeladen ? 'eingeladen, noch nicht eingelöst'
+                 : (k.aktiv ? 'aktiv' : (k.archiviert ? 'stillgelegt, archiviert' : 'stillgelegt')),
     k.ich ? 'das bin ich' : ''].filter(Boolean).join(' · ');
 
   if (kdTab === 'uebersicht') {
@@ -3898,6 +3953,14 @@ function kdZugang(k) {
   } else if (!k.aktiv) {
     tasten.push(`<button type="button" class="btn btn-plain btn-sm" onclick="kontoSchalten(${Number(k.id)}, true)">Aktivieren</button>`);
   }
+  /* Archivieren nur am stillgelegten Konto (ENT-672) -- die Sperre sitzt im
+     Server, das hier erspart nur den Umweg ueber einen Fehler. Und nur an
+     einem, das noch nicht archiviert ist; das umgekehrte holt es zurueck. */
+  if (!k.aktiv) {
+    tasten.push(k.archiviert
+      ? `<button type="button" class="btn btn-plain btn-sm" onclick="kontoArchiv(${Number(k.id)}, false)">Aus dem Archiv holen</button>`
+      : `<button type="button" class="btn btn-plain btn-sm" onclick="kontoArchiv(${Number(k.id)}, true)">Archivieren</button>`);
+  }
 
   $('kdZugang').innerHTML = `
     <div class="card" style="max-width:640px"><div class="card-hd"><h3>Anmeldung</h3></div>
@@ -3913,9 +3976,27 @@ function kdZugang(k) {
         ${k.ich ? '' : `<div class="of-hinweis" style="margin-top:12px">Das Passwort eines fremden Kontos
           lässt sich hier nicht setzen. Wer seines verloren hat, bekommt ein neues Konto und dieses
           wird stillgelegt.</div>`}
+        ${k.archiviert ? `<div class="of-hinweis" style="margin-top:12px">Dieses Konto ist archiviert:
+          Es steht nicht mehr in der Liste, ist aber nicht gelöscht — wer wann Zugang hatte, bleibt
+          nachvollziehbar. Seine E-Mail-Adresse bleibt belegt.</div>` : ''}
         <div class="kk-tasten">${tasten.join('')}</div>
         <div class="meldung versteckt" id="kdMeldung" style="margin-top:12px"></div>
       </div></div>`;
+}
+
+async function kontoArchiv(id, archiv) {
+  const a = await ruf('betreiber_konto_archivieren.php', { id: id, archiv: archiv });
+  if (a.status !== 'ok') {
+    melde($('kdMeldung') || $('haus-meldung'), 'fehler', a.message);
+    return;
+  }
+  kdVerlaufFuer = 0;
+  await ladeKonten();
+  /* Ein archiviertes Konto steht nicht mehr in der Liste. Auf seiner
+     Detailseite zu bleiben waere kein Fehler, aber es sieht aus, als sei
+     nichts geschehen -- darum zurueck in das Fach, in dem es jetzt liegt. */
+  if (archiv) { kArchivTab = 'archiv'; kArchivReiterZeichnen(); kGoListe(); }
+  kurzmeldung(archiv ? 'Konto archiviert.' : 'Konto aus dem Archiv geholt.');
 }
 
 async function kontoSchalten(id, aktiv) {
@@ -4065,7 +4146,7 @@ const K_BEREICH_NAMEN = {
    Beschriftung und faellt auf, wenn es stoert. */
 const K_FELD_NAMEN = {
   angelegt: 'Angelegt', zustand: 'Zustand', status: 'Status', passwort: 'Passwort',
-  eingeladen: 'Eingeladen', eingeloest: 'Einladung eingelöst',
+  eingeladen: 'Eingeladen', eingeloest: 'Einladung eingelöst', archiv: 'Archiv',
   email: 'E-Mail', vorname: 'Vorname', nachname: 'Nachname', anrede: 'Anrede',
   bezahlt: 'Bezahlt', versendet: 'Versendet', import: 'Import', logo: 'Logo',
   zwei_faktor_eingerichtet: 'Zwei-Faktor eingerichtet',
@@ -7784,6 +7865,8 @@ $('knopf-sv-erledigt').onclick = () => svStatus('erledigt');
 $('knopf-sv-neu').onclick      = () => { svNurOffen = true;  ladeSupport(); };
 $('knopf-sv-alle').onclick     = () => { svNurOffen = false; ladeSupport(); };
 $('knopf-abmelden').onclick   = abmelden;
+/* Das Menue bleibt sonst offen hinter dem Dialog stehen. */
+$('knopf-passwort').onclick   = () => { kontoMenuUm(); pwOeffnen(); };
 $('btnMarke').onclick         = kontoMenuUm;
 $('btn-thema').onclick        = themaUm;
 $('btn-glas').onclick         = glasUm;

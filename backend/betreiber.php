@@ -1016,6 +1016,16 @@ function be_tabellen(): array
   aktiv TINYINT(1) NOT NULL DEFAULT 1,
   angelegt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   letzte_anmeldung DATETIME NULL,
+  -- Archiviert (ENT-672): aus der Liste genommen, NICHT geloescht. Zwei
+  -- getrennte Angaben, weil es zwei verschiedene Aussagen sind: `aktiv`
+  -- sagt, ob dieses Konto noch hereinkommt, `archiviert_am`, ob es noch in
+  -- der Liste steht. Nur ein stillgelegtes Konto laesst sich archivieren --
+  -- ein aktives waere sonst ein Zugang, den die Liste verschweigt.
+  --
+  -- DATETIME statt eines Ja/Nein-Merkers, wie `letzte_anmeldung` daneben:
+  -- Es beantwortet zusaetzlich die Frage, WANN -- und die stellt sich genau
+  -- dann, wenn jemand rueckblickend wissen will, wer hier Zugang hatte.
+  archiviert_am DATETIME NULL,
   UNIQUE KEY uq_betreiber_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
@@ -1566,6 +1576,11 @@ function be_spalten(): array
         // Feld. Gefuellt werden die Teile nicht hier, sondern in
         // be_namen_nachtragen() hinter der Schleife -- erst dann stehen beide
         // Spalten, und die Reihenfolge der drei Eintraege spielt keine Rolle.
+        // Archiv am Betreiber-Konto (ENT-672). Eine bestehende Anlage
+        // bekommt die Spalte beim naechsten Einrichtungslauf; bis dahin
+        // meldet der Endpunkt "noch nicht nachgetragen", statt mit einem
+        // SQL-Fehler abzubrechen.
+        ['betreiber', 'archiviert_am', "ALTER TABLE betreiber ADD COLUMN archiviert_am DATETIME NULL AFTER letzte_anmeldung"],
         ['betreiber', 'anrede',   "ALTER TABLE betreiber ADD COLUMN anrede VARCHAR(20) NOT NULL DEFAULT '' AFTER name"],
         ['betreiber', 'nachname', "ALTER TABLE betreiber ADD COLUMN nachname VARCHAR(100) NOT NULL DEFAULT '' AFTER anrede"],
         ['betreiber', 'vorname',  "ALTER TABLE betreiber ADD COLUMN vorname VARCHAR(100) NOT NULL DEFAULT '' AFTER anrede"],
