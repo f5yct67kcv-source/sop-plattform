@@ -51,9 +51,35 @@ check('KRITISCH: der Hinweis laedt mindestens zwei Rechtstexte nach (Bedingungen
 // Kopiert wird in die Demo-Plaetze, nicht nach dist/: Der Hinweis geht nur
 // in einer Demo-Instanz auf, und ein Mandant haette sonst die
 // Demo-Bedingungen unter seiner eigenen Adresse liegen.
+//
+// Verlangt wird das Ziel "dist-demo/$PLATZ/" und nicht bloss "dist-demo/":
+// Eine Zeile mit einem festen Platznamen darin waere still falsch -- sie
+// liefe durch, der Deploy bliebe gruen, und neun von zehn Plaetzen zeigten
+// weiter "konnte nicht geladen werden". Ausdrueckliche Ansage des
+// Projektinhabers (2026-09-22): "nicht nur auf demo3 anwenden, sondern auf
+// allen 10 und auch kuenftigen". Die Platzliste selbst haelt
+// test_demo_plaetze.mjs mit DEMO_PLAETZE in backend/demo_zugang.php
+// zusammen; ein elfter Platz erbt die Zeilen damit von selbst.
 for (const datei of nachgeladen) {
+  const q = datei.replace(/\./g, '\\.');
   check(`KRITISCH: ${datei} wird auf die Demo-Plaetze kopiert -- sonst laeuft der Abruf auf der Instanz in den 404`,
-    new RegExp(`cp\\s+${datei.replace(/\./g, '\\.')}\\s+"dist-demo/`).test(workflow));
+    new RegExp(`cp\\s+${q}\\s+"dist-demo/`).test(workflow));
+  check(`KRITISCH: ${datei} geht an JEDEN Platz ($PLATZ), nicht an einen bestimmten`,
+    new RegExp(`cp\\s+${q}\\s+"dist-demo/\\$PLATZ/`).test(workflow));
+}
+
+// Und die Schleife drumherum: Die Zeilen muessen im Rumpf von
+// "for PLATZ in $PLAETZE" stehen. Stuenden sie davor oder dahinter, waere
+// $PLATZ leer oder der letzte Platz -- auch das liefe durch.
+const schleife = (() => {
+  const a = workflow.indexOf('for PLATZ in $PLAETZE; do');
+  if (a < 0) return '';
+  const b = workflow.indexOf('\n          done', a);
+  return b < 0 ? '' : workflow.slice(a, b);
+})();
+for (const datei of nachgeladen) {
+  check(`KRITISCH: die Kopierzeile fuer ${datei} steht in der Schleife ueber alle Plaetze`,
+    schleife.includes(`cp ${datei}`) || new RegExp(`cp\\s+${datei.replace(/\./g, '\\.')}\\s`).test(schleife));
 }
 
 // ── 2. Der gerenderte Bildschirm ─────────────────────────────────────────
