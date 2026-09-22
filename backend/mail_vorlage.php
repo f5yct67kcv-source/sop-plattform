@@ -87,9 +87,9 @@ function mail_feld(string $beschriftung, string $wert, bool $gleichschritt = fal
     $schrift = $gleichschritt
         ? "font-family:'SF Mono',Menlo,Consolas,monospace;letter-spacing:0.5px;"
         : '';
-    return '<tr><td style="padding:0 0 ' . ($kompakt ? 9 : 14) . 'px 0;">'
+    return '<tr><td style="padding:0 0 ' . ($kompakt ? 12 : 16) . 'px 0;">'
         . '<div class="d-leise" style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;'
-        . 'color:' . MAIL_FARBE_LEISE . ';padding-bottom:2px;">' . mail_e($beschriftung) . '</div>'
+        . 'color:' . MAIL_FARBE_LEISE . ';padding-bottom:4px;">' . mail_e($beschriftung) . '</div>'
         . '<div class="d-text" style="font-size:' . ($kompakt ? 15 : 16) . 'px;font-weight:600;color:'
         . MAIL_FARBE_TEXT . ';' . $schrift . '">' . $wert . '</div>'
         . '</td></tr>';
@@ -98,17 +98,17 @@ function mail_feld(string $beschriftung, string $wert, bool $gleichschritt = fal
 // Der abgesetzte Block, in dem die Felder stehen.
 function mail_block(string $felder, bool $kompakt = false): string
 {
-    $luft = $kompakt ? '14px 16px 5px 16px' : '20px 20px 6px 20px';
+    $luft = $kompakt ? '18px 20px 8px 20px' : '24px 22px 10px 22px';
     return '<table role="presentation" class="d-flaeche" cellpadding="0" cellspacing="0" border="0" width="100%"'
         . ' style="background:' . MAIL_FARBE_FLAECHE . ';border:1px solid ' . MAIL_FARBE_RAND . ';'
-        . 'border-radius:6px;margin:0 0 ' . ($kompakt ? 20 : 24) . 'px 0;"><tr><td style="padding:' . $luft . ';">'
+        . 'border-radius:6px;margin:4px 0 ' . ($kompakt ? 26 : 30) . 'px 0;"><tr><td style="padding:' . $luft . ';">'
         . '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">'
         . $felder . '</table></td></tr></table>';
 }
 
 function mail_absatz(string $html): string
 {
-    return '<p class="d-text" style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:'
+    return '<p class="d-text" style="margin:0 0 20px 0;font-size:15px;line-height:1.65;color:'
         . MAIL_FARBE_TEXT . ';">' . $html . '</p>';
 }
 
@@ -126,7 +126,7 @@ function mail_absatz(string $html): string
 function mail_knopf(string $beschriftung, string $ziel, bool $ersatzlink = true): string
 {
     return '<table role="presentation" cellpadding="0" cellspacing="0" border="0"'
-        . ' style="margin:0 0 18px 0;"><tr>'
+        . ' style="margin:6px 0 26px 0;"><tr>'
         . '<td style="background:' . MAIL_FARBE_BLAU . ';border-radius:6px;">'
         . '<a href="' . mail_e($ziel) . '" style="display:inline-block;'
         . 'padding:13px 24px;font-size:15px;font-weight:600;line-height:1.2;'
@@ -152,7 +152,7 @@ function mail_knopf(string $beschriftung, string $ziel, bool $ersatzlink = true)
 // Sie tritt zurueck: kleiner als der Fliesstext, leise, ohne Betonung.
 function mail_ersatzlink(string $ziel): string
 {
-    return '<p class="d-leise" style="margin:0 0 20px 0;font-size:11px;line-height:1.5;'
+    return '<p class="d-leise" style="margin:0 0 24px 0;font-size:11px;line-height:1.55;'
         . 'color:' . MAIL_FARBE_LEISE . ';">Falls der Knopf nicht funktioniert, '
         . 'kopieren Sie diese Adresse in Ihren Browser:<br>'
         . '<span style="word-break:break-all;opacity:0.8;">' . mail_e($ziel) . '</span></p>';
@@ -172,7 +172,7 @@ function mail_signatur(array $zeilen, string $bildKennung = '',
     $sichtbar = array_values(array_filter(array_map('trim', $zeilen), fn($z) => $z !== ''));
     if ($sichtbar === []) { $sichtbar = ['pzu consulting gmbh']; }
 
-    $html = '<p class="d-text" style="margin:0 0 4px 0;font-size:15px;line-height:1.6;color:'
+    $html = '<p class="d-text" style="margin:8px 0 6px 0;font-size:15px;line-height:1.6;color:'
         . MAIL_FARBE_TEXT . ';">Mit freundlichen Grüssen</p>'
         . '<p class="d-text" style="margin:0;font-size:15px;line-height:1.5;color:'
         . MAIL_FARBE_TEXT . ';">'
@@ -240,7 +240,7 @@ function mail_logo_bild(string $kennung, bool $fuerDunkelmodus): string
         . ' alt="GuardOpS" class="' . ($fuerDunkelmodus ? 'logo-hell' : 'logo-dunkel') . '"'
         . ' style="display:' . ($fuerDunkelmodus ? 'none' : 'block') . ';border:0;'
         . 'width:' . MAIL_LOGO_BREITE . 'px;max-width:' . MAIL_LOGO_BREITE . 'px;'
-        . 'height:auto;margin-top:18px;">';
+        . 'height:auto;margin-top:22px;">';
 }
 
 // Das Logo fuer die Signatur, als Rohbytes fuer smtp_senden(). Liegt neben
@@ -278,9 +278,9 @@ function mail_rahmen(string $inhalt): string
     // Mehr Luft nach unten als zuvor: Logo, Trennlinie und Fussangaben
     // standen zu dicht aufeinander (Befund des Projektinhabers am
     // 2026-09-19 an der echten Mail).
-    $fuss = '<tr><td style="padding:0 28px 30px 28px;">'
+    $fuss = '<tr><td style="padding:0 32px 34px 32px;">'
         . '<div class="d-rand d-leise" style="border-top:1px solid ' . MAIL_FARBE_RAND . ';'
-        . 'padding-top:20px;font-size:12px;line-height:1.6;color:' . MAIL_FARBE_LEISE . ';">'
+        . 'padding-top:24px;font-size:12px;line-height:1.7;color:' . MAIL_FARBE_LEISE . ';">'
         . 'pzu consulting gmbh &middot; Hochgasse 7 &middot; 4632 Trimbach<br>'
         . '<a class="d-blau" href="mailto:info@guardops.ch" style="color:' . MAIL_FARBE_BLAU
         . ';text-decoration:none;">info@guardops.ch</a>'
@@ -305,7 +305,7 @@ function mail_rahmen(string $inhalt): string
         . ' width="600" style="max-width:600px;width:100%;background:#FFFFFF;'
         . 'border:1px solid ' . MAIL_FARBE_RAND . ';'
         . 'border-radius:8px;overflow:hidden;font-family:' . MAIL_SCHRIFT . ';">'
-        . '<tr><td style="padding:28px 28px 22px 28px;">' . $inhalt . '</td></tr>'
+        . '<tr><td style="padding:36px 32px 30px 32px;">' . $inhalt . '</td></tr>'
         . $fuss
         . '</table></td></tr></table></body></html>';
 }
