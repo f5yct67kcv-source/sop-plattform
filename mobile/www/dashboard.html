@@ -10198,8 +10198,42 @@ function nativeAppHuelle() {
       && !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 }
 
+/* ── Welchen Server das gebuendelte Cockpit anspricht (ENT-669).
+   Hier stand bis ENT-669 dieselbe fest verdrahtete Adresse, die ENT-663
+   aus app.html entfernt hat -- cupi24.guardops.ch, woertlich, nirgends
+   ersetzt. Die App war damit halb mandantenfaehig: Die Waechter-Ansicht
+   sprach mit dem richtigen Server, das Cockpit desselben Buendels
+   ("Zum Cockpit" im Menue, nur fuer Verwaltung sichtbar) weiterhin mit
+   CUPI 24. Ein Admin eines zweiten Mandanten haette sich richtig
+   angemeldet und im Cockpit nichts als Fehler gesehen -- sein Token gilt
+   auf jenem Server nicht. Gefunden, weil der Projektinhaber fragte, ob
+   der Cockpit-Wechsel sauber verdrahtet sei. War er nicht.
+
+   Der Kurzname kommt aus demselben Speicher wie in app.html. Die beiden
+   Dateien teilen in der Huelle die Herkunft capacitor://localhost und
+   damit den localStorage -- wer sich in der App anmeldet, hat ihn
+   gesetzt, bevor dieses Cockpit ueberhaupt erreichbar ist.
+
+   Die Pruefung ist bewusst dieselbe strenge wie in app.html: Der Wert
+   wandert in eine URL. Ein unbrauchbarer Speicherwert fuehrt zu einer
+   LEEREN Basis -- api() bricht dann ehrlich ab, statt die Anfrage samt
+   Token an eine zusammengebastelte Adresse zu schicken. */
+const MANDANT_SCHLUESSEL = 'sop_mandant';
+function mandantGueltig(m) { return /^[a-z0-9][a-z0-9-]{0,62}$/.test(String(m || '')); }
+function mandantGemerkt() {
+  try {
+    const m = (localStorage.getItem(MANDANT_SCHLUESSEL) || '').trim();
+    return mandantGueltig(m) ? m : '';
+  } catch (e) { return ''; }
+}
+function apiBasis() {
+  if (!nativeAppHuelle()) { return 'api/'; }
+  const m = mandantGemerkt();
+  return m ? 'https://' + m + '.guardops.ch/api/' : '';
+}
+
 // ── Zustand
-const API = nativeAppHuelle() ? 'https://cupi24.guardops.ch/api/' : 'api/';
+const API = apiBasis();
 let token = localStorage.getItem('rv3_token') || '';
 let me    = JSON.parse(localStorage.getItem('rv3_user') || 'null');
 let stats = null;
@@ -10727,6 +10761,12 @@ function tutorialAutostartPruefen(data) {
 
 function api(path, opts) {
   opts = opts || {};
+  /* Ohne Basis keine Anfrage (ENT-669). Waere API leer, ginge die Anfrage
+     samt Token an einen relativen Pfad unter capacitor://localhost -- also
+     ins Nichts, aber mit Token im Kopf. Ein ehrliches Fehlschlagen mit
+     status 0 ist besser: Die Aufrufer behandeln das bereits wie "Server
+     nicht erreichbar". */
+  if (!API) { return Promise.resolve({ ok: false, status: 0, data: {} }); }
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['X-Auth-Token'] = token;
   return fetch(API + path, {
