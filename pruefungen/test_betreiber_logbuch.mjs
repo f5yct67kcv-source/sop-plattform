@@ -48,6 +48,12 @@ const OHNE_LOGBUCH = {
     + 'mit Zeitpunkt und Adresse am Beleg selbst.',
   'betreiber_beleg_oeffentlich.php':
     'Der oeffentliche Abruf eines Belegs. Schreibt nur den Abrufzeitpunkt.',
+  'betreiber_beleg_nachricht_oeffentlich.php':
+    'Hier schreibt der EMPFAENGER ueber den oeffentlichen Link (ENT-677). Es gibt '
+    + 'keinen angemeldeten Akteur, und die Nachricht IST der Eintrag: Sie steht mit '
+    + 'Seite, Zeitpunkt und -- wenn angegeben -- Namen am Beleg. Ein zweiter Eintrag '
+    + 'im Logbuch waere dieselbe Zeile ein zweites Mal. Die ANTWORT der Betreiberin '
+    + 'schreibt sehr wohl mit (betreiber_beleg_nachricht.php).',
   'betreiber_demo_beenden.php':
     'Demo-Instanzen sind Wegwerfumgebungen (ENT-523), kein Bestand dieser Ebene.',
   'betreiber_demo_ablauf.php':

@@ -879,15 +879,17 @@ soll.
 **Es fehlt also nur:** eine zweite Datenbank, vier Secrets, ein Umzug der
 Daten.
 
-### Die 16 Tabellen
+### Die 18 Tabellen
 
 ```
 betreiber                betreiber_sessions       betreiber_zwei_faktor
+betreiber_einladung
 mandant                  mandant_zaehlstand
 support_vorgang          support_nachricht
 be_kunden                be_kunden_person         be_kunden_kontaktweg
 be_produkte              be_belege                be_beleg_positionen
-be_aenderungslog         be_briefkopf             be_demo_nutzung_archiv
+be_beleg_nachricht       be_aenderungslog         be_briefkopf
+be_demo_nutzung_archiv
 ```
 
 Alles mit Praefix `be_` gehoert zum Belegteil des Betreibers und hat nichts
@@ -901,10 +903,10 @@ des Mandanten und bleiben, wo sie sind.
 1. **Zweite Datenbank bei Hostpoint anlegen.** Eigener Datenbankbenutzer,
    eigenes Passwort — nicht derselbe Benutzer wie fuer die Betriebsdaten,
    sonst ist die Trennung eine Buchhaltung ohne Wirkung.
-2. **Die 16 Tabellen exportieren**, aus der heutigen Datenbank, mit Daten.
+2. **Die 18 Tabellen exportieren**, aus der heutigen Datenbank, mit Daten.
    In phpMyAdmin: Export → *Angepasst* → nur diese 16 auswaehlen.
    Struktur **und** Daten.
-3. **In die neue Datenbank einspielen.** Danach zaehlen: 16 Tabellen, und
+3. **In die neue Datenbank einspielen.** Danach zaehlen: 18 Tabellen, und
    die Zeilenzahl in `betreiber`, `mandant` und `be_belege` muss mit der
    alten uebereinstimmen.
 4. **Die vier Secrets setzen** — GitHub → Settings → Environments →
@@ -920,7 +922,7 @@ des Mandanten und bleiben, wo sie sind.
    liegt in `betreiber_sessions` und ist mitgezogen — bleibt die Anmeldung
    haengen, ist etwas schiefgelaufen), Mandantenliste oeffnen, eine Rechnung
    aufrufen. Im Cockpit pruefen, dass der Betrieb unveraendert laeuft.
-7. **Die alten 16 Tabellen erst danach loeschen**, und nicht am selben Tag.
+7. **Die alten 18 Tabellen erst danach loeschen**, und nicht am selben Tag.
    Solange sie stehen, ist der Rueckweg ein Zuruecksetzen der vier Secrets
    und ein Deploy. Sind sie weg, ist er ein Wiedereinspielen aus dem Export.
 
@@ -934,7 +936,7 @@ des Mandanten und bleiben, wo sie sind.
 - **`mandant.id = 1` bleibt richtig.** Der Bestandsbetrieb wird nicht
   bewegt, nur der Stamm zieht um.
 - **Die Einrichtung legt fehlende Tabellen selbst an.** Wird Schritt 2/3
-  uebersprungen, entstehen die 16 Tabellen in der neuen Datenbank **leer** —
+  uebersprungen, entstehen die 18 Tabellen in der neuen Datenbank **leer** —
   inklusive eines wieder offenen Bootstraps. Das sieht aus wie ein frischer
   Betreiber-Bereich und ist in Wahrheit ein verlorener.
 - **Der Export enthaelt Zugangsdaten** (Passwort-Hashes, Zwei-Faktor-

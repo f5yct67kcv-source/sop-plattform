@@ -996,6 +996,12 @@ const OHNE_ANMELDUNG = [
   // Ausweis tatsaechlich der versand_token ist).
   'betreiber_beleg_oeffentlich.php',
   'betreiber_beleg_entscheidung.php',
+  // Dritter Weg am selben Link (ENT-677): der Aenderungswunsch des
+  // Empfaengers. Dieselbe Begruendung wie bei den beiden darueber -- kein
+  // Konto, Ausweis ist der versand_token --, dazu eine eigene Bremse
+  // ('be-nachricht:'), damit dieser Weg nicht als Postfach-Schleuder
+  // taugt, und nur POST.
+  'betreiber_beleg_nachricht_oeffentlich.php',
   // Demo-Selbstbedienung (ENT-601): Ein Interessent hat noch kein Konto,
   // kann also keine Sitzung mitbringen -- dieselbe Begruendung wie bei
   // login.php. Eigene Bremsen (IP und E-Mail-Adresse), Honigtopf,
