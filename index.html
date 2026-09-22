@@ -128,7 +128,7 @@ header h1 { font-size: 15px; font-weight: 660; letter-spacing: -.2px; color: var
 .req { color: var(--red); font-size: 14px; line-height: 1; }
 /* 16 px ist keine Geschmacksfrage: Darunter zoomt iOS beim Antippen in das
    Feld hinein und bleibt dort. 44 px Mindesthoehe fuer den Finger. */
-.field input, .field select, .field textarea { width: 100%; min-height: 44px; border: 1.5px solid var(--border); border-radius: 9px; padding: 11px 14px; font-size: 16px; color: var(--text); background: var(--bg); transition: border-color .15s, background .15s; -webkit-appearance: none; appearance: none; font-family: inherit; }
+.field input, .field select, .field textarea { width: 100%; min-height: 44px; border: 1.5px solid var(--border); border-radius: 9px; padding: 11px 14px; font-size: 16px; color: var(--text); background-color: var(--bg); transition: border-color .15s, background-color .15s; -webkit-appearance: none; appearance: none; font-family: inherit; }
 /* Ein festes, nicht aenderbares Feld (Einsatzart) -- vorher als Inline-Stil
    am Element, damit ausserhalb des Systems und beim naechsten Mal vergessen. */
 .field input.fest { color: var(--sub); cursor: default; }
@@ -138,22 +138,39 @@ header h1 { font-size: 15px; font-weight: 660; letter-spacing: -.2px; color: var
    danach fast auf dem Hintergrund. "Ausgegraut" soll heissen "nicht
    aenderbar", nicht "unlesbar". */
 .field input:disabled { color: var(--sub); -webkit-text-fill-color: var(--sub);
-  opacity: 1; background: var(--bg); cursor: default; }
-.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); background: var(--surface); }
-.field input.error, .field select.error { border-color: var(--red); background: var(--red-bg); }
+  opacity: 1; background-color: var(--bg); cursor: default; }
+/* background-COLOR, nicht die Kurzform "background" (ENT-676). Die
+   Kurzform setzt background-image, -repeat und -position implizit mit
+   zurueck -- und diese beiden Regeln haben eine hoehere Eigenspezifitaet
+   als ".field select" weiter unten, wo der Pfeil steht. Gemessen am
+   gerenderten Zustand ergab die Kurzform beim Fokus:
+     hell    no-repeat @ right 14px  ->  repeat @ 0% 0%, Bild WEG
+     dunkel  no-repeat @ right 14px  ->  repeat @ 0% 0%, Bild DA
+   Im Dunkelmodus gewinnt naemlich die Themenregel ganz unten fuer das
+   BILD (noch hoehere Spezifitaet), nicht aber fuer das "no-repeat"
+   daneben. Der 12x8 grosse Pfeil kachelte sich dadurch ueber das ganze
+   Feld -- das "Zickzack-Muster", das der Projektinhaber gemeldet hat.
+   Im Hellmodus fiel dieselbe Ursache nur niemandem auf, weil dort der
+   Pfeil beim Fokus schlicht verschwand.
+   Es ist derselbe Fehler, der am 2026-09-17 schon einmal behoben wurde
+   (siehe Kommentar weiter unten) -- damals im Ruhezustand, hier im
+   Fokus- und im Fehlerzustand. Mit background-color kann er in keinem
+   Zustand mehr auftreten: Wer nur die Farbe meint, schreibt nur die
+   Farbe. */
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); background-color: var(--surface); }
+.field input.error, .field select.error { border-color: var(--red); background-color: var(--red-bg); }
 .field .err-msg { font-size: 11px; color: var(--red); margin-top: 4px; display: none; }
 .field.has-error .err-msg { display: block; }
 select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B7280' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
-/* .field select { background: var(--bg) } (oben) ist eine KURZFORM -- die
-   setzt background-image/-repeat/-position implizit mit zurueck und
-   gewinnt gegen die blosse "select"-Regel oben (hoehere Eigenspezifitaet:
-   Klasse+Element schlaegt Element allein). Ohne diese Zeile blieb der
-   Pfeil unsichtbar (background-image:none gewann); mit der Dunkel-Variante
-   (naechste Regel) gewann NUR das Bild, nicht das "no-repeat" daneben --
-   das Ergebnis war ein gekacheltes Zickzack statt eines einzelnen Pfeils
-   (Befund vom 2026-09-17, gemessen am gerenderten Zustand). Dieselbe
-   Spezifitaet wie die Kurzform und spaeter im Text behebt beides: das Bild
-   erscheint, UND "no-repeat" gilt wieder. */
+/* Diese Zeile kam am 2026-09-17 gegen genau dasselbe gekachelte Zickzack
+   -- damals im Ruhezustand: Die Kurzform "background" in der Grundregel
+   oben setzte Bild, Wiederholung und Lage zurueck, und die Dunkel-Variante
+   darunter holte nur das BILD zurueck, nicht das "no-repeat" daneben.
+   Seit ENT-676 schreibt keine der Feldregeln mehr die Kurzform, sondern
+   nur background-color. Die Zeile bleibt trotzdem stehen: Sie traegt
+   Wiederholung, Lage und den Platz fuer den Pfeil fuer alle Felder in
+   .field-Containern, und ohne sie haengt das an der blossen
+   "select"-Regel oben allein. */
 .field select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B7280' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
 /* Dieselbe Pfeilform, hellerer Strich -- #6B7280 verschwindet fast auf dem
    dunklen Feldhintergrund. */
