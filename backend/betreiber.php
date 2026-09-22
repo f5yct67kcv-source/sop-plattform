@@ -263,7 +263,7 @@ function be_konten_zahl(PDO $pdo, int $ausser = 0): int
     return (int)$s->fetchColumn();
 }
 
-// ── Einladung eines neuen Kontos (ENT-663) ────────────────────────────
+// ── Einladung eines neuen Kontos (ENT-667) ────────────────────────────
 //
 // 48 STUNDEN, und die Zahl steht nur hier. Die Ruecksetzung eines
 // Mitarbeiterpassworts laeuft nach 30 Minuten ab (ENT-373) -- dort hat die
@@ -1126,9 +1126,9 @@ function be_tabellen(): array
   angelegt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-// ── Die offene Einladung (ENT-663) ────────────────────────────────────
+// ── Die offene Einladung (ENT-667) ────────────────────────────────────
 //
-// WARUM ES DIESE TABELLE GIBT: Bis ENT-663 tippte derjenige, der ein Konto
+// WARUM ES DIESE TABELLE GIBT: Bis ENT-667 tippte derjenige, der ein Konto
 // anlegt, dessen Passwort selbst und gab es weiter. Drei Folgen, alle mit
 // derselben Wurzel -- das Konto entstand fertig, mit einem Geheimnis, das
 // jemand anderes gewaehlt hatte:

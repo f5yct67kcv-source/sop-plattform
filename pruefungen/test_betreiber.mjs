@@ -77,7 +77,7 @@ const OEFFENTLICH = {
   'betreiber_beleg_oeffentlich.php': 'Ansicht der Offerte am Link, Ausweis ist der versand_token',
   'betreiber_beleg_entscheidung.php': 'Annehmen/Ablehnen am selben Link, nur POST',
 };
-// DRITTE Kategorie (ENT-663), und wieder aus einem anderen Grund als die
+// DRITTE Kategorie (ENT-667), und wieder aus einem anderen Grund als die
 // beiden oben. Ein Einstieg erzeugt die Sitzung, die er nicht verlangen
 // kann. Eine oeffentliche Beleg-Seite gehoert einem Empfaenger, der kein
 // Konto hat und auch keines bekommen soll. Diese beiden gehoeren jemandem,
@@ -130,7 +130,7 @@ check('KRITISCH: jede oeffentliche Beleg-Seite weist sich ueber versand_token au
   ohneVersandToken.length === 0);
 if (ohneVersandToken.length) { bad.push('ohne versand_token: ' + ohneVersandToken.join(', ')); }
 
-// Dieselbe Ueberlegung fuer die Einladungsseiten (ENT-663): Die Ausnahme
+// Dieselbe Ueberlegung fuer die Einladungsseiten (ENT-667): Die Ausnahme
 // traegt nur, solange ihr Ausweis wirklich der Einladungstoken ist -- und
 // zwar ueber be_einladung_konto(), die einzige Stelle, die den ABDRUCK
 // vergleicht. Wuerde einer der beiden den Token selbst in der Tabelle

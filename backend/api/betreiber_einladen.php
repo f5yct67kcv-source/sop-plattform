@@ -1,5 +1,5 @@
 <?php
-// Ein neues Konto der Betreiber-Ebene einladen (ENT-663).
+// Ein neues Konto der Betreiber-Ebene einladen (ENT-667).
 //
 // WAS SICH GEGENUEBER betreiber_konto_anlegen.php AENDERT: Dort tippte der
 // Anlegende das Passwort des neuen Kontos und gab es weiter. Hier setzt er

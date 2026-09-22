@@ -1,5 +1,5 @@
 <?php
-// Loest eine Einladung ein: Die Person setzt ihr Passwort selbst (ENT-663).
+// Loest eine Einladung ein: Die Person setzt ihr Passwort selbst (ENT-667).
 //
 // STEHT IN OHNE_ANMELDUNG (pruefungen/test_php.mjs): derselbe Grund wie bei
 // betreiber_einladung_pruefen.php -- wer eingeladen ist, hat noch keinen

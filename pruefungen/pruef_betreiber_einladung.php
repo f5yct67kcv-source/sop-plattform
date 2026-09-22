@@ -1,5 +1,5 @@
 <?php
-// Die Einladungsfunktionen der Betreiber-Ebene (ENT-663) wirklich
+// Die Einladungsfunktionen der Betreiber-Ebene (ENT-667) wirklich
 // AUSFUEHREN -- nicht ihren Quelltext lesen.
 //
 // Warum diese Datei: Drei Aussagen des Einladungswegs sind Entscheidungen

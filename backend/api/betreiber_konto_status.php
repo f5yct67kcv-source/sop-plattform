@@ -35,7 +35,7 @@ if (!$konto) {
 }
 
 // EIN EINGELADENES KONTO LAESST SICH NICHT VON HAND FREISCHALTEN
-// (ENT-663). Sonst entstuende ein aktives Konto ohne Passwort: Es kaeme
+// (ENT-667). Sonst entstuende ein aktives Konto ohne Passwort: Es kaeme
 // zwar niemand hinein (betreiber_anmelden.php prueft den leeren Hash), aber
 // die Kontenliste zeigte es als gewoehnliches Konto, und die offene
 // Einladung bliebe unbemerkt gueltig. "Eingeladen" ist ein eigener Zustand

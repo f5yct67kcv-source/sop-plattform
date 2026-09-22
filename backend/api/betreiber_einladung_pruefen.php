@@ -1,5 +1,5 @@
 <?php
-// Prueft einen Einladungslink, bevor die Seite das Formular zeigt (ENT-663).
+// Prueft einen Einladungslink, bevor die Seite das Formular zeigt (ENT-667).
 //
 // STEHT IN OHNE_ANMELDUNG (pruefungen/test_php.mjs): Wer eingeladen ist, hat
 // naturgemaess noch keinen Zugang -- der Ausweis ist der Token selbst, wie

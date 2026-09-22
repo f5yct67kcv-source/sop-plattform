@@ -959,7 +959,7 @@ const OHNE_ANMELDUNG = [
   // Zeitmessung und die gleichlautende Antwort fuer "gibt es nicht" und
   // "Passwort falsch". Eigene Pruefung: test_betreiber.mjs.
   'betreiber_anmelden.php',
-  // Die beiden Schritte der Einladung (ENT-663). Wer eingeladen ist, hat
+  // Die beiden Schritte der Einladung (ENT-667). Wer eingeladen ist, hat
   // naturgemaess noch keinen Zugang -- der Ausweis ist der Token aus der
   // Nachricht. Anders als der versand_token beim Beleg-Link liegt er als
   // ABDRUCK in der Datenbank (ENT-501): Dieser Link setzt ein Passwort auf

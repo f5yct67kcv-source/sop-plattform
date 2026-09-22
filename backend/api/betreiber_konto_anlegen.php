@@ -57,7 +57,7 @@ if ($vorhanden === 0) {
     require_verwaltung($user);
     $ich = null;
 } else {
-    // AB DEM ZWEITEN KONTO FUEHRT NUR NOCH DIE EINLADUNG (ENT-663).
+    // AB DEM ZWEITEN KONTO FUEHRT NUR NOCH DIE EINLADUNG (ENT-667).
     //
     // Bis hierher tippte der Anlegende das Passwort des neuen Kontos und gab
     // es weiter -- er kannte es also. Bis zur Einrichtung des zweiten

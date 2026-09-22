@@ -45,7 +45,7 @@ $liste = array_map(static function (array $k) use ($ich, $pdo, $geteilt): array 
     // eingerichtet ist -- sonst zeigt die Oberflaeche einen Knopf, der
     // nichts zuruecksetzen kann.
     $k['zwei_faktor'] = be_zf_tabelle_da($pdo) ? be_zf_ist_an($pdo, $k['id']) : null;
-    // Eingeladen und noch nicht eingeloest (ENT-663). Ohne dieses Feld
+    // Eingeladen und noch nicht eingeloest (ENT-667). Ohne dieses Feld
     // saehe so ein Konto in der Liste wie ein stillgelegtes aus -- zwei
     // verschiedene Aussagen unter einer Darstellung, und die Oberflaeche
     // boete einen Schalter "aktivieren" an, den der Server zu Recht

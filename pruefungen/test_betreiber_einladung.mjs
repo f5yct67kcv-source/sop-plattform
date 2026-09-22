@@ -1,8 +1,8 @@
-// Einladungsweg der Betreiber-Ebene (ENT-663).
+// Einladungsweg der Betreiber-Ebene (ENT-667).
 //
 // WARUM DIESE SUITE
 //
-// Bis ENT-663 tippte derjenige, der ein Betreiber-Konto anlegte, dessen
+// Bis ENT-667 tippte derjenige, der ein Betreiber-Konto anlegte, dessen
 // Passwort selbst. Drei Folgen, alle mit derselben Wurzel -- das Konto
 // entstand fertig, mit einem Geheimnis, das jemand anderes gewaehlt hatte:
 // der Anlegende kannte es, die Adresse wurde nie nachgewiesen, und

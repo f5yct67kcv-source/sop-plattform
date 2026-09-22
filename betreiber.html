@@ -594,7 +594,7 @@ ul.fehlt b { color: var(--ink); font-weight: 620; }
    mittig -- zusammen aber nicht mehr in der Mitte des Bildschirms. Darum
    bekommt .tor bei der Anmeldung eine Spalte, in der beide als EIN Block
    stehen. */
-/* #ein-tor (ENT-663) traegt dieselbe Marke ueber derselben Karte und
+/* #ein-tor (ENT-667) traegt dieselbe Marke ueber derselben Karte und
    braucht darum dieselbe Spalte -- sonst stuenden Marke und Karte in zwei
    Rasterzeilen, jede fuer sich mittig, zusammen aber nicht. */
 #tor, #ein-tor { grid-auto-flow: row; align-content: center; justify-items: center; }
@@ -1374,7 +1374,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   </div>
 </div>
 
-<!-- ── Einladung einloesen (ENT-663) ──────────────────────────────
+<!-- ── Einladung einloesen (ENT-667) ──────────────────────────────
      KEINE EIGENE SEITE, sondern ein dritter Zustand desselben Tors. Eine
      zweite Datei haette dasselbe CSS ein zweites Mal gebraucht, und zwei
      Fassungen derselben Anmeldekarte laufen auseinander, sobald jemand nur
@@ -2594,7 +2594,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <div class="f"><label for="k_email">E-Mail *</label>
           <input class="inp" id="k_email" type="email" autocomplete="off"></div>
       </div>
-      <!-- KEIN PASSWORTFELD MEHR (ENT-663). Bis dahin stand hier eines,
+      <!-- KEIN PASSWORTFELD MEHR (ENT-667). Bis dahin stand hier eines,
            und wer ein Konto anlegte, kannte damit dessen Passwort. Was an
            seine Stelle tritt, ist kein Feld, sondern eine Auskunft: was
            nach dem Speichern passiert. -->
@@ -3781,7 +3781,7 @@ function kZfMerker(k) {
   if (k.zwei_faktor === false) { return '<span class="merker m-warn">noch offen</span>'; }
   return '<span style="color:var(--ink-3)" title="Die Tabelle für den zweiten Faktor ist auf diesem Server noch nicht angelegt.">keine Angabe</span>';
 }
-/* DREI Zustaende, nicht zwei (ENT-663). "Eingeladen" ist weder aktiv noch
+/* DREI Zustaende, nicht zwei (ENT-667). "Eingeladen" ist weder aktiv noch
    stillgelegt: Ein stillgelegtes Konto hatte einmal Zugang und hat ihn
    nicht mehr, ein eingeladenes hatte ihn nie. Die beiden unter einer
    Darstellung zu fuehren waere genau die Verwechslung, die die Hausregel
@@ -4014,7 +4014,7 @@ async function kSpeichern() {
   if (id) {
     a = await ruf('betreiber_konto_speichern.php', Object.assign({ id: id }, daten));
   } else {
-    /* EINLADEN STATT ANLEGEN (ENT-663): Hier wird kein Passwort mehr
+    /* EINLADEN STATT ANLEGEN (ENT-667): Hier wird kein Passwort mehr
        vergeben. Die eingeladene Person setzt es selbst ueber einen Link an
        ihre Adresse -- damit kennt der Einladende es nie, und ein Tippfehler
        in der Adresse faellt sofort auf, weil nichts ankommt. */
@@ -7800,7 +7800,7 @@ document.querySelectorAll('[data-springe]').forEach(b => {
 themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell');
 glasSetzen(document.documentElement.getAttribute('data-glas') !== 'aus');
 
-/* ── Einladung einloesen (ENT-663) ─────────────────────────────────
+/* ── Einladung einloesen (ENT-667) ─────────────────────────────────
    Der Token steht in der URL, weil er aus einer E-Mail kommt -- anders als
    ein Sitzungstoken, der niemals dorthin gehoert. Er wird aus der
    Adresszeile ENTFERNT, sobald die Seite ihn gelesen hat: Sonst steht er im

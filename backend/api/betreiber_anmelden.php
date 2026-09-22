@@ -61,7 +61,7 @@ if (!$konto) {
     json_response(['status' => 'error', 'message' => 'Anmeldung nicht möglich.'], 401);
 }
 
-// LEERER HASH heisst "eingeladen, noch nicht eingeloest" (ENT-663). Die
+// LEERER HASH heisst "eingeladen, noch nicht eingeloest" (ENT-667). Die
 // Abfrage oben faengt diesen Fall schon ueber aktiv = 1 ab -- das hier ist
 // der zweite, unabhaengige Riegel. Er steht da, weil sich `aktiv` von Hand
 // setzen laesst und ein Konto ohne Passwort sonst allein davon abhinge,
