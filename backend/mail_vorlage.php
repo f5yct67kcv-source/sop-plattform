@@ -75,32 +75,40 @@ function mail_e(string $w): string
 // sind grosses I, kleines l und die Eins kaum zu unterscheiden, ebenso
 // Null und grosses O -- bei einem erzeugten Passwort, das jemand abtippt,
 // ist das kein Schoenheitsfehler, sondern ein gescheiterter Anmeldeversuch.
-function mail_feld(string $beschriftung, string $wert, bool $gleichschritt = false): string
+//
+// $kompakt fuer einen Block, der nur ein paar kurze Angaben traegt
+// (ENT-674): Nummer, Datum, Frist brauchen nicht dieselbe Flaeche wie
+// Zugangsdaten, die jemand abliest und abtippt. Gleiche Gestaltung, engere
+// Abstaende -- KEINE zweite Bauart. Der Zugangsblock der Demo-Mail bleibt
+// bewusst geraeumig; dort ist der Wert die Sache selbst.
+function mail_feld(string $beschriftung, string $wert, bool $gleichschritt = false,
+                   bool $kompakt = false): string
 {
     $schrift = $gleichschritt
         ? "font-family:'SF Mono',Menlo,Consolas,monospace;letter-spacing:0.5px;"
         : '';
-    return '<tr><td style="padding:0 0 14px 0;">'
+    return '<tr><td style="padding:0 0 ' . ($kompakt ? 12 : 16) . 'px 0;">'
         . '<div class="d-leise" style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;'
-        . 'color:' . MAIL_FARBE_LEISE . ';padding-bottom:3px;">' . mail_e($beschriftung) . '</div>'
-        . '<div class="d-text" style="font-size:16px;font-weight:600;color:' . MAIL_FARBE_TEXT . ';'
-        . $schrift . '">' . $wert . '</div>'
+        . 'color:' . MAIL_FARBE_LEISE . ';padding-bottom:4px;">' . mail_e($beschriftung) . '</div>'
+        . '<div class="d-text" style="font-size:' . ($kompakt ? 15 : 16) . 'px;font-weight:600;color:'
+        . MAIL_FARBE_TEXT . ';' . $schrift . '">' . $wert . '</div>'
         . '</td></tr>';
 }
 
 // Der abgesetzte Block, in dem die Felder stehen.
-function mail_block(string $felder): string
+function mail_block(string $felder, bool $kompakt = false): string
 {
+    $luft = $kompakt ? '18px 20px 8px 20px' : '24px 22px 10px 22px';
     return '<table role="presentation" class="d-flaeche" cellpadding="0" cellspacing="0" border="0" width="100%"'
         . ' style="background:' . MAIL_FARBE_FLAECHE . ';border:1px solid ' . MAIL_FARBE_RAND . ';'
-        . 'border-radius:6px;margin:0 0 24px 0;"><tr><td style="padding:20px 20px 6px 20px;">'
+        . 'border-radius:6px;margin:4px 0 ' . ($kompakt ? 26 : 30) . 'px 0;"><tr><td style="padding:' . $luft . ';">'
         . '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">'
         . $felder . '</table></td></tr></table>';
 }
 
 function mail_absatz(string $html): string
 {
-    return '<p class="d-text" style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:'
+    return '<p class="d-text" style="margin:0 0 20px 0;font-size:15px;line-height:1.65;color:'
         . MAIL_FARBE_TEXT . ';">' . $html . '</p>';
 }
 
@@ -115,19 +123,39 @@ function mail_absatz(string $html): string
 // Knoepfe verschluckt oder Bilder blockt, laesst den Empfaenger sonst vor
 // einer Mail ohne Weiterweg sitzen -- und die reine Textfassung hat den
 // Knopf ohnehin nie.
-function mail_knopf(string $beschriftung, string $ziel): string
+function mail_knopf(string $beschriftung, string $ziel, bool $ersatzlink = true): string
 {
     return '<table role="presentation" cellpadding="0" cellspacing="0" border="0"'
-        . ' style="margin:0 0 18px 0;"><tr>'
+        . ' style="margin:6px 0 26px 0;"><tr>'
         . '<td style="background:' . MAIL_FARBE_BLAU . ';border-radius:6px;">'
         . '<a href="' . mail_e($ziel) . '" style="display:inline-block;'
         . 'padding:13px 24px;font-size:15px;font-weight:600;line-height:1.2;'
         . 'color:#FFFFFF;text-decoration:none;">' . mail_e($beschriftung) . '</a>'
         . '</td></tr></table>'
-        . '<p class="d-leise" style="margin:0 0 18px 0;font-size:13px;line-height:1.6;'
+        . ($ersatzlink ? mail_ersatzlink($ziel) : '');
+}
+
+// Die Adresse in Klarschrift unter dem Knopf -- die Notloesung fuer ein
+// Mailprogramm, das den Knopf verschluckt.
+//
+// SIE IST NICHT IMMER NOETIG (Befund des Projektinhabers, 2026-09-22:
+// optisch stoerend, und andere Anbieter fuehren sie nicht). Jede Mail geht
+// als HTML UND als reiner Text hinaus, und die Textfassung traegt die
+// Adresse ohnehin; der Knopf selbst ist ein gewoehnlicher Verweis, kein
+// Bild und kein Skript. Weglassen darf sie darum, wer eine gewoehnliche
+// Geschaeftsmail schreibt -- beleg_mail() tut das.
+//
+// WO SIE BLEIBT: bei der Bestaetigungsmail zum Demo-Zugang. Dort haengt
+// der ganze Vorgang an genau einem Klick innerhalb einer Frist, und wer
+// dort nicht weiterkommt, hat keinen zweiten Weg.
+//
+// Sie tritt zurueck: kleiner als der Fliesstext, leise, ohne Betonung.
+function mail_ersatzlink(string $ziel): string
+{
+    return '<p class="d-leise" style="margin:0 0 24px 0;font-size:11px;line-height:1.55;'
         . 'color:' . MAIL_FARBE_LEISE . ';">Falls der Knopf nicht funktioniert, '
         . 'kopieren Sie diese Adresse in Ihren Browser:<br>'
-        . '<span style="word-break:break-all;">' . mail_e($ziel) . '</span></p>';
+        . '<span style="word-break:break-all;opacity:0.8;">' . mail_e($ziel) . '</span></p>';
 }
 
 // Die Signatur kommt als fertige Zeilenliste herein und NICHT aus dieser
@@ -144,7 +172,7 @@ function mail_signatur(array $zeilen, string $bildKennung = '',
     $sichtbar = array_values(array_filter(array_map('trim', $zeilen), fn($z) => $z !== ''));
     if ($sichtbar === []) { $sichtbar = ['pzu consulting gmbh']; }
 
-    $html = '<p class="d-text" style="margin:0 0 4px 0;font-size:15px;line-height:1.6;color:'
+    $html = '<p class="d-text" style="margin:8px 0 6px 0;font-size:15px;line-height:1.6;color:'
         . MAIL_FARBE_TEXT . ';">Mit freundlichen Grüssen</p>'
         . '<p class="d-text" style="margin:0;font-size:15px;line-height:1.5;color:'
         . MAIL_FARBE_TEXT . ';">'
@@ -212,7 +240,7 @@ function mail_logo_bild(string $kennung, bool $fuerDunkelmodus): string
         . ' alt="GuardOpS" class="' . ($fuerDunkelmodus ? 'logo-hell' : 'logo-dunkel') . '"'
         . ' style="display:' . ($fuerDunkelmodus ? 'none' : 'block') . ';border:0;'
         . 'width:' . MAIL_LOGO_BREITE . 'px;max-width:' . MAIL_LOGO_BREITE . 'px;'
-        . 'height:auto;margin-top:18px;">';
+        . 'height:auto;margin-top:22px;">';
 }
 
 // Das Logo fuer die Signatur, als Rohbytes fuer smtp_senden(). Liegt neben
@@ -250,9 +278,9 @@ function mail_rahmen(string $inhalt): string
     // Mehr Luft nach unten als zuvor: Logo, Trennlinie und Fussangaben
     // standen zu dicht aufeinander (Befund des Projektinhabers am
     // 2026-09-19 an der echten Mail).
-    $fuss = '<tr><td style="padding:0 28px 30px 28px;">'
+    $fuss = '<tr><td style="padding:0 32px 34px 32px;">'
         . '<div class="d-rand d-leise" style="border-top:1px solid ' . MAIL_FARBE_RAND . ';'
-        . 'padding-top:20px;font-size:12px;line-height:1.6;color:' . MAIL_FARBE_LEISE . ';">'
+        . 'padding-top:24px;font-size:12px;line-height:1.7;color:' . MAIL_FARBE_LEISE . ';">'
         . 'pzu consulting gmbh &middot; Hochgasse 7 &middot; 4632 Trimbach<br>'
         . '<a class="d-blau" href="mailto:info@guardops.ch" style="color:' . MAIL_FARBE_BLAU
         . ';text-decoration:none;">info@guardops.ch</a>'
@@ -277,7 +305,7 @@ function mail_rahmen(string $inhalt): string
         . ' width="600" style="max-width:600px;width:100%;background:#FFFFFF;'
         . 'border:1px solid ' . MAIL_FARBE_RAND . ';'
         . 'border-radius:8px;overflow:hidden;font-family:' . MAIL_SCHRIFT . ';">'
-        . '<tr><td style="padding:28px 28px 22px 28px;">' . $inhalt . '</td></tr>'
+        . '<tr><td style="padding:36px 32px 30px 32px;">' . $inhalt . '</td></tr>'
         . $fuss
         . '</table></td></tr></table></body></html>';
 }
