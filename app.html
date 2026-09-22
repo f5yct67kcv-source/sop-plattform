@@ -2245,6 +2245,16 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
   </div>
   <div class="gate-form" id="gate-login">
     <div id="gErr" class="msg-err" style="display:none"></div>
+    <!-- Der Betrieb (ENT-663, behebt OP-662). Nur in der Huelle: Im
+         Browser entscheidet die Adresszeile, dort gaebe es nichts zu
+         waehlen. Steht ueber Name und Passwort, weil er die Reihenfolge
+         der Wirklichkeit hat -- erst wohin, dann wer. -->
+    <div class="f" id="gMandantFeld" style="display:none">
+      <label for="gMandant" id="lb-betrieb">Betrieb</label>
+      <input class="inp" id="gMandant" autocomplete="off" autocapitalize="none"
+             spellcheck="false" inputmode="url">
+      <div class="gate-hinweis" id="gMandantHinweis" style="margin-top:6px"></div>
+    </div>
     <div class="f"><label for="gName" id="lb-name">Name</label><input class="inp" id="gName" autocomplete="username" autocapitalize="none"></div>
     <div class="f"><label for="gPass" id="lb-pass">Passwort</label>
       <div class="pw-feld"><input class="inp" id="gPass" type="password" autocomplete="current-password">
@@ -2252,6 +2262,12 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
                 onclick="togglePw('gPass', this)">👁</button></div></div>
     <button class="btn btn-primary btn-wide" id="gBtn" onclick="anmelden()">Anmelden</button>
     <button type="button" class="gate-link" id="lb-pwvergessen" onclick="pwVergessenZeigen()">Passwort vergessen?</button>
+    <!-- Wer den Betrieb schon gewaehlt hat, sieht ihn hier und kann ihn
+         wechseln. Leise, weil es der seltene Fall ist -- aber sichtbar,
+         weil ein Vertipper sonst nur mit einer Neuinstallation zu
+         beheben waere. -->
+    <button type="button" class="gate-link" id="gMandantWechsel"
+            style="display:none" onclick="gateBetriebOeffnen()"></button>
   </div>
 
   <!-- "Passwort vergessen" (ENT-373): Anmeldename eingeben, ein Link geht
@@ -2525,6 +2541,12 @@ html[data-thema="dunkel"] .thema-schalter .i-mond  { opacity: 1; }
 const W = {
     anmelden: 'Anmelden', name: 'Name', passwort: 'Passwort',
     fehlerAnmeldung: 'Name oder Passwort falsch.', beidesNoetig: 'Name und Passwort erforderlich.',
+    betrieb: 'Betrieb',
+    betriebHinweis: 'Kurzname deines Betriebs, z. B. musterag. Du bekommst ihn von deiner Einsatzleitung.',
+    betriebIst: 'Betrieb: {m} — ändern',
+    betriebNoetig: 'Bitte den Betrieb eintragen.',
+    betriebUngueltig: 'Nur Kleinbuchstaben, Ziffern und Bindestriche.',
+    betriebNichtErreichbar: 'Betrieb »{m}« nicht erreichbar — entweder gibt es ihn nicht, oder der Server antwortet gerade nicht. Bitte die Schreibweise prüfen.',
     heute: 'Heute', plan: 'Plan', rapport: 'Rapport', profil: 'Profil', sperren: 'Sperren',
     // ENT-234: neue Reiter Wächter/Menü, Plan+Sperren als Unterreiter verschmolzen.
     waechter: 'Wächter', menu: 'Menü',
@@ -3181,7 +3203,82 @@ function nativeAppHuelle() {
 // (Android), eine relative Adresse zeigte ins Buendel statt auf den
 // Server. Im Browser bleibt der bisherige, relative Pfad -- gleiche
 // Herkunft wie das Backend, kein CORS noetig.
-const API = nativeAppHuelle() ? 'https://cupi24.guardops.ch/api/' : 'api/';
+/* ══ DER MANDANT DER HUELLE (ENT-663, behebt OP-662) ═══════════════
+
+   Hier stand bis hierher eine FESTE Adresse:
+       const API = nativeAppHuelle() ? 'https://cupi24.guardops.ch/api/' : 'api/';
+   Damit sprach die App im Store ausschliesslich mit dem Server von
+   CUPI 24. Ein zweiter Mandant war nicht bedienbar -- im Widerspruch zu
+   ENT-661, wo entschieden wurde, dass die App allen Mandanten offensteht.
+
+   WARUM ES NICHT OHNE GEHT (die Frage des Projektinhabers: "bei
+   Coredinate klappt es von Beginn ueber die normale Anmeldemaske"):
+   Unsere Betriebstabellen haben KEINE Mandantenspalte -- `mitarbeiter`
+   traegt id, name, password_hash und so weiter, aber kein mandant_id.
+   Jeder Mandant hat eine eigene Datenbank; das Register dazu (Tabelle
+   `mandant` mit subdomain, db_host, db_name) liegt beim Betreiber. Ein
+   Server kennt darum nur seine eigenen Leute und kann gar nicht sagen,
+   ob ein Name zu einem anderen Betrieb gehoert. Ausserdem ist ein Name
+   damit nicht firmenuebergreifend eindeutig. Wer das anders will,
+   braucht eine gemeinsame Datenbank mit Mandantenspalte -- das ist kein
+   Feature, das ist ein anderes Backend.
+
+   Im BROWSER bleibt alles wie bisher: Dort entscheidet die Adresszeile,
+   der API-Pfad ist relativ, und es gibt nichts zu waehlen. Nur die
+   Huelle hat keine Adresszeile. */
+const MANDANT_SCHLUESSEL = 'sop_mandant';
+
+/* Der Uebergangswert fuer BESTEHENDE Installationen (Entscheidung des
+   Projektinhabers: "Gemerkte Adresse bleibt, nichts aendert sich").
+   Er greift nur dort, wo schon ein Anmeldetoken liegt -- das ist das
+   Kennzeichen einer Installation, die vor dieser Aenderung eingerichtet
+   wurde. Eine FRISCHE Installation hat keins und fragt.
+
+   Damit stirbt dieser Wert von selbst: Mit der letzten alten
+   Installation wird er bedeutungslos. Er ist die einzige Stelle im
+   Produkt, an der noch ein Mandantenname steht. */
+const MANDANT_UEBERGANG = 'cupi24';
+
+/* Strenge Pruefung, und sie ist kein Formalismus: Der Wert wandert in
+   eine URL. Stuende dort "boese.example/x?", schickte die App Name und
+   Passwort dorthin. Erlaubt ist darum genau das, was eine Subdomain sein
+   darf -- Kleinbuchstaben, Ziffern, Bindestriche, nicht mit einem
+   Bindestrich beginnend, hoechstens 63 Zeichen. */
+function mandantGueltig(m) {
+  return /^[a-z0-9][a-z0-9-]{0,62}$/.test(String(m || ''));
+}
+
+function mandantGemerkt() {
+  try {
+    const m = (localStorage.getItem(MANDANT_SCHLUESSEL) || '').trim();
+    return mandantGueltig(m) ? m : '';
+  } catch (e) { return ''; }
+}
+
+function mandantSetzen(m) {
+  if (!mandantGueltig(m)) { return false; }
+  try { localStorage.setItem(MANDANT_SCHLUESSEL, m); } catch (e) {}
+  return true;
+}
+
+// Bestehende Installationen einmalig uebernehmen -- siehe oben.
+function mandantUebernehmen() {
+  if (!nativeAppHuelle() || mandantGemerkt()) { return; }
+  try {
+    if (localStorage.getItem('rv3_token')) { mandantSetzen(MANDANT_UEBERGANG); }
+  } catch (e) {}
+}
+mandantUebernehmen();
+
+/* Die Adresse wird bei JEDEM Aufruf frisch gebildet und nicht einmal in
+   eine Konstante geschrieben: Der Mandant kann sich waehrend der
+   Sitzung aendern (erste Einrichtung, Wechsel nach einem Vertipper),
+   und eine Konstante truege dann den alten Wert bis zum Neustart. */
+function apiBasis() {
+  if (!nativeAppHuelle()) { return 'api/'; }
+  const m = mandantGemerkt();
+  return m ? 'https://' + m + '.guardops.ch/api/' : '';
+}
 let token = localStorage.getItem('rv3_token') || '';
 let ich = JSON.parse(localStorage.getItem('rv3_user') || 'null');
 let schichten = [];
@@ -3287,7 +3384,14 @@ function api(pfad, opts) {
   opts = opts || {};
   const kopf = { 'Content-Type': 'application/json' };
   if (token) kopf['X-Auth-Token'] = token;
-  return fetch(API + pfad, {
+  const basis = apiBasis();
+  /* Ohne Mandant gibt es keine Adresse. Ein relativer Pfad zeigte in der
+     Huelle ins Buendel (capacitor://localhost) und braechte eine
+     HTML-Seite zurueck, die sich als JSON nicht lesen laesst -- ein
+     Fehler, der nach allem Moeglichen aussieht, nur nicht nach der
+     Ursache. Darum hier ausdruecklich abbrechen. */
+  if (!basis) { return Promise.resolve({ ok: false, status: 0, data: {} }); }
+  return fetch(basis + pfad, {
     method: opts.method || 'GET', headers: kopf,
     body: opts.body ? JSON.stringify(opts.body) : undefined
   }).then(r => r.json().then(data => ({ ok: r.ok, status: r.status, data })).catch(() => ({ ok: false, status: r.status, data: {} })))
@@ -3295,6 +3399,7 @@ function api(pfad, opts) {
 }
 
 function beschriften() {
+  gateBetriebZeichnen();
   $('lb-name').textContent = w('name');
   $('lb-pass').textContent = w('passwort');
   $('gBtn').textContent = w('anmelden');
@@ -3377,13 +3482,73 @@ function pwResetSpeichern() {
   });
 }
 
+/* Steht das Betriebsfeld offen? Zwei Faelle: Es ist noch keiner gemerkt
+   (erste Einrichtung), oder jemand hat auf "aendern" getippt. */
+let gateBetriebOffen = false;
+
+function gateBetriebOeffnen() {
+  gateBetriebOffen = true;
+  gateBetriebZeichnen();
+  const f = $('gMandant');
+  if (f) { f.focus(); }
+}
+
+function gateBetriebZeichnen() {
+  const feld = $('gMandantFeld'), wechsel = $('gMandantWechsel');
+  if (!feld || !wechsel) { return; }
+  if (!nativeAppHuelle()) {
+    // Im Browser sagt die Adresszeile, wo man ist. Beide Bauteile weg --
+    // nicht nur unsichtbar, sondern ohne Inhalt, damit sie auch nicht
+    // versehentlich mit abgeschickt werden.
+    feld.style.display = 'none'; wechsel.style.display = 'none';
+    return;
+  }
+  const m = mandantGemerkt();
+  const offen = !m || gateBetriebOffen;
+  feld.style.display = offen ? '' : 'none';
+  wechsel.style.display = offen ? 'none' : '';
+  const hinweis = $('gMandantHinweis');
+  if (hinweis) { hinweis.textContent = w('betriebHinweis'); }
+  const lb = $('lb-betrieb');
+  if (lb) { lb.textContent = w('betrieb'); }
+  if (offen && m && !$('gMandant').value) { $('gMandant').value = m; }
+  if (!offen) { wechsel.textContent = w('betriebIst').replace('{m}', m); }
+}
+
 function anmelden() {
   const name = $('gName').value.trim(), pass = $('gPass').value;
   const err = $('gErr'); err.style.display = 'none';
-  if (!name || !pass) { err.textContent = w('beidesNoetig'); err.style.display = ''; return; }
+  const zeig = txt => { err.textContent = txt; err.style.display = ''; };
+  /* Der Betrieb zuerst: Ohne ihn gibt es keine Adresse, und eine
+     Anmeldung ins Leere sieht aus wie ein falsches Passwort. */
+  if (nativeAppHuelle()) {
+    const feldOffen = $('gMandantFeld') && $('gMandantFeld').style.display !== 'none';
+    if (feldOffen) {
+      const m = $('gMandant').value.trim().toLowerCase();
+      if (!m) { zeig(w('betriebNoetig')); return; }
+      if (!mandantGueltig(m)) { zeig(w('betriebUngueltig')); return; }
+      mandantSetzen(m);
+      gateBetriebOffen = false;
+      gateBetriebZeichnen();
+    }
+    if (!mandantGemerkt()) { zeig(w('betriebNoetig')); gateBetriebOeffnen(); return; }
+  }
+  if (!name || !pass) { zeig(w('beidesNoetig')); return; }
   const b = $('gBtn'); b.disabled = true;
-  api('login.php', { method: 'POST', body: { name, password: pass } }).then(({ ok, data }) => {
+  api('login.php', { method: 'POST', body: { name, password: pass } }).then(({ ok, status, data }) => {
     b.disabled = false;
+    /* Gar keine Antwort (status 0) ist etwas ANDERES als eine Antwort
+       "falsch". In der Huelle heisst das: Die Adresse hat niemanden
+       erreicht -- entweder gibt es den Betrieb nicht, oder sein Server
+       schweigt gerade. Beides laesst sich von hier aus nicht
+       unterscheiden, also behauptet die Meldung auch nicht, es zu
+       wissen (Hausregel: unbekannt darf nie wie keine aussehen). Und
+       das Feld geht wieder auf, damit ein Vertipper zu beheben ist. */
+    if (status === 0 && nativeAppHuelle()) {
+      zeig(w('betriebNichtErreichbar').replace('{m}', mandantGemerkt()));
+      gateBetriebOeffnen();
+      return;
+    }
     if (!ok || data.status !== 'ok') { err.textContent = data.message || w('fehlerAnmeldung'); err.style.display = ''; return; }
     token = data.token;
     ich = { name: data.name, ist_admin: data.ist_admin };
@@ -8082,7 +8247,7 @@ const dokGr = b => b >= 1048576 ? nf(b / 1048576, 1) + ' MB' : Math.max(1, Math.
 // nicht mehr als Nutzeraktion und der Browser blockiert es.
 function dokOeffnen(id) {
   const f = window.open('', '_blank');
-  fetch(API + 'einsatz_dokument.php?id=' + encodeURIComponent(id),
+  fetch(apiBasis() + 'einsatz_dokument.php?id=' + encodeURIComponent(id),
         { headers: token ? { 'X-Auth-Token': token } : {} })
     .then(r => { if (!r.ok) throw new Error('http'); return r.blob(); })
     .then(b => {
