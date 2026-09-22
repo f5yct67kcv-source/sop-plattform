@@ -75,25 +75,33 @@ function mail_e(string $w): string
 // sind grosses I, kleines l und die Eins kaum zu unterscheiden, ebenso
 // Null und grosses O -- bei einem erzeugten Passwort, das jemand abtippt,
 // ist das kein Schoenheitsfehler, sondern ein gescheiterter Anmeldeversuch.
-function mail_feld(string $beschriftung, string $wert, bool $gleichschritt = false): string
+//
+// $kompakt fuer einen Block, der nur ein paar kurze Angaben traegt
+// (ENT-674): Nummer, Datum, Frist brauchen nicht dieselbe Flaeche wie
+// Zugangsdaten, die jemand abliest und abtippt. Gleiche Gestaltung, engere
+// Abstaende -- KEINE zweite Bauart. Der Zugangsblock der Demo-Mail bleibt
+// bewusst geraeumig; dort ist der Wert die Sache selbst.
+function mail_feld(string $beschriftung, string $wert, bool $gleichschritt = false,
+                   bool $kompakt = false): string
 {
     $schrift = $gleichschritt
         ? "font-family:'SF Mono',Menlo,Consolas,monospace;letter-spacing:0.5px;"
         : '';
-    return '<tr><td style="padding:0 0 14px 0;">'
+    return '<tr><td style="padding:0 0 ' . ($kompakt ? 9 : 14) . 'px 0;">'
         . '<div class="d-leise" style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;'
-        . 'color:' . MAIL_FARBE_LEISE . ';padding-bottom:3px;">' . mail_e($beschriftung) . '</div>'
-        . '<div class="d-text" style="font-size:16px;font-weight:600;color:' . MAIL_FARBE_TEXT . ';'
-        . $schrift . '">' . $wert . '</div>'
+        . 'color:' . MAIL_FARBE_LEISE . ';padding-bottom:2px;">' . mail_e($beschriftung) . '</div>'
+        . '<div class="d-text" style="font-size:' . ($kompakt ? 15 : 16) . 'px;font-weight:600;color:'
+        . MAIL_FARBE_TEXT . ';' . $schrift . '">' . $wert . '</div>'
         . '</td></tr>';
 }
 
 // Der abgesetzte Block, in dem die Felder stehen.
-function mail_block(string $felder): string
+function mail_block(string $felder, bool $kompakt = false): string
 {
+    $luft = $kompakt ? '14px 16px 5px 16px' : '20px 20px 6px 20px';
     return '<table role="presentation" class="d-flaeche" cellpadding="0" cellspacing="0" border="0" width="100%"'
         . ' style="background:' . MAIL_FARBE_FLAECHE . ';border:1px solid ' . MAIL_FARBE_RAND . ';'
-        . 'border-radius:6px;margin:0 0 24px 0;"><tr><td style="padding:20px 20px 6px 20px;">'
+        . 'border-radius:6px;margin:0 0 ' . ($kompakt ? 20 : 24) . 'px 0;"><tr><td style="padding:' . $luft . ';">'
         . '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">'
         . $felder . '</table></td></tr></table>';
 }
@@ -124,10 +132,15 @@ function mail_knopf(string $beschriftung, string $ziel): string
         . 'padding:13px 24px;font-size:15px;font-weight:600;line-height:1.2;'
         . 'color:#FFFFFF;text-decoration:none;">' . mail_e($beschriftung) . '</a>'
         . '</td></tr></table>'
-        . '<p class="d-leise" style="margin:0 0 18px 0;font-size:13px;line-height:1.6;'
+        // DER ERSATZLINK TRITT ZURUECK (Befund des Projektinhabers,
+        // 2026-09-22): Er ist die Notloesung fuer ein Mailprogramm, das
+        // Knoepfe verschluckt, und soll auch danach aussehen -- kleiner als
+        // der Fliesstext, leise, die Adresse ohne Unterstreichung. Weg
+        // darf er nicht: Die reine Textfassung hat nie einen Knopf.
+        . '<p class="d-leise" style="margin:0 0 20px 0;font-size:11px;line-height:1.5;'
         . 'color:' . MAIL_FARBE_LEISE . ';">Falls der Knopf nicht funktioniert, '
         . 'kopieren Sie diese Adresse in Ihren Browser:<br>'
-        . '<span style="word-break:break-all;">' . mail_e($ziel) . '</span></p>';
+        . '<span style="word-break:break-all;opacity:0.8;">' . mail_e($ziel) . '</span></p>';
 }
 
 // Die Signatur kommt als fertige Zeilenliste herein und NICHT aus dieser

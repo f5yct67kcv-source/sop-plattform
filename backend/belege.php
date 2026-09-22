@@ -554,7 +554,7 @@ function beleg_mail(array $beleg, string $firma, string $link, string $person,
     // sonst nichts weiter (ENT-674, Punkt 3). Ein leeres Feld darf nie als
     // halber Name in einer Mail an einen Kunden ankommen.
     $person   = trim($person);
-    $anrede   = $person === '' ? 'Guten Tag' : 'Guten Tag ' . $person;
+    $anrede   = ($person === '' ? 'Guten Tag' : 'Guten Tag ' . $person) . ',';
 
     // Die Felder des Blocks. Beschriftungen aus BELEG_ARTEN, nicht
     // zusammengesetzt: "Offerte" + "nummer" ergaebe "Offertenummer".
@@ -583,7 +583,7 @@ function beleg_mail(array $beleg, string $firma, string $link, string $person,
     $zeilen = '';
     foreach ($felder as [$b, $w]) { $zeilen .= "$b: $w\n"; }
     $text = "$anrede\n\n"
-          . "$firma hat Ihnen eine neue $titel erstellt.\n\n"
+          . "wir haben für Sie eine neue $titel erstellt.\n\n"
           . $zeilen . "\n"
           . "$ansehen\n$link\n\n"
           . "Bei Fragen oder Unklarheiten melden Sie sich jederzeit bei uns.\n\n"
@@ -596,18 +596,23 @@ function beleg_mail(array $beleg, string $firma, string $link, string $person,
     $bilder   = array_values(array_filter([$logo, $logoHell]));
 
     $block = '';
-    foreach ($felder as [$b, $w]) { $block .= mail_feld($b, mail_e($w)); }
+    // Kompakt: drei kurze Angaben brauchen nicht die Flaeche eines
+    // Zugangsdatenblocks (ENT-674, Nachtrag).
+    foreach ($felder as [$b, $w]) { $block .= mail_feld($b, mail_e($w), false, true); }
 
     $inhalt = mail_absatz(mail_e($anrede))
-        // GROSS geschrieben. Bis ENT-674 stand hier mb_strtolower($titel)
-        // und damit "eine neue offerte erstellt" im Postfach -- ein
-        // Substantiv, klein geschrieben, in der ersten Mail an einen
-        // kuenftigen Mandanten.
-        . mail_absatz('<b>' . mail_e($firma) . '</b> hat Ihnen eine neue '
-            . mail_e($titel) . ' erstellt.')
-        . mail_block($block)
+        // IN DER ERSTEN PERSON (Befund des Projektinhabers, 2026-09-22):
+        // "GuardOpS hat Ihnen eine neue Offerte erstellt" liest sich wie
+        // eine Systemmeldung. Wer die Mail schickt, steht im Absender, im
+        // Betreff und in der Signatur -- der Satz selbst darf sprechen wie
+        // ein Mensch. Der Satz schliesst an die Anrede an und faengt darum
+        // klein an.
+        . mail_absatz('wir haben für Sie eine neue ' . mail_e($titel) . ' erstellt.')
+        . mail_block($block, true)
         . mail_absatz(mail_e($ansehen))
-        . mail_knopf($titel . ' anschauen', $link)
+        // "oeffnen" statt "anschauen": klarer und geschaeftlicher
+        // (Befund des Projektinhabers, 2026-09-22).
+        . mail_knopf($titel . ' öffnen', $link)
         . mail_absatz('Bei Fragen oder Unklarheiten melden Sie sich jederzeit bei uns.')
         . mail_signatur($gruss,
             $logo === null ? '' : (string)$logo['cid'],

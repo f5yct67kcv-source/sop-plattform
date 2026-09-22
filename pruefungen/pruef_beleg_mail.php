@@ -84,8 +84,11 @@ $pruef('GEGENPROBE — die Suche findet einen Betrag, wenn einer dasteht',
 $ohne = beleg_mail(['art' => 'offerte', 'nummer' => 'OF-0002', 'datum' => '2026-03-04',
                     'gueltig_bis' => null],
                    'Musterfirma', $LINK, '', $SIG);
+// Die Anrede endet mit Komma, weil der Folgesatz sie fortsetzt ("wir haben
+// für Sie ..."). Ohne Kontaktperson darf danach kein Leerzeichen und kein
+// Rest stehen -- "Guten Tag ," waere die halbe Anrede aus einem leeren Feld.
 $pruef('KRITISCH: ohne Kontaktperson gruesst die Mail ohne Namen',
-    str_starts_with($ohne['text'], "Guten Tag\n"));
+    str_starts_with($ohne['text'], "Guten Tag,\n"));
 $pruef('… und mit Kontaktperson steht sie da',
     str_contains($m['text'], 'Guten Tag Muster Kontakt'));
 $pruef('KRITISCH: eine nicht gesetzte Frist wird weggelassen, nicht geraten',
@@ -135,6 +138,12 @@ $pruef('KRITISCH: das HTML traegt ihn zweimal — im Knopf und lesbar darunter',
 // ── 5. Betreff und Ueberschriften ─────────────────────────────────────
 $pruef('der Betreff nennt Art, Nummer und Absender',
     $m['betreff'] === 'Neue Offerte OF-0001 von Musterfirma');
+// Der Satz spricht in der ersten Person und nennt die Firma nicht noch
+// einmal -- sie steht im Absender, im Betreff und in der Signatur. Eine
+// "Musterfirma hat Ihnen ..."-Meldung waere der Rueckfall (2026-09-22).
+$pruef('KRITISCH: der Satz spricht in der ersten Person',
+    str_contains($m['text'], 'wir haben für Sie eine neue Offerte erstellt')
+    && !str_contains($m['text'], 'Musterfirma hat Ihnen'));
 $pruef('KRITISCH: das Substantiv ist gross geschrieben',
     str_contains($m['text'], 'eine neue Offerte erstellt')
     && !str_contains($m['text'], 'eine neue offerte'));
@@ -154,9 +163,12 @@ $pruef('… und nirgends steht ein Platzhalter',
 //
 // Firma und Kontaktperson kommen aus der Datenbank. Ein Winkel darin darf
 // die Mail nicht zerlegen.
-$boese = beleg_mail($offerte, 'Muster <b>& Co', $LINK, 'Kontakt <script>', $SIG);
+// Ohne hinterlegte Signatur zeichnet die Firma -- so steht ihr Name im
+// HTML und laesst sich hier pruefen. Die Kontaktperson steht in der Anrede.
+$boese = beleg_mail($offerte, 'Muster <b>& Co', $LINK, 'Kontakt <script>', []);
 $pruef('KRITISCH: Firma und Person werden im HTML entschaerft',
     str_contains($boese['html'], 'Muster &lt;b&gt;')
+    && str_contains($boese['html'], 'Kontakt &lt;script&gt;')
     && !str_contains($boese['html'], '<script>'));
 
 echo count($bad) === 0
