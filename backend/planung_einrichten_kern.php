@@ -2737,6 +2737,63 @@ function kern_verweise_fehlend(PDO $pdo): array {
 // braucht, prueft sie NACH dem Befuellen.
 //
 // Gibt eine Liste in Klartext zurueck; leer heisst vollstaendig.
+// ── Spalten, die BREITER werden mussten ──────────────────────────────────
+//
+// Eigene Liste neben kern_spalten(): Jene traegt FEHLENDE Spalten nach und
+// erkennt sie daran, dass es sie nicht gibt. Eine Spalte, die es gibt und
+// nur zu kurz ist, faellt dort durch jedes Raster -- CREATE TABLE IF NOT
+// EXISTS fasst sie nicht an, hat_spalte() meldet sie als vorhanden, und der
+// naechste Eintrag laeuft in "Data too long".
+//
+// Je Eintrag: Tabelle, Spalte, Mindestbreite, ALTER-Befehl.
+if (!function_exists('kern_spalten_breite')) {
+function kern_spalten_breite(): array {
+    return [
+    // Der Abdruck des Demo-Hinweises haelt seit dem 2026-09-22 ZWEI
+    // Fassungen fest statt einer -- die Nutzungsbedingungen und die
+    // Datenschutzerklaerung, bei letzterer auch, welche der beiden es war
+    // (Platz oder gemeinsame Umgebung). In 20 Zeichen passt das nicht mehr.
+    ['demo_hinweis_bestaetigung', 'fassung', 60,
+     'ALTER TABLE demo_hinweis_bestaetigung MODIFY fassung VARCHAR(60) NOT NULL'],
+    ];
+}
+}
+
+// Welche davon heute noch zu schmal sind. EINE Abfrage fuer alle, wie
+// kern_schema_fehlend() -- und wie dort ist ein Fehlschlag kein Befund:
+// Ohne Zugriff auf information_schema wissen wir nichts, und "nichts
+// gewusst" darf nicht wie "alles in Ordnung" aussehen. Es bleibt dann beim
+// alten Stand, statt blind ein ALTER auf eine Tabelle loszulassen, deren
+// Zustand wir nicht kennen.
+if (!function_exists('kern_breite_fehlend')) {
+function kern_breite_fehlend(PDO $pdo): array {
+    $liste = kern_spalten_breite();
+    if ($liste === []) { return []; }
+    try {
+        $zeilen = $pdo->query(
+            "SELECT TABLE_NAME, COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH
+               FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()")->fetchAll(PDO::FETCH_NUM);
+    } catch (Throwable $e) {
+        return [];
+    }
+    $breite = [];
+    foreach ($zeilen as $z) {
+        $breite[strtolower((string)$z[0])][strtolower((string)$z[1])] = (int)$z[2];
+    }
+    $zuSchmal = [];
+    foreach ($liste as [$tabelle, $spalte, $soll]) {
+        $ist = $breite[strtolower($tabelle)][strtolower($spalte)] ?? null;
+        // Spalte (oder Tabelle) gibt es gar nicht: Das ist ein anderer
+        // Befund und steht bereits in kern_schema_fehlend(). Hier doppelt
+        // gemeldet, machte es die Liste laenger und nicht klarer.
+        if ($ist === null || $ist <= 0) { continue; }
+        if ($ist < $soll) { $zuSchmal[] = 'Breite ' . $tabelle . '.' . $spalte; }
+    }
+    return $zuSchmal;
+}
+}
+
 if (!function_exists('kern_schema_fehlend')) {
 function kern_schema_fehlend(PDO $pdo): array {
     $ist = [];
@@ -2944,43 +3001,30 @@ foreach ($spalten as [$tabelle, $spalte, $sql]) {
     schritt($pdo, $sql, "Spalte $tabelle.$spalte", $getan, $fehler);
 }
 
-// ── 2a. Fassungsfeld des Demo-Hinweises verbreitern (2026-09-22)
+// ── 2a. Spalten verbreitern, die enger sind als der heutige Bauplan
 //
-// Es haelt seit heute zwei Fassungen statt einer fest (siehe Kommentar bei
-// demo_hinweis_bestaetigung in kern_tabellen()); in 20 Zeichen passt das
-// nicht mehr. Eine laufende Anlage hat die Tabelle laengst -- CREATE TABLE
-// IF NOT EXISTS aendert an ihr nichts, und der naechste Eintrag liefe in
-// "Data too long", also mitten in den Bildschirm, den ein Interessent zum
-// Weiterkommen bestaetigen muss.
+// Eine laufende Anlage hat ihre Tabellen laengst; CREATE TABLE IF NOT
+// EXISTS aendert an einer bestehenden Spalte nichts, und kern_spalten()
+// traegt nur FEHLENDE nach. Eine Spalte, die es gibt und nur zu kurz ist,
+// faellt durch beide Raster -- der naechste Eintrag liefe in "Data too
+// long". Beim Demo-Hinweis waere das mitten in dem Bildschirm passiert, den
+// ein Interessent zum Weiterkommen bestaetigen muss.
 //
-// EIGENER SCHRITT UND NICHT kern_spalten(): Jene Liste traegt FEHLENDE
-// Spalten nach und erkennt sie daran, dass es sie nicht gibt. Diese Spalte
-// gibt es, sie ist nur zu kurz -- dieselbe Pruefung wuerde sie nie anfassen.
-// Gemessen wird darum die tatsaechliche Breite, nicht ihr Vorhandensein.
-if (hat_tabelle_jetzt($pdo, 'demo_hinweis_bestaetigung')
-    && hat_spalte($pdo, 'demo_hinweis_bestaetigung', 'fassung')) {
-    $breite = 0;
-    try {
-        $breite = (int)$pdo->query(
-            "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
-              WHERE TABLE_SCHEMA = DATABASE()
-                AND TABLE_NAME = 'demo_hinweis_bestaetigung'
-                AND COLUMN_NAME = 'fassung'")->fetchColumn();
-    } catch (Throwable $e) {
-        // Kein Zugriff auf information_schema: Dann bleibt es beim alten
-        // Stand, statt blind ein ALTER auf eine Tabelle loszulassen, deren
-        // Zustand wir nicht kennen.
-        $breite = 0;
+// Die Liste und die Messung stehen bei kern_spalten_breite() /
+// kern_breite_fehlend() -- dieselbe Quelle, aus der auch 'ausstehend' den
+// Knopf gelb faerbt. Eine Definition, nicht zwei.
+foreach (kern_spalten_breite() as [$tabelle, $spalte, $soll, $sql]) {
+    if (!hat_tabelle_jetzt($pdo, $tabelle) || !hat_spalte($pdo, $tabelle, $spalte)) {
+        continue;
     }
-    if ($breite > 0 && $breite < 60) {
-        if ($nurPruefen) {
-            $getan[] = 'Spalte demo_hinweis_bestaetigung.fassung ist noch zu kurz';
-        } else {
-            schritt($pdo,
-                'ALTER TABLE demo_hinweis_bestaetigung MODIFY fassung VARCHAR(60) NOT NULL',
-                'Fassungsfeld des Demo-Hinweises verbreitern', $getan, $fehler);
-        }
+    if (!in_array('Breite ' . $tabelle . '.' . $spalte, kern_breite_fehlend($pdo), true)) {
+        continue;
     }
+    if ($nurPruefen) {
+        $getan[] = "Spalte $tabelle.$spalte ist schmaler als $soll Zeichen";
+        continue;
+    }
+    schritt($pdo, $sql, "Spalte $tabelle.$spalte verbreitern", $getan, $fehler);
 }
 
 // Betreiber-eigene Spalten-Nachtraege (be_spalten() in backend/betreiber.php,
@@ -3391,7 +3435,19 @@ foreach (array_keys($tabellen) as $name) {
 // dieselbe Tabellen/Spalten-Pruefung, die auch demo_instanz.php fuer die
 // Platzwahl nutzt, kern_verweise_fehlend() dieselbe Verweisliste wie
 // Abschnitt 3 oben -- eine Definition, nicht zwei.
-$schemaOffen = count(kern_schema_fehlend($pdo)) + count(kern_verweise_fehlend($pdo));
+// kern_breite_fehlend() zaehlt mit: Eine zu schmale Spalte ist echte
+// Schema-Differenz, die nur ein Einrichtungslauf schliesst -- genau das,
+// wofuer der Knopf gelb wird. Zaehlte sie hier nicht mit, bliebe er grau,
+// der Betreiber-Bereich meldete "alles eingerichtet", und der Nachtrag
+// liefe nur, wenn jemand zufaellig trotzdem klickt.
+//
+// NICHT in kern_schema_fehlend(): Jene Funktion entscheidet in
+// demo_instanz.php auch darueber, ob ein Demo-Platz vergeben werden darf.
+// Eine zu schmale Spalte wuerde dort alle zehn Plaetze sperren und damit
+// jede Demo-Anfrage abweisen -- ein grosserer Schaden als der, den sie
+// anrichtet.
+$schemaOffen = count(kern_schema_fehlend($pdo)) + count(kern_verweise_fehlend($pdo))
+    + count(kern_breite_fehlend($pdo));
 
 return [
     'status' => (!$nurPruefen && ($fehlt || $fehler)) ? 'error' : 'ok',

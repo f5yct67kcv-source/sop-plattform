@@ -115,6 +115,28 @@ check('KRITISCH: der Demo-Hinweis hat eine Funktion, die die Rechtstexte nachlae
   check('KRITISCH: bestehende Anlagen bekommen die groessere Breite nachgetragen',
     /ALTER TABLE demo_hinweis_bestaetigung MODIFY fassung VARCHAR\(60\)/.test(kernTab)
     && /CHARACTER_MAXIMUM_LENGTH/.test(kernTab));
+
+  // Und jemand muss davon erfahren. 'ausstehend' faerbt den Update-Knopf im
+  // Cockpit und ist zugleich das, was der Betreiber-Bereich je Platz
+  // meldet. Es zaehlte bis zum 2026-09-22 nur FEHLENDE Tabellen, Spalten
+  // und Verweise -- eine zu schmale Spalte kam darin nicht vor. Der
+  // Nachtrag lag dann zwar im Code, lief aber nur, wenn jemand zufaellig
+  // trotzdem auf "Einrichtung" klickt. Ein Nachtrag, von dem niemand
+  // erfaehrt, ist keiner.
+  check('KRITISCH: eine zu schmale Spalte zaehlt in ausstehend mit -- sonst bleibt der Update-Knopf grau',
+    /\$schemaOffen\s*=[^;]*kern_breite_fehlend\(\$pdo\)/s.test(kernTab));
+
+  // Aber NICHT in kern_schema_fehlend(): Die entscheidet in
+  // demo_instanz.php mit darueber, ob ein Demo-Platz vergeben werden darf.
+  // Eine zu schmale Spalte wuerde dort alle zehn Plaetze sperren und jede
+  // Demo-Anfrage abweisen -- ein groesserer Schaden als der, den sie
+  // anrichtet.
+  const schemaFehlend = (() => {
+    const i = kernTab.indexOf('function kern_schema_fehlend(PDO $pdo): array {');
+    return i < 0 ? '' : kernTab.slice(i, kernTab.indexOf('\n}\n', i));
+  })();
+  check('KRITISCH: eine zu schmale Spalte sperrt KEINEN Demo-Platz bei der Vergabe',
+    schemaFehlend.length > 100 && !schemaFehlend.includes('kern_breite_fehlend'));
 }
 
 // ── 2. Der gerenderte Bildschirm ─────────────────────────────────────────
