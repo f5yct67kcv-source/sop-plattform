@@ -7,6 +7,7 @@ require_once __DIR__ . '/../ereignisse.php';
 
 $user = require_session();
 require_verwaltung($user);
+require_once __DIR__ . '/../mitarbeiter.php';   // ma_nur_menschen() (ENT-631)
 
 $monatStart    = date('Y-m-01');
 $vormonatStart = date('Y-m-01', strtotime('first day of last month'));
@@ -24,7 +25,7 @@ $stmt->execute([$monatStart, $monatStart, $vormonatStart, $monatStart, $vormonat
 $kpi = $stmt->fetch() ?: [];
 
 $counts = db()->query(
-    'SELECT (SELECT COUNT(*) FROM mitarbeiter WHERE aktiv = 1) AS mitarbeiter,
+    'SELECT (SELECT COUNT(*) FROM mitarbeiter WHERE aktiv = 1 AND ' . ma_nur_menschen(db()) . ') AS mitarbeiter,
             (SELECT COUNT(*) FROM kunden) AS kunden,
             (SELECT COUNT(*) FROM rapporte) AS rapporte_total'
 )->fetch() ?: [];
@@ -53,6 +54,13 @@ for ($i = 7; $i >= 0; $i--) {
 }
 
 // ── Offene Sitzungen (Sessions laufen in diesem Modell nicht automatisch ab)
+//
+// HIER OHNE ma_nur_menschen() (ENT-631), und das mit Absicht: Laeuft
+// gerade ein Supportzugang des Betreibers, soll der Betrieb ihn in seiner
+// eigenen Sitzungsliste SEHEN. Ueberall sonst faellt das Konto aus den
+// Aufzaehlungen -- es ist kein Mensch und zaehlt nicht zur Belegschaft.
+// Eine offene Sitzung dagegen ist genau die Aussage, die hier gefragt
+// ist, und sie gilt fuer jede Sitzung.
 $angemeldet = db()->query(
     'SELECT m.name, m.vorname, m.nachname, MAX(s.erstellt_am) AS letzte_anmeldung, COUNT(*) AS sitzungen
      FROM sessions s JOIN mitarbeiter m ON m.id = s.mitarbeiter_id
@@ -67,7 +75,7 @@ $stmt = db()->prepare(
             COALESCE(SUM(r.netto_h), 0) AS stunden, COUNT(r.id) AS anzahl
      FROM mitarbeiter m
      LEFT JOIN rapporte r ON r.mitarbeiter_id = m.id AND r.datum >= ?
-     WHERE m.aktiv = 1
+     WHERE m.aktiv = 1 AND ' . ma_nur_menschen(db(), 'm') . '
      GROUP BY m.id, m.name, m.vorname, m.nachname
      ORDER BY stunden DESC, m.name'
 );

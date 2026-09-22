@@ -360,7 +360,7 @@ function ma_login_name_gueltig(string $name): bool
 function ma_login_migrationsplan(PDO $pdo): array
 {
     $rows = $pdo->query('SELECT id, name, vorname, nachname, personalnummer, aktiv, erstellt_am
-                          FROM mitarbeiter ORDER BY id')
+                          FROM mitarbeiter WHERE ' . ma_nur_menschen($pdo) . ' ORDER BY id')
                 ->fetchAll(PDO::FETCH_ASSOC);
 
     $reserviert = [];
@@ -461,7 +461,7 @@ function ma_personalnummer_gueltig(string $pn): bool
 // keine uebersprungenen Zeilen: Jede Person ohne Nummer bekommt eine.
 function ma_personalnummer_migrationsplan(PDO $pdo): array
 {
-    $rows = $pdo->query('SELECT id, name, personalnummer, aktiv, erstellt_am FROM mitarbeiter ORDER BY id')
+    $rows = $pdo->query('SELECT id, name, personalnummer, aktiv, erstellt_am FROM mitarbeiter WHERE ' . ma_nur_menschen($pdo) . ' ORDER BY id')
                 ->fetchAll(PDO::FETCH_ASSOC);
     $vergeben = [];
     foreach ($rows as $r) {
@@ -762,4 +762,50 @@ function ma_stempel(PDO $pdo, string $spalte, string $wo, $wert): void
     if (!in_array($spalte, ['letzter_zugriff', 'passwort_geaendert_am'], true)) { return; }
     if (!$pdo->query('SHOW COLUMNS FROM mitarbeiter LIKE ' . $pdo->quote($spalte))->fetch()) { return; }
     $pdo->prepare("UPDATE mitarbeiter SET $spalte = NOW() WHERE $wo = ?")->execute([$wert]);
+}
+
+// Die Bedingung "nur echte Menschen" (ENT-631).
+//
+// WOZU: Seit ENT-631 traegt jeder Betrieb ein Konto "GuardOpS Support".
+// Es liegt in derselben Tabelle wie die Belegschaft, ist aber kein
+// Mensch: Es zaehlt nicht mit, es steht in keiner Auswahl, es arbeitet
+// keine Schicht und bekommt keinen Lohn. Ohne diese Bedingung stuende in
+// einer Demo mit fuenf erfundenen Leuten "Mitarbeitende: 6".
+//
+// ALS FRAGMENT UND NICHT ALS FERTIGE ABFRAGE: Die rund vierzig Stellen,
+// die die Tabelle aufzaehlen, sehen alle anders aus -- mit und ohne
+// WHERE, mit und ohne Alias, als COUNT und als Liste. Eine gemeinsame
+// Abfrage haette keine davon ersetzt. Was sie teilen koennen, ist der
+// Satz, der die Zeile ausschliesst.
+//
+// OHNE DIE SPALTE gibt es kein Support-Konto, und dann schliesst diese
+// Bedingung nichts aus (1=1) statt die Abfrage scheitern zu lassen. Die
+// Einrichtung traegt die Spalte nach; bis dahin laeuft alles wie vorher.
+//
+// pruefungen/test_support_konto.mjs achtet darauf, dass keine
+// aufzaehlende Abfrage sie vergisst -- die Regel steht damit im Netz und
+// nicht nur in einem Kommentar.
+function ma_nur_menschen(PDO $pdo, string $alias = ''): string
+{
+    // Gemerkt JE VERBINDUNG, nicht einmal fuer alle. Der Betreiber-Bereich
+    // geht in EINER Anfrage durch jede Mandanten-Datenbank; ein gemeinsamer
+    // Merker gaebe das Ergebnis des ersten Mandanten fuer alle uebrigen aus.
+    // Genau dieser Fehler ist hier schon einmal passiert -- hat_tabelle()
+    // meldete "5 von 5 Tabellen" fuer Datenbanken, die leer waren (siehe
+    // api/betreiber_schema_pruefen.php).
+    static $bekannt = [];
+    $schluessel = spl_object_id($pdo);
+    if (!isset($bekannt[$schluessel])) {
+        // Ohne SHOW COLUMNS: Das ist MySQL-eigen, und die Pruefskripte
+        // laufen gegen SQLite. "LIMIT 0" holt keine Zeile -- es scheitert
+        // nur, wenn die Spalte fehlt, und das ist genau die Frage.
+        try {
+            $pdo->query('SELECT support_konto FROM mitarbeiter LIMIT 0');
+            $bekannt[$schluessel] = true;
+        } catch (Throwable $e) {
+            $bekannt[$schluessel] = false;
+        }
+    }
+    if (!$bekannt[$schluessel]) { return '1=1'; }
+    return ($alias === '' ? '' : $alias . '.') . 'support_konto = 0';
 }

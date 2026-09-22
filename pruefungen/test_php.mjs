@@ -944,6 +944,12 @@ const OHNE_ANMELDUNG = [
   // Loeschen der eigenen Sitzung. Wirkt nur mit dem Token, den man ohnehin
   // schon hat, und kann nichts ausser dem eigenen Eintrag treffen.
   'logout.php',
+  // Der Sprung des Betreibers ins Cockpit (ENT-631). Kann keine Sitzung
+  // verlangen, weil er genau die erzeugt -- derselbe Fall wie login.php.
+  // Der Ausweis ist der Einmal-Schluessel: 32 Zufallsbytes, 60 Sekunden
+  // gueltig, genau einmal einloesbar, und ausstellen kann ihn nur, wer in
+  // die Datenbank dieses Betriebs schreiben darf.
+  'support_sprung_einloesen.php',
   // Ruecksetzung per Mail (ENT-373). Verwaltungskonten sind ausdruecklich
   // ausgenommen, die Antwort ist immer gleichlautend, eigene Bremse unter
   // dem Namensraum "reset:". Eigene Pruefung: pruef_passwort_reset.php.

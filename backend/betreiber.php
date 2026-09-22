@@ -493,6 +493,7 @@ function be_verbindung_lage(array $m): string
 // und es gibt keine Ebene darueber, die einen Missbrauch bemerken oder
 // rueckgaengig machen koennte.
 require_once __DIR__ . '/zweifaktor.php';
+require_once __DIR__ . '/mitarbeiter.php';   // ma_nur_menschen() (ENT-631)
 
 function be_zf_tabelle_da(PDO $pdo): bool
 {
@@ -858,8 +859,8 @@ function mandant_groesse(array $m): ?array
         $pdo = mandant_db($m);
         if (!hat_tabelle($pdo, 'mitarbeiter')) { return null; }
 
-        $gesamt = (int)$pdo->query('SELECT COUNT(*) FROM mitarbeiter')->fetchColumn();
-        $aktiv  = (int)$pdo->query('SELECT COUNT(*) FROM mitarbeiter WHERE aktiv = 1')->fetchColumn();
+        $gesamt = (int)$pdo->query('SELECT COUNT(*) FROM mitarbeiter WHERE ' . ma_nur_menschen($pdo))->fetchColumn();
+        $aktiv  = (int)$pdo->query('SELECT COUNT(*) FROM mitarbeiter WHERE aktiv = 1 AND ' . ma_nur_menschen($pdo))->fetchColumn();
 
         // Wer im laufenden Monat tatsächlich eingeteilt war. Die dritte
         // Zahl, weil "auf der Liste" und "im Einsatz" bei Aushilfen weit
@@ -893,7 +894,7 @@ function mandant_groesse(array $m): ?array
         // (Hausregel), und die Oberflaeche haelt die beiden auseinander.
         $letzterZugriff = null;
         if (hat_spalte($pdo, 'mitarbeiter', 'letzter_zugriff')) {
-            $letzterZugriff = $pdo->query('SELECT MAX(letzter_zugriff) FROM mitarbeiter')->fetchColumn();
+            $letzterZugriff = $pdo->query('SELECT MAX(letzter_zugriff) FROM mitarbeiter WHERE ' . ma_nur_menschen($pdo))->fetchColumn();
             $letzterZugriff = $letzterZugriff ?: null;
         }
         $letzterRapport = null;
@@ -1830,4 +1831,24 @@ function be_bestandsmandant_eintragen(PDO $stamm, PDO $betrieb): ?string
          VALUES (?, \'cupi24\', \'aktiv\', \'\', \'\', \'\', \'\')'
     )->execute([$name]);
     return $name;
+}
+
+// Die Adresse eines Mandanten, oder null.
+//
+// Dieselbe Bauart wie demo_platz_adresse(): aus der Subdomain gebildet,
+// nicht irgendwo abgelegt. Eine zweite Ablage waere eine zweite Wahrheit,
+// die beim Umziehen einer Subdomain stehenbleibt.
+//
+// NULL statt einer geratenen Adresse, wenn die Spalte leer ist: Ein
+// Mandant ohne Subdomain hat keine eigene Adresse -- das ist etwas
+// anderes als eine unbekannte (Hausregel). Der Aufrufer muss den
+// Unterschied benennen koennen.
+function mandant_adresse(?string $subdomain): ?string
+{
+    $s = trim((string)$subdomain);
+    if ($s === '') { return null; }
+    // Dieselbe Zeichenpruefung wie bei einer Subdomain ueblich: Was hier
+    // durchkaeme, landete in einer URL, die der Browser ansteuert.
+    if (!preg_match('/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/', $s)) { return null; }
+    return 'https://' . $s . '.' . DEMO_ADRESSE_BASIS;
 }

@@ -10,10 +10,11 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../ai.php';
-require __DIR__ . '/../planung.php';
+require_once __DIR__ . '/../planung.php';
 
 $user = require_session();
 require_recht($user, 'einsaetze_schreiben');
+require_once __DIR__ . '/../mitarbeiter.php';   // ma_nur_menschen() (ENT-631)
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
@@ -96,7 +97,7 @@ if ($art === 'masterplan') {
 
 // ── Zuteilung
 $mitarbeiter = db()->query(
-    'SELECT id, name, vorname, nachname FROM mitarbeiter WHERE aktiv = 1 ORDER BY name'
+    'SELECT id, name, vorname, nachname FROM mitarbeiter WHERE aktiv = 1 AND ' . ma_nur_menschen(db()) . ' ORDER BY name'
 )->fetchAll();
 
 $e = anthropic_extract_zuteilung($text, $vorlagen, $mitarbeiter, $heute, $monat);

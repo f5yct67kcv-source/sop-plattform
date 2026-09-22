@@ -532,6 +532,8 @@ check('es gibt ueberhaupt einen Endpunkt, der die Mandantenlage prueft',
 const DARF_VERBINDEN = {
   'betreiber_mandant_stand.php':   'zaehlt Tabellen, liest nichts',
   'betreiber_support.php':         'nur auf Freigabe, befristet, protokolliert (ENT-526)',
+  'betreiber_support_sprung.php':  'stellt den Einmal-Schluessel fuer den Sprung ins Cockpit aus; '
+                                 + 'Demo-Platz ohne, echter Mandant nur mit Freigabe (ENT-631)',
   // ENT-600/ENT-601. Eine Demo-Instanz ist kein Betrieb: Sie traegt
   // Musterdaten und wird beim Anfordern, beim erneuten Senden und beim
   // Ablaufen restlos geleert bzw. neu befuellt. Der Zugriff bleibt

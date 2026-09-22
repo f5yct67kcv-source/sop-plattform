@@ -12,10 +12,11 @@
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
-require __DIR__ . '/../planung.php';
+require_once __DIR__ . '/../planung.php';
 
 $user = require_session();
 require_recht($user, 'einsaetze_schreiben');
+require_once __DIR__ . '/../mitarbeiter.php';   // ma_nur_menschen() (ENT-631)
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
@@ -52,7 +53,7 @@ if (!$gewuenscht) {
 }
 $marken = implode(',', array_fill(0, count($gewuenscht), '?'));
 $p = db()->prepare("SELECT id, name, vorname, nachname FROM mitarbeiter
-                    WHERE aktiv = 1 AND id IN ($marken)");
+                    WHERE aktiv = 1 AND id IN ($marken) AND " . ma_nur_menschen(db()));
 $p->execute($gewuenscht);
 $leute = $p->fetchAll();
 if (!$leute) {

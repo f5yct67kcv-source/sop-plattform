@@ -2,13 +2,20 @@
 declare(strict_types=1);
 require __DIR__ . '/db.php';
 require_once __DIR__ . '/anmeldung.php';   // PASSWORT_KOSTEN (ENT-075)
+require_once __DIR__ . '/mitarbeiter.php';   // ma_nur_menschen() (ENT-631)
 
 // Einmaliges Bootstrap: legt den ersten Admin-Account an. Sperrt sich danach
 // selbst -- sobald ein Mitarbeiter existiert, tut dieses Skript nichts mehr.
 // Kann danach auf dem Server bleiben, ist aber empfehlenswert, es via FTP
 // zu loeschen, sobald der erste Admin-Account erstellt ist.
 
-$count = (int)db()->query('SELECT COUNT(*) AS c FROM mitarbeiter')->fetch()['c'];
+// Das Support-Konto zaehlt hier NICHT mit (ENT-631). Es entsteht bei der
+// Einrichtung, also bevor der erste Admin angelegt wird -- wuerde es
+// mitgezaehlt, haette sich dieses Bootstrap in jedem neuen Betrieb
+// gesperrt, noch ehe ein Mensch darin war.
+$count = (int)db()->query(
+    'SELECT COUNT(*) AS c FROM mitarbeiter WHERE ' . ma_nur_menschen(db())
+)->fetch()['c'];
 if ($count > 0) {
     json_response(['status' => 'error', 'message' => 'bereits eingerichtet -- diese Datei kann geloescht werden'], 403);
 }

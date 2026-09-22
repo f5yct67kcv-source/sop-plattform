@@ -5,10 +5,11 @@
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
-require __DIR__ . '/../planung.php';
+require_once __DIR__ . '/../planung.php';
 
 $user = require_session();
 require_recht($user, 'einsaetze_schreiben');
+require_once __DIR__ . '/../mitarbeiter.php';   // ma_nur_menschen() (ENT-631)
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
 }
@@ -122,7 +123,7 @@ $gewuenscht = array_values(array_unique(array_map('intval', (array)($input['mita
 $zuteilung = [];
 if ($gewuenscht) {
     $platzhalter = implode(',', array_fill(0, count($gewuenscht), '?'));
-    $stmt = db()->prepare("SELECT id FROM mitarbeiter WHERE aktiv = 1 AND id IN ($platzhalter)");
+    $stmt = db()->prepare("SELECT id FROM mitarbeiter WHERE aktiv = 1 AND id IN ($platzhalter) AND " . ma_nur_menschen(db()));
     $stmt->execute($gewuenscht);
     $zuteilung = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 }

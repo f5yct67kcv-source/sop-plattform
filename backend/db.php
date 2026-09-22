@@ -355,6 +355,7 @@ function sitzung_abdruck(string $token): string
     return hash('sha256', $token);
 }
 
+
 function require_session(): array {
     // NUR aus dem Kopfbereich (ENT-075). In der URL landet ein Token in
     // Server-Protokollen, im Browserverlauf und in der Adresszeile, die
@@ -368,9 +369,14 @@ function require_session(): array {
     $abdruck = sitzung_abdruck((string)$token);
     $pdo = db();
     $hatStempel = hat_spalte($pdo, 'sessions', 'letzte_nutzung');
+    // Stammt die Sitzung aus einem Supportzugang (ENT-631)? Steht an der
+    // Sitzung selbst, nicht am Konto -- so ist auch bekannt, ZU WELCHEM
+    // Sprung sie gehoert, und die Spur fuehrt zurueck bis zur Freigabe.
+    $hatSprung = hat_spalte($pdo, 'sessions', 'support_sprung_id');
     $stmt = $pdo->prepare(
         'SELECT m.id, m.name, m.ist_admin, s.erstellt_am'
-        . ($hatStempel ? ', s.letzte_nutzung' : '') . '
+        . ($hatStempel ? ', s.letzte_nutzung' : '')
+        . ($hatSprung ? ', s.support_sprung_id' : '') . '
          FROM sessions s
          JOIN mitarbeiter m ON m.id = s.mitarbeiter_id
          WHERE s.token = ? AND m.aktiv = 1'
@@ -438,7 +444,31 @@ function require_session(): array {
             . SITZUNG_MAX_TAGE . ' DAY)');
     }
 
-    unset($row['erstellt_am'], $row['letzte_nutzung']);
+    // ── Die Spur des Supportzugangs (ENT-631) ────────────────────────
+    //
+    // HIER und nicht in den einzelnen Schreibwegen: Dies ist die eine
+    // Stelle, durch die JEDER angemeldete Endpunkt laeuft. Ein Endpunkt,
+    // den jemand morgen dazuschreibt, protokolliert mit, ohne dass er
+    // davon wissen muss. Eine Regel, die in 200 Dateien einzeln stehen
+    // muesste, waere hier schon mehrfach an etwas Neuem gescheitert.
+    //
+    // Nur veraendernde Anfragen: Dass jemand DA war, steht in
+    // support_sprung; was er GETAN hat, gehoert hierher. Jeden Abruf
+    // mitzuschreiben ergaebe Berge, in denen die Aenderungen untergehen.
+    $row['support'] = $hatSprung && $row['support_sprung_id'] !== null;
+    if ($row['support']
+        && !in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD', 'OPTIONS'], true)) {
+        require_once __DIR__ . '/support.php';
+        support_spur_merken(
+            $pdo,
+            (int)$row['support_sprung_id'],
+            (string)$row['name'],
+            (string)($_SERVER['REQUEST_METHOD'] ?? ''),
+            basename((string)($_SERVER['SCRIPT_NAME'] ?? ''))
+        );
+    }
+
+    unset($row['erstellt_am'], $row['letzte_nutzung'], $row['support_sprung_id']);
     return $row;
 }
 

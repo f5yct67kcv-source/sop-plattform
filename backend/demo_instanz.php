@@ -17,6 +17,7 @@ declare(strict_types=1);
 // läuft, also der Ablauf, also genau die, die niemand ansieht.
 require_once __DIR__ . '/betreiber.php';
 require_once __DIR__ . '/demo_reset.php';
+require_once __DIR__ . '/support.php';
 require_once __DIR__ . '/demo_zugang.php';
 // Die Beispieldaten der frischen Instanz -- demo_zugang_einrichten() weiter
 // unten ruft sie auf. Kein stiller Vertrag: Wer diese Datei laedt, bekommt
@@ -82,6 +83,13 @@ function demo_instanz_leeren(PDO $betreiber, string $platz): ?string
 
     demo_reset_alle_tabellen_leeren($instanz);
     demo_reset_systemrollen_saeen($instanz);
+    // Das Support-Konto wieder anlegen (ENT-631). Das Leeren oben macht
+    // TRUNCATE auf JEDE Tabelle, also auch auf mitarbeiter -- ohne diese
+    // Zeile waere der Supportzugang nach dem ersten Ablauf einer Demo
+    // fort, und der Sprung endete auf einer Anmeldemaske, ohne zu sagen
+    // warum. Dieselbe Funktion wie in der Einrichtung, nicht eine zweite
+    // Fassung davon.
+    support_konto_sicherstellen($instanz);
     return null;
 }
 

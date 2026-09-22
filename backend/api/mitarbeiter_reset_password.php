@@ -19,7 +19,12 @@ if ($name === '') {
 }
 // Fuer wen wird zurueckgesetzt? Ein Verwaltungszugang braucht ein
 // laengeres Passwort -- das steht in der Datenbank, nicht in der Anfrage.
-$ziel = db()->prepare('SELECT id, ist_admin FROM mitarbeiter WHERE name = ?');
+// Das Support-Konto ist hier ausgenommen (ENT-631). Es hat bewusst kein
+// gueltiges Passwort; wer ihm eines geben koennte, koennte unter diesem
+// Namen arbeiten -- und das Protokoll schriebe die Aenderungen dem
+// Betreiber zu. Der einzige Weg in dieses Konto ist der Einmal-Schluessel.
+$ziel = db()->prepare('SELECT id, ist_admin FROM mitarbeiter WHERE name = ? AND '
+                      . ma_nur_menschen(db()));
 $ziel->execute([$name]);
 $zielZeile = $ziel->fetch(PDO::FETCH_ASSOC) ?: ['id' => 0, 'ist_admin' => 0];
 $zielId    = (int)$zielZeile['id'];
