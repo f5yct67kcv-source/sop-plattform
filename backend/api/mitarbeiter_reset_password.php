@@ -3,6 +3,9 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../anmeldung.php';   // passwort_pruefen (ENT-075)
+// Fuer ma_nur_menschen() (ENT-631) und ma_stempel(). Oben und nicht erst
+// weiter unten: Die Funktion steht schon in der Abfrage nach dem Ziel.
+require_once __DIR__ . '/../mitarbeiter.php';
 
 $user = require_session();
 require_recht($user, 'personal_schreiben');
@@ -49,7 +52,6 @@ if ($pwFehler !== null) {
 }
 
 $hash = password_hash($password, PASSWORD_DEFAULT, ['cost' => PASSWORT_KOSTEN]);
-require_once __DIR__ . '/../mitarbeiter.php';
 $stmt = db()->prepare('UPDATE mitarbeiter SET password_hash = ? WHERE name = ?');
 $stmt->execute([$hash, $name]);
 
