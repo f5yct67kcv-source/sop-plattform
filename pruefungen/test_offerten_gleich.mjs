@@ -327,9 +327,19 @@ const passt = (a, b) => a.s === b.s && Math.abs(a.h - b.h) <= 1;
 
    WICHTIG: Sie stehen hier trotzdem unter Beobachtung -- der Test prueft
    unten, dass sie bei Offerte und Rechnung tatsaechlich VERBORGEN sind.
-   Eine Ausnahme, die nicht mehr geprueft wird, ist ein Loch. */
+   Eine Ausnahme, die nicht mehr geprueft wird, ist ein Loch.
+
+   Der Rueckkanal am Beleg (ENT-677) ist der zweite Fall derselben Sorte:
+   Der Empfaenger einer Betreiber-Offerte hat kein Konto und schreibt ueber
+   den Versandlink. Im Cockpit gibt es diesen Weg nicht -- dort schreibt
+   eine Mandantin an ihre eigenen Kunden, und ob die antworten koennen
+   sollen, ist eine eigene Frage. Auch diese Bausteine stehen unter
+   Beobachtung: Sie sind nur ausgenommen, solange sie verborgen sind -- die
+   Karte erscheint erst, wenn tatsaechlich jemand geschrieben hat. */
 const NUR_BETREIBER = ['#ofLaufzeitKarte', '#of_vbeginn', '#of_vmindest',
-                       '#of_vfrist', '#of_vverlaengerung'];
+                       '#of_vfrist', '#of_vverlaengerung',
+                       '#ofFadenKarte', '#ofFadenListe', '#ofFadenAntwort',
+                       '#of_antwort', '#ofFadenSendenBtn', '#ofFadenHinweis'];
 
 function formularVergleichen(was, co, be) {
   check(`${was}: beide Seiten zeigen das Formular ohne JS-Fehler`,
@@ -353,14 +363,15 @@ function formularVergleichen(was, co, be) {
   if (nurBe.length) { bad.push(`${was}: nur im Betreiber-Bereich: ` + nurBe.join(', ')); }
 
   /* Die Ausnahmen sind nur ausgenommen, solange sie WEG sind. Steht die
-     Laufzeitkarte auf einer Offerte offen da, ist es kein Sonderfall mehr,
-     sondern ein zweites Formular. */
+     Laufzeitkarte auf einer Offerte offen da -- oder die Fadenkarte an
+     einem Beleg, zu dem niemand geschrieben hat --, ist es kein Sonderfall
+     mehr, sondern ein zweites Formular. */
   const sichtbareAusnahmen = NUR_BETREIBER
     .filter(k => be.m.nachId[k] && be.m.nachId[k].h > 0);
-  check(`KRITISCH ${was}: die Vertragsfelder bleiben verborgen`,
+  check(`KRITISCH ${was}: die betreiberseitigen Zusaetze bleiben verborgen`,
     sichtbareAusnahmen.length === 0);
   if (sichtbareAusnahmen.length) {
-    bad.push(`${was}: sichtbar, obwohl nur fuer den Vertrag: ` + sichtbareAusnahmen.join(', '));
+    bad.push(`${was}: sichtbar, obwohl nur fuer Vertrag oder Rueckkanal: ` + sichtbareAusnahmen.join(', '));
   }
 
   const gleich = Object.keys(co.m.nachId)

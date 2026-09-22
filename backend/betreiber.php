@@ -271,6 +271,80 @@ function be_konten_zahl(PDO $pdo, int $ausser = 0): int
 // kommt unangekuendigt und wird oft erst am naechsten Arbeitstag gesehen;
 // eine halbe Stunde erzeugte fast nur tote Links, und jedes Erneuern ist
 // ein weiterer Versand an ein Postfach. Zwei Tage sind der Ausgleich.
+// ── Der Faden am Beleg (ENT-677) ──────────────────────────────────────
+//
+// Drei kleine Funktionen statt einer grossen: Die Endpunkte auf beiden
+// Seiten -- der oeffentliche ohne Anmeldung und der im Betreiber-Bereich --
+// brauchen dieselben drei Schritte, und zwei Fassungen davon liefen beim
+// naechsten Umbau auseinander.
+
+// Laenge einer Nachricht. Kein Schutz vor Boesartigkeit -- der Token ist
+// der Ausweis --, sondern eine Grenze gegen das versehentlich
+// hineinkopierte Dokument. Wer mehr zu sagen hat, schreibt zweimal.
+const BE_NACHRICHT_ZEICHEN = 4000;
+
+function be_beleg_nachricht_tabelle_da(PDO $pdo): bool
+{
+    return hat_tabelle($pdo, 'be_beleg_nachricht');
+}
+
+// Der ganze Faden eines Belegs, aelteste zuerst -- so liest man ein
+// Gespraech.
+//
+// FEHLT DIE TABELLE, GIBT ES EINEN LEEREN FADEN und keinen Absturz: Zwischen
+// Deploy und Einrichtungslauf steht sie noch nicht, und ein Beleg soll sich
+// auch dann ansehen lassen. Das ist etwas anderes als "keine Nachrichten" --
+// darum fragt die Oberflaeche ueber be_beleg_nachricht_tabelle_da() nach,
+// bevor sie ein Eingabefeld anbietet, statt ein leeres Gespraech zu zeigen,
+// das nichts entgegennimmt.
+function be_beleg_nachrichten(PDO $pdo, int $belegId): array
+{
+    if (!be_beleg_nachricht_tabelle_da($pdo)) { return []; }
+    $s = $pdo->prepare(
+        'SELECT id, seite, autor, text, erstellt_am
+           FROM be_beleg_nachricht WHERE beleg_id = ? ORDER BY id ASC'
+    );
+    $s->execute([$belegId]);
+    return $s->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+// Schreibt eine Nachricht und gibt ihre Nummer zurueck (0, wenn die Tabelle
+// fehlt oder der Text leer ist).
+//
+// KUERZT STATT ABZUWEISEN: Ein zu langer Text ist ein Versehen, kein
+// Angriff, und eine Fehlermeldung an dieser Stelle kostet den Empfaenger
+// seinen ganzen Absatz.
+function be_beleg_nachricht_anlegen(PDO $pdo, int $belegId, string $seite,
+                                    string $autor, string $text): int
+{
+    if (!be_beleg_nachricht_tabelle_da($pdo)) { return 0; }
+    $text = trim($text);
+    if ($text === '' || $belegId <= 0) { return 0; }
+    if (!in_array($seite, ['kunde', 'betreiber'], true)) { return 0; }
+    $pdo->prepare(
+        'INSERT INTO be_beleg_nachricht (beleg_id, seite, autor, text, erstellt_am)
+         VALUES (?, ?, ?, ?, NOW())'
+    )->execute([$belegId, $seite, mb_substr(trim($autor), 0, 120),
+                mb_substr($text, 0, BE_NACHRICHT_ZEICHEN)]);
+    return (int)$pdo->lastInsertId();
+}
+
+// Wie eine Nachricht unterschrieben ist, wenn niemand einen Namen angegeben
+// hat. Nicht "Unbekannt" und nicht leer: Was feststeht, ist die HERKUNFT --
+// diese Nachricht kam ueber den Link zu genau diesem Beleg. Genau das sagt
+// der Text, statt einen Absender zu behaupten (Hausregel: Unbekannt darf nie
+// wie keine aussehen).
+function be_beleg_nachricht_absender(array $n): string
+{
+    $autor = trim((string)($n['autor'] ?? ''));
+    if ((string)($n['seite'] ?? '') === 'betreiber') {
+        return $autor !== '' ? $autor : 'Absender der Offerte';
+    }
+    return $autor !== ''
+        ? $autor . ' — über den Link zur Offerte'
+        : 'Über den Link zur Offerte';
+}
+
 const BE_EINLADUNG_STUNDEN = 48;
 
 function be_einladung_tabelle_da(PDO $pdo): bool
@@ -1378,7 +1452,13 @@ function be_tabellen(): array
   datum DATE NOT NULL,
   gueltig_bis DATE NULL,
   faellig_bis DATE NULL,
-  status ENUM('entwurf','versendet','angeschaut','bestaetigt','abgelehnt')
+  -- 'aenderung' seit ENT-677: Der Empfaenger hat am Link einen
+  -- Aenderungswunsch geschrieben. Eigener Zustand und kein blosser Zaehler,
+  -- damit in der Liste sichtbar ist, wo der Ball beim Betreiber liegt --
+  -- 'angeschaut' stuende sonst still weiter. NUR auf der Betreiberseite:
+  -- Die Tabelle `belege` der Mandantin kennt den Wert nicht, dort gibt es
+  -- diesen Rueckkanal nicht.
+  status ENUM('entwurf','versendet','angeschaut','aenderung','bestaetigt','abgelehnt')
          NOT NULL DEFAULT 'entwurf',
   bemerkung TEXT NULL,
   oeffentliche_notizen TEXT NULL,
@@ -1471,6 +1551,30 @@ function be_tabellen(): array
 // KEIN Fremdschluessel auf betreiber: Ein Verlauf muss den Datensatz
 // ueberleben, ueber den er berichtet -- darum steht der Name des Akteurs
 // als Text daneben und nicht nur seine ID.
+// Der Faden am Beleg (ENT-677). Der Empfaenger schreibt seinen
+// Aenderungswunsch dort, wo der Beleg steht, statt eine Mail zu schicken,
+// die jemand von Hand uebertraegt.
+//
+// EIGENE TABELLE UND NICHT DER SUPPORT-VORGANG: Der Support kennt nur
+// angemeldete Mandantinnen. Hier schreibt jemand ohne Konto ueber den
+// Versandlink, und eine Offertenrueckfrage gehoert nicht in den
+// Stoerungs-Posteingang.
+//
+// `autor` ist FREIWILLIG und darf leer bleiben (ENT-677 Punkt 4): Die
+// oeffentliche Seite kennt nur den Token, und der Link kann weitergeleitet
+// worden sein. Was feststeht, ist die Herkunft -- dass die Nachricht ueber
+// den Link zu genau diesem Beleg kam --, und die steht in `seite`. Ein
+// Pflichtfeld wuerde hier eine Identitaet behaupten, die es nicht gibt.
+'be_beleg_nachricht' => "CREATE TABLE IF NOT EXISTS be_beleg_nachricht (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  beleg_id INT UNSIGNED NOT NULL,
+  seite ENUM('kunde','betreiber') NOT NULL,
+  autor VARCHAR(120) NOT NULL DEFAULT '',
+  text TEXT NOT NULL,
+  erstellt_am DATETIME NOT NULL,
+  KEY idx_be_beleg_nachricht_beleg (beleg_id, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 'be_aenderungslog' => "CREATE TABLE IF NOT EXISTS be_aenderungslog (
   id INT AUTO_INCREMENT PRIMARY KEY,
   zeitpunkt DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -1714,6 +1818,12 @@ function be_namen_nachtragen(PDO $pdo): int
 function be_auswahlwerte(): array
 {
     return [
+        // Der sechste Belegzustand (ENT-677). Die vollstaendige Aufzaehlung
+        // muss mit der CREATE-TABLE-Fassung oben uebereinstimmen.
+        ['be_belege', 'status', 'aenderung',
+         "ALTER TABLE be_belege MODIFY COLUMN status "
+         . "ENUM('entwurf','versendet','angeschaut','aenderung','bestaetigt','abgelehnt') "
+         . "NOT NULL DEFAULT 'entwurf'"],
         // Die dritte Belegart (ENT-637).
         ['be_belege', 'art', 'vertrag',
          "ALTER TABLE be_belege MODIFY COLUMN art "
