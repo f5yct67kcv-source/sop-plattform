@@ -1,27 +1,37 @@
-// Herstellersignatur "powered by Guard OpS" in der Mitarbeiter-App.
+// Die Marke im Anmeldebildschirm der Mitarbeiter-App (ENT-668).
 //
-// Dieselbe Rolle wie im Anmeldebildschirm des Cockpits: Im Vordergrund
-// steht der Betrieb (Logo und Name), die Software signiert nur. Und
-// dieselben Fallen -- die Datei ist eine andere, die Mechanik ist es nicht:
+// Bis ENT-668 stand hier das Gegenteil: 60 Pruefungen ueber die
+// Herstellersignatur "powered by Guard OpS" am unteren Rand -- dass sie
+// gezeichnet wird, obenauf liegt, in ihrem Kasten sitzt, das Formular
+// nicht ueberdeckt. Die Signatur ist weg, und damit war die ganze Datei
+// eine Behauptung ueber etwas, das es nicht mehr gibt.
 //
-//   1. Sie wird uebermalt. Ab 900 px liegen Video und .gate-schleier als
-//      absolut gesetzte Ebenen ueber dem Fluss. Im Cockpit ist die
-//      Signatur beim Umbau genau so verschwunden: vorhanden, sichtbar,
-//      richtig gross, richtig gefaerbt -- und unter dem Schleier. Gesehen
-//      hat es erst ein Bildschirmfoto. Darum wird gefragt, welches Element
-//      am Ort des Logos wirklich OBEN liegt.
-//   2. Sie ueberdeckt das Formular. Die App laeuft auf Telefonen, auch auf
-//      kleinen. Gemessen stuende eine fest gesetzte Zeile 34 px ueber der
-//      Kante bei 320x568 um 35 px im Anmeldeformular. Geloest ist das ueber
-//      die Auto-Raender von .gate-mitte; ein spaeteres "position: fixed"
-//      saehe auf grossen Schirmen gleich aus und zerstoerte genau das.
-//      Geprueft wird zusaetzlich der laengste Zweig der Maske (neues
-//      Passwort setzen, zwei Felder mehr).
-//   3. Die Zeichnung sitzt nicht in ihrem Kasten (<use>-Falle, siehe
-//      test_marke_huelle.mjs).
-//   4. Die Zeichnung laeuft der des Cockpits davon. App und Cockpit sind
-//      getrennte Dateien und fuehren sie je einzeln mit.
-//   5. Der zugaengliche Name geht verloren: Die Bildmarke IST das G.
+// WARUM SIE WEG IST: Seit ENT-661 traegt die App oben dauerhaft die
+// GuardOpS-Bildmarke -- fuer JEDEN Mandanten, weil es eine App fuer alle
+// gibt und kein eigener Bau pro Mandant. Damit stand derselbe Name
+// zweimal auf derselben Flaeche. Eine Signatur ist die leise Unterschrift
+// unter fremdem Logo; steht oben schon der eigene Name, ist sie nur noch
+// eine Wiederholung. Im Cockpit (dashboard.html) bleibt sie darum: Dort
+// steht oben das Logo des MANDANTEN, und genau dann traegt sie.
+//
+// WAS JETZT GEPRUEFT WIRD -- und zwar so, dass ein Rueckfall auffaellt:
+//
+//   1. Die Signatur ist WEG, nicht bloss unsichtbar. Eine Pruefung auf
+//      "nicht sichtbar" bliebe gruen, wenn jemand sie mit display:none
+//      wieder einbaut -- und beim naechsten CSS-Umbau stuende sie da.
+//   2. Auch der Schriftzug im SVG-Vorrat ist weg. Er trug nur die
+//      Signatur; bliebe er liegen, waere er totes Gewicht im Buendel und
+//      eine Einladung, ihn "kurz" wieder zu verwenden.
+//   3. Der zugaengliche Name ist NICHT verloren gegangen. Das war die
+//      eigentliche Leistung der Signatur: Sie sprach "Guard OpS" aus.
+//      Jetzt muss die Bildmarke oben das tun -- die Bildmarke IST das G,
+//      und ein G allein sagt einem Screenreader nichts.
+//   4. Das Bild bleibt heil. Der entfernte Block hing an den
+//      Auto-Raendern von .gate-mitte; wer ihn herausnimmt, kann die
+//      Ausrichtung des Anmeldeblocks mitnehmen, ohne dass etwas bricht.
+//      Darum wird auf vier Geraetebreiten und in BEIDEN Zweigen der Maske
+//      gemessen, dass der Block oben steht, nichts ueberlaeuft und die
+//      Marke sichtbar bleibt.
 //
 // Gemessen wird am gerenderten Zustand (CLAUDE.md).
 import { WURZEL, browserPfad } from './pfade.mjs';
@@ -33,14 +43,33 @@ const URL = `file://${WURZEL}/app.html`;
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
-// ── Eine Zeichnung, mehrere Dateien ────────────────────────────────────
-const symbol = datei => {
+// ── Im Quelltext: kein Schriftzug mehr, Bildmarke unveraendert ─────────
+const symbol = (datei, id) => {
   const s = readFileSync(join(WURZEL, datei), 'utf8');
-  const a = s.indexOf('<symbol id="go-wort"');
+  const a = s.indexOf(`<symbol id="${id}"`);
   return a < 0 ? null : s.slice(a, s.indexOf('</symbol>', a));
 };
-check('KRITISCH: die App traegt Zeichen fuer Zeichen dieselbe Zeichnung wie das Cockpit',
-  !!symbol('app.html') && symbol('app.html') === symbol('dashboard.html'));
+check('KRITISCH: die App fuehrt den Schriftzug gar nicht mehr mit -- kein totes Gewicht im Buendel',
+  symbol('app.html', 'go-wort') === null);
+check('Die Bildmarke ist weiterhin da', !!symbol('app.html', 'go-bild'));
+/* Das Cockpit fuehrt KEINE Bildmarke allein -- es braucht nur den
+   Schriftzug. Vergleichbar sind darum nicht zwei Symbole, sondern die
+   beiden Schild-Pfade: Sie stecken in der Bildmarke der App und, kleiner
+   skaliert, im Schriftzug des Cockpits. Laufen sie auseinander, zeigen
+   App und Cockpit verschiedene Schilde -- genau der Fall, den diese
+   Pruefung seit jeher verhindern soll. Meine erste Fassung verglich
+   stattdessen "go-bild" hier mit "go-bild" dort und war gruen fuer
+   nichts: Dort gibt es das Symbol gar nicht, beide Seiten waeren null. */
+{
+  const bild = symbol('app.html', 'go-bild') || '';
+  const wort = symbol('dashboard.html', 'go-wort') || '';
+  const pfade = [...bild.matchAll(/ d="([^"]+)"/g)].map(m => m[1]);
+  check('Vorbedingung: die Bildmarke besteht aus den zwei Schild-Pfaden', pfade.length === 2);
+  check('KRITISCH: beide Pfade stecken Zeichen fuer Zeichen auch im Schriftzug des Cockpits',
+    pfade.length === 2 && pfade.every(d => wort.includes(d)));
+}
+check('Das Cockpit behaelt seinen Schriftzug -- dort signiert die Software unter fremdem Logo',
+  !!symbol('dashboard.html', 'go-wort'));
 
 const browser = await chromium.launch({ executablePath: browserPfad() });
 
@@ -57,76 +86,78 @@ async function seite(breite, hoehe) {
 }
 
 const MESSEN = () => {
-  const wrap = document.querySelector('.gate-sig');
-  const sig = document.querySelector('.gate-sig .go-sig');
-  const label = document.querySelector('.gate-sig .go-label');
-  const mitte = document.querySelector('.gate-mitte');
-  const logo = document.querySelector('.gate-oben .gate-marke');
   const gate = document.getElementById('gate');
-  if (!wrap || !sig || !mitte) { return null; }
-  const rs = sig.getBoundingClientRect();
-  const rw = wrap.getBoundingClientRect();
+  const mitte = document.querySelector('.gate-mitte');
+  const marke = document.querySelector('.gate-oben .gate-marke');
+  const sub = document.querySelector('.gate-oben .sub');
+  if (!gate || !mitte || !marke) { return null; }
   const rm = mitte.getBoundingClientRect();
-  const bb = sig.getBBox(), m = sig.getScreenCTM();
-  const pt = (x, y) => { const q = sig.createSVGPoint(); q.x = x; q.y = y; return q.matrixTransform(m); };
-  const a = pt(bb.x, bb.y), b = pt(bb.x + bb.width, bb.y + bb.height);
-  const proben = [.1, .3, .5, .7, .9].map(f => {
-    const e = document.elementFromPoint(rs.left + rs.width * f, rs.top + rs.height / 2);
-    return !!e && (e === sig || sig.contains(e));
+  const rk = marke.getBoundingClientRect();
+  /* .gate-oben liegt INNERHALB von .gate-mitte -- die Marke steht also
+     nicht ueber dem Block, sondern in seinem Kopf. Gemessen wird darum
+     gegen das erste Eingabefeld des gerade sichtbaren Zweigs. Meine
+     erste Fassung verglich gegen den Block selbst und fiel auf jeder
+     Breite durch. */
+  const feld = [...document.querySelectorAll('.gate-form')]
+    .filter(f => getComputedStyle(f).display !== 'none')
+    .flatMap(f => [...f.querySelectorAll('input')])
+    /* Nur SICHTBARE Felder: Im Anmeldezweig steht das Betriebsfeld
+       (ENT-665) als erstes im Aufbau, ist aber ausgeblendet, sobald der
+       Betrieb feststeht -- und ein ausgeblendetes Feld hat den Kasten
+       0/0/0/0. Genau daran ist die zweite Fassung dieser Messung
+       gescheitert: im Zweig "Passwort setzen" gruen, im Anmeldezweig rot,
+       weil es dort ein unsichtbares erstes Feld gibt. */
+    .find(e => e.getBoundingClientRect().height > 0);
+  const rf = feld ? feld.getBoundingClientRect() : null;
+  // Liegt die Marke wirklich obenauf -- oder unter dem Schleier?
+  const proben = [.2, .5, .8].map(f => {
+    const e = document.elementFromPoint(rk.left + rk.width * f, rk.top + rk.height / 2);
+    return !!e && (e === marke || marke.contains(e));
   });
-  const teile = [rs, ...(label ? [label.getBoundingClientRect()] : [])];
-  const links = Math.min(...teile.map(r => r.left));
-  const rechts = Math.max(...teile.map(r => r.right));
   return {
-    hoehe: rs.height,
-    gezeichnet: sig.getClientRects().length > 0 && rs.width > 0 && rs.height > 0
-                && getComputedStyle(sig).visibility === 'visible',
-    obenauf: proben.every(Boolean),
-    imKasten: a.x >= rs.left - 1 && a.y >= rs.top - 1 && b.x <= rs.right + 1 && b.y <= rs.bottom + 1,
-    deckungB: (b.x - a.x) / rs.width, deckungH: (b.y - a.y) / rs.height,
-    logoHoehe: logo ? logo.getBoundingClientRect().height : 0,
-    labelDa: !!label && label.textContent.trim().length > 0,
-    labelGroesse: label ? parseFloat(getComputedStyle(label).fontSize) : 0,
-    mitteAbweichung: Math.abs((links + rechts) / 2 - innerWidth / 2),
-    name: sig.getAttribute('aria-label') || '',
-    imBlock: !!wrap.closest('.gate-mitte'),
-    unterhalb: rw.top >= rm.bottom - 1,
-    ueberdeckt: rm.bottom > rw.top + 1,
-    abstandZurKante: innerHeight - rw.bottom,
+    // Was es nicht mehr geben darf:
+    sigDa: !!document.querySelector('.gate-sig'),
+    labelDa: !!document.querySelector('.go-label'),
+    wortDa: !!document.querySelector('.go-sig'),
+    vorratDa: !!document.getElementById('go-wort'),
+    textPowered: /powered\s*by/i.test(gate.innerText || ''),
+    // Was es weiterhin geben muss:
+    markeGezeichnet: rk.width > 0 && rk.height > 0
+                     && getComputedStyle(marke).visibility === 'visible',
+    markeObenauf: proben.every(Boolean),
+    markeName: marke.getAttribute('aria-label') || '',
+    subText: sub ? (sub.textContent || '').trim() : '',
+    // Was heil bleiben muss:
+    blockOben: rm.top < innerHeight / 2,
     ueberlauf: gate.scrollHeight - gate.clientHeight,
     scrollbar: ['auto', 'scroll'].includes(getComputedStyle(gate).overflowY),
-    ausVorrat: !!sig.querySelector('use')
-      && !!document.querySelector(sig.querySelector('use').getAttribute('href')),
+    markeUeberFeld: !!rf && rk.bottom <= rf.top + 1,
   };
 };
 
-// ── Desktop: hier liegt das Video darunter ─────────────────────────────
-const d = await seite(1440, 1000);
-const m = await d.evaluate(MESSEN);
-check('Die Signatur ist in der Anmeldemaske der App vorhanden', m !== null);
-if (m) {
-  check('Sie wird tatsaechlich gezeichnet, nicht nur deklariert', m.gezeichnet);
-  check('KRITISCH: sie liegt obenauf und wird nicht vom Schleier uebermalt', m.obenauf);
-  check('KRITISCH: die Zeichnung liegt in ihrem Kasten', m.imKasten);
-  check('KRITISCH: die Zeichnung fuellt ihren Kasten',
-    m.deckungB >= 0.90 && m.deckungH >= 0.85);
-  check('Sie bleibt kleiner als das Betriebslogo -- die Rangfolge stimmt',
-    m.hoehe < m.logoHoehe);
-  check('Sie erreicht das Mindestmass der Fassung ohne Claim (20 px)', m.hoehe >= 20);
-  check('Das Etikett "powered by" steht davor und bleibt kleiner als das Logo',
-    m.labelDa && m.labelGroesse > 0 && m.labelGroesse < m.hoehe);
-  check('Sie steht waagrecht in der Mitte des Fensters', m.mitteAbweichung <= 1);
-  check('Sie traegt den vollstaendigen Namen fuer Screenreader', /guard\s*ops/i.test(m.name));
-  check('Sie kommt aus dem gemeinsamen Vorrat, nicht aus einer Kopie', m.ausVorrat);
-  check('Sie liegt ausserhalb des Anmeldeblocks', !m.imBlock);
-  check('Sie steht unten am Rand, unter dem Anmeldeblock',
-    m.unterhalb && m.abstandZurKante >= 28 && m.abstandZurKante <= 40);
+// ── Desktop: hier liegt das Video/der Schleier darueber ────────────────
+{
+  const d = await seite(1440, 1000);
+  const m = await d.evaluate(MESSEN);
+  check('Vorbedingung: der Anmeldebildschirm ist messbar', m !== null);
+  if (m) {
+    check('KRITISCH: die Herstellersignatur ist WEG, nicht nur unsichtbar', m.sigDa === false);
+    check('KRITISCH: auch das Etikett "powered by" gibt es nicht mehr', m.labelDa === false);
+    check('KRITISCH: und im Text des Bildschirms steht es auch nirgends mehr', m.textPowered === false);
+    check('KRITISCH: der Schriftzug ist auch aus dem SVG-Vorrat verschwunden', m.vorratDa === false);
+    check('Kein verwaistes <svg class="go-sig"> haengt noch herum', m.wortDa === false);
+    check('KRITISCH: der Name ist nicht mit verschwunden -- die Bildmarke spricht ihn aus',
+      /guard\s*ops/i.test(m.markeName));
+    check('Die Marke wird gezeichnet, nicht nur deklariert', m.markeGezeichnet);
+    check('KRITISCH: sie liegt obenauf und wird nicht vom Schleier uebermalt', m.markeObenauf);
+    check('Der Firmenname steht unter der Marke', m.subText.length > 0);
+    check('Die Marke steht ueber dem ersten Eingabefeld', m.markeUeberFeld);
+    check('Der Anmeldeblock steht in der oberen Haelfte', m.blockOben);
+  }
+  await d.close();
 }
-await d.close();
 
-// ── Telefone, auch kleine ──────────────────────────────────────────────
-// Zwei Zweige: die kurze Anmeldung und der laengste Zweig der Maske
-// ("Neues Passwort setzen", zwei Felder mehr).
+// ── Telefone, auch kleine, in beiden Zweigen der Maske ─────────────────
 for (const [w, h] of [[430, 932], [390, 844], [360, 640], [320, 568]]) {
   const p = await seite(w, h);
   for (const zweig of ['anmeldung', 'passwort setzen']) {
@@ -139,16 +170,15 @@ for (const [w, h] of [[430, 932], [390, 844], [360, 640], [320, 568]]) {
     }
     const s = await p.evaluate(MESSEN);
     const fall = `${w}x${h} (${zweig})`;
-    check(`KRITISCH ${fall}: die Signatur ueberdeckt das Formular nicht`, s.ueberdeckt === false);
-    check(`${fall}: sie steht unter dem Anmeldeblock`, s.unterhalb);
-    check(`${fall}: sie steht waagrecht in der Mitte`, s.mitteAbweichung <= 1);
-    check(`${fall}: die Zeichnung liegt in ihrem Kasten`, s.imKasten);
-    if (s.ueberlauf <= 0) {
-      check(`${fall}: sie steht unten am Rand`,
-        s.abstandZurKante >= 28 && s.abstandZurKante <= 40);
-      check(`${fall}: sie liegt obenauf`, s.obenauf);
-    } else {
+    check(`KRITISCH ${fall}: keine Signatur`, s.sigDa === false && s.textPowered === false);
+    check(`${fall}: die Marke ist da und traegt den Namen`,
+      s.markeGezeichnet && /guard\s*ops/i.test(s.markeName));
+    check(`${fall}: die Marke steht ueber dem ersten Eingabefeld`, s.markeUeberFeld);
+    check(`${fall}: der Anmeldeblock steht in der oberen Haelfte`, s.blockOben);
+    if (s.ueberlauf > 0) {
       check(`${fall}: passt es nicht, bleibt der Bildschirm scrollbar`, s.scrollbar);
+    } else {
+      check(`${fall}: die Marke liegt obenauf`, s.markeObenauf);
     }
   }
   await p.close();
