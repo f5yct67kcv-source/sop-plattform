@@ -385,6 +385,112 @@ for (const [datei, titel] of [['impressum.html', 'Impressum'], ['datenschutz.htm
   if (fehlend.length) { bad.push('ins Leere: ' + fehlend.join(', ')); }
 }
 
+// ── Arbeitsnotizen gehen nicht mit hinaus ────────────────────────────────
+//
+// Jede dieser Seiten traegt im Kopf einen Kommentar mit Entscheidungs-
+// nummern, internen Dateipfaden und offenen Pruefpunkten -- bei den
+// Nutzungsbedingungen den Satz "ENTWURF. NICHT RECHTLICH GEPRUEFT. NICHT
+// OHNE FREIGABE LIVE NEHMEN." Dargestellt wird davon nichts. Im Quelltext
+// der ausgelieferten Seite stand es trotzdem, und seit die Rechtstexte auch
+// auf den Demo-Plaetzen liegen, faende ein Interessent diesen Satz unter
+// derselben Adresse, unter der der Demo-Hinweis ihn eben zum Durchlesen
+// gezwungen hat. Befund und Ansage des Projektinhabers, 2026-09-22.
+//
+// Im REPOSITORY bleibt der Vermerk -- dort sieht ihn, wer die Datei
+// aendert, und genau dafuer ist er da. Diese Suite prueft deshalb nicht,
+// dass er weg ist, sondern dass der Deploy ihn aus der KOPIE nimmt.
+{
+  const werkzeug = 'rechtstexte-ausliefern.py';
+  check(`KRITISCH: ${werkzeug} gibt es`, existsSync(`${WURZEL}/${werkzeug}`));
+
+  // Gemessen, nicht gelesen: Das Werkzeug laeuft gegen eine echte Kopie,
+  // und nachgesehen wird am Ergebnis -- Kommentare weg, Inhalt unberuehrt.
+  const { mkdtempSync, copyFileSync, writeFileSync } = await import('node:fs');
+  const { execFileSync } = await import('node:child_process');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const ordner = mkdtempSync(join(tmpdir(), 'recht-'));
+  const probe = join(ordner, 'nutzungsbedingungen.html');
+  copyFileSync(`${WURZEL}/nutzungsbedingungen.html`, probe);
+  let lief = true;
+  try {
+    execFileSync('python3', [`${WURZEL}/${werkzeug}`, probe], { stdio: 'pipe' });
+  } catch (e) { lief = false; }
+  check('KRITISCH: das Werkzeug laeuft durch', lief);
+  const gesaeubert = lief ? readFileSync(probe, 'utf8') : '';
+  const vorlage = lies('nutzungsbedingungen.html');
+  check('KRITISCH: der Entwurfsvermerk steht nicht mehr in der ausgelieferten Datei',
+    lief && !/ENTWURF/i.test(gesaeubert));
+  check('KRITISCH: kein HTML-Kommentar bleibt stehen', lief && !/<!--/.test(gesaeubert));
+
+  // ZWEITE PROBE an einer Datei, deren Kopf das Wort ENTWURF NICHT
+  // enthaelt: Sonst liesse sich das Werkzeug auf genau diesen einen Satz
+  // verengen, und die Pruefung bliebe gruen -- an nutzungsbedingungen.html
+  // allein ist der Unterschied nicht messbar, weil dort beides zusammenfaellt.
+  // Beim Schreiben dieser Suite genau so passiert.
+  const probe2 = join(ordner, 'datenschutz-demo-platz.html');
+  copyFileSync(`${WURZEL}/datenschutz-demo-platz.html`, probe2);
+  let lief2 = true;
+  try { execFileSync('python3', [`${WURZEL}/${werkzeug}`, probe2], { stdio: 'pipe' }); }
+  catch (e) { lief2 = false; }
+  const gesaeubert2 = lief2 ? readFileSync(probe2, 'utf8') : '';
+  check('KRITISCH: auch ein Kopf ohne das Wort ENTWURF geht nicht mit hinaus -- die Arbeitsnotizen sind das Problem, nicht ein einzelner Satz',
+    lief2 && !/ENTWURF/i.test(lies('datenschutz-demo-platz.html')) && !/<!--/.test(gesaeubert2));
+  const inhalt = t => (t.match(/<main>[\s\S]*<\/main>/) || [''])[0];
+  check('KRITISCH: der Text der Seite bleibt dabei unveraendert',
+    lief && inhalt(gesaeubert).length > 500 && inhalt(gesaeubert) === inhalt(vorlage));
+
+  // Gegenprobe im Betrieb: Eine Datei ohne Kommentare darf nicht scheitern
+  // (der Deploy ruft das Werkzeug bei jedem Lauf auf, auch nach dem ersten).
+  const zweimal = join(ordner, 'nochmal.html');
+  writeFileSync(zweimal, gesaeubert || '<html></html>');
+  let wieder = true;
+  try { execFileSync('python3', [`${WURZEL}/${werkzeug}`, zweimal], { stdio: 'pipe' }); }
+  catch (e) { wieder = false; }
+  check('ein zweiter Lauf ueber dieselbe Datei geht durch', wieder);
+
+  // Und der Deploy muss es fuer JEDE ausgelieferte Rechtsseite aufrufen --
+  // sonst geht die naechste neue Seite mit ihrem Kopf hinaus.
+  //
+  // GEPRUEFT WIRD DAS ZIEL, NICHT DER DATEINAME: nutzungsbedingungen.html
+  // geht in ZWEI Buendel, ins Homepage-Buendel und auf jeden Demo-Platz.
+  // Eine Pruefung, die nur nach dem Dateinamen sucht, ist schon zufrieden,
+  // wenn EINES der beiden gesaeubert wird -- das andere ginge mit seinem
+  // Kopf hinaus, und sie bliebe gruen. Beim Schreiben dieser Suite genau
+  // so passiert.
+  const workflow = lies('.github/workflows/deploy-hostpoint.yml');
+
+  // Was das Werkzeug tatsaechlich zu sehen bekommt: die Aufrufe samt ihrer
+  // Fortsetzungszeilen.
+  const gesaeubertePfade = new Set();
+  for (const stueck of workflow.split('rechtstexte-ausliefern.py').slice(1)) {
+    for (const zeile of stueck.split('\n')) {
+      for (const treffer of zeile.matchAll(/"?(dist-[^\s"]+\.html)"?/g)) {
+        gesaeubertePfade.add(treffer[1]);
+      }
+    }
+    // Der Aufruf endet an der ersten Zeile ohne Fortsetzungszeichen.
+    const ende = stueck.split('\n').findIndex(z => !z.trimEnd().endsWith('\\'));
+    if (ende >= 0) {
+      for (const zeile of stueck.split('\n').slice(ende + 1)) {
+        for (const treffer of zeile.matchAll(/"?(dist-[^\s"]+\.html)"?/g)) {
+          gesaeubertePfade.delete(treffer[1]);
+        }
+      }
+    }
+  }
+
+  const ziele = [...workflow.matchAll(/cp\s+([a-z0-9_-]+\.html)\s+"?(dist-[^\s"]+\.html)"?/g)]
+    .filter(m => /^(nutzungsbedingungen|datenschutz|impressum)/.test(m[1]))
+    .map(m => m[2])
+    .filter((z, i, a) => a.indexOf(z) === i);
+  check('die Suche findet ueberhaupt ausgelieferte Rechtsseiten', ziele.length >= 4);
+  for (const ziel of ziele) {
+    check(`KRITISCH: ${ziel} wird vor der Auslieferung gesaeubert`,
+      gesaeubertePfade.has(ziel));
+  }
+}
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

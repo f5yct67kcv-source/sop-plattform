@@ -1201,6 +1201,20 @@ jobs:
           # hier wie demo-bestaetigen.html: Der Interessent kam von dieser
           # Domain, der Endpunkt dahinter laeuft auf betreiber.guardops.ch.
           cp demo-weiter.html           dist-guardops/demo-weiter.html
+          # Die Kommentarkoepfe der Rechtsseiten sind Arbeitsnotizen --
+          # Entscheidungsnummern, interne Dateipfade, offene Pruefpunkte,
+          # und bei den Nutzungsbedingungen der Satz "ENTWURF. NICHT
+          # RECHTLICH GEPRUEFT". Dargestellt wird davon nichts, im
+          # Quelltext steht es trotzdem. Ansage des Projektinhabers
+          # (2026-09-22): aus der ausgelieferten Datei nehmen. Im
+          # Repository bleibt der Vermerk, wo ihn sieht, wer die Datei
+          # aendert. Gesaeubert wird die KOPIE, nach dem cp.
+          python3 rechtstexte-ausliefern.py \
+            dist-guardops/nutzungsbedingungen.html \
+            dist-guardops/datenschutz-demo.html \
+            dist-guardops/datenschutz-demo-platz.html \
+            dist-guardops/datenschutz.html \
+            dist-guardops/impressum.html
           cp recht.css                   dist-guardops/recht.css
           cp htaccess-guardops           dist-guardops/.htaccess
           cp robots-guardops.txt         dist-guardops/robots.txt
@@ -2371,6 +2385,13 @@ jobs:
             # abruft, und verlangt genau die hier.
             cp nutzungsbedingungen.html   "dist-demo/$PLATZ/nutzungsbedingungen.html"
             cp datenschutz-demo-platz.html "dist-demo/$PLATZ/datenschutz-demo-platz.html"
+            # Kommentarkoepfe aus der Kopie nehmen, gleicher Grund wie beim
+            # Homepage-Buendel: Hier faende ein Interessent den Vermerk
+            # "ENTWURF. NICHT RECHTLICH GEPRUEFT" unter derselben Adresse,
+            # unter der wir ihn eben zum Durchlesen gezwungen haben.
+            python3 rechtstexte-ausliefern.py \
+              "dist-demo/$PLATZ/nutzungsbedingungen.html" \
+              "dist-demo/$PLATZ/datenschutz-demo-platz.html"
 
             # ── Die eigene Datenbank des Platzes (ENT-600, Punkt 2) ──────
             ersetze __DB_HOST__ "$DB_HOST" "dist-demo/$PLATZ/db.php"
