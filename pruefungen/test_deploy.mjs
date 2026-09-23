@@ -1128,6 +1128,45 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
       bad.push('öffentlicher Demo-Endpunkt fehlt im betreiber-Bündel: ' + nichtKopiert.join(', '));
     }
   }
+  // ── Die Uebergabe eines Mandantenkontos (ENT-686) ──────────────────
+  //
+  // Zwei oeffentliche Endpunkte, dieselbe Falle wie bei
+  // demo_bestaetigen.php oben: Fehlt die cp-Zeile, antwortet Apache mit
+  // 404, und die eingeladene Person sieht nur, dass etwas abgebrochen ist.
+  // Sie ersetzen backend/setup.php und legen das erste Verwaltungskonto
+  // eines Mandanten an -- fehlt einer, ist ein Mandant nicht uebergebbar.
+  //
+  // EIGENE, FESTE LISTE statt eines Eintrags in OEFFENTLICHE_DEMO_SKRIPTE
+  // (backend/db.php): Jene Liste erlaubt zusaetzlich einen FREMDEN Ursprung
+  // (guardops.ch). Diese beiden laufen same-origin und brauchen das nicht;
+  // sie dort einzutragen waere eine Ausweitung ohne Anlass. Zwei feste
+  // Dateinamen, kein Muster.
+  const UEBERGABE_ENDPUNKTE = ['mandant_einladung_pruefen.php',
+                               'mandant_einladung_einloesen.php'];
+  check('KRITISCH: die oeffentlichen Endpunkte der Mandanten-Uebergabe werden ins betreiber-Bündel kopiert',
+    UEBERGABE_ENDPUNKTE.every(e => existsSync(`${WURZEL}/backend/api/${e}`))
+    && UEBERGABE_ENDPUNKTE.every(e => wirdKopiert(`backend/api/${e}`)));
+  {
+    const fehlt = UEBERGABE_ENDPUNKTE.filter(e => !wirdKopiert(`backend/api/${e}`));
+    if (fehlt.length) {
+      bad.push('Endpunkt der Mandanten-Uebergabe fehlt im betreiber-Bündel: ' + fehlt.join(', '));
+    }
+  }
+  {
+    // Und die Einbindungen dazu: Der Einloeseweg braucht
+    // planung_einrichten_kern.php (Bauplanpruefung) und mitarbeiter.php
+    // (Personalnummer, ma_nur_menschen). Liegt eines davon nicht im
+    // Buendel, bricht der Aufruf mit einem PHP-Fehler ab statt mit einer
+    // Aussage.
+    const module = transitiveModule(UEBERGABE_ENDPUNKTE.map(e => `api/${e}`));
+    const fehlende = [...module].filter(m => !liegtImBuendel(`dist-betreiber/${m}`));
+    check('KRITISCH: jede Datei, die die Mandanten-Uebergabe transitiv einbindet, liegt im betreiber-Bündel',
+      module.size >= 3 && fehlende.length === 0);
+    if (fehlende.length) {
+      bad.push('Einbindung fehlt im betreiber-Bündel (Mandanten-Uebergabe): ' + fehlende.join(', '));
+    }
+  }
+
   const oeffentlicheModule = transitiveModule(OEFFENTLICHE_DEMO_ENDPUNKTE.map(e => `api/${e}`));
   const fehlendeOeffentlicheModule = [...oeffentlicheModule].filter(m => !liegtImBuendel(`dist-betreiber/${m}`));
   check('KRITISCH: jede Datei, die ein öffentlicher Demo-Endpunkt transitiv einbindet, liegt im betreiber-Bündel',

@@ -326,7 +326,9 @@ check('die Unterzeile im Kopf sagt, welcher Reiter offen ist',
    dieser Zeile -- aber sie sind kein Betrieb, der die Plattform nutzt.
    Geprueft wird, was in der Liste landet, nicht wie gefiltert wird. */
 const stamm = await seite.evaluate(() => {
-  const zeilen = [...document.querySelectorAll('#m-inhalt tbody tr')]
+  /* tr:not(.auf-leib): eine Zeile je Eintrag -- seit ENT-696 hat jede
+     Zeile eine aufklappbare Leibzeile (siehe betreiber.html). */
+  const zeilen = [...document.querySelectorAll('#m-inhalt tbody tr:not(.auf-leib)')]
     .map(r => r.querySelector('td strong')?.textContent.trim() || '');
   return {
     zeilen,
@@ -418,7 +420,7 @@ check('KRITISCH: der Demo-Reiter beginnt bei den Zugängen und zeigt nur diese K
 
 // Die Teilung: laufend ist, was noch eine Instanz hat -- auch mit Frist um.
 const teilung = await seite.evaluate(() => {
-  const namen = id => [...document.querySelectorAll('#' + id + ' tbody tr')]
+  const namen = id => [...document.querySelectorAll('#' + id + ' tbody tr:not(.auf-leib)')]
     .map(r => r.querySelector('td strong')?.textContent.trim() || '');
   return { laufend: namen('demo-inhalt'), zu: namen('demo-abgelaufen') };
 });
@@ -429,7 +431,9 @@ check('KRITISCH: der geschlossene Zugang steht unter "Abgelaufene Zugänge" und 
 // Die Knoepfe entscheiden weiter je Zeile: Wer keine Instanz mehr hat, hat
 // kein Konto fuer ein neues Passwort und nichts mehr zu beenden.
 const zuKnoepfe = await seite.evaluate(() =>
-  [...document.querySelectorAll('#demo-abgelaufen tbody tr button')].map(b => b.textContent.trim()));
+  /* Ohne den Aufklapp-Pfeil (ENT-696): Er ist kein Knopf der Zeile,
+     sondern der Weg zu ihnen. */
+  [...document.querySelectorAll('#demo-abgelaufen tbody tr button:not(.auf-knopf)')].map(b => b.textContent.trim()));
 check('KRITISCH: bei einem geschlossenen Zugang gibt es weder "Erneut senden" noch "Beenden" noch "Nutzung"',
   zuKnoepfe.join('|') === 'Zurücknehmen');
 
@@ -467,7 +471,12 @@ const liveLesen = () => seite.evaluate(() => ({
 
 // Der zweite Platz, nicht der erste: Beim ersten stimmte es auch dann,
 // wenn der Knopf bloss die Kachel oeffnete und dort der erste vorgewaehlt ist.
-await seite.click('#demo-inhalt tbody tr:nth-child(2) [data-demo-nutzung]');
+/* Seit ENT-696 liegen die Knoepfe einer Zeile in ihrer aufgeklappten
+   Leibzeile: erst die zweite ZEILE aufklappen (nicht die zweite <tr> --
+   jede Zeile hat jetzt zwei), dann dort den Knopf druecken. */
+const zweiteZeile = seite.locator('#demo-inhalt tbody tr.auf-kopf').nth(1);
+await zweiteZeile.locator('.auf-knopf').click();
+await zweiteZeile.locator('xpath=following-sibling::tr[1]').locator('[data-demo-nutzung]').click();
 await seite.waitForTimeout(200);
 const perKnopf = await liveLesen();
 check('KRITISCH: der Knopf "Nutzung" in der Zeile springt auf die Kachel "Demo-Nutzung"',
@@ -575,15 +584,20 @@ await kachel('plaetze');
 const platzTabelle = await seite.evaluate(() => {
   const kopf = [...document.querySelectorAll('#demo-plaetze thead th')]
     .map(t => t.textContent.trim());
-  const zeilen = [...document.querySelectorAll('#demo-plaetze tbody tr')].map(r => {
+  /* Eine Zeile je Platz, nicht je <tr>: Seit ENT-696 hat jede Zeile eine
+     aufklappbare Leibzeile, und darin stehen ihre Knoepfe und die Auskunft
+     "nicht im Mandantenstamm". */
+  const zeilen = [...document.querySelectorAll('#demo-plaetze tbody tr:not(.auf-leib)')].map(r => {
     const td = [...r.querySelectorAll('td')];
+    const leib = r.nextElementSibling && r.nextElementSibling.classList.contains('auf-leib')
+      ? r.nextElementSibling : null;
     return {
       platz:  td[0]?.querySelector('strong')?.textContent.trim() || '',
       status: td[1]?.querySelector('.merker')?.textContent.trim() || '',
       wer:    td[2]?.textContent.trim() || '',
-      knoepfe: [...(td[4]?.querySelectorAll('button') || [])].map(b => b.textContent.trim()),
+      knoepfe: [...(leib ? leib.querySelectorAll('button') : [])].map(b => b.textContent.trim()),
       statusFarbe: td[1]?.querySelector('.merker')?.className || '',
-      ohneZeile: (td[4]?.textContent || '').trim(),
+      ohneZeile: (leib ? leib.textContent : '').trim(),
     };
   });
   return { kopf, zeilen };
@@ -603,8 +617,11 @@ check('KRITISCH: in "Belegt durch" steht der Name, nicht der Zustand',
 // Seit die Plaetze aus der Mandantenliste heraus sind, ist das hier der
 // einzige Weg zu ihrer Datenbankverbindung.
 check('KRITISCH: jeder Platz mit Mandanten-Zeile trägt seine Knöpfe',
-  platzTabelle.zeilen[0].knoepfe.join('|') === 'Ändern|Support'
-  && platzTabelle.zeilen[1].knoepfe.join('|') === 'Ändern|Support');
+  /* "Support" heisst seit ENT-696 "Einblick": In der aufgeklappten Zeile
+     steht der Knopf unter der Ueberschrift "Support" neben der
+     Freigabe-Lage -- die Ueberschrift sagt den Bereich, der Knopf die Tat. */
+  platzTabelle.zeilen[0].knoepfe.join('|') === 'Ändern|Einblick'
+  && platzTabelle.zeilen[1].knoepfe.join('|') === 'Ändern|Einblick');
 // "Kein Knopf" und "gibt es nicht" sind verschiedene Aussagen (Hausregel).
 check('KRITISCH: ein Platz ohne Mandanten-Zeile sagt das, statt still ohne Knöpfe dazustehen',
   platzTabelle.zeilen[2].knoepfe.length === 0
@@ -615,12 +632,12 @@ const sicht = await seite.evaluate(() => {
   /* Nur der erste Merker der Zelle: Seit ENT-622 steht darunter noch der
      Nachfass-Stand. Die ganze Zelle zu lesen hiesse, zwei Aussagen zu
      einer zu verruehren -- genau das, wogegen diese Pruefung da ist. */
-  const merkerWorte = [...document.querySelectorAll('#demo-inhalt tbody tr td:nth-child(4), #demo-abgelaufen tbody tr td:nth-child(4)')]
+  const merkerWorte = [...document.querySelectorAll('#demo-inhalt tbody tr:not(.auf-leib) td:nth-child(4), #demo-abgelaufen tbody tr:not(.auf-leib) td:nth-child(4)')]
     .map(e => (e.querySelector('.merker') || e).textContent.trim());
   return {
     titel: document.getElementById('leiste-titel').textContent.trim(),
-    plaetze: document.querySelectorAll('#demo-plaetze tbody tr').length,
-    zugaenge: document.querySelectorAll('#demo-inhalt tbody tr, #demo-abgelaufen tbody tr').length,
+    plaetze: document.querySelectorAll('#demo-plaetze tbody tr:not(.auf-leib)').length,
+    zugaenge: document.querySelectorAll('#demo-inhalt tbody tr:not(.auf-leib), #demo-abgelaufen tbody tr:not(.auf-leib)').length,
     merkerWorte,
     // textContent statt innerText: Seit ENT-689 steht nur eine Kachel
     // offen, die Aussagen liegen verteilt auf alle vier.
@@ -642,7 +659,7 @@ const sicht = await seite.evaluate(() => {
     zurueckKnoepfe:  document.querySelectorAll('[data-demo-offen]').length,
     // Die Zeile des erledigten Zugangs -- sie darf keinen offenen Merker
     // tragen und muss sagen, wer wann nachgefasst hat.
-    erledigteZeile: [...document.querySelectorAll('#demo-abgelaufen tbody tr')]
+    erledigteZeile: [...document.querySelectorAll('#demo-abgelaufen tbody tr:not(.auf-leib)')]
       .map(r => r.textContent).find(t => t.includes('probesecurity')) || '',
   };
 });
@@ -706,7 +723,7 @@ check('der erledigte nennt Datum und Konto, statt bloss zu verschwinden',
    stehen, wo der Vertrieb ohnehin hinsieht -- und zwar beim NAMEN, nicht
    in der Statusspalte zwischen Ablauf und Nachfass-Stand. */
 const weiterSicht = await seite.evaluate(() => {
-  const zeilen = [...document.querySelectorAll('#demo-inhalt tbody tr, #demo-abgelaufen tbody tr')];
+  const zeilen = [...document.querySelectorAll('#demo-inhalt tbody tr:not(.auf-leib), #demo-abgelaufen tbody tr:not(.auf-leib)')];
   const mit = zeilen.find(r => r.textContent.includes('probesecurity'));
   return {
     merker: mit ? [...mit.querySelectorAll('td:first-child .merker')]
