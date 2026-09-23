@@ -359,6 +359,16 @@ function demo_zugang_einrichten(PDO $pdo, string $firma, string $person,
          VALUES (?, ?, 1, ?, ?, 1, ?)'
     )->execute([$login, password_hash($passwort, PASSWORD_DEFAULT), $vorname, $nachname,
                 ma_personalnummer_generieren($instanz)]);
+    // Alle Rollen ausdruecklich eintragen (2026-09-23, Anordnung des
+    // Projektinhabers). Bisher stand hier nur ist_admin = 1, und die Rechte
+    // kamen aus dem Rueckfall in rechte_rollen() auf "Verwaltung". An
+    // Demo-Platz 3 liess sich damit kein Einsatz anlegen; erst mit allen von
+    // Hand vergebenen Rollen ging es. Ein Interessent soll die Plattform
+    // ueberall nutzen koennen, ohne zuerst die Rollenvergabe zu finden --
+    // und in der Administration sieht man jetzt, was er hat.
+    $neu = $instanz->prepare('SELECT id FROM mitarbeiter WHERE name = ?');
+    $neu->execute([$login]);
+    demo_betreiber_rollen_setzen($instanz, (int)$neu->fetchColumn());
 
     // ── Register ──
     $start    = date('Y-m-d H:i:s');
@@ -378,4 +388,24 @@ function demo_zugang_einrichten(PDO $pdo, string $firma, string $person,
         'laeuft_ab' => $laeuftAb,
         'mail'      => demo_zugang_mail($firma, $person, $adresse, $login, $passwort, $laeuftAb),
     ];
+}
+
+// Welche Rollen der Demobetreiber bekommt: jede Systemrolle, die es gibt.
+// Aus dem Katalog gelesen und nicht aufgezaehlt -- kommt eine Rolle dazu,
+// hat er sie ohne weiteres Zutun auch. Ohne Datenbank, damit sie sich fuer
+// sich allein pruefen laesst.
+function demo_betreiber_rollen(): array
+{
+    return array_keys(system_rollen());
+}
+
+function demo_betreiber_rollen_setzen(PDO $instanz, int $mitarbeiterId): void
+{
+    if ($mitarbeiterId <= 0) {
+        throw new RuntimeException('demo_betreiber_rollen_setzen: Konto nicht gefunden');
+    }
+    $ein = $instanz->prepare('INSERT INTO mitarbeiter_rollen (mitarbeiter_id, rolle) VALUES (?, ?)');
+    foreach (demo_betreiber_rollen() as $rolle) {
+        $ein->execute([$mitarbeiterId, $rolle]);
+    }
 }

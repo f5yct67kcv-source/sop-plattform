@@ -620,6 +620,33 @@ $pruef('KRITISCH: ein uebergangener Platz landet im Fehlerprotokoll',
 $pruef('KRITISCH: "alle belegt" und "keiner bereit" bleiben zwei verschiedene Gruende',
     str_contains($rumpf, "'kein_platz'") && str_contains($rumpf, "'nicht_bereit'"));
 
+// ══ Der Demobetreiber hat jedes Recht (2026-09-23) ═══════════════════
+// Anlass: An Demo-Platz 3 liess sich kein Einsatz anlegen, bis von Hand
+// alle Rollen vergeben waren. Geprueft wird die AUSSAGE -- mit den
+// vergebenen Rollen ist jedes Recht des Katalogs erreicht --, nicht eine
+// Rollenliste, die beim naechsten neuen Bereich still veraltet.
+$demoRechte = rechte_aus_rollen(demo_betreiber_rollen());
+$demoFehlt = array_diff(array_keys(rechte_katalog()), $demoRechte);
+$pruef('KRITISCH: der Demobetreiber bekommt jedes Recht, das es gibt'
+        . ($demoFehlt ? ' (es fehlt: ' . implode(', ', $demoFehlt) . ')' : ''),
+    $demoFehlt === []);
+// Und die Rollen werden auch WIRKLICH eingetragen: an einer echten
+// (SQLite-)Tabelle, nicht am Quelltext.
+$rollenDb = new PDO('sqlite::memory:');
+$rollenDb->exec('CREATE TABLE mitarbeiter_rollen (mitarbeiter_id INTEGER, rolle TEXT)');
+demo_betreiber_rollen_setzen($rollenDb, 42);
+$eingetragen = $rollenDb->query('SELECT rolle FROM mitarbeiter_rollen WHERE mitarbeiter_id = 42')
+    ->fetchAll(PDO::FETCH_COLUMN);
+$pruef('KRITISCH: die Rollen des Demobetreibers stehen danach in mitarbeiter_rollen',
+    array_diff(array_keys(rechte_katalog()), rechte_aus_rollen($eingetragen)) === []);
+// Die Einrichtung ruft das auch auf -- und zwar NACH dem Anlegen des
+// Kontos. Am Rumpf von demo_zugang_einrichten(), wie oben die Platzwahl:
+// ein echter Durchlauf braeuchte zehn Datenbanken.
+$kontoStelle = strpos($rumpf, 'INSERT INTO mitarbeiter');
+$rollenStelle = strpos($rumpf, 'demo_betreiber_rollen_setzen(');
+$pruef('KRITISCH: die Einrichtung traegt die Rollen nach dem Anlegen des Kontos ein',
+    $kontoStelle !== false && $rollenStelle !== false && $rollenStelle > $kontoStelle);
+
 // ══ Die offene Anfrage vor der Bestaetigung (ENT-624) ═════════════════
 require_once __DIR__ . '/../backend/demo_bestaetigung.php';
 
