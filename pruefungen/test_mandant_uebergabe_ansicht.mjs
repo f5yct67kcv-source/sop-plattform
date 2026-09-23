@@ -53,6 +53,16 @@ async function bis(bedingung) {
   for (let i = 0; i < 50 && !bedingung(); i++) { await new Promise(r => setTimeout(r, 100)); }
 }
 
+// Eine Zeile aufklappen, ueber ihren Namen angesprochen (nicht ueber die
+// Position: Seit 2026-09-23 hat jede Zeile eine Leibzeile darunter).
+async function aufklappen(page, name) {
+  await page.evaluate(n => {
+    const kopf = [...document.querySelectorAll('tr.auf-kopf')]
+      .find(tr => tr.querySelector('strong') && tr.querySelector('strong').textContent === n);
+    kopf.querySelector('.auf-knopf').click();
+  }, name);
+}
+
 const browser = await chromium.launch({ executablePath: browserPfad() });
 
 for (const [breite, hoehe, art] of [[390, 844, 'Handy'], [1280, 900, 'Desktop']]) {
@@ -188,8 +198,10 @@ for (const [breite, hoehe, art] of [[390, 844, 'Handy'], [1280, 900, 'Desktop']]
     const protokoll = [];
     await aufbauen(page, {
       'betreiber_mandant_list.php': { status: 'ok', mandanten: [
-        { id: 1, name: 'Beispielwache AG', subdomain: 'beispielwache', status: 'aktiv', ist_demo: false },
-        { id: 2, name: 'Vorrat A', subdomain: '', status: 'vorrat', ist_demo: false },
+        { id: 1, name: 'Beispielwache AG', subdomain: 'beispielwache', status: 'aktiv', ist_demo: false,
+          uebergabe: { lage: 'keine', datum: null } },
+        { id: 2, name: 'Vorrat A', subdomain: '', status: 'vorrat', ist_demo: false,
+          uebergabe: { lage: 'keine', datum: null } },
         { id: 3, name: 'Musterdienst GmbH', subdomain: 'muster', status: 'gesperrt', ist_demo: false },
       ] },
       'betreiber_mandant_einladen.php': { status: 'ok', gueltig_tage: 7 },
@@ -206,13 +218,71 @@ for (const [breite, hoehe, art] of [[390, 844, 'Handy'], [1280, 900, 'Desktop']]
       [...document.querySelectorAll('[data-zugang]')].map(b => b.dataset.zugang));
     check(`${art}: KRITISCH: "Zugang" steht nur beim aktiven Mandanten, nicht bei Vorrat oder gesperrt`,
       knoepfe.length === 1 && knoepfe[0] === '1');
-    const zeilenKnoepfe = await page.evaluate(() => {
-      const zelle = document.querySelector('[data-zugang]').closest('td');
-      return [...zelle.querySelectorAll('button')].map(b => b.textContent.trim());
-    });
-    check(`${art}: er steht als vierter neben Ändern · GAV · Support`,
-      zeilenKnoepfe.slice(0, 4).join('|') === 'Ändern|GAV|Support|Zugang');
 
+    // ── Aufklappen (Festlegung vom 2026-09-23) ──
+    // DER ZWECK DES UMBAUS, gemessen: Zugeklappt steht in der Tabelle kein
+    // einziger Handlungsknopf -- nur der Pfeil.
+    const zu = await page.evaluate(() => [...document.querySelectorAll('#m-inhalt button')]
+      .filter(b => b.offsetParent !== null && !b.classList.contains('auf-knopf')).length);
+    check(`${art}: KRITISCH: zugeklappt steht kein Handlungsknopf in der Tabelle`, zu === 0);
+    const pfeil = await page.evaluate(() => {
+      const k = document.querySelector('#m-inhalt .auf-knopf').getBoundingClientRect();
+      return { h: k.height, b: k.width };
+    });
+    if (art === 'Handy') { check('Handy: der Pfeil ist mindestens 44 px gross', pfeil.h >= 44 && pfeil.b >= 44); }
+    // Ein Klick irgendwo in die Zeile klappt auf -- nicht nur auf den Pfeil.
+    await page.click('#m-inhalt tr.auf-kopf >> nth=0 >> td >> nth=3');
+    const nachZeilenklick = await page.evaluate(() => {
+      const k = document.querySelector('#m-inhalt tr.auf-kopf .auf-knopf');
+      return { auf: k.getAttribute('aria-expanded'),
+               leibSichtbar: !document.getElementById(k.getAttribute('aria-controls')).classList.contains('versteckt'),
+               titel: [...document.getElementById(k.getAttribute('aria-controls')).querySelectorAll('.auf-titel')]
+                 .map(x => x.textContent.trim()) };
+    });
+    check(`${art}: KRITISCH: ein Klick in die Zeile klappt sie auf`,
+      nachZeilenklick.auf === 'true' && nachZeilenklick.leibSichtbar);
+    check(`${art}: aufgeklappt stehen die vier Bereiche in der festgelegten Reihenfolge`,
+      nachZeilenklick.titel.join('|') === 'Stammdaten|GAV|Zugang|Support');
+    // GEMESSEN (2026-09-23): Am Handy scrollt die Tabelle waagrecht. Die
+    // erste Fassung zeigte die aufgeklappte Flaeche so breit wie die ganze
+    // Tabelle -- GAV und Zugang lagen rechts ausserhalb. Jeder Bereich muss
+    // vollstaendig im Sichtbaren liegen, auf beiden Breiten.
+    const lage = await page.evaluate(() => {
+      const k = document.querySelector('#m-inhalt tr.auf-kopf .auf-knopf');
+      const leib = document.getElementById(k.getAttribute('aria-controls'));
+      return {
+        bereiche: [...leib.querySelectorAll('.auf-bereich')].map(b => {
+          const r = b.getBoundingClientRect(); return { l: r.left, r: r.right }; }),
+        knopfOben: [...leib.querySelectorAll('.auf-zeile button')].map(b => Math.round(b.getBoundingClientRect().top)),
+        knopfHoehe: [...leib.querySelectorAll('.auf-zeile button')].map(b => b.getBoundingClientRect().height),
+        breite: innerWidth,
+      };
+    });
+    check(`${art}: KRITISCH: jeder aufgeklappte Bereich liegt vollstaendig im sichtbaren Bildschirm`,
+      lage.bereiche.length === 4 && lage.bereiche.every(b => b.l >= 0 && b.r <= lage.breite));
+    // Kein Knopf bricht um: dann waere er hoeher als die uebrigen.
+    check(`${art}: kein Knopf in der aufgeklappten Zeile bricht um`,
+      Math.max(...lage.knopfHoehe) - Math.min(...lage.knopfHoehe) < 2);
+
+    // Immer nur eine offen: die zweite aufklappen, die erste schliesst sich.
+    await aufklappen(page, 'Vorrat A');
+    const offen = await page.evaluate(() =>
+      [...document.querySelectorAll('#m-inhalt .auf-knopf[aria-expanded="true"]')]
+        .map(k => k.closest('tr').querySelector('strong').textContent));
+    check(`${art}: KRITISCH: es ist immer nur eine Zeile offen`,
+      offen.length === 1 && offen[0] === 'Vorrat A');
+    const vorratZugang = await page.evaluate(() =>
+      document.querySelector('#m-inhalt tr.auf-kopf.offen').nextElementSibling.innerText);
+    check(`${art}: eine Vorratsanlage sagt beim Zugang, dass erst zugeteilt wird`,
+      /erst nach der Zuteilung/.test(vorratZugang));
+    // Nochmals klicken schliesst.
+    await aufklappen(page, 'Vorrat A');
+    check(`${art}: ein zweiter Klick schliesst die Zeile wieder`,
+      await page.evaluate(() => !document.querySelector('#m-inhalt .auf-knopf[aria-expanded="true"]')));
+
+    await aufklappen(page, 'Beispielwache AG');
+    const zugangKnopf = await page.evaluate(() => document.querySelector('[data-zugang="1"]').textContent.trim());
+    check(`${art}: ohne Vermerk heisst der Knopf "Einladen"`, zugangKnopf === 'Einladen');
     await page.click('[data-zugang="1"]');
     await page.waitForFunction(() => document.getElementById('dlgZugang').classList.contains('on')
       || getComputedStyle(document.getElementById('dlgZugang')).display !== 'none');
@@ -291,7 +361,7 @@ for (const [breite, hoehe, art] of [[390, 844, 'Handy'], [1280, 900, 'Desktop']]
   });
   await page.waitForSelector('#m-inhalt table');
   const zeilen = await page.evaluate(() => Object.fromEntries(
-    [...document.querySelectorAll('#m-inhalt tbody tr')].map(tr => {
+    [...document.querySelectorAll('#m-inhalt tbody tr:not(.auf-leib)')].map(tr => {
       const zelle = tr.children[6];
       const warn = [...zelle.querySelectorAll('.m-warn')].map(s => s.textContent);
       return [tr.querySelector('strong').textContent, { text: zelle.innerText, warn }];
@@ -342,6 +412,7 @@ for (const [breite, hoehe, art] of [[390, 844, 'Handy'], [1280, 900, 'Desktop']]
     document.getElementById('b-mandanten').classList.remove('versteckt');
     await ladeMandanten();
   });
+  await aufklappen(page, 'Beispielwache AG');
   await page.click('[data-zugang="1"]');
   await page.waitForFunction(() => document.activeElement && document.activeElement.id === 'z_vorname');
   await page.fill('#z_nachname', 'Beispiel');
@@ -351,6 +422,71 @@ for (const [breite, hoehe, art] of [[390, 844, 'Handy'], [1280, 900, 'Desktop']]
   await bis(() => protokoll.filter(p => p.name === 'betreiber_mandant_list.php').length > vorher);
   check('KRITISCH: nach dem Einladen wird die Liste neu geladen',
     protokoll.filter(p => p.name === 'betreiber_mandant_list.php').length > vorher);
+  await page.close();
+}
+
+// ── 7. Der Zugang in der aufgeklappten Zeile, je Stand ────────────────
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const u = (lage, extra) => Object.assign({ lage, datum: '2031-05-07' }, extra || {});
+  await aufbauen(page, { 'betreiber_mandant_list.php': { status: 'ok', mandanten: [
+    { id: 1, name: 'Offen AG', subdomain: 'o', status: 'aktiv', ist_demo: false,
+      uebergabe: u('offen', { person: 'Alex Beispiel', email: 'alex@example.org',
+        anrede: 'Frau', vorname: 'Alex', nachname: 'Beispiel' }) },
+    { id: 2, name: 'Eingeloest AG', subdomain: 'e', status: 'aktiv', ist_demo: false,
+      uebergabe: u('eingeloest', { person: 'Kim Muster', email: 'kim@example.org' }) },
+    { id: 3, name: 'Ueberfaellig AG', subdomain: 'u', status: 'aktiv', ist_demo: false,
+      uebergabe: u('ueberfaellig', { person: 'Sam Probe', email: 'sam@example.org' }) },
+  ] } }, []);
+  await page.goto(BASIS + 'betreiber.html');
+  await page.evaluate(async () => {
+    document.getElementById('tor').classList.add('versteckt');
+    document.getElementById('haus').classList.remove('versteckt');
+    document.getElementById('b-mandanten').classList.remove('versteckt');
+    await ladeMandanten();
+  });
+  const knopfText = id => page.evaluate(i => {
+    const b = document.querySelector('[data-zugang="' + i + '"]'); return b ? b.textContent.trim() : null; }, id);
+  check('eine offene Einladung heisst "Neu einladen"', (await knopfText(1)) === 'Neu einladen');
+  check('KRITISCH: nach dem Einloesen gibt es keinen Einladeknopf mehr', (await knopfText(2)) === null);
+  check('eine ueberfaellige Einladung heisst "Neu einladen"', (await knopfText(3)) === 'Neu einladen');
+  await aufklappen(page, 'Offen AG');
+  const leib = await page.evaluate(() =>
+    document.querySelector('#m-inhalt tr.auf-kopf.offen').nextElementSibling.innerText);
+  // GEMESSEN, und zwar HIER: Nur in dieser Zeile hat der Zugang einen
+  // zweizeiligen Stand (Frist UND Person) -- genau der Fall, in dem ein
+  // mittig ausgerichteter Knopf tiefer rutschte. In Abschnitt 4 gibt es ihn
+  // nicht, und dort blieb die Messung in der Gegenprobe gruen (2026-09-23).
+  const oben = await page.evaluate(() =>
+    [...document.querySelector('#m-inhalt tr.auf-kopf.offen').nextElementSibling
+      .querySelectorAll('.auf-zeile button')].map(b => Math.round(b.getBoundingClientRect().top)));
+  check('Desktop: die Knoepfe nebeneinander stehen auf einer Linie, auch neben zweizeiligem Stand',
+    oben.length === 4 && Math.max(...oben) - Math.min(...oben) <= 2);
+  check('KRITISCH: neben dem Knopf steht, an wen der letzte Link ging',
+    /Alex Beispiel · alex@example\.org/.test(leib) && /offen bis 07\.05\.2031/.test(leib));
+  await page.click('[data-zugang="1"]');
+  await page.waitForFunction(() => document.activeElement && document.activeElement.id === 'z_vorname');
+  const vorbelegt = await page.evaluate(() =>
+    ['z_anrede', 'z_vorname', 'z_nachname', 'z_email'].map(i => document.getElementById(i).value).join('|'));
+  check('KRITISCH: "Neu einladen" belegt den Dialog mit der letzten Person vor',
+    vorbelegt === 'Frau|Alex|Beispiel|alex@example.org');
+
+  // Der Not-Aus im Demo-Reiter: zuletzt und abgesetzt. Ausgefuehrt wird die
+  // Funktion der Seite selbst, mit einem laufenden Zugang.
+  const demo = await page.evaluate(() => {
+    const html = demoZugangBereiche({ id: 9, platz: 'demo1', status: 'aktiv',
+      email: 'x@example.org', nachgefasst_am: null }, true).filter(Boolean);
+    const d = document.createElement('div'); d.innerHTML = html.join('');
+    return [...d.querySelectorAll('.auf-bereich')].map(b => ({
+      titel: b.querySelector('.auf-titel').textContent, gefahr: b.classList.contains('gefahr') }));
+  });
+  check('KRITISCH: der Not-Aus steht zuletzt und als einziger abgesetzt',
+    demo.length === 4 && demo[3].titel === 'Not-Aus' && demo[3].gefahr
+    && demo.slice(0, 3).every(b => !b.gefahr));
+  const zuDemo = await page.evaluate(() => demoZugangBereiche({ id: 9, platz: 'demo1',
+    status: 'beendet', email: 'x@example.org', nachgefasst_am: null }, true).filter(Boolean).length);
+  check('KRITISCH: ein beendeter Zugang hat keinen Not-Aus, kein Erneut senden, keine Nutzung',
+    zuDemo === 1);
   await page.close();
 }
 

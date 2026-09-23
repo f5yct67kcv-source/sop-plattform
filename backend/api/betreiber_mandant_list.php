@@ -44,7 +44,7 @@ $uebergaben = null;
 if (mandant_einladung_tabelle_da($pdo)) {
     $uebergaben = [];
     foreach ($pdo->query(
-        'SELECT mandant_id, gueltig_bis, eingeloest_am,
+        'SELECT mandant_id, gueltig_bis, eingeloest_am, anrede, vorname, nachname, email,
                 CASE WHEN gueltig_bis > NOW() THEN 1 ELSE 0 END AS noch_gueltig
            FROM mandant_einladung'
     )->fetchAll(PDO::FETCH_ASSOC) ?: [] as $z) {
@@ -92,6 +92,21 @@ $liste = array_map(static function (array $m) use ($VERTRAG, $vertragDa, $heute,
     $m['uebergabe'] = $uebergaben === null
         ? ['lage' => 'nicht_eingerichtet', 'datum' => null]
         : mandant_uebergabe_lage($uebergaben[$m['id']] ?? null);
+    // AN WEN (aufgeklappte Zeile, 2026-09-23): Wer eingeladen ist, gehoert
+    // neben den Knopf "Neu einladen" -- sonst laedt man blind jemanden ein,
+    // ohne zu sehen, an wen der letzte Link ging. Die Liste ist nur fuer
+    // angemeldete Betreiber mit zweitem Faktor zugaenglich.
+    $e = $uebergaben[$m['id']] ?? null;
+    if ($e !== null) {
+        $m['uebergabe']['person'] = be_name_bauen((string)$e['vorname'], (string)$e['nachname']);
+        $m['uebergabe']['email']  = (string)$e['email'];
+        // Einzeln dazu, damit "Neu einladen" den Dialog vorbelegen kann: Der
+        // haeufigste Fall ist dieselbe Person mit abgelaufenem Link, und wer
+        // die Adresse neu abtippt, tippt sie womoeglich anders.
+        $m['uebergabe']['anrede']   = (string)$e['anrede'];
+        $m['uebergabe']['vorname']  = (string)$e['vorname'];
+        $m['uebergabe']['nachname'] = (string)$e['nachname'];
+    }
     $m['vertrag'] = be_vertrag_lage($m, $heute);
     $m['vertrag']['faellig_90'] = be_vertrag_faellig($m['vertrag'], 90, $heute);
     return $m;
