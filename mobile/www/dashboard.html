@@ -8924,7 +8924,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 
         <!-- Software-Stand (ENT-696). Welcher Code gerade in DIESEM Browser
              laeuft: Datum und Kurzkennung des Commits, eingesetzt vom
-             Deploy (Schritt "Software-Stand in dashboard.html einsetzen").
+             Deploy (Schritt "Software-Stand ... einsetzen").
              Hier und nicht unter "Betrieb", weil man ihn braucht, wenn man
              dem Betreiber etwas meldet -- "Betrieb" sind Angaben zum
              eigenen Betrieb, nicht zur Software. Eine dezente Zeile statt
@@ -24597,12 +24597,13 @@ function spFreigabeSetzen() {
 let spReiter = 'anfragen';
 // Software-Stand (ENT-696). Der Deploy ersetzt den Platzhalter in der
 // Konstante durch "JJJJ-MM-TT · abc1234" (Commit-Datum in Zuercher Zeit und
-// Kurzkennung des Commits). Geprueft wird die FORM des Wertes, nicht, ob er
-// noch dem Platzhalter gleicht: Der Vergleichstext wuerde vom Deploy
-// mitersetzt und die Pruefung damit immer "eingesetzt" sagen.
+// Kurzkennung des Commits; aus aufs-handy.sh ggf. mit "+ lokal geaendert").
+// Geprueft wird die FORM des Wertes, nicht, ob er noch dem Platzhalter
+// gleicht: Der Vergleichstext wuerde vom Deploy mitersetzt und die Pruefung
+// damit immer "eingesetzt" sagen.
 const APP_STAND = '%%APP_STAND%%';
 function appStand() {
-  return /^\d{4}-\d{2}-\d{2} · [0-9a-f]{7,40}$/.test(APP_STAND) ? APP_STAND : null;
+  return /^\d{4}-\d{2}-\d{2} · [0-9a-f]{7,40}( \+ lokal geändert)?$/.test(APP_STAND) ? APP_STAND : null;
 }
 // "Nicht bekannt" ist etwas anderes als ein leerer Stand: Die Seite kam dann
 // nicht ueber den Deploy (lokal geoeffnet) oder der Schritt hat versagt.

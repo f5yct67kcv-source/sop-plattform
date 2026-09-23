@@ -2191,15 +2191,27 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
     const ordner = mkdtempSync(join(tmpdir(), 'buendel-'));
     try {
       const datei = join(ordner, 'index.html');
+      // Seit ENT-696 beschreibt das Skript auch dashboard.html (Software-
+      // Stand) -- beide muessen zurueckkommen, nicht nur die erste.
+      const cockpit = join(ordner, 'dashboard.html');
       writeFileSync(datei, 'vorher key=__MAPS_IOS_KEY__ ende\n');
-      // Genau der Ablauf aus dem Skript: sichern, Schlüssel einsetzen,
+      writeFileSync(cockpit, "stand='%%APP_STAND%%'\n");
+      // Die Dateiliste kommt aus dem Skript selbst, nur mit den Pfaden
+      // dieses Wegwerf-Ordners: Wer dort eine Datei ergaenzt, ohne dass sie
+      // zurueckgesetzt wird, soll es hier merken.
+      const liste = (/^BUENDEL_DATEIEN=\(([^)]*)\)/m.exec(skript) || [])[1] || '';
+      const namen = [...liste.matchAll(/mobile\/www\/([\w.-]+)"/g)].map(m => m[1]);
+      check('Das Skript sichert index.html und dashboard.html',
+        namen.includes('index.html') && namen.includes('dashboard.html'));
+      // Genau der Ablauf aus dem Skript: sichern, Werte einsetzen,
       // zurücksetzen.
       execFileSync('bash', ['-c', [
-        `BUENDEL_DATEI=${JSON.stringify(datei)}`,
-        'BUENDEL_KOPIE=""',
+        `BUENDEL_DATEIEN=(${namen.map(n => JSON.stringify(join(ordner, n))).join(' ')})`,
+        'BUENDEL_KOPIEN=""',
         sichern, zurueck,
         'buendel_sichern',
         `sed -i 's|__MAPS_IOS_KEY__|AIzaSyGEHEIMGEHEIMGEHEIMGEHEIMGEHEIM|g' ${JSON.stringify(datei)}`,
+        `sed -i 's|%%APP_STAND%%|2025-03-04 · a3f9c1e|g' ${JSON.stringify(cockpit)}`,
         'buendel_zuruecksetzen',
       ].join('\n')], { encoding: 'utf8' });
       const danach = lies(datei, 'utf8');
@@ -2207,6 +2219,8 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
         !/AIza/.test(danach));
       check('KRITISCH: und der Platzhalter ist wieder da, das Bündel also unverändert',
         danach === 'vorher key=__MAPS_IOS_KEY__ ende\n');
+      check('KRITISCH: auch dashboard.html kommt unverändert zurück (Software-Stand, ENT-696)',
+        lies(cockpit, 'utf8') === "stand='%%APP_STAND%%'\n");
     } finally { rmSync(ordner, { recursive: true, force: true }); }
   } else {
     ['KRITISCH: nach dem Lauf steht kein Schlüssel mehr im versionierten Bündel',

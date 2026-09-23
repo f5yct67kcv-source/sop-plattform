@@ -2768,6 +2768,8 @@ const W = {
     spesenLeerText: 'Hier kommen deine Quittungsbelege hin — Tankquittungen und geschäftliche Einkäufe. Der Bereich wird gerade gebaut. Belege bis dahin bitte wie bisher aufbewahren und einreichen.',
     // Einstellungen (ENT-398)
     einstellungen: 'Einstellungen', darstellung: 'Darstellung',
+    // Software-Stand (ENT-696)
+    stand: 'Stand', standUnbekannt: 'Stand nicht bekannt',
     themaDunkel: 'Dunkle Darstellung',
     themaDunkelT: 'Standard der App. Abends und im Revier blendet ein heller Bildschirm und stört die Nachtsicht.',
     themaAufDunkel: 'Auf dunkle Darstellung wechseln',
@@ -3862,6 +3864,22 @@ function tastaturVerfolgen() {
 if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', tastaturVerfolgen);
   window.visualViewport.addEventListener('scroll', tastaturVerfolgen);
+}
+
+// Software-Stand (ENT-696). Der Web-Deploy setzt ihn in die Konstante ein
+// (Schritt "Software-Stand ... einsetzen"), fuer die native Huelle tut es
+// aufs-handy.sh vor "cap sync". Geprueft wird die FORM des Wertes -- ein
+// Vergleich mit dem Platzhalter wuerde beim Einsetzen mitersetzt. Der
+// Zusatz "+ lokal geaendert" kommt aus aufs-handy.sh, wenn vom Rechner
+// mit ungesicherten Aenderungen gebaut wurde: Dann stimmt der Commit
+// allein nicht.
+const APP_STAND = '%%APP_STAND%%';
+function appStand() {
+  return /^\d{4}-\d{2}-\d{2} · [0-9a-f]{7,40}( \+ lokal geändert)?$/.test(APP_STAND) ? APP_STAND : null;
+}
+function standZeile() {
+  const s = appStand();
+  return s ? w('stand') + ' ' + s : w('standUnbekannt');
 }
 
 // Die Zahlen, aus denen der Sockel entsteht -- als eine Zeile im Menue.
@@ -7491,7 +7509,14 @@ function zeichneMenu() {
       </div></div>
       <p style="font-size:12.5px;color:var(--ink-3);line-height:1.5;padding:0 2px">${esc(w('themaRundgangHinweis'))}</p>
       ${pushBlock()}
-      <p style="font-size:11px;color:var(--ink-3);line-height:1.5;padding:14px 2px 0;font-variant-numeric:tabular-nums">${esc(technikZeile())}</p>
+      <!-- Software-Stand (ENT-696): eigene Zeile ueber der Technikzeile, in
+           derselben Schrift (Vorgabe des Projektinhabers, 2026-09-23).
+           Eigene Zeile statt Eintrag in der Technikzeile: Nach dem Stand
+           fragt die Zentrale, nach den Messwerten niemand -- dazwischen
+           faende ihn keiner. Die Technikzeile verliert dafuer ihren Abstand
+           nach oben; die beiden stehen als Block zusammen. -->
+      <p id="appStand" style="font-size:11px;color:var(--ink-3);line-height:1.5;padding:14px 2px 0;font-variant-numeric:tabular-nums">${esc(standZeile())}</p>
+      <p style="font-size:11px;color:var(--ink-3);line-height:1.5;padding:2px 2px 0;font-variant-numeric:tabular-nums">${esc(technikZeile())}</p>
     </div>
 
     <div id="pr-stunden" style="display:none">
