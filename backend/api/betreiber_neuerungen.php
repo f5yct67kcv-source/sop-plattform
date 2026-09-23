@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Neuerungen fuer das Update-Fenster im Betreiberbereich (ENT-698).
-// Gleiche Bauart wie api/neuerungen.php, aber gegen das Betreiber-Konto.
+// Gleiche Bauart wie api/neuerungen_stand.php, aber gegen das Betreiber-Konto.
 //
 // GET         -- was dieses Konto noch nicht gesehen hat
 // POST {bis}  -- "gelesen bis Nummer n"

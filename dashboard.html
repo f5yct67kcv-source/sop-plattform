@@ -13519,7 +13519,7 @@ function loadEinsaetze() {
       // Die Meldung kommt vom Server -- er weiss, ob eine Tabelle fehlt.
       $('plTable').innerHTML = EMPTY('Planung nicht verfügbar',
         esc(data.message || 'Die Einsätze konnten nicht geladen werden.') +
-        '<div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="eiOeffnen()">Datenbank jetzt einrichten</button></div>');
+        '<div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="eiOeffnen(true)">Datenbank jetzt einrichten</button></div>');
       return;
     }
     einsaetze = data.einsaetze || [];
@@ -20051,7 +20051,7 @@ function loadObjekte() {
     if (!ok || data.status !== 'ok') {
       $('oTable').innerHTML = EMPTY('Objekte nicht verfügbar',
         esc(data.message || 'Die Objekte konnten nicht geladen werden.') +
-        '<div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="eiOeffnen()">Datenbank jetzt einrichten</button></div>');
+        '<div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="eiOeffnen(true)">Datenbank jetzt einrichten</button></div>');
       return;
     }
     objekte = data.objekte || [];
@@ -30124,7 +30124,7 @@ let updVonSelbstGezeigt = false;
 const updHandy = () => window.matchMedia('(max-width: 900px)').matches;
 
 function updLaden() {
-  return api('neuerungen.php?ziel=cockpit')
+  return api('neuerungen_stand.php?ziel=cockpit')
     .then(({ ok, data }) => (ok && data && data.status === 'ok') ? data : null)
     .catch(() => null);
 }
@@ -30150,7 +30150,9 @@ function updVonSelbst() {
   });
 }
 
-function eiOeffnen() {
+// sofort: gleich einspielen -- fuer "Datenbank jetzt einrichten", wo eine
+// Tabelle fehlt und der Knopf genau das verspricht.
+function eiOeffnen(sofort) {
   // Von Hand geoeffnet: Stand frisch holen, dann zeigen. Bis die Antwort
   // da ist, heisst es "wird geprueft" -- nicht "unbekannt".
   updVonSelbstGezeigt = true;
@@ -30160,6 +30162,7 @@ function eiOeffnen() {
   $('updLauf').hidden = true;
   updZeigen('laden');
   eiBetreiberPruefen();
+  if (sofort) { planungEinrichten(); }
   updLaden().then(d => { updStand = d; if (!updLaeuft) { updZeigen(); } });
 }
 
@@ -30240,7 +30243,7 @@ function updSchliessen() {
 function updGelesen() {
   const bis = updStand && updStand.neueste;
   if (!bis || updStand.stand_unbekannt) { return; }
-  api('neuerungen.php', { method: 'POST', body: { bis } }).catch(() => {});
+  api('neuerungen_stand.php', { method: 'POST', body: { bis } }).catch(() => {});
 }
 
 function updHauptknopf() {

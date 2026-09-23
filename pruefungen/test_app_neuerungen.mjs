@@ -12,8 +12,8 @@ const check = (n, c) => (c ? ok : bad).push(n);
 const browser = await chromium.launch({ executablePath: browserPfad() });
 
 const NEU = [
-  { nr: 5, datum: '2026-09-23', art: 'fehlerbehebung', titel: 'Eine Korrektur', text: 'Etwas geht jetzt wieder.' },
-  { nr: 4, datum: '2026-09-23', art: 'neu', titel: 'Eine Neuerung', text: 'Etwas ist dazugekommen.' },
+  { nr: 5, datum: '2028-06-10', art: 'fehlerbehebung', titel: 'Eine Korrektur', text: 'Etwas geht jetzt wieder.' },
+  { nr: 4, datum: '2028-06-10', art: 'neu', titel: 'Eine Neuerung', text: 'Etwas ist dazugekommen.' },
 ];
 
 async function seite(stand) {
@@ -33,7 +33,7 @@ async function seite(stand) {
       nachname: 'Muster', personalnummer: 'P-001', ist_admin: false } });
     if (p.includes('meine_schichten')) return send({ status: 'ok', schichten: [] });
     if (p.includes('rapport_list')) return send({ status: 'ok', rapporte: [] });
-    if (p === 'neuerungen.php') {
+    if (p === 'neuerungen_stand.php') {
       if (req.method() === 'POST') return send({ status: 'ok', gesehen_bis: body.bis });
       return send({ status: 'ok', ziel: 'app', neueste: 5, gesehen_bis: 3, neuerungen: stand.neu });
     }
@@ -53,7 +53,7 @@ const blattOffen = page => page.evaluate(() => $('blatt').classList.contains('on
 // ── Es gibt Neuerungen fuer die App
 let { page, rufe } = await seite({ neu: NEU });
 check('Die App fragt nach den Neuerungen FUER DIE APP',
-  rufe.some(r => r.p === 'neuerungen.php' && r.methode === 'GET' && r.suche.includes('ziel=app')));
+  rufe.some(r => r.p === 'neuerungen_stand.php' && r.methode === 'GET' && r.suche.includes('ziel=app')));
 check('KRITISCH: gibt es Neuerungen, oeffnet sich das Blatt von selbst', await blattOffen(page));
 check('Es heisst „Neu in GuardOpS“', (await page.textContent('#blTitel')).includes('Neu in GuardOpS'));
 const inhalt = await page.textContent('#blBody');
@@ -88,7 +88,7 @@ let vorher = rufe.length;
 await page.evaluate(() => blattZu());
 await page.waitForTimeout(200);
 check('Schliessen ohne „Verstanden“ merkt sich nichts',
-  !rufe.slice(vorher).some(r => r.p === 'neuerungen.php' && r.methode === 'POST'));
+  !rufe.slice(vorher).some(r => r.p === 'neuerungen_stand.php' && r.methode === 'POST'));
 check('Nach dem Schliessen ist die kurze Variante wieder weg -- das naechste Blatt ist wieder Vollbild',
   !(await page.evaluate(() => $('blatt').classList.contains('kurz'))));
 await page.close();
@@ -99,7 +99,7 @@ vorher = rufe.length;
 await page.click('#neuVerstanden');
 await page.waitForTimeout(250);
 check('KRITISCH: „Verstanden“ merkt sich die neueste Nummer am Konto',
-  rufe.slice(vorher).some(r => r.p === 'neuerungen.php' && r.methode === 'POST' && r.body.bis === 5));
+  rufe.slice(vorher).some(r => r.p === 'neuerungen_stand.php' && r.methode === 'POST' && r.body.bis === 5));
 check('und schliesst das Blatt', !(await blattOffen(page)));
 await page.close();
 

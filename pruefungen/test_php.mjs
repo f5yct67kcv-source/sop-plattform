@@ -949,7 +949,7 @@ const NUR_EIGENE_DATEN = [
   // mitarbeiter_id stammt ausnahmslos aus der Sitzung, nie aus der Anfrage.
   'tutorial_gesehen.php',
   'demo_hinweis_bestaetigen.php',
-  'neuerungen.php',               // was die eigene Person gelesen hat (ENT-698); einspielen verlangt betrieb_schreiben in planung_einrichten.php
+  'neuerungen_stand.php',             // was die eigene Person gelesen hat (ENT-698); einspielen verlangt betrieb_schreiben in planung_einrichten.php
 ];
 const ohnePruefung = apiDateien.filter(f => {
   const q = ohneKommentar(f);

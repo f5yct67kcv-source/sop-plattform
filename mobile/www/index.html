@@ -13224,7 +13224,7 @@ function blattZu() {
 let neuGezeigt = false, neuStand = null;
 function neuPruefen() {
   if (neuGezeigt || rundgangAktiv) { return; }
-  api('neuerungen.php?ziel=app').then(({ ok, data }) => {
+  api('neuerungen_stand.php?ziel=app').then(({ ok, data }) => {
     if (!ok || !data || data.status !== 'ok' || !(data.neuerungen || []).length) { return; }
     // Andere Fenster haben Vorrang: eine Mitteilung, die bestaetigt werden
     // muss, eine offene Runde, ein offenes Blatt. Die Neuerungen kommen
@@ -13249,7 +13249,7 @@ function neuPruefen() {
 }
 function neuVerstanden() {
   if (neuStand && neuStand.neueste && !neuStand.stand_unbekannt) {
-    api('neuerungen.php', { method: 'POST', body: { bis: neuStand.neueste } });
+    api('neuerungen_stand.php', { method: 'POST', body: { bis: neuStand.neueste } });
   }
   blattZu();
 }

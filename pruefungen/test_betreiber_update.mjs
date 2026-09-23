@@ -50,7 +50,7 @@ async function seite(stand) {
   return page;
 }
 const offen = p => p.evaluate(() => $('dlgEinrichtung').classList.contains('on'));
-const NEU = [{ nr: 4, datum: '2026-09-23', art: 'verbesserung', titel: 'Etwas Besseres', text: 'Beschreibung.' }];
+const NEU = [{ nr: 4, datum: '2028-06-10', art: 'verbesserung', titel: 'Etwas Besseres', text: 'Beschreibung.' }];
 
 // ── Update steht aus: Fenster von selbst, Einspielen in Teilen
 let page = await seite({ neu: NEU, offen: ['Mandant „Betrieb A“: Spalte x fehlt noch'], fehlerBei: null, bremse: 0 });

@@ -19,9 +19,9 @@ const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
 const NEU = [
-  { nr: 3, datum: '2026-09-23', art: 'fehlerbehebung', art_titel: 'Fehlerbehebung',
+  { nr: 3, datum: '2028-06-10', art: 'fehlerbehebung', art_titel: 'Fehlerbehebung',
     titel: 'Eine Korrektur', text: 'Etwas geht jetzt wieder.' },
-  { nr: 2, datum: '2026-09-23', art: 'neu', art_titel: 'Neu',
+  { nr: 2, datum: '2028-06-10', art: 'neu', art_titel: 'Neu',
     titel: 'Eine Neuerung', text: 'Etwas ist dazugekommen.' },
 ];
 const ETAPPEN = { tabellen: 'Tabellen anlegen', spalten: 'Spalten und Daten nachtragen',
@@ -47,7 +47,7 @@ async function seite(viewport) {
     rufe.push({ p, methode: req.method(), body, zeit: Date.now() });
     const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
     if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'a', ist_admin: true });
-    if (p === 'neuerungen.php') {
+    if (p === 'neuerungen_stand.php') {
       if (req.method() === 'POST') return send({ status: 'ok', gesehen_bis: body.bis });
       return send({ status: 'ok', ziel: 'cockpit', neueste: 3, gesehen_bis: 1,
         neuerungen: STAND.neuerungen, einrichtung_ausstehend: STAND.ausstehend,
@@ -110,7 +110,7 @@ await page.click('#updZu');
 await page.waitForTimeout(250);
 check('„Später“ schliesst das Fenster', !(await offen(page)));
 check('KRITISCH: „Später“ markiert nichts als gelesen',
-  !rufe.slice(vorher).some(r => r.p === 'neuerungen.php' && r.methode === 'POST'));
+  !rufe.slice(vorher).some(r => r.p === 'neuerungen_stand.php' && r.methode === 'POST'));
 check('Der Punkt am Kontomenü bleibt gefärbt',
   await page.evaluate(() => $('nav-einrichtung').classList.contains('hat-update')));
 
@@ -147,7 +147,7 @@ check('KRITISCH: was eingerichtet wurde, steht nicht mehr im Fenster', !nachher.
 check('KRITISCH: was schon da war, steht nicht mehr im Fenster', !nachher.includes('bereits vorhanden'));
 check('Die Neuerungen bleiben stehen', nachher.includes('Eine Neuerung'));
 check('Nach dem Einspielen gilt als gelesen, was angezeigt wurde',
-  rufe.slice(vorher).some(r => r.p === 'neuerungen.php' && r.methode === 'POST' && r.body.bis === 3));
+  rufe.slice(vorher).some(r => r.p === 'neuerungen_stand.php' && r.methode === 'POST' && r.body.bis === 3));
 await page.click('#eiBtn');   // Schliessen
 await page.waitForTimeout(250);
 check('„Schliessen“ schliesst', !(await offen(page)));
@@ -183,7 +183,7 @@ await page.waitForTimeout(250);
 check('KRITISCH: „Verstanden“ spielt nichts ein',
   !rufe.slice(vorher).some(r => r.p.includes('planung_einrichten') && r.methode === 'POST'));
 check('„Verstanden“ markiert die Neuerungen als gelesen',
-  rufe.slice(vorher).some(r => r.p === 'neuerungen.php' && r.methode === 'POST' && r.body.bis === 3));
+  rufe.slice(vorher).some(r => r.p === 'neuerungen_stand.php' && r.methode === 'POST' && r.body.bis === 3));
 await page.close();
 
 // ══ 3. Nichts offen, nichts Neues: das Fenster bleibt zu ═══════════════
