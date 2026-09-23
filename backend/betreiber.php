@@ -436,6 +436,110 @@ function be_einladung_konto(PDO $pdo, string $tokenRoh): ?array
     return $r === false ? null : $r;
 }
 
+// ── Einladung eines Mandanten (ENT-686) ───────────────────────────────
+//
+// SIEBEN TAGE, nicht die 48 Stunden der Betreiber-Ebene daneben. Der
+// Empfaenger sitzt nicht im Haus: Er ist die benannte Person eines Kunden,
+// bei dem gerade ein Vertrag zustande gekommen ist. Eine Frist, die den
+// ersten Versuch regelmaessig verfallen laesst, macht aus der Uebergabe
+// wieder Handarbeit -- und Handarbeit ist der Befund, der diesen Weg
+// ausgeloest hat.
+const MANDANT_EINLADUNG_TAGE = 7;
+
+function mandant_einladung_tabelle_da(PDO $pdo): bool
+{
+    return hat_tabelle($pdo, 'mandant_einladung');
+}
+
+// Sucht die offene Einladung zu einem rohen Token -- oder gibt null zurueck.
+//
+// ABGELAUFEN, EINGELOEST UND ERFUNDEN SIND HIER DASSELBE: alle drei geben
+// null, wie bei be_einladung_konto() daneben. Der Aufrufer darf sie nicht
+// verschieden beantworten -- "abgelaufen" bestaetigte, dass es diesen Link
+// einmal gab.
+//
+// Die Frist wird in der DATENBANK verglichen (NOW()), nicht in PHP: Sonst
+// entschiede die Uhr des Webservers, und Betreiber-Datenbank und Webserver
+// sind zwei verschiedene Uhren (OP-518).
+//
+// MITGELESEN WIRD DIE GANZE MANDANTENZEILE, weil der Aufrufer sie ohnehin
+// braucht: Ohne `db_host`/`db_name`/`secret_name` kaeme er nicht an die
+// Anlage, in der das Konto entstehen soll. Ein zweiter Aufruf waere ein
+// zweiter Ort, an dem dieselbe Zeile gesucht wird.
+function mandant_einladung_zu_token(PDO $pdo, string $tokenRoh): ?array
+{
+    if ($tokenRoh === '' || !mandant_einladung_tabelle_da($pdo)) { return null; }
+    $s = $pdo->prepare(
+        'SELECT e.mandant_id, e.anrede, e.vorname, e.nachname, e.email,
+                e.gueltig_bis, m.name AS mandant_name, m.status AS mandant_status,
+                m.subdomain, m.db_host, m.db_name, m.db_user, m.secret_name
+           FROM mandant_einladung e
+           JOIN mandant m ON m.id = e.mandant_id
+          WHERE e.token = ? AND e.eingeloest_am IS NULL AND e.gueltig_bis > NOW()'
+    );
+    $s->execute([hash('sha256', $tokenRoh)]);
+    $r = $s->fetch(PDO::FETCH_ASSOC);
+    return $r === false ? null : $r;
+}
+
+// Die Einladung beanspruchen: setzt `eingeloest_am`, aber nur, wenn sie noch
+// offen ist -- und meldet, ob das gelungen ist.
+//
+// WARUM NICHT EINFACH EIN UPDATE: Zwei gleichzeitige Aufrufe mit demselben
+// Link wuerden sonst beide durchkommen und beide ein Erstkonto anlegen.
+// "WHERE eingeloest_am IS NULL" macht daraus einen Wettlauf, den genau einer
+// gewinnt -- dasselbe Mittel wie `erinnert_am` beim Supportvorgang.
+//
+// DAS KONTO ENTSTEHT IN EINER ANDEREN DATENBANK, und zwei Datenbanken haben
+// keine gemeinsame Transaktion. Darum diese Reihenfolge: erst beansprucht,
+// dann angelegt, und scheitert das Anlegen, gibt der Aufrufer die Einladung
+// mit mandant_einladung_freigeben() wieder frei. Umgekehrt waere schlimmer:
+// Dann entstuende das Konto, und der Link blieb gueltig.
+function mandant_einladung_beanspruchen(PDO $pdo, int $mandantId): bool
+{
+    $s = $pdo->prepare(
+        'UPDATE mandant_einladung SET eingeloest_am = NOW()
+          WHERE mandant_id = ? AND eingeloest_am IS NULL'
+    );
+    $s->execute([$mandantId]);
+    return $s->rowCount() === 1;
+}
+
+// Wann die Uebergabe dieser Anlage stattgefunden hat -- oder null, wenn
+// nicht (keine Einladung, oder eine noch offene).
+//
+// WOZU: Der Ausstellweg muss wissen, ob diese Anlage schon uebergeben ist.
+// Er koennte dazu in der Anlage selbst nachzaehlen, wieviele Menschen in
+// `mitarbeiter` stehen -- genau das tut der Einloeseweg. Ein
+// betreiber_*-Endpunkt darf das NICHT: Die Trennung der Ebenen verbietet
+// ihm die Verwaltungstabellen, und test_betreiber.mjs setzt es durch. Der
+// Vermerk hier ist die richtige Quelle fuer diese Frage, und es ist
+// derselbe, aus dem die Liste spaeter den Uebergabestand liest.
+//
+// WAS ER NICHT WEISS: Eine Anlage, die vor ENT-686 ueber backend/setup.php
+// uebergeben wurde, hat hier keine Zeile. Fuer sie sagt diese Funktion
+// "nicht uebergeben", und aufgehalten wird sie erst beim Einloesen, das in
+// der Anlage selbst nachsieht. Das ist die Reihenfolge der beiden Sperren
+// und keine Luecke: Ein Konto entsteht dabei nie doppelt.
+function mandant_einladung_eingeloest_am(PDO $pdo, int $mandantId): ?string
+{
+    if (!mandant_einladung_tabelle_da($pdo)) { return null; }
+    $s = $pdo->prepare('SELECT eingeloest_am FROM mandant_einladung WHERE mandant_id = ?');
+    $s->execute([$mandantId]);
+    $w = $s->fetchColumn();
+    return ($w === false || $w === null || $w === '') ? null : (string)$w;
+}
+
+// Die Gegenbuchung zu mandant_einladung_beanspruchen(), wenn das Anlegen in
+// der Anlage scheitert. Ohne sie waere die Einladung verbraucht und niemand
+// haette ein Konto -- der Kunde stuende vor einem toten Link, und beim
+// Betreiber stuende "eingeloest".
+function mandant_einladung_freigeben(PDO $pdo, int $mandantId): void
+{
+    $pdo->prepare('UPDATE mandant_einladung SET eingeloest_am = NULL WHERE mandant_id = ?')
+        ->execute([$mandantId]);
+}
+
 // ── Mandant: was von aussen geschrieben werden darf ───────────────────
 //
 // Eine geschlossene Liste statt "alles, was ankommt". Ohne sie traegt der
@@ -1299,6 +1403,58 @@ function be_tabellen(): array
   erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   erstellt_von INT UNSIGNED NOT NULL,
   UNIQUE KEY uq_be_einladung_token (token)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// ── Einladung eines MANDANTEN (ENT-686) ───────────────────────────────
+//
+// Das Erstkonto eines Mandanten entsteht kuenftig hierueber und nicht mehr
+// ueber backend/setup.php -- eine Datei, die von Hand per FTP hochgeladen,
+// einmal aufgerufen und wieder geloescht wurde. Wer das tat, kannte das
+// Passwort des Kunden, und im System stand nirgends, dass die Uebergabe
+// stattgefunden hat.
+//
+// WARUM DIE ZEILE HIER LIEGT UND NICHT IN DER ANLAGE DES MANDANTEN
+// (ENT-686, Klaerung 1): Dieselbe Ueberlegung wie bei `support_vorgang`
+// weiter unten. Der Betreiber braucht EINE Liste ueber alle Mandanten, und
+// eine nicht erreichbare Mandantendatenbank wuerde sonst lautlos aus ihr
+// herausfallen. Beim Uebergabestand wiegt das schwerer als beim Support:
+// Die Anlage, deren Datenbank klemmt, ist genau die, die man sehen muss.
+// Ein Platz im Vorrat kennt dadurch weiterhin niemanden.
+//
+// EINE ZEILE JE MANDANT, darum `mandant_id` als Schluessel. Neu ausstellen
+// ueberschreibt Token und Frist -- der alte Link ist damit sofort ungueltig,
+// und genau das ist entschieden (ENT-686, Klaerung 2: neu ausstellen, nicht
+// verlaengern). Preis dieser Bauart: Eine zweite Uebergabe derselben Anlage
+// ueberschreibt den Vermerk der ersten. Die Liste soll den heutigen Stand
+// zeigen, nicht die Geschichte; wer die Geschichte braucht, findet sie im
+// Logbuch, das beide Male schreibt.
+//
+// `eingeloest_am` BLEIBT STEHEN, anders als bei `betreiber_einladung`, wo
+// die Zeile beim Einloesen geloescht wird. Der Grund dort -- der Zustand
+// stehe ohnehin in `betreiber.aktiv`, und zwei Orte laufen auseinander --
+// traegt hier nicht: Das Konto entsteht in einer ANDEREN Datenbank. Wird die
+// Zeile geloescht, gibt es in der Betreiber-Datenbank keine Stelle mehr, an
+// der steht, dass die Uebergabe stattgefunden hat. Genau das war der Befund.
+//
+// NULL statt eines Ja/Nein-Merkers, wie `erinnert_am` beim Supportvorgang:
+// Es beantwortet zusaetzlich die Frage, WANN -- und es ist die Sperre gegen
+// doppeltes Einloesen, gesetzt mit "WHERE eingeloest_am IS NULL".
+//
+// Die benannte Person steht HIER und nicht am Mandanten: Sie gehoert zu
+// dieser Uebergabe. Wer die Anlage spaeter verwaltet, steht danach in
+// `mitarbeiter` der Anlage selbst.
+'mandant_einladung' => "CREATE TABLE IF NOT EXISTS mandant_einladung (
+  mandant_id INT UNSIGNED NOT NULL PRIMARY KEY,
+  token CHAR(64) NOT NULL,
+  anrede VARCHAR(20) NOT NULL DEFAULT '',
+  vorname VARCHAR(100) NOT NULL DEFAULT '',
+  nachname VARCHAR(100) NOT NULL,
+  email VARCHAR(200) NOT NULL,
+  gueltig_bis DATETIME NOT NULL,
+  erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  erstellt_von INT UNSIGNED NOT NULL,
+  eingeloest_am DATETIME NULL,
+  UNIQUE KEY uq_mandant_einladung_token (token)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
 // ── Supportvorgaenge (ENT-538) ────────────────────────────────────────

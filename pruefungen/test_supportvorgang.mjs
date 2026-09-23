@@ -142,6 +142,19 @@ const BETREIBER_EBENE_ERLAUBT = [
   // schreibt nichts als zwei Felder daran und liest nichts sonst aus der
   // Betreiber-Datenbank.
   'demo_weiter.php',
+  // Die Uebergabe eines Mandantenkontos (ENT-686). Beide brauchen die
+  // Betreiber-Datenbank, weil die Einladung dort liegt und nicht in der
+  // Anlage des Mandanten -- entschieden, damit eine nicht erreichbare Anlage
+  // nicht lautlos aus der Uebergabeliste faellt (dieselbe Ueberlegung wie
+  // beim Supportvorgang, den diese Suite prueft). Sie laufen ohne Anmeldung:
+  // Wer eingeladen ist, hat noch keinen Zugang.
+  //
+  // WAS SIE AN DER BETREIBER-EBENE TUN: Der Pruefweg liest eine Einladung.
+  // Der Einloeseweg liest sie, beansprucht sie und schreibt den Zeitpunkt der
+  // Uebergabe daran. Kein Betreiber-Konto, keine fremde Mandantenzeile,
+  // nichts an der Support-Ebene.
+  'mandant_einladung_pruefen.php',
+  'mandant_einladung_einloesen.php',
 ];
 // TRANSITIV, nicht nur der eigene Quelltext: seit ENT-612 ist die
 // eigentliche Einrichtung (mitsamt ihrem betreiber_db()-Aufruf, Abschnitt
