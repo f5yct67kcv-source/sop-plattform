@@ -76,6 +76,11 @@ if ($freigabe === null) {
         'status'  => 'error',
         'grund'   => 'keine_freigabe',
         'lage'    => support_lage($pdo),
+        // Die offene Bitte kommt mit (ENT-683): Ohne sie müsste der
+        // Betreiber ein zweites Mal fragen, ob er schon gebeten hat -- und
+        // genau hier, wo er die verschlossene Tür sieht, ist die Frage
+        // fällig.
+        'bitte'   => support_bitte_offen($pdo),
         'message' => 'Für diesen Mandanten liegt keine gültige Support-Freigabe vor. '
                    . 'Sie wird im Cockpit des Betriebs erteilt und ist befristet.',
     ], 403);

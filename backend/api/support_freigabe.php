@@ -41,6 +41,11 @@ if (in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true)) {
         'status'   => 'ok',
         'lage'     => support_lage($pdo),
         'freigabe' => $offen,
+        // Hat der Betreiber um Einblick gebeten (ENT-683)? Die Bitte steht
+        // in derselben Datenbank und gehört an dieselbe Stelle: Wer hier
+        // entscheidet, soll den Grund vor sich haben, statt ihn zu suchen.
+        // Sie öffnet nichts -- erteilt wird weiterhin nur hier.
+        'bitte'    => support_bitte_offen($pdo),
         'vorgabe_stunden' => SUPPORT_STUNDEN_VORGABE,
         'max_stunden'     => SUPPORT_STUNDEN_MAX,
         // Damit die Oberfläche sagen kann, was eine Freigabe bedeutet --

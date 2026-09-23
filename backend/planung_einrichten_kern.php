@@ -2158,6 +2158,33 @@ CREATE TABLE IF NOT EXISTS lohnlauf_zeile (
   KEY idx_support_spur_sprung (sprung_id, zeitpunkt)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Die Bitte des Betreibers um eine Freigabe (ENT-683).
+//
+// WARUM SIE HIER LIEGT und nicht beim Betreiber: dieselbe Ueberlegung wie
+// bei support_freigabe daneben. Der Betrieb soll in SEINEN Daten nachlesen
+// koennen, wer wann um Einblick gebeten hat, ohne dafuer den Betreiber
+// fragen zu muessen. Und ein Demo-Platz hat gar keine andere Wahl: Er
+// erreicht den Stamm des Betreibers nicht (ENT-681).
+//
+// EINE BITTE IST KEINE FREIGABE. Sie oeffnet nichts, sie zaehlt keine
+// Frist und sie steht in einer eigenen Tabelle -- waere sie eine Zeile in
+// support_freigabe mit einem Merker "noch nicht erteilt", waere der Tag
+// nah, an dem eine Abfrage den Merker vergisst. Erteilt wird
+// ausschliesslich im Cockpit des Betriebs, wie bisher.
+//
+// erledigt_am haelt fest, dass auf diese Bitte hin freigegeben wurde --
+// sonst stuende sie weiter da, und niemand wuesste, ob die offene Freigabe
+// daneben etwas damit zu tun hat.
+'support_bitte' => "CREATE TABLE IF NOT EXISTS support_bitte (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  gebeten_von VARCHAR(200) NOT NULL,
+  gebeten_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  zweck VARCHAR(500) NOT NULL,
+  erledigt_am DATETIME NULL,
+  zurueckgezogen_am DATETIME NULL,
+  KEY idx_support_bitte_offen (erledigt_am, zurueckgezogen_am)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
     ];
 }
 }

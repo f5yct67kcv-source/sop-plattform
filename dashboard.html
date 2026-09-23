@@ -24271,8 +24271,31 @@ function sfZeichnen(d) {
     return;
   }
 
-  $('sfInhalt').innerHTML =
-      '<p class="zone-note" style="margin-top:0">' + esc(d.umfang || '') + '</p>'
+  /* Die Bitte des Betreibers (ENT-683), ganz oben in dieser Karte.
+
+     HIER UND NICHT IN EINEM EIGENEN CONTAINER: Wer sie liest, entscheidet
+     im selben Blick darunter -- der Grund gehört neben den Knopf, nicht auf
+     einen anderen Bildschirm. So festgelegt vom Projektinhaber
+     (2026-09-23).
+
+     SIE ÖFFNET NICHTS. Der Zweck wird ins Formular übernommen, damit nur
+     noch Dauer und Klick fehlen; erteilt wird trotzdem erst mit dem Klick,
+     und die Dauer bestimmt weiterhin der Betrieb. */
+  const bitte = d.bitte || null;
+  const bitteBlock = bitte
+    /* Bestehendes Muster als Vorbild: .zone.warn traegt im Cockpit das,
+       was Aufmerksamkeit verlangt, ohne ein Fehler zu sein. Kein eigener
+       Kasten mit eigenen Farben. */
+    ? '<div class="zone warn" style="margin:0 0 16px">'
+      + '<div class="zone-hd">Der Betreiber bittet um Einblick</div>'
+      + '<div style="margin-top:6px">' + esc(bitte.zweck) + '</div>'
+      + '<div style="color:var(--ink-3);font-size:12px;margin-top:6px">'
+      + esc(bitte.gebeten_von) + ' · ' + esc(String(bitte.gebeten_am).slice(0, 16))
+      + '</div></div>'
+    : '';
+
+  $('sfInhalt').innerHTML = bitteBlock
+    + '<p class="zone-note" style="margin-top:0">' + esc(d.umfang || '') + '</p>'
     + '<div style="margin:18px 0 14px"><strong>' + esc(wort) + '</strong>'
     + (offen
         ? '<div style="color:var(--ink-3);font-size:13px;margin-top:4px">Erteilt von '
@@ -24285,7 +24308,12 @@ function sfZeichnen(d) {
         ? '<button type="button" class="btn btn-sm" onclick="sfWiderrufen()">Freigabe zurückziehen</button>'
         : '<div class="feldreihe" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">'
           + '<label style="flex:1 1 220px">Wofür?'
-          + '<input id="sfZweck" type="text" maxlength="200" placeholder="z. B. Rundgänge werden nicht angezeigt"></label>'
+          /* Der Zweck der Bitte steht schon drin -- änderbar, nicht
+             festgeschrieben: Es bleibt die Angabe des Betriebs, auch wenn
+             der Betreiber sie vorgeschlagen hat. */
+          + '<input id="sfZweck" type="text" maxlength="200" value="'
+          + (bitte ? esc(bitte.zweck) : '')
+          + '" placeholder="z. B. Rundgänge werden nicht angezeigt"></label>'
           + '<label style="width:120px">Für wie lange?'
           + '<select id="sfStunden">'
           + '<option value="4">4 Stunden</option>'

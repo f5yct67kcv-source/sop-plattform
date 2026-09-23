@@ -87,7 +87,84 @@ function support_freigeben(PDO $pdo, int $stunden, string $wer, string $zweck): 
          VALUES (?, DATE_ADD(NOW(), INTERVAL ? HOUR), ?)'
     );
     $s->execute([mb_substr($wer, 0, 200), $stunden, mb_substr($zweck, 0, 500)]);
+    $neu = (int)$pdo->lastInsertId();
+
+    // Eine offene Bitte ist mit der Freigabe beantwortet (ENT-683). Hier und
+    // nicht im Endpunkt: Sonst bliebe sie beim naechsten Weg, der freigibt,
+    // stehen -- und der Betrieb saehe eine Bitte, der er laengst
+    // nachgekommen ist.
+    if (support_bitte_da($pdo)) {
+        $pdo->prepare('UPDATE support_bitte SET erledigt_am = NOW()
+                        WHERE erledigt_am IS NULL AND zurueckgezogen_am IS NULL')->execute();
+    }
+    return $neu;
+}
+
+// ── Die Bitte des Betreibers (ENT-683) ────────────────────────────────
+//
+// Der Betreiber kann um eine Freigabe BITTEN. Erteilt wird sie weiterhin
+// ausschliesslich im Cockpit des Betriebs -- die Bitte oeffnet nichts, sie
+// legt nur den Grund auf den Tisch, damit der Betrieb nicht raten muss,
+// wofuer er die Tuer aufmachen soll.
+//
+// Die Tabelle liegt beim BETRIEB, wie die Freigabe selbst: Er soll
+// nachlesen koennen, wer wann gebeten hat, ohne den Betreiber zu fragen.
+// Bei einem Demo-Platz geht es ohnehin nicht anders -- er erreicht den
+// Stamm nicht (ENT-681).
+function support_bitte_da(PDO $pdo): bool
+{
+    return hat_tabelle($pdo, 'support_bitte');
+}
+
+// Die offene Bitte, oder null. Offen heisst: weder erledigt noch
+// zurueckgezogen. Jüngste zuerst.
+//
+// KEINE FRIST: Eine Bitte laeuft nicht ab. Sie ist kein Zugang, sondern
+// eine Frage, und eine Frage verfaellt nicht von selbst -- sie wird
+// beantwortet, zurueckgezogen oder bleibt stehen.
+function support_bitte_offen(PDO $pdo): ?array
+{
+    if (!support_bitte_da($pdo)) { return null; }
+    $s = $pdo->query(
+        'SELECT id, gebeten_von, gebeten_am, zweck
+           FROM support_bitte
+          WHERE erledigt_am IS NULL AND zurueckgezogen_am IS NULL
+          ORDER BY id DESC LIMIT 1'
+    );
+    $r = $s->fetch(PDO::FETCH_ASSOC);
+    return $r === false ? null : $r;
+}
+
+// Eine Bitte stellen. Gibt die Id zurueck.
+//
+// EINE OFFENE BITTE REICHT: Steht schon eine, wird ihr Zweck ueberschrieben
+// statt eine zweite danebengelegt. Zwei Bitten nebeneinander liessen den
+// Betrieb raten, welche gilt -- und die zweite stuende auch dann noch da,
+// wenn er auf die erste hin freigegeben hat.
+function support_bitten(PDO $pdo, string $wer, string $zweck): int
+{
+    $offen = support_bitte_offen($pdo);
+    if ($offen !== null) {
+        $pdo->prepare('UPDATE support_bitte SET gebeten_von = ?, gebeten_am = NOW(), zweck = ?
+                        WHERE id = ?')
+            ->execute([mb_substr($wer, 0, 200), mb_substr($zweck, 0, 500), (int)$offen['id']]);
+        return (int)$offen['id'];
+    }
+    $pdo->prepare('INSERT INTO support_bitte (gebeten_von, zweck) VALUES (?, ?)')
+        ->execute([mb_substr($wer, 0, 200), mb_substr($zweck, 0, 500)]);
     return (int)$pdo->lastInsertId();
+}
+
+// Eine Bitte zuruecknehmen. Der Betreiber kann sie selbst zurueckziehen --
+// anders als eine Freigabe, die nur der Betrieb widerrufen kann. Wer
+// fragen darf, darf seine Frage auch zurueckziehen.
+function support_bitte_zuruecknehmen(PDO $pdo): int
+{
+    if (!support_bitte_da($pdo)) { return 0; }
+    $s = $pdo->prepare('UPDATE support_bitte SET zurueckgezogen_am = NOW()
+                         WHERE erledigt_am IS NULL AND zurueckgezogen_am IS NULL');
+    $s->execute();
+    return $s->rowCount();
 }
 
 // Alle offenen Freigaben widerrufen -- nicht nur die jüngste. Wer widerruft,
