@@ -473,15 +473,18 @@ async function vorratSeite(antwort, breite = 1500) {
   // Gemessen am gerenderten Zustand, nicht am onclick-Text.
   const angekommenReiter = await seite.evaluate(() => {
     const r = document.getElementById('nav-admin-support');
-    if (!r) { return { offen: false, formular: false }; }
+    if (!r) { return { offen: false, liste: false }; }
     r.click();
     const v = document.getElementById('view-support');
     return { offen: !!v && getComputedStyle(v).display !== 'none',
-             formular: !!document.getElementById('saNeuKarte')
-               && document.getElementById('saNeuKarte').offsetParent !== null };
+             // Seit ENT-687 beginnt die Ansicht auf "Meine Anfragen", nicht
+             // auf dem Formular: Wer Support oeffnet, kommt meist wegen
+             // einer laufenden Sache.
+             liste: !!document.getElementById('saListeKarte')
+               && document.getElementById('saListeKarte').offsetParent !== null };
   });
   check('Der Reiter fuehrt in die Supportansicht',
-    angekommenReiter.offen && angekommenReiter.formular);
+    angekommenReiter.offen && angekommenReiter.liste);
 
   // ── Der kurze Weg aus dem Kontomenue (ENT-538) ────────────────────
   //
@@ -508,7 +511,7 @@ async function vorratSeite(antwort, breite = 1500) {
     await seite.waitForTimeout(250);
     const imMenue = await seite.evaluate(() => {
       const sh = document.getElementById('shell');
-      const k = document.getElementById('nav-support');
+      const k = document.getElementById('nav-support-schnellweg');
       const ab = document.getElementById('nav-abmelden');
       if (!k) { return { da: false }; }
       const r = k.getBoundingClientRect();
@@ -527,7 +530,7 @@ async function vorratSeite(antwort, breite = 1500) {
 
     await seite.evaluate(() => { document.getElementById('shell').classList.remove('aus'); });
     const m = await seite.evaluate(() => {
-      const k = document.getElementById('nav-support');
+      const k = document.getElementById('nav-support-schnellweg');
       if (!k) { return null; }
       const r = k.getBoundingClientRect();
       const ein = document.getElementById('nav-einrichtung');
@@ -555,17 +558,20 @@ async function vorratSeite(antwort, breite = 1500) {
 
     // Und er fuehrt wirklich hin -- gemessen am gerenderten Zustand, nicht
     // am onclick-Text.
-    await seite.evaluate(() => { document.getElementById('nav-support').click(); });
+    await seite.evaluate(() => { document.getElementById('nav-support-schnellweg').click(); });
     await seite.waitForTimeout(250);
     const angekommen = await seite.evaluate(() => {
       const view = document.getElementById('view-support');
-      const karte = document.getElementById('saNeuKarte');
+      const karte = document.getElementById('saListeKarte');
+      const offen = document.querySelector('#spReiter .rdkr-tab.aktiv .rdkr-tab-lbl');
       return { ansichtOffen: !!view && getComputedStyle(view).display !== 'none',
                karteDa: !!karte && karte.offsetParent !== null,
+               offenerReiter: offen ? offen.textContent.trim() : '',
                titel: document.getElementById('pgTitle').textContent.trim() };
     });
     check('KRITISCH: der Eintrag oeffnet die Supportansicht', angekommen.ansichtOffen);
-    check('KRITISCH: und das Meldeformular steht darin', angekommen.karteDa);
+    check('KRITISCH: und beginnt auf "Meine Anfragen"',
+      angekommen.karteDa && angekommen.offenerReiter === 'Meine Anfragen');
     check('Die Kopfzeile sagt, wo man steht', /support/i.test(angekommen.titel));
   }
 
@@ -623,7 +629,7 @@ async function vorratSeite(antwort, breite = 1500) {
 
     const eintrag = await seite.evaluate(() => {
       document.getElementById('btnMarke').click();
-      const k = document.getElementById('nav-support');
+      const k = document.getElementById('nav-support-schnellweg');
       return { sichtbar: k.offsetParent !== null,
                display: getComputedStyle(k).display,
                hoehe: k.getBoundingClientRect().height };
@@ -633,9 +639,12 @@ async function vorratSeite(antwort, breite = 1500) {
       eintrag.sichtbar && eintrag.display !== 'none');
     check('KRITISCH: am Handy erreicht er die 44-px-Trefferflaeche', eintrag.hoehe >= 44);
 
-    await seite.evaluate(() => { document.getElementById('nav-support').click(); });
+    await seite.evaluate(() => { document.getElementById('nav-support-schnellweg').click(); });
     await seite.waitForTimeout(350);
     const mobil = await seite.evaluate(() => {
+      // Am Handy zuerst auf den Melde-Reiter: Die 16-px-Regel gilt fuer die
+      // Eingabefelder, und die stehen seit ENT-687 dort.
+      spReiterZeigen('melden');
       const ab = document.getElementById('saNeuKarte');
       const btr = document.getElementById('saBetreff');
       const txt = document.getElementById('saText');
@@ -669,6 +678,108 @@ async function vorratSeite(antwort, breite = 1500) {
       !danach.adminOffen && danach.kachelnSichtbar === 0);
 
     await seite.setViewportSize({ width: 1400, height: 900 });
+  }
+
+  // ── Die Reiterleiste (ENT-687) ────────────────────────────────────
+  //
+  // 1:1 dieselbe Bauart wie "Kontrollrunde aendern" im Revierdienst --
+  // ausdrueckliche Vorgabe des Projektinhabers. Geprueft wird, was die
+  // Leiste leisten soll: Sie bleibt in jedem Bereich stehen, sie sagt, wo
+  // man ist, und sie zeigt nur, was die Rolle sehen darf.
+  {
+    await seite.setViewportSize({ width: 1400, height: 900 });
+    await seite.evaluate(() => go('support'));
+    await seite.waitForTimeout(300);
+
+    const leiste = await seite.evaluate(() => {
+      const tabs = [...document.querySelectorAll('#spReiter .rdkr-tab')]
+        .filter(e => e.offsetParent !== null);
+      const l = document.getElementById('spReiter').getBoundingClientRect();
+      const inhalt = document.querySelector('#view-support').getBoundingClientRect();
+      return {
+        namen: tabs.map(e => e.querySelector('.rdkr-tab-lbl').textContent.trim()),
+        hoehen: tabs.map(e => Math.round(e.getBoundingClientRect().height)),
+        aktiv: tabs.filter(e => e.classList.contains('aktiv'))
+          .map(e => e.querySelector('.rdkr-tab-lbl').textContent.trim()),
+        versatz: Math.abs((l.left + l.width / 2) - (inhalt.left + inhalt.width / 2)),
+      };
+    });
+    check('KRITISCH: die vier Reiter stehen in der vereinbarten Reihenfolge',
+      JSON.stringify(leiste.namen) === JSON.stringify(
+        ['Meine Anfragen', 'Anliegen melden', 'Support-Freigabe', 'Protokoll']));
+    check('KRITISCH: genau einer ist markiert, und es ist der erste',
+      leiste.aktiv.length === 1 && leiste.aktiv[0] === 'Meine Anfragen');
+    check('Die Leiste sitzt mittig im Inhalt, nicht im Fenster', leiste.versatz <= 4);
+    check('Alle Reiter sind gleich hoch', new Set(leiste.hoehen).size === 1);
+
+    // Sie bleibt stehen, egal welcher Bereich offen ist -- der Unterschied
+    // zu einer Kacheluebersicht, die beim Wechsel verschwindet.
+    const beimWechsel = await seite.evaluate(() => {
+      const stand = [];
+      for (const id of ['melden', 'freigabe', 'protokoll', 'anfragen']) {
+        spReiterZeigen(id);
+        const offen = [...document.querySelectorAll('#view-support .rdkr-panel')]
+          .filter(e => e.style.display !== 'none').map(e => e.id);
+        stand.push({ id,
+          leiste: document.getElementById('spReiter').offsetParent !== null,
+          offen });
+      }
+      return stand;
+    });
+    check('KRITISCH: die Leiste bleibt in jedem Bereich stehen',
+      beimWechsel.every(x => x.leiste));
+    check('KRITISCH: es ist immer genau ein Bereich offen, und zwar der gewaehlte',
+      beimWechsel.every(x => x.offen.length === 1 && x.offen[0] === 'spAb-' + x.id));
+
+    // Die Zahl am Reiter: nur, wenn eine Antwort vorliegt.
+    const zahl = await seite.evaluate(([a, b]) => {
+      const lies = () => {
+        const e = document.getElementById('spAnfragenZahl');
+        return { sichtbar: e.style.display !== 'none', text: e.textContent };
+      };
+      saListeZeichnen([
+        { id: 1, betreff: 'Offen', status: 'neu', eroeffnet_am: a, nachrichten: 1 },
+        { id: 2, betreff: 'Auch offen', status: 'in_arbeit', eroeffnet_am: b, nachrichten: 2 },
+      ]);
+      const ohneAntwort = lies();
+      saListeZeichnen([
+        { id: 1, betreff: 'Offen', status: 'neu', eroeffnet_am: a, nachrichten: 1 },
+        { id: 2, betreff: 'Antwort da', status: 'wartet_auf_kunde', eroeffnet_am: b, nachrichten: 3 },
+      ]);
+      const mitAntwort = lies();
+      saListeZeichnen([]);
+      return { ohneAntwort, mitAntwort, leer: lies() };
+    }, [vorTagen(8), vorTagen(7)]);
+    check('KRITISCH: ohne Antwort traegt der Reiter keine Zahl',
+      !zahl.ohneAntwort.sichtbar);
+    check('KRITISCH: liegt eine Antwort vor, steht die Zahl da',
+      zahl.mitAntwort.sichtbar && zahl.mitAntwort.text === '1');
+    check('KRITISCH: eine leere Liste zeigt keine Null',
+      !zahl.leer.sichtbar);
+  }
+
+  // Ohne das Recht "rechte_lesen" fehlen Freigabe und Protokoll -- beide,
+  // nicht nur eines: Das Protokoll zeigt, wer wann in die Anlage gesehen
+  // hat, und ist damit so vertraulich wie die Freigabe selbst.
+  {
+    const ohneRecht = await seite.evaluate(() => {
+      const echt = window.darf;
+      window.darf = r => r !== 'rechte_lesen';
+      spFreigabeSetzen();
+      spReiterZeigen('freigabe');
+      const sichtbar = [...document.querySelectorAll('#spReiter .rdkr-tab')]
+        .filter(e => e.offsetParent !== null)
+        .map(e => e.querySelector('.rdkr-tab-lbl').textContent.trim());
+      const aktiv = document.querySelector('#spReiter .rdkr-tab.aktiv .rdkr-tab-lbl');
+      window.darf = echt;
+      spFreigabeSetzen();
+      spReiterZeigen('anfragen');
+      return { sichtbar, aktiv: aktiv ? aktiv.textContent.trim() : '' };
+    });
+    check('KRITISCH: ohne "rechte_lesen" fehlen Support-Freigabe UND Protokoll',
+      JSON.stringify(ohneRecht.sichtbar) === JSON.stringify(['Meine Anfragen', 'Anliegen melden']));
+    check('KRITISCH: ein Aufruf auf einen gesperrten Reiter landet auf dem ersten, nicht im Leeren',
+      ohneRecht.aktiv === 'Meine Anfragen');
   }
 
   // Leer ist etwas anderes als nicht abrufbar.
