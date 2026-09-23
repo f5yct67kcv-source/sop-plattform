@@ -551,11 +551,26 @@ function anthropic_route_diktat(string $text, array $kunden, array $mitarbeiter,
         'input_schema' => [
             'type' => 'object',
             'properties' => [
+                // "anderes" und "unklar" seit ENT-692. Vorher kannte das Feld
+                // nur die drei Bereiche und war Pflicht -- eine Offerte oder
+                // "zeig mir die Planung" landete zwangslaeufig in einem davon,
+                // meist im Einsatz. Zwei Werte statt einem, weil "verstanden,
+                // aber noch nicht moeglich" und "nicht verstanden" zwei
+                // verschiedene Aussagen sind und verschiedene Saetze brauchen.
                 'bereich' => [
                     'type' => 'string',
-                    'enum' => ['mitarbeiter', 'kunde', 'einsatz'],
+                    'enum' => ['mitarbeiter', 'kunde', 'einsatz', 'anderes', 'unklar'],
                     'description' => 'mitarbeiter: eine neue oder zu aendernde Person des Personals. kunde: eine neue '
-                        . 'Firma fuer die Kundendatei. einsatz: ein geplanter Auftrag oder Termin mit Datum und Zeit.',
+                        . 'Firma fuer die Kundendatei. einsatz: ein geplanter Auftrag oder Termin mit Datum und Zeit. '
+                        . 'anderes: der Text ist verstaendlich, verlangt aber etwas anderes als diese drei -- z.B. eine '
+                        . 'Offerte, eine Rechnung, ein Objekt, eine Auswertung oder das Oeffnen einer Seite. Eine '
+                        . 'Offerte ist KEIN Einsatz, auch wenn sie ein Datum nennt. unklar: der Text laesst sich '
+                        . 'keinem Anliegen zuordnen. Im Zweifel anderes oder unklar statt einer erzwungenen Zuordnung.',
+                ],
+                'anliegen' => [
+                    'type' => 'string',
+                    'description' => 'Nur bei bereich = anderes: was der Text verlangt, in zwei bis vier Worten, '
+                        . 'z.B. "Offerte erstellen" oder "Planung oeffnen".',
                 ],
                 'aktion' => [
                     'type' => 'string',
@@ -655,11 +670,128 @@ function anthropic_route_diktat(string $text, array $kunden, array $mitarbeiter,
         . "Erkenne, ob der Text eine neue Person, eine neue Firma oder einen geplanten Einsatz beschreibt, "
         . "und fuelle nur das passende der drei Felder. Beschreibt der Text stattdessen eine AENDERUNG an "
         . "einer bereits bekannten Person aus der Liste, setze bereich auf mitarbeiter, aktion auf aendern "
-        . "und fuelle mitarbeiter_aenderung statt mitarbeiter. Erfinde nichts -- ein Feld, das im Text nicht "
-        . "vorkommt, laesst du weg.\n\n"
+        . "und fuelle mitarbeiter_aenderung statt mitarbeiter. Verlangt der Text etwas anderes (Offerte, "
+        . "Rechnung, Seite oeffnen ...), setze bereich auf anderes und nenne das anliegen; verstehst du ihn "
+        . "nicht, setze unklar. Erfinde nichts -- ein Feld, das im Text nicht vorkommt, laesst du weg. "
+        . "Schreibe nie einen Platzhalter wie <UNKNOWN>, unbekannt oder n/a in ein Feld.\n\n"
         . "Text:\n{$text}";
 
     return anthropic_tool_call($tool, $userContent);
+}
+
+// ══════════════════════════════════════════ ROUTER-ERGEBNIS AUSWERTEN (ENT-692)
+//
+// Was das Modell zurueckgibt, wird hier -- ohne Netz, ohne Datenbank -- in die
+// Antwort an die Oberflaeche uebersetzt. Herausgezogen aus ki_router_parse.php,
+// damit sich jeder Zweig pruefen laesst (pruef_ki.php), nicht nur der eine, den
+// eine Umgebung ohne Schluessel gerade herstellt.
+
+// Ein Wert, der "weiss ich nicht" sagt, ist kein Wert. Das Modell hat
+// "<UNKNOWN>" als Kundennamen geliefert (Bildschirmfoto vom 2026-09-23); die
+// Oberflaeche markierte es blau als erkannt. Unbekannt sah damit aus wie ein
+// Kunde -- die Umkehrung der Regel "unbekannt darf nie wie keine aussehen".
+function ki_platzhalter(string $wert): bool
+{
+    $w = mb_strtolower(trim($wert));
+    if ($w === '') {
+        return true;
+    }
+    if (preg_match('/^[<\[{(].*[>\]})]$/u', $w)) {
+        return true;   // <UNKNOWN>, [unbekannt], {name} ...
+    }
+    return in_array($w, [
+        'unknown', 'unbekannt', 'n/a', 'na', 'n.a.', 'null', 'none', 'undefined', 'tbd', 'k.a.',
+        'keine angabe', 'nicht angegeben', 'nicht bekannt', 'nicht genannt', '-', '--', '—', '?', '??', '...', '…',
+    ], true);
+}
+
+// Leere und Platzhalter-Werte weg, auch eine Ebene tiefer nicht noetig: Alle
+// Felder des Routers sind flach, ausser den Login-Namen (eigene Pruefung).
+function ki_felder_saeubern(array $roh, array $erlaubt): array
+{
+    $felder = [];
+    foreach ($erlaubt as $f) {
+        if (!array_key_exists($f, $roh) || is_array($roh[$f])) {
+            continue;
+        }
+        $wert = trim((string)$roh[$f]);
+        if (!ki_platzhalter($wert)) {
+            $felder[$f] = $wert;
+        }
+    }
+    return $felder;
+}
+
+// Gibt [HTTP-Code, Antwort] zurueck.
+function ki_router_auswerten(array $e, array $maLoginNamen): array
+{
+    $bereich = (string)($e['bereich'] ?? '');
+
+    if ($bereich === 'anderes') {
+        $anliegen = trim((string)($e['anliegen'] ?? ''));
+        $anliegen = ki_platzhalter($anliegen) ? '' : mb_substr($anliegen, 0, 60);
+        return [422, [
+            'status' => 'error',
+            'grund' => 'nicht_abgedeckt',
+            'anliegen' => $anliegen,
+            'message' => ($anliegen !== '' ? "Verstanden: „{$anliegen}“. " : 'Verstanden, aber ')
+                . 'Das kann die Spracheingabe noch nicht. Sie legt heute Mitarbeitende, Kunden und Einsätze an '
+                . 'und ändert Mitarbeitende. Es wurde nichts geöffnet.',
+        ]];
+    }
+    if (!in_array($bereich, ['mitarbeiter', 'kunde', 'einsatz'], true)) {
+        return [422, [
+            'status' => 'error',
+            'grund' => 'unklar',
+            'message' => 'Der Text liess sich keinem Anliegen zuordnen. Bitte etwas genauer sagen, '
+                . 'z. B. „Neuer Kunde …“ oder „Neuer Einsatz für … am …“.',
+        ]];
+    }
+
+    $mitFelder = ['anrede', 'vorname', 'nachname', 'geburtsdatum', 'strasse', 'ort', 'telefon', 'mobil', 'email'];
+
+    // "aendern" gibt es nur bei Mitarbeitenden (ENT-042).
+    if ($bereich === 'mitarbeiter' && ($e['aktion'] ?? 'neu') === 'aendern') {
+        $aenderung = (array)($e['mitarbeiter_aenderung'] ?? []);
+        $loginName = trim((string)($aenderung['mitarbeiter_login_name'] ?? ''));
+        // Die KI soll nur zuordnen, nie einen Namen erfinden.
+        if ($loginName === '' || !in_array($loginName, $maLoginNamen, true)) {
+            return [422, [
+                'status' => 'error',
+                'grund' => 'person_unklar',
+                'message' => 'Die gemeinte Person liess sich nicht eindeutig zuordnen -- bitte im Mitarbeitenden-Bereich direkt diktieren.',
+            ]];
+        }
+        return [200, [
+            'status' => 'ok', 'bereich' => $bereich, 'aktion' => 'aendern',
+            'mitarbeiter_login_name' => $loginName,
+            'aenderungen' => ki_felder_saeubern((array)($aenderung['aenderungen'] ?? []), $mitFelder),
+        ]];
+    }
+
+    if ($bereich === 'mitarbeiter') {
+        return [200, ['status' => 'ok', 'bereich' => $bereich, 'aktion' => 'neu',
+            'felder' => ki_felder_saeubern((array)($e['mitarbeiter'] ?? []), $mitFelder)]];
+    }
+    if ($bereich === 'kunde') {
+        return [200, ['status' => 'ok', 'bereich' => $bereich, 'aktion' => 'neu',
+            'felder' => ki_felder_saeubern((array)($e['kunde'] ?? []),
+                ['name', 'strasse', 'hausnummer', 'plz', 'ort', 'telefon', 'email'])]];
+    }
+
+    $roh = (array)($e['einsatz'] ?? []);
+    $felder = ki_felder_saeubern($roh,
+        ['kunde_name', 'titel', 'strasse', 'ort', 'datum', 'von', 'bis', 'einsatzart', 'bemerkung']);
+    if (isset($roh['bedarf']) && is_numeric($roh['bedarf']) && (int)$roh['bedarf'] > 0) {
+        $felder['bedarf'] = min(99, (int)$roh['bedarf']);
+    }
+    // Nur bekannte Login-Namen duerfen als Zuteilung in die Oberflaeche.
+    $maNamen = array_values(array_intersect(
+        array_map('strval', array_filter((array)($roh['mitarbeiter_login_namen'] ?? []), 'is_scalar')),
+        $maLoginNamen
+    ));
+    return [200, ['status' => 'ok', 'bereich' => $bereich, 'aktion' => 'neu',
+        'felder' => $felder, 'mitarbeiter_login_namen' => $maNamen]];
 }
 
 // Liest einen Einsatz aus einem Bild (Screenshot einer E-Mail, eines Auftrags-

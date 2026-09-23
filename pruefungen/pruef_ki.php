@@ -167,6 +167,59 @@ pruef('Bei den selbsterklaerenden Gruenden haengt sie NICHT an',
     && !str_contains(ki_fehler_text('guthaben_leer')['message'], 'model: claude-beispiel'));
 ki_fehler_einzelheit('');
 
+// ══════════ DER ROUTER ZWINGT NICHTS IN EINEN BEREICH (ENT-692) ══════
+// Vorher kannte das Modell nur mitarbeiter/kunde/einsatz, das Feld war
+// Pflicht -- eine diktierte Offerte oeffnete "Neuer Einsatz". Geprueft wird
+// die Auswertung, nicht das Modell: was die Oberflaeche aus einer Antwort
+// macht.
+$bek = ['hmuster', 'afrei'];
+
+[$c, $a] = ki_router_auswerten(['bereich' => 'anderes', 'anliegen' => 'Offerte erstellen'], $bek);
+pruef('KRITISCH: ein Anliegen ausserhalb der drei Bereiche oeffnet keinen Dialog',
+    $c !== 200 && $a['status'] !== 'ok' && !isset($a['bereich']));
+pruef('Das erkannte Anliegen wird zurueckgemeldet, nicht verschluckt',
+    ($a['anliegen'] ?? '') === 'Offerte erstellen' && str_contains($a['message'], 'Offerte erstellen'));
+
+[$c2, $a2] = ki_router_auswerten(['bereich' => 'unklar'], $bek);
+[$c3, $a3] = ki_router_auswerten([], $bek);
+pruef('KRITISCH: nicht verstanden oeffnet ebenfalls keinen Dialog (auch ohne jedes Feld)',
+    $c2 !== 200 && $c3 !== 200 && $a2['status'] !== 'ok' && $a3['status'] !== 'ok');
+pruef('"Verstanden, aber nicht moeglich" und "nicht verstanden" sind zwei verschiedene Aussagen',
+    $a['grund'] !== $a2['grund'] && $a['message'] !== $a2['message']);
+[, $a4] = ki_router_auswerten(['bereich' => 'anderes', 'anliegen' => '<UNKNOWN>'], $bek);
+pruef('Ein Platzhalter als Anliegen wird nicht als Anliegen ausgegeben',
+    ($a4['anliegen'] ?? 'x') === '' && !str_contains($a4['message'], 'UNKNOWN'));
+
+// Platzhalter: der Fall aus dem Bildschirmfoto vom 2026-09-23.
+[$c5, $a5] = ki_router_auswerten(['bereich' => 'einsatz', 'einsatz' => [
+    'kunde_name' => '<UNKNOWN>', 'titel' => 'Verkehrsdienst', 'ort' => 'unbekannt',
+    'strasse' => 'n/a', 'datum' => '2000-01-01', 'von' => '07:00', 'bis' => '19:00', 'bedarf' => 2,
+    'mitarbeiter_login_namen' => ['hmuster', 'erfunden'],
+]], $bek);
+pruef('KRITISCH: ein Platzhalter als Kundenname kommt nicht als erkannter Wert an',
+    $c5 === 200 && !array_key_exists('kunde_name', $a5['felder']));
+pruef('Auch andere Platzhalter-Formen fallen weg (unbekannt, n/a)',
+    !array_key_exists('ort', $a5['felder']) && !array_key_exists('strasse', $a5['felder']));
+pruef('Echte Werte bleiben stehen',
+    $a5['felder']['titel'] === 'Verkehrsdienst' && $a5['felder']['von'] === '07:00' && $a5['felder']['bedarf'] === 2);
+pruef('KRITISCH: nur bekannte Login-Namen werden zugeteilt',
+    $a5['mitarbeiter_login_namen'] === ['hmuster']);
+
+[, $a6] = ki_router_auswerten(['bereich' => 'kunde', 'kunde' => ['name' => '[Firmenname]', 'ort' => 'Musterstadt']], $bek);
+pruef('Platzhalter fallen auch beim Kunden weg', !isset($a6['felder']['name']) && $a6['felder']['ort'] === 'Musterstadt');
+[, $a7] = ki_router_auswerten(['bereich' => 'mitarbeiter', 'mitarbeiter' => ['vorname' => 'Anna', 'nachname' => 'UNKNOWN']], $bek);
+pruef('... und bei neuen Mitarbeitenden', $a7['felder'] === ['vorname' => 'Anna']);
+[$c8, $a8] = ki_router_auswerten(['bereich' => 'mitarbeiter', 'aktion' => 'aendern',
+    'mitarbeiter_aenderung' => ['mitarbeiter_login_name' => 'hmuster', 'aenderungen' => ['telefon' => '<unbekannt>', 'ort' => 'Musterdorf']]], $bek);
+pruef('... und bei Aenderungen: ein Platzhalter ueberschreibt kein bestehendes Feld',
+    $c8 === 200 && $a8['aenderungen'] === ['ort' => 'Musterdorf']);
+[$c9] = ki_router_auswerten(['bereich' => 'mitarbeiter', 'aktion' => 'aendern',
+    'mitarbeiter_aenderung' => ['mitarbeiter_login_name' => 'erfunden']], $bek);
+pruef('KRITISCH: eine unbekannte Person wird nicht geaendert', $c9 !== 200);
+// Wertebereich des Platzhalter-Filters: gewoehnliche Woerter bleiben Werte.
+pruef('Gewoehnliche Werte gelten nicht als Platzhalter (Keine-Sorgen AG, Na, 0)',
+    !ki_platzhalter('Keine-Sorgen AG') && !ki_platzhalter('Nau') && !ki_platzhalter('0'));
+
 // ══════════ DER GRUND UEBERLEBT DEN RUECKWEG ══════════════════════════
 // Die Funktionen geben weiterhin null zurueck; der Grund steht daneben.
 ki_fehlergrund('dienst_gestoert');
