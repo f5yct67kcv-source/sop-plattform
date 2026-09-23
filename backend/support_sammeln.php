@@ -138,6 +138,10 @@ function be_freigabe_lagen(PDO $stamm, array $mandanten): array
             'subdomain'  => (string)($m['subdomain'] ?? ''),
             'lage'       => 'nicht_feststellbar',
             'freigabe'   => null,
+            // Immer vorhanden, auch wenn die Anlage stumm blieb: Ein
+            // fehlender Schluessel saehe in der Oberflaeche aus wie "nicht
+            // gebeten", und das waere eine Behauptung.
+            'bitte'      => null,
         ];
 
         $verbindung = mandant_verbindung_bereit($m);
@@ -150,6 +154,16 @@ function be_freigabe_lagen(PDO $stamm, array $mandanten): array
         try {
             $pdo = mandant_db($m);
             $eintrag['lage'] = support_lage($pdo);
+            // Ob dort eine Bitte offen steht (ENT-683). Der Betreiber soll
+            // in der Liste sehen, wen er schon gefragt hat -- sonst fragt er
+            // denselben Betrieb ein zweites Mal, und das sieht von dort aus
+            // aus wie Draengen.
+            $bitte = support_bitte_offen($pdo);
+            $eintrag['bitte'] = $bitte === null ? null : [
+                'von' => (string)$bitte['gebeten_von'],
+                'am'  => (string)$bitte['gebeten_am'],
+                'zweck' => (string)$bitte['zweck'],
+            ];
             $offen = support_freigabe_gueltig($pdo);
             if ($offen !== null) {
                 // Der Zweck steht mit dabei: Er sagt, WOFUER geoeffnet

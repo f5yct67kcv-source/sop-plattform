@@ -451,60 +451,6 @@ function ma_personalnummer_gueltig(string $pn): bool
     return preg_match('/^[1-9]\d{3}$/', $pn) === 1;
 }
 
-// ── Personalnummern-Nachtrag im Bestand (ENT-387) ───────────────────────
-// Wer schon eine Personalnummer hat, behaelt sie unveraendert -- nur wer
-// keine hat, bekommt eine zugewiesen. Reine Berechnung, schreibt nichts;
-// Vorschau (GET) und Ausfuehrung (POST) im Endpunkt rufen dieselbe Funktion
-// auf, gleiches Muster wie ma_login_migrationsplan().
-//
-// Anders als beim Login-Namen gibt es hier keine Namensgleichheit und
-// keine uebersprungenen Zeilen: Jede Person ohne Nummer bekommt eine.
-function ma_personalnummer_migrationsplan(PDO $pdo): array
-{
-    $rows = $pdo->query('SELECT id, name, personalnummer, aktiv, erstellt_am FROM mitarbeiter WHERE ' . ma_nur_menschen($pdo) . ' ORDER BY id')
-                ->fetchAll(PDO::FETCH_ASSOC);
-    $vergeben = [];
-    foreach ($rows as $r) {
-        $pn = trim((string)$r['personalnummer']);
-        if ($pn !== '') { $vergeben[$pn] = true; }
-    }
-
-    $plan = [];
-    foreach ($rows as $r) {
-        $pn = trim((string)$r['personalnummer']);
-        if ($pn !== '') {
-            $plan[] = ['id' => (int)$r['id'], 'name' => $r['name'], 'alt' => $pn, 'neu' => $pn,
-                'status' => 'unveraendert', 'aktiv' => (bool)$r['aktiv'], 'erstellt_am' => $r['erstellt_am']];
-            continue;
-        }
-        do {
-            $kandidat = (string)random_int(1000, 9999);
-        } while (isset($vergeben[$kandidat]));
-        $vergeben[$kandidat] = true;
-        $plan[] = ['id' => (int)$r['id'], 'name' => $r['name'], 'alt' => null, 'neu' => $kandidat,
-            'status' => 'zugewiesen', 'aktiv' => (bool)$r['aktiv'], 'erstellt_am' => $r['erstellt_am']];
-    }
-    return $plan;
-}
-
-// Fuehrt den Plan aus ma_personalnummer_migrationsplan() wirklich aus.
-// Anders als bei ma_login_migrieren() gibt es hier keine Sitzungen zu
-// beenden -- die Personalnummer ist kein Anmeldemerkmal, ihre Vergabe
-// meldet niemanden ab. Nur Zeilen mit Status "zugewiesen" werden
-// angefasst; wer schon eine Nummer hatte, bleibt unberuehrt.
-function ma_personalnummer_migrieren(PDO $pdo, array $akteur): array
-{
-    $plan = ma_personalnummer_migrationsplan($pdo);
-    $upd = $pdo->prepare('UPDATE mitarbeiter SET personalnummer = ? WHERE id = ?');
-    foreach ($plan as $eintrag) {
-        if ($eintrag['status'] !== 'zugewiesen') { continue; }
-        $upd->execute([$eintrag['neu'], $eintrag['id']]);
-        logbuch_schreiben($pdo, $akteur, 'mitarbeiter', $eintrag['id'],
-            'personalnummer', $eintrag['alt'], $eintrag['neu']);
-    }
-    return $plan;
-}
-
 // ── AHV-Nummer (ENT-451, revidiert ENT-348) ──────────────────────────────
 // Die schweizerische Versichertennummer ist 13-stellig, beginnt mit dem
 // Laenderpraefix 756 und traegt an letzter Stelle eine EAN-13-Pruefziffer.

@@ -299,17 +299,24 @@ function sv_tabellen_da(PDO $stamm): bool
 // einordnen kann -- und genau das entstünde, bräche es zwischen den beiden
 // Schreibvorgängen ab.
 function sv_einreichen(PDO $stamm, int $mandantId, array $werte,
-                       string $melder, string $melderRolle): int
+                       string $melder, string $melderRolle,
+                       string $melderEmail = ''): int
 {
+    // Die Adresse nur mitschreiben, wenn die Spalte steht (ENT-685). Auf
+    // einer Anlage, deren Einrichtung noch nicht gelaufen ist, gibt es sie
+    // nicht -- und eine Anfrage darf daran nicht scheitern. Sie ist der
+    // Weg, auf dem jemand Hilfe holt.
+    $mitEmail = hat_spalte($stamm, 'support_vorgang', 'melder_email');
+
     $stamm->beginTransaction();
     try {
         $s = $stamm->prepare(
             'INSERT INTO support_vorgang
                (mandant_id, betreff, art, status, melder_name, melder_rolle,
-                bildschirm, umgebung)
-             VALUES (?, ?, ?, \'neu\', ?, ?, ?, ?)'
+                bildschirm, umgebung' . ($mitEmail ? ', melder_email' : '') . ')
+             VALUES (?, ?, ?, \'neu\', ?, ?, ?, ?' . ($mitEmail ? ', ?' : '') . ')'
         );
-        $s->execute([
+        $werteListe = [
             $mandantId,
             $werte['betreff'],
             $werte['art'],
@@ -317,7 +324,9 @@ function sv_einreichen(PDO $stamm, int $mandantId, array $werte,
             mb_substr($melderRolle, 0, 200),
             $werte['bildschirm'],
             $werte['umgebung'],
-        ]);
+        ];
+        if ($mitEmail) { $werteListe[] = mb_substr($melderEmail, 0, 200); }
+        $s->execute($werteListe);
         $id = (int)$stamm->lastInsertId();
 
         $stamm->prepare(
@@ -558,6 +567,61 @@ function sv_benachrichtigen(PDO $stamm, array $vorgang, string $mandantName,
     return ['gesendet' => $gesendet, 'lage' => $gesendet > 0 ? 'ok' : 'fehlgeschlagen'];
 }
 
+// ── Die Antwort zurück an den Betrieb (ENT-685) ───────────────────────
+//
+// Die Gegenrichtung von sv_benachrichtigen(): Dort erfährt der Betreiber,
+// dass eine Anfrage da ist. Hier erfährt der Betrieb, dass sie beantwortet
+// wurde. Beides gab es bis heute nur in eine Richtung -- der Kunde, der auf
+// Antwort wartet, erfuhr sie gar nicht.
+//
+// AN DIE PERSON, DIE GEFRAGT HAT, und an niemanden sonst. Nicht an alle mit
+// Verwaltungsrecht: Eine Supportantwort kann schildern, was in diesem
+// Betrieb schiefläuft, und das geht die übrige Verwaltung nichts an,
+// solange sie nicht selbst gefragt hat.
+//
+// DER TEXT DER ANTWORT STEHT NICHT IN DER MAIL. Sie sagt, dass eine
+// Antwort da ist, und nennt den Weg dorthin. Eine Mail wandert durch fremde
+// Server; der Inhalt eines Supportfalls bleibt in der Anlage.
+//
+// Wie beim Eingang gilt: Der Versand darf das Antworten NIE scheitern
+// lassen. Die Antwort steht im Vorgang, sobald sie geschrieben ist.
+function sv_kunde_benachrichtigen(array $vorgang, string $absenderName, ?string $basis): array
+{
+    if (!function_exists('smtp_senden') || !function_exists('smtp_konfiguriert')
+        || !smtp_konfiguriert()) {
+        return ['gesendet' => 0, 'lage' => 'kein_versand'];
+    }
+    $an = trim((string)($vorgang['melder_email'] ?? ''));
+    if ($an === '' || !filter_var($an, FILTER_VALIDATE_EMAIL)) {
+        // Keine Adresse ist etwas anderes als ein fehlgeschlagener Versand:
+        // Der Vorgang stammt aus der Zeit vor dieser Spalte, oder das Konto
+        // hat keine hinterlegt. Die Glocke im Cockpit trägt die Meldung
+        // trotzdem.
+        return ['gesendet' => 0, 'lage' => 'keine_adresse'];
+    }
+
+    $betreff = (string)($vorgang['betreff'] ?? '');
+    $link    = $basis !== null ? rtrim($basis, '/') . '/dashboard.html' : null;
+
+    $text = "Guten Tag\n\n"
+          . "Auf Ihre Supportanfrage \"" . $betreff . "\" ist eine Antwort eingegangen.\n\n"
+          . ($link !== null
+              ? "Sie steht im Cockpit unter Administration:\n" . $link . "\n\n"
+              : "Sie steht im Cockpit unter Administration.\n\n")
+          . "Freundliche Grüsse\n" . $absenderName;
+    $html = '<p>' . nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8')) . '</p>';
+
+    try {
+        smtp_senden($an, (string)($vorgang['melder_name'] ?? ''),
+                    'Antwort auf Ihre Supportanfrage: ' . $betreff, $html, $text);
+        return ['gesendet' => 1, 'lage' => 'ok'];
+    } catch (Throwable $e) {
+        // Der Text des Mailservers kann Host und Benutzer enthalten und
+        // geht nicht nach aussen -- gemeldet wird die Lage.
+        return ['gesendet' => 0, 'lage' => 'fehlgeschlagen'];
+    }
+}
+
 // ── Die benannte Ausnahme ─────────────────────────────────────────────
 //
 // Dies ist die EINZIGE Funktion, über die Mandanten-Code die Betreiber-Ebene
@@ -593,6 +657,65 @@ function sv_mandant_bestimmen(PDO $stamm, PDO $betrieb): array
         if ((int)$m['id'] === ($treffer['id'] ?? -1)) { $name = (string)$m['name']; break; }
     }
     return ['id' => $treffer['id'], 'lage' => $treffer['lage'], 'name' => $name];
+}
+
+// ── Was der BETRIEB noch nicht gesehen hat (ENT-685) ──────────────────
+//
+// ANLASS: Der Betreiber antwortete, und im Cockpit stand davon nichts --
+// ausser dem Wort "Antwort erhalten" in einer Liste, die man erst aufsuchen
+// muss. Ein Kunde, der Support fragt, wartet auf genau diese Antwort; er
+// soll sie nicht suchen muessen.
+//
+// UNGELESEN HEISST: Die letzte Nachricht kommt vom Betreiber, und der
+// Betrieb hatte den Vorgang seither nicht offen. Nicht "Status ist
+// wartet_auf_kunde" -- der Status sagt, wer am Zug ist, und bleibt auch
+// dann stehen, wenn die Antwort laengst gelesen wurde. Zwei verschiedene
+// Aussagen, zwei verschiedene Felder.
+//
+// OHNE DIE SPALTE gibt es keine Aussage: Dann liefert die Funktion eine
+// leere Liste und der Aufrufer meldet es als "nicht feststellbar" -- nicht
+// als "nichts Neues". Eine Anlage vor dem Einrichtungslauf weiss es
+// schlicht nicht.
+function sv_kunde_ungelesen(PDO $stamm, ?int $mandantId = null, int $grenze = 20): array
+{
+    if (!sv_tabellen_da($stamm)
+        || !hat_spalte($stamm, 'support_vorgang', 'kunde_gelesen_am')) {
+        return [];
+    }
+    $wo = ''; $werte = [];
+    if ($mandantId !== null) { $wo = ' AND v.mandant_id = ?'; $werte[] = $mandantId; }
+
+    // Die letzte Nachricht je Vorgang steckt in der Unterabfrage, nicht in
+    // einer zweiten Runde: Sonst waere die Entscheidung "ungelesen" auf
+    // zwei Abfragen verteilt, zwischen denen sich der Stand aendern kann.
+    $s = $stamm->prepare(
+        'SELECT v.id, v.betreff, v.art, v.status, v.kunde_gelesen_am,
+                n.erstellt_am AS antwort_am, n.autor AS antwort_von, n.text AS antwort_text
+           FROM support_vorgang v
+           JOIN support_nachricht n ON n.id = (
+                SELECT n2.id FROM support_nachricht n2
+                 WHERE n2.vorgang_id = v.id ORDER BY n2.id DESC LIMIT 1)
+          WHERE n.seite = \'betreiber\'
+            AND (v.kunde_gelesen_am IS NULL OR v.kunde_gelesen_am < n.erstellt_am)' . $wo . '
+          ORDER BY n.erstellt_am DESC LIMIT ' . max(1, min(50, $grenze))
+    );
+    $s->execute($werte);
+    return $s->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+// Der Betrieb hat den Vorgang angesehen.
+//
+// GESETZT WIRD BEIM LESEN, nicht beim Antworten: Wer die Antwort liest und
+// nichts zu sagen hat, hat sie trotzdem gelesen. Haengte das Abhaken am
+// Antworten, blieben genau die Faelle stehen, die erledigt sind.
+function sv_kunde_gesehen(PDO $stamm, int $id, ?int $mandantId = null): bool
+{
+    if (!hat_spalte($stamm, 'support_vorgang', 'kunde_gelesen_am')) { return false; }
+    $wo = ''; $werte = [$id];
+    if ($mandantId !== null) { $wo = ' AND mandant_id = ?'; $werte[] = $mandantId; }
+    $s = $stamm->prepare('UPDATE support_vorgang SET kunde_gelesen_am = NOW() WHERE id = ?' . $wo);
+    $s->execute($werte);
+    return $s->rowCount() > 0;
 }
 
 // ── Der Nachlauf ──────────────────────────────────────────────────────

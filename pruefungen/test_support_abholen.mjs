@@ -123,6 +123,98 @@ check('KRITISCH: und im Buendel der Anlage',
   check(`${f} sperrt den Abholweg`, lies(f).includes('support_sammeln'));
 });
 
+// ── 7. Die Bitte um eine Freigabe (ENT-683) ─────────────────────────
+//
+// Sie ist der einzige Weg, den der Betreiber selbst in der Hand hat -- und
+// genau darum die Stelle, an der aus "fragen duerfen" versehentlich
+// "hereinkommen duerfen" werden koennte.
+let bitteAus = '', bitteCode = 0;
+try {
+  bitteAus = execFileSync('php', [`${HIER}/pruef_support_bitte.php`], { encoding: 'utf8' });
+} catch (e) {
+  bitteAus = String(e.stdout || '') + String(e.stderr || '');
+  bitteCode = e.status || 1;
+}
+const bitteAnzahl = Number((bitteAus.match(/^(\d+) bestanden/m) || [0, 0])[1]);
+check('KRITISCH: die Faelle der Bitte bestehen (ausgefuehrt, nicht gelesen)',
+  bitteCode === 0 && bitteAnzahl > 0 && !bitteAus.includes('\nx '));
+bitteAus.split('\n').filter(z => z.startsWith('x ')).forEach(z => bad.push('PHP: ' + z.slice(2)));
+
+const bittePhp = nurCode(lies('backend/api/betreiber_support_bitte.php'));
+// Der Betreiber schreibt eine BITTE in die Anlage des Betriebs. Er darf
+// dort nichts anderes anfassen -- vor allem keine Freigabe ausstellen.
+check('KRITISCH: die Bitte stellt keine Freigabe aus',
+  !/support_freigeben\s*\(/.test(bittePhp));
+check('KRITISCH: sie schreibt nur ueber die Bitte-Funktionen',
+  !/\b(INSERT|UPDATE|DELETE)\b/i.test(bittePhp));
+// Wer bittet, kommt aus der Sitzung -- nie aus der Anfrage. Derselbe
+// Grundsatz wie beim Freigebenden (ENT-526).
+check('KRITISCH: der Bittende kommt aus der Sitzung',
+  /\$ich\['name'\]/.test(bittePhp)
+  && !/\$daten\['gebeten_von'\]|\$daten\['wer'\]/.test(bittePhp));
+check('KRITISCH: ohne Zweck keine Bitte', /\$zweck === ''[\s\S]{0,200}400/.test(bittePhp));
+check('sie verlangt eine Betreiber-Sitzung', /require_betreiber_voll\(\)/.test(bittePhp));
+
+// Und im Cockpit: Die Bitte steht in der bestehenden Karte, nicht in einem
+// eigenen Container (Festlegung des Projektinhabers, 2026-09-23), und der
+// Zweck wandert ins Formular, damit nur noch Dauer und Klick fehlen.
+const cockpit = lies('dashboard.html');
+check('KRITISCH: das Cockpit zeigt die Bitte in der Karte Support-Freigabe',
+  /bitteBlock/.test(cockpit) && /Der Betreiber bittet um Einblick/.test(cockpit));
+check('der Zweck der Bitte steht im Freigabe-Formular',
+  /value="'\s*\+\s*\(bitte \? esc\(bitte\.zweck\)/.test(cockpit));
+// Am Handy dieselbe Datei -- sonst laufen die beiden auseinander.
+check('das Handy-Buendel traegt denselben Stand',
+  lies('mobile/www/dashboard.html').includes('Der Betreiber bittet um Einblick'));
+
+// ── 8. Der Betrieb erfaehrt von der Antwort (ENT-685) ───────────────
+//
+// ANLASS: Der Betreiber antwortete, und im Cockpit stand davon nichts --
+// ausser einem Wort in einer Liste, die man erst aufsuchen muss.
+let rmAus = '', rmCode = 0;
+try {
+  rmAus = execFileSync('php', [`${HIER}/pruef_support_rueckmeldung.php`], { encoding: 'utf8' });
+} catch (e) {
+  rmAus = String(e.stdout || '') + String(e.stderr || '');
+  rmCode = e.status || 1;
+}
+const rmAnzahl = Number((rmAus.match(/^(\d+) bestanden/m) || [0, 0])[1]);
+check('KRITISCH: die Faelle der Rueckmeldung bestehen (ausgefuehrt)',
+  rmCode === 0 && rmAnzahl > 0 && !rmAus.includes('\nx '));
+rmAus.split('\n').filter(z => z.startsWith('x ')).forEach(z => bad.push('PHP: ' + z.slice(2)));
+
+// Die Glocke zieht ihre Zeilen aus derselben Stelle wie der Feed -- eine
+// zweite Abfrage koennte eine andere Zahl zeigen als die Zeilen daneben.
+const stats = nurCode(lies('backend/api/dashboard_stats.php'));
+check('KRITISCH: der Supportkanal haengt am Feed, nicht an einer zweiten Abfrage',
+  /ereignisse_sammeln\(db\(\), *12, *\$svStamm/.test(stats));
+// Ohne Zuordnung wird NICHT geraten: ein fremder Vorgang in dieser Glocke
+// waere schlimmer als eine Glocke ohne Support.
+check('KRITISCH: ohne Mandantenzuordnung bleibt der Supportkanal aussen vor',
+  /\$svMandant === null[\s\S]{0,80}\$svStamm = null/.test(stats));
+// Und der Feed darf nicht daran haengen, dass die Betreiber-Ebene
+// erreichbar ist -- er ist der Herzschlag der Uebersicht.
+check('KRITISCH: eine nicht erreichbare Betreiber-Ebene reisst den Feed nicht mit',
+  /catch \(Throwable \$e\)[\s\S]{0,120}\$svStamm = null/.test(stats));
+
+const feed = nurCode(lies('backend/ereignisse.php'));
+check('die Supportantwort ist nicht ueber den Feed abhakbar',
+  !/'support_antwort'\s*=>/.test((feed.match(/const EREIGNIS_ARTEN = \{[\s\S]*?\};/) || [''])[0]));
+
+const cockpit2 = lies('dashboard.html');
+check('KRITISCH: die Glocke kennt die Supportantwort',
+  /support_antwort:/.test(cockpit2) && /Support hat geantwortet|hat auf/.test(cockpit2));
+check('KRITISCH: der Klick fuehrt in den Vorgang, nicht in die Uebersicht',
+  /support_antwort'[\s\S]{0,300}saOeffnen\(e\.id\)/.test(cockpit2));
+check('das Abzeichen am Support-Eintrag wird gesetzt',
+  /supportAbzeichenSetzen/.test(cockpit2) && /nav-support-abz/.test(cockpit2));
+// Angesagt statt nur eingefaerbt -- wer die Seite hoert, erfaehrt aus einer
+// roten Scheibe nichts.
+check('das Abzeichen wird auch angesagt',
+  /aria-label[\s\S]{0,120}neue Antwort/.test(cockpit2));
+check('das Handy-Buendel traegt denselben Stand',
+  lies('mobile/www/dashboard.html').includes('supportAbzeichenSetzen'));
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

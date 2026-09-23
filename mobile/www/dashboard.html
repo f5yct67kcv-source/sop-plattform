@@ -5596,7 +5596,16 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     </div>
 
     <nav class="side-nav">
-      <div class="nav-lbl">Betrieb</div>
+      <!-- "Tagesgeschaeft" seit ENT-682, vorher "Betrieb". Uebersicht,
+           Planung und Abgleich sind die taegliche Arbeit -- Betriebsdaten
+           liegen in keinem der drei. Der Name "Betrieb" ist mit ENT-682 an
+           den Administrationsreiter gegangen, der ihn traegt: Dort stehen
+           die Angaben zum Betrieb. Bis dahin hiessen beide gleich, und
+           ENT-229 hatte die Verwechslung geloest, indem es den REITER
+           umbenannte -- die schlechtere Haelfte, wie der Projektinhaber
+           am 2026-09-23 festhielt: Der Name gehoert dorthin, wo geklickt
+           wird, nicht auf eine Ueberschrift. -->
+      <div class="nav-lbl">Tagesgeschäft</div>
       <button class="nav-item on" id="nav-uebersicht" title="Übersicht" onclick="go('uebersicht')">
         <svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
         <span class="lbl">Übersicht</span>
@@ -5780,12 +5789,15 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <div class="nav-kinder">
           <button class="nav-kind" id="nav-admin-mitarbeiter" onclick="go('mitarbeiter')">Mitarbeitende</button>
           <!-- "Leistungen" hiess bis ENT-230 "Produkte" (Offerten-Positionen
-               sind Dienstleistungen), "Einstellungen" bis ENT-229 "Betrieb"
-               (Verwechslung mit der Sidebar-Gruppe "Betrieb"). Bezeichner,
-               Ansichtsnamen ('produkte', 'betrieb') und Endpunkte behalten
-               die alten Namen. -->
+               sind Dienstleistungen). "Betrieb" hiess von ENT-229 bis
+               ENT-682 "Einstellungen" -- wegen der damals gleichnamigen
+               Sidebar-Rubrik. ENT-682 hat die andere Haelfte umbenannt
+               (jetzt "Tagesgeschaeft") und den Namen hierher zurueckgeholt:
+               Was hier liegt, sind Angaben zum Betrieb, keine Einstellungen
+               an der Software. Bezeichner, Ansichtsnamen ('produkte',
+               'betrieb') und Endpunkte behalten die alten Namen. -->
           <button class="nav-kind" id="nav-admin-produkte" onclick="go('produkte')">Leistungen</button>
-          <button class="nav-kind" id="nav-admin-betrieb" onclick="go('betrieb')">Einstellungen</button>
+          <button class="nav-kind" id="nav-admin-betrieb" onclick="go('betrieb')">Betrieb</button>
           <!-- Mitteilungen an die Belegschaft (ENT-421). Unter Administration
                und nicht unter Auswertung: Hier wird etwas verfasst, nicht
                ausgewertet -- dieselbe Rubrik wie Mitarbeitende, an denen
@@ -5796,6 +5808,13 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                wird jemandem von aussen ein Zugang ins System gegeben. Das
                eigene Recht 'portal' haelt das auseinander. -->
           <button class="nav-kind" id="nav-admin-portal" onclick="go('portal')">Kundenzugänge</button>
+          <!-- Support (ENT-682). Eigener Reiter statt zweier Kacheln unter
+               "Einstellungen": Supportanfrage und Support-Freigabe betreffen
+               nicht den eigenen Betrieb, sondern den Betreiber der Plattform.
+               Ohne Rechtezeile in NAV_RECHTE -- fragen darf jeder, der ins
+               Cockpit kommt (die Grenze sitzt im Server, require_verwaltung),
+               und die Freigabe darin haengt an ihrem eigenen Recht. -->
+          <button class="nav-kind" id="nav-admin-support" onclick="go('support')">Support</button>
         </div>
       </div>
 
@@ -5835,12 +5854,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
            sind Ortswechsel. Der Fussteil folgt damit weiter seiner Ordnung --
            Werkzeuge, wer bin ich, wohin gehe ich, wie gehe ich raus.
 
-           WARUM HIER UND NICHT NUR IN DEN EINSTELLUNGEN: Die Kachel unter
-           Administration → Einstellungen bleibt der Ort, an dem der Vorgang
-           wohnt. Aber wer gerade nicht weiterkommt, sucht Hilfe dort, wo er
-           steht -- und nicht in einem Einstellungsbereich, den er in dem
-           Moment erst finden muss. Derselbe Griff wie beim Logo-Menü der
-           Anwendung, die der Projektinhaber als Vorbild gezeigt hat.
+           WARUM HIER UND NICHT NUR IM REITER: Seit ENT-682 wohnt der
+           Vorgang unter Administration → Support. Aber wer gerade nicht
+           weiterkommt, sucht Hilfe dort, wo er steht -- und nicht in einer
+           Rubrik, die er in dem Moment erst finden muss. Derselbe Griff wie
+           beim Logo-Menü der Anwendung, die der Projektinhaber als Vorbild
+           gezeigt hat.
 
            AUCH AM HANDY, auf ausdrücklichen Wunsch des Projektinhabers
            (Hausregel: der mobile Zuschnitt ist seine Entscheidung, nicht die
@@ -5850,17 +5869,30 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
            deshalb nicht nötig -- und zwei Zuschnitte für dieselbe Sache wären
            zwei Stellen, die auseinanderlaufen können.
 
-           WAS DABEI ZU LÖSEN WAR: Der Abschnitt liegt in der Administration,
-           und die ist am Handy nach ENT-235 bewusst nicht erreichbar. Über
-           den Zurück-Knopf käme man von hier aus in ihre Kachelübersicht und
-           damit doch hinein -- eine Tür, die jemand absichtlich zugemacht
-           hat, als Nebenwirkung wieder offen. Darum führt Zurück am Handy
-           dorthin, wo man herkam (siehe saZurueck). -->
-      <button class="nav-item" id="nav-support"
+           SEIT ENT-682 OHNE SONDERWEG: Solange der Abschnitt in der
+           Administration lag, führte der Zurück-Knopf am Handy in deren
+           Kachelübersicht -- also durch eine Tür, die ENT-235 dort
+           absichtlich zugemacht hat. Eine eigene Ansicht hat keine
+           Kachelübersicht über sich, der Sonderweg (saZurueck) ist damit
+           weggefallen. -->
+      <!-- ID BEWUSST NICHT "nav-support" (Befund 2026-09-23): go() sucht zu
+           jeder Ansicht den gleichnamigen Hauptpunkt ueber $('nav-' + view)
+           und markiert nur dann den passenden Unterpunkt, wenn es keinen
+           gibt. Dieser Schnellweg im Fussteil ist aber kein Hauptpunkt --
+           er trug den Namen schon, bevor es die Ansicht "support" gab. Die
+           Folge: In der Supportansicht blieb JEDER Unterpunkt unmarkiert,
+           und damit verschwand die ganze Reiterleiste der Administration
+           (topSubZeichnen() zeichnet sie aus dem markierten Unterpunkt). -->
+      <button class="nav-item" id="nav-support-schnellweg"
               title="Anliegen an den Betreiber der Plattform melden"
-              onclick="go('betrieb'); bkAbschnittZeigen('sa'); saLaden();">
+              onclick="go('support')">
         <svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span class="lbl">Support</span>
+        <!-- Ungelesene Antwort des Betreibers (ENT-685). Dieselbe Bauart wie
+             das Abzeichen an der Glocke -- und wie dort ANGESAGT statt nur
+             eingefaerbt: Wer die Seite hoert statt sieht, erfaehrt aus einer
+             roten Scheibe nichts. -->
+        <span class="glocke-badge" id="nav-support-abz" hidden></span>
       </button>
       <div class="side-user">
         <div class="avatar" id="uAvatar">–</div>
@@ -8334,15 +8366,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
               <span class="bk-kachel-lbl">Rollen & Berechtigungen</span>
             </button>
-            <!-- Personalnummern (ENT-387): eigene Kachel statt Teil von
-                 "Rollen & Berechtigungen" -- dort geht es um Zugriff, hier um
-                 ein Stammdatenfeld ohne Rechtebezug. Gleiche Bauart wie
-                 "Login-Namen umstellen" bei den Rollen: Vorschau, dann
-                 ausdrueckliche Bestaetigung. -->
-            <button type="button" class="bk-kachel" id="bkKachelPn" onclick="bkAbschnittZeigen('pn')">
-              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="15" x2="13" y2="15"/></svg></span>
-              <span class="bk-kachel-lbl">Personalnummern</span>
-            </button>
             <!-- Dienstfahrzeuge (ENT-313): der Fahrzeugbestand ist eine
                  betriebliche Stammdatei wie die Anstellungsorte, darum hier
                  und nicht in der Planung. Das spaetere Fahrtenbuch (Tacho bei
@@ -8351,28 +8374,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             <button type="button" class="bk-kachel" onclick="bkAbschnittZeigen('fz')">
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M3 13l2-5.5A2 2 0 0 1 6.9 6h10.2a2 2 0 0 1 1.9 1.5L21 13"/><path d="M3 13h18v4a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/></svg></span>
               <span class="bk-kachel-lbl">Dienstfahrzeuge</span>
-            </button>
-            <!-- Support-Freigabe (ENT-526). Steht hier und nicht bei den
-                 Kundenzugaengen: Es geht nicht um einen Kunden dieses
-                 Betriebs, sondern um den Betreiber der Plattform. Die Kachel
-                 erscheint nur mit dem Recht "Rollen & Berechtigungen" --
-                 wer sie bedient, oeffnet einem Betriebsfremden Einblick,
-                 und das ist dieselbe Art Entscheidung wie eine Rollenvergabe
-                 (siehe bkKachelSfSetzen). -->
-            <button type="button" class="bk-kachel" id="bkKachelSf" style="display:none"
-                    onclick="bkAbschnittZeigen('sf'); sfLaden();">
-              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></span>
-              <span class="bk-kachel-lbl">Support-Freigabe</span>
-            </button>
-            <!-- Supportanfrage (ENT-538). Neben der Freigabe, weil beides
-                 denselben Gegenueber betrifft -- aber OHNE die Rechtehuerde
-                 der Freigabe: Wer fragt, oeffnet niemandem die Tuer. Die
-                 Grenze sitzt im Server (require_verwaltung); wer in die
-                 Administration kommt, darf auch fragen. -->
-            <button type="button" class="bk-kachel"
-                    onclick="bkAbschnittZeigen('sa'); saLaden();">
-              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
-              <span class="bk-kachel-lbl">Supportanfrage</span>
             </button>
           </div>
 
@@ -8461,91 +8462,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         </div>
         </div>
 
-        <!-- Support-Freigabe (ENT-526). Der Plattform-Betreiber kann nur
-             hineinsehen, wenn dieser Betrieb es befristet erlaubt -- und
-             sieht dann ausschliesslich Diagnosedaten ohne Personenbezug.
-             Die Freigabe liegt bewusst in der Datenbank DIESES Betriebs:
-             laege sie beim Betreiber, koennte er sie sich selbst
-             ausstellen. Jeder Abruf steht im Protokoll unten. -->
-        <div class="bk-abschnitt" id="bkAb-sf" style="display:none">
-        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
-        <div class="grid">
-        <div class="card" id="sfKarte">
-          <div class="card-hd">
-            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></span>
-            <h3>Support-Freigabe</h3>
-          </div>
-          <div class="card-bd">
-            <div class="msg-err" id="sfErr" style="display:none"></div>
-            <div id="sfInhalt"><div style="color:var(--ink-3)">Wird geladen …</div></div>
-          </div>
-        </div>
-        <div class="card" id="sfProtokollKarte">
-          <div class="card-hd">
-            <span class="card-ic gedaempft"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
-            <h3>Protokoll</h3>
-          </div>
-          <div class="card-bd">
-            <div id="sfProtokoll"><div style="color:var(--ink-3)">Wird geladen …</div></div>
-          </div>
-        </div>
-        </div>
-        </div>
 
-        <!-- Supportanfrage (ENT-538). Der Weg vom Betrieb zum Betreiber:
-             ein Anliegen schildern, das nicht dringend genug fuer einen
-             Anruf ist, und den Verlauf dazu nachlesen.
-
-             Die Vorgaenge liegen in der Datenbank des BETREIBERS, nicht in
-             dieser -- anders als die Freigabe eine Zeile weiter oben.
-             Begruendung in backend/supportvorgang.php: Der Betreiber
-             braucht eine Arbeitsliste ueber alle Betriebe, und eine nicht
-             erreichbare Datenbank duerfte daraus nicht lautlos
-             herausfallen. Der Preis steht im Hinweis am Eingabefeld: Was
-             hier getippt wird, liegt beim Betreiber. -->
-        <div class="bk-abschnitt" id="bkAb-sa" style="display:none">
-        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="saZurueck()">Zurück</button>
-        <div class="grid">
-        <div class="card" id="saNeuKarte">
-          <div class="card-hd">
-            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
-            <h3>Anliegen melden</h3>
-          </div>
-          <div class="card-bd">
-            <div class="msg-err" id="saErr" style="display:none"></div>
-            <p class="zone-note" id="saHinweis" style="margin-top:0"></p>
-            <div id="saFormular"></div>
-          </div>
-        </div>
-        <div class="card" id="saListeKarte">
-          <div class="card-hd">
-            <span class="card-ic gedaempft"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
-            <h3>Meine Anfragen</h3>
-          </div>
-          <div class="card-bd">
-            <div id="saListe"><div style="color:var(--ink-3)">Wird geladen …</div></div>
-          </div>
-        </div>
-        <div class="card" id="saVorgangKarte" style="display:none">
-          <div class="card-hd">
-            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
-            <h3 id="saVorgangTitel">Vorgang</h3>
-          </div>
-          <div class="card-bd">
-            <div id="saVerlauf"></div>
-            <div style="margin-top:16px">
-              <label for="saAntwort">Nachricht</label>
-              <textarea class="inp" id="saAntwort" rows="3" maxlength="4000"
-                        placeholder="Rückfrage oder Ergänzung zu diesem Vorgang"></textarea>
-            </div>
-            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
-              <button type="button" class="btn btn-sm btn-primary" onclick="saAntworten()">Senden</button>
-              <button type="button" class="btn btn-sm" onclick="saSchliessen()">Schliessen</button>
-            </div>
-          </div>
-        </div>
-        </div>
-        </div>
 
         <!-- Zwei-Faktor-Anmeldung (ENT-076). Eigene Unteransicht statt neben
              Rollen zu stehen (ENT-161 hatte beide ueber ".g-1-1" gepaart,
@@ -8663,32 +8580,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             <div class="msg-err" id="lmErr" style="display:none"></div>
             <button type="button" class="btn btn-plain btn-sm" onclick="lmVorschau()">Vorschau laden</button>
             <div id="lmInhalt" style="margin-top:14px"></div>
-          </div>
-        </div>
-        </div>
-        </div>
-
-        <!-- Personalnummern (ENT-387): Nachtrag fuer Bestandsdaten ohne
-             Nummer, eigene Unteransicht neben "Rollen & Berechtigungen". -->
-        <div class="bk-abschnitt" id="bkAb-pn" style="display:none">
-        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
-        <div class="grid">
-        <div class="card" id="pnKarte">
-          <div class="card-hd">
-            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="15" x2="13" y2="15"/></svg></span>
-            <h3>Personalnummern</h3>
-          </div>
-          <div class="card-bd">
-            <div class="ki-hint web on" style="margin-bottom:14px">
-              <span>Jede Person bekommt beim Anlegen automatisch eine vierstellige Personalnummer
-                (1000–9999), zufällig statt fortlaufend vergeben — sie verrät damit weder Anlegereihenfolge
-                noch Mitarbeiterzahl. Das Feld lässt sich danach nicht mehr ändern. Wer schon eine
-                Personalnummer hat, behält sie unverändert; hier lassen sich nur <b>fehlende</b>
-                Personalnummern im Bestand nachtragen.</span>
-            </div>
-            <div class="msg-err" id="pnErr" style="display:none"></div>
-            <button type="button" class="btn btn-plain btn-sm" onclick="pnVorschau()">Vorschau laden</button>
-            <div id="pnInhalt" style="margin-top:14px"></div>
           </div>
         </div>
         </div>
@@ -8955,6 +8846,159 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             </div>
           </div>
         </div>
+        </div>
+        </div>
+      </section>
+
+      <!-- ══════════════════════════ SUPPORT ══════════════════════════
+           Eigene Ansicht seit ENT-682. Vorher lagen beide Teile als
+           Kacheln unter Administration → Einstellungen. Dort waren sie
+           falsch: Eine Einstellung beschreibt den eigenen Betrieb, hier
+           geht es um den Gegenueber -- den Betreiber der Plattform. Wer
+           Hilfe sucht, sucht sie nicht in einem Einstellungsbereich.
+
+           Beide Teile stehen untereinander statt hinter einer Kachelwand:
+           Zwei Karten rechtfertigen keine Zwischenstufe, und die Freigabe
+           faellt ohne das Recht "rechte_lesen" ohnehin weg (spFreigabe-
+           Setzen). Ein Zurueck-Knopf entfaellt damit auch -- die Ansicht
+           ist selbst die oberste Stufe.
+
+           AM HANDY ERREICHBAR, anders als der Rest der Administration
+           (ENT-235): Der Weg dorthin ist der Support-Knopf im Fussteil
+           der Seitenleiste, nicht die Administrationsrubrik. Damit
+           entfaellt auch der Sonderweg, den saZurueck bis ENT-682
+           gehen musste, um am Handy nicht in die Kachelübersicht der
+           Administration zu fuehren. -->
+      <section class="view" id="view-support">
+        <!-- Reiterleiste (ENT-687). Dasselbe Muster wie "Kontrollrunde
+             ändern" im Revierdienst (.rdkr-reiter/.rdkr-tab, ENT-261) --
+             ausdrückliche Vorgabe des Projektinhabers, 1:1 wie dort. Die
+             Klassen werden mitbenutzt statt nachgebaut; sie tragen seit
+             ENT-258 schon zwei Bereiche (Kontrollrunden und
+             Arbeitsergebnisse), eine dritte eigene Kopie wäre eine dritte
+             Stelle, die auseinanderläuft.
+
+             ZAHL NUR, WO ETWAS OFFEN IST: "Meine Anfragen" trägt einen
+             Zähler, sobald eine Antwort vorliegt -- das ist der Grund, aus
+             dem jemand nachsieht. Eine Zahl, die immer dasteht, ist
+             Dekoration; eine, die nur bei etwas Offenem erscheint, ist ein
+             Hinweis (siehe saReiterZahl).
+
+             "Protokoll" hängt am selben Recht wie die Freigabe
+             (rechte_lesen): Es zeigt, wer wann in die Anlage gesehen hat.
+             Ohne das Recht bleiben zwei Reiter statt vier -- siehe
+             spFreigabeSetzen(). -->
+        <div class="rdkr-reiter" id="spReiter">
+          <button type="button" class="rdkr-tab" data-reiter="anfragen" onclick="spReiterZeigen('anfragen')">
+            <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+            <span class="rdkr-tab-lbl">Meine Anfragen</span>
+            <span class="chip chip-p" id="spAnfragenZahl" style="display:none">0</span>
+          </button>
+          <button type="button" class="rdkr-tab" data-reiter="melden" onclick="spReiterZeigen('melden')">
+            <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+            <span class="rdkr-tab-lbl">Anliegen melden</span>
+          </button>
+          <button type="button" class="rdkr-tab" id="spTabFreigabe" data-reiter="freigabe" style="display:none" onclick="spReiterZeigen('freigabe')">
+            <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></span>
+            <span class="rdkr-tab-lbl">Support-Freigabe</span>
+          </button>
+          <button type="button" class="rdkr-tab" id="spTabProtokoll" data-reiter="protokoll" style="display:none" onclick="spReiterZeigen('protokoll')">
+            <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+            <span class="rdkr-tab-lbl">Protokoll</span>
+          </button>
+        </div>
+
+        <!-- Supportanfrage (ENT-538). Der Weg vom Betrieb zum Betreiber:
+             ein Anliegen schildern, das nicht dringend genug fuer einen
+             Anruf ist, und den Verlauf dazu nachlesen.
+
+             Die Vorgaenge liegen in der Datenbank des BETREIBERS, nicht in
+             dieser -- anders als die Support-Freigabe weiter unten.
+             Begruendung in backend/supportvorgang.php: Der Betreiber
+             braucht eine Arbeitsliste ueber alle Betriebe, und eine nicht
+             erreichbare Datenbank duerfte daraus nicht lautlos
+             herausfallen. Der Preis steht im Hinweis am Eingabefeld: Was
+             hier getippt wird, liegt beim Betreiber. -->
+        <div class="rdkr-panel" id="spAb-anfragen" style="display:none">
+        <div class="grid">
+  <div class="card" id="saListeKarte">
+            <div class="card-hd">
+              <span class="card-ic gedaempft"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+              <h3>Meine Anfragen</h3>
+            </div>
+            <div class="card-bd">
+              <div id="saListe"><div style="color:var(--ink-3)">Wird geladen …</div></div>
+            </div>
+          </div>
+  <div class="card" id="saVorgangKarte" style="display:none">
+            <div class="card-hd">
+              <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+              <h3 id="saVorgangTitel">Vorgang</h3>
+            </div>
+            <div class="card-bd">
+              <div id="saVerlauf"></div>
+              <div style="margin-top:16px">
+                <label for="saAntwort">Nachricht</label>
+                <textarea class="inp" id="saAntwort" rows="3" maxlength="4000"
+                          placeholder="Rückfrage oder Ergänzung zu diesem Vorgang"></textarea>
+              </div>
+              <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+                <button type="button" class="btn btn-sm btn-primary" onclick="saAntworten()">Senden</button>
+                <button type="button" class="btn btn-sm" onclick="saSchliessen()">Schliessen</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
+
+        <div class="rdkr-panel" id="spAb-melden" style="display:none">
+        <div class="grid">
+  <div class="card" id="saNeuKarte">
+            <div class="card-hd">
+              <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+              <h3>Anliegen melden</h3>
+            </div>
+            <div class="card-bd">
+              <div class="msg-err" id="saErr" style="display:none"></div>
+              <p class="zone-note" id="saHinweis" style="margin-top:0"></p>
+              <div id="saFormular"></div>
+            </div>
+          </div>
+        </div>
+        </div>
+
+        <!-- Support-Freigabe (ENT-526). Der Plattform-Betreiber kann nur
+             hineinsehen, wenn dieser Betrieb es befristet erlaubt -- und
+             sieht dann ausschliesslich Diagnosedaten ohne Personenbezug.
+             Die Freigabe liegt bewusst in der Datenbank DIESES Betriebs:
+             laege sie beim Betreiber, koennte er sie sich selbst
+             ausstellen. Jeder Abruf steht im Protokoll unten. -->
+        <div class="rdkr-panel" id="spAb-freigabe" style="display:none">
+        <div class="grid">
+  <div class="card" id="sfKarte">
+            <div class="card-hd">
+              <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></span>
+              <h3>Support-Freigabe</h3>
+            </div>
+            <div class="card-bd">
+              <div class="msg-err" id="sfErr" style="display:none"></div>
+              <div id="sfInhalt"><div style="color:var(--ink-3)">Wird geladen …</div></div>
+            </div>
+          </div>
+        </div>
+        </div>
+
+        <div class="rdkr-panel" id="spAb-protokoll" style="display:none">
+        <div class="grid">
+  <div class="card" id="sfProtokollKarte">
+            <div class="card-hd">
+              <span class="card-ic gedaempft"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+              <h3>Protokoll</h3>
+            </div>
+            <div class="card-bd">
+              <div id="sfProtokoll"><div style="color:var(--ink-3)">Wird geladen …</div></div>
+            </div>
+          </div>
         </div>
         </div>
       </section>
@@ -11429,6 +11473,9 @@ function rechteAnwenden() {
 }
 
 // ══════════════════════════════════════════ NAVIGATION
+// Welche Ansicht offen ist und welche es davor war (ENT-682, siehe go()).
+let goAnsicht = '';
+let goVorherigeAnsicht = '';
 const TITLES = {
   uebersicht:  ['Übersicht', 'Laufender Monat'],
   planung:     ['Planung', 'Geplante Einsätze'],
@@ -11437,7 +11484,8 @@ const TITLES = {
   kunden:      ['Kunden', 'Stammdaten'],
   produkte:    ['Leistungen', 'Preise und Standardtexte für Offerten'],
   offerte:     ['Offerte', 'Positionen, Preise und Summen'],
-  betrieb:     ['Einstellungen', 'Betrieb, Briefkopf, Zugang, Rollen und Dienstfahrzeuge'],
+  betrieb:     ['Betrieb', 'Anstellungsorte, Briefkopf, Zugang, Rollen und Dienstfahrzeuge'],
+  support:     ['Support', 'Anliegen an den Betreiber und befristete Support-Freigabe'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
   lohnlaeufe:  ['Lohnläufe', 'Aus abgeglichenen Ist-Zeiten wird der Bruttolohn'],
   lohnarten:   ['Lohnarten', 'Woraus eine Abrechnung besteht — und was in welche Bemessungsgrundlage zählt'],
@@ -12543,6 +12591,11 @@ function weiteAnsicht(an) {
 }
 
 function go(view) {
+  // Woher jemand kommt (ENT-682). Gebraucht von saBildschirm(): Solange der
+  // Supportabschnitt in der Administration lag, konnte er den offenen
+  // Abschnitt selbst ablesen. Als eigene Ansicht wechselt man dorthin --
+  // die Angabe, die dem Support hilft, ist darum die Ansicht davor.
+  if (view !== goAnsicht) { goVorherigeAnsicht = goAnsicht; goAnsicht = view; }
   dpReiterWechsel(view);
   if (huelleKompakt()) { navGruppenZu(); }
   document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
@@ -12597,15 +12650,14 @@ function go(view) {
   // die Liste zurueck, und jeder andere Reiterwechsel laeuft ebenfalls durch
   // maGoTab(). Eine zweite Entscheidung hier waere eine zweite Wahrheit.
   if (view !== 'planung' && view !== 'mitarbeiter') { weiteAnsicht(ANSICHT_WEIT.includes(view)); }
-  topSubZeichnen();
   if (view === 'planung' && MOBIL() && pTab === 'uebersicht') goTab('einsaetze');
   if (view === 'mitarbeiter' && !mitarbeiter.length) loadMitarbeiter();
-  if (view === 'betrieb') { ladeBetrieb(); zfLaden(); rvLaden(); lmSichtbarkeit(); pnSichtbarkeit(); }
+  if (view === 'betrieb') { ladeBetrieb(); zfLaden(); rvLaden(); lmSichtbarkeit(); }
   // Die Administrationsgruppe klappt auf, wenn eine ihrer Seiten offen ist --
   // und der Elternpunkt wird mitmarkiert, sonst sieht die Seitenleiste aus,
   // als waere man nirgends (dasselbe Muster wie bei den Kunden, ENT-039).
   const imAdmin = view === 'mitarbeiter' || view === 'betrieb' || view === 'produkte'
-    || view === 'mitteilungen' || view === 'portal';
+    || view === 'mitteilungen' || view === 'portal' || view === 'support';
   $('navg-admin').classList.toggle('offen', imAdmin);
   if (imAdmin) { $('nav-admin').classList.add('on'); }
   document.querySelectorAll('#navg-admin .nav-kind').forEach(k => k.classList.remove('on'));
@@ -12615,6 +12667,19 @@ function go(view) {
   if (view === 'produkte') { produkte.length ? renderProdukte() : loadProdukte(); }
   if (view === 'mitteilungen') { $('nav-admin-mitteilungen').classList.add('on'); mtlLaden(); }
   if (view === 'portal') { $('nav-admin-portal').classList.add('on'); kzLaden(); }
+  // Support (ENT-682). Die Freigabe haengt an ihrem eigenen Recht und wird
+  // nur geholt, wenn sie ueberhaupt zu sehen ist -- ein Abruf, den der
+  // Server mit 403 beantwortet, waere eine leere Flaeche ohne einen Satz.
+  if (view === 'support') {
+    $('nav-admin-support').classList.add('on');
+    saLaden();
+    if (spFreigabeSetzen()) { sfLaden(); }
+    // Immer auf "Meine Anfragen" beginnen, nicht im zuletzt besuchten
+    // Reiter stehenbleiben -- gleiches Muster wie bkUebersichtZeigen() bei
+    // "Betrieb". Erst NACH spFreigabeSetzen(), sonst faende der Ruecksetzer
+    // die beiden Rechte-Reiter noch in ihrem alten Zustand vor.
+    spReiterZeigen('anfragen');
+  }
   const kontrView = view === 'pensen' || view === 'auslagen' || view === 'abwesenheiten'
     || view === 'arbeitsergebnisse';
   $('navg-kontrolle').classList.toggle('offen', kontrView);
@@ -12646,6 +12711,15 @@ function go(view) {
   $('nav-revierdienst-einrichtung').classList.toggle('on', view === 'revierdienst');
   if (view === 'rundgaenge') { revierdienstUebersichtOeffnen(); }
   if (view === 'revierdienst') { revierdienstEinrichtungOeffnen(); }
+  // ERST JETZT, nicht weiter oben (Befund 2026-09-23). Die Werkzeugleiste
+  // wird aus dem MARKIERTEN Unterpunkt gezeichnet -- stand sie vor den
+  // Markierungen, traf sie nur die Ansichten, deren Menue-ID zufaellig auf
+  // den Ansichtsnamen endet (der Suffix-Vergleich weiter oben). Fuenf taten
+  // das nicht: Revierdienst-Uebersicht ('rundgaenge' an "…-uebersicht"),
+  // Revierdienst-Einrichtung, Lohnlaeufe, Saetze und Regelwerk -- und
+  // Support, wo zusaetzlich der Schnellweg im Fussteil den Namen belegte.
+  // In allen fuenf verschwand die Leiste im kompakten Zustand ganz.
+  topSubZeichnen();
   if (view === 'abgleich') {
     // Vorgabe: der zurückliegende Monat bis heute. Wer weiter zurück will,
     // stellt den Zeitraum um.
@@ -13490,6 +13564,10 @@ const EREIGNIS_ART = {
   // Grund wie oben: Ein gemeldeter Vorfall ist nie Routine -- er soll
   // auffallen, nicht im Strom der Bestaetigungen untergehen.
   vorfall:  { punkt: 'warn', wort: 'hat ein Ereignis gemeldet' },
+  // Antwort auf die eigene Supportanfrage (ENT-685). 'ok': Es ist eine gute
+  // Nachricht -- da ist die Antwort, auf die jemand gewartet hat. Nicht
+  // 'warn', das ist fuer Dinge reserviert, die schieflaufen koennen.
+  support_antwort: { punkt: 'ok', wort: 'hat geantwortet' },
 };
 
 // ══════════════════════════════════════════ SCHNELLZUGRIFF (ENT-096)
@@ -13602,6 +13680,9 @@ function renderEreignisse() {
       ? hinweis
       : EMPTY('Nichts Neues', 'Hier erscheinen eingegangene Rapporte, Sperrtage, Rückmeldungen zu Schichten und Entscheidungen zu Offerten.');
     glockeAktualisieren([], fehlt);
+    // Auch hier: Ein Abzeichen, das vom letzten Laden stehen bleibt,
+    // behauptet eine Antwort, die es nicht mehr gibt.
+    supportAbzeichenSetzen([]);
     return;
   }
 
@@ -13629,8 +13710,32 @@ function renderEreignisse() {
     <div class="erg-detail" id="ergDetail${i}" style="display:none"></div>`;
   }).join('');
   // Die Glocke (ENT-197) zeigt dieselben Zeilen kompakt im Dropdown -- eine
-  // Quelle, zwei Ziele, damit beide immer denselben Stand haben.
+  // Quelle, zwei Ziele, damit beide immer denselben Stand haben. Seit
+  // ENT-685 kommt das Abzeichen am Support-Eintrag als drittes dazu.
   glockeAktualisieren(f, fehlt);
+  supportAbzeichenSetzen(f);
+}
+
+/* Das Abzeichen am Support-Eintrag der Seitenleiste (ENT-685).
+ *
+ * WARUM ZUSAETZLICH ZUR GLOCKE: Die Glocke sammelt alles; wer sie oeffnet,
+ * sieht eine Supportantwort zwischen Rapporten und Sperrtagen. Das Abzeichen
+ * sagt, WOHIN man gehen muss, und steht direkt an der Tuer.
+ *
+ * GEZAEHLT WIRD AUS DERSELBEN LISTE wie Glocke und Feed -- eine zweite
+ * Abfrage koennte eine andere Zahl liefern als die Zeilen daneben. */
+function supportAbzeichenSetzen(f) {
+  const el = $('nav-support-abz');
+  if (!el) { return; }
+  const offen = (f || []).filter(x => x.typ === 'support_antwort').length;
+  el.hidden = !offen;
+  el.textContent = offen > 99 ? '99+' : String(offen);
+  const knopf = el.closest('.nav-item');
+  if (knopf) {
+    knopf.setAttribute('aria-label', offen
+      ? 'Support — ' + offen + (offen === 1 ? ' neue Antwort' : ' neue Antworten')
+      : 'Support');
+  }
 }
 
 // Punkt-Farbe, Ablehnung-Kennzeichnung und Absenderzeile — von der vollen
@@ -13670,6 +13775,12 @@ function ereignisZeile(x) {
     // Objekt und Zeit stehen dahinter.
     return `${x.art || 'Ereignis'} — ${x.objekt || '?'}${x.kunde ? ', ' + x.kunde : ''}`
       + `${x.bemerkung ? ' — ' + x.bemerkung : ''}`;
+  }
+  if (x.typ === 'support_antwort') {
+    /* Der Betreff, nicht der Text der Antwort: Die Antwort selbst gehoert in
+       den Vorgang, wo sie im Zusammenhang steht -- und sie kann schildern,
+       was in diesem Betrieb schieflaeuft. Im Feed steht, DASS sie da ist. */
+    return `hat auf „${x.betreff || 'Ihre Anfrage'}" geantwortet`;
   }
   if (x.typ === 'rundgang_spontan') {
     const grund = x.ausnahme_grund ? (RUNDGANG_AUSSERHALB_FENSTER_GRUENDE[x.ausnahme_grund] || x.ausnahme_grund) : null;
@@ -13829,6 +13940,19 @@ function glockeSchliessen() {
 // zwei Ansichten, keine zweite Detailanzeige noetig.
 function glockeZeileGeklickt(i) {
   glockeSchliessen();
+  /* Eine Supportantwort fuehrt dorthin, wo sie steht (ENT-685) -- nicht in
+     die Uebersicht, wo nur dieselbe Zeile noch einmal stuende. Erst dort
+     gilt sie als gelesen; der Endpunkt setzt den Stempel beim Oeffnen. */
+  const e = (stats.ereignisse || [])[i];
+  if (e && e.typ === 'support_antwort') {
+    /* Derselbe Weg, den der Support-Eintrag der Seitenleiste nimmt. Seit
+       ENT-682 ist das eine eigene Ansicht, und go() holt die Vorgaenge
+       dabei selbst -- ein zweites saLaden() hier waere derselbe Abruf ein
+       zweites Mal. */
+    go('support');
+    saOeffnen(e.id);
+    return;
+  }
   go('uebersicht');
   const zeile = document.querySelectorAll('#ereignisFeed .rank.erg')[i];
   if (!zeile) { return; }
@@ -24069,7 +24193,6 @@ function ibanIstQrJs(iban) {
 function bkUebersichtZeigen() {
   $('bkUebersicht').style.display = '';
   document.querySelectorAll('#view-betrieb .bk-abschnitt').forEach(a => { a.style.display = 'none'; });
-  bkKachelSfSetzen();
 }
 
 
@@ -24103,10 +24226,10 @@ let saVorgang = 0;
    nur die eine Angabe, die beim Nachstellen hilft. Faellt sie leer aus,
    wird das als "nicht mitgeschickt" angezeigt, nicht als leeres Feld. */
 function saBildschirm() {
-  const offen = document.querySelector('.bk-abschnitt:not([style*="none"])');
-  const titel = offen && offen.querySelector('h3');
-  return titel ? titel.textContent.trim().slice(0, 120) : 'Administration';
+  const v = TITLES[goVorherigeAnsicht];
+  return v ? v[0].slice(0, 120) : 'Cockpit';
 }
+
 
 /* Browser und Bildschirmbreite, gekuerzt. Genau die zwei Angaben, mit
    denen sich "bei mir sieht das anders aus" am haeufigsten aufklaert.
@@ -24122,24 +24245,6 @@ function saUmgebung() {
   return name + ' · ' + window.innerWidth + '×' + window.innerHeight;
 }
 
-/* Zurück aus dem Supportteil.
- *
- * Am Desktop wie bei jedem anderen Abschnitt: zur Kachelübersicht der
- * Einstellungen, aus der man gekommen ist.
- *
- * AM HANDY NICHT. Dorthin führt kein Weg über die Navigation -- die
- * Administration ist dort seit ENT-235 bewusst ausgeblendet, und der
- * einzige Zugang zu diesem Abschnitt ist das Kontomenü. Ein Zurück in die
- * Kachelübersicht öffnete genau die Tür wieder, die jemand absichtlich
- * zugemacht hat. Zurück heisst hier darum: dahin, wo man herkam.
- *
- * Dieselbe Schwelle wie ".nur-desktop" im Stylesheet (900 px) -- zwei
- * verschiedene Grenzen für dasselbe "am Handy" liefen irgendwann
- * auseinander. */
-function saZurueck() {
-  if (window.matchMedia('(max-width: 900px)').matches) { go('uebersicht'); return; }
-  bkUebersichtZeigen();
-}
 
 function saLaden() {
   $('saErr').style.display = 'none';
@@ -24219,10 +24324,16 @@ function saSenden() {
       ? 'Anfrage gesendet — der Betreiber ist benachrichtigt.'
       : 'Anfrage gesendet. Sie steht im Vorrat des Betreibers; eine E-Mail ging nicht hinaus.');
     saLaden();
+    // Hinueber zu "Meine Anfragen" (ENT-687): Der neue Vorgang landet dort,
+    // und wer gerade gesendet hat, will sehen, dass er angekommen ist.
+    // Bliebe die Ansicht beim leeren Formular stehen, waere die Meldung das
+    // Einzige, was den Versand belegt.
+    spReiterZeigen('anfragen');
   }).catch(() => toast('Die Anfrage konnte nicht gesendet werden.'));
 }
 
 function saListeZeichnen(liste) {
+  spAnfragenZahlSetzen(liste);
   if (!liste.length) {
     $('saListe').innerHTML = '<div style="color:var(--ink-3)">Noch keine Anfrage gestellt.</div>';
     return;
@@ -24283,9 +24394,57 @@ function saAntworten() {
  * (require_recht_nach_methode auf 'rechte'): Was im Browser steht, ist
  * Bequemlichkeit, keine Sicherung.
  */
-function bkKachelSfSetzen() {
-  const k = $('bkKachelSf');
-  if (k) { k.style.display = darf('rechte_lesen') ? '' : 'none'; }
+// Support-Freigabe und Protokoll zeigen sich nur, wer selbst Rollen
+// vergeben darf (ENT-526): Wer die Freigabe bedient, oeffnet einem
+// Betriebsfremden Einblick, und das Protokoll zeigt, wer wann in die
+// Anlage gesehen hat. Beides ist dieselbe Art Entscheidung wie eine
+// Rollenvergabe. Gibt zurueck, ob die beiden Reiter stehen -- go() holt
+// die Daten nur dann.
+function spFreigabeSetzen() {
+  const sichtbar = darf('rechte_lesen');
+  ['spTabFreigabe', 'spTabProtokoll'].forEach(id => {
+    const el = $(id);
+    if (el) { el.style.display = sichtbar ? '' : 'none'; }
+  });
+  return sichtbar;
+}
+
+// Reiterwechsel innerhalb der Supportansicht (ENT-687). Gleiche Bauart wie
+// rdKrAbschnittZeigen() bei den Kontrollrunden: Die Leiste bleibt in jedem
+// Bereich stehen, gewechselt wird nur der Inhalt darunter, und der offene
+// Reiter wird markiert -- sonst sieht man der Seite nicht an, wo man ist.
+let spReiter = 'anfragen';
+function spReiterZeigen(id) {
+  // Ein Reiter, den es fuer diese Rolle nicht gibt, faellt auf den ersten
+  // zurueck. Sonst stuende jemand ohne das Recht vor einer leeren Seite,
+  // wenn ein Aufruf von aussen auf 'freigabe' zeigt.
+  const knopf = document.querySelector('#spReiter .rdkr-tab[data-reiter="' + id + '"]');
+  if (!knopf || knopf.style.display === 'none') { id = 'anfragen'; }
+  spReiter = id;
+  document.querySelectorAll('#view-support .rdkr-panel').forEach(a => { a.style.display = 'none'; });
+  $('spAb-' + id).style.display = '';
+  document.querySelectorAll('#spReiter .rdkr-tab').forEach(t => {
+    const ist = t.dataset.reiter === id;
+    t.classList.toggle('aktiv', ist);
+    t.setAttribute('aria-current', ist ? 'true' : 'false');
+  });
+  // Ein offener Vorgang gehoert zum Reiter "Meine Anfragen" -- wer
+  // wegwechselt, laesst ihn nicht im Hintergrund offen stehen.
+  if (id !== 'anfragen') { saSchliessen(); }
+}
+
+// Die Zahl am Reiter "Meine Anfragen": nur, wenn etwas offen ist.
+// "wartet_auf_kunde" heisst aus Sicht des Betriebs "Antwort erhalten"
+// (siehe SA_STATUS) -- genau der Grund, aus dem jemand hier nachsieht.
+// Kein Zaehler bei null: Eine Null am Reiter sagt dasselbe wie keine Zahl,
+// kostet aber Aufmerksamkeit.
+function spAnfragenZahlSetzen(vorgaenge) {
+  const el = $('spAnfragenZahl');
+  if (!el) { return; }
+  const offen = (vorgaenge || []).filter(v => v.status === 'wartet_auf_kunde').length;
+  el.textContent = String(offen);
+  el.style.display = offen > 0 ? '' : 'none';
+  el.title = offen === 1 ? 'Eine Anfrage hat eine Antwort' : offen + ' Anfragen haben eine Antwort';
 }
 
 const SF_LAGE = {
@@ -24319,8 +24478,31 @@ function sfZeichnen(d) {
     return;
   }
 
-  $('sfInhalt').innerHTML =
-      '<p class="zone-note" style="margin-top:0">' + esc(d.umfang || '') + '</p>'
+  /* Die Bitte des Betreibers (ENT-683), ganz oben in dieser Karte.
+
+     HIER UND NICHT IN EINEM EIGENEN CONTAINER: Wer sie liest, entscheidet
+     im selben Blick darunter -- der Grund gehört neben den Knopf, nicht auf
+     einen anderen Bildschirm. So festgelegt vom Projektinhaber
+     (2026-09-23).
+
+     SIE ÖFFNET NICHTS. Der Zweck wird ins Formular übernommen, damit nur
+     noch Dauer und Klick fehlen; erteilt wird trotzdem erst mit dem Klick,
+     und die Dauer bestimmt weiterhin der Betrieb. */
+  const bitte = d.bitte || null;
+  const bitteBlock = bitte
+    /* Bestehendes Muster als Vorbild: .zone.warn traegt im Cockpit das,
+       was Aufmerksamkeit verlangt, ohne ein Fehler zu sein. Kein eigener
+       Kasten mit eigenen Farben. */
+    ? '<div class="zone warn" style="margin:0 0 16px">'
+      + '<div class="zone-hd">Der Betreiber bittet um Einblick</div>'
+      + '<div style="margin-top:6px">' + esc(bitte.zweck) + '</div>'
+      + '<div style="color:var(--ink-3);font-size:12px;margin-top:6px">'
+      + esc(bitte.gebeten_von) + ' · ' + esc(String(bitte.gebeten_am).slice(0, 16))
+      + '</div></div>'
+    : '';
+
+  $('sfInhalt').innerHTML = bitteBlock
+    + '<p class="zone-note" style="margin-top:0">' + esc(d.umfang || '') + '</p>'
     + '<div style="margin:18px 0 14px"><strong>' + esc(wort) + '</strong>'
     + (offen
         ? '<div style="color:var(--ink-3);font-size:13px;margin-top:4px">Erteilt von '
@@ -24333,7 +24515,12 @@ function sfZeichnen(d) {
         ? '<button type="button" class="btn btn-sm" onclick="sfWiderrufen()">Freigabe zurückziehen</button>'
         : '<div class="feldreihe" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">'
           + '<label style="flex:1 1 220px">Wofür?'
-          + '<input id="sfZweck" type="text" maxlength="200" placeholder="z. B. Rundgänge werden nicht angezeigt"></label>'
+          /* Der Zweck der Bitte steht schon drin -- änderbar, nicht
+             festgeschrieben: Es bleibt die Angabe des Betriebs, auch wenn
+             der Betreiber sie vorgeschlagen hat. */
+          + '<input id="sfZweck" type="text" maxlength="200" value="'
+          + (bitte ? esc(bitte.zweck) : '')
+          + '" placeholder="z. B. Rundgänge werden nicht angezeigt"></label>'
           + '<label style="width:120px">Für wie lange?'
           + '<select id="sfStunden">'
           + '<option value="4">4 Stunden</option>'
@@ -25196,96 +25383,6 @@ function lmAusfuehren() {
     lmZeichnen(true);
     loadMitarbeiter();
   }).catch(() => lmFehler('Netzwerkfehler.'));
-}
-
-// ── Personalnummern nachtragen (ENT-387) ─────────────────────────────────
-// Gleiche Bauart wie "Login-Namen umstellen" (Vorschau, dann ausdrueckliche
-// Bestaetigung), aber ohne Sitzungs-/Abmelde-Hinweis: Die Personalnummer
-// ist kein Anmeldemerkmal. Sichtbar mit demselben Recht wie das
-// gewoehnliche Bearbeiten der Personalakte (personal_schreiben) --
-// schwaecher als bei den Login-Namen, weil hier nichts an der Anmeldung
-// haengt.
-let pnPlan = null;
-
-function pnSichtbarkeit() {
-  const kachel = $('bkKachelPn');
-  if (kachel) { kachel.style.display = darf('personal_schreiben') ? '' : 'none'; }
-  const karte = $('pnKarte');
-  if (karte) { karte.style.display = darf('personal_schreiben') ? '' : 'none'; }
-}
-
-function pnFehler(text) {
-  const e = $('pnErr');
-  if (!e) return;
-  e.textContent = text || '';
-  e.style.display = text ? '' : 'none';
-}
-
-function pnVorschau() {
-  pnFehler('');
-  $('pnInhalt').innerHTML = '<p class="zone-note">Wird geprüft …</p>';
-  api('mitarbeiter_personalnummer_migrieren.php').then(({ ok, data }) => {
-    if (!ok || data.status !== 'ok') {
-      $('pnInhalt').innerHTML = '';
-      pnFehler(data && data.message ? data.message : 'Vorschau fehlgeschlagen.');
-      return;
-    }
-    pnPlan = data.plan || [];
-    pnZeichnen(false);
-  }).catch(() => { $('pnInhalt').innerHTML = ''; pnFehler('Netzwerkfehler.'); });
-}
-
-// `ausgefuehrt` unterscheidet Vorschau (Knopf zum Anstossen) von der
-// Meldung danach, wie bei lmZeichnen().
-function pnZeichnen(ausgefuehrt) {
-  const plan = pnPlan || [];
-  const zugewiesen = plan.filter(p => p.status === 'zugewiesen');
-  const unveraendert = plan.filter(p => p.status === 'unveraendert');
-  const zeile = p => `<tr><td>${esc(p.name)}</td><td>${esc(p.neu)}</td>
-    <td>${p.aktiv ? 'aktiv' : '<span style="color:var(--neg)">inaktiv</span>'}</td>
-    <td>${dmy(p.erstellt_am)}</td></tr>`;
-  const tabelle = zugewiesen.length ? `
-    <div style="overflow:auto;max-height:320px;margin-top:10px;border:1px solid var(--line);border-radius:8px">
-      <table><thead><tr><th>Login-Name</th><th>Neue Personalnummer</th><th>Status</th><th>Angelegt am</th></tr></thead>
-      <tbody>${zugewiesen.map(zeile).join('')}</tbody></table>
-    </div>` : '';
-  let kopf;
-  if (ausgefuehrt) {
-    kopf = `<div class="ki-hint web on" style="background:var(--pos-soft);color:var(--pos)"><span>
-      <b>${zugewiesen.length} Personalnummern vergeben.</b>
-      ${unveraendert.length} hatten bereits eine und blieben unverändert.</span></div>`;
-  } else if (!zugewiesen.length) {
-    kopf = `<p class="zone-note">Nichts zu tun — alle Mitarbeitenden haben bereits eine Personalnummer.</p>`;
-  } else {
-    kopf = `<p class="zone-note"><b>${zugewiesen.length}</b> Personalnummern würden vergeben.
-      ${unveraendert.length} haben bereits eine.</p>
-      <div class="zone danger" style="margin-top:10px">
-        <div class="zone-hd">Jetzt vergeben</div>
-        <div class="zone-note">Nicht rückgängig zu machen: Die Personalnummer lässt sich danach nicht mehr ändern.</div>
-        <button class="btn btn-danger btn-sm" onclick="pnAusfuehrenFragen()">${zugewiesen.length} Personalnummern vergeben</button>
-      </div>`;
-  }
-  $('pnInhalt').innerHTML = kopf + tabelle;
-}
-
-function pnAusfuehrenFragen() {
-  const anzahl = (pnPlan || []).filter(p => p.status === 'zugewiesen').length;
-  askConfirm('Personalnummern vergeben?',
-    `${anzahl} Personen bekommen jetzt eine Personalnummer. Sie lässt sich danach nicht mehr ändern.`,
-    'Vergeben', pnAusfuehren);
-}
-
-function pnAusfuehren() {
-  pnFehler('');
-  api('mitarbeiter_personalnummer_migrieren.php', { method: 'POST', body: { bestaetigt: true } }).then(({ ok, data }) => {
-    if (!ok || data.status !== 'ok') {
-      pnFehler(data && data.message ? data.message : 'Vergeben fehlgeschlagen.');
-      return;
-    }
-    pnPlan = data.plan || [];
-    pnZeichnen(true);
-    loadMitarbeiter();
-  }).catch(() => pnFehler('Netzwerkfehler.'));
 }
 
 function zfLaden() {

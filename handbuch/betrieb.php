@@ -59,30 +59,19 @@
 
       <p class="hb-kicker">Cockpit</p>
       <h1>Betrieb</h1>
-      <p class="hb-lead">Acht Kacheln für alles, was den Betrieb als Ganzes betrifft, statt
+      <p class="hb-lead">Fünf Kacheln für alles, was den Betrieb als Ganzes betrifft, statt
       eine einzelne Kunden- oder Personalakte — von den Anstellungsorten bis zur
       Rollenvergabe.</p>
 
-      <div class="hb-kasten hb-hinweis">
-        <p class="hb-kasten-titel">Zwei Namen für denselben Bereich</p>
-        <p>Im Cockpit selbst heisst der Knopf <b>„Einstellungen"</b> (unter
-        „Administration", nur am Desktop). Im Code, im Entscheidungsprotokoll und
-        darum auch in diesem Handbuch trägt derselbe Bereich weiterhin den älteren
-        Namen <b>„Betrieb"</b> — nicht zu verwechseln mit der gleichnamigen
-        Seitenleisten-Rubrik für das Tagesgeschäft.</p>
-      </div>
 
-      <h2 id="die-acht-kacheln">Die acht Kacheln</h2>
+      <h2 id="die-fuenf-kacheln">Die fünf Kacheln</h2>
       <div class="hb-tabelle-wrap"><table>
         <tr><th>Kachel</th><th>Wofür</th></tr>
         <tr><td><b>Betrieb</b></td><td>Hauptdomizil, Anstellungsorte, Logo</td></tr>
         <tr><td><b>Briefkopf für Rapporte</b></td><td>Kopf-/Fusszeile und QR-Rechnungsdaten auf dem Kundenrapport</td></tr>
         <tr><td><b>Mein Zugang: Zwei-Faktor-Anmeldung</b></td><td>Eigene 2FA — siehe <a href="erste-schritte.php">Erste Schritte</a></td></tr>
         <tr><td><b>Rollen &amp; Berechtigungen</b></td><td>Profile, Zuteilung, Einsatzmerkmale, Login-Namen</td></tr>
-        <tr><td><b>Personalnummern</b></td><td>Fehlende Personalnummern nachtragen</td></tr>
         <tr><td><b>Dienstfahrzeuge</b></td><td>Fahrzeug-Stammdaten</td></tr>
-        <tr><td><b>Support-Freigabe</b></td><td>Befristeter Diagnose-Zugriff für den Plattform-Betreiber — nur mit Recht „Rollen &amp; Berechtigungen"</td></tr>
-        <tr><td><b>Supportanfrage</b></td><td>Ticket an den Plattform-Betreiber</td></tr>
       </table></div>
 
       <h2 id="betrieb-hauptdomizil-anstellungsorte-logo">Betrieb: Hauptdomizil, Anstellungsorte, Logo</h2>
@@ -151,9 +140,15 @@
       </div>
 
       <h2 id="personalnummern">Personalnummern</h2>
-      <p>Gleiches Muster (Vorschau → Bestätigung), aber ohne Abmelde-Bezug: trägt
-      ausschliesslich <b>fehlende</b> vierstellige Personalnummern nach. Sie werden
-      zufällig vergeben, nicht fortlaufend, und sind danach nicht mehr änderbar.</p>
+      <p>Jede Person bekommt beim Anlegen automatisch eine vierstellige
+      Personalnummer (1000–9999), zufällig vergeben statt fortlaufend — sie verrät
+      damit weder Anlegereihenfolge noch Mitarbeiterzahl. Das gilt für jeden Weg,
+      auf dem eine Person entsteht, einschliesslich des ersten Adminkontos beim
+      Einrichten eines Betriebs.</p>
+      <p>Einen eigenen Bildschirm zum Nachtragen gibt es seit dem 23.&nbsp;September
+      2026 nicht mehr: Es bleibt nichts nachzutragen. Fehlt in einem Altbestand doch
+      einmal eine Nummer, trägt die <b>Verwaltung</b> sie in der Personalakte der
+      betreffenden Person ein — nur sie darf das, und nur einmal.</p>
 
       <h2 id="dienstfahrzeuge">Dienstfahrzeuge</h2>
       <p>Reine Stammdaten — „hier wird nichts kontrolliert und nichts gerechnet".
@@ -172,8 +167,18 @@
       anderer Bereich (Fahrzeugübernahme in der App) — hier nur die Stammdaten.</p>
 
       <h2 id="support-freigabe-und-supportanfrage">Support-Freigabe und Supportanfrage</h2>
-      <p>Betreffen den <b>Plattform-Betreiber</b> — eine andere Stelle als CUPI&nbsp;24
-      selbst, zuständig für den Betrieb der Software.</p>
+      <p><b>Nicht mehr hier.</b> Beides steht seit dem 23.&nbsp;September 2026 unter
+      <b>Administration&nbsp;→&nbsp;Support</b> — ein eigener Reiter neben diesem.
+      Sie betreffen nicht den eigenen Betrieb, sondern den <b>Plattform-Betreiber</b>,
+      also die Stelle, die die Software betreibt. Beschrieben sind sie bis auf
+      Weiteres hier, weil das Handbuch noch kein eigenes Kapitel dafür hat.</p>
+      <p>Die Seite dort führt vier Reiter, gleiche Bauart wie „Kontrollrunde ändern"
+      im Revierdienst: <b>Meine Anfragen</b> (Startseite; trägt eine Zahl, sobald
+      eine Antwort vorliegt), <b>Anliegen melden</b>, <b>Support-Freigabe</b> und
+      <b>Protokoll</b>. Die letzten beiden erscheinen nur mit dem Recht
+      „Rollen&nbsp;&amp;&nbsp;Berechtigungen" — das Protokoll zeigt, wer wann in
+      die Anlage gesehen hat, und ist damit so vertraulich wie die Freigabe
+      selbst.</p>
       <ul>
         <li><b>Support-Freigabe:</b> befristeter Diagnose-Zugriff (4&nbsp;Std. / 24&nbsp;Std.
         [Standard] / 3&nbsp;Tage / 7&nbsp;Tage) mit Zweckangabe, jederzeit zurückziehbar.
