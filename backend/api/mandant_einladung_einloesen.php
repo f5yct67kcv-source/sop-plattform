@@ -193,4 +193,10 @@ try {
 be_log($pdo, ['id' => 0, 'name' => $person],
        'mandant', $mandantId, 'erstkonto eingelöst', null, $person);
 
-json_response(['status' => 'ok', 'name' => $person]);
+// Wohin der Kunde jetzt geht: seine eigene Anlage, nicht die Anmeldung, auf
+// der diese Karte steht (die gehoert dem Betreiber). null, solange die
+// Subdomain nicht feststeht -- dann sagt die Seite, von wem er sie bekommt,
+// statt einen Knopf zu zeigen, der ins Leere fuehrt.
+json_response(['status' => 'ok', 'name' => $person,
+               'betrieb' => (string)$e['mandant_name'],
+               'adresse' => mandant_adresse((string)$e['subdomain'])]);

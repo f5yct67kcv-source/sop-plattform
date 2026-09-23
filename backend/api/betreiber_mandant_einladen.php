@@ -88,6 +88,18 @@ if ((string)$m['status'] !== 'aktiv') {
         ][(string)$m['status']] ?? 'Dieser Mandant ist nicht aktiv. Solange das so ist, wird kein Zugang übergeben.'], 409);
 }
 
+// KEIN ERSTKONTO IN EINEM DEMO-PLATZ. Ein Demo-Platz ist ein aktiver
+// Mandant mit eigener Datenbank -- ohne diese Sperre liesse sich dort ein
+// dauerhaftes Verwaltungskonto einrichten, das kein Ablauf und kein Leeren
+// kennt. Die Konten eines Platzes vergibt die Demo selbst (ENT-600). Die
+// Mandantentabelle zeigt fuer Demo-Plaetze keinen Knopf; das erspart nur den
+// Umweg, die Sperre steht hier.
+if (in_array((string)$m['subdomain'], DEMO_PLAETZE, true)) {
+    json_response(['status' => 'error',
+        'message' => 'Das ist ein Demo-Platz. Seine Zugänge vergibt die Demo selbst; '
+                   . 'ein Erstkonto wird dort nicht übergeben.'], 409);
+}
+
 // ── Erst pruefen, ob sich ueberhaupt verschicken laesst ───────────────
 //
 // VOR dem Anlegen der Einladung, nicht danach -- dieselbe Reihenfolge wie in
@@ -221,7 +233,14 @@ function mandant_einladung_versenden(string $basis, string $tokenRoh, string $em
     // dort als index.html ab -- ein "/betreiber.html" gibt es da NICHT und
     // der Link liefe ins Leere. Im Cockpit-Buendel liegt die Datei unter
     // ihrem eigenen Namen. Darum wird nachgesehen, nicht geraten.
-    $seite = is_file(__DIR__ . '/../../betreiber.html') ? '/betreiber.html' : '/';
+    //
+    // EINE EBENE HINAUF, nicht zwei: Im Buendel liegt api/ direkt unter der
+    // Seite. Die erste Fassung dieses Wegs suchte zwei Ebenen hinauf, also
+    // ausserhalb des Buendels, und fiel darum IMMER auf "/" zurueck -- im
+    // Betreiber-Buendel zufaellig richtig, aus dem cupi24-Buendel ausgestellt
+    // ein Link ins Cockpit. test_mandant_einladung.mjs haelt beide
+    // Einladungswege auf demselben Pfad.
+    $seite = is_file(__DIR__ . '/../betreiber.html') ? '/betreiber.html' : '/';
     $link  = $basis . $seite . '?uebergabe=' . urlencode($tokenRoh);
     $tage  = MANDANT_EINLADUNG_TAGE;
 

@@ -242,6 +242,34 @@ check('KRITISCH: der Pruefweg gibt keine Datenbankangaben heraus',
 check('KRITISCH: der Pruefweg gibt keinen Abdruck und keine Kennung heraus',
   !/'token'\s*=>/.test(pruefen) && !/'mandant_id'\s*=>/.test(pruefen));
 
+// ── 14. Beide Einladungswege finden die Seite auf demselben Weg ───────
+//
+// Die erste Fassung dieses Wegs suchte die Seite zwei Ebenen ueber api/,
+// also ausserhalb des Buendels, und fiel darum immer auf "/" zurueck -- aus
+// dem cupi24-Buendel ausgestellt ein Link ins Cockpit statt auf die
+// Einloeseseite. Das Vorbild betreiber_einladen.php sucht eine Ebene hinauf.
+// Geprueft wird nicht die Zeichenkette an sich, sondern dass beide Wege
+// DENSELBEN Ort pruefen: Aendert sich der Aufbau der Buendel, muessen beide
+// mit.
+{
+  const pfad = q => (q.match(/is_file\(\s*__DIR__\s*\.\s*'([^']+)'\s*\)/) || [, null])[1];
+  const vorbild = pfad(nurCode(lies(API + 'betreiber_einladen.php')));
+  const hier    = pfad(einladen);
+  check('KRITISCH: der Uebergabe-Link sucht die Seite dort, wo auch die Betreiber-Einladung sie sucht',
+    vorbild !== null && hier === vorbild);
+}
+
+// ── 15. Kein Erstkonto in einem Demo-Platz ────────────────────────────
+//
+// Ein Demo-Platz ist ein aktiver Mandant mit eigener Datenbank. Ohne diese
+// Sperre liesse sich dort ein dauerhaftes Verwaltungskonto einrichten, das
+// kein Ablauf und kein Leeren kennt. Sie steht VOR jeder Verbindung und vor
+// dem Versand.
+check('KRITISCH: der Ausstellweg weist Demo-Plaetze ab, bevor er verbindet oder verschickt',
+  /in_array\(\s*\(string\)\$m\['subdomain'\],\s*DEMO_PLAETZE/.test(einladen)
+  && einladen.indexOf('DEMO_PLAETZE') < einladen.indexOf('mandant_db(')
+  && einladen.indexOf('DEMO_PLAETZE') < einladen.indexOf('REPLACE INTO mandant_einladung'));
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

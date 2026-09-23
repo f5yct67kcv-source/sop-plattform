@@ -1418,6 +1418,10 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
            des zweiten Faktors -- Begruendung im Kopf von
            betreiber_einladung_einloesen.php. -->
       <div id="ein-fertig" class="versteckt">
+        <!-- Nur bei der Uebergabe an einen Mandanten (ENT-686): die Adresse,
+             unter der der Kunde ab jetzt arbeitet. Ausgeschrieben, damit er
+             sie sich merken kann -- der Knopf allein verriete sie nicht. -->
+        <div id="ein-adresse" class="hinweis versteckt" style="margin-bottom:12px"></div>
         <div class="knopfzeile">
           <button id="knopf-ein-weiter" class="haupt">Weiter zur Anmeldung</button>
         </div>
@@ -2691,6 +2695,49 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   </div>
 </div>
 
+<!-- Zugang eines Mandanten uebergeben (ENT-686). Dasselbe Muster wie
+     "Neues Konto" darueber -- Name, Adresse, darunter die Auskunft, was nach
+     dem Klick passiert. Kein Passwortfeld: Das setzt die eingeladene Person
+     selbst, und der Betreiber kennt es nie. -->
+<div class="of-dlg-huelle" id="dlgZugang">
+  <div class="of-dlg">
+    <div class="of-dlg-hd">
+      <h2>Zugang übergeben</h2>
+      <p id="zDlgUnter"></p>
+    </div>
+    <div class="of-dlg-bd">
+      <div class="meldung fehler versteckt" id="zErr"></div>
+      <div class="raster2">
+        <div class="f"><label for="z_anrede">Anrede</label>
+          <select class="inp" id="z_anrede">
+            <option value="">—</option>
+            <option>Herr</option>
+            <option>Frau</option>
+          </select></div>
+        <div class="f"><label for="z_vorname">Vorname</label>
+          <input class="inp" id="z_vorname"></div>
+        <div class="f"><label for="z_nachname">Nachname *</label>
+          <input class="inp" id="z_nachname"></div>
+        <div class="f"><label for="z_email">E-Mail *</label>
+          <input class="inp" id="z_email" type="email" autocomplete="off"></div>
+      </div>
+      <div class="ki-hint web on" style="margin-bottom:0">
+        <!-- Die Frist steht hier NICHT: Sie kommt vom Server und steht in der
+             Bestaetigung nach dem Versand -- eine zweite Zahl hier waere beim
+             naechsten Bemessen falsch (gleiche Regel wie beim Konto-Dialog). -->
+        <span><b>Es wird ein Link verschickt.</b> Die Person setzt ihr
+        Passwort selbst — wir kennen es nie. Mit diesem Zugang verwaltet sie den ganzen
+        Betrieb; weitere Konten legt sie danach selbst an. Eine neue Einladung macht
+        den alten Link ungültig.</span>
+      </div>
+    </div>
+    <div class="of-dlg-ft">
+      <button type="button" class="btn btn-plain" onclick="dlgZu('dlgZugang')">Abbrechen</button>
+      <button type="button" class="btn btn-primary" id="zSaveBtn" onclick="zEinladen()">Einladen</button>
+    </div>
+  </div>
+</div>
+
 <!-- Eigenes Passwort wechseln (ENT-615). -->
 <div class="of-dlg-huelle" id="dlgPasswort">
   <div class="of-dlg">
@@ -3404,6 +3451,12 @@ async function ladeMandanten() {
           + '<button class="klein" data-bearbeiten="' + m.id + '">Ändern</button> '
           + '<button class="klein" data-gav="' + m.id + '">GAV</button> '
           + '<button class="klein" data-support="' + m.id + '">Support</button>'
+          /* Nur bei aktiven Mandanten (ENT-686): Eine Vorratsanlage hat noch
+             keinen Kunden, eine gesperrte oder gekuendigte bekommt keinen
+             Zugang. Die Sperre steht im Server; hier erspart sie nur den
+             Umweg ueber eine Fehlermeldung. */
+          + (m.status === 'aktiv'
+              ? ' <button class="klein" data-zugang="' + m.id + '">Zugang</button>' : '')
           + freigabeFeld(m.id)
           + '</td>'
       + '</tr>').join('')
@@ -3424,6 +3477,8 @@ async function ladeMandanten() {
     b.onclick = () => gavFragen(liste.find(m => m.id === +b.dataset.gav)));
   inhalt.querySelectorAll('[data-support]').forEach(b =>
     b.onclick = () => supportHolen(liste.find(m => m.id === +b.dataset.support)));
+  inhalt.querySelectorAll('[data-zugang]').forEach(b =>
+    b.onclick = () => zDlgOeffnen(liste.find(m => m.id === +b.dataset.zugang)));
 
   /* Der Freigabe-Stand kommt nach (siehe ladeFreigabeLagen): Ein bereits
      bekannter Stand wird sofort gezeichnet, damit die Felder beim
@@ -4432,6 +4487,53 @@ async function kSpeichern() {
   kurzmeldung(id ? 'Konto gespeichert.'
                  : 'Einladung verschickt an ' + daten.email
                    + ' — ' + (a.gueltig_stunden || 48) + ' Stunden gültig.');
+}
+
+/* ── Zugang eines Mandanten uebergeben (ENT-686) ───────────────────
+   Dasselbe Muster wie das Einladen eines Betreiber-Kontos darueber. Die
+   Pruefungen, ob die Anlage uebergabefaehig ist (erreichbar, ganzer
+   Bauplan, noch nicht uebergeben), macht der Server -- er sagt auch, woran
+   es liegt. */
+let zMandant = null;
+
+function zDlgOeffnen(m) {
+  if (!m) { return; }
+  zMandant = m;
+  stumm($('zErr'));
+  $('zDlgUnter').textContent = m.name + ' — die erste Person, die diesen Betrieb in '
+    + 'GuardOpS verwaltet.';
+  ['z_anrede', 'z_vorname', 'z_nachname', 'z_email'].forEach(i => { $(i).value = ''; });
+  dlgAuf('dlgZugang');
+  setTimeout(() => $('z_vorname').focus(), 30);
+}
+
+async function zEinladen() {
+  stumm($('zErr'));
+  if (!zMandant) { return; }
+  const daten = {
+    mandant_id: zMandant.id,
+    anrede:   $('z_anrede').value,
+    vorname:  $('z_vorname').value.trim(),
+    nachname: $('z_nachname').value.trim(),
+    email:    $('z_email').value.trim(),
+  };
+  if (!daten.nachname) { melde($('zErr'), 'fehler', 'Ein Nachname wird gebraucht.'); return; }
+  if (!daten.email)    { melde($('zErr'), 'fehler', 'Eine E-Mail-Adresse wird gebraucht.'); return; }
+  const knopf = $('zSaveBtn');
+  knopf.disabled = true;
+  try {
+    const a = await ruf('betreiber_mandant_einladen.php', daten);
+    if (a.status !== 'ok') {
+      melde($('zErr'), 'fehler', a.message || 'Die Einladung konnte nicht verschickt werden.');
+      return;
+    }
+    dlgZu('dlgZugang');
+    /* Die Frist kommt vom Server (gueltig_tage) -- keine zweite Zahl hier. */
+    kurzmeldung('Einladung verschickt an ' + daten.email + ' — '
+      + a.gueltig_tage + ' Tage gültig.');
+  } finally {
+    knopf.disabled = false;
+  }
 }
 
 /* ── Eigenes Passwort ──────────────────────────────────────────── */
@@ -8389,11 +8491,18 @@ glasSetzen(document.documentElement.getAttribute('data-glas') !== 'aus');
    Adresszeile ENTFERNT, sobald die Seite ihn gelesen hat: Sonst steht er im
    Browserverlauf und wandert beim naechsten Klick als Referrer mit. */
 let einToken = '';
+/* Welche Einladung: die eines Betreiber-Kontos (ENT-667) oder die Uebergabe
+   des Erstkontos eines Mandanten (ENT-686). Dieselbe Karte, andere Texte und
+   ein anderer Weg danach -- der Kunde gehoert nicht zur Betreiber-Anmeldung,
+   sondern in seine eigene Anlage. */
+let einArt = 'betreiber';
+let einAdresse = null;
 
 function einLinkAufraeumen() {
   try {
     const u = new URL(location.href);
     u.searchParams.delete('einladung');
+    u.searchParams.delete('uebergabe');
     history.replaceState(null, '', u.pathname + (u.search || '') + u.hash);
   } catch (e) { /* aelterer Browser -- der Link bleibt stehen, mehr nicht */ }
 }
@@ -8420,6 +8529,33 @@ async function einladungPruefen(t) {
   $('ein-pass').focus();
 }
 
+/* Die Uebergabe an einen Mandanten (ENT-686). Sie-Form wie in der Mail, und
+   kein Wort "Betreiber": Wer hier landet, verwaltet seinen eigenen Betrieb,
+   nicht die Plattform. Auch der Browser-Tab hiesse sonst "Betreiber". */
+async function uebergabePruefen(t) {
+  einToken = t;
+  einArt = 'mandant';
+  einAdresse = null;
+  document.title = 'Zugang einrichten – GuardOpS';
+  einLinkAufraeumen();
+  zeig($('tor'), false);
+  zeig($('ein-tor'), true);
+
+  const a = await ruf('mandant_einladung_pruefen.php', { token: t });
+  if (a.status !== 'ok') {
+    $('ein-sub').textContent = 'Diese Einladung lässt sich nicht öffnen';
+    melde($('ein-meldung'), 'fehler', a.message || 'Dieser Link gilt nicht mehr.');
+    return;
+  }
+  /* Betrieb UND Adresse: wofuer der Zugang gilt, und an wen er ging -- ein
+     Tippfehler in der Adresse faellt hier auf. */
+  $('ein-sub').textContent = a.betrieb + ' · ' + a.email;
+  $('ein-hinweis').textContent = 'Mindestens ' + a.mindestlaenge
+    + ' Zeichen. Mit diesem Zugang verwalten Sie den ganzen Betrieb.';
+  zeig($('ein-form'), true);
+  $('ein-pass').focus();
+}
+
 async function einladungEinloesen() {
   const knopf = $('knopf-einloesen');
   const p1 = $('ein-pass').value;
@@ -8437,12 +8573,41 @@ async function einladungEinloesen() {
   }
   knopf.disabled = true;
   try {
-    const a = await ruf('betreiber_einladung_einloesen.php', { token: einToken, passwort: p1 });
+    /* ZWEI AUSGESCHRIEBENE AUFRUFE statt eines Namens aus einer Bedingung:
+       test_offerten_betreiber.mjs liest die Endpunkte dieser Seite an ihren
+       ruf('…')-Aufrufen ab. Ein zusammengesetzter Name waere fuer sie
+       unsichtbar -- und die Wache haette fuer genau diesen Aufruf still
+       aufgehoert zu gelten. */
+    const daten = { token: einToken, passwort: p1 };
+    const a = einArt === 'mandant'
+      ? await ruf('mandant_einladung_einloesen.php', daten)
+      : await ruf('betreiber_einladung_einloesen.php', daten);
     if (a.status !== 'ok') {
       melde($('ein-meldung'), 'fehler', a.message || 'Das Passwort konnte nicht gesetzt werden.');
       return;
     }
     zeig($('ein-form'), false);
+    if (einArt === 'mandant') {
+      /* KEINE Anmeldung hier: Die Karte steht im Betreiber-Bereich, der
+         Kunde arbeitet unter seiner eigenen Adresse. Steht die noch nicht
+         fest, sagt die Seite das -- statt eines Knopfs, der ins Leere fuehrt. */
+      einAdresse = a.adresse || null;
+      $('ein-sub').textContent = 'Der Zugang steht';
+      if (einAdresse) {
+        melde($('ein-meldung'), 'gut',
+          'Das Passwort ist gesetzt. Melden Sie sich ab jetzt unter der Adresse Ihres Betriebs an.');
+        $('ein-adresse').textContent = einAdresse.replace(/^https:\/\//, '');
+        zeig($('ein-adresse'), true);
+        $('knopf-ein-weiter').textContent = 'Zur Anmeldung';
+        zeig($('ein-fertig'), true);
+      } else {
+        melde($('ein-meldung'), 'gut',
+          'Das Passwort ist gesetzt. Die Adresse Ihres Betriebs erhalten Sie von der Person, '
+          + 'die Sie eingeladen hat.');
+      }
+      einToken = '';
+      return;
+    }
     $('ein-sub').textContent = 'Der Zugang steht';
     melde($('ein-meldung'), 'gut',
       'Das Passwort ist gesetzt. Beim ersten Anmelden richtest du die '
@@ -8459,6 +8624,8 @@ async function einladungEinloesen() {
 
 $('knopf-einloesen').onclick = einladungEinloesen;
 $('knopf-ein-weiter').onclick = () => {
+  /* Der Kunde geht in seine eigene Anlage, nicht zur Betreiber-Anmeldung. */
+  if (einArt === 'mandant' && einAdresse) { location.href = einAdresse; return; }
   zeig($('ein-tor'), false);
   stumm($('ein-meldung'));
   zeig($('tor'), true);
@@ -8475,6 +8642,10 @@ $('knopf-ein-weiter').onclick = () => {
      verschickt wurde, statt stillschweigend in fremde Sitzung zu fallen. */
   const ausUrl = new URLSearchParams(location.search).get('einladung') || '';
   if (ausUrl) { await einladungPruefen(ausUrl); return; }
+  /* Die Uebergabe an einen Mandanten (ENT-686) -- aus demselben Grund vor
+     einer bestehenden Sitzung wie die Einladung darueber. */
+  const uebergabe = new URLSearchParams(location.search).get('uebergabe') || '';
+  if (uebergabe) { await uebergabePruefen(uebergabe); return; }
   if (!token) { return; }
   const a = await ruf('betreiber_zf_status.php');
   if (a.status !== 'ok') { sessionStorage.removeItem(SCHLUESSEL); token = ''; return; }

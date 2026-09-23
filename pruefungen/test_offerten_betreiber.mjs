@@ -103,7 +103,14 @@ const seite = lies('betreiber.html');
 const aufrufe = [...new Set([...nurCode(seite).matchAll(/ruf\(\s*'([a-z_0-9]+\.php)/g)]
   .map(m => m[1]))];
 check('es wurden ueberhaupt Endpunktaufrufe gefunden', aufrufe.length >= 15);
-const fremdeAufrufe = aufrufe.filter(a => !a.startsWith('betreiber_') && !a.startsWith('demo_'));
+// Die Uebergabe an einen Mandanten (ENT-686): Die Einloesekarte des KUNDEN
+// steht im selben Tor wie die Betreiber-Anmeldung, und ihre beiden Endpunkte
+// laufen ohne Anmeldung -- darum ohne betreiber_-Praefix, wie die
+// demo_*-Endpunkte daneben. NAMENTLICH, nicht als Praefix: Die Ausnahme soll
+// genau diese zwei decken und keinen dritten, der zufaellig gleich beginnt.
+const UEBERGABE_AUFRUFE = ['mandant_einladung_pruefen.php', 'mandant_einladung_einloesen.php'];
+const fremdeAufrufe = aufrufe.filter(a => !a.startsWith('betreiber_') && !a.startsWith('demo_')
+  && !UEBERGABE_AUFRUFE.includes(a));
 check('KRITISCH: der Betreiber-Bereich ruft ausschliesslich betreiber_*-Endpunkte',
   fremdeAufrufe.length === 0);
 if (fremdeAufrufe.length) { bad.push('fremder Aufruf: ' + fremdeAufrufe.join(', ')); }
