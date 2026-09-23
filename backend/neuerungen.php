@@ -30,12 +30,20 @@ function neuerungen_katalog(): array
 {
     return [
         [
-            'nr'    => 6,
+            'nr'    => 7,
             'datum' => '2026-09-23',
             'art'   => 'neu',
             'fuer'  => ['cockpit', 'betreiber'],
             'titel' => 'Verlauf an jeder Offerte',
             'text'  => 'Unter dem Formular steht jetzt, wer die Offerte wann gesendet oder geändert hat und was der Empfänger getan hat: Code angefordert, angenommen, abgelehnt, Änderungswunsch.',
+        ],
+        [
+            'nr'    => 6,
+            'datum' => '2026-09-23',
+            'art'   => 'fehlerbehebung',
+            'fuer'  => ['cockpit'],
+            'titel' => '„Neuer Einsatz“ fragt beim Revierdienst nach',
+            'text'  => 'Fehlt einer eingeteilten Person die Revierdienst-Berechtigung, fragt die Maske jetzt nach, wie beim Bearbeiten eines Einsatzes. Mit „Trotzdem zuteilen“ wird der Einsatz angelegt.',
         ],
         [
             'nr'    => 5,
