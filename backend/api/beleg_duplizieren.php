@@ -13,6 +13,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../belege.php';
+require_once __DIR__ . '/../logbuch.php';
 
 $user = require_session();
 require_recht($user, 'offerten_schreiben');
@@ -82,5 +83,9 @@ try {
     $pdo->rollBack();
     throw $e;
 }
+
+// Verlauf (ENT-697): am Doppel steht, woher es kommt.
+logbuch_schreiben($pdo, $user, 'beleg', $neuId, 'angelegt', null,
+    $nummer . ' · Doppel von ' . (string)($quelle['nummer'] ?? ''));
 
 json_response(['status' => 'ok', 'id' => $neuId, 'nummer' => $nummer]);

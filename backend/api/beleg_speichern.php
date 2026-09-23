@@ -15,6 +15,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../belege.php';
+require_once __DIR__ . '/../logbuch.php';
 
 $user = require_session();
 require_recht($user, 'offerten_schreiben');
@@ -89,6 +90,8 @@ foreach ((array)($in['positionen'] ?? []) as $p) {
 
 $pdo = db();
 $pdo->beginTransaction();
+$vorher = [];
+$abdruckVorher = '';
 try {
     if ($id > 0) {
         $chk = $pdo->prepare('SELECT id, status, entscheidung_am FROM belege WHERE id = ?');
@@ -104,6 +107,11 @@ try {
             $pdo->rollBack();
             json_response(['status' => 'error', 'message' => 'Dieser Beleg wurde vom Empfänger angenommen und ist gesperrt. Für Änderungen bitte duplizieren.'], 409);
         }
+        // Fuer den Verlauf (ENT-697): der Stand vor dem Speichern.
+        $v = $pdo->prepare('SELECT ' . implode(', ', array_keys($kopf)) . ' FROM belege WHERE id = ?');
+        $v->execute([$id]);
+        $vorher = $v->fetch(PDO::FETCH_ASSOC) ?: [];
+        $abdruckVorher = beleg_positionen_abdruck($pdo, $id);
         $satz = implode(', ', array_map(fn($f) => "$f = ?", array_keys($kopf)));
         $pdo->prepare("UPDATE belege SET $satz WHERE id = ?")
             ->execute(array_merge(array_values($kopf), [$id]));
@@ -128,6 +136,15 @@ try {
 } catch (Throwable $e) {
     $pdo->rollBack();
     throw $e;
+}
+
+// Verlauf (ENT-697), wie im Betreiber-Bereich NACH dem Commit: Ein Eintrag
+// ueber eine zurueckgerollte Aenderung waere schlimmer als keiner.
+if ($nummer === null) {
+    logbuch_vergleichen($pdo, $user, 'beleg', $id, $vorher, $kopf);
+    beleg_positionen_loggen($pdo, $user, $id, $abdruckVorher, beleg_positionen_abdruck($pdo, $id));
+} else {
+    logbuch_schreiben($pdo, $user, 'beleg', $id, 'angelegt', null, $art . ' ' . $nummer);
 }
 
 $antwort = ['status' => 'ok', 'id' => $id, 'summen' => $summen];

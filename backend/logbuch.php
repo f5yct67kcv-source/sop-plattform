@@ -41,7 +41,11 @@ declare(strict_types=1);
 // Kilometerstand, dass dies mit einem Logeintrag registriert wird."* Am
 // Kilometerstand haengt spaeter die Kontrolle gefahrener Strecken -- eine
 // Zahl, die sich spurlos aendern laesst, traegt keine Kontrolle.
-const LOGBUCH_BEREICHE = ['mitarbeiter', 'fahrzeug'];
+// 'beleg' seit ENT-697: der Verlauf am Beleg. Die Betreiberin schrieb ihre
+// Belege schon mit (ENT-614), das Cockpit bis dahin nicht. Die Gesamtsicht
+// logbuch_list.php liest weiterhin nur 'mitarbeiter' -- Belege stehen am
+// Beleg, nicht im Personal-Logbuch.
+const LOGBUCH_BEREICHE = ['mitarbeiter', 'fahrzeug', 'beleg'];
 
 // ── Zweiter Tabellensatz: die Betreiber-Ebene (ENT-614) ──────────────
 //
