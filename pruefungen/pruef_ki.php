@@ -167,58 +167,113 @@ pruef('Bei den selbsterklaerenden Gruenden haengt sie NICHT an',
     && !str_contains(ki_fehler_text('guthaben_leer')['message'], 'model: claude-beispiel'));
 ki_fehler_einzelheit('');
 
-// ══════════ DER ROUTER ZWINGT NICHTS IN EINEN BEREICH (ENT-692) ══════
+// ══════════ STUFE 1: DAS ANLIEGEN (ENT-692/693) ══════════════════════
 // Vorher kannte das Modell nur mitarbeiter/kunde/einsatz, das Feld war
 // Pflicht -- eine diktierte Offerte oeffnete "Neuer Einsatz". Geprueft wird
 // die Auswertung, nicht das Modell: was die Oberflaeche aus einer Antwort
 // macht.
-$bek = ['hmuster', 'afrei'];
+$alles = fn(string $r) => true;
+$nichts = fn(string $r) => false;
 
-[$c, $a] = ki_router_auswerten(['bereich' => 'anderes', 'anliegen' => 'Offerte erstellen'], $bek);
-pruef('KRITISCH: ein Anliegen ausserhalb der drei Bereiche oeffnet keinen Dialog',
-    $c !== 200 && $a['status'] !== 'ok' && !isset($a['bereich']));
+[$c, $a, $k] = ki_absicht_pruefen(['absicht' => 'anderes', 'anliegen' => 'Planung oeffnen'], $alles);
+pruef('KRITISCH: ein Anliegen ausserhalb des Katalogs oeffnet keinen Dialog', $k === null && $c !== 200 && $a['status'] !== 'ok');
 pruef('Das erkannte Anliegen wird zurueckgemeldet, nicht verschluckt',
-    ($a['anliegen'] ?? '') === 'Offerte erstellen' && str_contains($a['message'], 'Offerte erstellen'));
+    ($a['anliegen'] ?? '') === 'Planung oeffnen' && str_contains($a['message'], 'Planung oeffnen'));
+pruef('Die Meldung nennt, was stattdessen geht -- aus dem Katalog, nicht abgeschrieben',
+    array_reduce(ki_faehigkeiten(), fn($ok, $f) => $ok && str_contains($a['message'], $f['titel']), true));
 
-[$c2, $a2] = ki_router_auswerten(['bereich' => 'unklar'], $bek);
-[$c3, $a3] = ki_router_auswerten([], $bek);
-pruef('KRITISCH: nicht verstanden oeffnet ebenfalls keinen Dialog (auch ohne jedes Feld)',
-    $c2 !== 200 && $c3 !== 200 && $a2['status'] !== 'ok' && $a3['status'] !== 'ok');
-pruef('"Verstanden, aber nicht moeglich" und "nicht verstanden" sind zwei verschiedene Aussagen',
-    $a['grund'] !== $a2['grund'] && $a['message'] !== $a2['message']);
-[, $a4] = ki_router_auswerten(['bereich' => 'anderes', 'anliegen' => '<UNKNOWN>'], $bek);
+[$c2, $a2, $k2] = ki_absicht_pruefen(['absicht' => 'unklar'], $alles);
+[$c3, $a3, $k3] = ki_absicht_pruefen([], $alles);
+[$c3b, , $k3b] = ki_absicht_pruefen(['absicht' => 'einsatz'], $alles);   // alter Wert, kein Katalogeintrag
+pruef('KRITISCH: nicht verstanden oeffnet keinen Dialog (auch ohne Feld, auch mit Fremdwert)',
+    $k2 === null && $k3 === null && $k3b === null && $c2 !== 200 && $c3 !== 200 && $c3b !== 200);
+
+[$c4, $a4, $k4] = ki_absicht_pruefen(['absicht' => 'beleg_neu', 'anliegen' => 'Offerte erstellen'], $nichts);
+pruef('KRITISCH: ohne das Recht der Faehigkeit geht es nicht weiter', $k4 === null && $c4 === 403);
+pruef('... und zwar mit dem Recht der Faehigkeit, nicht einem pauschalen',
+    ($a4['recht'] ?? '') === ki_faehigkeiten()['beleg_neu']['recht']);
+pruef('Nicht verstanden, nicht abgedeckt und kein Recht sind drei verschiedene Aussagen',
+    count(array_unique([$a['grund'], $a2['grund'], $a4['grund']])) === 3
+    && count(array_unique([$a['message'], $a2['message'], $a4['message']])) === 3);
+[, $a5] = ki_absicht_pruefen(['absicht' => 'anderes', 'anliegen' => '<UNKNOWN>'], $alles);
 pruef('Ein Platzhalter als Anliegen wird nicht als Anliegen ausgegeben',
-    ($a4['anliegen'] ?? 'x') === '' && !str_contains($a4['message'], 'UNKNOWN'));
+    ($a5['anliegen'] ?? 'x') === '' && !str_contains($a5['message'], 'UNKNOWN'));
+
+// Jede Faehigkeit kommt nur mit IHREM Recht durch.
+$rechteOk = true;
+foreach (ki_faehigkeiten() as $key => $f) {
+    [, , $mit] = ki_absicht_pruefen(['absicht' => $key], fn($r) => $r === $f['recht']);
+    [, , $ohne] = ki_absicht_pruefen(['absicht' => $key], fn($r) => $r !== $f['recht']);
+    $rechteOk = $rechteOk && $mit === $key && $ohne === null;
+}
+pruef('KRITISCH: jede Faehigkeit haengt an genau ihrem Recht', $rechteOk);
+pruef('Jede Faehigkeit hat ein Feld-Schema und ein Recht, das es gibt',
+    array_reduce(array_keys(ki_faehigkeiten()), fn($ok, $key) => $ok && ki_felder_schema($key) !== [], true));
+
+// ══════════ STUFE 2: DIE FELDER ══════════════════════════════════════
+$listen = [
+    'mitarbeiter' => [['name' => 'hmuster', 'vorname' => 'Hans', 'nachname' => 'Muster'], ['name' => 'afrei']],
+    'kunden' => [['id' => 7, 'name' => 'Beispiel AG'], ['id' => 9, 'name' => 'Muster GmbH']],
+    'produkte' => [['id' => 3, 'name' => 'Verkehrsdienst', 'einheit' => 'Std.'], ['id' => 4, 'name' => 'Objektschutz', 'einheit' => 'Std.']],
+];
 
 // Platzhalter: der Fall aus dem Bildschirmfoto vom 2026-09-23.
-[$c5, $a5] = ki_router_auswerten(['bereich' => 'einsatz', 'einsatz' => [
+[$c6, $a6] = ki_felder_auswerten('einsatz_neu', [
     'kunde_name' => '<UNKNOWN>', 'titel' => 'Verkehrsdienst', 'ort' => 'unbekannt',
     'strasse' => 'n/a', 'datum' => '2000-01-01', 'von' => '07:00', 'bis' => '19:00', 'bedarf' => 2,
     'mitarbeiter_login_namen' => ['hmuster', 'erfunden'],
-]], $bek);
+], $listen);
 pruef('KRITISCH: ein Platzhalter als Kundenname kommt nicht als erkannter Wert an',
-    $c5 === 200 && !array_key_exists('kunde_name', $a5['felder']));
+    $c6 === 200 && !array_key_exists('kunde_name', $a6['felder']));
 pruef('Auch andere Platzhalter-Formen fallen weg (unbekannt, n/a)',
-    !array_key_exists('ort', $a5['felder']) && !array_key_exists('strasse', $a5['felder']));
+    !array_key_exists('ort', $a6['felder']) && !array_key_exists('strasse', $a6['felder']));
 pruef('Echte Werte bleiben stehen',
-    $a5['felder']['titel'] === 'Verkehrsdienst' && $a5['felder']['von'] === '07:00' && $a5['felder']['bedarf'] === 2);
-pruef('KRITISCH: nur bekannte Login-Namen werden zugeteilt',
-    $a5['mitarbeiter_login_namen'] === ['hmuster']);
+    $a6['felder']['titel'] === 'Verkehrsdienst' && $a6['felder']['von'] === '07:00' && $a6['felder']['bedarf'] === 2);
+pruef('KRITISCH: nur bekannte Login-Namen werden zugeteilt', $a6['mitarbeiter_login_namen'] === ['hmuster']);
+pruef('Die Antwort traegt Bereich und Aktion fuer die Oberflaeche', $a6['bereich'] === 'einsatz' && $a6['aktion'] === 'neu');
 
-[, $a6] = ki_router_auswerten(['bereich' => 'kunde', 'kunde' => ['name' => '[Firmenname]', 'ort' => 'Musterstadt']], $bek);
-pruef('Platzhalter fallen auch beim Kunden weg', !isset($a6['felder']['name']) && $a6['felder']['ort'] === 'Musterstadt');
-[, $a7] = ki_router_auswerten(['bereich' => 'mitarbeiter', 'mitarbeiter' => ['vorname' => 'Anna', 'nachname' => 'UNKNOWN']], $bek);
-pruef('... und bei neuen Mitarbeitenden', $a7['felder'] === ['vorname' => 'Anna']);
-[$c8, $a8] = ki_router_auswerten(['bereich' => 'mitarbeiter', 'aktion' => 'aendern',
-    'mitarbeiter_aenderung' => ['mitarbeiter_login_name' => 'hmuster', 'aenderungen' => ['telefon' => '<unbekannt>', 'ort' => 'Musterdorf']]], $bek);
+[, $a7] = ki_felder_auswerten('kunde_neu', ['name' => '[Firmenname]', 'ort' => 'Musterstadt'], []);
+pruef('Platzhalter fallen auch beim Kunden weg', !isset($a7['felder']['name']) && $a7['felder']['ort'] === 'Musterstadt');
+[, $a8] = ki_felder_auswerten('mitarbeiter_neu', ['vorname' => 'Anna', 'nachname' => 'UNKNOWN'], []);
+pruef('... und bei neuen Mitarbeitenden', $a8['felder'] === ['vorname' => 'Anna']);
+[$c9, $a9] = ki_felder_auswerten('mitarbeiter_aendern',
+    ['mitarbeiter_login_name' => 'hmuster', 'aenderungen' => ['telefon' => '<unbekannt>', 'ort' => 'Musterdorf']], $listen);
 pruef('... und bei Aenderungen: ein Platzhalter ueberschreibt kein bestehendes Feld',
-    $c8 === 200 && $a8['aenderungen'] === ['ort' => 'Musterdorf']);
-[$c9] = ki_router_auswerten(['bereich' => 'mitarbeiter', 'aktion' => 'aendern',
-    'mitarbeiter_aenderung' => ['mitarbeiter_login_name' => 'erfunden']], $bek);
-pruef('KRITISCH: eine unbekannte Person wird nicht geaendert', $c9 !== 200);
-// Wertebereich des Platzhalter-Filters: gewoehnliche Woerter bleiben Werte.
-pruef('Gewoehnliche Werte gelten nicht als Platzhalter (Keine-Sorgen AG, Na, 0)',
+    $c9 === 200 && $a9['aenderungen'] === ['ort' => 'Musterdorf'] && $a9['aktion'] === 'aendern');
+[$c10] = ki_felder_auswerten('mitarbeiter_aendern', ['mitarbeiter_login_name' => 'erfunden'], $listen);
+pruef('KRITISCH: eine unbekannte Person wird nicht geaendert', $c10 !== 200);
+pruef('Gewoehnliche Werte gelten nicht als Platzhalter (Keine-Sorgen AG, Nau, 0)',
     !ki_platzhalter('Keine-Sorgen AG') && !ki_platzhalter('Nau') && !ki_platzhalter('0'));
+
+// Offerte und Rechnung (ENT-695).
+[$c11, $a11] = ki_felder_auswerten('beleg_neu', [
+    'art' => 'offerte', 'kunde_name' => 'beispiel ag', 'titel' => 'Umzug Samstag',
+    'positionen' => [
+        ['produkt_id' => 3, 'leistung' => 'Verkehrsdienst', 'menge' => 16, 'einheit' => 'Tag'],
+        ['produkt_id' => 99, 'leistung' => 'Absperrgitter', 'menge' => 10, 'einheit' => 'Stk.'],
+        ['leistung' => 'Funkgeraete'],
+        ['leistung' => '<UNKNOWN>'],
+    ],
+], $listen);
+pruef('Offerte: der Bereich ist beleg, die Art offerte', $c11 === 200 && $a11['bereich'] === 'beleg' && $a11['art'] === 'offerte');
+pruef('KRITISCH: ein bekannter Kunde kommt mit seiner echten ID und seiner Schreibweise',
+    $a11['kunde'] === ['id' => 7, 'name' => 'Beispiel AG']);
+pruef('KRITISCH: eine Katalog-ID zaehlt nur, wenn es sie gibt (99 wird Freitext)',
+    $a11['positionen'][0]['produkt_id'] === 3 && $a11['positionen'][1]['produkt_id'] === null
+    && $a11['positionen'][1]['produkt_name'] === 'Absperrgitter');
+pruef('Eine Position ohne Katalog und ohne Text wird nicht erfunden', count($a11['positionen']) === 3);
+pruef('Menge bleibt, fehlende Menge wird 1', $a11['positionen'][0]['menge'] == 16 && $a11['positionen'][2]['menge'] == 1);
+pruef('KRITISCH: keine Position traegt einen Preis aus dem Diktat',
+    array_reduce($a11['positionen'], fn($ok, $p) => $ok && !preg_grep('/preis|rappen|betrag/i', array_keys($p)), true));
+[, $a12] = ki_felder_auswerten('beleg_neu', ['kunde_name' => 'Neue Firma AG', 'art' => 'rechnung'], $listen);
+pruef('Ein unbekannter Kunde kommt als Name ohne ID -- nichts wird still angelegt',
+    $a12['kunde'] === ['id' => null, 'name' => 'Neue Firma AG'] && $a12['art'] === 'rechnung');
+[, $a13] = ki_felder_auswerten('beleg_neu', ['kunde_name' => '<UNKNOWN>', 'art' => 'irgendwas'], $listen);
+pruef('Kein Kunde bei Platzhalter; eine fremde Art wird Offerte', $a13['kunde'] === null && $a13['art'] === 'offerte');
+[, $a14] = ki_felder_auswerten('beleg_neu', ['positionen' => [['produkt_id' => 3, 'leistung' => 'x']]], ['kunden' => [], 'produkte' => []]);
+pruef('Ohne lesbaren Katalog wird auch eine genannte ID zum Freitext', $a14['positionen'][0]['produkt_id'] === null);
+pruef('Das Schema der Offerte fragt keinen Preis ab',
+    !preg_match('/preis|rappen|betrag/i', json_encode(ki_felder_schema('beleg_neu'))));
 
 // ══════════ DER GRUND UEBERLEBT DEN RUECKWEG ══════════════════════════
 // Die Funktionen geben weiterhin null zurueck; der Grund steht daneben.
@@ -244,9 +299,14 @@ if (ki_schluessel_fehlt(ki_schluessel())) {
         $r2 === null && ki_fehlergrund() === 'nicht_eingerichtet');
 
     ki_fehlergrund('kein_ergebnis');
-    $r3 = anthropic_route_diktat('Beispieltext', [], [], '2000-01-01');
-    pruef('KRITISCH: und fuer das Diktat',
+    $r3 = anthropic_ki_absicht('Beispieltext');
+    pruef('KRITISCH: und fuer das Diktat (Stufe 1)',
         $r3 === null && ki_fehlergrund() === 'nicht_eingerichtet');
+
+    ki_fehlergrund('kein_ergebnis');
+    $r4 = anthropic_ki_felder('beleg_neu', 'Beispieltext', ['kunden' => [], 'produkte' => []], '2000-01-01');
+    pruef('KRITISCH: und fuer das Diktat (Stufe 2)',
+        $r4 === null && ki_fehlergrund() === 'nicht_eingerichtet');
 } else {
     // Hier steht ein echter Wert -- dann laeuft diese Pruefung auf einem
     // Deploy-Stand und nicht im Repository. Nicht stillschweigend

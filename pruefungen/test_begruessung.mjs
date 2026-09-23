@@ -209,19 +209,20 @@ await page.screenshot({ path: OUT + '/81-router-einsatz.png' });
 await page.evaluate(() => enNeuAbbrechen());
 routerAntwort = null;
 
-// ══════════ ROUTER: NICHT ABGEDECKT / NICHT VERSTANDEN (ENT-692)
+// ══════════ ROUTER: NICHT ABGEDECKT / NICHT VERSTANDEN / KEIN RECHT (ENT-692/693)
 // Die Antwort kommt aus der echten Auswertung des Servers, nicht aus einer
 // hier ausgedachten -- sonst prueft der Test eine Antwort, die der Server
 // gar nicht mehr gibt. Anlass: Eine diktierte Offerte oeffnete "Neuer
 // Einsatz".
-const serverAntwort = modell => JSON.parse(execFileSync('php', ['-r',
-  `require '${WURZEL}/backend/ai.php'; echo json_encode(ki_router_auswerten(json_decode($argv[1], true), []));`,
+const serverAntwort = (modell, darf) => JSON.parse(execFileSync('php', ['-r',
+  `require '${WURZEL}/backend/ai.php'; [$c, $a] = ki_absicht_pruefen(json_decode($argv[1], true), fn($r) => ${darf ? 'true' : 'false'}); echo json_encode([$c, $a]);`,
   JSON.stringify(modell)]).toString());
-for (const [fall, modell, text] of [
-  ['Offerte (nicht abgedeckt)', { bereich: 'anderes', anliegen: 'Offerte erstellen' }, 'Erstelle eine Offerte für die Beispiel AG'],
-  ['nicht verstanden', { bereich: 'unklar' }, 'irgendwas Unklares'],
+for (const [fall, modell, darf, text] of [
+  ['nicht abgedeckt', { absicht: 'anderes', anliegen: 'Planung öffnen' }, true, 'Zeig mir die Planung vom Oktober'],
+  ['nicht verstanden', { absicht: 'unklar' }, true, 'irgendwas Unklares'],
+  ['kein Recht', { absicht: 'beleg_neu', anliegen: 'Offerte erstellen' }, false, 'Offerte für die Beispiel AG'],
 ]) {
-  const [code, antwort] = serverAntwort(modell);
+  const [code, antwort] = serverAntwort(modell, darf);
   routerAntwort = [antwort, code];
   await page.fill('#rtText', text);
   await page.click('#rtBtn');
@@ -229,7 +230,8 @@ for (const [fall, modell, text] of [
   check(`${fall}: die Meldung des Servers wird gezeigt`,
     await page.isVisible('#rtErr') && (await page.textContent('#rtErr')) === antwort.message);
   check(`${fall}: kein Dialog öffnet sich`,
-    !(await page.isVisible('#mv-bearbeiten.on')) && !(await page.isVisible('#dlgKunde.on')) && !(await page.isVisible('#view-einsatzneu.on')));
+    !(await page.isVisible('#mv-bearbeiten.on')) && !(await page.isVisible('#dlgKunde.on'))
+    && !(await page.isVisible('#view-einsatzneu.on')) && !(await page.isVisible('#view-offerte.on')));
   check(`${fall}: der Text bleibt für eine Korrektur stehen`, (await page.inputValue('#rtText')) === text);
 }
 routerAntwort = null;

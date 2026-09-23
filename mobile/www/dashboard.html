@@ -2029,6 +2029,12 @@ html:not(.hat-reinigung) [data-sparte-feld] { display: none !important; }
 /* Aus dem Internet ergaenzt — bewusst eine andere Farbe als das Diktat,
    weil hier niemand die Angabe gesagt hat und sie geprueft gehoert. */
 .inp.web { border-color: var(--warn); background: var(--warn-soft); }
+/* Aus der Spracheingabe, aber nicht zugeordnet (ENT-695): ein gesagter
+   Kunde, der nicht in der Liste steht, eine Leistung, die nicht im Katalog
+   ist. Orange statt blau -- blau heisst "uebernommen", orange "bitte
+   pruefen". */
+.inp.ki-offen { border-color: var(--warn); background: var(--warn-soft); }
+.f-hint.ki-offen { color: var(--warn); }
 .ki-hint { display: none; align-items: flex-start; gap: 9px; background: var(--accent-soft); border: 1px solid var(--accent-line); border-radius: var(--r-sm); padding: 10px 12px; font-size: 12.5px; color: var(--accent); line-height: 1.5; margin-bottom: 16px; }
 .ki-hint.on { display: flex; }
 .ki-hint.web { background: var(--warn-soft); border-color: var(--warn-line); color: var(--warn); }
@@ -7092,6 +7098,11 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <div class="msg-err" id="ofFormErr" style="display:none;margin-bottom:12px"></div>
         <!-- Nach einer Annahme am Link (ENT-688): lesbar, aber gesperrt. -->
         <div id="ofFormSperre" style="display:none;font-size:12.5px;color:var(--pos);background:var(--pos-soft);border-radius:var(--r-xs);padding:8px 11px;margin-bottom:12px;line-height:1.5"></div>
+        <!-- Spracheingabe (ENT-695): dasselbe Band wie bei "Neuer Einsatz". -->
+        <div class="ki-hint" id="ofKiHint">
+          <svg class="i i-sm" viewBox="0 0 24 24" style="margin-top:1px;flex:none"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+          <span id="ofKiText"></span>
+        </div>
 
         <!-- Zwei Boxen -- Empfaenger, Termine/Nummer -- nach dem Vorbild des
              bisherigen Fremdsystems (ENT-187), urspruenglich mit einer
@@ -7106,7 +7117,8 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           <div class="card"><div class="card-bd">
             <div class="f"><label for="of_kunde">Empfänger *</label>
               <input class="inp" id="of_kunde" list="dlKunden" autocomplete="off"
-                     placeholder="Kunde suchen …" oninput="ofKundeGewaehlt()"></div>
+                     placeholder="Kunde suchen …" oninput="ofKundeGewaehlt()">
+              <div class="f-hint ki-offen" id="ofKundeHinweis" style="display:none">Nicht in der Kundenliste</div></div>
             <div class="f" style="margin-bottom:10px"><label for="of_person">Ansprechperson</label>
               <select class="inp" id="of_person"></select></div>
             <button class="btn btn-plain btn-sm" type="button" onclick="ofNeueAdresse()">
@@ -12277,10 +12289,11 @@ function zeitTaktStarten() {
 // ══════════════════════════════════════════ BEGRÜSSUNG UND DIKTAT-ROUTER (ENT-032)
 // Persoenliche Begruessung mit wechselnden Formulierungen, ein Kurzueberblick
 // und ein Diktat-/Bild-Router, der erkennt, in welchen Bereich ein Eingabe
-// gehoert, und den passenden bestehenden Dialog vorbefuellt oeffnet. Deckt
-// bewusst nur die NEUANLAGE ab (Mitarbeiter, Kunde, Einsatz) -- eine
-// Aenderung bestehender Datensaetze braucht einen eindeutig getroffenen
-// Datensatz und bleibt den bestehenden Einzel-Diktaten vorbehalten.
+// gehoert, und den passenden bestehenden Dialog vorbefuellt oeffnet. Welche
+// Faehigkeiten es gibt, steht seit ENT-695 an EINER Stelle: im Katalog
+// ki_faehigkeiten() in backend/ai.php (heute: Mitarbeitende anlegen und
+// aendern, Kunde, Einsatz, Offerte/Rechnung). Eine neue Faehigkeit braucht
+// dort einen Eintrag und hier einen Zweig in rtDialogOeffnen().
 const BEGR_GRUSS = {
   morgen: ['Guten Morgen', 'Guten Morgen', 'Einen guten Start'],
   tag: ['Guten Tag', 'Schön, dass du da bist', 'Willkommen zurück'],
@@ -12349,6 +12362,8 @@ function rtErkennen(prefix) {
 function rtDialogOeffnen(data) {
   const bereich = data.bereich;
   const aktion = data.aktion || 'neu';
+  // Offerte und Rechnung (ENT-695) laden ihre Listen selbst.
+  if (bereich === 'beleg') { ofAusDiktat(data); return; }
   const bereit = bereich === 'einsatz'
     ? Promise.all([mitarbeiter.length ? null : loadMitarbeiter(), kunden.length ? null : loadKunden()])
     : bereich === 'kunde' ? (kunden.length ? Promise.resolve() : loadKunden())
@@ -15078,6 +15093,11 @@ function ofNeu(art) {
   $('of_bedingungen').value = '';
   $('of_fusszeile').value = '';
   $('of_unterschriftsseite').checked = false;
+  // Reste einer vorigen Spracheingabe weg (ENT-695) -- sonst stuende eine
+  // von Hand begonnene Offerte blau markiert da.
+  ['of_kunde', 'of_titel', 'of_bemerkung'].forEach(id => $(id).classList.remove('ki', 'ki-offen'));
+  $('ofKundeHinweis').style.display = 'none';
+  $('ofKiHint').classList.remove('on');
   $('of_nummer').value = naechsteNummer || 'wird beim Speichern vergeben';
   // Direkt gesetzt statt ueber ofRabattEinheitSetzen(): die hiesse hier nur
   // "von irgendeinem Altwert auf 0 umrechnen", was fuer einen leeren Entwurf
@@ -15109,6 +15129,85 @@ function ofNeuStarten(art) {
   const vorlauf = produkte.length ? Promise.resolve() : loadProdukte();
   const kundenDa = kunden.length ? Promise.resolve() : loadKunden();
   Promise.all([vorlauf, kundenDa]).then(() => ofNeu(art));
+}
+
+// Offerte oder Rechnung aus der Spracheingabe (ENT-695). Oeffnet dasselbe
+// Formular wie "Neue Offerte" und fuellt es vor; gespeichert wird per Klick
+// (ENT-015). Blau: uebernommen. Orange: gesagt, aber nicht zugeordnet --
+// ein Kunde, der nicht in der Liste steht, eine Leistung, die nicht im
+// Katalog ist. Ein Preis kommt nie aus dem Diktat, nur aus dem Katalog.
+function ofAusDiktat(data) {
+  const art = data.art === 'rechnung' ? 'rechnung' : 'offerte';
+  Promise.all([
+    produkte.length ? null : loadProdukte(),
+    kunden.length ? null : loadKunden(),
+    belege.length || ofNaechsteNummer ? null : loadBelege(),
+  ]).then(() => {
+    ofNeu(art);
+    const felder = data.felder || {};
+    const blau = [], offen = [];
+
+    const k = data.kunde || null;
+    const treffer = k && k.id ? kunden.find(x => Number(x.id) === Number(k.id)) : null;
+    if (treffer) {
+      $('of_kunde').value = treffer.name;
+      ofFormKundeId = Number(treffer.id);
+      ofPersonenFuellen(null);
+      $('of_kunde').classList.add('ki');
+      blau.push('Empfänger');
+    } else if (k && k.name) {
+      $('of_kunde').value = k.name;
+      ofFormKundeId = null;
+      $('of_kunde').classList.add('ki-offen');
+      $('ofKundeHinweis').style.display = '';
+      offen.push(`Empfänger „${esc(k.name)}“ steht nicht in der Kundenliste – über „Neue Adresse erstellen“ anlegen`);
+    } else {
+      offen.push('Empfänger');
+    }
+    for (const [feld, id, text] of [['titel', 'of_titel', 'Titel'], ['bemerkung', 'of_bemerkung', 'Bemerkung']]) {
+      if (felder[feld]) { $(id).value = felder[feld]; $(id).classList.add('ki'); blau.push(text); }
+    }
+
+    const aktiv = produkte.filter(p => Number(p.aktiv ?? 1) === 1);
+    const zeilen = (data.positionen || []).map(p => {
+      const z = ofLeereZeile();
+      const menge = Number(p.menge);
+      z.menge = Number.isFinite(menge) && menge > 0 ? menge : 1;
+      const prod = p.produkt_id ? aktiv.find(x => Number(x.id) === Number(p.produkt_id)) : null;
+      if (prod) {
+        // Einheit und Preis gehoeren zum Katalogeintrag -- ein Preis je
+        // Stunde mit einer gesagten Einheit "Tag" ergaebe einen falschen Betrag.
+        z.produkt_id = Number(prod.id);
+        z.produkt_name = prod.name;
+        z.beschreibung = prod.beschreibung || '';
+        z.einzelpreis_rappen = Number(prod.einzelpreis_rappen) || 0;
+        z.einheit = prod.einheit || 'Std.';
+        z.mwst_satz_bp = Number(prod.mwst_satz_bp) || 0;
+        z.ki = 'katalog';
+      } else {
+        z.produkt_name = p.produkt_name || p.gesagt || '';
+        if (p.einheit) { z.einheit = p.einheit; }
+        z.ki = 'offen';
+      }
+      return z;
+    }).filter(z => z.produkt_name);
+    if (zeilen.length) { ofPos = zeilen; }
+    ofZeilenZeichnen();
+
+    const imKatalog = zeilen.filter(z => z.ki === 'katalog').length;
+    const frei = zeilen.length - imKatalog;
+    if (imKatalog) { blau.push(imKatalog === 1 ? '1 Position aus dem Katalog' : `${imKatalog} Positionen aus dem Katalog`); }
+    if (frei) { offen.push(frei === 1 ? '1 Position nicht im Katalog – Preis eintragen' : `${frei} Positionen nicht im Katalog – Preis eintragen`); }
+    if (!zeilen.length) { offen.push('Positionen'); }
+
+    let t = blau.length
+      ? `Blau markiert wurde aus dem Diktat übernommen: ${esc(blau.join(', '))}.`
+      : 'Aus dem Diktat liess sich kein Feld zuordnen.';
+    if (offen.length) { t += ` Noch offen: ${offen.join('; ')}.`; }
+    t += ' Es ist noch nichts gespeichert.';
+    $('ofKiText').innerHTML = t;
+    $('ofKiHint').classList.add('on');
+  });
 }
 
 // Eine neue Offerte mit bereits gesetztem Empfaenger -- aus dem Zeilenmenue
@@ -15212,6 +15311,12 @@ function ofKundeGewaehlt() {
   const vorher = ofFormKundeId;
   ofFormKundeId = k ? Number(k.id) : null;
   if (ofFormKundeId !== vorher) { ofPersonenFuellen(null); }
+  // Ein aus der Spracheingabe unbekannter Name ist erledigt, sobald ein
+  // echter Kunde dasteht -- oder das Feld leer ist.
+  if (ofFormKundeId || !name) {
+    $('of_kunde').classList.remove('ki-offen');
+    $('ofKundeHinweis').style.display = 'none';
+  }
 }
 
 // "Neue Adresse erstellen" direkt aus dem Offert-Formular (ENT-187): oeffnet
@@ -15226,8 +15331,12 @@ function ofNeueAdresse() {
     $('of_kunde').value = k.name;
     ofFormKundeId = Number(k.id);
     ofPersonenFuellen(null);
+    ofKundeGewaehlt();
   };
-  openKundeNeu();
+  // Steht ein gesagter, aber unbekannter Name im Feld (ENT-695), kommt er
+  // gleich in den neuen Kunden mit -- sonst tippte man ihn ein zweites Mal.
+  const gesagt = $('of_kunde').classList.contains('ki-offen') ? $('of_kunde').value.trim() : '';
+  openKundeNeu(gesagt ? { name: gesagt } : undefined, gesagt ? {} : undefined);
 }
 
 // ── Positionszeilen ───────────────────────────────────────────────────────
@@ -15316,16 +15425,17 @@ function ofZeileHtml(p, i, produktListe) {
   return `<div class="of-pos">
     <div class="of-pos-kopf">
       <div class="f"><label for="ofp_name${i}">Leistung</label>
-        <input class="inp" id="ofp_name${i}" list="dlProdukte" value="${esc(p.produkt_name)}"
+        <input class="inp${p.ki === 'katalog' ? ' ki' : p.ki === 'offen' ? ' ki-offen' : ''}" id="ofp_name${i}" list="dlProdukte" value="${esc(p.produkt_name)}"
                oninput="ofZeileFeld(${i}, 'produkt_name', this.value)"
-               onchange="ofProduktUebernehmen(${i}, this.value)"></div>
+               onchange="ofProduktUebernehmen(${i}, this.value)">
+        ${p.ki === 'offen' ? `<div class="f-hint ki-offen" id="ofp_hint${i}">Nicht im Katalog – Preis eintragen</div>` : ''}</div>
       <div class="f"><label for="ofp_menge${i}">Menge</label>
         <input class="inp num" id="ofp_menge${i}" inputmode="decimal" value="${esc(String(p.menge))}"
                oninput="ofZeileFeld(${i}, 'menge', this.value)"></div>
       <div class="f"><label for="ofp_einheit${i}">Einheit</label>
         ${einheitHtml('ofp_einheit' + i, p.einheit, `ofZeileFeld(${i}, 'einheit', this.value)`)}</div>
       <div class="f"><label for="ofp_preis${i}">Einzelpreis</label>
-        <input class="inp num" id="ofp_preis${i}" inputmode="decimal" value="${rappenZuChf(p.einzelpreis_rappen)}"
+        <input class="inp num" id="ofp_preis${i}" inputmode="decimal" value="${p.ki === 'offen' && !p.einzelpreis_rappen ? '' : rappenZuChf(p.einzelpreis_rappen)}"
                oninput="ofZeileFeld(${i}, 'einzelpreis_rappen', this.value)"></div>
       <div class="f"><label for="ofp_rabatt${i}">Rabatt %</label>
         <input class="inp num" id="ofp_rabatt${i}" inputmode="decimal" value="${bpText(p.rabatt_bp)}"
@@ -15387,6 +15497,12 @@ function ofProduktUebernehmen(i, name) {
   if (!z.einzelpreis_rappen) { z.einzelpreis_rappen = Number(p.einzelpreis_rappen) || 0; }
   if (!z.einheit || z.einheit === 'Std.') { z.einheit = p.einheit || 'Std.'; }
   z.mwst_satz_bp = Number(p.mwst_satz_bp) || 0;
+  // Aus der Spracheingabe offen, jetzt zugeordnet (ENT-695).
+  if (z.ki === 'offen') {
+    delete z.ki;
+    const n = $('ofp_name' + i); if (n) { n.classList.remove('ki-offen'); }
+    const h = $('ofp_hint' + i); if (h) { h.remove(); }
+  }
   // Die Felder DIESER Zeile einzeln nachziehen statt die ganze Liste neu zu
   // zeichnen. Das Ereignis kommt aus 'change', also beim Verlassen des
   // Feldes -- ein Neuzeichnen loeschte genau das Element, das den Wechsel

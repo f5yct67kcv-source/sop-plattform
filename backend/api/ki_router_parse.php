@@ -1,21 +1,21 @@
 <?php
-// Ordnet einen diktierten oder getippten Text einem Bereich zu (ENT-032).
-// Schreibt nichts -- das Ergebnis oeffnet nur den passenden bestehenden
-// Dialog bzw. die Bearbeiten-Schublade, vorbefuellt wie zuvor bei den
-// seitengebundenen Einzel-Diktaten.
+// Spracheingabe: ordnet einen diktierten oder getippten Text einer Faehigkeit
+// zu und liefert deren Felder (ENT-032, seit ENT-695 in zwei Stufen ueber
+// den Katalog ki_faehigkeiten() in ai.php).
 //
-// Deckt die Neuanlage aller drei Bereiche ab, und seit ENT-042 zusaetzlich
-// die AENDERUNG eines bestehenden Mitarbeitenden -- fuer Kunde/Einsatz gibt
-// es das bewusst weiterhin nicht (siehe ai.php). Seit ENT-692 sagt der
-// Router ehrlich, wenn ein Anliegen (z.B. eine Offerte) nicht dazugehoert,
-// statt es in einen der drei Bereiche zu zwingen.
+// Schreibt nichts -- das Ergebnis oeffnet nur den passenden bestehenden
+// Dialog vorbefuellt; gespeichert wird per Klick (ENT-015).
+//
+// Rechte: Zugang hat, wer in die Verwaltung darf. Ob die erkannte Faehigkeit
+// erlaubt ist, entscheidet danach darf() mit deren eigenem Recht -- vorher
+// galt fuer alles einsaetze_schreiben (ENT-695).
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../ai.php';
 
 $user = require_session();
-require_recht($user, 'einsaetze_schreiben');
+require_verwaltung($user);
 require_once __DIR__ . '/../mitarbeiter.php';   // ma_nur_menschen() (ENT-631)
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
@@ -31,17 +31,38 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $heute)) {
     $heute = date('Y-m-d');
 }
 
-$kunden = db()->query('SELECT name FROM kunden ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
-$mitarbeiter = db()->query(
-    'SELECT name, vorname, nachname FROM mitarbeiter WHERE aktiv = 1 AND ' . ma_nur_menschen(db()) . ' ORDER BY name'
-)->fetchAll();
+// ── Stufe 1: das Anliegen
+$a = anthropic_ki_absicht($text);
+if ($a === null) {
+    ki_fehler_melden();
+}
+[$code, $antwort, $key] = ki_absicht_pruefen($a, fn(string $recht) => darf($user, $recht));
+if ($key === null) {
+    json_response($antwort, $code);
+}
 
-$e = anthropic_route_diktat($text, $kunden, $mitarbeiter, $heute);
+// ── Stufe 2: nur die Listen, die diese Faehigkeit braucht
+$listen = [];
+foreach (ki_faehigkeiten()[$key]['listen'] as $liste) {
+    if ($liste === 'kunden') {
+        $listen['kunden'] = db()->query('SELECT id, name FROM kunden ORDER BY name')->fetchAll();
+    } elseif ($liste === 'mitarbeiter') {
+        $listen['mitarbeiter'] = db()->query(
+            'SELECT name, vorname, nachname FROM mitarbeiter WHERE aktiv = 1 AND ' . ma_nur_menschen(db()) . ' ORDER BY name'
+        )->fetchAll();
+    } elseif ($liste === 'produkte') {
+        // Der Katalog nur fuer wen er ohnehin lesbar ist. Ohne ihn werden
+        // alle Positionen Freitextzeilen -- dasselbe, was das Formular dieser
+        // Person auch von Hand bietet.
+        $listen['produkte'] = darf($user, 'leistungen_lesen') && hat_tabelle(db(), 'produkte')
+            ? db()->query('SELECT id, name, einheit FROM produkte WHERE aktiv = 1 ORDER BY sortierung, name')->fetchAll()
+            : [];
+    }
+}
+
+$e = anthropic_ki_felder($key, $text, $listen, $heute);
 if ($e === null) {
     ki_fehler_melden();
 }
-
-// Auswertung ohne Netz und Datenbank in ai.php (ENT-692), damit jeder Zweig
-// pruefbar ist: Bereich, "anderes"/"unklar", Platzhalter, Login-Namen.
-[$code, $antwort] = ki_router_auswerten($e, array_column($mitarbeiter, 'name'));
+[$code, $antwort] = ki_felder_auswerten($key, $e, $listen);
 json_response($antwort, $code);
