@@ -44,6 +44,9 @@ let speicherFehlerBei = null;   // Datum, bei dem das Speichern scheitern soll
 // Antwortet wie require_recht() in backend/rechte.php, wenn der Rolle das
 // Recht fehlt: 403, der Name des Rechts und ein Satz, der die Rolle nennt.
 let rechtFehlt = false;
+// Antwortet wie einsatz_save.php, wenn eine eingeteilte Person keine
+// Revierdienst-Berechtigung hat (ENT-284): 409, bis die Bestaetigung mitkommt.
+let ohneRevier = false;
 const ROLLE_FEHLT = 'Deiner Rolle fehlt das Recht „Einsätze & Zuteilung: schreiben“.';
 // Bremse fuer die Speicherantwort. Ohne sie ist eine Reihe schneller fertig,
 // als sich der Zustand "laeuft gerade" ueberhaupt ablesen laesst -- die
@@ -73,6 +76,12 @@ await page.route('**/api/**', async route => {
   }
   if (p.includes('einsatz_save')) {
     if (bremse) { await new Promise(r => setTimeout(r, bremse)); }
+    if (ohneRevier && !(body && body.trotz_fehlender_berechtigung)) {
+      return route.fulfill({ status: 409, contentType: 'application/json',
+        body: JSON.stringify({ status: 'error', unberechtigt: true,
+          message: 'Ohne Revierdienst-Berechtigung: Adrian Muster',
+          personen: [{ mitarbeiter_id: 1, name: 'Adrian Muster', login_name: 'adrian' }] }) });
+    }
     if (rechtFehlt) {
       return route.fulfill({ status: 403, contentType: 'application/json',
         body: JSON.stringify({ status: 'error', recht: 'einsaetze_schreiben', message: ROLLE_FEHLT }) });
@@ -283,6 +292,28 @@ check('KRITISCH: fehlt der Rolle das Recht, nennt die Anlegen-Maske genau diesen
 check('KRITISCH: jeder Schreibweg mit fehlendem Recht meldet ihn auch zentral',
   (await page.textContent('#toast')).includes(ROLLE_FEHLT));
 rechtFehlt = false;
+
+// ── Fehlt einer eingeteilten Person die Revierdienst-Berechtigung, fragt
+// die Maske nach -- wie die Schublade. Bis 2026-09-23 wies sie nur ab.
+ohneRevier = true;
+vor = speicherRufe().length;
+await formular(tag(44), tag(46), '07:30', '16:30');
+await page.evaluate(() => createEinsatz());
+await page.waitForTimeout(700);
+check('KRITISCH: fehlt die Revierdienst-Berechtigung, oeffnet sich die Nachfrage statt einer Absage',
+  await page.evaluate(() => document.getElementById('dlgRevierWarnung').classList.contains('on')));
+check('Die Nachfrage nennt die Person',
+  (await page.textContent('#rwText')).includes('Adrian Muster'));
+check('KRITISCH: bis zur Bestaetigung ist nichts angelegt, und die Reihe hat nach dem ersten Tag angehalten',
+  speicherRufe().length === vor + 1);
+check('Kein „Anlegen fehlgeschlagen“ neben der Nachfrage',
+  await page.evaluate(() => $('enNeuErr').style.display === 'none'));
+await page.click('#rwTrotzdem', { timeout: 2000 }).catch(() => bad.push('„Trotzdem zuteilen“ war nicht anklickbar'));
+await page.waitForTimeout(1400);
+const bestaetigt = speicherRufe().slice(vor + 1);
+check('KRITISCH: „Trotzdem zuteilen“ legt die ganze Reihe an, jeden Tag mit der Bestaetigung',
+  bestaetigt.length === 3 && bestaetigt.every(r => r.body.trotz_fehlender_berechtigung === true));
+ohneRevier = false;
 
 // ── Dokumente haengen an JEDEM Tag der Reihe
 const anhaenge = () => rufe.filter(r => r.body && r.body.aktion === 'hochladen');
