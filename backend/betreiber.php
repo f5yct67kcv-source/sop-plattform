@@ -1324,6 +1324,15 @@ function be_tabellen(): array
   melder_rolle VARCHAR(200) NOT NULL DEFAULT '',
   bildschirm VARCHAR(200) NOT NULL DEFAULT '',
   umgebung VARCHAR(200) NOT NULL DEFAULT '',
+  -- Wohin die Antwort gemeldet wird (ENT-685). Aus der Sitzung des
+  -- Meldenden, nie aus der Anfrage. Leer heisst: keine Adresse hinterlegt,
+  -- nicht etwa 'will keine Post'. Der Unterschied steht in der Lage, die
+  -- sv_kunde_benachrichtigen() zurueckgibt.
+  melder_email VARCHAR(200) NOT NULL DEFAULT '',
+  -- Wann der BETRIEB den Vorgang zuletzt offen hatte (ENT-685). Daran
+  -- haengt die Glocke: Eine Antwort gilt als ungelesen, solange die letzte
+  -- Nachricht des Betreibers juenger ist als dieser Zeitpunkt.
+  kunde_gelesen_am DATETIME NULL,
   eroeffnet_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   geaendert_am DATETIME NULL,
   erledigt_am DATETIME NULL,
@@ -1787,6 +1796,14 @@ function be_spalten(): array
         ['be_belege', 'total_monat_rappen',      "ALTER TABLE be_belege ADD COLUMN total_monat_rappen INT NOT NULL DEFAULT 0 AFTER verlaengerung_monate"],
         ['be_belege', 'total_jahr_rappen',       "ALTER TABLE be_belege ADD COLUMN total_jahr_rappen INT NOT NULL DEFAULT 0 AFTER total_monat_rappen"],
         ['be_beleg_positionen', 'periode',       "ALTER TABLE be_beleg_positionen ADD COLUMN periode ENUM('einmalig','monatlich','jaehrlich') NOT NULL DEFAULT 'einmalig' AFTER mwst_satz_bp"],
+        // Rueckmeldung an den Betrieb (ENT-685). Beide NULL-bar bzw. leer:
+        // Ein bestehender Vorgang hat keine Adresse und gilt als nie
+        // gelesen -- das ist richtig so, niemand hat ihn je unter diesem
+        // Gesichtspunkt geoeffnet. Ein Vorgabewert "gelesen" wuerde
+        // behaupten, was nicht geprueft wurde, und die erste Antwort
+        // stillschweigend verschlucken.
+        ['support_vorgang', 'melder_email',     "ALTER TABLE support_vorgang ADD COLUMN melder_email VARCHAR(200) NOT NULL DEFAULT '' AFTER melder_rolle"],
+        ['support_vorgang', 'kunde_gelesen_am', "ALTER TABLE support_vorgang ADD COLUMN kunde_gelesen_am DATETIME NULL AFTER melder_email"],
     ];
 }
 

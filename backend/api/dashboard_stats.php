@@ -4,6 +4,8 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../ereignisse.php';
+require_once __DIR__ . '/../betreiber.php';       // betreiber_db() (ENT-685)
+require_once __DIR__ . '/../supportvorgang.php';  // sv_kunde_ungelesen() (ENT-685)
 
 $user = require_session();
 require_verwaltung($user);
@@ -85,7 +87,26 @@ $proMitarbeiter = $stmt->fetchAll();
 // ── Ereignis-Feed (ENT-090). Loest den frueheren Sperrtage-Feed ab: Er ist
 // jetzt EINE der Arten, nicht der ganze Inhalt. Die Zusammenstellung steht in
 // backend/ereignisse.php, damit sie pruefbar ist und nicht im Endpunkt liegt.
-$ereignisse = ereignisse_sammeln(db());
+//
+// Der Supportkanal kommt seit ENT-685 dazu. Er liegt NICHT in der
+// Betriebsdatenbank, sondern beim Betreiber (bei einem Mandanten mit
+// eigener Datenbank in seiner eigenen, ENT-681) -- darum die zweite
+// Verbindung und die Zuordnung, wer hier fragt. Beides sauber abgefangen:
+// Der Feed ist der Herzschlag der Uebersicht und darf nicht davon abhaengen,
+// dass die Betreiber-Ebene gerade erreichbar ist.
+$svStamm = null; $svMandant = null;
+try {
+    $svStamm = betreiber_db();
+    $zuordnung = sv_mandant_bestimmen($svStamm, db());
+    $svMandant = $zuordnung['id'] === null ? null : (int)$zuordnung['id'];
+    // Ohne Zuordnung wird NICHT geraten: Ein Vorgang eines fremden Betriebs
+    // in dieser Glocke waere schlimmer als eine Glocke ohne Support.
+    if ($svMandant === null) { $svStamm = null; }
+} catch (Throwable $e) {
+    $svStamm = null;
+}
+
+$ereignisse = ereignisse_sammeln(db(), 12, $svStamm, $svMandant);
 
 // ── Letzte Rapporte
 $letzte = db()->query(

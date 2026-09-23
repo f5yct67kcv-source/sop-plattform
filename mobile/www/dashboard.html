@@ -5851,6 +5851,11 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
               onclick="go('support')">
         <svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span class="lbl">Support</span>
+        <!-- Ungelesene Antwort des Betreibers (ENT-685). Dieselbe Bauart wie
+             das Abzeichen an der Glocke -- und wie dort ANGESAGT statt nur
+             eingefaerbt: Wer die Seite hoert statt sieht, erfaehrt aus einer
+             roten Scheibe nichts. -->
+        <span class="glocke-badge" id="nav-support-abz" hidden></span>
       </button>
       <div class="side-user">
         <div class="avatar" id="uAvatar">–</div>
@@ -13511,6 +13516,10 @@ const EREIGNIS_ART = {
   // Grund wie oben: Ein gemeldeter Vorfall ist nie Routine -- er soll
   // auffallen, nicht im Strom der Bestaetigungen untergehen.
   vorfall:  { punkt: 'warn', wort: 'hat ein Ereignis gemeldet' },
+  // Antwort auf die eigene Supportanfrage (ENT-685). 'ok': Es ist eine gute
+  // Nachricht -- da ist die Antwort, auf die jemand gewartet hat. Nicht
+  // 'warn', das ist fuer Dinge reserviert, die schieflaufen koennen.
+  support_antwort: { punkt: 'ok', wort: 'hat geantwortet' },
 };
 
 // ══════════════════════════════════════════ SCHNELLZUGRIFF (ENT-096)
@@ -13623,6 +13632,9 @@ function renderEreignisse() {
       ? hinweis
       : EMPTY('Nichts Neues', 'Hier erscheinen eingegangene Rapporte, Sperrtage, Rückmeldungen zu Schichten und Entscheidungen zu Offerten.');
     glockeAktualisieren([], fehlt);
+    // Auch hier: Ein Abzeichen, das vom letzten Laden stehen bleibt,
+    // behauptet eine Antwort, die es nicht mehr gibt.
+    supportAbzeichenSetzen([]);
     return;
   }
 
@@ -13650,8 +13662,32 @@ function renderEreignisse() {
     <div class="erg-detail" id="ergDetail${i}" style="display:none"></div>`;
   }).join('');
   // Die Glocke (ENT-197) zeigt dieselben Zeilen kompakt im Dropdown -- eine
-  // Quelle, zwei Ziele, damit beide immer denselben Stand haben.
+  // Quelle, zwei Ziele, damit beide immer denselben Stand haben. Seit
+  // ENT-685 kommt das Abzeichen am Support-Eintrag als drittes dazu.
   glockeAktualisieren(f, fehlt);
+  supportAbzeichenSetzen(f);
+}
+
+/* Das Abzeichen am Support-Eintrag der Seitenleiste (ENT-685).
+ *
+ * WARUM ZUSAETZLICH ZUR GLOCKE: Die Glocke sammelt alles; wer sie oeffnet,
+ * sieht eine Supportantwort zwischen Rapporten und Sperrtagen. Das Abzeichen
+ * sagt, WOHIN man gehen muss, und steht direkt an der Tuer.
+ *
+ * GEZAEHLT WIRD AUS DERSELBEN LISTE wie Glocke und Feed -- eine zweite
+ * Abfrage koennte eine andere Zahl liefern als die Zeilen daneben. */
+function supportAbzeichenSetzen(f) {
+  const el = $('nav-support-abz');
+  if (!el) { return; }
+  const offen = (f || []).filter(x => x.typ === 'support_antwort').length;
+  el.hidden = !offen;
+  el.textContent = offen > 99 ? '99+' : String(offen);
+  const knopf = el.closest('.nav-item');
+  if (knopf) {
+    knopf.setAttribute('aria-label', offen
+      ? 'Support — ' + offen + (offen === 1 ? ' neue Antwort' : ' neue Antworten')
+      : 'Support');
+  }
 }
 
 // Punkt-Farbe, Ablehnung-Kennzeichnung und Absenderzeile — von der vollen
@@ -13691,6 +13727,12 @@ function ereignisZeile(x) {
     // Objekt und Zeit stehen dahinter.
     return `${x.art || 'Ereignis'} — ${x.objekt || '?'}${x.kunde ? ', ' + x.kunde : ''}`
       + `${x.bemerkung ? ' — ' + x.bemerkung : ''}`;
+  }
+  if (x.typ === 'support_antwort') {
+    /* Der Betreff, nicht der Text der Antwort: Die Antwort selbst gehoert in
+       den Vorgang, wo sie im Zusammenhang steht -- und sie kann schildern,
+       was in diesem Betrieb schieflaeuft. Im Feed steht, DASS sie da ist. */
+    return `hat auf „${x.betreff || 'Ihre Anfrage'}" geantwortet`;
   }
   if (x.typ === 'rundgang_spontan') {
     const grund = x.ausnahme_grund ? (RUNDGANG_AUSSERHALB_FENSTER_GRUENDE[x.ausnahme_grund] || x.ausnahme_grund) : null;
@@ -13850,6 +13892,19 @@ function glockeSchliessen() {
 // zwei Ansichten, keine zweite Detailanzeige noetig.
 function glockeZeileGeklickt(i) {
   glockeSchliessen();
+  /* Eine Supportantwort fuehrt dorthin, wo sie steht (ENT-685) -- nicht in
+     die Uebersicht, wo nur dieselbe Zeile noch einmal stuende. Erst dort
+     gilt sie als gelesen; der Endpunkt setzt den Stempel beim Oeffnen. */
+  const e = (stats.ereignisse || [])[i];
+  if (e && e.typ === 'support_antwort') {
+    /* Derselbe Weg, den der Support-Eintrag der Seitenleiste nimmt. Seit
+       ENT-682 ist das eine eigene Ansicht, und go() holt die Vorgaenge
+       dabei selbst -- ein zweites saLaden() hier waere derselbe Abruf ein
+       zweites Mal. */
+    go('support');
+    saOeffnen(e.id);
+    return;
+  }
   go('uebersicht');
   const zeile = document.querySelectorAll('#ereignisFeed .rank.erg')[i];
   if (!zeile) { return; }
