@@ -153,6 +153,15 @@ $pdo->beginTransaction();
 try {
     $vorher = [];
     if ($id > 0) {
+        // Angenommen heisst gesperrt (ENT-688) -- hier im Server, nicht nur
+        // in der Oberflaeche. Wer am Formular vorbei speichert, veraendert
+        // sonst ein Dokument, unter dem eine Annahme steht.
+        $sp = $pdo->prepare('SELECT status, entscheidung_am FROM be_belege WHERE id = ?');
+        $sp->execute([$id]);
+        if (beleg_gesperrt($sp->fetch(PDO::FETCH_ASSOC) ?: [])) {
+            $pdo->rollBack();
+            json_response(['status' => 'error', 'message' => 'Dieser Beleg wurde vom Empfänger angenommen und ist gesperrt. Für Änderungen bitte duplizieren.'], 409);
+        }
         $chk = $pdo->prepare('SELECT ' . implode(', ', array_keys($kopf)) . ' FROM be_belege WHERE id = ?');
         $chk->execute([$id]);
         $vorher = $chk->fetch(PDO::FETCH_ASSOC) ?: [];

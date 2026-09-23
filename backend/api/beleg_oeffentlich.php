@@ -117,25 +117,22 @@ try {
             . 'Bitte wenden Sie sich an den Absender.');
     }
 
-    $kunde = null;
-    if ($b['kunde_id']) {
-        $s = $pdo->prepare(
-            'SELECT name, zusatzfeld, strasse, hausnummer, adresszusatz, plz, ort
-               FROM kunden WHERE id = ?'
-        );
-        $s->execute([(int)$b['kunde_id']]);
-        $kunde = $s->fetch() ?: null;
+    // WAS DER KUNDE SIEHT, IST DIE LETZTE VERSENDETE FASSUNG (ENT-688) --
+    // Begruendung in belege.php und betreiber_beleg_oeffentlich.php. Ohne
+    // Fassung (versendet vor ENT-688, oder vor dem Einrichtungslauf) zeigt
+    // die Seite den Beleg wie bisher.
+    $fassung = beleg_letzte_fassung($pdo, (int)$b['id']);
+    if ($fassung && !$fassung['echt']) {
+        portal_fehler('Dokument nicht verfügbar', 'Dieses Dokument lässt sich gerade nicht '
+            . 'anzeigen. Bitte wenden Sie sich an den Absender.', 500);
     }
-    $person = null;
-    if ($b['person_id']) {
-        $s = $pdo->prepare('SELECT anrede, vorname, nachname FROM kunden_person WHERE id = ?');
-        $s->execute([(int)$b['person_id']]);
-        $person = $s->fetch() ?: null;
-    }
-    $betrieb = $pdo->query(
-        'SELECT firma, fusszeile, fusszeile2, logo_mime, logo, qr_iban, qr_strasse, qr_hausnummer, qr_plz, qr_ort
-           FROM betrieb WHERE id = 1'
-    )->fetch();
+    $abbild = $fassung
+        ? $fassung['abbild']
+        : beleg_abbild_lesen($pdo, (int)$b['id'], '', beleg_absender_betrieb($pdo));
+    $kunde   = $abbild['kunde'] ?? null;
+    $person  = $abbild['person'] ?? null;
+    $betrieb = (array)($abbild['absender'] ?? []);
+    $b       = array_merge($b, (array)($abbild['beleg'] ?? []));
     $firma = trim((string)($betrieb['firma'] ?? ''));
     // Dieselbe Quelle und dasselbe Bild wie im internen Ausdruck (ofBlatt()
     // in dashboard.html, ENT-192) -- ein Kunde, der dieselbe Rechnung einmal
@@ -143,9 +140,8 @@ try {
     // verschiedene Kopfzeilen bekommen (ENT-206).
     $absenderZeilen = array_values(array_filter(array_map('trim',
         explode("\n", (string)($betrieb['fusszeile'] ?? '')))));
-    $logoDatenUrl = ($betrieb['logo'] !== null && $betrieb['logo_mime'])
-        ? 'data:' . $betrieb['logo_mime'] . ';base64,' . base64_encode($betrieb['logo'])
-        : null;
+    // Im Abbild steht das Logo schon als data:-URL (beleg_absender_betrieb()).
+    $logoDatenUrl = !empty($betrieb['logo']) ? (string)$betrieb['logo'] : null;
     // Betriebs-Fusszeile am unteren Blattrand (Adresse/Bankverbindung/UID) --
     // dasselbe Muster wie bkFusszeile() in dashboard.html: zwei Bloecke
     // nebeneinander, nur wenn wenigstens einer gefuellt ist (ENT-206). Das
@@ -165,8 +161,8 @@ try {
             . '</div>';
     }
 
-    $b['positionen'] = beleg_positionen_lesen($pdo, (int)$b['id']);
-    $summen = beleg_summen($b['positionen'], (int)$b['rabatt_bp']);
+    // Gerechnet gespeichert, hier nicht neu gerechnet (ENT-688).
+    $summen = (array)$abbild['summen'];
 
     $entschieden = !empty($b['entscheidung_am']);
     $heute = date('Y-m-d');
@@ -309,7 +305,14 @@ try {
     // Dokument gehoert (Datum, Adresse, Positionen, Summen), bleibt
     // vollstaendig im rechten "Dokument"-Bereich -- links stehen dieselben
     // Kernangaben nur ZUSAETZLICH, zum schnellen Ueberblick.
+    // Ab der zweiten Fassung sagt die Seite, welche sie zeigt (ENT-688).
+    $fassungZeile = ($fassung && (int)$fassung['nummer'] > 1)
+        ? '<div style="font-size:12px;color:#6B7280;margin:-8px 0 14px">Fassung '
+          . (int)$fassung['nummer'] . ' vom ' . portal_dmy(substr((string)$fassung['versendet_am'], 0, 10))
+          . '</div>'
+        : '';
     $zusammenfassung = '<div class="zf-titel">' . portal_esc($titel) . ' ' . portal_esc($b['nummer']) . '</div>'
+        . $fassungZeile
         . $hinweis
         . '<div class="zf-label">Absender</div>'
         . '<div style="line-height:1.5;font-size:13px">' . portal_esc($firma !== '' ? $firma : 'Absender') . '</div>'

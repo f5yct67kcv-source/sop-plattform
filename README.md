@@ -914,7 +914,7 @@ soll.
 **Es fehlt also nur:** eine zweite Datenbank, vier Secrets, ein Umzug der
 Daten.
 
-### Die 18 Tabellen
+### Die 19 Tabellen
 
 ```
 betreiber                betreiber_sessions       betreiber_zwei_faktor
@@ -923,8 +923,8 @@ mandant                  mandant_zaehlstand
 support_vorgang          support_nachricht
 be_kunden                be_kunden_person         be_kunden_kontaktweg
 be_produkte              be_belege                be_beleg_positionen
-be_beleg_nachricht       be_aenderungslog         be_briefkopf
-be_demo_nutzung_archiv
+be_beleg_nachricht       be_beleg_fassung         be_aenderungslog
+be_briefkopf             be_demo_nutzung_archiv
 ```
 
 Alles mit Praefix `be_` gehoert zum Belegteil des Betreibers und hat nichts

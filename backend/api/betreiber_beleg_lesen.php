@@ -58,6 +58,17 @@ if ($beleg['person_id']) {
 // "noch nicht eingerichtet" von "noch nichts geschrieben" nicht zu
 // unterscheiden, und die Oberflaeche boete ein Eingabefeld an, das nichts
 // entgegennimmt (Hausregel: Unbekannt darf nie wie keine aussehen).
+// Der Stand der Fassungen (ENT-688): welche versendet sind, ob der Entwurf
+// seither geaendert wurde und ob der Beleg nach einer Annahme gesperrt ist.
+// Scheitert das Lesen, fehlt die Angabe ganz -- und die Oberflaeche zeigt
+// keinen Fassungs-Chip statt eines falschen.
+try {
+    $fassung = beleg_fassung_stand($pdo, $beleg, 'be_', be_beleg_absender($pdo));
+} catch (Throwable $e) {
+    $fassung = null;
+}
+
 json_response(['status' => 'ok', 'beleg' => $beleg, 'kunde' => $kunde, 'person' => $person,
+    'fassung' => $fassung,
     'faden_da' => be_beleg_nachricht_tabelle_da($pdo),
     'nachrichten' => be_beleg_nachrichten($pdo, $id)]);
