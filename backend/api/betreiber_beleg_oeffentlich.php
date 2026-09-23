@@ -106,7 +106,7 @@ function portal_seite(string $titel, string $inhalt): void
                          .zusammenfassung{display:none}.karte{box-shadow:none;padding:0}
                          .keindruck{display:none}}
             @media (max-width:720px){.buehne{display:block}.zusammenfassung{margin-bottom:20px}}
-          </style></head><body><div class="buehne">' . $inhalt . '</div></body></html>';
+          ' . beleg_unterschrift_css() . '</style></head><body><div class="buehne">' . $inhalt . '</div></body></html>';
     exit;
 }
 
@@ -227,6 +227,11 @@ try {
     // nichts entgegennimmt.
     $fadenDa      = be_beleg_nachricht_tabelle_da($pdo);
     $nachrichten  = be_beleg_nachrichten($pdo, (int)$b['id']);
+
+    // Die Unterschrift am Link (ENT-688, Schritt 2). Fehlt die Tabelle, bleibt
+    // es beim bisherigen Annehmen per Klick -- bis zum Einrichtungslauf.
+    $unterschriftDa = beleg_unterschrift_tabelle_da($pdo, 'be_');
+    $unterschrift   = beleg_unterschrift_letzte($pdo, 'be_', (int)$b['id']);
 
     $titel = BELEG_ARTEN[$b['art']]['titel'] ?? 'Beleg';
     $datumLabel  = BELEG_ARTEN[$b['art']]['datum_label'] ?? 'Datum';
@@ -363,19 +368,42 @@ try {
     // Link ueberschreibt "versendet"/"angeschaut".
     $hinweis = '';
     $knoepfe = '';
+    // Wer entschieden hat, steht dabei, sobald es festgehalten ist (ENT-688).
+    $durch = ($unterschrift && $entschieden)
+        ? ' von ' . portal_esc(implode(', ', array_filter([(string)$unterschrift['name'],
+            (string)($unterschrift['art'] === 'annahme' ? $unterschrift['funktion'] : '')],
+            static fn($t) => trim($t) !== '')))
+        : '';
     if ($b['status'] === 'bestaetigt' && $entschieden) {
-        $hinweis = '<div class="hinweis hinweis-an">Angenommen am ' . portal_dmy(substr((string)$b['entscheidung_am'], 0, 10)) . '.</div>';
+        $hinweis = '<div class="hinweis hinweis-an">Angenommen am ' . portal_dmy(substr((string)$b['entscheidung_am'], 0, 10)) . $durch . '.</div>';
     } elseif ($b['status'] === 'abgelehnt' && $entschieden) {
-        $hinweis = '<div class="hinweis hinweis-ab">Abgelehnt am ' . portal_dmy(substr((string)$b['entscheidung_am'], 0, 10)) . '.</div>';
+        $hinweis = '<div class="hinweis hinweis-ab">Abgelehnt am ' . portal_dmy(substr((string)$b['entscheidung_am'], 0, 10)) . $durch . '.</div>';
     } elseif ($abgelaufen) {
         $hinweis = '<div class="hinweis hinweis-versendet">Dieser Link ist abgelaufen. Bitte wenden Sie sich an den Absender.</div>';
-    } elseif ($b['art'] === 'offerte') {
-        $hinweis = '<div class="hinweis hinweis-versendet">Bitte prüfen Sie die Offerte und teilen Sie uns Ihre Entscheidung mit.</div>';
-        $knoepfe = '<form method="post" action="betreiber_beleg_entscheidung.php" class="keindruck" style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">'
-            . '<input type="hidden" name="token" value="' . portal_esc($token) . '">'
-            . '<button type="submit" name="entscheidung" value="ablehnen" class="knopf knopf-ab">Ablehnen</button>'
-            . '<button type="submit" name="entscheidung" value="annehmen" class="knopf knopf-an">Annehmen</button>'
-            . '</form>';
+    } elseif (beleg_unterschreibbar((string)$b['art'])) {
+        $hinweis = '<div class="hinweis hinweis-versendet">Bitte prüfen Sie ' . ($b['art'] === 'vertrag' ? 'den Vertrag' : 'die Offerte')
+            . ' und teilen Sie uns Ihre Entscheidung mit.</div>';
+        if ($unterschriftDa) {
+            // Annehmen oeffnet den Unterschriftsdialog, Ablehnen den Dialog mit
+            // Name und Grund (ENT-688, Punkte 4 bis 6).
+            $knoepfe = '<div class="keindruck" style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">'
+                . '<button type="button" class="knopf knopf-ab" onclick="uzAblehnen()">Ablehnen</button>'
+                . '<button type="button" class="knopf knopf-an" onclick="uzAnnehmen()">Annehmen</button>'
+                . '</div>'
+                . beleg_unterschrift_dialog_html([
+                    'art' => (string)$b['art'], 'nummer' => (string)$b['nummer'],
+                    'fassung' => $fassung ? (int)$fassung['nummer'] : 1,
+                    'firma' => (string)($kunde['name'] ?? ''),
+                    'endpunkt' => 'betreiber_beleg_unterschrift.php',
+                    'entscheid' => 'betreiber_beleg_entscheidung.php', 'token' => $token,
+                ]);
+        } else {
+            $knoepfe = '<form method="post" action="betreiber_beleg_entscheidung.php" class="keindruck" style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">'
+                . '<input type="hidden" name="token" value="' . portal_esc($token) . '">'
+                . '<button type="submit" name="entscheidung" value="ablehnen" class="knopf knopf-ab">Ablehnen</button>'
+                . '<button type="submit" name="entscheidung" value="annehmen" class="knopf knopf-an">Annehmen</button>'
+                . '</form>';
+        }
     }
 
     // ── Der Faden in der Entscheidungskarte (ENT-677) ─────────────────
@@ -392,6 +420,7 @@ try {
     $lageText = [
         'gesendet' => ['hinweis-an', 'Ihre Rückmeldung ist angekommen. Wir melden uns.'],
         'leer' => ['hinweis-versendet', 'Es war kein Text im Feld — bitte noch einmal.'],
+        'name_fehlt' => ['hinweis-ab', 'Bitte geben Sie Ihren Namen an, um abzulehnen.'],
         'nicht_eingerichtet' => ['hinweis-versendet',
             'Rückmeldungen sind hier gerade nicht möglich. Bitte antworten Sie auf die E-Mail.'],
     ][(string)($_GET['lage'] ?? '')] ?? null;
@@ -497,22 +526,34 @@ try {
     if (!empty($b['unterschriftsseite'])) {
         $auftraggeber  = trim((string)($kunde['name'] ?? '')) ?: 'Auftraggeber';
         $auftragnehmer = $firma !== '' ? $firma : 'Auftragnehmer';
+        // Nach einer Annahme am Link stehen die Linien nicht leer (ENT-688):
+        // beim Empfaenger die gezeichnete Unterschrift oder sein getippter
+        // Name, beim Absender der Name aus der Freigabe beim Versenden.
+        $linien = beleg_unterschrift_linien($unterschrift, $fassung, $entschieden && $b['status'] === 'bestaetigt');
         $unterschriftsseite = '<div style="margin-top:34px;page-break-inside:avoid;break-inside:avoid">'
             . '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#6B7280;margin-bottom:18px">Unterschriften</div>'
-            . '<div style="color:#6B7280;margin-bottom:34px;font-size:12px">Ort, Datum</div>'
+            . '<div style="color:#6B7280;margin-bottom:' . ($linien['ort'] !== '' ? '6' : '34') . 'px;font-size:12px">Ort, Datum</div>'
+            . ($linien['ort'] !== '' ? '<div style="font-size:12px;margin-bottom:6px">' . $linien['ort'] . '</div>' : '')
             . '<div style="border-bottom:1px solid #14161A;width:260px;margin-bottom:40px"></div>'
             . '<div style="display:flex;gap:60px">'
             . '<div style="flex:1">'
-            . '<div style="border-bottom:1px solid #14161A;height:46px"></div>'
+            . '<div style="border-bottom:1px solid #14161A;height:46px;display:flex;align-items:flex-end">' . $linien['kunde'] . '</div>'
             . '<div style="margin-top:8px;font-size:11px;color:#6B7280">Unterschrift ' . portal_esc($auftraggeber) . '</div>'
             . '</div>'
             . '<div style="flex:1">'
-            . '<div style="border-bottom:1px solid #14161A;height:46px"></div>'
+            . '<div style="border-bottom:1px solid #14161A;height:46px;display:flex;align-items:flex-end">' . $linien['absender'] . '</div>'
             . '<div style="margin-top:8px;font-size:11px;color:#6B7280">Unterschrift ' . portal_esc($auftragnehmer) . '</div>'
             . '</div>'
             . '</div>'
             . '</div>';
     }
+
+    // Das Pruefprotokoll (ENT-688, Punkt 8) -- nur nach einer Annahme mit
+    // Code, und nur wenn die Fassung dazu passt.
+    $protokoll = ($unterschrift && $unterschrift['art'] === 'annahme' && $fassung
+                  && $b['status'] === 'bestaetigt' && $entschieden)
+        ? beleg_pruefprotokoll_html(beleg_pruefprotokoll_zeilen($b, $fassung, $unterschrift))
+        : '';
 
     $spalte = 'padding:2px 24px 2px 0;color:#6B7280;font-size:12px';
 
@@ -595,6 +636,7 @@ try {
         . $abschnitt('Notizen', $b['oeffentliche_notizen'])
         . $abschnitt('Bedingungen', $b['bedingungen'])
         . $unterschriftsseite
+        . $protokoll
         . '<div style="margin-top:auto;padding-top:14px">'
         . ($b['fusszeile_text'] ? '<div style="border-top:1px solid #E5E8EC;padding-top:14px;white-space:pre-line;line-height:1.5;font-size:12px">' . nl2br(portal_esc($b['fusszeile_text'])) . '</div>' : '')
         . $betriebFusszeile

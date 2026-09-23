@@ -20,9 +20,10 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../belege.php';
 
-function entscheidung_zurueck(string $token): void
+function entscheidung_zurueck(string $token, string $lage = ''): void
 {
-    header('Location: betreiber_beleg_oeffentlich.php?token=' . urlencode($token));
+    header('Location: betreiber_beleg_oeffentlich.php?token=' . urlencode($token)
+        . ($lage !== '' ? '&lage=' . urlencode($lage) : ''));
     exit;
 }
 
@@ -62,7 +63,7 @@ try {
     // Schon entschieden, oder gar keine Offerte -- die Seite zeigt dann auch
     // keine Knoepfe mehr, aber ein direkter POST am Formular vorbei soll
     // trotzdem nichts bewirken.
-    if (!empty($b['entscheidung_am']) || $b['art'] !== 'offerte') {
+    if (!empty($b['entscheidung_am']) || !beleg_unterschreibbar((string)$b['art'])) {
         entscheidung_zurueck($token);
     }
 
@@ -71,6 +72,23 @@ try {
         && substr((string)$b['gueltig_bis'], 0, 10) < $heute;
     if ($abgelaufen) {
         entscheidung_zurueck($token);
+    }
+
+    // SEIT ENT-688 (SCHRITT 2) GILT EINE ANNAHME ERST MIT DEM CODE, und sie
+    // laeuft ueber betreiber_beleg_unterschrift.php. Ein "annehmen" hier waere der
+    // alte Klick ohne Nachweis -- er wird abgewiesen, sobald die Tabelle da
+    // ist. Fehlt sie (zwischen Deploy und Einrichtungslauf), bleibt es beim
+    // bisherigen Weg.
+    //
+    // Ablehnen braucht einen Namen, der Grund ist freiwillig (Punkt 6).
+    $mitUnterschrift = beleg_unterschrift_tabelle_da($pdo, 'be_');
+    if ($mitUnterschrift && $wahl === 'annehmen') {
+        entscheidung_zurueck($token);
+    }
+    $name  = mb_substr(trim((string)preg_replace('/\s+/u', ' ', (string)($_POST['name'] ?? ''))), 0, 120);
+    $grund = mb_substr(trim((string)($_POST['grund'] ?? '')), 0, 4000);
+    if ($mitUnterschrift && $name === '') {
+        entscheidung_zurueck($token, 'name_fehlt');
     }
 
     $neuerStatus = $wahl === 'annehmen' ? 'bestaetigt' : 'abgelehnt';
@@ -91,10 +109,21 @@ try {
             }
         }
     }
+    if ($mitUnterschrift && $fassungNr !== null) {
+        $k = $pdo->prepare('SELECT k.email FROM be_kunden k JOIN be_belege b ON b.kunde_id = k.id WHERE b.id = ?');
+        $k->execute([(int)$b['id']]);
+        beleg_ablehnung_anlegen($pdo, 'be_', (int)$b['id'], $fassungNr, $name, $grund,
+            trim((string)$k->fetchColumn()), $ip, (string)($_SERVER['HTTP_USER_AGENT'] ?? ''));
+        // Der Grund gehoert auch in den Faden (ENT-677): Dort steht das
+        // Gespraech ueber diese Offerte, und dort antwortet der Betreiber.
+        if ($grund !== '') {
+            be_beleg_nachricht_anlegen($pdo, (int)$b['id'], 'kunde', $name, 'Abgelehnt: ' . $grund);
+        }
+    }
     $mitFassung = hat_spalte($pdo, 'be_belege', 'entscheidung_fassung');
     $pdo->prepare(
         'UPDATE be_belege SET status = ?, entscheidung_am = NOW(), entscheidung_ip = ?'
-        . ($mitFassung ? ', entscheidung_fassung = ?' : '') . ' WHERE id = ?'
+        . ($mitFassung ? ', entscheidung_fassung = ?' : '') . ' WHERE id = ? AND entscheidung_am IS NULL'
     )->execute($mitFassung ? [$neuerStatus, $ip, $fassungNr, (int)$b['id']]
                            : [$neuerStatus, $ip, (int)$b['id']]);
 

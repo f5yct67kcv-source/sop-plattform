@@ -25,7 +25,7 @@ const check = (n, c) => (c ? ok : bad).push(n);
 
 // ── Vier Varianten wirklich durch PHP rendern ─────────────────────────────
 const VARIANTEN = ['rechnung_offen', 'rechnung_qr', 'offerte_offen', 'offerte_entschieden', 'offerte_unterschrift',
-                   'offerte_fassung'];
+                   'offerte_fassung', 'offerte_signatur'];
 const html = {};
 for (const v of VARIANTEN) {
   let aus = '', code = 0;
@@ -217,6 +217,13 @@ try {
       /Fassung 2 vom \d\d\.\d\d\.\d{4}/.test(zf));
     await page.close();
   }
+
+  // ── offerte_signatur: Annehmen oeffnet den Dialog (ENT-688, Schritt 2) ─
+  check('KRITISCH: mit eingerichteter Unterschrift gibt es kein Annehmen per Klick mehr',
+    html.offerte_signatur.includes('uzAnnehmen()') && !html.offerte_signatur.includes('value="annehmen"'));
+  check('KRITISCH: der Dialog spricht den Cockpit-Endpunkt an, nicht den der Betreiberin',
+    html.offerte_signatur.includes('"endpunkt":"beleg_unterschrift.php"')
+    && !html.offerte_signatur.includes('betreiber_beleg_unterschrift.php'));
 
   // ── Mobil: die Spalten stapeln sich, nichts ueberlappt ──────────────────
   {

@@ -129,6 +129,18 @@ $abbild    = $fassungDa ? beleg_abbild_lesen($pdo, $id, 'be_', be_beleg_absender
 $naechste  = ($abbild !== null) ? beleg_fassung_naechste($pdo, $id, $abbild, 'be_')
                                 : ['nummer' => 1, 'neu' => false];
 if ($gesperrt) { $naechste['neu'] = false; }
+
+// FREIGABE (ENT-688, Punkt 7): Eine neue Fassung einer Offerte oder eines
+// Vertrags geht nur mit der ausdruecklichen Erklaerung "Ich gebe diese
+// Fassung verbindlich frei" hinaus. Geprueft HIER, nicht nur im Dialog --
+// sonst stuende im Protokoll eine Freigabe, die niemand abgegeben hat. Eine
+// Erinnerung ohne neue Fassung braucht keine: Freigegeben ist schon, was
+// der Link zeigt.
+$freigabe = !empty($in['freigabe']);
+if ($naechste['neu'] && beleg_unterschreibbar((string)$beleg['art']) && !$freigabe) {
+    json_response(['status' => 'error', 'freigabe_noetig' => true,
+        'message' => 'Bitte bestätigen, dass Sie diese Fassung verbindlich freigeben.'], 400);
+}
 $fassungNr = $naechste['neu'] ? (int)$naechste['nummer']
            : max(1, (int)(beleg_letzte_fassung($pdo, $id, 'be_')['nummer'] ?? 1));
 
@@ -154,7 +166,7 @@ try {
 // Die Fassung erst NACH dem Versand: Scheitert die Mail, gibt es auch keine
 // Fassung, die als "versendet" dastuende, ohne dass sie jemand bekam.
 if ($naechste['neu'] && $abbild !== null) {
-    beleg_fassung_anlegen($pdo, $id, $abbild, 'versand', (string)($ich['name'] ?? ''), 'be_');
+    beleg_fassung_anlegen($pdo, $id, $abbild, 'versand', (string)($ich['name'] ?? ''), 'be_', $freigabe);
     be_log($pdo, $ich, 'beleg', $id, 'fassung', null, 'Fassung ' . $fassungNr);
 }
 

@@ -2854,6 +2854,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     <div class="of-dlg-hd">
       <h2 id="frageTitel">–</h2>
       <p id="frageText">–</p>
+      <!-- Eine ausdrueckliche Erklaerung, die erst bestaetigt sein muss
+           (ENT-688: Freigabe beim Versenden). Nur sichtbar, wenn die Frage
+           eine verlangt. -->
+      <label class="check" id="frageHakenZeile" style="display:none;margin-top:14px;font-size:13px;line-height:1.45">
+        <input type="checkbox" id="frageHaken"> <span id="frageHakenText"></span>
+      </label>
     </div>
     <div class="of-dlg-ft">
       <button type="button" class="btn btn-plain" onclick="dlgZu('dlgFrage')">Abbrechen</button>
@@ -5529,11 +5535,20 @@ function dlgZu(id)  { $(id).classList.remove('on'); }
 
 /* Sicherheitsabfrage mit eigenem Wortlaut. Der Knopf traegt, was er tut --
    "OK" sagt nicht, dass eine E-Mail rausgeht. */
-function frageStellen(titel, satz, knopftext, dann) {
+/* haken (freiwillig): eine Erklaerung, die angehakt sein muss, bevor der
+   Knopf geht -- heute die Freigabe beim Versenden (ENT-688). Ohne haken
+   verhaelt sich die Frage wie immer. */
+function frageStellen(titel, satz, knopftext, dann, haken) {
   $('frageTitel').textContent = titel;
   $('frageText').textContent = satz;
   const ja = $('frageJa');
   ja.textContent = knopftext;
+  const zeile = $('frageHakenZeile'), box = $('frageHaken');
+  zeile.style.display = haken ? '' : 'none';
+  $('frageHakenText').textContent = haken || '';
+  box.checked = false;
+  ja.disabled = !!haken;
+  box.onchange = () => { ja.disabled = !!haken && !box.checked; };
   ja.onclick = () => { dlgZu('dlgFrage'); dann(); };
   dlgAuf('dlgFrage');
 }
@@ -7899,10 +7914,30 @@ function ofFassungZeichnen(f) {
    ohne Personen. */
 function ofSperreSetzen(gesperrt) {
   const leiste = $('ofFormSperre');
-  leiste.textContent = gesperrt
-    ? 'Angenommen am ' + dmy(ofFormEntschiedenAm) + '. Gesperrt – für Änderungen bitte duplizieren.'
-    : '';
-  leiste.style.display = gesperrt ? '' : 'none';
+  /* Wer entschieden hat, steht dabei (ENT-688, Schritt 2). Ging der Code an
+     eine andere Adresse als die, an die der Beleg versendet wurde, sagt die
+     Leiste das ausdruecklich -- das ist die Angabe, die man im Zweifel
+     nachpruefen will. */
+  const u = ofFormFassung && ofFormFassung.unterschrift;
+  const wer = u ? [u.name, u.art === 'annahme' ? u.funktion : '', u.art === 'annahme' ? u.firma : '']
+    .filter(Boolean).join(', ') : '';
+  const abgelehnt = !gesperrt && !!u && u.art === 'ablehnung' && ofFormStatus === 'abgelehnt';
+  let text = '';
+  if (gesperrt) {
+    text = 'Angenommen am ' + dmy(ofFormEntschiedenAm) + (wer ? ' von ' + wer : '')
+      + '. Gesperrt – für Änderungen bitte duplizieren.';
+    if (u && u.abweichend) {
+      text += ' Achtung: Der Bestätigungscode ging an ' + u.email + ', nicht an die Empfängeradresse '
+        + (u.empfaenger_email || '(keine hinterlegt)') + '.';
+    }
+  } else if (abgelehnt) {
+    text = 'Abgelehnt am ' + dmy(ofFormEntschiedenAm) + (wer ? ' von ' + wer : '') + '.'
+      + (u.grund ? ' Grund: ' + u.grund : ' Ohne Grund.');
+  }
+  leiste.textContent = text;
+  leiste.style.color = abgelehnt ? 'var(--neg)' : 'var(--pos)';
+  leiste.style.background = abgelehnt ? 'var(--neg-soft)' : 'var(--pos-soft)';
+  leiste.style.display = text ? '' : 'none';
   $('ofFormSaveBtn').style.display = gesperrt ? 'none' : '';
   const kopf = $('ofBtnZurueck').parentElement;
   const wurzel = $('ofFormSaveBtn').closest('#of-formular, #view-offerte');
@@ -8482,8 +8517,14 @@ function ofVersenden(id) {
   const text = neu
     ? `Der Empfänger erhält eine E-Mail, dass die ${t.dokument} angepasst wurde. Der Link bleibt derselbe und zeigt ab dann die neue Fassung.`
     : t.versandText;
+  /* Freigabe (ENT-688, Punkt 7): Eine NEUE Fassung einer Offerte oder eines
+     Vertrags geht nur mit dem Haken hinaus. Der Server prueft das selbst
+     (freigabe_noetig); hier erspart es nur den Umweg. */
+  const erste = ofFormId === Number(id) && !(ofFormFassung && (ofFormFassung.fassungen || []).length);
+  const haken = (ofArt === 'offerte' || ofArt === 'vertrag') && (neu || erste || ofFormId !== Number(id))
+    ? `Ich gebe diese Fassung der ${t.dokument} verbindlich frei.` : '';
   frageStellen(frage, text, 'Versenden', async () => {
-    const a = await ruf('betreiber_beleg_versenden.php', { id: Number(id) });
+    const a = await ruf('betreiber_beleg_versenden.php', { id: Number(id), freigabe: !!haken });
     if (a.status !== 'ok') { kurzmeldung(a.message || 'Versand fehlgeschlagen.'); return; }
     kurzmeldung(a.neue_fassung && Number(a.fassung) > 1
       ? `Fassung ${Number(a.fassung)} verschickt.` : t.versandErfolg);
@@ -8492,7 +8533,7 @@ function ofVersenden(id) {
       await ofFassungNachladen(id);
     }
     await belegListeAktualisieren(ofArt);
-  });
+  }, haken);
 }
 
 /* Ein Klick irgendwo sonst schliesst das Zeilenmenue. Ohne das bliebe es
