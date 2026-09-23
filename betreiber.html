@@ -803,6 +803,12 @@ svg.i-sm { width: 15px; height: 15px; }
 .rdkr-tab.aktiv { border-color: var(--accent); background: var(--accent-soft); }
 .rdkr-tab.aktiv .rdkr-tab-ic { background: var(--accent); color: #fff; }
 @media (max-width: 720px) { .rdkr-tab { min-height: 44px; } }
+/* Wahl des Platzes in "Laufende Plätze" (ENT-690). Der gewaehlte traegt
+   dieselbe Farbe wie die offene Kachel darueber -- ein Zustand, eine
+   Farbe. */
+.nu-wahl { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 22px; border-bottom: 1px solid var(--line-soft); }
+.nu-wahl:empty { display: none; }
+.nu-wahl button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 
 /* ── Tabellen ── */
 .tw table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -1877,16 +1883,36 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     </div>
     </div>
 
-    <!-- Anonymisierte Summe ueber ALLE bisher geleerten Demo-Plaetze, aus
-         be_demo_nutzung_archiv (ENT-653). Die Live-Ansicht EINES laufenden
-         Platzes haengt dagegen an dessen eigener Zeile unter "Demo-Zugänge",
-         nicht hier -- diese Karte zeigt nie einen einzelnen Platz oder
-         Interessenten. -->
+    <!-- Zwei Karten, nicht eine gemischte Liste (ENT-690, Antwort des
+         Projektinhabers 2026-09-23). Vorher stand hier nur das Archiv, und
+         solange kein Platz geleert war, sagte die Kachel "Noch nichts
+         archiviert" -- neben vier laufenden Plaetzen mit Nutzungsdaten. Das
+         las sich wie "keine Nutzung" (Hausregel: unbekannt darf nie wie
+         keine aussehen).
+
+         OBEN LIVE, JE PLATZ: welcher Reiter, wie lange -- nur solange der
+         Platz laeuft. Der Knopf "Nutzung" in einer Zeile unter
+         "Demo-Zugänge" ist eine Abkuerzung hierher, keine zweite Ansicht.
+
+         UNTEN DAS ARCHIV, ANONYM (ENT-653): Summe ueber alle bisher
+         geleerten Plaetze. Diese Karte zeigt nie einen einzelnen Platz oder
+         Interessenten -- darum getrennt und nicht in dieselbe Liste. -->
     <div class="demo-panel" id="demoAb-nutzung" hidden>
     <div class="karte">
       <div class="karte-kopf">
         <div>
-          <h2>Demo-Nutzung</h2>
+          <h2>Laufende Plätze</h2>
+          <div class="sub">Live — welcher Reiter, wie lange, solange der Platz läuft</div>
+        </div>
+      </div>
+      <div class="nu-wahl" id="nu-wahl"></div>
+      <div id="nu-inhalt"></div>
+    </div>
+
+    <div class="karte">
+      <div class="karte-kopf">
+        <div>
+          <h2>Archiv</h2>
           <div class="sub">Anonym, über alle bisherigen Interessenten hinweg — archiviert beim Leeren eines Platzes</div>
         </div>
       </div>
@@ -1905,21 +1931,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <div id="demo-abgelaufen"></div>
     </div>
     </div>
-    </div>
-
-    <!-- Live-Nutzung EINES laufenden Demo-Platzes (ENT-653) -- geoeffnet
-         ueber den Knopf "Nutzung" bei "Demo-Zugänge". Gleiche Bauart wie
-         #sup-karte daneben: eine Karte neben den Reitern, aus mehreren
-         Zeilen erreichbar, statt eines Dialogs. -->
-    <div class="karte versteckt" id="nu-karte">
-      <div class="karte-kopf">
-        <div>
-          <h2 id="nu-titel">Nutzung</h2>
-          <div class="sub">Welcher Reiter, wie lange — nur während dieser Platz noch läuft</div>
-        </div>
-        <button class="klein" id="knopf-nu-zu">Schliessen</button>
-      </div>
-      <div id="nu-inhalt"></div>
     </div>
 
     <!-- Formular und Supportzugriff liegen NEBEN den Reitern, nicht in
@@ -2854,6 +2865,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     <div class="of-dlg-hd">
       <h2 id="frageTitel">–</h2>
       <p id="frageText">–</p>
+      <!-- Eine ausdrueckliche Erklaerung, die erst bestaetigt sein muss
+           (ENT-688: Freigabe beim Versenden). Nur sichtbar, wenn die Frage
+           eine verlangt. -->
+      <label class="check" id="frageHakenZeile" style="display:none;margin-top:14px;font-size:13px;line-height:1.45">
+        <input type="checkbox" id="frageHaken"> <span id="frageHakenText"></span>
+      </label>
     </div>
     <div class="of-dlg-ft">
       <button type="button" class="btn btn-plain" onclick="dlgZu('dlgFrage')">Abbrechen</button>
@@ -4727,11 +4744,9 @@ function demoReiterZeigen(id) {
     t.setAttribute('aria-current', ist ? 'true' : 'false');
   });
   /* Die Karten neben den Kacheln gehen beim Wechsel zu, aus demselben
-     Grund wie in mandGo(): Die Live-Nutzung gehoert zu einer Zeile unter
-     "Demo-Zugänge", Formular und Supportzugriff zu einer unter
-     "Demo-Plätze". Unter einer anderen Kachel stuende nirgends mehr,
-     woraus sie geoeffnet wurden. */
-  zeig($('nu-karte'), false);
+     Grund wie in mandGo(): Formular und Supportzugriff gehoeren zu einer
+     Zeile unter "Demo-Plätze". Unter einer anderen Kachel stuende
+     nirgends mehr, woraus sie geoeffnet wurden. */
   zeig($('m-form-karte'), false);
   zeig($('sup-karte'), false);
 }
@@ -4839,6 +4854,7 @@ async function ladeDemo() {
     plaetze.innerHTML = nichtDa;
     inhalt.innerHTML = nichtDa;
     $('demo-abgelaufen').innerHTML = nichtDa;
+    nutzungWahlZeichnen(null, nichtDa);
     demoAbzeichenSetzen(0);
     demoReiterZahlen(null);
     return;
@@ -4848,6 +4864,7 @@ async function ladeDemo() {
     plaetze.innerHTML = fehler;
     inhalt.innerHTML = fehler;
     $('demo-abgelaufen').innerHTML = fehler;
+    nutzungWahlZeichnen(null, fehler);
     demoAbzeichenSetzen(0);
     demoReiterZahlen(null);
     return;
@@ -4902,6 +4919,7 @@ async function ladeDemo() {
      Handlung -- er gehoert zu den laufenden, bis er geschlossen ist. */
   const laufend = liste.filter(z => z.status === 'aktiv');
   const zu      = liste.filter(z => z.status !== 'aktiv');
+  nutzungWahlZeichnen(laufend);
   demoReiterZahlen(kenntNachfassen ? {
     zugaenge:   laufend.filter(z => !z.nachgefasst_am).length,
     abgelaufen: zu.filter(z => !z.nachgefasst_am).length,
@@ -4978,7 +4996,7 @@ function demoZugangTabelle(ziel, liste, kenntNachfassen, kenntWeiter) {
     + '</tbody></table></div>';
 
   ziel.querySelectorAll('[data-demo-nutzung]').forEach(b =>
-    b.onclick = () => nutzungHolen(demoPlatzMandant(b.dataset.demoNutzung)));
+    b.onclick = () => { demoReiterZeigen('nutzung'); nutzungWaehlen(b.dataset.demoNutzung); });
   ziel.querySelectorAll('[data-demo-beenden]').forEach(b =>
     b.onclick = () => demoBeenden(liste.find(z => z.id === +b.dataset.demoBeenden)));
   ziel.querySelectorAll('[data-demo-nachgefasst]').forEach(b =>
@@ -4989,17 +5007,54 @@ function demoZugangTabelle(ziel, liste, kenntNachfassen, kenntWeiter) {
     b.onclick = () => demoErneut(b, liste.find(z => z.id === +b.dataset.demoErneut)));
 }
 
+/* Die Namen der Reiter, wie das Cockpit sie zeigt (ENT-690). Gemeldet
+   wird der interne Ansichtsname (go(view) in dashboard.html) -- "lohnlaeufe"
+   sagt einem Menschen weniger als "Lohnläufe". Abgeschrieben aus TITLES im
+   Cockpit; test_demo_zugang.mjs prueft, dass jeder Schluessel dort hier
+   einen Namen hat. Wo der Titel allein mehrdeutig ist, steht die Rubrik
+   davor ("Übersicht" gibt es zweimal).
+   Ein unbekannter Schluessel bleibt stehen, wie er gemeldet wurde, statt
+   zu verschwinden -- eine fehlende Zeile saehe aus wie "nicht benutzt". */
+const NUTZUNG_REITER = {
+  uebersicht:        'Übersicht',
+  planung:           'Planung',
+  abgleich:          'Schichten abgleichen',
+  mitarbeiter:       'Mitarbeitende',
+  kunden:            'Kunden',
+  produkte:          'Leistungen',
+  offerte:           'Offerte',
+  betrieb:           'Betrieb',
+  support:           'Support',
+  pensen:            'Pensen',
+  lohnlaeufe:        'Lohnläufe',
+  lohnarten:         'Lohnarten',
+  lohnsaetze:        'Sätze und Regelwerk',
+  abwesenheiten:     'Abwesenheiten',
+  auslagen:          'Auslagenersatz',
+  arbeitsergebnisse: 'Arbeitsergebnisse',
+  rundgaenge:        'Revierdienst · Übersicht',
+  revierdienst:      'Revierdienst · Einrichtung',
+  einsatzneu:        'Neuer Einsatz',
+  einsatzplan:       'Einsatz planen',
+  objekt:            'Objekt',
+  mitteilungen:      'Mitteilungen',
+  portal:            'Kundenzugänge',
+};
+
 /* Zeilenweise Darstellung Reiter/Dauer/Aufrufe -- eine kleine Tabelle statt
    eines Balkendiagramms (ENT-653): Zahlen genau lesen zu koennen wiegt hier
    mehr als eine Grafik, und beide Karten (Live und Archiv) brauchen genau
-   dieselbe Form -- eine Definition, nicht zwei. */
-function nutzungTabelle(zeilen, leerText) {
+   dieselbe Form -- eine Definition, nicht zwei.
+   Der Leerzustand ist ein leerBlock wie ueberall sonst. Vorher stand hier
+   ein nacktes <div class="zweit">, dessen Gestaltung nur innerhalb einer
+   Tabellenzelle greift -- der Text klebte ohne Abstand am Kartenrand. */
+function nutzungTabelle(zeilen, leerTitel, leerText) {
   zeilen = zeilen || [];
-  if (!zeilen.length) { return '<div class="zweit">' + text(leerText) + '</div>'; }
+  if (!zeilen.length) { return leerBlock('◇', leerTitel, leerText); }
   return '<div class="tab-huelle"><table><thead><tr>'
     + '<th>Reiter</th><th>Dauer</th><th>Aufrufe</th></tr></thead><tbody>'
     + zeilen.map(z => '<tr>'
-        + '<td>' + text(z.reiter) + '</td>'
+        + '<td>' + text(NUTZUNG_REITER[z.reiter] || z.reiter) + '</td>'
         + '<td>' + dauerText(z.dauer_s) + '</td>'
         + '<td>' + z.aufrufe + '</td>'
       + '</tr>').join('')
@@ -5013,22 +5068,71 @@ function dauerText(dauerS) {
   return min > 0 ? min + ' Min.' : '< 1 Min.';
 }
 
-/* Live-Nutzung EINES Platzes (ENT-653). OHNE Support-Freigabe -- bewusste
-   Abweichung von supportHolen() daneben, siehe Kopfkommentar von
-   backend/api/betreiber_demo_nutzung.php. */
-async function nutzungHolen(m) {
-  if (!m) { return; }
-  stumm($('haus-meldung'));
-  $('nu-titel').textContent = 'Nutzung: ' + m.name;
-  $('nu-inhalt').textContent = 'Lädt …';
-  zeig($('nu-karte'), true);
-  const a = await ruf('betreiber_demo_nutzung.php?id=' + m.id);
-  if (a.status !== 'ok') {
-    $('nu-inhalt').innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
+/* ── Laufende Plätze (ENT-690) ────────────────────────────────────
+   Ein Knopf je laufendem Platz, darunter dessen Nutzung. Gewaehlt bleibt,
+   was gewaehlt war, solange der Platz noch laeuft; sonst der erste -- eine
+   Karte, die erst nach einem Klick etwas zeigt, sieht leer aus. */
+let nutzungLaufend = [];
+let nutzungPlatz = null;
+
+function nutzungWahlZeichnen(laufend, leerHtml) {
+  const wahl = $('nu-wahl');
+  if (!laufend) {
+    nutzungLaufend = [];
+    nutzungPlatz = null;
+    wahl.innerHTML = '';
+    $('nu-inhalt').innerHTML = leerHtml || '';
     return;
   }
-  $('nu-inhalt').innerHTML = nutzungTabelle(a.reiter,
-    'Noch keine Meldung — der Interessent hat den Reiter noch nicht gewechselt.');
+  nutzungLaufend = laufend;
+  if (!laufend.length) {
+    nutzungPlatz = null;
+    wahl.innerHTML = '';
+    $('nu-inhalt').innerHTML = leerBlock('◇', 'Kein Platz läuft gerade',
+      'Sobald ein Interessent einen Demo-Zugang hat, steht sein Platz hier.');
+    return;
+  }
+  wahl.innerHTML = laufend.map(z =>
+    '<button type="button" class="klein" data-nu-platz="' + text(z.platz) + '">'
+    + text(z.platz) + ' · ' + text(z.firma) + '</button>').join('');
+  wahl.querySelectorAll('[data-nu-platz]').forEach(b =>
+    b.onclick = () => nutzungWaehlen(b.dataset.nuPlatz));
+  const bleibt = laufend.some(z => z.platz === nutzungPlatz);
+  nutzungWaehlen(bleibt ? nutzungPlatz : laufend[0].platz);
+}
+
+function nutzungWaehlen(platz) {
+  nutzungPlatz = platz;
+  document.querySelectorAll('#nu-wahl [data-nu-platz]').forEach(b =>
+    b.setAttribute('aria-pressed', b.dataset.nuPlatz === platz ? 'true' : 'false'));
+  nutzungHolen(platz);
+}
+
+/* Live-Nutzung EINES Platzes (ENT-653). OHNE Support-Freigabe -- bewusste
+   Abweichung von supportHolen() daneben, siehe Kopfkommentar von
+   backend/api/betreiber_demo_nutzung.php.
+   Wer schnell zwischen Plaetzen wechselt, bekommt die Antworten nicht in
+   derselben Reihenfolge zurueck: Gezeichnet wird nur, was zum zuletzt
+   gewaehlten Platz gehoert. */
+async function nutzungHolen(platz) {
+  const ziel = $('nu-inhalt');
+  if (!mandantenAlle.length) { await ladeMandanten(); }
+  if (platz !== nutzungPlatz) { return; }
+  const m = demoPlatzMandant(platz);
+  if (!m) {
+    ziel.innerHTML = leerBlock('⚠', 'Nicht zuzuordnen',
+      'Der Platz ' + platz + ' steht nicht im Mandantenstamm — ohne die Zeile dort gibt es keine Verbindung zu seiner Datenbank.');
+    return;
+  }
+  ziel.textContent = 'Lädt …';
+  const a = await ruf('betreiber_demo_nutzung.php?id=' + m.id);
+  if (platz !== nutzungPlatz) { return; }
+  if (a.status !== 'ok') {
+    ziel.innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
+    return;
+  }
+  ziel.innerHTML = nutzungTabelle(a.reiter, 'Noch keine Meldung',
+    'Der Interessent hat den Reiter noch nicht gewechselt — gemeldet wird erst beim Verlassen eines Reiters.');
 }
 
 /* Archiv ueber ALLE bisher geleerten Plaetze (ENT-653), anonym. Laeuft
@@ -5046,8 +5150,8 @@ async function ladeDemoNutzungArchiv() {
     ziel.innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
     return;
   }
-  ziel.innerHTML = nutzungTabelle(a.reiter,
-    'Noch nichts archiviert — erst wenn der erste Platz geleert wird, entsteht hier eine Zeile.');
+  ziel.innerHTML = nutzungTabelle(a.reiter, 'Noch nichts archiviert',
+    'Erst wenn der erste Platz geleert wird, entsteht hier eine Zeile. Was die laufenden Plätze gerade zeigen, steht oben.');
 }
 
 /* Zugangsdaten erneut senden (ENT-649).
@@ -5529,11 +5633,20 @@ function dlgZu(id)  { $(id).classList.remove('on'); }
 
 /* Sicherheitsabfrage mit eigenem Wortlaut. Der Knopf traegt, was er tut --
    "OK" sagt nicht, dass eine E-Mail rausgeht. */
-function frageStellen(titel, satz, knopftext, dann) {
+/* haken (freiwillig): eine Erklaerung, die angehakt sein muss, bevor der
+   Knopf geht -- heute die Freigabe beim Versenden (ENT-688). Ohne haken
+   verhaelt sich die Frage wie immer. */
+function frageStellen(titel, satz, knopftext, dann, haken) {
   $('frageTitel').textContent = titel;
   $('frageText').textContent = satz;
   const ja = $('frageJa');
   ja.textContent = knopftext;
+  const zeile = $('frageHakenZeile'), box = $('frageHaken');
+  zeile.style.display = haken ? '' : 'none';
+  $('frageHakenText').textContent = haken || '';
+  box.checked = false;
+  ja.disabled = !!haken;
+  box.onchange = () => { ja.disabled = !!haken && !box.checked; };
   ja.onclick = () => { dlgZu('dlgFrage'); dann(); };
   dlgAuf('dlgFrage');
 }
@@ -7533,6 +7646,7 @@ function ofNeu(art) {
     .forEach(b => { $(b).style.display = 'none'; });
   ofZeilenZeichnen();
   ofFormEntschiedenAm = null;
+  ofFormToken = '';
   ofFassungZeichnen(null);
   ofFormularZeigen(true);
   setTimeout(() => $('of_kunde').focus(), 60);
@@ -7852,6 +7966,10 @@ function ofSummenZeichnen() {
   $('ofSummen').innerHTML = html;
 }
 
+/* Wo das unterschriebene PDF liegt (ENT-688, Schritt 3) -- je Seite ein
+   eigener Endpunkt, darum ausserhalb des gemeinsamen Blocks darunter. */
+const OF_PDF_ENDPUNKT = 'betreiber_beleg_pdf.php';
+
 /* ── Fassungen und Sperre (ENT-688) ─────────────────────────────────────
    Der Chip im Kopf sagt, welche Fassung der Empfaenger am Link sieht, und
    faerbt sich orange, sobald der Entwurf davon abweicht. Dann heisst der
@@ -7867,6 +7985,7 @@ function ofSummenZeichnen() {
    haelt die beiden zusammen. */
 let ofFormFassung = null;
 let ofFormEntschiedenAm = null;
+let ofFormToken = '';
 
 function ofFassungZeichnen(f) {
   ofFormFassung = f || null;
@@ -7899,10 +8018,41 @@ function ofFassungZeichnen(f) {
    ohne Personen. */
 function ofSperreSetzen(gesperrt) {
   const leiste = $('ofFormSperre');
-  leiste.textContent = gesperrt
-    ? 'Angenommen am ' + dmy(ofFormEntschiedenAm) + '. Gesperrt – für Änderungen bitte duplizieren.'
-    : '';
-  leiste.style.display = gesperrt ? '' : 'none';
+  /* Wer entschieden hat, steht dabei (ENT-688, Schritt 2). Ging der Code an
+     eine andere Adresse als die, an die der Beleg versendet wurde, sagt die
+     Leiste das ausdruecklich -- das ist die Angabe, die man im Zweifel
+     nachpruefen will. */
+  const u = ofFormFassung && ofFormFassung.unterschrift;
+  const wer = u ? [u.name, u.art === 'annahme' ? u.funktion : '', u.art === 'annahme' ? u.firma : '']
+    .filter(Boolean).join(', ') : '';
+  const abgelehnt = !gesperrt && !!u && u.art === 'ablehnung' && ofFormStatus === 'abgelehnt';
+  let text = '';
+  if (gesperrt) {
+    text = 'Angenommen am ' + dmy(ofFormEntschiedenAm) + (wer ? ' von ' + wer : '')
+      + '. Gesperrt – für Änderungen bitte duplizieren.';
+    if (u && u.abweichend) {
+      text += ' Achtung: Der Bestätigungscode ging an ' + u.email + ', nicht an die Empfängeradresse '
+        + (u.empfaenger_email || '(keine hinterlegt)') + '.';
+    }
+  } else if (abgelehnt) {
+    text = 'Abgelehnt am ' + dmy(ofFormEntschiedenAm) + (wer ? ' von ' + wer : '') + '.'
+      + (u.grund ? ' Grund: ' + u.grund : ' Ohne Grund.');
+  }
+  leiste.textContent = text;
+  /* Das unterschriebene PDF (ENT-688, Schritt 3) -- das gespeicherte aus
+     dem Moment der Annahme, ueber denselben Link, den der Kunde hat. */
+  if (gesperrt && u && u.pdf_da && ofFormToken) {
+    const a = document.createElement('a');
+    a.href = API + OF_PDF_ENDPUNKT + '?token=' + encodeURIComponent(ofFormToken);
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = 'Unterschriebenes PDF öffnen';
+    a.style.cssText = 'margin-left:8px;font-weight:650;color:inherit;text-decoration:underline';
+    leiste.appendChild(a);
+  }
+  leiste.style.color = abgelehnt ? 'var(--neg)' : 'var(--pos)';
+  leiste.style.background = abgelehnt ? 'var(--neg-soft)' : 'var(--pos-soft)';
+  leiste.style.display = text ? '' : 'none';
   $('ofFormSaveBtn').style.display = gesperrt ? 'none' : '';
   const kopf = $('ofBtnZurueck').parentElement;
   const wurzel = $('ofFormSaveBtn').closest('#of-formular, #view-offerte');
@@ -7927,6 +8077,7 @@ async function ofFassungNachladen(id) {
   try { a = await ruf('betreiber_beleg_lesen.php?id=' + Number(id)); } catch (e) { return; }
   if (!a || a.status !== 'ok' || ofFormId !== Number(id)) { return; }
   ofFormEntschiedenAm = a.beleg.entscheidung_am || null;
+  ofFormToken = a.beleg.versand_token || '';
   ofFassungZeichnen(a.fassung);
 }
 
@@ -7995,6 +8146,7 @@ async function ofOeffnen(id) {
     .forEach(x => { $(x).style.display = ''; });
   ofZeilenZeichnen();
   ofFormEntschiedenAm = b.entscheidung_am || null;
+  ofFormToken = b.versand_token || '';
   ofFassungZeichnen(a.fassung);
   ofFadenZeichnen(a.nachrichten || [], !!a.faden_da);
   ofFormularZeigen(true);
@@ -8482,8 +8634,14 @@ function ofVersenden(id) {
   const text = neu
     ? `Der Empfänger erhält eine E-Mail, dass die ${t.dokument} angepasst wurde. Der Link bleibt derselbe und zeigt ab dann die neue Fassung.`
     : t.versandText;
+  /* Freigabe (ENT-688, Punkt 7): Eine NEUE Fassung einer Offerte oder eines
+     Vertrags geht nur mit dem Haken hinaus. Der Server prueft das selbst
+     (freigabe_noetig); hier erspart es nur den Umweg. */
+  const erste = ofFormId === Number(id) && !(ofFormFassung && (ofFormFassung.fassungen || []).length);
+  const haken = (ofArt === 'offerte' || ofArt === 'vertrag') && (neu || erste || ofFormId !== Number(id))
+    ? `Ich gebe diese Fassung der ${t.dokument} verbindlich frei.` : '';
   frageStellen(frage, text, 'Versenden', async () => {
-    const a = await ruf('betreiber_beleg_versenden.php', { id: Number(id) });
+    const a = await ruf('betreiber_beleg_versenden.php', { id: Number(id), freigabe: !!haken });
     if (a.status !== 'ok') { kurzmeldung(a.message || 'Versand fehlgeschlagen.'); return; }
     kurzmeldung(a.neue_fassung && Number(a.fassung) > 1
       ? `Fassung ${Number(a.fassung)} verschickt.` : t.versandErfolg);
@@ -8492,7 +8650,7 @@ function ofVersenden(id) {
       await ofFassungNachladen(id);
     }
     await belegListeAktualisieren(ofArt);
-  });
+  }, haken);
 }
 
 /* Ein Klick irgendwo sonst schliesst das Zeilenmenue. Ohne das bliebe es
@@ -8626,7 +8784,6 @@ demoReiterZeigen(demoReiter);
 $('knopf-speichern').onclick  = mandantSpeichern;
 $('knopf-abbrechen').onclick  = () => zeig($('m-form-karte'), false);
 $('knopf-sup-zu').onclick      = () => zeig($('sup-karte'), false);
-$('knopf-nu-zu').onclick       = () => zeig($('nu-karte'), false);
 $('knopf-sup-sprung').onclick  = supSprungAusloesen;   // ENT-631
 $('knopf-sv-zu').onclick       = () => zeig($('sv-karte'), false);
 $('knopf-sv-senden').onclick   = svAntworten;

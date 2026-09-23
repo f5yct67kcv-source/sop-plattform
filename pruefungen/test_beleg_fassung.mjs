@@ -236,13 +236,20 @@ const MESSEN = () => {
     druckenFrei: !document.getElementById('ofFormDruckBtn').disabled,
     personGesperrt: document.getElementById('of_person').disabled,
     menue: pop ? pop.textContent.replace(/\s+/g, ' ') : '',
+    pdfLink: (document.querySelector('#ofFormSperre a') || {}).getAttribute
+      ? document.querySelector('#ofFormSperre a').getAttribute('href') : '',
   };
 };
 
 const STAND = {
   gesperrt: { fassungen: [{ nummer: 1, versendet_am: '2031-02-20 09:00:00' },
                           { nummer: 2, versendet_am: '2031-03-01 09:00:00' }],
-              fassung_geaendert: false, gesperrt: true },
+              fassung_geaendert: false, gesperrt: true,
+              // Schritt 2 und 3: wer angenommen hat, und dass ein PDF vorliegt.
+              unterschrift: { art: 'annahme', fassung: 2, name: 'Erika Beispiel', funktion: 'Geschäftsführerin',
+                              firma: 'Musterbetrieb AG', email: 'leitung@musterbetrieb.example',
+                              empfaenger_email: 'post@musterbetrieb.example', abweichend: true,
+                              grund: '', bestaetigt_am: '2031-03-02 10:15:00', pdf_da: true } },
   geaendert: { fassungen: [{ nummer: 2, versendet_am: '2031-03-01 09:00:00' }],
                fassung_geaendert: true, gesperrt: false },
 };
@@ -258,6 +265,7 @@ async function durchgang(name, oeffnen) {
   const vorher = await seite.evaluate(MESSEN);
   await seite.evaluate(st => {
     ofFormEntschiedenAm = '2031-03-02 10:15:00';
+    ofFormToken = 'tokPruef';
     ofFassungZeichnen(st);
   }, STAND.gesperrt);
   await seite.waitForTimeout(60);
@@ -288,6 +296,12 @@ for (const e of ergebnisse) {
   check(`KRITISCH: ${e.name} — angenommen: Kopf- und Positionsfelder gesperrt, Speichern weg`,
     e.zu.titelGesperrt && e.zu.positionGesperrt && !e.zu.speichernSicht);
   check(`KRITISCH: ${e.name} — angenommen: Drucken im Kopf bleibt bedienbar`, e.zu.druckenFrei);
+  check(`KRITISCH: ${e.name} — angenommen: die Leiste nennt, wer angenommen hat, und warnt bei abweichender Codeadresse`,
+    e.zu.leisteText.includes('von Erika Beispiel, Geschäftsführerin, Musterbetrieb AG')
+    && e.zu.leisteText.includes('Achtung: Der Bestätigungscode ging an leitung@musterbetrieb.example'));
+  check(`KRITISCH: ${e.name} — angenommen: die Leiste verlinkt das unterschriebene PDF des eigenen Endpunkts`,
+    e.zu.pdfLink === 'api/' + (e.name === 'Betreiber' ? 'betreiber_beleg_pdf.php' : 'beleg_pdf.php') + '?token=tokPruef');
+  check(`${e.name} — ohne Annahme kein PDF-Link`, e.auf.pdfLink === '');
   check(`${e.name} — angenommen: der Chip nennt die angenommene Fassung`,
     e.zu.chipSicht && e.zu.chipText === 'Fassung 2 · versendet 01.03.2031' && /chip-a/.test(e.zu.chipKlasse));
 

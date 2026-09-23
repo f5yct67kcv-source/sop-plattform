@@ -25,7 +25,7 @@ const check = (n, c) => (c ? ok : bad).push(n);
 
 // ── Vier Varianten wirklich durch PHP rendern ─────────────────────────────
 const VARIANTEN = ['rechnung_offen', 'rechnung_qr', 'offerte_offen', 'offerte_entschieden', 'offerte_unterschrift',
-                   'offerte_fassung'];
+                   'offerte_fassung', 'offerte_signatur'];
 const html = {};
 for (const v of VARIANTEN) {
   let aus = '', code = 0;
@@ -218,6 +218,13 @@ try {
     await page.close();
   }
 
+  // ── offerte_signatur: Annehmen oeffnet den Dialog (ENT-688, Schritt 2) ─
+  check('KRITISCH: mit eingerichteter Unterschrift gibt es kein Annehmen per Klick mehr',
+    html.offerte_signatur.includes('uzAnnehmen()') && !html.offerte_signatur.includes('value="annehmen"'));
+  check('KRITISCH: der Dialog spricht den Cockpit-Endpunkt an, nicht den der Betreiberin',
+    html.offerte_signatur.includes('"endpunkt":"beleg_unterschrift.php"')
+    && !html.offerte_signatur.includes('betreiber_beleg_unterschrift.php'));
+
   // ── Mobil: die Spalten stapeln sich, nichts ueberlappt ──────────────────
   {
     const page = await browser.newPage({ viewport: { width: 390, height: 900 } });
@@ -230,6 +237,15 @@ try {
     const dok = await page.locator('.karte').boundingBox();
     check('KRITISCH: auf schmalem Bildschirm stehen die Spalten UNTEREINANDER, nicht ueberlappend',
       dok.y >= zf.y + zf.height - 2);
+    // Die Positionstabelle passt in die Breite (Befund 2026-09-23: 414 px auf
+    // 390 px). Sie steht in einem eigenen Rahmen und rueckt am Handy enger.
+    const breite = await page.evaluate(() => ({
+      seite: document.documentElement.scrollWidth, fenster: window.innerWidth,
+      rahmen: (() => { const r = document.querySelector('.pos-rahmen'); return r ? r.scrollWidth - r.clientWidth : -1; })(),
+    }));
+    check(`KRITISCH: mobil rollt die Seite nicht seitlich (${breite.seite} px bei ${breite.fenster})`,
+      breite.seite <= breite.fenster);
+    check('KRITISCH: mobil passt die Positionstabelle ganz in ihren Rahmen', breite.rahmen === 0);
     await page.close();
   }
 } finally {

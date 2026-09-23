@@ -1676,7 +1676,48 @@ function be_tabellen(): array
   anlass ENUM('versand','annahme') NOT NULL DEFAULT 'versand',
   versendet_am DATETIME NOT NULL,
   versendet_von VARCHAR(120) NOT NULL DEFAULT '',
+  -- Beim Versenden ausdruecklich freigegeben (ENT-688, Punkt 7).
+  freigegeben TINYINT(1) NOT NULL DEFAULT 0,
+  -- Wer versendet hat, als Konto -- fuer die Bestaetigung nach der Annahme.
+  versendet_von_id INT NULL,
   UNIQUE KEY uq_be_beleg_fassung (beleg_id, nummer)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Die Unterschriften am Link (ENT-688, Schritt 2): je Annahme oder Ablehnung
+// eine Zeile. Eine Annahme entsteht offen, wenn der Code angefordert wird,
+// und gilt erst mit bestaetigt_am. Danach wird die Zeile nicht mehr
+// geschrieben (alle Schreibwege tragen "AND bestaetigt_am IS NULL").
+//
+// code_abdruck: SHA-256 aus Zeile und Code -- der Code selbst steht nie
+// hier. empfaenger_email haelt fest, wohin der Beleg versendet war; weicht
+// `email` davon ab, zeigen Protokoll und Betreiberansicht das ausdruecklich.
+// zeichnung ist freiwillig; ohne sie steht der getippte Name auf der Linie.
+// KEINE Loeschkaskade: Das Protokoll ueberlebt seinen Beleg (Art. 958f OR).
+'be_beleg_unterschrift' => "CREATE TABLE IF NOT EXISTS be_beleg_unterschrift (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  beleg_id INT UNSIGNED NOT NULL,
+  fassung INT NOT NULL,
+  art ENUM('annahme','ablehnung') NOT NULL,
+  name VARCHAR(120) NOT NULL DEFAULT '',
+  funktion VARCHAR(120) NOT NULL DEFAULT '',
+  firma VARCHAR(200) NOT NULL DEFAULT '',
+  email VARCHAR(200) NOT NULL DEFAULT '',
+  zeichnungsberechtigt TINYINT(1) NOT NULL DEFAULT 0,
+  zeichnung MEDIUMTEXT NULL,
+  grund TEXT NULL,
+  empfaenger_email VARCHAR(200) NOT NULL DEFAULT '',
+  code_abdruck CHAR(64) NOT NULL DEFAULT '',
+  code_gesendet_am DATETIME NULL,
+  code_versuche INT NOT NULL DEFAULT 0,
+  bestaetigt_am DATETIME NULL,
+  ip VARCHAR(64) NOT NULL DEFAULT '',
+  browser VARCHAR(255) NOT NULL DEFAULT '',
+  erstellt_am DATETIME NOT NULL,
+  -- Das unterschriebene PDF (ENT-688, Schritt 3): einmal bei der Annahme
+  -- erzeugt und danach nie neu geschrieben (Bedingung pdf IS NULL).
+  pdf MEDIUMBLOB NULL,
+  pdf_pruefsumme CHAR(64) NOT NULL DEFAULT '',
+  KEY idx_be_beleg_unterschrift (beleg_id, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
 'be_aenderungslog' => "CREATE TABLE IF NOT EXISTS be_aenderungslog (
@@ -1845,6 +1886,14 @@ function be_spalten(): array
         // Welche Fassung der Empfaenger angenommen oder abgelehnt hat
         // (ENT-688). NULL-bar: Eine Entscheidung von vorher kennt keine.
         ['be_belege', 'entscheidung_fassung',    "ALTER TABLE be_belege ADD COLUMN entscheidung_fassung INT UNSIGNED NULL AFTER entscheidung_ip"],
+        // Die ausdrueckliche Freigabe beim Versenden (ENT-688, Punkt 7).
+        // 0 fuer alles davor: Da wurde nicht gefragt, also auch nicht
+        // freigegeben.
+        ['be_beleg_fassung', 'freigegeben',      "ALTER TABLE be_beleg_fassung ADD COLUMN freigegeben TINYINT(1) NOT NULL DEFAULT 0 AFTER versendet_von"],
+        // Das unterschriebene PDF und wer versendet hat (ENT-688, Schritt 3).
+        ['be_beleg_unterschrift', 'pdf',          "ALTER TABLE be_beleg_unterschrift ADD COLUMN pdf MEDIUMBLOB NULL AFTER erstellt_am"],
+        ['be_beleg_unterschrift', 'pdf_pruefsumme', "ALTER TABLE be_beleg_unterschrift ADD COLUMN pdf_pruefsumme CHAR(64) NOT NULL DEFAULT '' AFTER pdf"],
+        ['be_beleg_fassung', 'versendet_von_id', "ALTER TABLE be_beleg_fassung ADD COLUMN versendet_von_id INT NULL AFTER freigegeben"],
         ['be_beleg_positionen', 'periode',       "ALTER TABLE be_beleg_positionen ADD COLUMN periode ENUM('einmalig','monatlich','jaehrlich') NOT NULL DEFAULT 'einmalig' AFTER mwst_satz_bp"],
         // Rueckmeldung an den Betrieb (ENT-685). Beide NULL-bar bzw. leer:
         // Ein bestehender Vorgang hat keine Adresse und gilt als nie

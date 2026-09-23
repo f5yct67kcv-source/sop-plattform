@@ -91,6 +91,19 @@ if ($argVariante === 'offerte_fassung') {
     $pdo->exec("UPDATE beleg_positionen SET einzelpreis_rappen = 1234 WHERE beleg_id = 1");
 }
 
+// Variante offerte_signatur (ENT-688, Schritt 2): Unterschrift eingerichtet,
+// die Offerte noch offen -- Annehmen oeffnet den Dialog statt zu posten.
+if ($argVariante === 'offerte_signatur') {
+    $pdo->sqliteCreateFunction('NOW', static fn(): string => date('Y-m-d H:i:s'));
+    $pdo->exec("CREATE TABLE beleg_fassung (id INTEGER PRIMARY KEY AUTOINCREMENT, beleg_id INTEGER,
+      nummer INTEGER, abbild TEXT, pruefsumme TEXT, anlass TEXT DEFAULT 'versand',
+      versendet_am TEXT, versendet_von TEXT DEFAULT '')");
+    $pdo->exec("CREATE TABLE beleg_unterschrift (id INTEGER PRIMARY KEY AUTOINCREMENT, beleg_id INTEGER,
+      fassung INTEGER, art TEXT, name TEXT, funktion TEXT, firma TEXT, email TEXT, zeichnungsberechtigt INTEGER,
+      zeichnung TEXT, grund TEXT, empfaenger_email TEXT, code_abdruck TEXT, code_gesendet_am TEXT,
+      code_versuche INTEGER, bestaetigt_am TEXT, ip TEXT, browser TEXT, erstellt_am TEXT)");
+}
+
 $_GET['token'] = 'tok123';
 $_SERVER['HTTP_HOST'] = 'lokal.test';
 eval($quelle);

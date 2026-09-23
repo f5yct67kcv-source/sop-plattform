@@ -1319,7 +1319,44 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   anlass VARCHAR(20) NOT NULL DEFAULT 'versand',
   versendet_am DATETIME NOT NULL,
   versendet_von VARCHAR(120) NOT NULL DEFAULT '',
+  freigegeben TINYINT(1) NOT NULL DEFAULT 0,
+  versendet_von_id INT NULL,
   UNIQUE KEY uq_beleg_fassung (beleg_id, nummer)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Die Unterschriften am Link (ENT-688, Schritt 2): je Annahme oder Ablehnung
+// eine Zeile. Eine Annahme entsteht offen, wenn der Code angefordert wird,
+// und gilt erst mit bestaetigt_am. Danach wird die Zeile nicht mehr
+// geschrieben (alle Schreibwege tragen "AND bestaetigt_am IS NULL").
+//
+// code_abdruck: SHA-256 aus Zeile und Code -- der Code selbst steht nie
+// hier. empfaenger_email haelt fest, wohin der Beleg versendet war; weicht
+// `email` davon ab, zeigen Protokoll und Betreiberansicht das ausdruecklich.
+// zeichnung ist freiwillig; ohne sie steht der getippte Name auf der Linie.
+// KEINE Loeschkaskade: Das Protokoll ueberlebt seinen Beleg (Art. 958f OR).
+'beleg_unterschrift' => "CREATE TABLE beleg_unterschrift (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  beleg_id INT NOT NULL,
+  fassung INT NOT NULL,
+  art VARCHAR(20) NOT NULL,
+  name VARCHAR(120) NOT NULL DEFAULT '',
+  funktion VARCHAR(120) NOT NULL DEFAULT '',
+  firma VARCHAR(200) NOT NULL DEFAULT '',
+  email VARCHAR(200) NOT NULL DEFAULT '',
+  zeichnungsberechtigt TINYINT(1) NOT NULL DEFAULT 0,
+  zeichnung MEDIUMTEXT NULL,
+  grund TEXT NULL,
+  empfaenger_email VARCHAR(200) NOT NULL DEFAULT '',
+  code_abdruck CHAR(64) NOT NULL DEFAULT '',
+  code_gesendet_am DATETIME NULL,
+  code_versuche INT NOT NULL DEFAULT 0,
+  bestaetigt_am DATETIME NULL,
+  ip VARCHAR(64) NOT NULL DEFAULT '',
+  browser VARCHAR(255) NOT NULL DEFAULT '',
+  erstellt_am DATETIME NOT NULL,
+  pdf MEDIUMBLOB NULL,
+  pdf_pruefsumme CHAR(64) NOT NULL DEFAULT '',
+  KEY idx_beleg_unterschrift (beleg_id, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
 // Abwesenheitsplanung (ENT-255): Antrag/Genehmigung fuer Ferien, Krankheit,
@@ -2668,6 +2705,15 @@ function kern_spalten(): array {
     ['belege', 'entscheidung_ip', 'ALTER TABLE belege ADD COLUMN entscheidung_ip VARCHAR(45) NULL AFTER entscheidung_am'],
     // Welche Fassung entschieden wurde (ENT-688).
     ['belege', 'entscheidung_fassung', 'ALTER TABLE belege ADD COLUMN entscheidung_fassung INT NULL AFTER entscheidung_ip'],
+    // Die ausdrueckliche Freigabe beim Versenden (ENT-688, Punkt 7). Muss
+    // VOR versendet_von_id stehen, das "AFTER freigegeben" angelegt wird --
+    // umgekehrt scheiterte der Einrichtungslauf am 2026-09-23 an jedem
+    // Mandanten (test_spalten_reihenfolge.mjs).
+    ['beleg_fassung', 'freigegeben', 'ALTER TABLE beleg_fassung ADD COLUMN freigegeben TINYINT(1) NOT NULL DEFAULT 0 AFTER versendet_von'],
+    // Das unterschriebene PDF und wer versendet hat (ENT-688, Schritt 3).
+    ['beleg_unterschrift', 'pdf', 'ALTER TABLE beleg_unterschrift ADD COLUMN pdf MEDIUMBLOB NULL AFTER erstellt_am'],
+    ['beleg_unterschrift', 'pdf_pruefsumme', "ALTER TABLE beleg_unterschrift ADD COLUMN pdf_pruefsumme CHAR(64) NOT NULL DEFAULT '' AFTER pdf"],
+    ['beleg_fassung', 'versendet_von_id', 'ALTER TABLE beleg_fassung ADD COLUMN versendet_von_id INT NULL AFTER freigegeben'],
 
     // Rundgang pausieren/abbrechen (ENT-146). pausiert_seit haelt den Beginn
     // der AKTUELLEN Pause fest -- pause_minuten ist die kumulierte Summe ueber
