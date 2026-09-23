@@ -1320,6 +1320,7 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   versendet_am DATETIME NOT NULL,
   versendet_von VARCHAR(120) NOT NULL DEFAULT '',
   freigegeben TINYINT(1) NOT NULL DEFAULT 0,
+  versendet_von_id INT NULL,
   UNIQUE KEY uq_beleg_fassung (beleg_id, nummer)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
@@ -1353,6 +1354,8 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   ip VARCHAR(64) NOT NULL DEFAULT '',
   browser VARCHAR(255) NOT NULL DEFAULT '',
   erstellt_am DATETIME NOT NULL,
+  pdf MEDIUMBLOB NULL,
+  pdf_pruefsumme CHAR(64) NOT NULL DEFAULT '',
   KEY idx_beleg_unterschrift (beleg_id, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
@@ -2703,6 +2706,10 @@ function kern_spalten(): array {
     // Welche Fassung entschieden wurde (ENT-688).
     ['belege', 'entscheidung_fassung', 'ALTER TABLE belege ADD COLUMN entscheidung_fassung INT NULL AFTER entscheidung_ip'],
     // Die ausdrueckliche Freigabe beim Versenden (ENT-688, Punkt 7).
+    // Das unterschriebene PDF und wer versendet hat (ENT-688, Schritt 3).
+    ['beleg_unterschrift', 'pdf', 'ALTER TABLE beleg_unterschrift ADD COLUMN pdf MEDIUMBLOB NULL AFTER erstellt_am'],
+    ['beleg_unterschrift', 'pdf_pruefsumme', "ALTER TABLE beleg_unterschrift ADD COLUMN pdf_pruefsumme CHAR(64) NOT NULL DEFAULT '' AFTER pdf"],
+    ['beleg_fassung', 'versendet_von_id', 'ALTER TABLE beleg_fassung ADD COLUMN versendet_von_id INT NULL AFTER freigegeben'],
     ['beleg_fassung', 'freigegeben', 'ALTER TABLE beleg_fassung ADD COLUMN freigegeben TINYINT(1) NOT NULL DEFAULT 0 AFTER versendet_von'],
 
     // Rundgang pausieren/abbrechen (ENT-146). pausiert_seit haelt den Beginn

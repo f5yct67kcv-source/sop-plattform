@@ -977,7 +977,8 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     //   __APP_BASIS_URL__ basis_url_pruefen() erkennt ihn und liefert null;
     //                     die Demo-Mail enthält keinen Link auf die Anlage.
     //   __DIR__           PHPs eigene Konstante, kein Platzhalter.
-    const absichtlich = /^(__DB_[A-Z]+__|__APP_BASIS_URL__|__DIR__)$/;
+    //   __FILE__          ebenso (FPDF, backend/fpdf/fpdf.php, ENT-688).
+    const absichtlich = /^(__DB_[A-Z]+__|__APP_BASIS_URL__|__DIR__|__FILE__)$/;
 
     const offen = [];
     for (const q of quellen) {
@@ -1193,7 +1194,9 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     const gesperrt = new Set((ht.match(/<FilesMatch "\^\(([a-z_|]+)\)\\\.php\$">/) || [])[1]?.split('|') ?? []);
     const mitgeliefertePhp = cpZeilen
       .filter(z => z.nach.startsWith('dist-betreiber/') && z.nach.endsWith('.php') && !z.nach.startsWith('dist-betreiber/api/'))
-      .map(z => z.nach.replace('dist-betreiber/', '').replace(/\.php$/, ''));
+      // FilesMatch fragt nach dem DATEINAMEN, auch im Unterordner
+      // (fpdf/fpdf.php, ENT-688) -- darum der Name ohne Pfad.
+      .map(z => z.nach.replace('dist-betreiber/', '').replace(/\.php$/, '').replace(/^.*\//, ''));
     const ungeschuetzt = mitgeliefertePhp.filter(m => !gesperrt.has(m));
     check('KRITISCH: die .htaccess von betreiber.guardops.ch sperrt jede mitgelieferte Backend-Datei gegen direkten Abruf',
       mitgeliefertePhp.length >= 5 && ungeschuetzt.length === 0);
@@ -1260,7 +1263,7 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     // dieser Ausnahmeliste, sondern muessen ueber "ersetzt" oben gefunden
     // werden wie jeder andere Platzhalter. __DIR__ ist PHPs eigene
     // Konstante, kein Platzhalter.
-    const absichtlich = /^__DIR__$/;
+    const absichtlich = /^(__DIR__|__FILE__)$/;
     const offen = [];
     for (const q of quellen) {
       if (!existsSync(`${WURZEL}/${q}`)) { offen.push(`${q}: Datei fehlt`); continue; }
@@ -1361,7 +1364,9 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     const gesperrt = new Set((ht.match(/<FilesMatch "\^\(([a-z_|]+)\)\\\.php\$">/) || [])[1]?.split('|') ?? []);
     const mitgeliefertePhp = cpZeilen
       .filter(z => z.nach.startsWith('dist-portal/') && z.nach.endsWith('.php') && !z.nach.startsWith('dist-portal/api/'))
-      .map(z => z.nach.replace('dist-portal/', '').replace(/\.php$/, ''));
+      // FilesMatch fragt nach dem DATEINAMEN, auch im Unterordner
+      // (fpdf/fpdf.php, ENT-688) -- darum der Name ohne Pfad.
+      .map(z => z.nach.replace('dist-portal/', '').replace(/\.php$/, '').replace(/^.*\//, ''));
     const ungeschuetzt = mitgeliefertePhp.filter(m => !gesperrt.has(m));
     check('KRITISCH: die .htaccess von portal.guardops.ch sperrt jede mitgelieferte Backend-Datei gegen direkten Abruf',
       mitgeliefertePhp.length >= 3 && ungeschuetzt.length === 0);
@@ -1423,7 +1428,7 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     const endpunktPfade = endpunkte.map(e => `backend/api/${e}`);
     for (const p of endpunktPfade) { quellen.push(p); }
     const ersetzt = new Set([...bauen.matchAll(/sed -i "s\|(__[A-Z_]+__)\|/g)].map(m => m[1]));
-    const absichtlich = /^__DIR__$/;
+    const absichtlich = /^(__DIR__|__FILE__)$/;
     const offen = [];
     for (const q of quellen) {
       if (!existsSync(`${WURZEL}/${q}`)) { offen.push(`${q}: Datei fehlt`); continue; }
@@ -1510,7 +1515,8 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     const mitgeliefertePhp = [...bauen.matchAll(/^\s*cp\s+(\S+)\s+(dist-cupi24\/\S+\.php)\s*$/gm)]
       .map(m => m[2])
       .filter(z => !z.startsWith('dist-cupi24/api/'))
-      .map(z => z.replace('dist-cupi24/', '').replace(/\.php$/, ''));
+      // Der Dateiname ohne Unterordner -- so fragt FilesMatch (ENT-688).
+      .map(z => z.replace('dist-cupi24/', '').replace(/\.php$/, '').replace(/^.*\//, ''));
     const ungeschuetzt = mitgeliefertePhp.filter(m => !gesperrt.has(m));
     check('KRITISCH: die .htaccess von cupi24.guardops.ch sperrt jede mitgelieferte Backend-Hilfsdatei gegen direkten Abruf',
       mitgeliefertePhp.length >= 15 && ungeschuetzt.length === 0);
@@ -1597,7 +1603,8 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     //                    gar nicht braucht. Dass der Platzhalter stehen
     //                    bleibt, ist im Code abgefangen:
     //                    mapsSchluesselTauglich() erkennt ihn.
-    const absichtlichCupi = /^(__DIR__|__MAPS_IOS_KEY__)$/;
+    //   __FILE__         ebenso PHPs eigene Konstante (FPDF, ENT-688).
+    const absichtlichCupi = /^(__DIR__|__MAPS_IOS_KEY__|__FILE__)$/;
 
     const offenCupi = [];
     for (const { quelle, ziel } of textDateienCupi) {
@@ -1622,7 +1629,7 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
       const zeile = bauen.match(/dist-cupi24\/ \\\n\s*\| grep -v ([^\\\n]*)/);
       const imDeploy = new Set(
         [...(zeile ? zeile[1] : '').matchAll(/'\^?(__[A-Z0-9_]+__)\$?'/g)].map(m => m[1]));
-      const hier = ['__DIR__', '__MAPS_IOS_KEY__'].filter(p => absichtlichCupi.test(p));
+      const hier = ['__DIR__', '__MAPS_IOS_KEY__', '__FILE__'].filter(p => absichtlichCupi.test(p));
       check('KRITISCH: der Deploy selbst kennt dieselben Ausnahmen wie diese Prüfung',
         !!zeile && hier.length > 0 && hier.every(p => imDeploy.has(p)));
     }
@@ -2165,7 +2172,8 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
     const mitgeliefertePhp = [...bauen.matchAll(/^\s*cp\s+\S+\s+(dist\/\S+\.php)\s*$/gm)]
       .map(m => m[1])
       .filter(z => !z.startsWith('dist/api/'))
-      .map(z => z.replace('dist/', '').replace(/\.php$/, ''));
+      // Der Dateiname ohne Unterordner -- so fragt FilesMatch (ENT-688).
+      .map(z => z.replace('dist/', '').replace(/\.php$/, '').replace(/^.*\//, ''));
     const ungeschuetzt = mitgeliefertePhp.filter(m => !gesperrt.has(m));
     check('KRITISCH: die .htaccess des Rapport-Tools sperrt jede mitgelieferte Backend-Hilfsdatei gegen direkten Abruf',
       mitgeliefertePhp.length >= 15 && ungeschuetzt.length === 0);

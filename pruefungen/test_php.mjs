@@ -1065,6 +1065,11 @@ const OHNE_ANMELDUNG = [
   // der richtige Code nimmt an; der Code steht nie in der Datenbank.
   'beleg_unterschrift.php',
   'betreiber_beleg_unterschrift.php',
+  // Das unterschriebene PDF am selben Link (ENT-688, Schritt 3). Nur
+  // lesend, derselbe Ausweis (versand_token), und nur das GESPEICHERTE PDF
+  // mit stimmender Pruefsumme -- nie ein neu erzeugtes.
+  'beleg_pdf.php',
+  'betreiber_beleg_pdf.php',
   // Demo-Selbstbedienung (ENT-601): Ein Interessent hat noch kein Konto,
   // kann also keine Sitzung mitbringen -- dieselbe Begruendung wie bei
   // login.php. Eigene Bremsen (IP und E-Mail-Adresse), Honigtopf,
