@@ -38,7 +38,16 @@ declare(strict_types=1);
 // setzt einen leeren Wert ein, und diese Datei erkennt das selbst.
 function ki_schluessel(): string
 {
-    return '__ANTHROPIC_API_KEY__';
+    $wert = '__ANTHROPIC_API_KEY__';
+    // Messlauf der Spracheingabe (ENT-695, pruefungen/ki_saetze.php): Nur
+    // dort, nur auf der Kommandozeile und nur, solange der Deploy hier
+    // nichts eingesetzt hat, darf ein Schluessel von aussen kommen. Der
+    // Webserver kommt an diesen Zweig nicht heran (PHP_SAPI), und die
+    // normale Regression auch nicht (die Konstante setzt nur der Messlauf).
+    if (ki_schluessel_fehlt($wert) && PHP_SAPI === 'cli' && defined('KI_MESSLAUF_SCHLUESSEL')) {
+        return (string)KI_MESSLAUF_SCHLUESSEL;
+    }
+    return $wert;
 }
 
 // Ist gar kein Schluessel hinterlegt? Eigene, reine Funktion, damit sich auch
@@ -308,10 +317,10 @@ function ki_werkzeug_eingabe(array $data, string $werkzeug): ?array
     return null;
 }
 
-function anthropic_tool_call(array $tool, string $userContent): ?array {
+function anthropic_tool_call(array $tool, string $userContent, int $maxTokens = 512): ?array {
     $data = ki_aufruf([
         'model' => 'claude-haiku-4-5-20251001',
-        'max_tokens' => 512,
+        'max_tokens' => $maxTokens,
         'tools' => [$tool],
         'tool_choice' => ['type' => 'tool', 'name' => $tool['name']],
         'messages' => [
@@ -535,131 +544,388 @@ function anthropic_extract_zuteilung(string $text, array $vorlagen, array $mitar
     return anthropic_tool_call($tool, $userContent);
 }
 
-// Ordnet ein Diktat einem Bereich zu und extrahiert im selben Zug dessen
-// Felder (ENT-032) -- ein Aufruf statt zwei, damit der Router nicht spuerbar
-// langsamer ist als die frueheren Einzel-Diktate. Deckt die Neuanlage aller
-// drei Bereiche ab, und seit ENT-042 zusaetzlich die AENDERUNG eines
-// bestehenden Mitarbeitenden -- fuer Kunde/Einsatz gibt es das bewusst
-// weiterhin nicht (dafuer gab es auch vorher keinen eigenen Diktat-Weg, das
-// Risiko eines falsch getroffenen Datensatzes bei einer Aenderung waere ohne
-// jede Erfahrung damit unnoetig).
-function anthropic_route_diktat(string $text, array $kunden, array $mitarbeiter, string $heute): ?array
+// ══════════════════════════════════════════ SPRACHEINGABE: KATALOG (ENT-695)
+//
+// Bis ENT-692 ordnete EIN Werkzeug (route_diktat) den Text einem von drei
+// Bereichen zu und fuellte im selben Zug deren Felder. Das Modell musste bei
+// jedem Satz alle Felder aller Bereiche kennen, und jeder neue Bereich
+// verlaengerte dieselbe Aufzaehlung. Eine diktierte Offerte oeffnete darum
+// "Neuer Einsatz": Es gab schlicht keinen passenderen Wert.
+//
+// Seit ENT-695 zwei Stufen:
+//   1. ki_absicht: nur das Anliegen bestimmen (kurz, alle Faehigkeiten).
+//   2. ki_felder:  nur die Felder DIESER einen Faehigkeit, mit nur den
+//                  Listen, die sie braucht.
+// Eine neue Faehigkeit ist ein neuer Eintrag in ki_faehigkeiten() plus ein
+// Zweig in ki_felder_auswerten() und in rtDialogOeffnen() -- kein Umbau.
+//
+// Der Preis: ein zweiter Modellaufruf, spuerbar etwa eine Sekunde. Bewusst
+// in Kauf genommen (Entscheid des Projektinhabers, ENT-695); der fruehere
+// Kommentar hier ("ein Aufruf statt zwei, damit der Router nicht langsamer
+// ist") ist damit ueberholt.
+//
+// Was sich NICHT aendert: Die Spracheingabe schreibt nichts. Sie oeffnet den
+// passenden Dialog vorbefuellt, gespeichert wird per Klick (ENT-015, in
+// ENT-695 ausdruecklich bestaetigt).
+
+// Jede Faehigkeit traegt ihr eigenes Recht, geprueft ueber darf(). Vorher
+// verlangte der Endpunkt fuer alles einsaetze_schreiben -- wer nur Kunden
+// pflegen durfte, kam an die Spracheingabe gar nicht heran.
+//
+// 'listen' sagt, was Stufe 2 zu sehen bekommt. Nicht mehr als noetig: Jede
+// Liste geht an den Anbieter (OP-28).
+function ki_faehigkeiten(): array
 {
+    return [
+        'mitarbeiter_neu' => [
+            'bereich' => 'mitarbeiter', 'aktion' => 'neu', 'recht' => 'personal_schreiben',
+            'titel' => 'Mitarbeitende anlegen',
+            'beschreibung' => 'Eine neue Person fuer das Personal erfassen.',
+            'listen' => [],
+        ],
+        'mitarbeiter_aendern' => [
+            'bereich' => 'mitarbeiter', 'aktion' => 'aendern', 'recht' => 'personal_schreiben',
+            'titel' => 'Mitarbeitende ändern',
+            'beschreibung' => 'Angaben einer bereits bekannten Person aendern (Adresse, Telefon ...).',
+            'listen' => ['mitarbeiter'],
+        ],
+        'kunde_neu' => [
+            'bereich' => 'kunde', 'aktion' => 'neu', 'recht' => 'kunden_schreiben',
+            'titel' => 'Kunden anlegen',
+            'beschreibung' => 'Eine neue Firma oder Person fuer die Kundendatei erfassen.',
+            'listen' => [],
+        ],
+        'einsatz_neu' => [
+            'bereich' => 'einsatz', 'aktion' => 'neu', 'recht' => 'einsaetze_schreiben',
+            'titel' => 'Einsätze anlegen',
+            'beschreibung' => 'Einen geplanten Auftrag mit Datum und Zeit, zu dem Personal ausrueckt.',
+            'listen' => ['kunden', 'mitarbeiter'],
+        ],
+        'beleg_neu' => [
+            'bereich' => 'beleg', 'aktion' => 'neu', 'recht' => 'offerten_schreiben',
+            'titel' => 'Offerten und Rechnungen anlegen',
+            'beschreibung' => 'Eine Offerte (Angebot, Kostenvoranschlag) oder eine Rechnung an einen Kunden, '
+                . 'mit Leistungen und Mengen. Auch wenn ein Datum genannt wird: eine Offerte ist KEIN Einsatz.',
+            'listen' => ['kunden', 'produkte'],
+        ],
+    ];
+}
+
+// ── Stufe 1: das Anliegen
+function anthropic_ki_absicht(string $text): ?array
+{
+    $f = ki_faehigkeiten();
+    $katalog = implode("\n", array_map(fn($k, $v) => "- {$k}: {$v['beschreibung']}", array_keys($f), $f));
     $tool = [
-        'name' => 'route_diktat',
-        'description' => 'Ordnet einen diktierten oder getippten Text einem Bereich zu und extrahiert dessen Felder.',
+        'name' => 'absicht_erkennen',
+        'description' => 'Bestimmt, welches Anliegen ein diktierter oder getippter Text hat.',
         'input_schema' => [
             'type' => 'object',
             'properties' => [
-                'bereich' => [
+                // "anderes" und "unklar" sind zwei Aussagen (ENT-692):
+                // verstanden, aber nicht abgedeckt -- und nicht verstanden.
+                'absicht' => ['type' => 'string', 'enum' => array_merge(array_keys($f), ['anderes', 'unklar'])],
+                'anliegen' => [
                     'type' => 'string',
-                    'enum' => ['mitarbeiter', 'kunde', 'einsatz'],
-                    'description' => 'mitarbeiter: eine neue oder zu aendernde Person des Personals. kunde: eine neue '
-                        . 'Firma fuer die Kundendatei. einsatz: ein geplanter Auftrag oder Termin mit Datum und Zeit.',
-                ],
-                'aktion' => [
-                    'type' => 'string',
-                    'enum' => ['neu', 'aendern'],
-                    'description' => 'neu: eine neue Person/Firma/ein neuer Einsatz (Standardfall). aendern: nur '
-                        . 'moeglich, wenn bereich = mitarbeiter -- der Text beschreibt eine Aenderung an einer '
-                        . 'bereits bekannten Person aus der Liste (z.B. "Aendere die Adresse von ...", "... hat '
-                        . 'eine neue Telefonnummer"). Ist unklar, ob Neuanlage oder Aenderung gemeint ist, oder '
-                        . 'passt keine bekannte Person eindeutig, waehle neu.',
-                ],
-                'mitarbeiter' => [
-                    'type' => 'object',
-                    'description' => 'Nur ausfuellen, wenn bereich = mitarbeiter und aktion = neu.',
-                    'properties' => [
-                        // Keine personalnummer: sie wird seit ENT-387 automatisch
-                        // vergeben und liesse sich aus einem Diktat ohnehin nicht
-                        // uebernehmen -- die Angabe wuerde nur eine Erwartung wecken,
-                        // die das Anlegen dann stillschweigend verwirft.
-                        'vorname' => ['type' => 'string'], 'nachname' => ['type' => 'string'],
-                        'anrede' => ['type' => 'string', 'enum' => ['Herr', 'Frau', 'Divers']],
-                        'geburtsdatum' => ['type' => 'string', 'description' => 'Format JJJJ-MM-TT'],
-                        'strasse' => ['type' => 'string'], 'ort' => ['type' => 'string'],
-                        'telefon' => ['type' => 'string'], 'mobil' => ['type' => 'string'],
-                        'email' => ['type' => 'string'],
-                    ],
-                ],
-                'mitarbeiter_aenderung' => [
-                    'type' => 'object',
-                    'description' => 'Nur ausfuellen, wenn bereich = mitarbeiter und aktion = aendern.',
-                    'properties' => [
-                        'mitarbeiter_login_name' => [
-                            'type' => 'string',
-                            'description' => 'Login-Name der gemeinten Person, exakt wie in der Liste angegeben, '
-                                . 'auch wenn der Text einen Tippfehler oder eine Umschreibung enthaelt.',
-                        ],
-                        'aenderungen' => [
-                            'type' => 'object',
-                            'description' => 'Nur die tatsaechlich im Text genannten Felder eintragen, alle anderen weglassen.',
-                            'properties' => [
-                                // Keine personalnummer hier: sie laesst sich seit
-                                // ENT-387 nicht mehr aendern (weder beim Anlegen
-                                // noch beim Bearbeiten).
-                                'anrede' => ['type' => 'string', 'enum' => ['Herr', 'Frau', 'Divers']],
-                                'vorname' => ['type' => 'string'], 'nachname' => ['type' => 'string'],
-                                'geburtsdatum' => ['type' => 'string', 'description' => 'Format JJJJ-MM-TT'],
-                                'strasse' => ['type' => 'string'], 'ort' => ['type' => 'string'],
-                                'telefon' => ['type' => 'string'], 'mobil' => ['type' => 'string'],
-                                'email' => ['type' => 'string'],
-                            ],
-                        ],
-                    ],
-                ],
-                'kunde' => [
-                    'type' => 'object',
-                    'description' => 'Nur ausfuellen, wenn bereich = kunde.',
-                    // PLZ und Ort getrennt seit ENT-044 -- der Kundenstamm
-                    // fuehrt sie in zwei Feldern, und Zusammensetzen ist
-                    // einfacher als spaeteres Auseinandernehmen.
-                    'properties' => [
-                        'name' => ['type' => 'string'], 'strasse' => ['type' => 'string'],
-                        'hausnummer' => ['type' => 'string'],
-                        'plz' => ['type' => 'string', 'description' => 'Nur die vierstellige Postleitzahl.'],
-                        'ort' => ['type' => 'string', 'description' => 'Nur der Ortsname, ohne Postleitzahl.'],
-                        'telefon' => ['type' => 'string'], 'email' => ['type' => 'string'],
-                    ],
-                ],
-                'einsatz' => [
-                    'type' => 'object',
-                    'description' => 'Nur ausfuellen, wenn bereich = einsatz.',
-                    'properties' => [
-                        'kunde_name' => ['type' => 'string', 'description' => 'Steht er in der Kundenliste, exakt so schreiben wie dort.'],
-                        'titel' => ['type' => 'string'], 'strasse' => ['type' => 'string'],
-                        'ort' => ['type' => 'string', 'description' => 'PLZ und Ort des Arbeitsortes.'],
-                        'datum' => ['type' => 'string', 'description' => 'Format JJJJ-MM-TT'],
-                        'von' => ['type' => 'string', 'description' => 'Format HH:MM'],
-                        'bis' => ['type' => 'string', 'description' => 'Format HH:MM'],
-                        'bedarf' => ['type' => 'integer'],
-                        'einsatzart' => ['type' => 'string'],
-                        'mitarbeiter_login_namen' => ['type' => 'array', 'items' => ['type' => 'string']],
-                        'bemerkung' => ['type' => 'string'],
-                    ],
+                    'description' => 'Was der Text verlangt, in zwei bis vier Worten, z.B. "Offerte erstellen" '
+                        . 'oder "Planung oeffnen". Immer ausfuellen, ausser bei unklar.',
                 ],
             ],
-            'required' => ['bereich'],
+            'required' => ['absicht'],
         ],
     ];
-
-    $kundenText = $kunden ? implode("\n", array_map(fn($k) => '- ' . $k, $kunden)) : '(keine Kunden erfasst)';
-    $maText = $mitarbeiter
-        ? implode("\n", array_map(fn($m) => "- {$m['name']}: " . trim(($m['vorname'] ?? '') . ' ' . ($m['nachname'] ?? '')), $mitarbeiter))
-        : '(keine Mitarbeitenden erfasst)';
-
-    $userContent =
-        "Heutiges Datum: {$heute}.\n\n"
-        . "Bekannte Kunden:\n{$kundenText}\n\n"
-        . "Bekannte Mitarbeitende (Login-Name: Vorname Nachname):\n{$maText}\n\n"
-        . "Erkenne, ob der Text eine neue Person, eine neue Firma oder einen geplanten Einsatz beschreibt, "
-        . "und fuelle nur das passende der drei Felder. Beschreibt der Text stattdessen eine AENDERUNG an "
-        . "einer bereits bekannten Person aus der Liste, setze bereich auf mitarbeiter, aktion auf aendern "
-        . "und fuelle mitarbeiter_aenderung statt mitarbeiter. Erfinde nichts -- ein Feld, das im Text nicht "
-        . "vorkommt, laesst du weg.\n\n"
+    $userContent = "Moegliche Anliegen:\n{$katalog}\n"
+        . "- anderes: verstaendlich, aber keines der obigen (z.B. eine Seite oeffnen, eine Auswertung).\n"
+        . "- unklar: der Text laesst sich keinem Anliegen zuordnen.\n\n"
+        . "Waehle genau ein Anliegen. Im Zweifel anderes oder unklar statt einer erzwungenen Zuordnung.\n\n"
         . "Text:\n{$text}";
-
     return anthropic_tool_call($tool, $userContent);
+}
+
+// ── Stufe 2: die Felder einer Faehigkeit
+function ki_felder_schema(string $key): array
+{
+    $person = [
+        'anrede' => ['type' => 'string', 'enum' => ['Herr', 'Frau', 'Divers']],
+        'vorname' => ['type' => 'string'], 'nachname' => ['type' => 'string'],
+        'geburtsdatum' => ['type' => 'string', 'description' => 'Format JJJJ-MM-TT'],
+        'strasse' => ['type' => 'string'], 'ort' => ['type' => 'string'],
+        'telefon' => ['type' => 'string'], 'mobil' => ['type' => 'string'],
+        'email' => ['type' => 'string'],
+    ];
+    // Keine personalnummer: seit ENT-387 automatisch vergeben und nicht
+    // aenderbar -- die Angabe weckte nur eine Erwartung.
+    switch ($key) {
+        case 'mitarbeiter_neu':
+            return $person;
+        case 'mitarbeiter_aendern':
+            return [
+                'mitarbeiter_login_name' => [
+                    'type' => 'string',
+                    'description' => 'Login-Name der gemeinten Person, exakt wie in der Liste, auch wenn der Text '
+                        . 'einen Tippfehler oder eine Umschreibung enthaelt.',
+                ],
+                'aenderungen' => [
+                    'type' => 'object',
+                    'description' => 'Nur die tatsaechlich im Text genannten Felder.',
+                    'properties' => $person,
+                ],
+            ];
+        case 'kunde_neu':
+            // PLZ und Ort getrennt seit ENT-044.
+            return [
+                'name' => ['type' => 'string'], 'strasse' => ['type' => 'string'],
+                'hausnummer' => ['type' => 'string'],
+                'plz' => ['type' => 'string', 'description' => 'Nur die vierstellige Postleitzahl.'],
+                'ort' => ['type' => 'string', 'description' => 'Nur der Ortsname, ohne Postleitzahl.'],
+                'telefon' => ['type' => 'string'], 'email' => ['type' => 'string'],
+            ];
+        case 'einsatz_neu':
+            return [
+                'kunde_name' => ['type' => 'string', 'description' => 'Steht er in der Kundenliste, exakt so schreiben wie dort.'],
+                'titel' => ['type' => 'string'], 'strasse' => ['type' => 'string'],
+                'ort' => ['type' => 'string', 'description' => 'PLZ und Ort des Arbeitsortes.'],
+                'datum' => ['type' => 'string', 'description' => 'Format JJJJ-MM-TT'],
+                'von' => ['type' => 'string', 'description' => 'Format HH:MM'],
+                'bis' => ['type' => 'string', 'description' => 'Format HH:MM'],
+                'bedarf' => ['type' => 'integer'],
+                'einsatzart' => ['type' => 'string'],
+                'mitarbeiter_login_namen' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'bemerkung' => ['type' => 'string'],
+            ];
+        case 'beleg_neu':
+            // Keine Preise: Ein Preis kommt aus dem Leistungskatalog oder von
+            // Hand, nie aus einem Diktat. Ein verhoerter Betrag auf einer
+            // Offerte ist teurer als ein leeres Feld.
+            return [
+                'art' => ['type' => 'string', 'enum' => ['offerte', 'rechnung'],
+                    'description' => 'rechnung nur, wenn ausdruecklich eine Rechnung verlangt ist.'],
+                'kunde_name' => ['type' => 'string', 'description' => 'Steht er in der Kundenliste, exakt so schreiben wie dort.'],
+                'titel' => ['type' => 'string', 'description' => 'Kurzer Betreff, nur wenn im Text erkennbar.'],
+                'bemerkung' => ['type' => 'string', 'description' => 'Weitere Angaben wie Einsatzdatum oder -ort, nur wenn genannt.'],
+                'positionen' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'produkt_id' => ['type' => 'integer',
+                                'description' => 'ID aus dem Leistungskatalog, nur wenn die Leistung eindeutig passt. Sonst weglassen.'],
+                            'leistung' => ['type' => 'string', 'description' => 'Die Leistung, wie sie gesagt wurde.'],
+                            'menge' => ['type' => 'number'],
+                            'einheit' => ['type' => 'string', 'description' => 'z.B. Std., Stk., Tag -- nur wenn genannt.'],
+                        ],
+                        'required' => ['leistung'],
+                    ],
+                ],
+            ];
+    }
+    return [];
+}
+
+// $listen: ['kunden' => [['id','name'],...], 'mitarbeiter' => [['name','vorname','nachname'],...],
+//           'produkte' => [['id','name','einheit'],...]] -- nur, was die Faehigkeit braucht.
+function anthropic_ki_felder(string $key, string $text, array $listen, string $heute): ?array
+{
+    $teile = ["Heutiges Datum: {$heute}."];
+    if (isset($listen['kunden'])) {
+        $teile[] = "Bekannte Kunden:\n" . ($listen['kunden']
+            ? implode("\n", array_map(fn($k) => '- ' . $k['name'], $listen['kunden'])) : '(keine Kunden erfasst)');
+    }
+    if (isset($listen['mitarbeiter'])) {
+        $teile[] = "Bekannte Mitarbeitende (Login-Name: Vorname Nachname):\n" . ($listen['mitarbeiter']
+            ? implode("\n", array_map(fn($m) => "- {$m['name']}: " . trim(($m['vorname'] ?? '') . ' ' . ($m['nachname'] ?? '')), $listen['mitarbeiter']))
+            : '(keine Mitarbeitenden erfasst)');
+    }
+    if (isset($listen['produkte'])) {
+        $teile[] = "Leistungskatalog (ID: Name, Einheit):\n" . ($listen['produkte']
+            ? implode("\n", array_map(fn($p) => "- {$p['id']}: {$p['name']}, " . ($p['einheit'] ?? ''), $listen['produkte']))
+            : '(kein Katalog verfuegbar -- produkt_id immer weglassen)');
+    }
+    $teile[] = "Fuelle nur die Felder, die im Text vorkommen. Erfinde nichts. Schreibe nie einen Platzhalter "
+        . "wie <UNKNOWN>, unbekannt oder n/a in ein Feld -- lass es weg.";
+    $teile[] = "Text:\n{$text}";
+
+    $tool = [
+        'name' => 'felder_' . $key,
+        'description' => 'Extrahiert die Felder fuer: ' . (ki_faehigkeiten()[$key]['titel'] ?? $key) . '.',
+        'input_schema' => ['type' => 'object', 'properties' => ki_felder_schema($key)],
+    ];
+    return anthropic_tool_call($tool, implode("\n\n", $teile), $key === 'beleg_neu' ? 1024 : 512);
+}
+
+// ══════════════════════════════════════════ AUSWERTEN (ENT-692/693)
+//
+// Rein, ohne Netz und Datenbank -- damit pruef_ki.php jeden Zweig pruefen
+// kann, nicht nur den einen, den eine Umgebung ohne Schluessel herstellt.
+
+// Ein Wert, der "weiss ich nicht" sagt, ist kein Wert. Das Modell hat
+// "<UNKNOWN>" als Kundennamen geliefert (Bildschirmfoto vom 2026-09-23); die
+// Oberflaeche markierte es blau als erkannt. Unbekannt sah damit aus wie ein
+// Kunde -- die Umkehrung der Regel "unbekannt darf nie wie keine aussehen".
+function ki_platzhalter(string $wert): bool
+{
+    $w = mb_strtolower(trim($wert));
+    if ($w === '') {
+        return true;
+    }
+    if (preg_match('/^[<\[{(].*[>\]})]$/u', $w)) {
+        return true;   // <UNKNOWN>, [unbekannt], {name} ...
+    }
+    return in_array($w, [
+        'unknown', 'unbekannt', 'n/a', 'na', 'n.a.', 'null', 'none', 'undefined', 'tbd', 'k.a.',
+        'keine angabe', 'nicht angegeben', 'nicht bekannt', 'nicht genannt', '-', '--', '—', '?', '??', '...', '…',
+    ], true);
+}
+
+// Leere und Platzhalter-Werte weg. Alle Felder sind flach, ausser
+// Login-Namen und Positionen (je eigene Pruefung).
+function ki_felder_saeubern(array $roh, array $erlaubt): array
+{
+    $felder = [];
+    foreach ($erlaubt as $f) {
+        if (!array_key_exists($f, $roh) || is_array($roh[$f])) {
+            continue;
+        }
+        $wert = trim((string)$roh[$f]);
+        if (!ki_platzhalter($wert)) {
+            $felder[$f] = $wert;
+        }
+    }
+    return $felder;
+}
+
+// Stufe 1 auswerten. Gibt [Code, Antwort, null] zurueck, wenn es hier endet,
+// oder [200, null, Faehigkeit], wenn Stufe 2 folgt.
+//
+// Drei Arten, nicht weiterzukommen, und drei Saetze dafuer: nicht verstanden,
+// verstanden aber nicht abgedeckt, abgedeckt aber keine Berechtigung. Die
+// dritte Art pruefen wir NACH der Erkennung und nicht, indem wir dem Modell
+// nur die erlaubten Faehigkeiten zeigen -- sonst saehe "kein Recht" aus wie
+// "kann die Spracheingabe nicht", und jemand suchte den Fehler am falschen
+// Ort.
+function ki_absicht_pruefen(array $a, callable $darf): array
+{
+    $katalog = ki_faehigkeiten();
+    $absicht = (string)($a['absicht'] ?? '');
+    $anliegen = trim((string)($a['anliegen'] ?? ''));
+    $anliegen = ki_platzhalter($anliegen) ? '' : mb_substr($anliegen, 0, 60);
+    $verstanden = $anliegen !== '' ? "Verstanden: „{$anliegen}“. " : '';
+
+    if ($absicht === 'anderes') {
+        $koennen = implode(', ', array_map(fn($f) => $f['titel'], $katalog));
+        return [422, [
+            'status' => 'error', 'grund' => 'nicht_abgedeckt', 'anliegen' => $anliegen,
+            'message' => ($verstanden ?: 'Verstanden, aber: ')
+                . "Das kann die Spracheingabe noch nicht. Möglich sind heute: {$koennen}. Es wurde nichts geöffnet.",
+        ], null];
+    }
+    if (!isset($katalog[$absicht])) {
+        return [422, [
+            'status' => 'error', 'grund' => 'unklar',
+            'message' => 'Der Text liess sich keinem Anliegen zuordnen. Bitte etwas genauer sagen, '
+                . 'z. B. „Neuer Kunde …“, „Offerte für … über …“ oder „Neuer Einsatz für … am …“.',
+        ], null];
+    }
+    $f = $katalog[$absicht];
+    if (!$darf($f['recht'])) {
+        return [403, [
+            'status' => 'error', 'grund' => 'kein_recht', 'recht' => $f['recht'], 'anliegen' => $anliegen,
+            'message' => $verstanden . "Für „{$f['titel']}“ fehlt dir die Berechtigung. Es wurde nichts geöffnet.",
+        ], null];
+    }
+    return [200, null, $absicht];
+}
+
+// Stufe 2 auswerten. $listen wie bei anthropic_ki_felder(), aber mit IDs.
+function ki_felder_auswerten(string $key, array $e, array $listen): array
+{
+    $katalog = ki_faehigkeiten();
+    $mitFelder = ['anrede', 'vorname', 'nachname', 'geburtsdatum', 'strasse', 'ort', 'telefon', 'mobil', 'email'];
+    $maLogin = array_map('strval', array_column($listen['mitarbeiter'] ?? [], 'name'));
+    $basis = ['status' => 'ok', 'faehigkeit' => $key,
+        'bereich' => $katalog[$key]['bereich'] ?? '', 'aktion' => $katalog[$key]['aktion'] ?? 'neu'];
+
+    switch ($key) {
+        case 'mitarbeiter_aendern':
+            $loginName = trim((string)($e['mitarbeiter_login_name'] ?? ''));
+            // Die KI soll nur zuordnen, nie einen Namen erfinden.
+            if ($loginName === '' || !in_array($loginName, $maLogin, true)) {
+                return [422, ['status' => 'error', 'grund' => 'person_unklar',
+                    'message' => 'Die gemeinte Person liess sich nicht eindeutig zuordnen -- bitte im Mitarbeitenden-Bereich direkt diktieren.']];
+            }
+            return [200, $basis + ['mitarbeiter_login_name' => $loginName,
+                'aenderungen' => ki_felder_saeubern(is_array($e['aenderungen'] ?? null) ? $e['aenderungen'] : [], $mitFelder)]];
+
+        case 'mitarbeiter_neu':
+            return [200, $basis + ['felder' => ki_felder_saeubern($e, $mitFelder)]];
+
+        case 'kunde_neu':
+            return [200, $basis + ['felder' => ki_felder_saeubern($e,
+                ['name', 'strasse', 'hausnummer', 'plz', 'ort', 'telefon', 'email'])]];
+
+        case 'einsatz_neu':
+            $felder = ki_felder_saeubern($e,
+                ['kunde_name', 'titel', 'strasse', 'ort', 'datum', 'von', 'bis', 'einsatzart', 'bemerkung']);
+            if (isset($e['bedarf']) && is_numeric($e['bedarf']) && (int)$e['bedarf'] > 0) {
+                $felder['bedarf'] = min(99, (int)$e['bedarf']);
+            }
+            // Nur bekannte Login-Namen duerfen als Zuteilung in die Oberflaeche.
+            $namen = is_array($e['mitarbeiter_login_namen'] ?? null) ? $e['mitarbeiter_login_namen'] : [];
+            $maNamen = array_values(array_intersect(array_map('strval', array_filter($namen, 'is_scalar')), $maLogin));
+            return [200, $basis + ['felder' => $felder, 'mitarbeiter_login_namen' => $maNamen]];
+
+        case 'beleg_neu':
+            $art = ($e['art'] ?? '') === 'rechnung' ? 'rechnung' : 'offerte';
+            $felder = ki_felder_saeubern($e, ['titel', 'bemerkung']);
+
+            // Kunde gegen die echte Liste. Nicht gefunden heisst: Name
+            // zurueckgeben, id null -- die Oberflaeche markiert ihn orange
+            // und bietet "Neue Adresse erstellen" an. Nichts wird still
+            // angelegt (ENT-695).
+            $kunde = null;
+            $kName = trim((string)($e['kunde_name'] ?? ''));
+            if (!ki_platzhalter($kName)) {
+                $kunde = ['id' => null, 'name' => $kName];
+                foreach ($listen['kunden'] ?? [] as $k) {
+                    if (mb_strtolower(trim((string)$k['name'])) === mb_strtolower($kName)) {
+                        $kunde = ['id' => (int)$k['id'], 'name' => (string)$k['name']];
+                        break;
+                    }
+                }
+            }
+
+            // Positionen: eine produkt_id zaehlt nur, wenn es sie im Katalog
+            // gibt. Alles andere wird eine Freitextzeile mit dem gesagten
+            // Text -- nie ein erfundenes Produkt, nie ein Preis.
+            $produkte = [];
+            foreach ($listen['produkte'] ?? [] as $p) {
+                $produkte[(int)$p['id']] = $p;
+            }
+            $positionen = [];
+            foreach ((is_array($e['positionen'] ?? null) ? $e['positionen'] : []) as $roh) {
+                if (!is_array($roh) || count($positionen) >= 30) {
+                    continue;
+                }
+                $leistung = trim((string)($roh['leistung'] ?? ''));
+                $pid = isset($roh['produkt_id']) && is_numeric($roh['produkt_id']) ? (int)$roh['produkt_id'] : 0;
+                $treffer = $produkte[$pid] ?? null;
+                if ($treffer === null && ki_platzhalter($leistung)) {
+                    continue;   // weder Katalog noch Text: nichts, was man pruefen koennte
+                }
+                $menge = isset($roh['menge']) && is_numeric($roh['menge']) ? (float)$roh['menge'] : 1.0;
+                $menge = ($menge > 0 && $menge <= 100000) ? round($menge, 2) : 1.0;
+                $einheit = trim((string)($roh['einheit'] ?? ''));
+                $positionen[] = [
+                    'produkt_id' => $treffer ? (int)$treffer['id'] : null,
+                    'produkt_name' => $treffer ? (string)$treffer['name'] : mb_substr($leistung, 0, 200),
+                    'gesagt' => ki_platzhalter($leistung) ? '' : mb_substr($leistung, 0, 200),
+                    'menge' => $menge,
+                    'einheit' => ki_platzhalter($einheit) ? '' : mb_substr($einheit, 0, 20),
+                ];
+            }
+            return [200, $basis + ['art' => $art, 'felder' => $felder, 'kunde' => $kunde, 'positionen' => $positionen]];
+    }
+    return [422, ['status' => 'error', 'grund' => 'unklar', 'message' => 'Unbekannte Fähigkeit.']];
 }
 
 // Liest einen Einsatz aus einem Bild (Screenshot einer E-Mail, eines Auftrags-

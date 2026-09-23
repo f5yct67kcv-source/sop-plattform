@@ -18,7 +18,8 @@ $pdo = db();
 
 $mitarbeiterId = (int)($_GET['mitarbeiter_id'] ?? $user['id']);
 if ($mitarbeiterId !== (int)$user['id'] && !darf($user, 'personal_lesen')) {
-    json_response(['status' => 'error', 'message' => 'Dafür fehlt dir die Berechtigung.'], 403);
+    json_response(['status' => 'error', 'recht' => 'personal_lesen',
+        'message' => recht_fehlt_meldung('personal_lesen')], 403);
 }
 
 $jahr = (int)($_GET['jahr'] ?? date('Y'));

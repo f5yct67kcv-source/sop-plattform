@@ -95,7 +95,10 @@
       unten), dort „Einsatz bearbeiten" für dieselben Stammdaten in einer
       Schublade, oder „Löschen" (entfernt Einsatz und Zuteilung, bereits erfasste
       Rapporte bleiben unberührt). Ein Diktatfeld oben in der Liste nimmt auch
-      Text/Diktat/Bilder entgegen und legt daraus direkt einen Einsatz an.</p>
+      Text/Diktat/Bilder entgegen und öffnet daraus den passenden Dialog
+      vorbefüllt: Einsatz, Kunde, Mitarbeitende, Offerte oder Rechnung.
+      Gespeichert wird erst mit deinem Klick. Was die Spracheingabe (noch)
+      nicht kann, sagt sie, statt einen falschen Dialog zu öffnen.</p>
 
       <div class="hb-kasten hb-regel">
         <p class="hb-kasten-titel">Zwei Sperren, unabhängig voneinander</p>
