@@ -138,6 +138,45 @@ try {
   await p.close();
 } catch (e) { bad.push('Untermenue: ' + String(e).split('\n')[0].slice(0, 120)); }
 
+// ══════════════════════════════ KEINE RUBRIK HEISST WIE EIN MENUEPUNKT
+//
+// Die Seitenleiste hatte bis ENT-682 zweimal "Betrieb": die Rubrik ueber
+// Uebersicht/Planung/Abgleich und den Reiter unter Administration. ENT-229
+// hatte das 2026-08-29 schon einmal geloest, indem es den REITER umbenannte;
+// ENT-682 hat es andersherum entschieden -- der Name gehoert dorthin, wo
+// geklickt wird. Geprueft wird nicht, wie die beiden heute heissen, sondern
+// dass keine Rubrikueberschrift denselben Text traegt wie ein Menuepunkt:
+// Das faellt auch dann auf, wenn spaeter jemand eine neue Rubrik erfindet.
+{
+  const p = await seite(1600, 900);
+  const doppelt = await p.evaluate(() => {
+    const norm = t => (t || '').trim().toLowerCase();
+    // In der Reihenfolge durchgehen und jeden Punkt seiner Rubrik zuordnen.
+    // Dass eine Rubrik ihren EIGENEN Elternpunkt gleich nennt, ist gewollt
+    // (Revierdienst, Auswertung, Administration tragen je eine Gruppe) --
+    // die Ueberschrift steht dann direkt darueber, und niemand verwechselt
+    // etwas. Gesucht ist der andere Fall: derselbe Name in ZWEI Rubriken.
+    const wo = [];
+    let rubrik = '';
+    const lauf = el => {
+      for (const kind of el.children) {
+        if (kind.classList.contains('nav-lbl')) { rubrik = norm(kind.textContent); continue; }
+        if (kind.classList.contains('nav-item') || kind.classList.contains('nav-kind')) {
+          const t = kind.querySelector('.lbl');
+          wo.push({ name: norm(t ? t.textContent : kind.textContent), rubrik });
+        }
+        if (kind.children.length) { lauf(kind); }
+      }
+    };
+    lauf(document.querySelector('.side-nav'));
+    return [...new Set(wo.map(x => x.rubrik))]
+      .filter(r => r && wo.some(x => x.name === r && x.rubrik !== r));
+  });
+  check('KRITISCH: keine Rubrikueberschrift heisst wie ein Menuepunkt',
+    doppelt.length === 0);
+  await p.close();
+}
+
 // ══════════════════════════════ EIN MARKUP, KEINE ZWEITE KOPIE
 {
   const p = await seite(1600, 900);
@@ -295,7 +334,7 @@ try {
 
   // Gemessen statt geglaubt, und im Zustand, in dem es zaehlt: ausgeblendete
   // Leiste, 1600 px Fenster. Einsatzliste und Kundenliste nutzen sie ganz,
-  // die Einstellungen bleiben beim Deckel von 1440 px. Der Unterschied ist
+  // der Betrieb bleibt beim Deckel von 1440 px. Der Unterschied ist
   // der ganze Punkt -- nur verlaeuft er seit ENT-422 zwischen Tabelle und
   // Formular, nicht mehr zwischen Planung und Stammdaten.
   await p.evaluate(() => huelleSetzen('aus')); await p.waitForTimeout(250);
@@ -308,7 +347,7 @@ try {
   const bBetr = (await mass(p, '.content')).w;
   check('KRITISCH: die Einsatzliste nutzt die ganze Breite', bEins === 1600);
   check('KRITISCH: die Kundenliste nutzt die ganze Breite', bKund === 1600);
-  check('KRITISCH: die Einstellungen bleiben bei der Lesebreite', bBetr === 1440);
+  check('KRITISCH: der Betrieb bleibt bei der Lesebreite', bBetr === 1440);
 
   await p.close();
 }
@@ -518,13 +557,17 @@ try {
   await p.evaluate(() => go('mitarbeiter')); await p.waitForTimeout(300);
   const n2 = await p.evaluate(() => [...document.querySelectorAll('#topSub button')].map(b => b.textContent));
   // Seit ENT-181 drei: Leistungen steht zwischen Mitarbeitenden und den
-  // Einstellungen (Namen seit ENT-229/ENT-230, vorher Produkte/Betrieb).
+  // Betrieb (Namen seit ENT-230/ENT-682; der mittlere hiess ENT-229 bis
+  // ENT-682 "Einstellungen", davor schon "Betrieb").
   // Seit ENT-421 vier: "Mitteilungen" kommt hinten dazu. Seit ENT-441 fuenf:
   // "Kundenzugaenge" (Kundenportal) steht am Ende -- unter Administration und
   // nicht unter Kunden, weil dort kein Stamm gepflegt, sondern jemandem von
-  // aussen ein Zugang gegeben wird.
+  // aussen ein Zugang gegeben wird. Seit ENT-682 sechs: "Support" steht am
+  // Ende -- Supportanfrage und Support-Freigabe betreffen den Betreiber der
+  // Plattform und nicht den eigenen Betrieb, darum nicht mehr als Kacheln
+  // unter "Einstellungen" (die seit ENT-682 wieder "Betrieb" heissen).
   check('KRITISCH: auch die Administration zeigt ihre Unterkategorien',
-    JSON.stringify(n2) === JSON.stringify(['Mitarbeitende', 'Leistungen', 'Einstellungen', 'Mitteilungen', 'Kundenzugänge']));
+    JSON.stringify(n2) === JSON.stringify(['Mitarbeitende', 'Leistungen', 'Betrieb', 'Mitteilungen', 'Kundenzugänge', 'Support']));
 
   // Ein Bereich ohne Untergruppen zeigt keine leere Leiste
   await p.evaluate(() => go('abgleich')); await p.waitForTimeout(300);
@@ -560,11 +603,11 @@ try {
   // stimmt -- genau das ist der Zweck dieser Suite.
   const mPlanung = await mitteVon(() => go('planung'));
   check('Bei den Kunden stehen sechs Unterkategorien (ENT-181, "Übersicht" seit ENT-555)', mKunden.anzahl === 6);
-  check('Bei der Administration fuenf (ENT-181/ENT-421/ENT-441)', mAdmin.anzahl === 5);
+  check('Bei der Administration sechs (ENT-181/ENT-421/ENT-441/ENT-682)', mAdmin.anzahl === 6);
   check('Bei der Planung ebenfalls vier', mPlanung.anzahl === 4);
   check('KRITISCH: sechs Unterkategorien stehen in der Fenstermitte',
     Math.abs(mKunden.mitte - 800) <= 4);
-  check('KRITISCH: fuenf ebenfalls -- die Zahl aendert die Mitte nicht',
+  check('KRITISCH: sechs der Administration ebenfalls -- die Zahl aendert die Mitte nicht',
     Math.abs(mAdmin.mitte - 800) <= 4);
   check('KRITISCH: und eine anders breite Leiste ebenfalls',
     Math.abs(mPlanung.mitte - 800) <= 4);

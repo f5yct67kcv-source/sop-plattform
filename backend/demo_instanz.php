@@ -23,6 +23,7 @@ require_once __DIR__ . '/demo_zugang.php';
 // unten ruft sie auf. Kein stiller Vertrag: Wer diese Datei laedt, bekommt
 // alles mit, was sie braucht (Lehre aus dem Fehlschlag vom 2026-09-19).
 require_once __DIR__ . '/demo_daten.php';
+require_once __DIR__ . '/mitarbeiter.php';   // ma_personalnummer_generieren() (ENT-684)
 // Fuer kern_schema_fehlend() in der Platzwahl: Der Sollstand des Schemas
 // steht dort, wo die Einrichtung ihn selbst benutzt.
 require_once __DIR__ . '/planung_einrichten_kern.php';
@@ -351,10 +352,13 @@ function demo_zugang_einrichten(PDO $pdo, string $firma, string $person,
     $teile    = preg_split('/\s+/', $person) ?: [$person];
     $nachname = count($teile) > 1 ? array_pop($teile) : $person;
     $vorname  = count($teile) > 0 ? implode(' ', $teile) : '';
+    // Personalnummer gleich mit (ENT-684), gleiche Begruendung wie in
+    // setup.php: Jede Person hat eine, ab dem Moment, in dem sie existiert.
     $instanz->prepare(
-        'INSERT INTO mitarbeiter (name, password_hash, ist_admin, vorname, nachname, aktiv)
-         VALUES (?, ?, 1, ?, ?, 1)'
-    )->execute([$login, password_hash($passwort, PASSWORD_DEFAULT), $vorname, $nachname]);
+        'INSERT INTO mitarbeiter (name, password_hash, ist_admin, vorname, nachname, aktiv, personalnummer)
+         VALUES (?, ?, 1, ?, ?, 1, ?)'
+    )->execute([$login, password_hash($passwort, PASSWORD_DEFAULT), $vorname, $nachname,
+                ma_personalnummer_generieren($instanz)]);
 
     // ── Register ──
     $start    = date('Y-m-d H:i:s');

@@ -457,20 +457,38 @@ async function vorratSeite(antwort, breite = 1500) {
   await seite.waitForSelector('#shell.on');
   await seite.waitForTimeout(400);
 
-  // Die Kachel fuehrt in den Abschnitt -- und zwar OHNE die Rechtehuerde
-  // der Freigabe: Wer fragt, oeffnet niemandem die Tuer.
-  const kachel = await seite.evaluate(() => {
-    const k = [...document.querySelectorAll('.bk-kachel')]
-      .find(b => /Supportanfrage/.test(b.textContent));
-    if (!k) { return null; }
-    const r = k.getBoundingClientRect();
-    return { da: true, hoehe: r.height, ruft: k.getAttribute('onclick') || '',
-             versteckt: k.style.display === 'none' };
+  // Der Reiter unter Administration fuehrt in die Supportansicht -- und
+  // zwar OHNE die Rechtehuerde der Freigabe: Wer fragt, oeffnet niemandem
+  // die Tuer. Seit ENT-682 ein eigener Reiter statt zweier Kacheln unter
+  // "Einstellungen"; die Freigabe darin haengt weiter an ihrem Recht.
+  const reiter = await seite.evaluate(() => {
+    const r = document.getElementById('nav-admin-support');
+    if (!r) { return null; }
+    // Die Rechtezeilen setzen die Sichtbarkeit als Inline-Stil (rechteAnwenden).
+    // Ein zugeklapptes Menue ist etwas anderes als ein weggenommener Punkt --
+    // gemessen wird darum beides getrennt: hier der Punkt selbst, gleich
+    // darunter, dass er wirklich hinfuehrt.
+    const eltern = document.getElementById('nav-admin');
+    if (eltern) { eltern.click(); }
+    return { sichtbar: r.style.display !== 'none' && r.offsetParent !== null,
+             beschriftung: r.textContent.trim() };
   });
-  check('KRITISCH: die Kachel "Supportanfrage" steht in den Einstellungen', !!kachel);
-  check('KRITISCH: sie ist nicht an die Rechtehuerde der Freigabe gebunden',
-    kachel && !kachel.versteckt);
-  check('Die Kachel fuehrt in den Supportabschnitt', kachel && /bkAb|sa/.test(kachel.ruft));
+  check('KRITISCH: die Administration hat einen Reiter "Support"',
+    !!reiter && /Support/.test(reiter.beschriftung));
+  check('KRITISCH: er ist nicht an die Rechtehuerde der Freigabe gebunden',
+    reiter && reiter.sichtbar);
+  // Gemessen am gerenderten Zustand, nicht am onclick-Text.
+  const angekommenReiter = await seite.evaluate(() => {
+    const r = document.getElementById('nav-admin-support');
+    if (!r) { return { offen: false, formular: false }; }
+    r.click();
+    const v = document.getElementById('view-support');
+    return { offen: !!v && getComputedStyle(v).display !== 'none',
+             formular: !!document.getElementById('saNeuKarte')
+               && document.getElementById('saNeuKarte').offsetParent !== null };
+  });
+  check('Der Reiter fuehrt in die Supportansicht',
+    angekommenReiter.offen && angekommenReiter.formular);
 
   // ── Der kurze Weg aus dem Kontomenue (ENT-538) ────────────────────
   //
@@ -547,19 +565,20 @@ async function vorratSeite(antwort, breite = 1500) {
     await seite.evaluate(() => { document.getElementById('nav-support').click(); });
     await seite.waitForTimeout(250);
     const angekommen = await seite.evaluate(() => {
-      const ab = document.getElementById('bkAb-sa');
-      const view = document.getElementById('view-betrieb');
-      return { abschnittOffen: !!ab && getComputedStyle(ab).display !== 'none',
-               ansichtOffen: !!view && getComputedStyle(view).display !== 'none' };
+      const view = document.getElementById('view-support');
+      const karte = document.getElementById('saNeuKarte');
+      return { ansichtOffen: !!view && getComputedStyle(view).display !== 'none',
+               karteDa: !!karte && karte.offsetParent !== null,
+               titel: document.getElementById('pgTitle').textContent.trim() };
     });
-    check('KRITISCH: der Eintrag oeffnet die Administration', angekommen.ansichtOffen);
-    check('KRITISCH: und landet im Supportteil, nicht auf der Uebersicht',
-      angekommen.abschnittOffen);
+    check('KRITISCH: der Eintrag oeffnet die Supportansicht', angekommen.ansichtOffen);
+    check('KRITISCH: und das Meldeformular steht darin', angekommen.karteDa);
+    check('Die Kopfzeile sagt, wo man steht', /support/i.test(angekommen.titel));
   }
 
   // Die Statuswoerter des Betriebs: "wartet auf Kunde" heisst aus seiner
   // Sicht "Antwort erhalten" -- derselbe Zustand, die andere Blickrichtung.
-  await seite.evaluate(() => go('betrieb'));
+  await seite.evaluate(() => go('support'));
   await seite.waitForTimeout(120);
   const worte = await seite.evaluate(() =>
     Object.entries(SA_STATUS).map(([k, v]) => [k, v[1]]));
@@ -575,9 +594,9 @@ async function vorratSeite(antwort, breite = 1500) {
     umgebung.length < 60 && !/Mozilla|AppleWebKit|Gecko/.test(umgebung));
 
   // Gemessen: die Zeile und der Verlauf.
+  await seite.evaluate(() => go('support'));
+  await seite.waitForTimeout(250);
   await seite.evaluate(([alt1, alt2]) => {
-    go('betrieb');
-    bkAbschnittZeigen('sa');
     saListeZeichnen([
       { id: 1, betreff: 'Rundgang bricht ab', status: 'neu',
         eroeffnet_am: alt1, nachrichten: 1 },
@@ -624,11 +643,11 @@ async function vorratSeite(antwort, breite = 1500) {
     await seite.evaluate(() => { document.getElementById('nav-support').click(); });
     await seite.waitForTimeout(350);
     const mobil = await seite.evaluate(() => {
-      const ab = document.getElementById('bkAb-sa');
+      const ab = document.getElementById('saNeuKarte');
       const btr = document.getElementById('saBetreff');
       const txt = document.getElementById('saText');
       return {
-        offen: !!ab && getComputedStyle(ab).display !== 'none',
+        offen: !!ab && ab.offsetParent !== null,
         querlauf: document.documentElement.scrollWidth - window.innerWidth,
         betreffSchrift: btr ? parseFloat(getComputedStyle(btr).fontSize) : 0,
         textSchrift: txt ? parseFloat(getComputedStyle(txt).fontSize) : 0,
@@ -642,31 +661,21 @@ async function vorratSeite(antwort, breite = 1500) {
     check('Die Schublade ist danach zu -- man steht im Inhalt, nicht im Menue',
       mobil.schubladeZu);
 
-    // DIE NEBENWIRKUNG, die es zu vermeiden galt: Ueber "Zurueck" darf man
-    // am Handy NICHT in die Kacheluebersicht der Administration geraten --
-    // die ist dort nach ENT-235 bewusst nicht erreichbar.
-    await seite.evaluate(() => {
-      document.querySelector('#bkAb-sa .bk-zurueck').click();
-    });
-    await seite.waitForTimeout(350);
+    // DIE NEBENWIRKUNG, die es zu vermeiden galt: Am Handy darf der Weg in
+    // den Support NICHT die Administration mitoeffnen -- die ist dort nach
+    // ENT-235 bewusst nicht erreichbar. Bis ENT-682 lag der Supportteil in
+    // ihr, und der Zurueck-Knopf fuehrte in ihre Kacheluebersicht; seither
+    // ist Support eine eigene Ansicht und der Sonderweg entfallen. Geprueft
+    // wird weiter die Aussage, nicht der damalige Weg dorthin.
     const danach = await seite.evaluate(() => ({
       adminOffen: getComputedStyle(document.getElementById('view-betrieb')).display !== 'none',
       kachelnSichtbar: [...document.querySelectorAll('.bk-kachel')]
         .filter(e => e.offsetParent !== null).length,
     }));
-    check('KRITISCH: "Zurueck" fuehrt am Handy NICHT in die Administration',
+    check('KRITISCH: der Support oeffnet am Handy NICHT die Administration',
       !danach.adminOffen && danach.kachelnSichtbar === 0);
 
-    // Am Desktop bleibt es beim gewohnten Weg: zurueck in die Kacheln.
     await seite.setViewportSize({ width: 1400, height: 900 });
-    await seite.evaluate(() => { go('betrieb'); bkAbschnittZeigen('sa'); });
-    await seite.waitForTimeout(250);
-    await seite.evaluate(() => { document.querySelector('#bkAb-sa .bk-zurueck').click(); });
-    await seite.waitForTimeout(250);
-    const desktopZurueck = await seite.evaluate(() =>
-      [...document.querySelectorAll('.bk-kachel')].filter(e => e.offsetParent !== null).length);
-    check('KRITISCH: am Desktop fuehrt "Zurueck" weiterhin in die Kacheluebersicht',
-      desktopZurueck > 0);
   }
 
   // Leer ist etwas anderes als nicht abrufbar.

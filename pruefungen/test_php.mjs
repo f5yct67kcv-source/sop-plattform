@@ -180,9 +180,56 @@ try {
   pnCode = e.status || 1;
 }
 const pnBeanstandet = pnAus.split('\n').filter(z => z.trim().startsWith('X '));
-check('KRITISCH: die automatische Personalnummer (Ziehung und Bestandsnachtrag) läuft korrekt durch',
+check('KRITISCH: die automatische Personalnummer (Ziehung und Formprüfung) läuft korrekt durch',
   pnCode === 0 && pnBeanstandet.length === 0);
 if (pnBeanstandet.length) { pnBeanstandet.forEach(z => bad.push('PHP-Personalnummer: ' + z.trim())); }
+
+// ── Jeder Anlegeweg vergibt die Personalnummer selbst (ENT-684) ──────────
+//
+// Bis ENT-684 taten das nur mitarbeiter_create.php; setup.php und
+// demo_instanz.php legten ihr Erstkonto OHNE Nummer an. Fuer genau diese
+// Luecke gab es einen eigenen Nachtrags-Bildschirm unter Administration.
+// Der ist weg -- also muss die Zusage hier gehalten werden, sonst steht
+// bei jedem neuen Mandanten wieder eine Person ohne Nummer da, und diesmal
+// ohne Werkzeug, das es meldet.
+//
+// Wer eine Zeile hier eintraegt, muss sagen warum. Ohne diese zweite Liste
+// bliebe ein vergessenes personalnummer stillschweigend gruen -- dasselbe
+// Muster wie OHNE_ANMELDUNG weiter unten.
+const INSERT_OHNE_PERSONALNUMMER = {
+  'backend/support.php':
+    'Supportkonto des Betreibers, kein Mensch dieses Betriebs -- ma_nur_menschen() schliesst es aus.',
+  'backend/demo_daten.php':
+    'Traegt sie unmittelbar danach per UPDATE nach, zusammen mit der Funktion der Demoperson.',
+};
+{
+  const treffer = execFileSync('grep',
+    ['-rlE', 'INSERT INTO `?mitarbeiter`? *\\(', `${WURZEL}/backend`], { encoding: 'utf8' })
+    .split('\n').filter(Boolean)
+    .map(f => f.replace(`${WURZEL}/`, ''));
+  const ohne = treffer.filter(f => {
+    const quelle = readFileSync(`${WURZEL}/${f}`, 'utf8');
+    // Zwei Bauarten, beide zaehlen: eine ausgeschriebene Spaltenliste, die
+    // personalnummer nennt (setup.php, demo_instanz.php) -- oder eine
+    // Spaltenliste, die aus einem Feld gebaut wird, in das die Nummer
+    // gezogen wird (mitarbeiter_create.php). Beim zweiten steht im INSERT
+    // selbst nichts, was man lesen koennte; die Zusage haengt dort am
+    // Aufruf von ma_personalnummer_generieren().
+    if (/ma_personalnummer_generieren\s*\(/.test(quelle)) { return false; }
+    const spalten = [...quelle.matchAll(/INSERT INTO `?mitarbeiter`? *\(([^)]*)\)/g)]
+      .map(m => m[1]);
+    return spalten.some(sp => !/personalnummer/.test(sp));
+  });
+  const unerlaubt = ohne.filter(f => !(f in INSERT_OHNE_PERSONALNUMMER));
+  check('KRITISCH: jeder Weg, der eine Person anlegt, vergibt ihr eine Personalnummer',
+    unerlaubt.length === 0);
+  unerlaubt.forEach(f => bad.push('Legt eine Person ohne Personalnummer an: ' + f));
+  // Und umgekehrt: eine Ausnahme, die es nicht mehr braucht, wird entfernt --
+  // sonst deckt die Liste irgendwann etwas, das gar nicht mehr da ist.
+  const tot = Object.keys(INSERT_OHNE_PERSONALNUMMER).filter(f => !ohne.includes(f));
+  check('Keine tote Ausnahme in INSERT_OHNE_PERSONALNUMMER', tot.length === 0);
+  tot.forEach(f => bad.push('Ausnahme ohne Anlass: ' + f));
+}
 
 // Die Personalnummer darf nicht aus der Eingabe uebernommen werden, weder
 // beim Anlegen noch beim Bearbeiten -- sonst waere die Sperre nur
