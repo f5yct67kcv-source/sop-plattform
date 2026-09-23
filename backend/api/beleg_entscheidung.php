@@ -17,9 +17,10 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require __DIR__ . '/../belege.php';
 
-function entscheidung_zurueck(string $token): void
+function entscheidung_zurueck(string $token, string $lage = ''): void
 {
-    header('Location: beleg_oeffentlich.php?token=' . urlencode($token));
+    header('Location: beleg_oeffentlich.php?token=' . urlencode($token)
+        . ($lage !== '' ? '&lage=' . urlencode($lage) : ''));
     exit;
 }
 
@@ -55,7 +56,7 @@ try {
     // Konzept nicht) -- die Seite selbst zeigt in dem Fall auch keine
     // Knoepfe mehr, aber ein direkter POST unter Umgehung des Formulars soll
     // trotzdem nichts bewirken.
-    if (!empty($b['entscheidung_am']) || $b['art'] !== 'offerte') {
+    if (!empty($b['entscheidung_am']) || !beleg_unterschreibbar((string)$b['art'])) {
         entscheidung_zurueck($token);
     }
 
@@ -64,6 +65,23 @@ try {
         && substr((string)$b['gueltig_bis'], 0, 10) < $heute;
     if ($abgelaufen) {
         entscheidung_zurueck($token);
+    }
+
+    // SEIT ENT-688 (SCHRITT 2) GILT EINE ANNAHME ERST MIT DEM CODE, und sie
+    // laeuft ueber beleg_unterschrift.php. Ein "annehmen" hier waere der
+    // alte Klick ohne Nachweis -- er wird abgewiesen, sobald die Tabelle da
+    // ist. Fehlt sie (zwischen Deploy und Einrichtungslauf), bleibt es beim
+    // bisherigen Weg.
+    //
+    // Ablehnen braucht einen Namen, der Grund ist freiwillig (Punkt 6).
+    $mitUnterschrift = beleg_unterschrift_tabelle_da($pdo, '');
+    if ($mitUnterschrift && $wahl === 'annehmen') {
+        entscheidung_zurueck($token);
+    }
+    $name  = mb_substr(trim((string)preg_replace('/\s+/u', ' ', (string)($_POST['name'] ?? ''))), 0, 120);
+    $grund = mb_substr(trim((string)($_POST['grund'] ?? '')), 0, 4000);
+    if ($mitUnterschrift && $name === '') {
+        entscheidung_zurueck($token, 'name_fehlt');
     }
 
     $neuerStatus = $wahl === 'annehmen' ? 'bestaetigt' : 'abgelehnt';
@@ -84,10 +102,16 @@ try {
             }
         }
     }
+    if ($mitUnterschrift && $fassungNr !== null) {
+        $k = $pdo->prepare('SELECT k.email FROM kunden k JOIN belege b ON b.kunde_id = k.id WHERE b.id = ?');
+        $k->execute([(int)$b['id']]);
+        beleg_ablehnung_anlegen($pdo, '', (int)$b['id'], $fassungNr, $name, $grund,
+            trim((string)$k->fetchColumn()), $ip, (string)($_SERVER['HTTP_USER_AGENT'] ?? ''));
+    }
     $mitFassung = hat_spalte($pdo, 'belege', 'entscheidung_fassung');
     $pdo->prepare(
         'UPDATE belege SET status = ?, entscheidung_am = NOW(), entscheidung_ip = ?'
-        . ($mitFassung ? ', entscheidung_fassung = ?' : '') . ' WHERE id = ?'
+        . ($mitFassung ? ', entscheidung_fassung = ?' : '') . ' WHERE id = ? AND entscheidung_am IS NULL'
     )->execute($mitFassung ? [$neuerStatus, $ip, $fassungNr, (int)$b['id']]
                            : [$neuerStatus, $ip, (int)$b['id']]);
 

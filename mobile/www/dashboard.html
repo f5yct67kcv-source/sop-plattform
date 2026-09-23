@@ -10274,7 +10274,14 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 <div class="dlg-scrim" id="dlgConfirm">
   <div class="dlg narrow">
     <div class="dlg-hd"><h2 id="cfTitel">Sicher?</h2><p id="cfText"></p></div>
-    <div class="dlg-bd" style="padding-top:0"></div>
+    <div class="dlg-bd" style="padding-top:0">
+      <!-- Eine ausdrueckliche Erklaerung, die erst bestaetigt sein muss
+           (ENT-688: Freigabe beim Versenden). Nur sichtbar, wenn die Frage
+           eine verlangt. -->
+      <label class="check" id="cfHakenZeile" style="display:none;font-size:13px;line-height:1.45">
+        <input type="checkbox" id="cfHaken"> <span id="cfHakenText"></span>
+      </label>
+    </div>
     <div class="dlg-ft">
       <button class="btn btn-plain" onclick="closeDlg('dlgConfirm')">Abbrechen</button>
       <button class="btn btn-danger" id="cfBtn">Bestätigen</button>
@@ -15541,10 +15548,30 @@ function ofFassungZeichnen(f) {
    ohne Personen. */
 function ofSperreSetzen(gesperrt) {
   const leiste = $('ofFormSperre');
-  leiste.textContent = gesperrt
-    ? 'Angenommen am ' + dmy(ofFormEntschiedenAm) + '. Gesperrt – für Änderungen bitte duplizieren.'
-    : '';
-  leiste.style.display = gesperrt ? '' : 'none';
+  /* Wer entschieden hat, steht dabei (ENT-688, Schritt 2). Ging der Code an
+     eine andere Adresse als die, an die der Beleg versendet wurde, sagt die
+     Leiste das ausdruecklich -- das ist die Angabe, die man im Zweifel
+     nachpruefen will. */
+  const u = ofFormFassung && ofFormFassung.unterschrift;
+  const wer = u ? [u.name, u.art === 'annahme' ? u.funktion : '', u.art === 'annahme' ? u.firma : '']
+    .filter(Boolean).join(', ') : '';
+  const abgelehnt = !gesperrt && !!u && u.art === 'ablehnung' && ofFormStatus === 'abgelehnt';
+  let text = '';
+  if (gesperrt) {
+    text = 'Angenommen am ' + dmy(ofFormEntschiedenAm) + (wer ? ' von ' + wer : '')
+      + '. Gesperrt – für Änderungen bitte duplizieren.';
+    if (u && u.abweichend) {
+      text += ' Achtung: Der Bestätigungscode ging an ' + u.email + ', nicht an die Empfängeradresse '
+        + (u.empfaenger_email || '(keine hinterlegt)') + '.';
+    }
+  } else if (abgelehnt) {
+    text = 'Abgelehnt am ' + dmy(ofFormEntschiedenAm) + (wer ? ' von ' + wer : '') + '.'
+      + (u.grund ? ' Grund: ' + u.grund : ' Ohne Grund.');
+  }
+  leiste.textContent = text;
+  leiste.style.color = abgelehnt ? 'var(--neg)' : 'var(--pos)';
+  leiste.style.background = abgelehnt ? 'var(--neg-soft)' : 'var(--pos-soft)';
+  leiste.style.display = text ? '' : 'none';
   $('ofFormSaveBtn').style.display = gesperrt ? 'none' : '';
   const kopf = $('ofBtnZurueck').parentElement;
   const wurzel = $('ofFormSaveBtn').closest('#of-formular, #view-offerte');
@@ -15930,15 +15957,20 @@ function ofVersenden(id) {
   const text = neu
     ? `Der Empfänger erhält eine E-Mail, dass die ${t.dokument} angepasst wurde. Der Link bleibt derselbe und zeigt ab dann die neue Fassung.`
     : t.versandText;
+  // Freigabe (ENT-688, Punkt 7): Eine NEUE Fassung einer Offerte geht nur
+  // mit dem Haken hinaus. Der Server prueft das selbst (freigabe_noetig).
+  const erste = ofFormId === Number(id) && !(ofFormFassung && (ofFormFassung.fassungen || []).length);
+  const haken = ofArt === 'offerte' && (neu || erste || ofFormId !== Number(id))
+    ? `Ich gebe diese Fassung der ${t.dokument} verbindlich frei.` : '';
   askConfirm(frage, text, 'Versenden', () => {
-      api('beleg_versenden.php', { method: 'POST', body: { id: Number(id) } }).then(({ ok, data }) => {
+      api('beleg_versenden.php', { method: 'POST', body: { id: Number(id), freigabe: !!haken } }).then(({ ok, data }) => {
         if (!ok || data.status !== 'ok') { toast(data.message || 'Versand fehlgeschlagen.'); return; }
         toast(data.neue_fassung && Number(data.fassung) > 1
           ? `Fassung ${Number(data.fassung)} verschickt.` : t.versandErfolg);
         if (ofFormId === Number(id)) { ofFormStatus = 'versendet'; ofFormSubZeichnen(); ofFassungNachladen(id); }
         belegListeAktualisieren(ofArt);
       }).catch(() => toast('Versand fehlgeschlagen.'));
-    });
+    }, haken);
 }
 
 // Erzeugt das Blatt. Getrennt von ofDrucken(), damit es sich ohne Drucken
@@ -31514,11 +31546,20 @@ function closeDlg(id) {
   $(id).classList.remove('on');
 }
 
-function askConfirm(titel, text, knopf, fn) {
+// haken (freiwillig): eine Erklaerung, die angehakt sein muss, bevor der
+// Knopf geht -- heute die Freigabe beim Versenden (ENT-688). Ohne haken
+// verhaelt sich die Rueckfrage wie immer.
+function askConfirm(titel, text, knopf, fn, haken) {
   $('cfTitel').textContent = titel;
   $('cfText').textContent = text;
   const b = $('cfBtn');
   b.textContent = knopf;
+  const zeile = $('cfHakenZeile'), box = $('cfHaken');
+  zeile.style.display = haken ? '' : 'none';
+  $('cfHakenText').textContent = haken || '';
+  box.checked = false;
+  b.disabled = !!haken;
+  box.onchange = () => { b.disabled = !!haken && !box.checked; };
   b.onclick = () => { closeDlg('dlgConfirm'); fn(); };
   openDlg('dlgConfirm');
 }

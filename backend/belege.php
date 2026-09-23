@@ -967,7 +967,8 @@ function beleg_letzte_fassung(PDO $pdo, int $belegId, string $tabPraefix = ''): 
 {
     if (!beleg_fassung_tabelle_da($pdo, $tabPraefix)) { return null; }
     $s = $pdo->prepare(
-        'SELECT nummer, abbild, pruefsumme, anlass, versendet_am, versendet_von
+        'SELECT nummer, abbild, pruefsumme, anlass, versendet_am, versendet_von'
+        . (beleg_fassung_freigabe_da($pdo, $tabPraefix) ? ', freigegeben' : '') . '
            FROM ' . beleg_tabelle($tabPraefix, 'beleg_fassung') . '
           WHERE beleg_id = ? ORDER BY nummer DESC LIMIT 1'
     );
@@ -977,6 +978,7 @@ function beleg_letzte_fassung(PDO $pdo, int $belegId, string $tabPraefix = ''): 
     $json = (string)$z['abbild'];
     $z['nummer'] = (int)$z['nummer'];
     $z['echt']   = hash_equals((string)$z['pruefsumme'], beleg_pruefsumme($json));
+    $z['freigegeben'] = (int)($z['freigegeben'] ?? 0) === 1;
     $z['abbild'] = json_decode($json, true) ?: [];
     return $z;
 }
@@ -991,7 +993,7 @@ function beleg_letzte_fassung(PDO $pdo, int $belegId, string $tabPraefix = ''): 
 //
 // Gibt ['nummer' => n, 'neu' => bool] zurueck.
 function beleg_fassung_anlegen(PDO $pdo, int $belegId, array $abbild, string $anlass,
-                               string $von, string $tabPraefix = ''): array
+                               string $von, string $tabPraefix = '', bool $freigegeben = false): array
 {
     $json = beleg_abbild_json($abbild);
     $summe = beleg_pruefsumme($json);
@@ -1000,12 +1002,28 @@ function beleg_fassung_anlegen(PDO $pdo, int $belegId, array $abbild, string $an
         return ['nummer' => (int)$letzte['nummer'], 'neu' => false];
     }
     $nummer = $letzte ? (int)$letzte['nummer'] + 1 : 1;
+    // Die Freigabe (ENT-688, Punkt 7) steht nur in der Zeile, wenn die
+    // Spalte schon da ist -- zwischen Deploy und Einrichtungslauf fehlt sie.
+    $mitFreigabe = beleg_fassung_freigabe_da($pdo, $tabPraefix);
     $pdo->prepare(
         'INSERT INTO ' . beleg_tabelle($tabPraefix, 'beleg_fassung') . '
-            (beleg_id, nummer, abbild, pruefsumme, anlass, versendet_am, versendet_von)
-         VALUES (?, ?, ?, ?, ?, NOW(), ?)'
-    )->execute([$belegId, $nummer, $json, $summe, $anlass, mb_substr($von, 0, 120)]);
+            (beleg_id, nummer, abbild, pruefsumme, anlass, versendet_am, versendet_von'
+        . ($mitFreigabe ? ', freigegeben' : '') . ')
+         VALUES (?, ?, ?, ?, ?, NOW(), ?' . ($mitFreigabe ? ', ?' : '') . ')'
+    )->execute(array_merge([$belegId, $nummer, $json, $summe, $anlass, mb_substr($von, 0, 120)],
+        $mitFreigabe ? [$freigegeben ? 1 : 0] : []));
     return ['nummer' => $nummer, 'neu' => true];
+}
+
+// Gibt es die Spalte fuer die Freigabe (ENT-688, Schritt 2)?
+function beleg_fassung_freigabe_da(PDO $pdo, string $tabPraefix = ''): bool
+{
+    try {
+        $pdo->query('SELECT freigegeben FROM ' . beleg_tabelle($tabPraefix, 'beleg_fassung') . ' LIMIT 0');
+        return true;
+    } catch (Throwable $e) {
+        return false;
+    }
 }
 
 // Braucht der Versand eine neue Fassung? Dieselbe Frage wie in
@@ -1055,5 +1073,615 @@ function beleg_fassung_stand(PDO $pdo, array $beleg, string $tabPraefix, array $
         ], $fassungen),
         'fassung_geaendert' => $geaendert,
         'gesperrt' => beleg_gesperrt($beleg),
+        // Wer entschieden hat (ENT-688, Schritt 2) -- ohne die Zeichnung,
+        // die ist fuer die Anzeige im Formular zu schwer und steht auf dem
+        // Dokument. 'abweichend' zeigt die Oberflaeche ausdruecklich an.
+        'unterschrift' => beleg_unterschrift_kurz(beleg_unterschrift_letzte($pdo, $tabPraefix, (int)$beleg['id'])),
+    ];
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Unterschrift am Link (ENT-688, Schritt 2)
+// ══════════════════════════════════════════════════════════════════════════
+//
+// Eine EINFACHE elektronische Signatur: Sie aendert nichts daran, dass die
+// Annahme formfrei gilt (Art. 1 und 11 OR), sie macht sie BEWEISBAR -- wer
+// (Name, Funktion, Firma), wann, welche Fassung (Pruefsumme), und mit
+// Zugriff auf welche Mailadresse (Bestaetigungscode). Einer eigenhaendigen
+// Unterschrift gleichgestellt ist nur die qualifizierte Signatur nach
+// ZertES; die ist hier bewusst nicht gebaut (OP-693).
+//
+// DER CODE GEHT AN DIE ADRESSE, DIE DER UNTERZEICHNENDE ANGIBT (ENT-688,
+// Punkt 4): Die Offerte geht oft an die Kontaktperson, unterschreiben darf
+// aber die Geschaeftsleitung. Ob die Adresse von der Empfaengeradresse des
+// Belegs abweicht, steht ausdruecklich im Protokoll und beim Betreiber.
+//
+// GESPEICHERT WIRD NIE DER CODE, nur sein Abdruck -- dieselbe Haltung wie
+// bei den Sitzungen (sitzung_abdruck()).
+
+const BELEG_CODE_GUELTIG_MIN = 15;
+const BELEG_CODE_VERSUCHE    = 5;
+// Zeichen der data:-URL einer gezeichneten Unterschrift. unterschrift.js
+// schneidet auf die Striche zu; ein echtes Bild liegt weit darunter.
+const BELEG_ZEICHNUNG_MAX    = 400000;
+// Welche Belegarten sich annehmen lassen. Eine Rechnung wird bezahlt, nicht
+// unterschrieben.
+const BELEG_UNTERSCHREIBBAR  = ['offerte', 'vertrag'];
+
+function beleg_unterschreibbar(string $art): bool
+{
+    return in_array($art, BELEG_UNTERSCHREIBBAR, true);
+}
+
+function beleg_unterschrift_tabelle_da(PDO $pdo, string $tabPraefix = ''): bool
+{
+    static $da = [];
+    $tab = beleg_tabelle($tabPraefix, 'beleg_unterschrift');
+    if (!empty($da[spl_object_id($pdo) . $tab])) { return true; }
+    try {
+        $pdo->query("SELECT code_abdruck FROM {$tab} LIMIT 0");
+    } catch (Throwable $e) {
+        return false;
+    }
+    return $da[spl_object_id($pdo) . $tab] = true;
+}
+
+// Sechs Ziffern, fuehrende Nullen erhalten. random_int, nicht rand():
+// Der Code ist ein Ausweis.
+function beleg_code_neu(): string
+{
+    return str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+}
+
+// Der Abdruck haengt an der Zeile: Derselbe Code an zwei Unterschriften
+// ergibt zwei verschiedene Abdruecke.
+function beleg_code_abdruck(int $zeile, string $code): string
+{
+    return hash('sha256', $zeile . ':' . $code);
+}
+
+// Eine gezeichnete Unterschrift: leer (dann steht der getippte Name auf der
+// Linie) oder ein PNG als data:-URL. Was anders aussieht, wird abgewiesen
+// (null) -- und nicht still weggelassen, sonst haelte der Unterzeichnende
+// eine Zeichnung fuer abgegeben, die es nicht gibt.
+function beleg_zeichnung_pruefen(string $roh): ?string
+{
+    $roh = trim($roh);
+    if ($roh === '') { return ''; }
+    if (strlen($roh) > BELEG_ZEICHNUNG_MAX) { return null; }
+    if (!preg_match('~^data:image/png;base64,([A-Za-z0-9+/]+={0,2})$~', $roh, $m)) { return null; }
+    $bin = base64_decode($m[1], true);
+    // Magic Bytes statt einer Behauptung (gleiches Prinzip wie
+    // rundgang_rapport_versenden.php).
+    if ($bin === false || strncmp($bin, "\x89PNG\r\n\x1a\n", 8) !== 0) { return null; }
+    return $roh;
+}
+
+// Die Angaben aus dem Unterschriftsdialog, geprueft. Gibt
+// ['fehler' => '…'] oder ['werte' => [...]] zurueck.
+function beleg_unterschrift_angaben(array $in): array
+{
+    $text = static fn(string $k, int $max): string =>
+        mb_substr(trim(preg_replace('/\s+/u', ' ', (string)($in[$k] ?? ''))), 0, $max);
+    $w = [
+        'name'     => $text('name', 120),
+        'funktion' => $text('funktion', 120),
+        'firma'    => $text('firma', 200),
+        'email'    => mb_substr(trim((string)($in['email'] ?? '')), 0, 200),
+    ];
+    if ($w['name'] === '')     { return ['fehler' => 'Bitte Ihren Namen angeben.']; }
+    if ($w['funktion'] === '') { return ['fehler' => 'Bitte Ihre Funktion angeben.']; }
+    if ($w['email'] === '' || !filter_var($w['email'], FILTER_VALIDATE_EMAIL)) {
+        return ['fehler' => 'Bitte eine gültige E-Mail-Adresse angeben — dorthin geht der Bestätigungscode.'];
+    }
+    // Die Erklaerung ist Pflicht und wird ausdruecklich abgegeben, nicht
+    // vorausgesetzt: Sie ist der Satz, auf den es im Streitfall ankommt.
+    if (empty($in['zeichnungsberechtigt'])) {
+        return ['fehler' => 'Bitte bestätigen Sie, dass Sie zeichnungsberechtigt sind.'];
+    }
+    $zeichnung = beleg_zeichnung_pruefen((string)($in['zeichnung'] ?? ''));
+    if ($zeichnung === null) {
+        return ['fehler' => 'Die gezeichnete Unterschrift liess sich nicht lesen. Bitte neu zeichnen oder weglassen.'];
+    }
+    $w['zeichnung'] = $zeichnung;
+    return ['werte' => $w];
+}
+
+// Legt eine offene Unterschrift an und gibt Zeile und Code zurueck. Der
+// Code verlaesst diese Funktion nur, damit der Aufrufer ihn verschicken
+// kann; in der Datenbank steht er nie.
+function beleg_unterschrift_anlegen(PDO $pdo, string $tabPraefix, int $belegId, int $fassung,
+                                    array $werte, string $empfaengerEmail,
+                                    string $ip, string $browser): array
+{
+    $tab = beleg_tabelle($tabPraefix, 'beleg_unterschrift');
+    $pdo->prepare(
+        "INSERT INTO {$tab} (beleg_id, fassung, art, name, funktion, firma, email,
+            zeichnungsberechtigt, zeichnung, empfaenger_email, code_abdruck,
+            code_gesendet_am, code_versuche, ip, browser, erstellt_am)
+         VALUES (?, ?, 'annahme', ?, ?, ?, ?, 1, ?, ?, '', NOW(), 0, ?, ?, NOW())"
+    )->execute([$belegId, $fassung, $werte['name'], $werte['funktion'], $werte['firma'],
+                $werte['email'], $werte['zeichnung'] !== '' ? $werte['zeichnung'] : null,
+                mb_substr($empfaengerEmail, 0, 200), mb_substr($ip, 0, 64), mb_substr($browser, 0, 255)]);
+    $zeile = (int)$pdo->lastInsertId();
+    $code = beleg_code_neu();
+    $pdo->prepare("UPDATE {$tab} SET code_abdruck = ? WHERE id = ? AND bestaetigt_am IS NULL")
+        ->execute([beleg_code_abdruck($zeile, $code), $zeile]);
+    return ['id' => $zeile, 'code' => $code];
+}
+
+// Prueft den eingegebenen Code. Lagen:
+//   'ok'         bestaetigt -- ab jetzt unveraenderlich
+//   'falsch'     Code stimmt nicht; noch Versuche uebrig
+//   'gesperrt'   zu viele Fehlversuche -- neuen Code anfordern
+//   'abgelaufen' aelter als BELEG_CODE_GUELTIG_MIN
+//   'fassung'    seit dem Anfordern ist eine neue Fassung versendet worden
+//   'unbekannt'  keine offene Unterschrift dieser Nummer an diesem Beleg
+//   'schon'      bereits bestaetigt
+// Vier verschiedene Fehler, vier verschiedene Texte auf der Seite.
+function beleg_unterschrift_pruefen(PDO $pdo, string $tabPraefix, int $belegId, int $zeile,
+                                    string $code, int $aktuelleFassung): string
+{
+    $tab = beleg_tabelle($tabPraefix, 'beleg_unterschrift');
+    $s = $pdo->prepare("SELECT id, fassung, code_abdruck, code_gesendet_am, code_versuche, bestaetigt_am
+                          FROM {$tab} WHERE id = ? AND beleg_id = ? AND art = 'annahme'");
+    $s->execute([$zeile, $belegId]);
+    $z = $s->fetch(PDO::FETCH_ASSOC);
+    if (!$z) { return 'unbekannt'; }
+    if (!empty($z['bestaetigt_am'])) { return 'schon'; }
+    if ((int)$z['code_versuche'] >= BELEG_CODE_VERSUCHE) { return 'gesperrt'; }
+    // Unterschrieben wird, was beim Anfordern am Link stand. Ist inzwischen
+    // eine neue Fassung versendet, gilt der Code nicht mehr fuer sie.
+    if ((int)$z['fassung'] !== $aktuelleFassung) { return 'fassung'; }
+    $alter = time() - (int)strtotime((string)$z['code_gesendet_am']);
+    if ($alter > BELEG_CODE_GUELTIG_MIN * 60) { return 'abgelaufen'; }
+    $code = preg_replace('/\D/', '', $code);
+    if ($code === '' || !hash_equals((string)$z['code_abdruck'], beleg_code_abdruck($zeile, $code))) {
+        $pdo->prepare("UPDATE {$tab} SET code_versuche = code_versuche + 1
+                        WHERE id = ? AND bestaetigt_am IS NULL")->execute([$zeile]);
+        return ((int)$z['code_versuche'] + 1 >= BELEG_CODE_VERSUCHE) ? 'gesperrt' : 'falsch';
+    }
+    $pdo->prepare("UPDATE {$tab} SET bestaetigt_am = NOW() WHERE id = ? AND bestaetigt_am IS NULL")
+        ->execute([$zeile]);
+    return 'ok';
+}
+
+// Eine Ablehnung: Name Pflicht, Grund freiwillig, kein Code (ENT-688,
+// Punkt 6). Sie verpflichtet niemanden -- ein Code waere nur Huerde.
+function beleg_ablehnung_anlegen(PDO $pdo, string $tabPraefix, int $belegId, int $fassung,
+                                 string $name, string $grund, string $empfaengerEmail,
+                                 string $ip, string $browser): int
+{
+    $tab = beleg_tabelle($tabPraefix, 'beleg_unterschrift');
+    $pdo->prepare(
+        "INSERT INTO {$tab} (beleg_id, fassung, art, name, grund, empfaenger_email,
+            code_abdruck, code_versuche, bestaetigt_am, ip, browser, erstellt_am)
+         VALUES (?, ?, 'ablehnung', ?, ?, ?, '', 0, NOW(), ?, ?, NOW())"
+    )->execute([$belegId, $fassung, mb_substr($name, 0, 120),
+                $grund !== '' ? mb_substr($grund, 0, 4000) : null, mb_substr($empfaengerEmail, 0, 200),
+                mb_substr($ip, 0, 64), mb_substr($browser, 0, 255)]);
+    return (int)$pdo->lastInsertId();
+}
+
+// Die zuletzt bestaetigte Entscheidung (Annahme oder Ablehnung) eines
+// Belegs -- oder null. 'abweichend' sagt, ob der Code an eine andere
+// Adresse ging als die, an die der Beleg versendet wurde.
+function beleg_unterschrift_letzte(PDO $pdo, string $tabPraefix, int $belegId): ?array
+{
+    if (!beleg_unterschrift_tabelle_da($pdo, $tabPraefix)) { return null; }
+    $s = $pdo->prepare(
+        'SELECT id, fassung, art, name, funktion, firma, email, zeichnungsberechtigt, zeichnung,
+                grund, empfaenger_email, code_gesendet_am, bestaetigt_am, ip, browser
+           FROM ' . beleg_tabelle($tabPraefix, 'beleg_unterschrift') . '
+          WHERE beleg_id = ? AND bestaetigt_am IS NOT NULL ORDER BY id DESC LIMIT 1'
+    );
+    $s->execute([$belegId]);
+    $z = $s->fetch(PDO::FETCH_ASSOC);
+    if (!$z) { return null; }
+    $z['fassung'] = (int)$z['fassung'];
+    $z['abweichend'] = $z['art'] === 'annahme'
+        && mb_strtolower(trim((string)$z['email'])) !== mb_strtolower(trim((string)$z['empfaenger_email']));
+    return $z;
+}
+
+// Die Mail mit dem Code. BEWUSST OHNE eine Angabe des Unterzeichnenden:
+// Der Weg nimmt Text von jemandem entgegen, der nicht angemeldet ist, und
+// schickt eine Mail an eine Adresse, die er selbst nennt. Stuende sein Name
+// in der Mail, liesse sich der Weg als Versandweg fuer fremde Texte
+// missbrauchen. So traegt die Mail nur, was vom Absender stammt.
+function beleg_code_mail(array $beleg, string $firma, string $code): array
+{
+    $angabe = BELEG_ARTEN[(string)($beleg['art'] ?? 'offerte')] ?? BELEG_ARTEN['offerte'];
+    $titel  = (string)$angabe['titel'];
+    $nummer = (string)($beleg['nummer'] ?? '');
+    $von    = $firma !== '' ? $firma : 'dem Absender';
+    $betreff = "Ihr Bestätigungscode: $code";
+    $text = "Guten Tag\n\n"
+        . "Sie möchten die $titel $nummer von $von annehmen. Ihr Bestätigungscode:\n\n"
+        . "$code\n\n"
+        . "Der Code gilt " . BELEG_CODE_GUELTIG_MIN . " Minuten. Geben Sie ihn auf der Seite der $titel ein.\n\n"
+        . "Haben Sie nichts angefordert, können Sie diese Mail ignorieren — ohne den Code wird nichts angenommen.";
+    $inhalt = mail_absatz('Guten Tag')
+        . mail_absatz('Sie möchten die ' . mail_e("$titel $nummer") . ' von ' . mail_e($von)
+            . ' annehmen. Ihr Bestätigungscode:')
+        . mail_block(mail_feld('Bestätigungscode', mail_e($code), true), true)
+        . mail_absatz('Der Code gilt ' . BELEG_CODE_GUELTIG_MIN . ' Minuten. Geben Sie ihn auf der Seite der '
+            . mail_e($titel) . ' ein.')
+        . mail_absatz('Haben Sie nichts angefordert, können Sie diese Mail ignorieren — ohne den Code '
+            . 'wird nichts angenommen.');
+    return ['betreff' => $betreff, 'text' => $text, 'html' => mail_rahmen($inhalt), 'bilder' => []];
+}
+
+// Laesst sich am Link noch entscheiden? Unterschreibbare Art, noch nicht
+// entschieden, Frist nicht abgelaufen. Dieselbe Bedingung wie auf der Seite
+// -- die Wache hier ist die, die traegt.
+function beleg_link_offen(array $b): bool
+{
+    if (!beleg_unterschreibbar((string)($b['art'] ?? ''))) { return false; }
+    if (!empty($b['entscheidung_am'])) { return false; }
+    $frist = beleg_abbild_datum($b['gueltig_bis'] ?? null);
+    return $frist === null || $frist >= date('Y-m-d');
+}
+
+// ── Der Ablauf hinter den beiden oeffentlichen Endpunkten ─────────────
+//
+// EINMAL HIER, fuer Betreiber und Cockpit: Die vier Endpunkte
+// ({betreiber_}beleg_unterschrift_{anfordern,bestaetigen}.php) holen nur
+// ihre Verbindung, ihren Absender und rufen dann diese Funktion. Zwei
+// Kopien dieses Ablaufs waeren die Stelle, an der eine Seite in einem Jahr
+// eine Wache weniger hat.
+//
+// Laeuft im Kontext eines Endpunkts: json_response(), anmeld_*() und
+// smtp_*() stammen aus db.php, anmeldung.php und mailer.php.
+//
+// DIE BREMSE zaehlt je Beleg UND je Absenderadresse. Jede Codeanforderung
+// und jeder falsche Code ist ein Versuch; nach fuenf je Beleg in fuenfzehn
+// Minuten ist Pause. Damit taugt der Weg weder zum Durchprobieren des
+// sechsstelligen Codes noch als Mailschleuder an beliebige Adressen.
+function beleg_unterschrift_ablauf(string $was, PDO $pdo, string $tabPraefix, array $in,
+                                   string $firma): void
+{
+    $token = (string)($in['token'] ?? '');
+    if ($token === '') {
+        json_response(['status' => 'error', 'lage' => 'link', 'message' => 'Der Link ist unvollständig.'], 400);
+    }
+    $tab = beleg_tabelle($tabPraefix, 'belege');
+    $s = $pdo->prepare("SELECT id, art, nummer, status, kunde_id, gueltig_bis, entscheidung_am
+                          FROM {$tab} WHERE versand_token = ?");
+    $s->execute([$token]);
+    $b = $s->fetch(PDO::FETCH_ASSOC);
+    if (!$b) {
+        json_response(['status' => 'error', 'lage' => 'link', 'message' => 'Dieser Link ist nicht (mehr) gültig.'], 404);
+    }
+    $id = (int)$b['id'];
+
+    $name = 'beleg-code:' . $tabPraefix . $id;
+    $adresse = anmeld_adresse();
+    [$fName, $fAdresse] = anmeld_zaehlen(db(), $name, $adresse);
+    if (anmeld_sperre($fName, $fAdresse) > 0) {
+        json_response(['status' => 'error', 'lage' => 'bremse',
+            'message' => 'Zu viele Versuche. Bitte in 15 Minuten erneut versuchen.'], 429);
+    }
+    if (!beleg_unterschrift_tabelle_da($pdo, $tabPraefix) || !beleg_fassung_tabelle_da($pdo, $tabPraefix)) {
+        json_response(['status' => 'error', 'lage' => 'nicht_eingerichtet',
+            'message' => 'Die Annahme am Link ist hier noch nicht eingerichtet. Bitte antworten Sie auf die E-Mail.'], 503);
+    }
+    if (!beleg_link_offen($b)) {
+        json_response(['status' => 'error', 'lage' => 'zu',
+            'message' => 'Hier lässt sich nicht mehr entscheiden — der Beleg ist bereits entschieden oder abgelaufen.'], 409);
+    }
+
+    // Die Fassung, die jetzt am Link steht. Hat der Beleg noch keine
+    // (versendet vor ENT-688), wird festgehalten, was er in diesem Moment
+    // zeigt -- genau das wird unterschrieben.
+    $fassung = beleg_letzte_fassung($pdo, $id, $tabPraefix);
+    if (!$fassung) {
+        $absender = $tabPraefix === 'be_' && function_exists('be_beleg_absender')
+            ? be_beleg_absender($pdo) : beleg_absender_betrieb($pdo);
+        $abbild = beleg_abbild_lesen($pdo, $id, $tabPraefix, $absender);
+        $fassungNr = (int)beleg_fassung_anlegen($pdo, $id, $abbild, 'annahme', '', $tabPraefix)['nummer'];
+    } else {
+        if (!$fassung['echt']) {
+            json_response(['status' => 'error', 'lage' => 'zu',
+                'message' => 'Dieses Dokument lässt sich gerade nicht bestätigen. Bitte wenden Sie sich an den Absender.'], 409);
+        }
+        $fassungNr = (int)$fassung['nummer'];
+    }
+
+    $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    $browser = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+
+    if ($was === 'anfordern') {
+        $angaben = beleg_unterschrift_angaben($in);
+        if (isset($angaben['fehler'])) {
+            json_response(['status' => 'error', 'lage' => 'angaben', 'message' => $angaben['fehler']], 400);
+        }
+        if (!smtp_konfiguriert()) {
+            json_response(['status' => 'error', 'lage' => 'mail',
+                'message' => 'Der Code lässt sich gerade nicht verschicken. Bitte versuchen Sie es später erneut.'], 503);
+        }
+        $empfaenger = '';
+        if (!empty($b['kunde_id'])) {
+            $k = $pdo->prepare('SELECT email FROM ' . beleg_tabelle($tabPraefix, 'kunden') . ' WHERE id = ?');
+            $k->execute([(int)$b['kunde_id']]);
+            $empfaenger = trim((string)$k->fetchColumn());
+        }
+        $u = beleg_unterschrift_anlegen($pdo, $tabPraefix, $id, $fassungNr, $angaben['werte'],
+                                        $empfaenger, $ip, $browser);
+        anmeld_fehlversuch(db(), $name, $adresse);
+        $mail = beleg_code_mail($b, $firma, $u['code']);
+        try {
+            smtp_senden($angaben['werte']['email'], $angaben['werte']['name'], $mail['betreff'],
+                        $mail['html'], $mail['text'], [], $mail['bilder']);
+        } catch (Throwable $e) {
+            json_response(['status' => 'error', 'lage' => 'mail',
+                'message' => 'Der Code liess sich nicht verschicken. Bitte prüfen Sie die Adresse oder versuchen Sie es später erneut.'], 502);
+        }
+        json_response(['status' => 'ok', 'id' => $u['id'], 'an' => $angaben['werte']['email'],
+            'gueltig_min' => BELEG_CODE_GUELTIG_MIN]);
+    }
+
+    // bestaetigen
+    $lage = beleg_unterschrift_pruefen($pdo, $tabPraefix, $id, (int)($in['id'] ?? 0),
+                                       (string)($in['code'] ?? ''), $fassungNr);
+    if ($lage !== 'ok') {
+        if ($lage === 'falsch' || $lage === 'gesperrt') { anmeld_fehlversuch(db(), $name, $adresse); }
+        $texte = [
+            'falsch'     => 'Der Code stimmt nicht. Bitte prüfen Sie die Eingabe.',
+            'gesperrt'   => 'Zu viele falsche Eingaben. Bitte fordern Sie einen neuen Code an.',
+            'abgelaufen' => 'Der Code ist abgelaufen. Bitte fordern Sie einen neuen an.',
+            'fassung'    => 'Inzwischen liegt eine neue Fassung vor. Bitte laden Sie die Seite neu und prüfen Sie sie.',
+            'unbekannt'  => 'Diese Anfrage ist nicht mehr gültig. Bitte beginnen Sie neu.',
+            'schon'      => 'Diese Annahme ist bereits bestätigt.',
+        ];
+        json_response(['status' => 'error', 'lage' => $lage, 'message' => $texte[$lage] ?? 'Nicht möglich.'],
+            $lage === 'schon' ? 409 : 400);
+    }
+    // Erst mit dem richtigen Code wird der Beleg angenommen -- und nur,
+    // wenn nicht zwischendurch jemand anders entschieden hat.
+    $mitFassung = beleg_spalte_da_portabel($pdo, $tab, 'entscheidung_fassung');
+    $pdo->prepare("UPDATE {$tab} SET status = 'bestaetigt', entscheidung_am = NOW(), entscheidung_ip = ?"
+        . ($mitFassung ? ', entscheidung_fassung = ?' : '')
+        . ' WHERE id = ? AND entscheidung_am IS NULL')
+        ->execute($mitFassung ? [$ip, $fassungNr, $id] : [$ip, $id]);
+    json_response(['status' => 'ok', 'lage' => 'ok']);
+}
+
+// Gibt es eine Spalte? Auf MySQL und SQLite gleich (LIMIT 0).
+function beleg_spalte_da_portabel(PDO $pdo, string $tabelle, string $spalte): bool
+{
+    try {
+        $pdo->query("SELECT {$spalte} FROM {$tabelle} LIMIT 0");
+        return true;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+// ── Was die oeffentliche Seite dazu zeigt ─────────────────────────────
+//
+// Beide oeffentlichen Seiten (Betreiber und Cockpit) zeigen denselben
+// Dialog und dasselbe Protokoll -- darum hier und nicht zweimal.
+
+function beleg_h(?string $s): string
+{
+    return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+}
+
+function beleg_zeitpunkt(?string $roh): string
+{
+    $t = strtotime((string)$roh);
+    return ($roh && $t) ? date('d.m.Y, H:i', $t) . ' Uhr' : '–';
+}
+
+// Die Zeilen des Pruefprotokolls einer Annahme (ENT-688, Punkt 8), als
+// [Beschriftung, Wert]. Getrennt vom HTML, damit Seite und spaeter das PDF
+// (Schritt 3) dieselben Angaben in derselben Reihenfolge zeigen.
+function beleg_pruefprotokoll_zeilen(array $beleg, array $fassung, array $u): array
+{
+    $titel = (string)(BELEG_ARTEN[(string)($beleg['art'] ?? 'offerte')]['titel'] ?? 'Beleg');
+    $versendet = beleg_zeitpunkt($fassung['versendet_am'] ?? null);
+    if (trim((string)($fassung['versendet_von'] ?? '')) !== '') {
+        $versendet .= ' von ' . $fassung['versendet_von'];
+    }
+    if (!empty($fassung['freigegeben'])) { $versendet .= ', ausdrücklich freigegeben'; }
+    $wer = implode(', ', array_filter([(string)$u['name'], (string)$u['funktion'], (string)$u['firma']],
+        static fn($t) => trim($t) !== ''));
+    $codeAn = (string)$u['email'];
+    if (!empty($u['abweichend'])) {
+        $codeAn .= ' — weicht von der Empfängeradresse des Belegs ab ('
+            . ((string)$u['empfaenger_email'] !== '' ? $u['empfaenger_email'] : 'keine hinterlegt') . ')';
+    }
+    return [
+        ['Dokument', $titel . ' ' . ($beleg['nummer'] ?? '') . ', Fassung ' . (int)($fassung['nummer'] ?? 0)],
+        ['Prüfsumme (SHA-256)', (string)($fassung['pruefsumme'] ?? '')],
+        ['Versendet', $versendet],
+        ['Angenommen von', $wer],
+        ['Erklärung', 'Zeichnungsberechtigung bestätigt'],
+        ['Bestätigungscode an', $codeAn],
+        ['Code angefordert', beleg_zeitpunkt($u['code_gesendet_am'] ?? null)],
+        ['Bestätigt', beleg_zeitpunkt($u['bestaetigt_am'] ?? null)],
+        ['IP-Adresse', (string)$u['ip'] !== '' ? (string)$u['ip'] : '–'],
+        ['Browser', (string)$u['browser'] !== '' ? (string)$u['browser'] : '–'],
+    ];
+}
+
+// Das Protokoll als Abschnitt am Ende des Dokuments. Es steht IM Dokument
+// (und damit auf dem Ausdruck), nicht in der Seitenspalte: Es gehoert zu
+// dem, was angenommen wurde.
+function beleg_pruefprotokoll_html(array $zeilen): string
+{
+    $html = '';
+    foreach ($zeilen as [$l, $w]) {
+        $mono = $l === 'Prüfsumme (SHA-256)';
+        $html .= '<tr><td style="padding:3px 18px 3px 0;color:#6B7280;vertical-align:top;white-space:nowrap">'
+            . beleg_h($l) . '</td><td style="padding:3px 0;word-break:break-all'
+            . ($mono ? ';font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px' : '')
+            . '">' . beleg_h($w) . '</td></tr>';
+    }
+    return '<div id="pruefprotokoll" style="margin-top:30px;padding-top:14px;border-top:1px solid #E5E8EC;'
+        . 'page-break-inside:avoid;break-inside:avoid">'
+        . '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;'
+        . 'color:#6B7280;margin-bottom:8px">Prüfprotokoll der elektronischen Annahme</div>'
+        . '<table style="width:100%;font-size:11.5px;line-height:1.45">' . $html . '</table>'
+        . '<div style="font-size:10.5px;color:#6B7280;margin-top:8px;line-height:1.5">Einfache elektronische '
+        . 'Signatur mit Bestätigungscode per E-Mail. Die Prüfsumme weist nach, dass dieses Dokument seit der '
+        . 'Annahme unverändert ist.</div></div>';
+}
+
+// Der Unterschriftsdialog (ENT-688: Dialog ueber der Seite, zwei Schritte)
+// und der Ablehnen-Dialog.
+//
+// $info: art, nummer, fassung, firma (des Empfaengers, zum Vorbelegen),
+// endpunkt (JSON), entscheid (Formularziel fuers Ablehnen), token.
+//
+// OHNE JAVASCRIPT keine Annahme: Code anfordern, zeichnen und bestaetigen
+// brauchen es. Das steht dann ausdruecklich da, statt dass ein Knopf nichts
+// tut.
+function beleg_unterschrift_dialog_html(array $info): string
+{
+    $titel = (string)(BELEG_ARTEN[(string)$info['art']]['titel'] ?? 'Beleg');
+    $was   = $titel . ' ' . $info['nummer'] . ($info['fassung'] > 1 ? ', Fassung ' . (int)$info['fassung'] : '');
+    $feld  = 'width:100%;box-sizing:border-box;font:inherit;font-size:16px;border:1px solid #D6DAE0;'
+           . 'border-radius:8px;padding:10px;margin:4px 0 12px';
+    $lab   = 'display:block;font-size:12px;font-weight:600;color:#374151';
+    $js = [
+        'endpunkt' => (string)$info['endpunkt'],
+        'token'    => (string)$info['token'],
+        'titel'    => $titel,
+        'was'      => $was,
+    ];
+    return '<div class="uz-huelle keindruck" id="uzHuelle" role="dialog" aria-modal="true" aria-labelledby="uzTitel">'
+        . '<div class="uz-karte">'
+        // Schritt 1: Angaben
+        . '<div id="uzSchritt1">'
+        . '<h2 id="uzTitel" style="font-size:18px;margin:0 0 4px">' . beleg_h($titel) . ' annehmen</h2>'
+        . '<p style="font-size:13px;color:#6B7280;margin:0 0 16px">' . beleg_h($was)
+        . '. Wir schicken Ihnen einen Code per E-Mail; erst mit ihm ist die Annahme gültig.</p>'
+        . '<label style="' . $lab . '">Name *<input id="uzName" autocomplete="name" maxlength="120" style="' . $feld . '"></label>'
+        . '<label style="' . $lab . '">Funktion *<input id="uzFunktion" autocomplete="organization-title" maxlength="120" placeholder="z. B. Geschäftsführer" style="' . $feld . '"></label>'
+        . '<label style="' . $lab . '">Firma<input id="uzFirma" autocomplete="organization" maxlength="200" value="'
+        . beleg_h((string)$info['firma']) . '" style="' . $feld . '"></label>'
+        . '<label style="' . $lab . '">Ihre E-Mail-Adresse *<input id="uzEmail" type="email" autocomplete="email" maxlength="200" style="' . $feld . '"></label>'
+        . '<div style="' . $lab . ';margin-bottom:6px">Unterschrift <span style="font-weight:400;color:#6B7280">(freiwillig)</span></div>'
+        . '<div id="uzZeichnung" style="margin-bottom:14px"></div>'
+        . '<label style="display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.45;margin-bottom:16px">'
+        . '<input type="checkbox" id="uzBerechtigt" style="width:20px;height:20px;margin-top:1px;flex:0 0 auto">'
+        . '<span>Ich bin berechtigt, für die genannte Firma zu unterzeichnen, und nehme die ' . beleg_h($was)
+        . ' verbindlich an.</span></label>'
+        . '<div id="uzFehler1" class="hinweis hinweis-ab" style="display:none;margin:0 0 12px"></div>'
+        . '<div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">'
+        . '<button type="button" class="knopf knopf-plain" onclick="uzZu()">Abbrechen</button>'
+        . '<button type="button" class="knopf knopf-an" id="uzAnfordern" onclick="uzAnfordern()">Code anfordern</button>'
+        . '</div></div>'
+        // Schritt 2: Code
+        . '<div id="uzSchritt2" style="display:none">'
+        . '<h2 style="font-size:18px;margin:0 0 4px">Code eingeben</h2>'
+        . '<p style="font-size:13px;color:#6B7280;margin:0 0 16px" id="uzCodeText"></p>'
+        . '<label style="' . $lab . '">Bestätigungscode<input id="uzCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" '
+        . 'style="' . $feld . ';font-size:22px;letter-spacing:6px;text-align:center"></label>'
+        . '<div id="uzFehler2" class="hinweis hinweis-ab" style="display:none;margin:0 0 12px"></div>'
+        . '<div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;align-items:center">'
+        . '<button type="button" class="knopf knopf-plain" onclick="uzSchritt(1)">Zurück</button>'
+        . '<button type="button" class="knopf knopf-an" id="uzBestaetigen" onclick="uzBestaetigen()">Verbindlich annehmen</button>'
+        . '</div></div>'
+        . '</div></div>'
+        // Ablehnen
+        . '<div class="uz-huelle keindruck" id="uzAbHuelle" role="dialog" aria-modal="true" aria-labelledby="uzAbTitel">'
+        . '<div class="uz-karte"><form method="post" action="' . beleg_h((string)$info['entscheid']) . '">'
+        . '<input type="hidden" name="token" value="' . beleg_h((string)$info['token']) . '">'
+        . '<input type="hidden" name="entscheidung" value="ablehnen">'
+        . '<h2 id="uzAbTitel" style="font-size:18px;margin:0 0 4px">' . beleg_h($titel) . ' ablehnen</h2>'
+        . '<p style="font-size:13px;color:#6B7280;margin:0 0 16px">' . beleg_h($was) . '</p>'
+        . '<label style="' . $lab . '">Name *<input name="name" required maxlength="120" autocomplete="name" style="' . $feld . '"></label>'
+        . '<label style="' . $lab . '">Grund <span style="font-weight:400;color:#6B7280">(freiwillig)</span>'
+        . '<textarea name="grund" maxlength="4000" rows="4" placeholder="z. B. zu teuer, anderer Anbieter" style="' . $feld . '"></textarea></label>'
+        . '<div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">'
+        . '<button type="button" class="knopf knopf-plain" onclick="uzAbZu()">Abbrechen</button>'
+        . '<button type="submit" class="knopf knopf-ab">Ablehnen</button>'
+        . '</div></form></div></div>'
+        . '<noscript><div class="hinweis hinweis-versendet" style="margin-top:14px">Für die Annahme am Link wird '
+        . 'JavaScript benötigt. Bitte aktivieren Sie es oder antworten Sie auf die E-Mail.</div></noscript>'
+        . '<script src="/unterschrift.js"></script>'
+        . '<script>(function(){var C=' . json_encode($js, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) . ';'
+        . 'var $=function(i){return document.getElementById(i);};var zeile=0;'
+        . 'function fehler(n,t){var e=$("uzFehler"+n);e.textContent=t||"";e.style.display=t?"":"none";}'
+        . 'window.uzSchritt=function(n){$("uzSchritt1").style.display=n===1?"":"none";'
+        . '$("uzSchritt2").style.display=n===2?"":"none";fehler(1,"");fehler(2,"");'
+        . 'if(n===2){$("uzCode").focus();}};'
+        . 'var eingerichtet=false;'
+        . 'window.uzAnnehmen=function(){$("uzHuelle").classList.add("an");uzSchritt(1);'
+        . 'if(!eingerichtet&&window.Unterschrift){eingerichtet=true;Unterschrift.einrichten({ziel:"uzZeichnung",'
+        . 'kontext:function(){return{zeilen:[C.was,$("uzFirma").value],name:$("uzName").value};}});}'
+        . 'setTimeout(function(){$("uzName").focus();},30);};'
+        . 'window.uzZu=function(){$("uzHuelle").classList.remove("an");};'
+        . 'window.uzAblehnen=function(){$("uzAbHuelle").classList.add("an");};'
+        . 'window.uzAbZu=function(){$("uzAbHuelle").classList.remove("an");};'
+        . 'function senden(daten){daten.token=C.token;return fetch(C.endpunkt,{method:"POST",'
+        . 'headers:{"Content-Type":"application/json"},body:JSON.stringify(daten)})'
+        . '.then(function(r){return r.json().catch(function(){return{status:"error",message:"Unerwartete Antwort."};});})'
+        . '.catch(function(){return{status:"error",message:"Keine Verbindung. Bitte erneut versuchen."};});}'
+        . 'window.uzAnfordern=function(){var k=$("uzAnfordern");k.disabled=true;fehler(1,"");'
+        . 'senden({was:"anfordern",name:$("uzName").value,funktion:$("uzFunktion").value,firma:$("uzFirma").value,'
+        . 'email:$("uzEmail").value,zeichnungsberechtigt:$("uzBerechtigt").checked?1:0,'
+        . 'zeichnung:(window.Unterschrift&&Unterschrift.daten())||""}).then(function(a){k.disabled=false;'
+        . 'if(a.status!=="ok"){fehler(1,a.message||"Das hat nicht geklappt.");return;}zeile=a.id;'
+        . '$("uzCodeText").textContent="Wir haben einen Code an "+a.an+" geschickt. Er gilt "+a.gueltig_min+" Minuten.";'
+        . '$("uzCode").value="";uzSchritt(2);});};'
+        . 'window.uzBestaetigen=function(){var k=$("uzBestaetigen");k.disabled=true;fehler(2,"");'
+        . 'senden({was:"bestaetigen",id:zeile,code:$("uzCode").value}).then(function(a){k.disabled=false;'
+        . 'if(a.status==="ok"||a.lage==="schon"){location.reload();return;}'
+        . 'fehler(2,a.message||"Das hat nicht geklappt.");'
+        . 'if(a.lage==="gesperrt"||a.lage==="abgelaufen"||a.lage==="unbekannt"){zeile=0;}});};'
+        . 'document.addEventListener("keydown",function(e){if(e.key==="Escape"){uzZu();uzAbZu();}});'
+        . '})();</script>';
+}
+
+// Das CSS dazu. Eigene Funktion, weil es in den <style>-Block der Seite
+// gehoert und nicht mitten ins Dokument.
+function beleg_unterschrift_css(): string
+{
+    return '.uz-huelle{position:fixed;inset:0;background:rgba(20,22,26,.45);display:none;'
+        . 'align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow-y:auto}'
+        . '.uz-huelle.an{display:flex}'
+        . '.uz-karte{background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.2);'
+        . 'width:100%;max-width:460px;padding:26px 24px;box-sizing:border-box}'
+        . '.knopf:disabled{opacity:.6;cursor:default}'
+        . '@media print{.uz-huelle{display:none!important}}';
+}
+
+// Was nach einer Annahme auf den Unterschriftslinien steht, als fertiges
+// HTML: 'kunde', 'absender', 'ort'. Leer, solange nichts angenommen ist --
+// dann bleiben die Linien zum Ausdrucken und Unterschreiben von Hand.
+//
+// Der getippte Name steht in einer Schreibschrift, damit er als
+// Unterschrift lesbar ist und nicht wie eine Beschriftung. Es ist KEINE
+// Nachbildung einer Handschrift: Die Beweiskraft kommt aus Code und
+// Protokoll (ENT-688, Punkt 5).
+function beleg_unterschrift_linien(?array $u, ?array $fassung, bool $angenommen): array
+{
+    $leer = ['kunde' => '', 'absender' => '', 'ort' => ''];
+    if (!$angenommen || !$u || $u['art'] !== 'annahme') { return $leer; }
+    $schrift = 'font-family:\'Segoe Script\',\'Brush Script MT\',\'Snell Roundhand\',cursive;font-size:21px;line-height:1.1;padding-bottom:4px';
+    $kunde = !empty($u['zeichnung'])
+        ? '<img src="' . beleg_h((string)$u['zeichnung']) . '" alt="Unterschrift" style="max-height:44px;max-width:100%">'
+        : '<span style="' . $schrift . '">' . beleg_h((string)$u['name']) . '</span>';
+    $absender = ($fassung && !empty($fassung['freigegeben']) && trim((string)$fassung['versendet_von']) !== '')
+        ? '<span style="' . $schrift . '">' . beleg_h((string)$fassung['versendet_von']) . '</span>'
+        : '';
+    $t = strtotime((string)$u['bestaetigt_am']);
+    return ['kunde' => $kunde, 'absender' => $absender,
+            'ort' => 'Elektronisch angenommen am ' . ($t ? date('d.m.Y', $t) : '–')];
+}
+
+// Die Unterschrift fuer das Formular: alles ausser Zeichnung, IP und Browser.
+function beleg_unterschrift_kurz(?array $u): ?array
+{
+    if (!$u) { return null; }
+    return [
+        'art' => (string)$u['art'], 'fassung' => (int)$u['fassung'], 'name' => (string)$u['name'],
+        'funktion' => (string)$u['funktion'], 'firma' => (string)$u['firma'], 'email' => (string)$u['email'],
+        'empfaenger_email' => (string)$u['empfaenger_email'], 'abweichend' => (bool)$u['abweichend'],
+        'grund' => (string)($u['grund'] ?? ''), 'bestaetigt_am' => (string)$u['bestaetigt_am'],
     ];
 }

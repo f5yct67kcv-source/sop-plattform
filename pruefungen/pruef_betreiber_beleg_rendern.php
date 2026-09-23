@@ -12,6 +12,9 @@
 //   ohne_fassung   versendet vor ENT-688: die Seite zeigt den Beleg wie bisher
 //   fassung        Fassung 2 versendet, danach im Entwurf geaendert
 //   verfaelscht    Fassung 2, deren Abbild nachtraeglich veraendert wurde
+//   signatur       Unterschrift eingerichtet, noch offen: Dialog statt Klick
+//   angenommen     mit Code angenommen: Protokoll und gefuellte Linien
+//   abgelehnt      mit Name und Grund abgelehnt
 //
 // Gibt das fertige HTML auf stdout aus.
 declare(strict_types=1);
@@ -55,7 +58,7 @@ $pdo->exec("INSERT INTO be_briefkopf (id, firma, absender, email) VALUES
 $pdo->exec("INSERT INTO be_kunden VALUES (1, 'Muster Sicherheit AG', NULL, 'Musterweg', '12', NULL, '3000', 'Musterstadt')");
 $pdo->exec("INSERT INTO be_kunden_person VALUES (1, 'Frau', 'Erika', 'Beispiel')");
 $pdo->exec("INSERT INTO be_belege VALUES (1, 'tok456', 'offerte', 'OF-0815', 1, 1, 'Lizenz 12 Monate', '',
-  '2031-03-01', '2031-04-01', NULL, 0, 'versendet', 0, NULL, NULL, NULL, 'Zahlbar in 30 Tagen', NULL, 0)");
+  '2031-03-01', '2031-04-01', NULL, 0, 'versendet', 0, NULL, NULL, NULL, 'Zahlbar in 30 Tagen', NULL, 1)");
 $pdo->exec("INSERT INTO be_beleg_positionen VALUES (1, 1, 0, NULL, 'Lizenz', 'zwölf Monate', 1, 'Stk.', 250000, 0, 810)");
 
 require __DIR__ . '/../backend/betreiber.php';
@@ -79,6 +82,25 @@ if ($variante !== 'ohne_fassung') {
     if ($variante === 'verfaelscht') {
         $pdo->exec("UPDATE be_beleg_fassung SET abbild = REPLACE(abbild, '220000', '120000') WHERE nummer = 2");
     }
+}
+if (in_array($variante, ['signatur', 'angenommen', 'abgelehnt'], true)) {
+    $pdo->exec("CREATE TABLE be_beleg_unterschrift (id INTEGER PRIMARY KEY AUTOINCREMENT, beleg_id INTEGER,
+      fassung INTEGER, art TEXT, name TEXT DEFAULT '', funktion TEXT DEFAULT '', firma TEXT DEFAULT '',
+      email TEXT DEFAULT '', zeichnungsberechtigt INTEGER DEFAULT 0, zeichnung TEXT, grund TEXT,
+      empfaenger_email TEXT DEFAULT '', code_abdruck TEXT DEFAULT '', code_gesendet_am TEXT,
+      code_versuche INTEGER DEFAULT 0, bestaetigt_am TEXT, ip TEXT DEFAULT '', browser TEXT DEFAULT '',
+      erstellt_am TEXT)");
+}
+if ($variante === 'angenommen') {
+    $u = beleg_unterschrift_anlegen($pdo, 'be_', 1, 2, ['name' => 'Erika Beispiel', 'funktion' => 'Geschäftsführerin',
+        'firma' => 'Muster Sicherheit AG', 'email' => 'leitung@muster.invalid', 'zeichnung' => ''],
+        'post@muster.invalid', '192.0.2.10', 'Pruefbrowser/1.0');
+    $pdo->exec("UPDATE be_beleg_unterschrift SET bestaetigt_am = NOW() WHERE id = " . (int)$u['id']);
+    $pdo->exec("UPDATE be_belege SET status = 'bestaetigt', entscheidung_am = NOW() WHERE id = 1");
+}
+if ($variante === 'abgelehnt') {
+    beleg_ablehnung_anlegen($pdo, 'be_', 1, 2, 'Rolf Muster', 'zu teuer', 'post@muster.invalid', '192.0.2.10', 'x');
+    $pdo->exec("UPDATE be_belege SET status = 'abgelehnt', entscheidung_am = NOW() WHERE id = 1");
 }
 
 $quelle = file_get_contents(__DIR__ . '/../backend/api/betreiber_beleg_oeffentlich.php');

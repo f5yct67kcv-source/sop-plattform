@@ -1344,6 +1344,12 @@ jobs:
           # aber unnoetig umstaendlich. Lokal faellt es nicht auf, weil dort
           # die Datei neben der Seite liegt.
           cp qrcode.js                 dist-betreiber/qrcode.js
+          # unterschrift.js traegt das Zeichenfeld im Unterschriftsdialog der
+          # oeffentlichen Belegseite (ENT-688, Schritt 2). Die Seite laedt es
+          # per <script src="/unterschrift.js">; fehlt die Datei, bleibt das
+          # Feld leer und die Annahme laeuft trotzdem -- die Zeichnung ist
+          # freiwillig. Lokal faellt das Fehlen nicht auf.
+          cp unterschrift.js           dist-betreiber/unterschrift.js
           cp backend/api/betreiber_*.php dist-betreiber/api/
           # Die oeffentliche Selbstbedienung (ENT-601, ENT-624): kein
           # betreiber_-Praefix, weil sie ausdruecklich OHNE Anmeldung

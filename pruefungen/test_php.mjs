@@ -1058,6 +1058,13 @@ const OHNE_ANMELDUNG = [
   // ('be-nachricht:'), damit dieser Weg nicht als Postfach-Schleuder
   // taugt, und nur POST.
   'betreiber_beleg_nachricht_oeffentlich.php',
+  // Die Unterschrift am selben Link (ENT-688, Schritt 2), je Seite ein
+  // Endpunkt. Dieselbe Begruendung -- kein Konto, Ausweis ist der
+  // versand_token --, dazu die Bremse 'beleg-code:' je Beleg und Adresse
+  // (Codeanforderungen und falsche Codes zaehlen), nur POST und JSON. Erst
+  // der richtige Code nimmt an; der Code steht nie in der Datenbank.
+  'beleg_unterschrift.php',
+  'betreiber_beleg_unterschrift.php',
   // Demo-Selbstbedienung (ENT-601): Ein Interessent hat noch kein Konto,
   // kann also keine Sitzung mitbringen -- dieselbe Begruendung wie bei
   // login.php. Eigene Bremsen (IP und E-Mail-Adresse), Honigtopf,
