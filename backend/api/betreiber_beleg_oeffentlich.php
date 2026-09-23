@@ -591,7 +591,13 @@ try {
 
     $dokument = '<div class="keindruck" style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:24px">'
         . '<button type="button" class="knopf knopf-plain" onclick="window.print()">Drucken</button>'
-        . '<button type="button" class="knopf knopf-plain" id="btnHerunterladen" onclick="portalHerunterladen()">Herunterladen</button>'
+        // Nach einer Annahme laedt "Herunterladen" das GESPEICHERTE,
+        // unterschriebene PDF (ENT-688, Schritt 3) -- nicht eine Kopie aus dem
+        // Browser, die vom angenommenen Dokument abweichen koennte.
+        . (($unterschrift && $unterschrift['art'] === 'annahme' && !empty($unterschrift['pdf_da']) && $entschieden)
+            ? '<a class="knopf knopf-plain" id="btnHerunterladen" style="line-height:20px" href="betreiber_beleg_pdf.php?token='
+              . portal_esc(rawurlencode($token)) . '">Herunterladen</a>'
+            : '<button type="button" class="knopf knopf-plain" id="btnHerunterladen" onclick="portalHerunterladen()">Herunterladen</button>')
         . '</div>'
         . '<div id="dokumentGanz">'
         // Die Mindesthoehe gilt nur noch im DRUCK (siehe @media print):

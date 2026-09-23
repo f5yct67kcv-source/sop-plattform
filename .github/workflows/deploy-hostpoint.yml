@@ -736,6 +736,11 @@ jobs:
           cp backend/fahrzeug.php dist/fahrzeug.php
           cp backend/geofence_bereich.php dist/geofence_bereich.php
           cp backend/belege.php dist/belege.php
+          # Unterschriebenes PDF (ENT-688): Modul, FPDF, Schriften.
+          cp backend/belegpdf.php dist/belegpdf.php
+          mkdir -p dist/fpdf/font
+          cp backend/fpdf/fpdf.php dist/fpdf/fpdf.php
+          cp backend/fpdf/font/*.json dist/fpdf/font/
           cp backend/qrrechnung.php dist/qrrechnung.php
           cp backend/produkte.php dist/produkte.php
           cp backend/mailer.php dist/mailer.php
@@ -1346,6 +1351,11 @@ jobs:
           # im Haus -- eine zweite Kopie der Geldrechnung waere die Stelle,
           # an der die beiden Seiten auseinanderlaufen.
           cp backend/belege.php        dist-betreiber/belege.php
+          # Unterschriebenes PDF (ENT-688): Modul, FPDF, Schriften.
+          cp backend/belegpdf.php dist-betreiber/belegpdf.php
+          mkdir -p dist-betreiber/fpdf/font
+          cp backend/fpdf/fpdf.php dist-betreiber/fpdf/fpdf.php
+          cp backend/fpdf/font/*.json dist-betreiber/fpdf/font/
           cp backend/kunden.php        dist-betreiber/kunden.php
           cp backend/produkte.php      dist-betreiber/produkte.php
           # Der Zahlteil der Rechnung (ENT-616) -- derselbe Rechenkern wie
@@ -1543,8 +1553,9 @@ jobs:
           # jedem Fall ein echter Fehler (z. B. eine vergessene sed-Zeile),
           # keine bewusste Ausnahme mehr -- die Liste unten traegt darum nur
           # noch PHPs eigene Konstante __DIR__.
+          # __FILE__: PHP-Konstante in FPDF (ENT-688).
           UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' dist-betreiber/ \
-                   | grep -v -e '^__DIR__$' \
+                   | grep -v -e '^__DIR__$' -e '^__FILE__$' \
                    | sort -u || true)
           if [ -n "$UEBRIG" ]; then
             echo "::error::Nicht ersetzte Platzhalter im betreiber-Buendel: $UEBRIG"
@@ -1813,6 +1824,11 @@ jobs:
           cp backend/fahrzeug.php dist-cupi24/fahrzeug.php
           cp backend/geofence_bereich.php dist-cupi24/geofence_bereich.php
           cp backend/belege.php dist-cupi24/belege.php
+          # Unterschriebenes PDF (ENT-688): Modul, FPDF, Schriften.
+          cp backend/belegpdf.php dist-cupi24/belegpdf.php
+          mkdir -p dist-cupi24/fpdf/font
+          cp backend/fpdf/fpdf.php dist-cupi24/fpdf/fpdf.php
+          cp backend/fpdf/font/*.json dist-cupi24/fpdf/font/
           cp backend/qrrechnung.php dist-cupi24/qrrechnung.php
           cp backend/produkte.php dist-cupi24/produkte.php
           cp backend/mailer.php dist-cupi24/mailer.php
@@ -2013,7 +2029,7 @@ jobs:
           # mapsSchluesselTauglich() erkennt ihn und meldet "nicht
           # eingerichtet" statt "nicht freigegeben".
           UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' dist-cupi24/ \
-                   | grep -v -e '^__DIR__$' -e '^__MAPS_IOS_KEY__$' \
+                   | grep -v -e '^__DIR__$' -e '^__MAPS_IOS_KEY__$' -e '^__FILE__$' \
                    | sort -u || true)
           if [ -n "$UEBRIG" ]; then
             echo "::error::Nicht ersetzte Platzhalter im cupi24-Buendel: $UEBRIG"
@@ -2441,7 +2457,7 @@ jobs:
             # Buendeln oben (__DIR__ ist PHPs eigene Konstante,
             # __MAPS_IOS_KEY__ gehoert ins App-Buendel, ENT-609).
             UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' "dist-demo/$PLATZ/" \
-                     | grep -v -e '^__DIR__$' -e '^__MAPS_IOS_KEY__$' \
+                     | grep -v -e '^__DIR__$' -e '^__MAPS_IOS_KEY__$' -e '^__FILE__$' \
                      | sort -u || true)
             if [ -n "$UEBRIG" ]; then
               echo "::error::Nicht ersetzte Platzhalter im Buendel fuer $PLATZ: $UEBRIG"

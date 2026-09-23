@@ -968,7 +968,9 @@ function beleg_letzte_fassung(PDO $pdo, int $belegId, string $tabPraefix = ''): 
     if (!beleg_fassung_tabelle_da($pdo, $tabPraefix)) { return null; }
     $s = $pdo->prepare(
         'SELECT nummer, abbild, pruefsumme, anlass, versendet_am, versendet_von'
-        . (beleg_fassung_freigabe_da($pdo, $tabPraefix) ? ', freigegeben' : '') . '
+        . (beleg_fassung_freigabe_da($pdo, $tabPraefix) ? ', freigegeben' : '')
+        . (beleg_spalte_da_portabel($pdo, beleg_tabelle($tabPraefix, 'beleg_fassung'), 'versendet_von_id')
+           ? ', versendet_von_id' : '') . '
            FROM ' . beleg_tabelle($tabPraefix, 'beleg_fassung') . '
           WHERE beleg_id = ? ORDER BY nummer DESC LIMIT 1'
     );
@@ -993,7 +995,8 @@ function beleg_letzte_fassung(PDO $pdo, int $belegId, string $tabPraefix = ''): 
 //
 // Gibt ['nummer' => n, 'neu' => bool] zurueck.
 function beleg_fassung_anlegen(PDO $pdo, int $belegId, array $abbild, string $anlass,
-                               string $von, string $tabPraefix = '', bool $freigegeben = false): array
+                               string $von, string $tabPraefix = '', bool $freigegeben = false,
+                               ?int $vonId = null): array
 {
     $json = beleg_abbild_json($abbild);
     $summe = beleg_pruefsumme($json);
@@ -1005,13 +1008,15 @@ function beleg_fassung_anlegen(PDO $pdo, int $belegId, array $abbild, string $an
     // Die Freigabe (ENT-688, Punkt 7) steht nur in der Zeile, wenn die
     // Spalte schon da ist -- zwischen Deploy und Einrichtungslauf fehlt sie.
     $mitFreigabe = beleg_fassung_freigabe_da($pdo, $tabPraefix);
+    // Wer versendet hat, als Konto (Schritt 3) -- nur, wenn die Spalte da ist.
+    $mitVonId = beleg_spalte_da_portabel($pdo, beleg_tabelle($tabPraefix, 'beleg_fassung'), 'versendet_von_id');
     $pdo->prepare(
         'INSERT INTO ' . beleg_tabelle($tabPraefix, 'beleg_fassung') . '
             (beleg_id, nummer, abbild, pruefsumme, anlass, versendet_am, versendet_von'
-        . ($mitFreigabe ? ', freigegeben' : '') . ')
-         VALUES (?, ?, ?, ?, ?, NOW(), ?' . ($mitFreigabe ? ', ?' : '') . ')'
+        . ($mitFreigabe ? ', freigegeben' : '') . ($mitVonId ? ', versendet_von_id' : '') . ')
+         VALUES (?, ?, ?, ?, ?, NOW(), ?' . ($mitFreigabe ? ', ?' : '') . ($mitVonId ? ', ?' : '') . ')'
     )->execute(array_merge([$belegId, $nummer, $json, $summe, $anlass, mb_substr($von, 0, 120)],
-        $mitFreigabe ? [$freigegeben ? 1 : 0] : []));
+        $mitFreigabe ? [$freigegeben ? 1 : 0] : [], $mitVonId ? [$vonId] : []));
     return ['nummer' => $nummer, 'neu' => true];
 }
 
@@ -1279,6 +1284,13 @@ function beleg_unterschrift_letzte(PDO $pdo, string $tabPraefix, int $belegId): 
     $z = $s->fetch(PDO::FETCH_ASSOC);
     if (!$z) { return null; }
     $z['fassung'] = (int)$z['fassung'];
+    // Liegt ein unterschriebenes PDF vor (Schritt 3)? Ohne es zu laden.
+    $z['pdf_da'] = false;
+    if (beleg_spalte_da_portabel($pdo, beleg_tabelle($tabPraefix, 'beleg_unterschrift'), 'pdf')) {
+        $p = $pdo->prepare('SELECT pdf IS NOT NULL FROM ' . beleg_tabelle($tabPraefix, 'beleg_unterschrift') . ' WHERE id = ?');
+        $p->execute([(int)$z['id']]);
+        $z['pdf_da'] = (bool)$p->fetchColumn();
+    }
     $z['abweichend'] = $z['art'] === 'annahme'
         && mb_strtolower(trim((string)$z['email'])) !== mb_strtolower(trim((string)$z['empfaenger_email']));
     return $z;
@@ -1444,7 +1456,15 @@ function beleg_unterschrift_ablauf(string $was, PDO $pdo, string $tabPraefix, ar
         . ($mitFassung ? ', entscheidung_fassung = ?' : '')
         . ' WHERE id = ? AND entscheidung_am IS NULL')
         ->execute($mitFassung ? [$ip, $fassungNr, $id] : [$ip, $id]);
-    json_response(['status' => 'ok', 'lage' => 'ok']);
+
+    // Schritt 3: PDF ablegen und Bestaetigungen verschicken. Scheitert
+    // etwas davon, bleibt der Beleg angenommen -- 'abschluss' sagt, was
+    // geklappt hat. Die GuardOpS-Signatur nur auf der Betreiberseite.
+    $abschluss = function_exists('beleg_annahme_abschliessen')
+        ? beleg_annahme_abschliessen($pdo, $tabPraefix, $id, $b, $firma,
+            ($tabPraefix === 'be_' && function_exists('mail_signatur_zeilen')) ? mail_signatur_zeilen() : [])
+        : null;
+    json_response(['status' => 'ok', 'lage' => 'ok', 'abschluss' => $abschluss]);
 }
 
 // Gibt es eine Spalte? Auf MySQL und SQLite gleich (LIMIT 0).
@@ -1683,5 +1703,6 @@ function beleg_unterschrift_kurz(?array $u): ?array
         'funktion' => (string)$u['funktion'], 'firma' => (string)$u['firma'], 'email' => (string)$u['email'],
         'empfaenger_email' => (string)$u['empfaenger_email'], 'abweichend' => (bool)$u['abweichend'],
         'grund' => (string)($u['grund'] ?? ''), 'bestaetigt_am' => (string)$u['bestaetigt_am'],
+        'pdf_da' => (bool)($u['pdf_da'] ?? false),
     ];
 }

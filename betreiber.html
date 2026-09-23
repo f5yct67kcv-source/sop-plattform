@@ -7646,6 +7646,7 @@ function ofNeu(art) {
     .forEach(b => { $(b).style.display = 'none'; });
   ofZeilenZeichnen();
   ofFormEntschiedenAm = null;
+  ofFormToken = '';
   ofFassungZeichnen(null);
   ofFormularZeigen(true);
   setTimeout(() => $('of_kunde').focus(), 60);
@@ -7965,6 +7966,10 @@ function ofSummenZeichnen() {
   $('ofSummen').innerHTML = html;
 }
 
+/* Wo das unterschriebene PDF liegt (ENT-688, Schritt 3) -- je Seite ein
+   eigener Endpunkt, darum ausserhalb des gemeinsamen Blocks darunter. */
+const OF_PDF_ENDPUNKT = 'betreiber_beleg_pdf.php';
+
 /* ── Fassungen und Sperre (ENT-688) ─────────────────────────────────────
    Der Chip im Kopf sagt, welche Fassung der Empfaenger am Link sieht, und
    faerbt sich orange, sobald der Entwurf davon abweicht. Dann heisst der
@@ -7980,6 +7985,7 @@ function ofSummenZeichnen() {
    haelt die beiden zusammen. */
 let ofFormFassung = null;
 let ofFormEntschiedenAm = null;
+let ofFormToken = '';
 
 function ofFassungZeichnen(f) {
   ofFormFassung = f || null;
@@ -8033,6 +8039,17 @@ function ofSperreSetzen(gesperrt) {
       + (u.grund ? ' Grund: ' + u.grund : ' Ohne Grund.');
   }
   leiste.textContent = text;
+  /* Das unterschriebene PDF (ENT-688, Schritt 3) -- das gespeicherte aus
+     dem Moment der Annahme, ueber denselben Link, den der Kunde hat. */
+  if (gesperrt && u && u.pdf_da && ofFormToken) {
+    const a = document.createElement('a');
+    a.href = API + OF_PDF_ENDPUNKT + '?token=' + encodeURIComponent(ofFormToken);
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = 'Unterschriebenes PDF öffnen';
+    a.style.cssText = 'margin-left:8px;font-weight:650;color:inherit;text-decoration:underline';
+    leiste.appendChild(a);
+  }
   leiste.style.color = abgelehnt ? 'var(--neg)' : 'var(--pos)';
   leiste.style.background = abgelehnt ? 'var(--neg-soft)' : 'var(--pos-soft)';
   leiste.style.display = text ? '' : 'none';
@@ -8060,6 +8077,7 @@ async function ofFassungNachladen(id) {
   try { a = await ruf('betreiber_beleg_lesen.php?id=' + Number(id)); } catch (e) { return; }
   if (!a || a.status !== 'ok' || ofFormId !== Number(id)) { return; }
   ofFormEntschiedenAm = a.beleg.entscheidung_am || null;
+  ofFormToken = a.beleg.versand_token || '';
   ofFassungZeichnen(a.fassung);
 }
 
@@ -8128,6 +8146,7 @@ async function ofOeffnen(id) {
     .forEach(x => { $(x).style.display = ''; });
   ofZeilenZeichnen();
   ofFormEntschiedenAm = b.entscheidung_am || null;
+  ofFormToken = b.versand_token || '';
   ofFassungZeichnen(a.fassung);
   ofFadenZeichnen(a.nachrichten || [], !!a.faden_da);
   ofFormularZeigen(true);
