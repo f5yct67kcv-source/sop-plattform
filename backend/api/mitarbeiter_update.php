@@ -92,8 +92,8 @@ if (!darf($user, 'personal_vertraulich_schreiben')) {
     $verboten = array_intersect(array_keys($s), ma_vertrauliche_felder());
     foreach ($verboten as $feld) { unset($s[$feld]); }
     if (!$s) {
-        json_response(['status' => 'error',
-            'message' => 'Dafür fehlt dir die Berechtigung.'], 403);
+        json_response(['status' => 'error', 'recht' => 'personal_vertraulich_schreiben',
+            'message' => recht_fehlt_meldung('personal_vertraulich_schreiben')], 403);
     }
 }
 
