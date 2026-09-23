@@ -136,6 +136,13 @@ const BETREIBER_EBENE_ERLAUBT = [
   // brauchen dieselbe Datenbank aus demselben Grund.
   'demo_bestaetigen.php',
   'demo_erneut_senden.php',
+  // Der Ereignis-Feed der Uebersicht (ENT-685). Er fragt den Supportkanal
+  // mit, damit der Betrieb erfaehrt, dass der Betreiber geantwortet hat --
+  // bis dahin erfuhr er es gar nicht. Ausschliesslich LESEND und
+  // ausschliesslich ueber sv_mandant_bestimmen() und sv_kunde_ungelesen():
+  // keine eigene Abfrage, keine fremden Vorgaenge (ohne Zuordnung bleibt
+  // der Kanal aussen vor, nachgewiesen in test_support_abholen.mjs).
+  'dashboard_stats.php',
   // Der Weg zurueck nach dem Ablauf (ENT-634): Der Knopf aus der
   // Abschiedsmail traegt seinen Vermerk an genau derselben Zeile in
   // demo_zugang ein, die auch demo_bestaetigen.php angelegt hat. Er

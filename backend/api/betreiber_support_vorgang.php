@@ -34,6 +34,7 @@ require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../supportvorgang.php';
 require_once __DIR__ . '/../support.php';
 require_once __DIR__ . '/../support_sammeln.php';
+require_once __DIR__ . '/../mailer.php';
 
 $betreiber = require_betreiber_voll();
 $pdo = betreiber_db();
@@ -197,8 +198,27 @@ if ($neu === null) {
     json_response(['status' => 'error', 'message' => 'Diesen Vorgang gibt es nicht.'], 404);
 }
 
-// OHNE Zähler: Er zählt seit dem Abholweg über zwei Quellen (Stamm und
-// eigene Anlagen). Hier stünde nur die Hälfte davon, und eine halbe Zahl
-// ist schlechter als keine -- die Oberfläche lädt den Vorrat ohnehin neu.
+// Der Betrieb erfährt von der Antwort (ENT-685). Bis hierher erfuhr er sie
+// gar nicht -- er hätte von sich aus nachsehen müssen. Der Versand darf das
+// Antworten nicht scheitern lassen: Sie steht im Vorgang, sobald sie
+// geschrieben ist. Was mit der Post geschah, wird berichtet, nicht zur
+// Bedingung gemacht.
+$vorgang = sv_detail($ziel, $id);
+// DIE ADRESSE DES BETRIEBS, nicht die eigene: basis_url() zeigt hier auf
+// betreiber.guardops.ch -- ein Link dorthin führte den Kunden auf eine
+// Anmeldung, die ihm nicht gehört. Die Adresse steht im Mandantenstamm
+// (mandant_adresse); fehlt die Subdomain, geht die Mail ohne Link, statt
+// auf gut Glück irgendwohin zu verweisen.
+$ziffer = (int)($vorgang['mandant_id'] ?? 0);
+$adresse = null;
+if (hat_tabelle($pdo, 'mandant')) {
+    $sm = $pdo->prepare('SELECT subdomain FROM mandant WHERE id = ?');
+    $sm->execute([(int)($daten['mandant'] ?? 0) ?: $ziffer]);
+    $adresse = mandant_adresse((string)($sm->fetchColumn() ?: ''));
+}
+$post = sv_kunde_benachrichtigen($vorgang ?? [], trim((string)($betreiber['name'] ?? 'Support')),
+                                 $adresse);
+
 json_response(['status' => 'ok', 'id' => $id, 'neuer_status' => $neu,
-               'nachrichten' => sv_nachrichten($ziel, $id)]);
+               'nachrichten' => sv_nachrichten($ziel, $id),
+               'post' => $post['lage']]);
