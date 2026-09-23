@@ -228,6 +228,198 @@ function require_betreiber(): array
 // Bezug nachvollziehbar in den Daten, ohne dass der Wert selbst dort liegt.
 const BE_STATUS = ['aktiv', 'gesperrt', 'gekuendigt'];
 
+// Der vierte Zustand (ENT-686): eine vorbereitete Anlage im Vorrat, die noch
+// keinem Kunden gehoert.
+//
+// BEWUSST NICHT IN BE_STATUS. Diese Liste sagt, was der Betreiber von Hand
+// setzen darf (api/betreiber_mandant_status.php). "vorrat" darf er nicht: Ein
+// laufender Mandant, von Hand zurueck in den Vorrat gestellt, saehe aus wie
+// eine freie Anlage -- mit den Personaldaten eines Kunden darin. Zurueck in
+// den Vorrat kommt eine Anlage erst, wenn sie geleert ist (ENT-686,
+// Klaerung 6), und dieser Weg ist noch nicht gebaut. Hinein kommt sie nur
+// beim Anlegen, heraus nur durch Zuteilung auf "aktiv".
+const MANDANT_STATUS_VORRAT = 'vorrat';
+
+// EINE Stelle fuer die Frage, ob eine Mandantenzeile ein Kunde ist. Die
+// Listen, die ueber alle Mandanten laufen (Vertraege, Zaehlstand,
+// Support-Lage), fragen hier -- sonst lernt beim naechsten neuen Zustand
+// genau eine von ihnen ihn nicht.
+function mandant_ist_vorrat(array $m): bool
+{
+    return (string)($m['status'] ?? '') === MANDANT_STATUS_VORRAT;
+}
+
+// ── Der Mandanten-Vorrat: die reinen Teile (ENT-686/ENT-691) ──────────
+//
+// Befund je Anlage, Zusammenzaehlen, Meldetext und Zeitgeber-Schluessel --
+// alles ohne Verbindung zu einer Anlage. Die Schleife, die zu den
+// Vorratsanlagen VERBINDET, steht bewusst im Endpunkt
+// (api/betreiber_vorrat_pruefen.php): Dort sieht sie die Wache ueber die
+// mandant_db()-Aufrufer (test_betreiber.mjs), die betreiber.php selbst
+// ausnimmt, weil sie mandant_db() hier definiert.
+//
+// Bis zum Zusammenfuehren mit main (2026-09-23) stand das alles in einem
+// eigenen Modul backend/mandant_vorrat.php. Das brauchte je Buendel eine
+// Kopierzeile -- und im Hauptbuendel war dafuer kein Platz mehr: Der
+// Deploy-Schritt "Platzhalter durch echte Werte ersetzen" stand 9 Zeichen
+// unter der Grenze, ab der GitHub ihn komplett abweist. Hier, in einer
+// Datei, die jedes Buendel ohnehin traegt, braucht es keine Zeile.
+
+// Die Mandantenzeilen im Vorrat -- nur die Abfrage, ohne Verbindung. Rein
+// genug, um sie gegen SQLite zu pruefen: Der Status-Filter ist die Aussage,
+// dass kein Kunde in die Vorratspruefung geraet.
+function mandant_vorrat_zeilen(PDO $stamm): array
+{
+    $s = $stamm->prepare(
+        'SELECT id, name, status, db_host, db_name, db_user, secret_name
+           FROM mandant WHERE status = ? ORDER BY id'
+    );
+    $s->execute([MANDANT_STATUS_VORRAT]);
+    return $s->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+// Soll-Groesse und Meldeschwelle (ENT-686, Klaerung 5): drei Anlagen, und
+// gemeldet wird, sobald weniger als zwei wirklich uebergabefaehig sind. Dann
+// bleibt nach einem Vertragsabschluss Zeit fuer den Hoster-Schritt, bevor
+// der naechste kommt.
+const MANDANT_VORRAT_SOLL     = 3;
+const MANDANT_VORRAT_SCHWELLE = 2;
+
+// Wie es um EINE Vorratsanlage steht -- aus dem, was die Pruefung
+// herausgefunden hat. Rein, damit sich jede Lage mit frei gewaehlten Werten
+// pruefen laesst, ohne Datenbank.
+//
+// $verbindung: das Ergebnis von mandant_verbindung_bereit(), oder
+//              'fehlgeschlagen', wenn die Verbindung trotz "bereit" nicht
+//              zustande kam.
+// $luecken:    die Liste aus kern_schema_fehlend(), oder null, wenn gar
+//              nicht geprueft werden konnte.
+//
+// VIER AUSSAGEN, VIER TEXTE (Hausregel): nicht eingetragen, nicht
+// erreichbar, halb eingerichtet und bereit sind verschiedene Dinge -- und
+// verlangen verschiedene Handgriffe an verschiedenen Orten. Eine nicht
+// erreichbare Anlage ist ausdruecklich NICHT uebergabefaehig: Ob sie es
+// waere, wissen wir nicht, und "unbekannt" darf nie wie "bereit" aussehen.
+function mandant_vorrat_befund(string $verbindung, ?array $luecken): array
+{
+    if ($verbindung === 'standardverbindung' || $verbindung === 'unvollstaendig') {
+        return ['lage' => 'nicht_eingetragen', 'bereit' => false,
+                'text' => 'Datenbankangaben fehlen im Mandantenstamm'];
+    }
+    if ($verbindung === 'secret_fehlt') {
+        return ['lage' => 'secret_fehlt', 'bereit' => false,
+                'text' => 'Zugangsdaten fehlen im Deploy (MANDANT_SECRETS)'];
+    }
+    if ($verbindung !== 'bereit' || $luecken === null) {
+        return ['lage' => 'nicht_erreichbar', 'bereit' => false,
+                'text' => 'Datenbank nicht erreichbar'];
+    }
+    if ($luecken !== []) {
+        // Mit Zahl UND Beispielen, wie bei der Demo-Zuteilung: "unvollstaendig"
+        // allein sagt niemandem, ob eine Spalte fehlt oder die halbe Anlage.
+        return ['lage' => 'schema_unvollstaendig', 'bereit' => false,
+                'text' => 'Schema unvollständig — ' . count($luecken) . ' fehlende Stellen, darunter: '
+                        . implode(', ', array_slice($luecken, 0, 3))];
+    }
+    return ['lage' => 'bereit', 'bereit' => true, 'text' => 'übergabefähig'];
+}
+
+// Zaehlt aus den Einzelbefunden zusammen. Rein, aus demselben Grund wie
+// mandant_vorrat_befund().
+//
+// ZWEI ZAHLEN, NICHT EINE (Hausregel "Einheiten nie vermischen"):
+// "eingetragen" zaehlt Mandantenzeilen mit Status vorrat, "bereit" die davon,
+// die heute wirklich uebergeben werden koennten. Eine Anlage, die eingetragen
+// ist und nicht antwortet, gehoert zur ersten Zahl und nicht zur zweiten.
+function mandant_vorrat_zusammenfassen(array $plaetze): array
+{
+    $bereit = count(array_filter($plaetze, static fn(array $p): bool => $p['bereit']));
+    return [
+        'plaetze'     => $plaetze,
+        'eingetragen' => count($plaetze),
+        'bereit'      => $bereit,
+        'soll'        => MANDANT_VORRAT_SOLL,
+        'schwelle'    => MANDANT_VORRAT_SCHWELLE,
+        'zu_wenig'    => $bereit < MANDANT_VORRAT_SCHWELLE,
+    ];
+}
+
+// Die Nachricht an die Betreiber-Konten -- oder null, wenn nichts zu melden
+// ist. Rein: Ob gemeldet wird und was drinsteht, laesst sich so ohne
+// Mailserver pruefen.
+//
+// JEDEN TAG, SOLANGE ES SO BLEIBT (ENT-686, Festlegung vom 2026-09-23). Kein
+// gespeicherter Vermerk "schon gemeldet": Er koennte verloren gehen oder vom
+// tatsaechlichen Stand abweichen. Die Meldung hoert von selbst auf, sobald
+// wieder genug Anlagen bereit sind.
+function mandant_vorrat_meldung(array $lage): ?array
+{
+    if (!$lage['zu_wenig']) { return null; }
+
+    $bereit = (int)$lage['bereit'];
+    // "Keine Zahl ohne Bezug": "1" allein sagte nicht, ob von einer oder von
+    // drei. Darum immer mit dem, worauf sie sich bezieht.
+    $betreff = $bereit === 0
+        ? 'GuardOpS: Kein Mandanten-Vorrat übergabefähig'
+        : "GuardOpS: Nur noch $bereit Anlage im Vorrat übergabefähig";
+
+    $zeilen = [];
+    foreach ($lage['plaetze'] as $p) {
+        $zeilen[] = '- ' . $p['name'] . ': ' . $p['text'];
+    }
+    $liste = $zeilen === []
+        ? "Im Mandantenstamm ist keine Anlage mit Status „Vorrat\" eingetragen.\n"
+        : implode("\n", $zeilen) . "\n";
+
+    $text = "Übergabefähig: $bereit von {$lage['eingetragen']} eingetragenen Anlagen "
+          . "(Soll: {$lage['soll']}, Meldung unter {$lage['schwelle']}).\n\n"
+          . $liste . "\n"
+          . "Solange das so bleibt, kommt diese Nachricht jeden Tag. Sie hört von selbst auf, "
+          . "sobald wieder genug Anlagen übergabefähig sind.\n\n"
+          . "Nachfüllen: Datenbank beim Hoster anlegen, Zugang in MANDANT_SECRETS eintragen, "
+          . "Anlage im Betreiber-Bereich mit Status „Vorrat\" erfassen und die Einrichtung laufen lassen.";
+
+    return ['betreff' => $betreff, 'text' => $text];
+}
+
+// Prueft den Zeitgeber-Schluessel. Dieselbe Bauart wie
+// demo_ablauf_zeitgeber_lage(), mit eigenem Platzhalter: Ein unersetzter
+// Platzhalter heisst "nicht eingerichtet", nicht "falscher Schluessel" --
+// sonst waere der Endpunkt in jedem Buendel ohne Schluessel fuer jeden offen,
+// der den Platzhaltertext kennt.
+function mandant_vorrat_zeitgeber_lage(string $erwartet, string $mitgegeben): string
+{
+    if ($erwartet === '' || str_starts_with($erwartet, '__')) { return 'nicht_eingerichtet'; }
+    if ($mitgegeben === '') { return 'kein_schluessel_in_der_adresse'; }
+    return hash_equals($erwartet, $mitgegeben) ? 'ok' : 'falscher_schluessel';
+}
+
+// Kennt die Mandantentabelle den Status "vorrat" schon? Er kommt ueber einen
+// Nachtrag (be_auswahlwerte in betreiber.php). Solange der nicht gelaufen
+// ist, kann keine Anlage im Vorrat stehen -- und das ist "nicht
+// eingerichtet", nicht "Vorrat leer".
+//
+// STEHT HIER, in betreiber.php: Auch der Anlegeweg braucht sie, und er
+// verbindet zu keiner Mandantendatenbank.
+//
+// GEFRAGT WIRD DIE DATENBANK SELBST, wie in be_auswahlwerte_nachtragen():
+// Ob der Wert erlaubt ist, weiss sie, und ein Merker daneben koennte von ihr
+// abweichen. Auf den Wert IN ANFUEHRUNGSZEICHEN geprueft, damit kein
+// laengerer Wert, der "vorrat" enthaelt, als Treffer durchgeht.
+function mandant_vorrat_status_da(PDO $stamm): bool
+{
+    try {
+        $s = $stamm->prepare(
+            "SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mandant' AND COLUMN_NAME = 'status'"
+        );
+        $s->execute();
+        return str_contains((string)($s->fetchColumn() ?: ''), "'" . MANDANT_STATUS_VORRAT . "'");
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
 function be_mandant_status_gueltig(string $status): bool
 {
     return in_array($status, BE_STATUS, true);
@@ -454,6 +646,137 @@ function be_einladung_konto(PDO $pdo, string $tokenRoh): ?array
     $s->execute([hash('sha256', $tokenRoh)]);
     $r = $s->fetch(PDO::FETCH_ASSOC);
     return $r === false ? null : $r;
+}
+
+// ── Einladung eines Mandanten (ENT-686) ───────────────────────────────
+//
+// SIEBEN TAGE, nicht die 48 Stunden der Betreiber-Ebene daneben. Der
+// Empfaenger sitzt nicht im Haus: Er ist die benannte Person eines Kunden,
+// bei dem gerade ein Vertrag zustande gekommen ist. Eine Frist, die den
+// ersten Versuch regelmaessig verfallen laesst, macht aus der Uebergabe
+// wieder Handarbeit -- und Handarbeit ist der Befund, der diesen Weg
+// ausgeloest hat.
+const MANDANT_EINLADUNG_TAGE = 7;
+
+function mandant_einladung_tabelle_da(PDO $pdo): bool
+{
+    return hat_tabelle($pdo, 'mandant_einladung');
+}
+
+// Sucht die offene Einladung zu einem rohen Token -- oder gibt null zurueck.
+//
+// ABGELAUFEN, EINGELOEST UND ERFUNDEN SIND HIER DASSELBE: alle drei geben
+// null, wie bei be_einladung_konto() daneben. Der Aufrufer darf sie nicht
+// verschieden beantworten -- "abgelaufen" bestaetigte, dass es diesen Link
+// einmal gab.
+//
+// Die Frist wird in der DATENBANK verglichen (NOW()), nicht in PHP: Sonst
+// entschiede die Uhr des Webservers, und Betreiber-Datenbank und Webserver
+// sind zwei verschiedene Uhren (OP-518).
+//
+// MITGELESEN WIRD DIE GANZE MANDANTENZEILE, weil der Aufrufer sie ohnehin
+// braucht: Ohne `db_host`/`db_name`/`secret_name` kaeme er nicht an die
+// Anlage, in der das Konto entstehen soll. Ein zweiter Aufruf waere ein
+// zweiter Ort, an dem dieselbe Zeile gesucht wird.
+function mandant_einladung_zu_token(PDO $pdo, string $tokenRoh): ?array
+{
+    if ($tokenRoh === '' || !mandant_einladung_tabelle_da($pdo)) { return null; }
+    $s = $pdo->prepare(
+        'SELECT e.mandant_id, e.anrede, e.vorname, e.nachname, e.email,
+                e.gueltig_bis, m.name AS mandant_name, m.status AS mandant_status,
+                m.subdomain, m.db_host, m.db_name, m.db_user, m.secret_name
+           FROM mandant_einladung e
+           JOIN mandant m ON m.id = e.mandant_id
+          WHERE e.token = ? AND e.eingeloest_am IS NULL AND e.gueltig_bis > NOW()'
+    );
+    $s->execute([hash('sha256', $tokenRoh)]);
+    $r = $s->fetch(PDO::FETCH_ASSOC);
+    return $r === false ? null : $r;
+}
+
+// Die Einladung beanspruchen: setzt `eingeloest_am`, aber nur, wenn sie noch
+// offen ist -- und meldet, ob das gelungen ist.
+//
+// WARUM NICHT EINFACH EIN UPDATE: Zwei gleichzeitige Aufrufe mit demselben
+// Link wuerden sonst beide durchkommen und beide ein Erstkonto anlegen.
+// "WHERE eingeloest_am IS NULL" macht daraus einen Wettlauf, den genau einer
+// gewinnt -- dasselbe Mittel wie `erinnert_am` beim Supportvorgang.
+//
+// DAS KONTO ENTSTEHT IN EINER ANDEREN DATENBANK, und zwei Datenbanken haben
+// keine gemeinsame Transaktion. Darum diese Reihenfolge: erst beansprucht,
+// dann angelegt, und scheitert das Anlegen, gibt der Aufrufer die Einladung
+// mit mandant_einladung_freigeben() wieder frei. Umgekehrt waere schlimmer:
+// Dann entstuende das Konto, und der Link blieb gueltig.
+function mandant_einladung_beanspruchen(PDO $pdo, int $mandantId): bool
+{
+    $s = $pdo->prepare(
+        'UPDATE mandant_einladung SET eingeloest_am = NOW()
+          WHERE mandant_id = ? AND eingeloest_am IS NULL'
+    );
+    $s->execute([$mandantId]);
+    return $s->rowCount() === 1;
+}
+
+// Wann die Uebergabe dieser Anlage stattgefunden hat -- oder null, wenn
+// nicht (keine Einladung, oder eine noch offene).
+//
+// WOZU: Der Ausstellweg muss wissen, ob diese Anlage schon uebergeben ist.
+// Er koennte dazu in der Anlage selbst nachzaehlen, wieviele Menschen in
+// `mitarbeiter` stehen -- genau das tut der Einloeseweg. Ein
+// betreiber_*-Endpunkt darf das NICHT: Die Trennung der Ebenen verbietet
+// ihm die Verwaltungstabellen, und test_betreiber.mjs setzt es durch. Der
+// Vermerk hier ist die richtige Quelle fuer diese Frage, und es ist
+// derselbe, aus dem die Liste spaeter den Uebergabestand liest.
+//
+// WAS ER NICHT WEISS: Eine Anlage, die vor ENT-686 ueber backend/setup.php
+// uebergeben wurde, hat hier keine Zeile. Fuer sie sagt diese Funktion
+// "nicht uebergeben", und aufgehalten wird sie erst beim Einloesen, das in
+// der Anlage selbst nachsieht. Das ist die Reihenfolge der beiden Sperren
+// und keine Luecke: Ein Konto entsteht dabei nie doppelt.
+function mandant_einladung_eingeloest_am(PDO $pdo, int $mandantId): ?string
+{
+    if (!mandant_einladung_tabelle_da($pdo)) { return null; }
+    $s = $pdo->prepare('SELECT eingeloest_am FROM mandant_einladung WHERE mandant_id = ?');
+    $s->execute([$mandantId]);
+    $w = $s->fetchColumn();
+    return ($w === false || $w === null || $w === '') ? null : (string)$w;
+}
+
+// Der Uebergabestand eines Mandanten fuer die Liste (ENT-686, Klaerung 7).
+//
+// VIER AUSSAGEN, VIER LAGEN (Hausregel) -- und die vierte heisst bewusst
+// "keine" und NICHT "nicht uebergeben": Eine Anlage, die vor ENT-686 ueber
+// setup.php uebergeben wurde, hat hier keine Zeile und trotzdem ein
+// Verwaltungskonto. Ob in einer Anlage jemand arbeitet, darf die
+// Betreiber-Ebene nicht nachsehen. Wir wissen nur, was in unseren Buechern
+// steht (Festlegung vom 2026-09-23: "keine Einladung erfasst").
+//
+// Rein: $e ist die Zeile aus mandant_einladung mitsamt `noch_gueltig`, das
+// die DATENBANK rechnet (gueltig_bis > NOW()) -- dieselbe Uhr, die auch das
+// Einloesen fragt, nicht die des Webservers.
+function mandant_uebergabe_lage(?array $e): array
+{
+    if ($e === null) { return ['lage' => 'keine', 'datum' => null]; }
+    $tag = static fn($w): ?string => ($w === null || $w === '') ? null : substr((string)$w, 0, 10);
+    if ($tag($e['eingeloest_am'] ?? null) !== null) {
+        return ['lage' => 'eingeloest', 'datum' => $tag($e['eingeloest_am'])];
+    }
+    // Offen ist sie, solange die Datenbank sie fuer gueltig haelt. Dieselbe
+    // Frage wie beim Einloesen -- sonst zeigte die Liste "offen" fuer einen
+    // Link, der schon abgewiesen wird.
+    return (int)($e['noch_gueltig'] ?? 0) === 1
+        ? ['lage' => 'offen',        'datum' => $tag($e['gueltig_bis'] ?? null)]
+        : ['lage' => 'ueberfaellig', 'datum' => $tag($e['gueltig_bis'] ?? null)];
+}
+
+// Die Gegenbuchung zu mandant_einladung_beanspruchen(), wenn das Anlegen in
+// der Anlage scheitert. Ohne sie waere die Einladung verbraucht und niemand
+// haette ein Konto -- der Kunde stuende vor einem toten Link, und beim
+// Betreiber stuende "eingeloest".
+function mandant_einladung_freigeben(PDO $pdo, int $mandantId): void
+{
+    $pdo->prepare('UPDATE mandant_einladung SET eingeloest_am = NULL WHERE mandant_id = ?')
+        ->execute([$mandantId]);
 }
 
 // ── Mandant: was von aussen geschrieben werden darf ───────────────────
@@ -1241,7 +1564,9 @@ function be_tabellen(): array
   -- Datenbankangaben zu finden. Leer, solange ein Mandant noch unter der
   -- geteilten Testadresse laeuft.
   subdomain VARCHAR(100) NOT NULL DEFAULT '',
-  status ENUM('aktiv','gesperrt','gekuendigt') NOT NULL DEFAULT 'aktiv',
+  -- 'vorrat' (ENT-686): eine vorbereitete Anlage, die noch keinem Kunden
+  -- gehoert. Datenbank, Schema und Secret stehen, Adresse und Kunde nicht.
+  status ENUM('aktiv','gesperrt','gekuendigt','vorrat') NOT NULL DEFAULT 'aktiv',
   kanton CHAR(2) NULL,
   vertrag_beginn DATE NULL,
   mindestlaufzeit_monate INT NULL,
@@ -1319,6 +1644,58 @@ function be_tabellen(): array
   erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   erstellt_von INT UNSIGNED NOT NULL,
   UNIQUE KEY uq_be_einladung_token (token)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// ── Einladung eines MANDANTEN (ENT-686) ───────────────────────────────
+//
+// Das Erstkonto eines Mandanten entsteht kuenftig hierueber und nicht mehr
+// ueber backend/setup.php -- eine Datei, die von Hand per FTP hochgeladen,
+// einmal aufgerufen und wieder geloescht wurde. Wer das tat, kannte das
+// Passwort des Kunden, und im System stand nirgends, dass die Uebergabe
+// stattgefunden hat.
+//
+// WARUM DIE ZEILE HIER LIEGT UND NICHT IN DER ANLAGE DES MANDANTEN
+// (ENT-686, Klaerung 1): Dieselbe Ueberlegung wie bei `support_vorgang`
+// weiter unten. Der Betreiber braucht EINE Liste ueber alle Mandanten, und
+// eine nicht erreichbare Mandantendatenbank wuerde sonst lautlos aus ihr
+// herausfallen. Beim Uebergabestand wiegt das schwerer als beim Support:
+// Die Anlage, deren Datenbank klemmt, ist genau die, die man sehen muss.
+// Ein Platz im Vorrat kennt dadurch weiterhin niemanden.
+//
+// EINE ZEILE JE MANDANT, darum `mandant_id` als Schluessel. Neu ausstellen
+// ueberschreibt Token und Frist -- der alte Link ist damit sofort ungueltig,
+// und genau das ist entschieden (ENT-686, Klaerung 2: neu ausstellen, nicht
+// verlaengern). Preis dieser Bauart: Eine zweite Uebergabe derselben Anlage
+// ueberschreibt den Vermerk der ersten. Die Liste soll den heutigen Stand
+// zeigen, nicht die Geschichte; wer die Geschichte braucht, findet sie im
+// Logbuch, das beide Male schreibt.
+//
+// `eingeloest_am` BLEIBT STEHEN, anders als bei `betreiber_einladung`, wo
+// die Zeile beim Einloesen geloescht wird. Der Grund dort -- der Zustand
+// stehe ohnehin in `betreiber.aktiv`, und zwei Orte laufen auseinander --
+// traegt hier nicht: Das Konto entsteht in einer ANDEREN Datenbank. Wird die
+// Zeile geloescht, gibt es in der Betreiber-Datenbank keine Stelle mehr, an
+// der steht, dass die Uebergabe stattgefunden hat. Genau das war der Befund.
+//
+// NULL statt eines Ja/Nein-Merkers, wie `erinnert_am` beim Supportvorgang:
+// Es beantwortet zusaetzlich die Frage, WANN -- und es ist die Sperre gegen
+// doppeltes Einloesen, gesetzt mit "WHERE eingeloest_am IS NULL".
+//
+// Die benannte Person steht HIER und nicht am Mandanten: Sie gehoert zu
+// dieser Uebergabe. Wer die Anlage spaeter verwaltet, steht danach in
+// `mitarbeiter` der Anlage selbst.
+'mandant_einladung' => "CREATE TABLE IF NOT EXISTS mandant_einladung (
+  mandant_id INT UNSIGNED NOT NULL PRIMARY KEY,
+  token CHAR(64) NOT NULL,
+  anrede VARCHAR(20) NOT NULL DEFAULT '',
+  vorname VARCHAR(100) NOT NULL DEFAULT '',
+  nachname VARCHAR(100) NOT NULL,
+  email VARCHAR(200) NOT NULL,
+  gueltig_bis DATETIME NOT NULL,
+  erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  erstellt_von INT UNSIGNED NOT NULL,
+  eingeloest_am DATETIME NULL,
+  UNIQUE KEY uq_mandant_einladung_token (token)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
 // ── Supportvorgaenge (ENT-538) ────────────────────────────────────────
@@ -1993,6 +2370,11 @@ function be_auswahlwerte(): array
          "ALTER TABLE be_belege MODIFY COLUMN status "
          . "ENUM('entwurf','versendet','angeschaut','aenderung','bestaetigt','abgelehnt') "
          . "NOT NULL DEFAULT 'entwurf'"],
+        // Der Vorrat vorbereiteter Anlagen (ENT-686). Die vollstaendige
+        // Aufzaehlung muss mit der CREATE-TABLE-Fassung oben uebereinstimmen.
+        ['mandant', 'status', 'vorrat',
+         "ALTER TABLE mandant MODIFY COLUMN status "
+         . "ENUM('aktiv','gesperrt','gekuendigt','vorrat') NOT NULL DEFAULT 'aktiv'"],
         // Die dritte Belegart (ENT-637).
         ['be_belege', 'art', 'vertrag',
          "ALTER TABLE be_belege MODIFY COLUMN art "

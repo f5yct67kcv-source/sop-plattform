@@ -30,6 +30,22 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 8,
+            'datum' => '2026-09-23',
+            'art'   => 'neu',
+            'fuer'  => ['betreiber'],
+            'titel' => 'Zugang per Einladung, Zeilen zum Ausklappen',
+            'text'  => 'Den ersten Zugang eines Betriebs gibt es jetzt per Einladungslink an eine benannte Person, sieben Tage gültig. Unter „Einrichtung“ steht, ob die Einladung offen, eingelöst oder abgelaufen ist. Die Knöpfe in den Tabellen liegen neu in der ausgeklappten Zeile – ein Klick auf die Zeile öffnet sie.',
+        ],
+        [
+            'nr'    => 7,
+            'datum' => '2026-09-23',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit', 'betreiber'],
+            'titel' => 'Verlauf an jeder Offerte',
+            'text'  => 'Unter dem Formular steht jetzt, wer die Offerte wann gesendet oder geändert hat und was der Empfänger getan hat: Code angefordert, angenommen, abgelehnt, Änderungswunsch.',
+        ],
+        [
             'nr'    => 6,
             'datum' => '2026-09-23',
             'art'   => 'fehlerbehebung',

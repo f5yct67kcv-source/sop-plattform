@@ -68,7 +68,20 @@ try {
     $fassung = null;
 }
 
+$fadenDa = be_beleg_nachricht_tabelle_da($pdo);
+$nachrichten = be_beleg_nachrichten($pdo, $id);
+
+// Der Verlauf (ENT-697), mit dem Faden als einer seiner Quellen. Scheitert
+// er, fehlt er ganz (null) -- die Karte sagt dann "nicht abrufbar" statt
+// "nichts passiert".
+try {
+    $verlauf = beleg_verlauf($pdo, $beleg, 'be_', $fadenDa ? $nachrichten : null);
+} catch (Throwable $e) {
+    $verlauf = null;
+}
+
 json_response(['status' => 'ok', 'beleg' => $beleg, 'kunde' => $kunde, 'person' => $person,
     'fassung' => $fassung,
-    'faden_da' => be_beleg_nachricht_tabelle_da($pdo),
-    'nachrichten' => be_beleg_nachrichten($pdo, $id)]);
+    'faden_da' => $fadenDa,
+    'nachrichten' => $nachrichten,
+    'verlauf' => $verlauf]);

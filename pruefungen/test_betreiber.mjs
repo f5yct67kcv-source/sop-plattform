@@ -524,7 +524,16 @@ check('KRITISCH: der Code wird vor der Sitzung geprueft, nicht danach',
 // Liste statt eines Verzeichnis-Scans: Diese beiden Dateinamen sind fest,
 // kein Muster.
 const OEFFENTLICHE_DEMO_ENDPUNKTE = ['demo_anfordern.php', 'demo_erneut_senden.php'];
-const endpunkteMitOeffentlicherDemo = [...endpunkte, ...OEFFENTLICHE_DEMO_ENDPUNKTE];
+// Dieselbe Ueberlegung eine Ebene tiefer (ENT-686): Der Einloeseweg der
+// Mandanten-Uebergabe verbindet zur Anlage des Mandanten -- dort MUSS das
+// erste Konto entstehen -- und laeuft ohne Anmeldung. Ohne diesen Eintrag
+// saehe die Wache unten ihn nicht, und die wichtigste Regel des Hauses
+// haette still aufgehoert zu gelten, fuer etwas Neues, das sie nicht geerbt
+// hat. Genau diese Sorte Luecke ist hier schon mehrfach entstanden.
+const OEFFENTLICHE_UEBERGABE_ENDPUNKTE = ['mandant_einladung_pruefen.php',
+                                          'mandant_einladung_einloesen.php'];
+const endpunkteMitOeffentlicherDemo = [...endpunkte, ...OEFFENTLICHE_DEMO_ENDPUNKTE,
+                                       ...OEFFENTLICHE_UEBERGABE_ENDPUNKTE];
 
 const MANDANT_VERBINDER = /mandant_db\s*\(|mandant_stand\s*\(/;
 
@@ -609,6 +618,36 @@ const DARF_VERBINDEN = {
   // nie eingetragen, weil die Wache ihn bis heute nicht sah. Kein neuer
   // Zugriff, nur ein bisher unsichtbarer.
   'betreiber_demo_erneut.php':     'setzt das Passwort einer Demo-Instanz zurueck (ENT-649)',
+  // ENT-686: die Uebergabe eines Mandantenkontos. Beide ersetzen
+  // backend/setup.php -- eine Datei, die von Hand per FTP hochgeladen und
+  // wieder geloescht wurde, damit dort genau das entstehen konnte, was diese
+  // beiden jetzt tun.
+  //
+  // KEINE BETRIEBSDATEN. Gelesen wird der BAUPLAN der Anlage
+  // (kern_schema_fehlend) und die ANZAHL der Menschen in `mitarbeiter`, kein
+  // einziges Feld daraus. Geschrieben wird beim Einloesen genau eine Zeile:
+  // das erste Verwaltungskonto einer Anlage, in der noch niemand steht --
+  // von der eingeladenen Person selbst, nicht vom Betreiber. Der Einblick in
+  // eine Anlage haengt unveraendert an betreiber_support.php mit Freigabe
+  // und Protokoll.
+  //
+  // WARUM DAS AUSSTELLEN VERBINDET: Es prueft, ob die Anlage wirklich
+  // uebergabefaehig ist, BEVOR der Link hinausgeht -- die Lehre aus demo6
+  // und demo8, wo alle Tabellen da waren und die nachtraeglichen Spalten
+  // fehlten. Ein Link auf eine halbe Anlage geht an einen zahlenden Kunden.
+  //
+  // Nachgewiesen in test_mandant_einladung.mjs: Beide fassen ausschliesslich
+  // `mitarbeiter` an, und der Einloeseweg nur, solange dort kein Mensch steht.
+  'betreiber_mandant_einladen.php':   'prueft die Anlage vor dem Versand, legt nichts an (ENT-686)',
+  'mandant_einladung_einloesen.php':  'legt das Erstkonto in der leeren Anlage an, ohne Anmeldung (ENT-686)',
+  // ENT-686: die taegliche Pruefung des Vorrats. Verbindet in EIGENER Zeile
+  // (mandant_db im Endpunkt), damit diese Wache sie sieht -- die reinen
+  // Teile liegen in betreiber.php, das mandant_db() definiert und darum
+  // ausgenommen ist. Gelesen wird ausschliesslich der Bauplan jeder
+  // Vorratsanlage (kern_schema_fehlend), keine Verwaltungstabelle; die
+  // Anlagen gehoeren noch keinem Kunden. Nachgewiesen in
+  // test_mandant_vorrat.mjs.
+  'betreiber_vorrat_pruefen.php':     'prueft Erreichbarkeit und Bauplan jeder Vorratsanlage (ENT-686)',
 };
 const heimlich = nutztMandantDb.filter(f => !DARF_VERBINDEN[f]);
 check('KRITISCH: nur namentlich genannte Endpunkte verbinden zu einer Mandantendatenbank',

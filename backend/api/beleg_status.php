@@ -13,6 +13,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../belege.php';
+require_once __DIR__ . '/../logbuch.php';
 
 $user = require_session();
 require_recht($user, 'offerten_schreiben');
@@ -47,5 +48,10 @@ if (beleg_gesperrt($zeile) && $neu !== $alt) {
 }
 
 $pdo->prepare('UPDATE belege SET status = ? WHERE id = ?')->execute([$neu, $id]);
+
+// Verlauf (ENT-697), gleiche Zeile wie im Betreiber-Bereich.
+if ($neu !== $alt) {
+    logbuch_schreiben($pdo, $user, 'beleg', $id, 'status', $alt, $neu);
+}
 
 json_response(['status' => 'ok', 'alter_status' => $alt, 'neuer_status' => $neu]);

@@ -1026,6 +1026,15 @@ const OHNE_ANMELDUNG = [
   // Zwei-Faktor-Pflicht. Eigene Pruefung: test_betreiber_einladung.mjs.
   'betreiber_einladung_pruefen.php',
   'betreiber_einladung_einloesen.php',
+  // Die Uebergabe eines Mandantenkontos (ENT-686). Ersetzt backend/setup.php:
+  // Wer eingeladen ist, hat noch keinen Zugang -- der Ausweis ist der Token,
+  // und er liegt als Abdruck in der Betreiber-Datenbank (ENT-501). Das
+  // Einloesen legt das erste Verwaltungskonto der Anlage an und meldet
+  // ausdruecklich NICHT an; danach fuehrt der gewoehnliche Weg ueber
+  // login.php. Eigene Bremse unter dem Namensraum "ma-uebergabe:". Eigene
+  // Pruefung: test_mandant_einladung.mjs.
+  'mandant_einladung_pruefen.php',
+  'mandant_einladung_einloesen.php',
   // Die drei Eingaenge des Kundenportals -- stehen zusaetzlich in
   // PORTAL_EINGAENGE weiter unten, weil dort die Portal-Regel greift.
   'portal_anmelden.php',

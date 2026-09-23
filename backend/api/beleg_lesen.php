@@ -10,6 +10,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../belege.php';
 require __DIR__ . '/../kunden.php';
+require_once __DIR__ . '/../logbuch.php';
 
 $user = require_session();
 require_recht($user, 'offerten_lesen');
@@ -53,5 +54,13 @@ try {
     $fassung = null;
 }
 
+// Der Verlauf (ENT-697). Scheitert er, fehlt er ganz (null) -- die Karte
+// sagt dann "nicht abrufbar" statt "nichts passiert".
+try {
+    $verlauf = beleg_verlauf($pdo, $beleg, '');
+} catch (Throwable $e) {
+    $verlauf = null;
+}
+
 json_response(['status' => 'ok', 'beleg' => $beleg, 'kunde' => $kunde, 'person' => $person,
-    'fassung' => $fassung]);
+    'fassung' => $fassung, 'verlauf' => $verlauf]);

@@ -10,6 +10,7 @@
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
+require_once __DIR__ . '/../logbuch.php';
 
 $user = require_session();
 require_recht($user, 'offerten_schreiben');
@@ -25,13 +26,20 @@ if ($id <= 0) {
 }
 
 $pdo = db();
-$chk = $pdo->prepare('SELECT id FROM belege WHERE id = ?');
+$chk = $pdo->prepare('SELECT id, bezahlt FROM belege WHERE id = ?');
 $chk->execute([$id]);
-if (!$chk->fetch()) {
+$vorher = $chk->fetch();
+if (!$vorher) {
     json_response(['status' => 'error', 'message' => 'Beleg nicht gefunden'], 404);
 }
 $bezahltAm = $bezahlt ? date('Y-m-d') : null;
 $pdo->prepare('UPDATE belege SET bezahlt = ?, bezahlt_am = ? WHERE id = ?')
     ->execute([$bezahlt, $bezahltAm, $id]);
+
+// Verlauf (ENT-697), gleiche Zeile wie im Betreiber-Bereich.
+if ((int)$vorher['bezahlt'] !== $bezahlt) {
+    logbuch_schreiben($pdo, $user, 'beleg', $id, 'bezahlt',
+        $bezahlt ? 'offen' : 'bezahlt', $bezahlt ? 'bezahlt am ' . $bezahltAm : 'offen');
+}
 
 json_response(['status' => 'ok', 'bezahlt' => $bezahlt, 'bezahlt_am' => $bezahltAm]);

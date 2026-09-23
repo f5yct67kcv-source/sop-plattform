@@ -40,9 +40,33 @@ if (!$alt) {
     json_response(['status' => 'error', 'message' => 'Diesen Mandanten gibt es nicht.'], 404);
 }
 
+// ── Der Vorrat (ENT-686) ──────────────────────────────────────────────
+//
+// HINEIN NIE VON HAND: "vorrat" steht nicht in BE_STATUS und faellt darum
+// schon oben durch. Ein laufender Mandant, von Hand in den Vorrat gestellt,
+// saehe aus wie eine freie Anlage -- mit den Personaldaten eines Kunden
+// darin, bereit zur Uebergabe an den naechsten. Zurueck in den Vorrat kommt
+// eine Anlage erst, wenn sie geleert ist (ENT-686, Klaerung 6).
+//
+// HERAUS NUR AUF "AKTIV": Das ist die Zuteilung. Eine Vorratsanlage zu
+// sperren oder zu kuendigen ergibt keinen Sinn -- es gibt keinen Vertrag und
+// keinen Kunden, dem das gaelte.
+if ((string)$alt['status'] === MANDANT_STATUS_VORRAT && $status !== 'aktiv') {
+    json_response(['status' => 'error',
+        'message' => 'Diese Anlage liegt im Vorrat und gehört noch keinem Kunden. '
+                   . 'Sie wird aktiv, indem sie einem Kunden zugeteilt wird — '
+                   . 'sperren oder kündigen lässt sie sich nicht.'], 409);
+}
+
 $stmt = $pdo->prepare('UPDATE mandant SET status = ?, geaendert_am = NOW() WHERE id = ?');
 $stmt->execute([$status, $id]);
 
 be_log($pdo, $ich, 'mandant', $id, 'status', (string)$alt['status'], $status);
+// Die Zuteilung bekommt einen eigenen Eintrag: "status: vorrat -> aktiv"
+// ist richtig, aber wer spaeter nachsieht, sucht nach dem Moment, in dem
+// eine Anlage einem Kunden uebergeben wurde, nicht nach einem Statuswechsel.
+if ((string)$alt['status'] === MANDANT_STATUS_VORRAT) {
+    be_log($pdo, $ich, 'mandant', $id, 'aus dem Vorrat zugeteilt', null, (string)$alt['name']);
+}
 
 json_response(['status' => 'ok', 'id' => $id, 'neuer_status' => $status]);

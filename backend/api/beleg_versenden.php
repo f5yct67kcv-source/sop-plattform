@@ -11,6 +11,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../belege.php';
+require_once __DIR__ . '/../logbuch.php';
 require __DIR__ . '/../mailer.php';
 
 $user = require_session();
@@ -174,6 +175,7 @@ try {
 if ($naechste['neu'] && $abbild !== null) {
     beleg_fassung_anlegen($pdo, $id, $abbild, 'versand', (string)($user['name'] ?? ''), '', $freigabe,
         isset($user['id']) ? (int)$user['id'] : null);
+    logbuch_schreiben($pdo, $user, 'beleg', $id, 'fassung', null, 'Fassung ' . $fassungNr);
 }
 
 // Eine bereits getroffene Kundenentscheidung wird durch einen erneuten
@@ -186,9 +188,14 @@ if ($naechste['neu'] && !$gesperrt && !empty($beleg['entscheidung_am'])) {
     $pdo->prepare('UPDATE belege SET status = ?, entscheidung_am = NULL, entscheidung_ip = NULL'
         . (hat_spalte($pdo, 'belege', 'entscheidung_fassung') ? ', entscheidung_fassung = NULL' : '')
         . ' WHERE id = ?')->execute(['versendet', $id]);
+    logbuch_schreiben($pdo, $user, 'beleg', $id, 'status', $alt, 'versendet');
 } elseif (!in_array($alt, ['bestaetigt', 'abgelehnt'], true)) {
     $pdo->prepare('UPDATE belege SET status = ? WHERE id = ?')->execute(['versendet', $id]);
 }
+
+// Der Versand selbst ist der Eintrag (ENT-697), mit Adresse -- wie im
+// Betreiber-Bereich: "verschickt" ohne Empfaenger beantwortet nichts.
+logbuch_schreiben($pdo, $user, 'beleg', $id, 'versendet', null, $anEmail);
 
 json_response(['status' => 'ok', 'link' => $link, 'fassung' => $fassungNr,
     'neue_fassung' => (bool)$naechste['neu']]);

@@ -1385,6 +1385,22 @@ jobs:
           # CORS-Kopfzeile, und der Interessent sieht nur "Die Verbindung
           # ist abgebrochen".
           cp backend/api/demo_weiter.php        dist-betreiber/api/demo_weiter.php
+          # Die Uebergabe eines Mandantenkontos (ENT-686): kein
+          # betreiber_-Praefix, weil beide ausdruecklich OHNE Anmeldung
+          # laufen -- wer eingeladen ist, hat noch keinen Zugang. Der
+          # Wildcard weiter oben faengt sie darum nicht ein.
+          #
+          # NICHT in OEFFENTLICHE_DEMO_SKRIPTE (backend/db.php), und das ist
+          # Absicht: Diese Liste erlaubt einen FREMDEN Ursprung
+          # (guardops.ch). Der Uebergabe-Link fuehrt auf den
+          # Betreiber-Bereich selbst, ist also same-origin und braucht das
+          # nicht -- ein Eintrag dort waere eine Ausweitung ohne Anlass.
+          # Dass die Zeilen hier stehen, prueft test_deploy.mjs eigens; die
+          # Falle ist dieselbe wie bei demo_bestaetigen.php: Fehlt die
+          # Datei, antwortet Apache mit 404, und der Kunde sieht nur, dass
+          # etwas abgebrochen ist.
+          cp backend/api/mandant_einladung_pruefen.php   dist-betreiber/api/mandant_einladung_pruefen.php
+          cp backend/api/mandant_einladung_einloesen.php dist-betreiber/api/mandant_einladung_einloesen.php
           cp htaccess-betreiber        dist-betreiber/.htaccess
           cp robots-betreiber.txt      dist-betreiber/robots.txt
 
@@ -1504,6 +1520,14 @@ jobs:
           # (api/betreiber_demo_ablauf.php). Derselbe Wert wie beim
           # naechtlichen Demo-Reset -- es ist derselbe Cron-Dienst.
           sed -i "s|__DEMO_ABLAUF_TOKEN__|$EFF_DEMO_ABLAUF_TOKEN|g" dist-betreiber/api/betreiber_demo_ablauf.php
+          # Die taegliche Pruefung des Mandanten-Vorrats (ENT-686,
+          # api/betreiber_vorrat_pruefen.php). Derselbe Schluessel wie beim
+          # Demo-Ablauf darueber -- es ist derselbe Cron-Dienst beim Hoster,
+          # und ein zweites Secret waere ein zweiter Wert, der von Hand
+          # gleich gehalten werden muss. Der Endpunkt liest nur den Stand
+          # und schreibt Post an die Betreiber-Konten; mehr oeffnet der
+          # Schluessel dort nicht.
+          sed -i "s|__VORRAT_ZEITGEBER_TOKEN__|$EFF_DEMO_ABLAUF_TOKEN|g" dist-betreiber/api/betreiber_vorrat_pruefen.php
           # Die Deploy-Geheimnisse der einzelnen Mandanten-Datenbanken
           # (OP-526, mandant_secret() in backend/betreiber.php) -- als
           # base64(JSON), nicht als rohes JSON, siehe Begruendung bei
