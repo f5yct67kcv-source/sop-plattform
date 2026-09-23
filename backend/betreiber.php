@@ -599,6 +599,33 @@ function mandant_einladung_eingeloest_am(PDO $pdo, int $mandantId): ?string
     return ($w === false || $w === null || $w === '') ? null : (string)$w;
 }
 
+// Der Uebergabestand eines Mandanten fuer die Liste (ENT-686, Klaerung 7).
+//
+// VIER AUSSAGEN, VIER LAGEN (Hausregel) -- und die vierte heisst bewusst
+// "keine" und NICHT "nicht uebergeben": Eine Anlage, die vor ENT-686 ueber
+// setup.php uebergeben wurde, hat hier keine Zeile und trotzdem ein
+// Verwaltungskonto. Ob in einer Anlage jemand arbeitet, darf die
+// Betreiber-Ebene nicht nachsehen. Wir wissen nur, was in unseren Buechern
+// steht (Festlegung vom 2026-09-23: "keine Einladung erfasst").
+//
+// Rein: $e ist die Zeile aus mandant_einladung mitsamt `noch_gueltig`, das
+// die DATENBANK rechnet (gueltig_bis > NOW()) -- dieselbe Uhr, die auch das
+// Einloesen fragt, nicht die des Webservers.
+function mandant_uebergabe_lage(?array $e): array
+{
+    if ($e === null) { return ['lage' => 'keine', 'datum' => null]; }
+    $tag = static fn($w): ?string => ($w === null || $w === '') ? null : substr((string)$w, 0, 10);
+    if ($tag($e['eingeloest_am'] ?? null) !== null) {
+        return ['lage' => 'eingeloest', 'datum' => $tag($e['eingeloest_am'])];
+    }
+    // Offen ist sie, solange die Datenbank sie fuer gueltig haelt. Dieselbe
+    // Frage wie beim Einloesen -- sonst zeigte die Liste "offen" fuer einen
+    // Link, der schon abgewiesen wird.
+    return (int)($e['noch_gueltig'] ?? 0) === 1
+        ? ['lage' => 'offen',        'datum' => $tag($e['gueltig_bis'] ?? null)]
+        : ['lage' => 'ueberfaellig', 'datum' => $tag($e['gueltig_bis'] ?? null)];
+}
+
 // Die Gegenbuchung zu mandant_einladung_beanspruchen(), wenn das Anlegen in
 // der Anlage scheitert. Ohne sie waere die Einladung verbraucht und niemand
 // haette ein Konto -- der Kunde stuende vor einem toten Link, und beim

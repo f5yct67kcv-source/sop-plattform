@@ -270,6 +270,21 @@ check('KRITISCH: der Ausstellweg weist Demo-Plaetze ab, bevor er verbindet oder 
   && einladen.indexOf('DEMO_PLAETZE') < einladen.indexOf('mandant_db(')
   && einladen.indexOf('DEMO_PLAETZE') < einladen.indexOf('REPLACE INTO mandant_einladung'));
 
+// ── 16. Der Uebergabestand in der Liste ───────────────────────────────
+//
+// Gerechnet mit der Uhr der DATENBANK (dieselbe, die beim Einloesen
+// entscheidet) und ueber EINE Funktion. Und fehlt die Tabelle, heisst das
+// "nicht eingerichtet", nicht "keine Einladung".
+{
+  const liste = nurCode(lies(API + 'betreiber_mandant_list.php'));
+  check('KRITISCH: die Liste rechnet "noch gueltig" in der Datenbank, nicht in PHP',
+    /gueltig_bis\s*>\s*NOW\(\)/.test(liste) && !/strtotime|time\(\)/.test(liste));
+  check('KRITISCH: die Lage kommt aus mandant_uebergabe_lage(), nicht aus einer zweiten Rechnung',
+    /mandant_uebergabe_lage\s*\(/.test(liste));
+  check('KRITISCH: ohne Tabelle heisst die Lage "nicht eingerichtet"',
+    /mandant_einladung_tabelle_da\s*\(/.test(liste) && /'nicht_eingerichtet'/.test(liste));
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

@@ -34,8 +34,26 @@ $zeilen = $pdo->query(
        FROM mandant ORDER BY id'
 )->fetchAll(PDO::FETCH_ASSOC);
 
+// Der Uebergabestand (ENT-686): EINE Abfrage fuer alle, nicht eine je Zeile.
+// Die Einladungen liegen in der Betreiber-Datenbank -- darum ist diese
+// Auskunft auch fuer eine Anlage da, die gerade nicht antwortet.
+//
+// Fehlt die Tabelle (zwischen Deploy und Einrichtungslauf), ist das "nicht
+// eingerichtet" und nicht "keine Einladung" -- zwei Aussagen (Hausregel).
+$uebergaben = null;
+if (mandant_einladung_tabelle_da($pdo)) {
+    $uebergaben = [];
+    foreach ($pdo->query(
+        'SELECT mandant_id, gueltig_bis, eingeloest_am,
+                CASE WHEN gueltig_bis > NOW() THEN 1 ELSE 0 END AS noch_gueltig
+           FROM mandant_einladung'
+    )->fetchAll(PDO::FETCH_ASSOC) ?: [] as $z) {
+        $uebergaben[(int)$z['mandant_id']] = $z;
+    }
+}
+
 $heute = date('Y-m-d');
-$liste = array_map(static function (array $m) use ($VERTRAG, $vertragDa, $heute): array {
+$liste = array_map(static function (array $m) use ($VERTRAG, $vertragDa, $heute, $uebergaben): array {
     $m['id'] = (int)$m['id'];
     // Die drei Lagen werden vom Server benannt, nicht von der Oberflaeche
     // erraten -- "nicht eingerichtet", "kein Zugriff", "nichts vorhanden"
@@ -71,6 +89,9 @@ $liste = array_map(static function (array $m) use ($VERTRAG, $vertragDa, $heute)
     // Kuendigungstermin folgt aus Beginn, Mindestlaufzeit, Verlaengerung und
     // Frist. Ein abgelegter Wert stuende ab dem Tag falsch da, an dem der
     // Termin verstreicht.
+    $m['uebergabe'] = $uebergaben === null
+        ? ['lage' => 'nicht_eingerichtet', 'datum' => null]
+        : mandant_uebergabe_lage($uebergaben[$m['id']] ?? null);
     $m['vertrag'] = be_vertrag_lage($m, $heute);
     $m['vertrag']['faellig_90'] = be_vertrag_faellig($m['vertrag'], 90, $heute);
     return $m;

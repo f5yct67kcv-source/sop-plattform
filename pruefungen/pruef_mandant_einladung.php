@@ -212,6 +212,33 @@ $ges = mandant_einladung_zu_token($db, $tokenGes);
 $pruef('ein gesperrter Mandant liefert seinen Status mit, statt den Link zu verschweigen',
     $ges !== null && $ges['mandant_status'] === 'gesperrt');
 
+// ── 8. Der Uebergabestand fuer die Liste ──────────────────────────────
+//
+// Vier Lagen, und die Datenbank entscheidet ueber "offen" -- nicht die Uhr
+// des Webservers. Geprueft mit einer Frist, die nach PHP-Zeit noch in der
+// Zukunft liegt, die Datenbank aber fuer abgelaufen haelt: Dann gilt, was
+// die Datenbank sagt, denn sie entscheidet auch beim Einloesen.
+$zukunft = date('Y-m-d H:i:s', time() + 86400 * 3);
+$pruef('ohne Vermerk heisst die Lage "keine" -- nicht "nicht uebergeben"',
+    mandant_uebergabe_lage(null) === ['lage' => 'keine', 'datum' => null]);
+$pruef('eine offene Einladung nennt ihr Fristende',
+    mandant_uebergabe_lage(['eingeloest_am' => null, 'gueltig_bis' => $zukunft, 'noch_gueltig' => 1])
+    === ['lage' => 'offen', 'datum' => substr($zukunft, 0, 10)]);
+$pruef('KRITISCH: ueber "offen" entscheidet die Datenbank, nicht die Uhr des Webservers',
+    mandant_uebergabe_lage(['eingeloest_am' => null, 'gueltig_bis' => $zukunft, 'noch_gueltig' => 0])['lage']
+    === 'ueberfaellig');
+$pruef('KRITISCH: eingeloest schlaegt jede Frist -- auch eine abgelaufene',
+    mandant_uebergabe_lage(['eingeloest_am' => '2025-02-03 10:00:00',
+                            'gueltig_bis' => '2025-02-01 00:00:00', 'noch_gueltig' => 0])
+    === ['lage' => 'eingeloest', 'datum' => '2025-02-03']);
+$vier = array_unique(array_map(static fn($e) => mandant_uebergabe_lage($e)['lage'], [
+    null,
+    ['eingeloest_am' => null, 'gueltig_bis' => $zukunft, 'noch_gueltig' => 1],
+    ['eingeloest_am' => null, 'gueltig_bis' => $zukunft, 'noch_gueltig' => 0],
+    ['eingeloest_am' => '2025-02-03 10:00:00', 'gueltig_bis' => $zukunft, 'noch_gueltig' => 1],
+]));
+$pruef('KRITISCH: vier Faelle ergeben vier verschiedene Lagen', count($vier) === 4);
+
 echo count($bad) === 0
     ? "$ok bestanden\n\nAlle Pruefungen bestanden.\n"
     : "$ok bestanden, " . count($bad) . " nicht bestanden\n\n  ✗ "

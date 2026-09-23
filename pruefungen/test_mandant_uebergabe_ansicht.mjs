@@ -263,6 +263,97 @@ for (const [breite, hoehe, art] of [[390, 844, 'Handy'], [1280, 900, 'Desktop']]
   }
 }
 
+// ── 5. Der Uebergabestand in der Spalte "Einrichtung" ─────────────────
+//
+// Vier Aussagen, vier Texte, und Farbe traegt allein "ueberfaellig" (ENT-686,
+// Klaerung 7). "Keine Einladung erfasst" steht nur bei aktiven Mandanten --
+// und heisst so, weil ein Bestandsmandant ohne Vermerk trotzdem ein Konto
+// haben kann.
+for (const [breite, hoehe, art] of [[390, 844, 'Handy'], [1280, 900, 'Desktop']]) {
+  const page = await browser.newPage({ viewport: { width: breite, height: hoehe } });
+  const protokoll = [];
+  const m = (id, name, status, uebergabe) => ({ id, name, subdomain: 's' + id, status, ist_demo: false, uebergabe });
+  await aufbauen(page, { 'betreiber_mandant_list.php': { status: 'ok', mandanten: [
+    m(1, 'Ohne Vermerk AG', 'aktiv', { lage: 'keine', datum: null }),
+    m(2, 'Eingeladen AG', 'aktiv', { lage: 'offen', datum: '2031-05-07' }),
+    m(3, 'Eingeloest AG', 'aktiv', { lage: 'eingeloest', datum: '2030-02-03' }),
+    m(4, 'Ueberfaellig AG', 'aktiv', { lage: 'ueberfaellig', datum: '2030-01-02' }),
+    m(5, 'Vorrat A', 'vorrat', { lage: 'keine', datum: null }),
+    m(6, 'Gekuendigt AG', 'gekuendigt', { lage: 'eingeloest', datum: '2029-04-05' }),
+    m(7, 'Frisch AG', 'aktiv', { lage: 'nicht_eingerichtet', datum: null }),
+  ] } }, protokoll);
+  await page.goto(BASIS + 'betreiber.html');
+  await page.evaluate(async () => {
+    document.getElementById('tor').classList.add('versteckt');
+    document.getElementById('haus').classList.remove('versteckt');
+    document.getElementById('b-mandanten').classList.remove('versteckt');
+    await ladeMandanten();
+  });
+  await page.waitForSelector('#m-inhalt table');
+  const zeilen = await page.evaluate(() => Object.fromEntries(
+    [...document.querySelectorAll('#m-inhalt tbody tr')].map(tr => {
+      const zelle = tr.children[6];
+      const warn = [...zelle.querySelectorAll('.m-warn')].map(s => s.textContent);
+      return [tr.querySelector('strong').textContent, { text: zelle.innerText, warn }];
+    })));
+  check(`${art}: ohne Vermerk steht "keine Einladung erfasst"`,
+    /keine Einladung erfasst/.test(zeilen['Ohne Vermerk AG'].text));
+  // Die Aussage, fuer die diese Zeile ueberhaupt so heisst: Sie behauptet
+  // nicht, dass niemand Zugang hat.
+  check(`${art}: KRITISCH: nirgends steht bloss "keine Einladung" oder "nicht übergeben"`,
+    Object.values(zeilen).every(z => !/keine Einladung(?! erfasst)|nicht übergeben/.test(z.text)));
+  check(`${art}: eine offene Einladung nennt ihr Fristende mit Jahr`,
+    /eingeladen, offen bis 07\.05\.2031/.test(zeilen['Eingeladen AG'].text));
+  check(`${art}: eine eingeloeste nennt ihr Datum`,
+    /eingelöst am 03\.02\.2030/.test(zeilen['Eingeloest AG'].text));
+  check(`${art}: eine ueberfaellige nennt, seit wann`,
+    /überfällig seit 02\.01\.2030/.test(zeilen['Ueberfaellig AG'].text));
+  check(`${art}: KRITISCH: Farbe traegt allein "ueberfaellig"`,
+    zeilen['Ueberfaellig AG'].warn.some(w => /überfällig/.test(w))
+    && Object.entries(zeilen).filter(([n]) => n !== 'Ueberfaellig AG')
+         .every(([, z]) => !z.warn.some(w => /Einladung|eingel|überfällig|Übergabe/.test(w))));
+  check(`${art}: KRITISCH: bei einer Vorratsanlage steht kein "keine Einladung erfasst"`,
+    !/Einladung/.test(zeilen['Vorrat A'].text));
+  check(`${art}: ein vorhandener Vermerk bleibt auch nach der Kuendigung sichtbar`,
+    /eingelöst am 05\.04\.2029/.test(zeilen['Gekuendigt AG'].text));
+  check(`${art}: KRITISCH: "nicht eingerichtet" sieht anders aus als "keine Einladung erfasst"`,
+    /Übergabe nicht eingerichtet/.test(zeilen['Frisch AG'].text)
+    && !/keine Einladung/.test(zeilen['Frisch AG'].text));
+  const ueberlauf = await page.evaluate(() => ({
+    seite: document.documentElement.scrollWidth - innerWidth }));
+  check(`${art}: die Seite laeuft nicht waagrecht ueber`, ueberlauf.seite <= 0);
+  await page.close();
+}
+
+// ── 6. Nach dem Einladen steht der neue Stand sofort da ───────────────
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const protokoll = [];
+  await aufbauen(page, {
+    'betreiber_mandant_list.php': { status: 'ok', mandanten: [
+      { id: 1, name: 'Beispielwache AG', subdomain: 'b', status: 'aktiv', ist_demo: false,
+        uebergabe: { lage: 'keine', datum: null } }] },
+    'betreiber_mandant_einladen.php': { status: 'ok', gueltig_tage: 7 },
+  }, protokoll);
+  await page.goto(BASIS + 'betreiber.html');
+  await page.evaluate(async () => {
+    document.getElementById('tor').classList.add('versteckt');
+    document.getElementById('haus').classList.remove('versteckt');
+    document.getElementById('b-mandanten').classList.remove('versteckt');
+    await ladeMandanten();
+  });
+  await page.click('[data-zugang="1"]');
+  await page.waitForFunction(() => document.activeElement && document.activeElement.id === 'z_vorname');
+  await page.fill('#z_nachname', 'Beispiel');
+  await page.fill('#z_email', 'alex@example.org');
+  const vorher = protokoll.filter(p => p.name === 'betreiber_mandant_list.php').length;
+  await page.click('#zSaveBtn');
+  await bis(() => protokoll.filter(p => p.name === 'betreiber_mandant_list.php').length > vorher);
+  check('KRITISCH: nach dem Einladen wird die Liste neu geladen',
+    protokoll.filter(p => p.name === 'betreiber_mandant_list.php').length > vorher);
+  await page.close();
+}
+
 await browser.close();
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

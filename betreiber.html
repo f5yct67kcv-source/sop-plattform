@@ -3534,7 +3534,7 @@ async function ladeMandanten() {
         + '<td>' + merker(GAV_TEXT, m.gav_lage)
           + (m.gav_bestaetigt_am ? '<div class="zweit">' + text(m.gav_bestaetigt_am.slice(0, 10)) + '</div>' : '')
           + '</td>'
-        + '<td>' + standZelle(stand[m.id], m.verbindung_lage) + '</td>'
+        + '<td>' + standZelle(stand[m.id], m.verbindung_lage) + uebergabeZeile(m) + '</td>'
         + '<td style="text-align:right;white-space:nowrap">'
           + '<button class="klein" data-bearbeiten="' + m.id + '">Ändern</button> '
           + '<button class="klein" data-gav="' + m.id + '">GAV</button> '
@@ -3590,6 +3590,47 @@ function standZelle(st, verbLage) {
          + '<div class="zweit">' + st.tabellen + ' von ' + st.gesamt + ' Tabellen</div>';
   }
   return kopf + '<div class="zweit">' + st.tabellen + ' von ' + st.gesamt + ' Tabellen</div>';
+}
+
+/* ── Uebergabestand (ENT-686, Klaerung 7) ──────────────────────────
+   Eine feine Zweitzeile unter dem Merker der Einrichtung -- derselbe
+   Baustein wie das Datum in der GAV-Spalte, kein eigener Container.
+
+   VIER AUSSAGEN, VIER TEXTE. Gerechnet hat der Server; hier wird nur
+   benannt. Farbe traegt allein "ueberfaellig" -- der einzige Zustand, der
+   eine Handlung verlangt (dieselbe Regel wie bei der Support-Lage).
+
+   "KEINE EINLADUNG ERFASST", nicht "keine Einladung": Ein Mandant, der vor
+   diesem Weg ueber setup.php uebergeben wurde, hat keinen Vermerk und
+   trotzdem ein Verwaltungskonto. Wir wissen nur, was in unseren Buechern
+   steht (Festlegung vom 2026-09-23). */
+const UEBERGABE_TEXT = {
+  keine:              'keine Einladung erfasst',
+  offen:              'eingeladen, offen bis',
+  eingeloest:         'eingelöst am',
+  ueberfaellig:       'überfällig seit',
+  nicht_eingerichtet: 'Übergabe nicht eingerichtet',
+};
+function tagDeutsch(iso) {
+  const [j, m, t] = String(iso || '').slice(0, 10).split('-');
+  return t ? t + '.' + m + '.' + j : '';
+}
+function uebergabeZeile(m) {
+  const u = m.uebergabe;
+  if (!u) { return ''; }
+  /* "Keine Einladung erfasst" nur, wo eine Einladung ueberhaupt in Frage
+     kommt: bei einem aktiven Mandanten. Einer Vorratsanlage fehlt der
+     Kunde, einer gesperrten oder gekuendigten wird nichts uebergeben -- die
+     Zeile waere dort Rauschen. Ein vorhandener Vermerk steht dagegen immer
+     da; "eingeloest am" bleibt auch nach einer Kuendigung wahr. */
+  if (u.lage === 'keine' && m.status !== 'aktiv') { return ''; }
+  const wort = UEBERGABE_TEXT[u.lage] || u.lage;
+  const datum = u.datum ? ' ' + tagDeutsch(u.datum) : '';
+  if (u.lage === 'ueberfaellig') {
+    return '<div class="zweit" style="margin-top:6px"><span class="merker m-warn">'
+      + text(wort + datum) + '</span></div>';
+  }
+  return '<div class="zweit" style="margin-top:6px">' + text(wort + datum) + '</div>';
 }
 
 function zahlBlock(lab, wert, bezug) {
@@ -4616,6 +4657,9 @@ async function zEinladen() {
       return;
     }
     dlgZu('dlgZugang');
+    /* Neu laden, damit der Uebergabestand in der Spalte "Einrichtung"
+       sofort "eingeladen" sagt und nicht bis zum naechsten Aufruf das Alte. */
+    ladeMandanten();
     /* Die Frist kommt vom Server (gueltig_tage) -- keine zweite Zahl hier. */
     kurzmeldung('Einladung verschickt an ' + daten.email + ' — '
       + a.gueltig_tage + ' Tage gültig.');
