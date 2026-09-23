@@ -16,6 +16,7 @@
 import { WURZEL, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 import { readFileSync } from 'fs';
+import { execFileSync } from 'child_process';
 
 const EXE = browserPfad();
 const ok = [], bad = [];
@@ -60,7 +61,18 @@ const RECHNUNGEN = [
 
 // Drehbuch des Modells: Auf eine Frage ruft es `aufruf` auf, auf das
 // Ergebnis antwortet es mit `antwort`. Was es zurueckbekam, wird gemerkt.
-let drehbuch = null, belegeGesperrt = false, abwesenheitGesperrt = true, assistentAntwort = null;
+let drehbuch = null, belegeGesperrt = false, abwesenheitGesperrt = true, assistentAntwort = null, routerAntwort = null;
+const rufe = [];
+// Katalog und Kunden fuer die Formular-Werkzeuge (ENT-700). Die Antwort der
+// Spracheingabe kommt aus der echten Auswertung des Servers.
+const KU = [{ id: 7, name: 'Beispiel AG', aktiv: 1 }, { id: 9, name: 'Muster GmbH', aktiv: 1 }];
+const PR = [
+  { id: 3, name: 'Verkehrsdienst', beschreibung: '', einzelpreis_rappen: 8500, einheit: 'Std.', mwst_satz_bp: 810, sortierung: 1, aktiv: 1 },
+  { id: 4, name: 'Objektschutz', beschreibung: '', einzelpreis_rappen: 7200, einheit: 'Std.', mwst_satz_bp: 810, sortierung: 2, aktiv: 1 },
+];
+const routerAus = (key, modell) => JSON.parse(execFileSync('php', ['-r',
+  `require '${WURZEL}/backend/ai.php'; [$c, $a] = ki_felder_auswerten($argv[1], json_decode($argv[2], true), json_decode($argv[3], true)); echo json_encode([$c, $a]);`,
+  key, JSON.stringify(modell), JSON.stringify({ kunden: KU, produkte: PR.map(p => ({ id: p.id, name: p.name, einheit: p.einheit })), mitarbeiter: MA })]).toString());
 const zurueck = [];
 const umgebung = { wert: '__APP_ENV__' };
 
@@ -80,6 +92,7 @@ async function neueSeite() {
     body: readFileSync(`${WURZEL}/testumgebung.js`, 'utf8').replace(/__APP_ENV__/g, umgebung.wert) }));
   await page.route('**/api/**', route => {
     const req = route.request(), p = req.url().split('/api/')[1];
+    rufe.push(p);
     const send = (b, s) => route.fulfill({ status: s || 200, contentType: 'application/json', body: JSON.stringify(b) });
     if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'hmuster', ist_admin: true });
     if (p.startsWith('ki_assistent')) {
@@ -95,6 +108,9 @@ async function neueSeite() {
       zurueck.push(JSON.parse(r.content));
       return send({ status: 'ok', stop_reason: 'end_turn', content: [{ type: 'text', text: drehbuch.antwort }] });
     }
+    if (p.startsWith('ki_router_parse')) return routerAntwort ? send(routerAntwort[1], routerAntwort[0]) : send({ status: 'error', message: 'kein Mock' }, 502);
+    if (p.startsWith('produkt_list')) return send({ status: 'ok', produkte: PR });
+    if (p.startsWith('kunden_list')) return send({ status: 'ok', kunden: KU });
     if (p.startsWith('einsatz_list')) return send({ status: 'ok', einsaetze: EI });
     if (p.startsWith('mitarbeiter_list')) return send({ status: 'ok', mitarbeiter: MA, listen: {} });
     if (p.startsWith('verfuegbarkeit_list')) return send({ status: 'ok', sperren: [{ mitarbeiter_id: 4, datum: tag(2), bemerkung: 'Familienfest' }] });
@@ -144,10 +160,13 @@ await page.waitForTimeout(200);
 check('Ein Klick auf die Figur öffnet das Fenster', await page.isVisible('#asPanel'));
 const pn = await box(page, '#asPanel');
 check('Das Fenster steht ganz im Bild, über der Figur (gemessen)', pn.x >= 0 && pn.y >= 0 && pn.r <= 1500 && pn.b <= f.y + 1);
-check('Das Fenster sagt, dass es nichts ändert', /ändere nichts/.test(await page.textContent('#asVerlauf')));
+check('Das Fenster sagt, dass Speichern bei der Person bleibt', /Speichern tust du selbst/.test(await page.textContent('#asVerlauf')));
 
 const fragen = async (text, d) => {
   drehbuch = d;
+  // Nach einem vorbereiteten Formular ist das Fenster zu -- wie ein Mensch
+  // oeffnet der Test es mit einem Klick auf die Figur wieder.
+  if (!(await page.isVisible('#asPanel'))) { await page.click('#asFigur'); await page.waitForTimeout(100); }
   await page.fill('#asText', text);
   await page.click('#asBtn');
   await page.waitForFunction(() => !document.getElementById('asBtn').disabled, null, { timeout: 5000 });
@@ -208,6 +227,58 @@ check('Entwürfe werden gezählt, aber nicht als offen', r.entwuerfe_nicht_verse
 check('KRITISCH: überfällig nach derselben Regel wie die Rechnungsliste (RE-1, 3 Tage)', r.ueberfaellig === 1 && r.posten[0].stand === '3 Tage überfällig');
 r = await fragen('Nur überfällige?', { name: 'offene_rechnungen', input: { nur_ueberfaellig: true }, antwort: 'Eine.' });
 check('Nur überfällige: RE-1', r.anzahl === 1 && r.posten[0].nummer === 'RE-1');
+
+// ══════════ FORMULARE VORBEREITEN UND ERGAENZEN (ENT-700)
+r = await fragen('Ergänze die Offerte', { name: 'formular_ergaenzen', input: { titel: 'X' }, antwort: 'Es ist nichts offen.' });
+check('Ergänzen ohne offenes Formular ergibt einen Fehler, keine erfundene Änderung', !!r.fehler && !r.geaendert);
+
+routerAntwort = routerAus('beleg_neu', { art: 'offerte', kunde_name: 'beispiel ag', positionen: [{ produkt_id: 3, leistung: 'Verkehrsdienst', menge: 16 }] });
+r = await fragen('Mach mir eine Offerte für die Beispiel AG über 16 Stunden Verkehrsdienst',
+  { name: 'formular_vorbereiten', input: { auftrag: 'Offerte für die Beispiel AG über 16 Stunden Verkehrsdienst' }, antwort: 'Die Offerte ist vorbereitet.' });
+const routerRuf = rufe.filter(x => x.startsWith('ki_router_parse')).length;
+check('KRITISCH: Anlegen läuft über dieselbe Erkennung wie der Sprechen-Knopf (ki_router_parse)', routerRuf === 1);
+check('Die Offerte geht auf', await page.isVisible('#view-offerte.on'));
+check('Der Stand des Formulars geht ans Modell: Empfänger aus der Kundenliste, Position mit Katalogpreis',
+  r.geoeffnet === true && r.empfaenger.in_kundenliste === true && r.positionen.length === 1 && r.positionen[0].preis_chf === '85.00');
+check('... und dass nichts gespeichert ist', r.gespeichert === false);
+check('Das Fenster klappt zu, die Figur bleibt', !(await page.isVisible('#asPanel')) && await page.isVisible('#asFigur'));
+check('Die Antwort steht als Sprechblase an der Figur', (await page.isVisible('#asBlase')) && (await page.textContent('#asBlase')) === 'Die Offerte ist vorbereitet.');
+const bl = await box(page, '#asBlase'), fg = await box(page, '#asFigur');
+await page.screenshot({ path: OUT + '/assistent-formular.png' });
+check('Die Sprechblase steht über der Figur, ganz im Bild (gemessen)', bl.b <= fg.y + 1 && bl.x >= 0 && bl.y >= 0 && bl.r <= 1500);
+
+r = await fragen('Und noch 4 Stunden Objektschutz und 10 Funkgeräte dazu, die erste Position auf 20 Stunden',
+  { name: 'formular_ergaenzen', input: { positionen_hinzu: [{ leistung: 'objektschutz', menge: 4 }, { leistung: 'Funkgeräte', menge: 10 }],
+    positionen_menge: [{ nr: 1, menge: 20 }] }, antwort: 'Ergänzt.' });
+const pos = await page.evaluate(() => ofPos.map(z => ({ n: z.produkt_name, m: z.menge, p: z.einzelpreis_rappen, ki: z.ki })));
+check('Ergänzen: drei Positionen, die erste mit neuer Menge', pos.length === 3 && pos[0].m === 20);
+check('KRITISCH: eine Katalogleistung kommt mit Katalogname und Katalogpreis (blau)', pos[1].n === 'Objektschutz' && pos[1].p === 7200 && pos[1].ki === 'katalog');
+check('KRITISCH: eine unbekannte Leistung wird Freitext ohne Preis (orange), und das Modell erfährt es',
+  pos[2].n === 'Funkgeräte' && !pos[2].p && pos[2].ki === 'offen' && r.hinweise.some(h => /nicht im Leistungskatalog/.test(h)));
+check('Das Modell sieht, dass für die Freitextzeile der Preis fehlt', r.noch_offen.some(x => /Preis für „Funkgeräte“/.test(x)));
+check('Die neuen Zeilen sind im Formular sichtbar markiert (Farbe gemessen)', await page.evaluate(() => {
+  const a = getComputedStyle(document.getElementById('ofp_name1')).borderTopColor, b = getComputedStyle(document.getElementById('ofp_name2')).borderTopColor;
+  return a !== b; }));
+r = await fragen('Die dritte Position weg', { name: 'formular_ergaenzen', input: { positionen_entfernen: [3] }, antwort: 'Entfernt.' });
+check('Eine Position lässt sich entfernen', r.positionen.length === 2);
+check('KRITISCH: gespeichert wurde nichts', !rufe.some(x => /beleg_speichern|einsatz_save|kunde_save/.test(x)));
+
+routerAntwort = routerAus('einsatz_neu', { kunde_name: 'Beispiel AG', datum: tag(5), von: '07:00', bis: '16:00', bedarf: 2 });
+r = await fragen('Neuer Einsatz für die Beispiel AG', { name: 'formular_vorbereiten', input: { auftrag: 'Neuer Einsatz für die Beispiel AG' }, antwort: 'Vorbereitet.' });
+check('Einsatz: das Formular geht auf', r.geoeffnet === true && await page.isVisible('#view-einsatzneu.on'));
+r = await fragen('bis 18 Uhr und drei Leute', { name: 'formular_ergaenzen', input: { bis: '18:00', bedarf: 3 }, antwort: 'Angepasst.' });
+check('Einsatz ergänzen: Bis und Anzahl stehen im Formular und sind blau markiert',
+  (await page.inputValue('#enNBis')) === '18:00' && (await page.inputValue('#enNBedarf')) === '3'
+  && await page.evaluate(() => document.getElementById('enNBis').classList.contains('ki')));
+check('... und die sichtbare Zeitauswahl zeigt es auch', await page.evaluate(() => {
+  const el = document.getElementById('enNBis'); return !el.__zw || (el.__zw.std.value === '18' && el.__zw.min.value === '00'); }));
+await page.evaluate(() => enNeuAbbrechen());
+
+routerAntwort = [403, { status: 'error', grund: 'kein_recht', recht: 'offerten_schreiben', message: 'Für „Offerten“ fehlt dir die Berechtigung.' }];
+r = await fragen('Offerte für die Muster GmbH', { name: 'formular_vorbereiten', input: { auftrag: 'Offerte für die Muster GmbH' }, antwort: 'Keine Berechtigung.' });
+check('KRITISCH: ohne Recht öffnet sich nichts, und der Grund der Spracheingabe geht unverändert ans Modell',
+  r.geoeffnet === false && r.grund === 'kein_recht' && /Berechtigung/.test(r.meldung));
+routerAntwort = null;
 
 // ══════════ KEIN RECHT, FALSCHE EINGABE
 belegeGesperrt = true;

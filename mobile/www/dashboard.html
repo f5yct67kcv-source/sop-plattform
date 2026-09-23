@@ -2082,6 +2082,10 @@ html:not(.hat-reinigung) [data-sparte-feld] { display: none !important; }
 .as-fuss .as-reihe { display: flex; gap: 8px; align-items: center; }
 .as-fuss .as-reihe .sprach { flex: 1; margin: 0; }
 .as-fuss textarea { resize: none; }
+/* Sprechblase ueber der Figur (ENT-700): nur solange das Fenster zu ist. */
+.as-blase { max-width: 300px; padding: 10px 13px; border-radius: 12px; background: var(--surface); border: 1px solid var(--accent-line); box-shadow: 0 8px 24px rgba(0,0,0,.28); font-size: 13px; line-height: 1.45; cursor: pointer; position: relative; }
+.as-blase[hidden] { display: none; }
+.as-blase::after { content: ''; position: absolute; right: 30px; bottom: -7px; width: 12px; height: 12px; background: var(--surface); border-right: 1px solid var(--accent-line); border-bottom: 1px solid var(--accent-line); transform: rotate(45deg); }
 
 .ki-hint.web { background: var(--warn-soft); border-color: var(--warn-line); color: var(--warn); }
 .ki-hint a { color: inherit; }
@@ -9919,6 +9923,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <div class="sprach-hint" id="asSprachHint"></div>
     </div>
   </div>
+  <div class="as-blase" id="asBlase" hidden role="status" onclick="this.hidden = true"></div>
   <button type="button" class="as-figur" id="asFigur" aria-label="Assistent öffnen" title="Assistent">
     <svg viewBox="0 0 120 120" aria-hidden="true">
       <defs><clipPath id="asKreis"><circle cx="60" cy="60" r="60"/></clipPath><linearGradient id="asHg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d4a73"/><stop offset="1" stop-color="#15243d"/></linearGradient></defs>
@@ -12550,12 +12555,14 @@ function rtDialogOeffnen(data) {
   const bereich = data.bereich;
   const aktion = data.aktion || 'neu';
   // Offerte und Rechnung (ENT-695) laden ihre Listen selbst.
-  if (bereich === 'beleg') { ofAusDiktat(data); return; }
+  if (bereich === 'beleg') { return ofAusDiktat(data); }
   const bereit = bereich === 'einsatz'
     ? Promise.all([mitarbeiter.length ? null : loadMitarbeiter(), kunden.length ? null : loadKunden()])
     : bereich === 'kunde' ? (kunden.length ? Promise.resolve() : loadKunden())
     : (mitarbeiter.length ? Promise.resolve() : loadMitarbeiter());
-  Promise.resolve(bereit).then(() => {
+  // Gibt das Oeffnen als Promise zurueck: Der Assistent (ENT-700) liest
+  // danach den Stand des Formulars.
+  return Promise.resolve(bereit).then(() => {
     if (bereich === 'mitarbeiter' && aktion === 'aendern') {
       const idx = mitarbeiter.findIndex(m => m.name === data.mitarbeiter_login_name);
       if (idx === -1) { toast('Die erkannte Person steht nicht in der Liste.'); return; }
@@ -12595,7 +12602,7 @@ function gsErkennen() {
 }
 
 // ══════════════════════════════════════════ ASSISTENT (ENT-699, nur Testumgebung)
-// Sieht nach und antwortet, statt nur Formulare vorzubefuellen. Das Modell
+// Sieht nach und antwortet; seit ENT-700 bereitet er auch Formulare vor. Das Modell
 // waehlt ein Werkzeug, das Werkzeug laeuft HIER im Browser -- mit denselben
 // Funktionen, mit denen das Cockpit rechnet (zaehltAlsBesetzt, konflikte,
 // ruheLuecken, gesperrtAm, reFaelligTage), auf Daten aus den bestehenden,
@@ -12647,12 +12654,14 @@ function asStart() {
   asZiehbar($('asKopf'), null);
   if (!$('asVerlauf').children.length) {
     asNachricht('er', 'Hallo. Ich kann nachsehen, was Kunden bei Offerten entschieden haben, wo in Einsätzen noch Leute fehlen, '
-      + 'wer in einem Zeitfenster verfügbar ist und welche Rechnungen offen sind. Ich ändere nichts.');
+      + 'wer in einem Zeitfenster verfügbar ist und welche Rechnungen offen sind. Offerten, Rechnungen, Einsätze, Kunden '
+      + 'und Mitarbeitende bereite ich als Formular vor. Speichern tust du selbst.');
   }
 }
 
 function asPanelUm() { $('asPanel').hidden ? asPanelAuf() : asPanelZu(); }
 function asPanelAuf() {
+  $('asBlase').hidden = true;
   $('asPanel').hidden = false;
   asInSicht();
   setTimeout(() => $('asText').focus(), 30);
@@ -12822,6 +12831,7 @@ async function asSenden() {
   asKuerzen();
   asNachrichten.push({ role: 'user', content: text });
   asTreffer = [];
+  asFormularNeu = false;
   asLaeuft = true;
   $('asBtn').disabled = true;
   $('asWidget').classList.add('denkt');
@@ -12845,6 +12855,9 @@ async function asSenden() {
           || 'Dazu habe ich keine Antwort.';
         asNachricht('er', antwort, asTreffer);
         asSprechen(antwort);
+        // Ein Formular ist aufgegangen (ENT-700): Fenster zu, damit es frei
+        // ist; die Figur bleibt und zeigt die Antwort kurz als Sprechblase.
+        if (asFormularNeu) { asPanelZu(); asBlase(antwort); }
         return;
       }
       const ergebnisse = [];
@@ -12886,6 +12899,8 @@ async function asWerkzeug(name, e) {
   if (name === 'offene_plaetze') { return asWzOffen(e); }
   if (name === 'verfuegbare_mitarbeitende') { return asWzVerfuegbar(e); }
   if (name === 'offene_rechnungen') { return asWzRechnungen(e); }
+  if (name === 'formular_vorbereiten') { return asWzVorbereiten(e); }
+  if (name === 'formular_ergaenzen') { return asWzErgaenzen(e); }
   return { modell: { fehler: 'unbekanntes Werkzeug' } };
 }
 
@@ -13020,6 +13035,151 @@ async function asWzRechnungen(e) {
       sub: tageText(b), oeffnen: () => ofOeffnen(b.id),
     })),
   };
+}
+
+// ── Formulare (ENT-700). Anlegen und Aendern laufen ueber DIESELBE Erkennung
+// wie der Sprechen-Knopf (ki_router_parse.php, ENT-695): eine Erkennung,
+// dieselben Regeln -- blau uebernommen, orange pruefen, kein Preis aus dem
+// Diktat, Recht je Faehigkeit. Danach ergaenzt der Assistent das offene
+// Formular im Gespraech. Gespeichert wird nur per Klick (ENT-015).
+let asFormular = null;          // { bereich, aktion } des zuletzt vorbereiteten Formulars
+let asFormularNeu = false;      // in dieser Frage geoeffnet -> Fenster klappt nach der Antwort zu
+
+function asFormularOffen() {
+  if (!asFormular) { return false; }
+  if (asFormular.bereich === 'beleg') { return $('view-offerte').classList.contains('on'); }
+  if (asFormular.bereich === 'einsatz') { return $('view-einsatzneu').classList.contains('on'); }
+  if (asFormular.bereich === 'kunde') { return $('dlgKunde').classList.contains('on'); }
+  if (asFormular.bereich === 'mitarbeiter') { return !!document.querySelector('#mv-bearbeiten.on'); }
+  return false;
+}
+
+// Was im Formular steht -- fuer das Modell, damit es sagen kann, was
+// uebernommen und was noch offen ist. Gelesen aus dem Formular selbst, nicht
+// aus dem, was gesagt wurde.
+function asFormularStand() {
+  const b = asFormular && asFormular.bereich;
+  if (b === 'beleg') {
+    const kundeBekannt = !!ofFormKundeId;
+    return {
+      formular: ofArt === 'rechnung' ? 'Rechnung' : 'Offerte',
+      empfaenger: $('of_kunde').value.trim() ? { name: $('of_kunde').value.trim(), in_kundenliste: kundeBekannt } : null,
+      titel: $('of_titel').value.trim() || null,
+      positionen: ofPos.filter(z => z.produkt_name).map((z, i) => ({
+        nr: i + 1, leistung: z.produkt_name, menge: z.menge, einheit: z.einheit,
+        im_katalog: !!z.produkt_id, preis_chf: z.einzelpreis_rappen ? chf(z.einzelpreis_rappen) : null })),
+      noch_offen: [
+        ...(!kundeBekannt ? [$('of_kunde').value.trim() ? 'Empfänger nicht in der Kundenliste' : 'Empfänger'] : []),
+        ...(ofPos.some(z => z.produkt_name) ? [] : ['Positionen']),
+        ...ofPos.filter(z => z.produkt_name && !z.einzelpreis_rappen).map(z => `Preis für „${z.produkt_name}“`),
+      ],
+      katalog: produkte.filter(p => Number(p.aktiv ?? 1) === 1).map(p => p.name).slice(0, 60),
+      gespeichert: false,
+    };
+  }
+  if (b === 'einsatz') {
+    const w = f => { const el = $(enId('enN', f)); return el ? String(el.value || '').trim() : ''; };
+    const stand = {};
+    EN_FELDER.forEach(f => { if (w(f)) { stand[f] = w(f); } });
+    return { formular: 'Einsatz', felder: stand,
+      noch_offen: ['kunde_name', 'ort', 'von', 'bis'].filter(f => !w(f)).map(f => EN_LABEL[f]), gespeichert: false };
+  }
+  if (b === 'kunde') { return { formular: 'Kunde', name: $('ku_name').value.trim() || null, gespeichert: false }; }
+  if (b === 'mitarbeiter') { return { formular: asFormular.aktion === 'aendern' ? 'Mitarbeitende ändern' : 'Mitarbeitende anlegen', gespeichert: false }; }
+  return {};
+}
+
+async function asWzVorbereiten(e) {
+  const auftrag = String(e.auftrag || '').trim().slice(0, 2000);
+  if (!auftrag) { return { modell: { fehler: 'auftrag fehlt' } }; }
+  const { ok, status, data } = await api('ki_router_parse.php', { method: 'POST', body: { text: auftrag, heute: isoTag() } });
+  if (status === 401) { doLogout(); return { modell: { fehler: 'abgemeldet' } }; }
+  if (!ok || data.status !== 'ok') {
+    // Der Grund der Spracheingabe geht unveraendert weiter: nicht abgedeckt,
+    // nicht verstanden, kein Recht, nicht eingerichtet -- vier Saetze.
+    return { modell: { geoeffnet: false, grund: data.grund || (status === 403 ? 'kein_recht' : 'fehler'),
+      meldung: data.message || 'Die Erkennung ist gerade nicht verfügbar.' } };
+  }
+  await rtDialogOeffnen(data);
+  asFormular = { bereich: data.bereich, aktion: data.aktion || 'neu' };
+  asFormularNeu = true;
+  return { modell: { geoeffnet: true, ...asFormularStand(),
+    hinweis: 'Das Formular ist vorbefüllt, nicht gespeichert. Blau ist übernommen, orange zu prüfen.' } };
+}
+
+async function asWzErgaenzen(e) {
+  if (!asFormularOffen()) {
+    return { modell: { fehler: 'Es ist kein vorbereitetes Formular offen. Zuerst formular_vorbereiten.' } };
+  }
+  const geaendert = [], hinweise = [];
+  if (asFormular.bereich === 'beleg') {
+    if (e.kunde_name) {
+      $('of_kunde').value = String(e.kunde_name).trim();
+      const k = kunden.find(x => String(x.name).toLowerCase() === String(e.kunde_name).trim().toLowerCase());
+      if (k) { $('of_kunde').value = k.name; }
+      ofKundeGewaehlt();
+      const bekannt = !!ofFormKundeId;
+      $('of_kunde').classList.toggle('ki', bekannt);
+      $('of_kunde').classList.toggle('ki-offen', !bekannt);
+      $('ofKundeHinweis').style.display = bekannt ? 'none' : '';
+      geaendert.push('Empfänger');
+    }
+    for (const [feld, id] of [['titel', 'of_titel'], ['bemerkung', 'of_bemerkung']]) {
+      if (e[feld]) { $(id).value = String(e[feld]); $(id).classList.add('ki'); geaendert.push(feld === 'titel' ? 'Titel' : 'Bemerkung'); }
+    }
+    let zeilen = ofPos.slice();
+    const entfernen = new Set((Array.isArray(e.positionen_entfernen) ? e.positionen_entfernen : []).map(Number));
+    if (entfernen.size) { zeilen = zeilen.filter((z, i) => !entfernen.has(i + 1)); geaendert.push('Positionen entfernt'); }
+    (Array.isArray(e.positionen_menge) ? e.positionen_menge : []).forEach(p => {
+      const z = ofPos[Number(p.nr) - 1];
+      const m = Number(p.menge);
+      if (z && zeilen.includes(z) && Number.isFinite(m) && m > 0) { z.menge = m; geaendert.push(`Menge Position ${p.nr}`); }
+      else { hinweise.push(`Position ${p.nr} gibt es nicht`); }
+    });
+    const neu = (Array.isArray(e.positionen_hinzu) ? e.positionen_hinzu : []).map(p => {
+      const name = String(p.leistung || '').trim();
+      const prod = produkte.find(x => Number(x.aktiv ?? 1) === 1 && String(x.name).toLowerCase() === name.toLowerCase());
+      if (!prod && name) { hinweise.push(`„${name}“ steht nicht im Leistungskatalog: als Freitextzeile ohne Preis eingefügt`); }
+      return name ? ofDiktatZeile(prod, name, p.menge, p.einheit) : null;
+    }).filter(Boolean);
+    if (neu.length) {
+      // Die leere Startzeile eines neuen Formulars wird ersetzt, nicht stehen gelassen.
+      zeilen = zeilen.filter(z => z.produkt_name).concat(neu);
+      geaendert.push(neu.length === 1 ? '1 Position' : `${neu.length} Positionen`);
+    }
+    ofPos = zeilen.length ? zeilen : [ofLeereZeile()];
+    ofZeilenZeichnen();
+  } else if (asFormular.bereich === 'einsatz') {
+    const felder = { datum: asDatum(e.datum), von: asZeit(e.von), bis: asZeit(e.bis),
+      bedarf: Number.isInteger(e.bedarf) && e.bedarf > 0 ? String(Math.min(99, e.bedarf)) : null,
+      ort: e.ort, strasse: e.strasse, titel: e.titel, bemerkung: e.bemerkung };
+    Object.entries(felder).forEach(([f, v]) => {
+      if (v === null || v === undefined || String(v).trim() === '') { return; }
+      const el = $(enId('enN', f));
+      if (!el) { return; }
+      el.value = String(v).trim();
+      el.classList.add('ki');
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      geaendert.push(EN_LABEL[f] || f);
+    });
+    if (e.kunde_name) { hinweise.push('Den Kunden eines Einsatzes bitte im Formular wählen.'); }
+    if (e.positionen_hinzu || e.positionen_menge || e.positionen_entfernen) { hinweise.push('Ein Einsatz hat keine Positionen.'); }
+  } else {
+    return { modell: { fehler: 'Kunden- und Mitarbeitendenformulare ergänzt der Assistent nicht. Bitte im Formular weiter, oder den ganzen Auftrag neu sagen.' } };
+  }
+  return { modell: { geaendert, hinweise, ...asFormularStand() } };
+}
+
+// Sprechblase an der Figur: Klappt das Fenster fuer das Formular zu, steht
+// die Antwort kurz dort -- auch fuer wen die Stimme stumm geschaltet ist.
+let asBlaseZeit = null;
+function asBlase(text) {
+  const b = $('asBlase');
+  b.textContent = text;
+  b.hidden = false;
+  clearTimeout(asBlaseZeit);
+  asBlaseZeit = setTimeout(() => { b.hidden = true; }, Math.min(15000, 4000 + text.length * 60));
 }
 
 function rtZuruecksetzen(prefix) {
@@ -15748,6 +15908,30 @@ function ofNeuStarten(art) {
   Promise.all([vorlauf, kundenDa]).then(() => ofNeu(art));
 }
 
+// Eine Positionszeile aus der Spracheingabe (ENT-695), seit ENT-700 auch
+// vom Assistenten benutzt. Mit Katalogeintrag: blau, Einheit und Preis aus
+// dem Katalog -- ein Preis je Stunde mit einer gesagten Einheit "Tag" ergaebe
+// einen falschen Betrag. Ohne: orange Freitextzeile, kein Preis.
+function ofDiktatZeile(prod, gesagt, menge, einheit) {
+  const z = ofLeereZeile();
+  const m = Number(menge);
+  z.menge = Number.isFinite(m) && m > 0 ? m : 1;
+  if (prod) {
+    z.produkt_id = Number(prod.id);
+    z.produkt_name = prod.name;
+    z.beschreibung = prod.beschreibung || '';
+    z.einzelpreis_rappen = Number(prod.einzelpreis_rappen) || 0;
+    z.einheit = prod.einheit || 'Std.';
+    z.mwst_satz_bp = Number(prod.mwst_satz_bp) || 0;
+    z.ki = 'katalog';
+  } else {
+    z.produkt_name = String(gesagt || '').slice(0, 200);
+    if (einheit) { z.einheit = einheit; }
+    z.ki = 'offen';
+  }
+  return z;
+}
+
 // Offerte oder Rechnung aus der Spracheingabe (ENT-695). Oeffnet dasselbe
 // Formular wie "Neue Offerte" und fuellt es vor; gespeichert wird per Klick
 // (ENT-015). Blau: uebernommen. Orange: gesagt, aber nicht zugeordnet --
@@ -15755,7 +15939,7 @@ function ofNeuStarten(art) {
 // Katalog ist. Ein Preis kommt nie aus dem Diktat, nur aus dem Katalog.
 function ofAusDiktat(data) {
   const art = data.art === 'rechnung' ? 'rechnung' : 'offerte';
-  Promise.all([
+  return Promise.all([
     produkte.length ? null : loadProdukte(),
     kunden.length ? null : loadKunden(),
     belege.length || ofNaechsteNummer ? null : loadBelege(),
@@ -15785,28 +15969,9 @@ function ofAusDiktat(data) {
       if (felder[feld]) { $(id).value = felder[feld]; $(id).classList.add('ki'); blau.push(text); }
     }
 
-    const aktiv = produkte.filter(p => Number(p.aktiv ?? 1) === 1);
     const zeilen = (data.positionen || []).map(p => {
-      const z = ofLeereZeile();
-      const menge = Number(p.menge);
-      z.menge = Number.isFinite(menge) && menge > 0 ? menge : 1;
-      const prod = p.produkt_id ? aktiv.find(x => Number(x.id) === Number(p.produkt_id)) : null;
-      if (prod) {
-        // Einheit und Preis gehoeren zum Katalogeintrag -- ein Preis je
-        // Stunde mit einer gesagten Einheit "Tag" ergaebe einen falschen Betrag.
-        z.produkt_id = Number(prod.id);
-        z.produkt_name = prod.name;
-        z.beschreibung = prod.beschreibung || '';
-        z.einzelpreis_rappen = Number(prod.einzelpreis_rappen) || 0;
-        z.einheit = prod.einheit || 'Std.';
-        z.mwst_satz_bp = Number(prod.mwst_satz_bp) || 0;
-        z.ki = 'katalog';
-      } else {
-        z.produkt_name = p.produkt_name || p.gesagt || '';
-        if (p.einheit) { z.einheit = p.einheit; }
-        z.ki = 'offen';
-      }
-      return z;
+      const prod = p.produkt_id ? produkte.find(x => Number(x.aktiv ?? 1) === 1 && Number(x.id) === Number(p.produkt_id)) : null;
+      return ofDiktatZeile(prod, p.produkt_name || p.gesagt || '', p.menge, p.einheit);
     }).filter(z => z.produkt_name);
     if (zeilen.length) { ofPos = zeilen; }
     ofZeilenZeichnen();

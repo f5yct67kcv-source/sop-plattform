@@ -293,8 +293,17 @@ foreach (['production', 'Production', 'production ', 'staging', '', '__APP_ENV__
 pruef('Dieselbe Produktionsregel wie umgebung_ist_produktion() in db.php (nur das exakte Wort sperrt)', $gleich);
 
 $wz = ki_assistent_werkzeuge();
-pruef('Jedes Werkzeug traegt ein Recht aus dem Rechtekatalog (lesen genuegt, schreiben braucht es nie)',
-    array_reduce($wz, fn($ok, $w) => $ok && preg_match('/^[a-z_]+_lesen$/', $w['recht']), true));
+// Nachsehen braucht ein Leserecht. Die beiden Formular-Werkzeuge (ENT-700)
+// tragen keins: Sie laufen ueber ki_router_parse.php, das je erkannter
+// Faehigkeit deren eigenes Recht prueft (ENT-695). Ein drittes Werkzeug ohne
+// Recht faellt hier auf.
+$ohneRecht = array_keys(array_filter($wz, fn($w) => $w['recht'] === null));
+sort($ohneRecht);
+pruef('Jedes Werkzeug zum Nachsehen traegt ein Leserecht aus dem Rechtekatalog',
+    array_reduce(array_filter($wz, fn($w) => $w['recht'] !== null), fn($ok, $w) => $ok && preg_match('/^[a-z_]+_lesen$/', $w['recht']), true));
+pruef('KRITISCH: ohne eigenes Recht sind nur die zwei Formular-Werkzeuge (Recht je Faehigkeit im Router)',
+    $ohneRecht === ['formular_ergaenzen', 'formular_vorbereiten']);
+pruef('Kein Werkzeug fragt einen Preis ab', !preg_match('/preis|rappen|betrag/i', json_encode(array_column($wz, 'input_schema'))));
 pruef('Der Systemtext nennt jedes Werkzeug, das es gibt -- aus der Liste, nicht abgeschrieben',
     array_reduce($wz, fn($ok, $w) => $ok && str_contains(ki_assistent_system('2000-01-05'), $w['titel']), true));
 pruef('Der Systemtext nennt den Wochentag des mitgegebenen Datums (2000-01-05 war ein Mittwoch)',

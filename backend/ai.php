@@ -1068,6 +1068,42 @@ function ki_assistent_werkzeuge(): array
             'input_schema' => ['type' => 'object', 'properties' => ['datum' => $datum, 'von' => $zeit, 'bis' => $zeit],
                 'required' => ['datum', 'von', 'bis']],
         ],
+        // Die beiden Formular-Werkzeuge (ENT-700) schreiben nichts: Sie oeffnen
+        // ein vorbefuelltes Formular bzw. aendern ein offenes, gespeichert
+        // wird per Klick (ENT-015). Ihr Recht haengt an der Faehigkeit, die
+        // die Spracheingabe erkennt (ki_faehigkeiten(), ENT-695) -- darum
+        // hier kein festes Recht, geprueft wird in ki_router_parse.php.
+        'formular_vorbereiten' => [
+            'recht' => null,
+            'titel' => 'Offerten, Rechnungen, Einsätze, Kunden und Mitarbeitende vorbereiten',
+            'description' => 'Oeffnet ein vorbefuelltes Formular zum Anlegen einer Offerte, Rechnung, eines Einsatzes, '
+                . 'Kunden oder Mitarbeitenden, oder zum Aendern von Angaben einer bekannten Person. Nichts wird '
+                . 'gespeichert; die Person prueft und speichert selbst. auftrag ist der vollstaendige Auftrag in einem '
+                . 'Satz, mit allen genannten Angaben (Kunde, Leistungen, Mengen, Datum, Zeit ...).',
+            'input_schema' => ['type' => 'object', 'properties' => [
+                'auftrag' => ['type' => 'string', 'description' => 'z.B. "Offerte fuer die Beispiel AG ueber 16 Stunden Verkehrsdienst"'],
+            ], 'required' => ['auftrag']],
+        ],
+        'formular_ergaenzen' => [
+            'recht' => null,
+            'titel' => 'Ein vorbereitetes Formular ergänzen',
+            'description' => 'Aendert das Formular, das formular_vorbereiten gerade geoeffnet hat: bei Offerte oder '
+                . 'Rechnung Empfaenger, Titel, Bemerkung und Positionen (hinzufuegen, Menge aendern, entfernen), '
+                . 'beim Einsatz Datum, Zeiten, Anzahl, Ort, Strasse, Bezeichnung und Bemerkung. Nie Preise. Nur '
+                . 'nennen, was sich aendern soll.',
+            'input_schema' => ['type' => 'object', 'properties' => [
+                'kunde_name' => ['type' => 'string'], 'titel' => ['type' => 'string'], 'bemerkung' => ['type' => 'string'],
+                'positionen_hinzu' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
+                    'leistung' => ['type' => 'string', 'description' => 'Name wie im Leistungskatalog, falls bekannt.'],
+                    'menge' => ['type' => 'number'], 'einheit' => ['type' => 'string']], 'required' => ['leistung']]],
+                'positionen_menge' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
+                    'nr' => ['type' => 'integer', 'description' => 'Positionsnummer, ab 1'], 'menge' => ['type' => 'number']],
+                    'required' => ['nr', 'menge']]],
+                'positionen_entfernen' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Positionsnummern, ab 1'],
+                'datum' => $datum, 'von' => $zeit, 'bis' => $zeit, 'bedarf' => ['type' => 'integer'],
+                'ort' => ['type' => 'string'], 'strasse' => ['type' => 'string'],
+            ]],
+        ],
         'offene_rechnungen' => [
             'recht' => 'offerten_lesen',
             'titel' => 'Offene Rechnungen',
@@ -1098,7 +1134,11 @@ function ki_assistent_system(string $heute): string
         . "- Steht in einem Ergebnis ein hinweis (zum Beispiel, dass etwas nicht beruecksichtigt ist), gib ihn weiter.\n"
         . "- Offene Plaetze und Einsaetze sind verschiedene Einheiten: nenne beide getrennt, nie das eine als das andere.\n"
         . "- Ruhezeit-Hinweise gibst du so weiter, wie sie im Ergebnis stehen. Du legst den GAV nicht aus.\n"
-        . "- Du kannst nichts aendern, speichern oder versenden. Wirst du darum gebeten, sag das.\n"
+        . "- Soll etwas angelegt oder eine Person geaendert werden, rufe formular_vorbereiten mit dem ganzen Auftrag "
+        . "auf. Danach sagst du kurz, was uebernommen wurde und was noch offen ist, und dass die Person pruefen und "
+        . "speichern muss. Weitere Angaben dazu gehen mit formular_ergaenzen ins offene Formular.\n"
+        . "- Du selbst speicherst, versendest und loeschst nie etwas, und du setzt nie Preise. Wirst du darum gebeten, "
+        . "sag das.\n"
         . "- Rechne relative Angaben (morgen, Samstag, diese Woche) selbst in Daten um.\n"
         . "- Passt keine Frage zu deinen Werkzeugen, sag, was du heute beantworten kannst: {$koennen}.";
 }
