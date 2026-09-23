@@ -74,6 +74,12 @@ Diese sind schon einmal gebrochen worden, jedes Mal beim Bauen von etwas
 - **Sperren gehören in den Server, nicht in die Oberfläche.** Eine Sperre,
   die man am Browser vorbei umgehen kann, ist keine. Was im Browser steht,
   erspart nur den Umweg.
+- **Jeder Push, den jemand in der Oberfläche bemerkt, bekommt einen Eintrag
+  in `backend/neuerungen.php` (ENT-698).** Oben anfügen, Nummer um eins
+  höher als die höchste, nie eine Nummer wiederverwenden oder umschreiben —
+  am Konto steht, bis zu welcher Nummer jemand gelesen hat. Der Text ist
+  für Menschen, kein Einrichtungsschritt. Ohne Eintrag erscheint das Update
+  im Update-Fenster nicht.
 
 Die folgenden vier sind mit **ENT-501** dazugekommen, nach der
 Sicherheitsprüfung vom 2026-09-09. Jede davon wird von `pruef_sicherheit.php`

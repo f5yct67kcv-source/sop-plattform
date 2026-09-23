@@ -59,6 +59,10 @@ const OHNE_LOGBUCH = {
     + 'keinen angemeldeten Akteur; die Unterschrift IST der Eintrag -- mit Name, '
     + 'Funktion, Codeadresse, Zeitpunkten, Adresse und Browser in be_beleg_unterschrift '
     + 'und im Pruefprotokoll am Dokument. Ein Logbuchsatz waere dieselbe Zeile noch einmal.',
+  'betreiber_neuerungen.php':
+    'Merkt nur, bis zu welcher Neuerung das eigene Konto gelesen hat (ENT-698). '
+    + 'Keine Aenderung am Bestand, nichts, das ein anderer je nachvollziehen muesste -- '
+    + 'dasselbe wie das Wegklicken eines Hinweises.',
   'betreiber_demo_beenden.php':
     'Demo-Instanzen sind Wegwerfumgebungen (ENT-523), kein Bestand dieser Ebene.',
   'betreiber_demo_ablauf.php':

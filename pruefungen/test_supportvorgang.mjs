@@ -124,6 +124,12 @@ const BETREIBER_EBENE_ERLAUBT = [
   // solange der Bootstrap offen ist -- aelter als die Supportvorgaenge und
   // hier nur der Vollstaendigkeit halber genannt.
   'planung_einrichten.php',
+  // Das Update-Fenster (ENT-698). Bindet planung_einrichten_kern.php nur
+  // fuer kern_schema_fehlend() und die beiden Geschwister ein, um zu sagen,
+  // ob ein Update aussteht. betreiber_db() steht im Kern allein in
+  // Abschnitt 3b von planung_einrichten_ausfuehren(), und das ruft dieser
+  // Endpunkt nie auf.
+  'neuerungen_stand.php',
   // Die oeffentliche Demo-Selbstbedienung (ENT-601): Das Register der
   // Demo-Zugaenge (demo_zugang) und der Mandantenstamm liegen in der
   // Betreiber-Datenbank, nicht in einer Demo-Instanz (siehe demo_zugang.php,

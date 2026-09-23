@@ -32,4 +32,18 @@ if ($methode !== 'GET' && $methode !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur GET oder POST'], 405);
 }
 
-json_response(planung_einrichten_ausfuehren(db(), $methode === 'GET'));
+// Etappe (ENT-698): Der Ladebalken ruft jede Etappe einzeln auf. Ohne
+// Angabe laeuft alles in einem Zug wie bisher. Eine unbekannte Etappe wird
+// abgewiesen, nicht still zu "alles" -- sonst liefe ein Tippfehler im
+// Browser als vollstaendiger Lauf durch.
+$etappe = null;
+if ($methode === 'POST') {
+    $eingabe = json_decode((string)file_get_contents('php://input'), true);
+    $etappe = is_array($eingabe) && isset($eingabe['etappe']) ? (string)$eingabe['etappe'] : null;
+    if ($etappe !== null && !array_key_exists($etappe, kern_etappen())) {
+        json_response(['status' => 'error', 'message' => 'Unbekannte Etappe'], 400);
+    }
+}
+$ergebnis = planung_einrichten_ausfuehren(db(), $methode === 'GET', true, $etappe);
+$ergebnis['etappen'] = kern_etappen();
+json_response($ergebnis);
