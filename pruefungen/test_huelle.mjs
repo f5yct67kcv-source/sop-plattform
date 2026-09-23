@@ -522,9 +522,12 @@ try {
   // Seit ENT-421 vier: "Mitteilungen" kommt hinten dazu. Seit ENT-441 fuenf:
   // "Kundenzugaenge" (Kundenportal) steht am Ende -- unter Administration und
   // nicht unter Kunden, weil dort kein Stamm gepflegt, sondern jemandem von
-  // aussen ein Zugang gegeben wird.
+  // aussen ein Zugang gegeben wird. Seit ENT-682 sechs: "Support" steht am
+  // Ende -- Supportanfrage und Support-Freigabe betreffen den Betreiber der
+  // Plattform und nicht den eigenen Betrieb, darum nicht mehr als Kacheln
+  // unter "Einstellungen".
   check('KRITISCH: auch die Administration zeigt ihre Unterkategorien',
-    JSON.stringify(n2) === JSON.stringify(['Mitarbeitende', 'Leistungen', 'Einstellungen', 'Mitteilungen', 'Kundenzugänge']));
+    JSON.stringify(n2) === JSON.stringify(['Mitarbeitende', 'Leistungen', 'Einstellungen', 'Mitteilungen', 'Kundenzugänge', 'Support']));
 
   // Ein Bereich ohne Untergruppen zeigt keine leere Leiste
   await p.evaluate(() => go('abgleich')); await p.waitForTimeout(300);
@@ -560,11 +563,11 @@ try {
   // stimmt -- genau das ist der Zweck dieser Suite.
   const mPlanung = await mitteVon(() => go('planung'));
   check('Bei den Kunden stehen sechs Unterkategorien (ENT-181, "Übersicht" seit ENT-555)', mKunden.anzahl === 6);
-  check('Bei der Administration fuenf (ENT-181/ENT-421/ENT-441)', mAdmin.anzahl === 5);
+  check('Bei der Administration sechs (ENT-181/ENT-421/ENT-441/ENT-682)', mAdmin.anzahl === 6);
   check('Bei der Planung ebenfalls vier', mPlanung.anzahl === 4);
   check('KRITISCH: sechs Unterkategorien stehen in der Fenstermitte',
     Math.abs(mKunden.mitte - 800) <= 4);
-  check('KRITISCH: fuenf ebenfalls -- die Zahl aendert die Mitte nicht',
+  check('KRITISCH: sechs der Administration ebenfalls -- die Zahl aendert die Mitte nicht',
     Math.abs(mAdmin.mitte - 800) <= 4);
   check('KRITISCH: und eine anders breite Leiste ebenfalls',
     Math.abs(mPlanung.mitte - 800) <= 4);

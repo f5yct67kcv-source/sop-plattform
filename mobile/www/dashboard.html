@@ -5759,6 +5759,13 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                wird jemandem von aussen ein Zugang ins System gegeben. Das
                eigene Recht 'portal' haelt das auseinander. -->
           <button class="nav-kind" id="nav-admin-portal" onclick="go('portal')">Kundenzugänge</button>
+          <!-- Support (ENT-682). Eigener Reiter statt zweier Kacheln unter
+               "Einstellungen": Supportanfrage und Support-Freigabe betreffen
+               nicht den eigenen Betrieb, sondern den Betreiber der Plattform.
+               Ohne Rechtezeile in NAV_RECHTE -- fragen darf jeder, der ins
+               Cockpit kommt (die Grenze sitzt im Server, require_verwaltung),
+               und die Freigabe darin haengt an ihrem eigenen Recht. -->
+          <button class="nav-kind" id="nav-admin-support" onclick="go('support')">Support</button>
         </div>
       </div>
 
@@ -5798,12 +5805,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
            sind Ortswechsel. Der Fussteil folgt damit weiter seiner Ordnung --
            Werkzeuge, wer bin ich, wohin gehe ich, wie gehe ich raus.
 
-           WARUM HIER UND NICHT NUR IN DEN EINSTELLUNGEN: Die Kachel unter
-           Administration → Einstellungen bleibt der Ort, an dem der Vorgang
-           wohnt. Aber wer gerade nicht weiterkommt, sucht Hilfe dort, wo er
-           steht -- und nicht in einem Einstellungsbereich, den er in dem
-           Moment erst finden muss. Derselbe Griff wie beim Logo-Menü der
-           Anwendung, die der Projektinhaber als Vorbild gezeigt hat.
+           WARUM HIER UND NICHT NUR IM REITER: Seit ENT-682 wohnt der
+           Vorgang unter Administration → Support. Aber wer gerade nicht
+           weiterkommt, sucht Hilfe dort, wo er steht -- und nicht in einer
+           Rubrik, die er in dem Moment erst finden muss. Derselbe Griff wie
+           beim Logo-Menü der Anwendung, die der Projektinhaber als Vorbild
+           gezeigt hat.
 
            AUCH AM HANDY, auf ausdrücklichen Wunsch des Projektinhabers
            (Hausregel: der mobile Zuschnitt ist seine Entscheidung, nicht die
@@ -5813,15 +5820,15 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
            deshalb nicht nötig -- und zwei Zuschnitte für dieselbe Sache wären
            zwei Stellen, die auseinanderlaufen können.
 
-           WAS DABEI ZU LÖSEN WAR: Der Abschnitt liegt in der Administration,
-           und die ist am Handy nach ENT-235 bewusst nicht erreichbar. Über
-           den Zurück-Knopf käme man von hier aus in ihre Kachelübersicht und
-           damit doch hinein -- eine Tür, die jemand absichtlich zugemacht
-           hat, als Nebenwirkung wieder offen. Darum führt Zurück am Handy
-           dorthin, wo man herkam (siehe saZurueck). -->
+           SEIT ENT-682 OHNE SONDERWEG: Solange der Abschnitt in der
+           Administration lag, führte der Zurück-Knopf am Handy in deren
+           Kachelübersicht -- also durch eine Tür, die ENT-235 dort
+           absichtlich zugemacht hat. Eine eigene Ansicht hat keine
+           Kachelübersicht über sich, der Sonderweg (saZurueck) ist damit
+           weggefallen. -->
       <button class="nav-item" id="nav-support"
               title="Anliegen an den Betreiber der Plattform melden"
-              onclick="go('betrieb'); bkAbschnittZeigen('sa'); saLaden();">
+              onclick="go('support')">
         <svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span class="lbl">Support</span>
       </button>
@@ -8315,28 +8322,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M3 13l2-5.5A2 2 0 0 1 6.9 6h10.2a2 2 0 0 1 1.9 1.5L21 13"/><path d="M3 13h18v4a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/></svg></span>
               <span class="bk-kachel-lbl">Dienstfahrzeuge</span>
             </button>
-            <!-- Support-Freigabe (ENT-526). Steht hier und nicht bei den
-                 Kundenzugaengen: Es geht nicht um einen Kunden dieses
-                 Betriebs, sondern um den Betreiber der Plattform. Die Kachel
-                 erscheint nur mit dem Recht "Rollen & Berechtigungen" --
-                 wer sie bedient, oeffnet einem Betriebsfremden Einblick,
-                 und das ist dieselbe Art Entscheidung wie eine Rollenvergabe
-                 (siehe bkKachelSfSetzen). -->
-            <button type="button" class="bk-kachel" id="bkKachelSf" style="display:none"
-                    onclick="bkAbschnittZeigen('sf'); sfLaden();">
-              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></span>
-              <span class="bk-kachel-lbl">Support-Freigabe</span>
-            </button>
-            <!-- Supportanfrage (ENT-538). Neben der Freigabe, weil beides
-                 denselben Gegenueber betrifft -- aber OHNE die Rechtehuerde
-                 der Freigabe: Wer fragt, oeffnet niemandem die Tuer. Die
-                 Grenze sitzt im Server (require_verwaltung); wer in die
-                 Administration kommt, darf auch fragen. -->
-            <button type="button" class="bk-kachel"
-                    onclick="bkAbschnittZeigen('sa'); saLaden();">
-              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
-              <span class="bk-kachel-lbl">Supportanfrage</span>
-            </button>
           </div>
 
           <div class="card">
@@ -8424,91 +8409,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         </div>
         </div>
 
-        <!-- Support-Freigabe (ENT-526). Der Plattform-Betreiber kann nur
-             hineinsehen, wenn dieser Betrieb es befristet erlaubt -- und
-             sieht dann ausschliesslich Diagnosedaten ohne Personenbezug.
-             Die Freigabe liegt bewusst in der Datenbank DIESES Betriebs:
-             laege sie beim Betreiber, koennte er sie sich selbst
-             ausstellen. Jeder Abruf steht im Protokoll unten. -->
-        <div class="bk-abschnitt" id="bkAb-sf" style="display:none">
-        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
-        <div class="grid">
-        <div class="card" id="sfKarte">
-          <div class="card-hd">
-            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></span>
-            <h3>Support-Freigabe</h3>
-          </div>
-          <div class="card-bd">
-            <div class="msg-err" id="sfErr" style="display:none"></div>
-            <div id="sfInhalt"><div style="color:var(--ink-3)">Wird geladen …</div></div>
-          </div>
-        </div>
-        <div class="card" id="sfProtokollKarte">
-          <div class="card-hd">
-            <span class="card-ic gedaempft"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
-            <h3>Protokoll</h3>
-          </div>
-          <div class="card-bd">
-            <div id="sfProtokoll"><div style="color:var(--ink-3)">Wird geladen …</div></div>
-          </div>
-        </div>
-        </div>
-        </div>
 
-        <!-- Supportanfrage (ENT-538). Der Weg vom Betrieb zum Betreiber:
-             ein Anliegen schildern, das nicht dringend genug fuer einen
-             Anruf ist, und den Verlauf dazu nachlesen.
-
-             Die Vorgaenge liegen in der Datenbank des BETREIBERS, nicht in
-             dieser -- anders als die Freigabe eine Zeile weiter oben.
-             Begruendung in backend/supportvorgang.php: Der Betreiber
-             braucht eine Arbeitsliste ueber alle Betriebe, und eine nicht
-             erreichbare Datenbank duerfte daraus nicht lautlos
-             herausfallen. Der Preis steht im Hinweis am Eingabefeld: Was
-             hier getippt wird, liegt beim Betreiber. -->
-        <div class="bk-abschnitt" id="bkAb-sa" style="display:none">
-        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="saZurueck()">Zurück</button>
-        <div class="grid">
-        <div class="card" id="saNeuKarte">
-          <div class="card-hd">
-            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
-            <h3>Anliegen melden</h3>
-          </div>
-          <div class="card-bd">
-            <div class="msg-err" id="saErr" style="display:none"></div>
-            <p class="zone-note" id="saHinweis" style="margin-top:0"></p>
-            <div id="saFormular"></div>
-          </div>
-        </div>
-        <div class="card" id="saListeKarte">
-          <div class="card-hd">
-            <span class="card-ic gedaempft"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
-            <h3>Meine Anfragen</h3>
-          </div>
-          <div class="card-bd">
-            <div id="saListe"><div style="color:var(--ink-3)">Wird geladen …</div></div>
-          </div>
-        </div>
-        <div class="card" id="saVorgangKarte" style="display:none">
-          <div class="card-hd">
-            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
-            <h3 id="saVorgangTitel">Vorgang</h3>
-          </div>
-          <div class="card-bd">
-            <div id="saVerlauf"></div>
-            <div style="margin-top:16px">
-              <label for="saAntwort">Nachricht</label>
-              <textarea class="inp" id="saAntwort" rows="3" maxlength="4000"
-                        placeholder="Rückfrage oder Ergänzung zu diesem Vorgang"></textarea>
-            </div>
-            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
-              <button type="button" class="btn btn-sm btn-primary" onclick="saAntworten()">Senden</button>
-              <button type="button" class="btn btn-sm" onclick="saSchliessen()">Schliessen</button>
-            </div>
-          </div>
-        </div>
-        </div>
-        </div>
 
         <!-- Zwei-Faktor-Anmeldung (ENT-076). Eigene Unteransicht statt neben
              Rollen zu stehen (ENT-161 hatte beide ueber ".g-1-1" gepaart,
@@ -8918,6 +8819,107 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             </div>
           </div>
         </div>
+        </div>
+        </div>
+      </section>
+
+      <!-- ══════════════════════════ SUPPORT ══════════════════════════
+           Eigene Ansicht seit ENT-682. Vorher lagen beide Teile als
+           Kacheln unter Administration → Einstellungen. Dort waren sie
+           falsch: Eine Einstellung beschreibt den eigenen Betrieb, hier
+           geht es um den Gegenueber -- den Betreiber der Plattform. Wer
+           Hilfe sucht, sucht sie nicht in einem Einstellungsbereich.
+
+           Beide Teile stehen untereinander statt hinter einer Kachelwand:
+           Zwei Karten rechtfertigen keine Zwischenstufe, und die Freigabe
+           faellt ohne das Recht "rechte_lesen" ohnehin weg (spFreigabe-
+           Setzen). Ein Zurueck-Knopf entfaellt damit auch -- die Ansicht
+           ist selbst die oberste Stufe.
+
+           AM HANDY ERREICHBAR, anders als der Rest der Administration
+           (ENT-235): Der Weg dorthin ist der Support-Knopf im Fussteil
+           der Seitenleiste, nicht die Administrationsrubrik. Damit
+           entfaellt auch der Sonderweg, den saZurueck bis ENT-682
+           gehen musste, um am Handy nicht in die Kachelübersicht der
+           Administration zu fuehren. -->
+      <section class="view" id="view-support">
+        <!-- Supportanfrage (ENT-538). Der Weg vom Betrieb zum Betreiber:
+             ein Anliegen schildern, das nicht dringend genug fuer einen
+             Anruf ist, und den Verlauf dazu nachlesen.
+
+             Die Vorgaenge liegen in der Datenbank des BETREIBERS, nicht in
+             dieser -- anders als die Support-Freigabe weiter unten.
+             Begruendung in backend/supportvorgang.php: Der Betreiber
+             braucht eine Arbeitsliste ueber alle Betriebe, und eine nicht
+             erreichbare Datenbank duerfte daraus nicht lautlos
+             herausfallen. Der Preis steht im Hinweis am Eingabefeld: Was
+             hier getippt wird, liegt beim Betreiber. -->
+        <div class="grid">
+        <div class="card" id="saNeuKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+            <h3>Anliegen melden</h3>
+          </div>
+          <div class="card-bd">
+            <div class="msg-err" id="saErr" style="display:none"></div>
+            <p class="zone-note" id="saHinweis" style="margin-top:0"></p>
+            <div id="saFormular"></div>
+          </div>
+        </div>
+        <div class="card" id="saListeKarte">
+          <div class="card-hd">
+            <span class="card-ic gedaempft"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+            <h3>Meine Anfragen</h3>
+          </div>
+          <div class="card-bd">
+            <div id="saListe"><div style="color:var(--ink-3)">Wird geladen …</div></div>
+          </div>
+        </div>
+        <div class="card" id="saVorgangKarte" style="display:none">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+            <h3 id="saVorgangTitel">Vorgang</h3>
+          </div>
+          <div class="card-bd">
+            <div id="saVerlauf"></div>
+            <div style="margin-top:16px">
+              <label for="saAntwort">Nachricht</label>
+              <textarea class="inp" id="saAntwort" rows="3" maxlength="4000"
+                        placeholder="Rückfrage oder Ergänzung zu diesem Vorgang"></textarea>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+              <button type="button" class="btn btn-sm btn-primary" onclick="saAntworten()">Senden</button>
+              <button type="button" class="btn btn-sm" onclick="saSchliessen()">Schliessen</button>
+            </div>
+          </div>
+        </div>
+        </div>
+
+        <!-- Support-Freigabe (ENT-526). Der Plattform-Betreiber kann nur
+             hineinsehen, wenn dieser Betrieb es befristet erlaubt -- und
+             sieht dann ausschliesslich Diagnosedaten ohne Personenbezug.
+             Die Freigabe liegt bewusst in der Datenbank DIESES Betriebs:
+             laege sie beim Betreiber, koennte er sie sich selbst
+             ausstellen. Jeder Abruf steht im Protokoll unten. -->
+        <div class="grid" id="spFreigabe" style="display:none">
+        <div class="card" id="sfKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></span>
+            <h3>Support-Freigabe</h3>
+          </div>
+          <div class="card-bd">
+            <div class="msg-err" id="sfErr" style="display:none"></div>
+            <div id="sfInhalt"><div style="color:var(--ink-3)">Wird geladen …</div></div>
+          </div>
+        </div>
+        <div class="card" id="sfProtokollKarte">
+          <div class="card-hd">
+            <span class="card-ic gedaempft"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+            <h3>Protokoll</h3>
+          </div>
+          <div class="card-bd">
+            <div id="sfProtokoll"><div style="color:var(--ink-3)">Wird geladen …</div></div>
+          </div>
         </div>
         </div>
       </section>
@@ -11381,6 +11383,9 @@ function rechteAnwenden() {
 }
 
 // ══════════════════════════════════════════ NAVIGATION
+// Welche Ansicht offen ist und welche es davor war (ENT-682, siehe go()).
+let goAnsicht = '';
+let goVorherigeAnsicht = '';
 const TITLES = {
   uebersicht:  ['Übersicht', 'Laufender Monat'],
   planung:     ['Planung', 'Geplante Einsätze'],
@@ -11390,6 +11395,7 @@ const TITLES = {
   produkte:    ['Leistungen', 'Preise und Standardtexte für Offerten'],
   offerte:     ['Offerte', 'Positionen, Preise und Summen'],
   betrieb:     ['Einstellungen', 'Betrieb, Briefkopf, Zugang, Rollen und Dienstfahrzeuge'],
+  support:     ['Support', 'Anliegen an den Betreiber und befristete Support-Freigabe'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
   lohnlaeufe:  ['Lohnläufe', 'Aus abgeglichenen Ist-Zeiten wird der Bruttolohn'],
   lohnarten:   ['Lohnarten', 'Woraus eine Abrechnung besteht — und was in welche Bemessungsgrundlage zählt'],
@@ -12495,6 +12501,11 @@ function weiteAnsicht(an) {
 }
 
 function go(view) {
+  // Woher jemand kommt (ENT-682). Gebraucht von saBildschirm(): Solange der
+  // Supportabschnitt in der Administration lag, konnte er den offenen
+  // Abschnitt selbst ablesen. Als eigene Ansicht wechselt man dorthin --
+  // die Angabe, die dem Support hilft, ist darum die Ansicht davor.
+  if (view !== goAnsicht) { goVorherigeAnsicht = goAnsicht; goAnsicht = view; }
   dpReiterWechsel(view);
   if (huelleKompakt()) { navGruppenZu(); }
   document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
@@ -12557,7 +12568,7 @@ function go(view) {
   // und der Elternpunkt wird mitmarkiert, sonst sieht die Seitenleiste aus,
   // als waere man nirgends (dasselbe Muster wie bei den Kunden, ENT-039).
   const imAdmin = view === 'mitarbeiter' || view === 'betrieb' || view === 'produkte'
-    || view === 'mitteilungen' || view === 'portal';
+    || view === 'mitteilungen' || view === 'portal' || view === 'support';
   $('navg-admin').classList.toggle('offen', imAdmin);
   if (imAdmin) { $('nav-admin').classList.add('on'); }
   document.querySelectorAll('#navg-admin .nav-kind').forEach(k => k.classList.remove('on'));
@@ -12567,6 +12578,14 @@ function go(view) {
   if (view === 'produkte') { produkte.length ? renderProdukte() : loadProdukte(); }
   if (view === 'mitteilungen') { $('nav-admin-mitteilungen').classList.add('on'); mtlLaden(); }
   if (view === 'portal') { $('nav-admin-portal').classList.add('on'); kzLaden(); }
+  // Support (ENT-682). Die Freigabe haengt an ihrem eigenen Recht und wird
+  // nur geholt, wenn sie ueberhaupt zu sehen ist -- ein Abruf, den der
+  // Server mit 403 beantwortet, waere eine leere Flaeche ohne einen Satz.
+  if (view === 'support') {
+    $('nav-admin-support').classList.add('on');
+    saLaden();
+    if (spFreigabeSetzen()) { sfLaden(); }
+  }
   const kontrView = view === 'pensen' || view === 'auslagen' || view === 'abwesenheiten'
     || view === 'arbeitsergebnisse';
   $('navg-kontrolle').classList.toggle('offen', kontrView);
@@ -24021,7 +24040,6 @@ function ibanIstQrJs(iban) {
 function bkUebersichtZeigen() {
   $('bkUebersicht').style.display = '';
   document.querySelectorAll('#view-betrieb .bk-abschnitt').forEach(a => { a.style.display = 'none'; });
-  bkKachelSfSetzen();
 }
 
 
@@ -24055,10 +24073,10 @@ let saVorgang = 0;
    nur die eine Angabe, die beim Nachstellen hilft. Faellt sie leer aus,
    wird das als "nicht mitgeschickt" angezeigt, nicht als leeres Feld. */
 function saBildschirm() {
-  const offen = document.querySelector('.bk-abschnitt:not([style*="none"])');
-  const titel = offen && offen.querySelector('h3');
-  return titel ? titel.textContent.trim().slice(0, 120) : 'Administration';
+  const v = TITLES[goVorherigeAnsicht];
+  return v ? v[0].slice(0, 120) : 'Cockpit';
 }
+
 
 /* Browser und Bildschirmbreite, gekuerzt. Genau die zwei Angaben, mit
    denen sich "bei mir sieht das anders aus" am haeufigsten aufklaert.
@@ -24074,24 +24092,6 @@ function saUmgebung() {
   return name + ' · ' + window.innerWidth + '×' + window.innerHeight;
 }
 
-/* Zurück aus dem Supportteil.
- *
- * Am Desktop wie bei jedem anderen Abschnitt: zur Kachelübersicht der
- * Einstellungen, aus der man gekommen ist.
- *
- * AM HANDY NICHT. Dorthin führt kein Weg über die Navigation -- die
- * Administration ist dort seit ENT-235 bewusst ausgeblendet, und der
- * einzige Zugang zu diesem Abschnitt ist das Kontomenü. Ein Zurück in die
- * Kachelübersicht öffnete genau die Tür wieder, die jemand absichtlich
- * zugemacht hat. Zurück heisst hier darum: dahin, wo man herkam.
- *
- * Dieselbe Schwelle wie ".nur-desktop" im Stylesheet (900 px) -- zwei
- * verschiedene Grenzen für dasselbe "am Handy" liefen irgendwann
- * auseinander. */
-function saZurueck() {
-  if (window.matchMedia('(max-width: 900px)').matches) { go('uebersicht'); return; }
-  bkUebersichtZeigen();
-}
 
 function saLaden() {
   $('saErr').style.display = 'none';
@@ -24235,9 +24235,15 @@ function saAntworten() {
  * (require_recht_nach_methode auf 'rechte'): Was im Browser steht, ist
  * Bequemlichkeit, keine Sicherung.
  */
-function bkKachelSfSetzen() {
-  const k = $('bkKachelSf');
-  if (k) { k.style.display = darf('rechte_lesen') ? '' : 'none'; }
+// Die Support-Freigabe zeigt sich nur, wer selbst Rollen vergeben darf
+// (ENT-526): Wer sie bedient, oeffnet einem Betriebsfremden Einblick, und
+// das ist dieselbe Art Entscheidung wie eine Rollenvergabe. Gibt zurueck,
+// ob der Block steht -- go() holt die Daten nur dann.
+function spFreigabeSetzen() {
+  const el = $('spFreigabe');
+  const sichtbar = darf('rechte_lesen');
+  if (el) { el.style.display = sichtbar ? '' : 'none'; }
+  return sichtbar;
 }
 
 const SF_LAGE = {
