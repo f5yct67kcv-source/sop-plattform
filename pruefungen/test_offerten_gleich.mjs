@@ -341,6 +341,14 @@ const NUR_BETREIBER = ['#ofLaufzeitKarte', '#of_vbeginn', '#of_vmindest',
                        '#ofFadenKarte', '#ofFadenListe', '#ofFadenAntwort',
                        '#of_antwort', '#ofFadenSendenBtn', '#ofFadenHinweis'];
 
+/* Die Gegenrichtung (ENT-695): Die Spracheingabe gibt es nur im Cockpit.
+   Ihr Band oben und der Hinweis „Nicht in der Kundenliste" unter dem
+   Empfaenger erscheinen erst, wenn eine Offerte per Sprache vorbefuellt
+   wurde. Im Betreiber-Bereich gibt es diesen Weg nicht. Dieselbe Regel wie
+   oben: ausgenommen nur, solange sie verborgen sind -- stehen sie in einer
+   gewoehnlichen Offerte offen da, ist es ein zweites Formular. */
+const NUR_COCKPIT = ['#ofKiHint', '#ofKiText', '#ofKundeHinweis'];
+
 function formularVergleichen(was, co, be) {
   check(`${was}: beide Seiten zeigen das Formular ohne JS-Fehler`,
     co.fehler.length === 0 && be.fehler.length === 0);
@@ -354,7 +362,7 @@ function formularVergleichen(was, co, be) {
   // Dieselben Felder unter denselben Bezeichnern. Ein Feld, das hier fehlt
   // oder dazukommt, ist keine Gestaltungsfrage mehr, sondern ein anderes
   // Formular.
-  const nurCo = Object.keys(co.m.nachId).filter(k => !(k in be.m.nachId));
+  const nurCo = Object.keys(co.m.nachId).filter(k => !(k in be.m.nachId) && !NUR_COCKPIT.includes(k));
   const nurBe = Object.keys(be.m.nachId)
     .filter(k => !(k in co.m.nachId) && !NUR_BETREIBER.includes(k));
   check(`KRITISCH ${was}: dieselben Bausteine, keiner fehlt und keiner ist zuviel`,
@@ -368,6 +376,12 @@ function formularVergleichen(was, co, be) {
      mehr, sondern ein zweites Formular. */
   const sichtbareAusnahmen = NUR_BETREIBER
     .filter(k => be.m.nachId[k] && be.m.nachId[k].h > 0);
+  const sichtbarNurCockpit = NUR_COCKPIT.filter(k => co.m.nachId[k] && co.m.nachId[k].h > 0);
+  check(`KRITISCH ${was}: die Bausteine der Spracheingabe bleiben in einer gewoehnlichen Offerte verborgen`,
+    sichtbarNurCockpit.length === 0);
+  if (sichtbarNurCockpit.length) {
+    bad.push(`${was}: sichtbar ohne Spracheingabe: ` + sichtbarNurCockpit.join(', '));
+  }
   check(`KRITISCH ${was}: die betreiberseitigen Zusaetze bleiben verborgen`,
     sichtbareAusnahmen.length === 0);
   if (sichtbareAusnahmen.length) {

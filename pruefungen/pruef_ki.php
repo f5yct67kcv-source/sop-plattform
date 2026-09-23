@@ -265,9 +265,9 @@ pruef('Eine Position ohne Katalog und ohne Text wird nicht erfunden', count($a11
 pruef('Menge bleibt, fehlende Menge wird 1', $a11['positionen'][0]['menge'] == 16 && $a11['positionen'][2]['menge'] == 1);
 pruef('KRITISCH: keine Position traegt einen Preis aus dem Diktat',
     array_reduce($a11['positionen'], fn($ok, $p) => $ok && !preg_grep('/preis|rappen|betrag/i', array_keys($p)), true));
-[, $a12] = ki_felder_auswerten('beleg_neu', ['kunde_name' => 'Neue Firma AG', 'art' => 'rechnung'], $listen);
+[, $a12] = ki_felder_auswerten('beleg_neu', ['kunde_name' => 'Beispiel Neubau AG', 'art' => 'rechnung'], $listen);
 pruef('Ein unbekannter Kunde kommt als Name ohne ID -- nichts wird still angelegt',
-    $a12['kunde'] === ['id' => null, 'name' => 'Neue Firma AG'] && $a12['art'] === 'rechnung');
+    $a12['kunde'] === ['id' => null, 'name' => 'Beispiel Neubau AG'] && $a12['art'] === 'rechnung');
 [, $a13] = ki_felder_auswerten('beleg_neu', ['kunde_name' => '<UNKNOWN>', 'art' => 'irgendwas'], $listen);
 pruef('Kein Kunde bei Platzhalter; eine fremde Art wird Offerte', $a13['kunde'] === null && $a13['art'] === 'offerte');
 [, $a14] = ki_felder_auswerten('beleg_neu', ['positionen' => [['produkt_id' => 3, 'leistung' => 'x']]], ['kunden' => [], 'produkte' => []]);

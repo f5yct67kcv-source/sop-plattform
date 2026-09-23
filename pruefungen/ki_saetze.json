@@ -9,7 +9,7 @@
     {"text": "Erstelle mir eine Offerte für die Beispiel AG über 16 Stunden Verkehrsdienst", "absicht": "beleg_neu", "kritisch": true, "art": "offerte", "kunde_id": 7, "produkte": [3]},
     {"text": "Offerte Muster GmbH, zwei Mann Objektschutz am Samstag von 18 bis 6 Uhr", "absicht": "beleg_neu", "kritisch": true, "art": "offerte", "kunde_id": 9, "produkte": [4]},
     {"text": "Mach mir es Angebot für d Seeblick Immobilien, 20 Revierkontrollen im Monat", "absicht": "beleg_neu", "kritisch": true, "art": "offerte", "kunde_id": 11, "produkte": [5]},
-    {"text": "Kostenvoranschlag für die Neue Firma AG, Verkehrsdienst für ein Dorffest am 12. Juni, dazu die Anfahrtspauschale", "absicht": "beleg_neu", "kritisch": true, "art": "offerte", "kunde_id": null, "produkte": [3, 6]},
+    {"text": "Kostenvoranschlag für die Beispiel Neubau AG, Verkehrsdienst für ein Dorffest am 12. Juni, dazu die Anfahrtspauschale", "absicht": "beleg_neu", "kritisch": true, "art": "offerte", "kunde_id": null, "produkte": [3, 6]},
     {"text": "Offerte für die Beispiel AG, 8 Stunden Verkehrsdienst und 10 Absperrgitter", "absicht": "beleg_neu", "kritisch": true, "art": "offerte", "kunde_id": 7, "produkte": [3], "freitext": 1},
     {"text": "Stell der Muster GmbH eine Rechnung über 12 Stunden Objektschutz", "absicht": "beleg_neu", "kritisch": true, "art": "rechnung", "kunde_id": 9, "produkte": [4]},
     {"text": "Rechnung an die Beispiel AG für den Verkehrsdienst von letzter Woche, 24 Stunden", "absicht": "beleg_neu", "kritisch": true, "art": "rechnung", "kunde_id": 7, "produkte": [3]},

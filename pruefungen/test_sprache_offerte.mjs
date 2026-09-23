@@ -133,13 +133,13 @@ check('... und der Preis kommt jetzt aus dem Katalog', (await page.inputValue('#
 
 // ══════════ UNBEKANNTER KUNDE
 await page.evaluate(() => go('uebersicht')); await page.waitForTimeout(200);
-await diktieren({ art: 'offerte', kunde_name: 'Neue Firma AG', positionen: [{ produkt_id: 4, leistung: 'Objektschutz', menge: 8 }] },
-  'Offerte für die Neue Firma AG, 8 Stunden Objektschutz');
-check('Unbekannter Kunde: der gesagte Name steht im Feld', (await page.inputValue('#of_kunde')) === 'Neue Firma AG');
+await diktieren({ art: 'offerte', kunde_name: 'Beispiel Neubau AG', positionen: [{ produkt_id: 4, leistung: 'Objektschutz', menge: 8 }] },
+  'Offerte für die Beispiel Neubau AG, 8 Stunden Objektschutz');
+check('Unbekannter Kunde: der gesagte Name steht im Feld', (await page.inputValue('#of_kunde')) === 'Beispiel Neubau AG');
 check('KRITISCH: ... orange, nicht blau', (await farbe('#of_kunde')) === tokens.orange);
 check('KRITISCH: ... und nicht als gewählter Kunde behandelt', await page.evaluate(() => ofFormKundeId === null));
 check('Unter dem Feld steht „nicht in der Kundenliste"', await page.isVisible('#ofKundeHinweis'));
-check('Das Band nennt den Namen und den Weg', /Neue Firma AG/.test(await page.textContent('#ofKiText'))
+check('Das Band nennt den Namen und den Weg', /Beispiel Neubau AG/.test(await page.textContent('#ofKiText'))
   && /Neue Adresse erstellen/.test(await page.textContent('#ofKiText')));
 // Gemessen: der Hinweis steht UNTER dem Feld, nicht daneben.
 const lage = await page.evaluate(() => {
@@ -152,7 +152,7 @@ check('Der Hinweis steht unter dem Feld, bündig links (gemessen)', lage.unter &
 await page.click('button[onclick="ofNeueAdresse()"]');
 await page.waitForTimeout(300);
 check('„Neue Adresse erstellen" öffnet den Kundendialog', await page.isVisible('#dlgKunde.on'));
-check('KRITISCH: ... mit dem gesagten Namen vorbefüllt', (await page.inputValue('#ku_name')) === 'Neue Firma AG');
+check('KRITISCH: ... mit dem gesagten Namen vorbefüllt', (await page.inputValue('#ku_name')) === 'Beispiel Neubau AG');
 await page.evaluate(() => closeDlg('dlgKunde'));
 
 // Wird ein bekannter Kunde gewählt, ist die Warnung erledigt.

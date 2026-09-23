@@ -37,7 +37,9 @@ if ($a === null) {
     ki_fehler_melden();
 }
 [$code, $antwort, $key] = ki_absicht_pruefen($a, fn(string $recht) => darf($user, $recht));
-if ($key === null) {
+// Endet es hier (nicht verstanden, nicht abgedeckt, kein Recht), steht die
+// fertige Antwort schon da.
+if ($antwort !== null) {
     json_response($antwort, $code);
 }
 
