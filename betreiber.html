@@ -1001,7 +1001,13 @@ tbody tr.aus td { opacity: .55; }
    genau die Unruhe, die hier wegsoll.
 
    Aufgeklappt: je Bereich "Ueberschrift oben, darunter Stand und Knopf"
-   (Hausregel) -- die Handlung steht neben dem, worauf sie wirkt. */
+   (Hausregel) -- die Handlung steht neben dem, worauf sie wirkt.
+
+   KEINE HANDY-REGELN, mit Absicht: Der Betreiber-Bereich bekommt keine
+   mobile Fassung (ENT-697). Zwei Regeln, die hier kurz standen (Pfeil
+   44 px, aufgeklappte Flaeche am sichtbaren Rand), sind darum wieder
+   entfernt. Ausgenommen von ENT-697 ist die Einloeseseite des Kunden --
+   sie ist die Anmeldekarte und nicht diese Tabelle. */
 tr.auf-kopf { cursor: pointer; }
 tr.auf-kopf:hover > td, tr.auf-kopf.offen > td { background: var(--surface-2); }
 .auf-zelle { width: 1%; text-align: right; white-space: nowrap; }
@@ -1090,14 +1096,6 @@ tr.auf-leib > td { background: var(--surface-2); padding-top: 4px; }
   background: transparent; }
 
 @media (max-width: 900px) {
-  .auf-knopf { width: 44px; height: 44px; }
-  /* Die Tabelle scrollt am Handy waagrecht. Die aufgeklappte Flaeche waere
-     so breit wie die ganze Tabelle, und die Haelfte der Bereiche laege
-     rechts ausserhalb (gemessen 2026-09-23). Darum klebt sie am linken Rand
-     des Sichtbaren, ist hoechstens so breit wie der Bildschirm, und die
-     Bereiche stehen untereinander. */
-  .auf-inhalt { position: sticky; left: 0; max-width: calc(100vw - 56px);
-    grid-template-columns: 1fr; }
   .of-abschluss { grid-template-columns: 1fr; }
   .of-kopf-zwei { grid-template-columns: 1fr; }
   .of-pos-kopf { grid-template-columns: 1fr 1fr 1fr; }

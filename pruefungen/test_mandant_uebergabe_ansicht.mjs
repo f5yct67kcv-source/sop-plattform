@@ -193,6 +193,12 @@ for (const [breite, hoehe, art] of [[390, 844, 'Handy'], [1280, 900, 'Desktop']]
   }
 
   // ── 4. Der Knopf "Zugang" und sein Dialog ──────────────────────────
+  //
+  // NUR AM DESKTOP: Der Betreiber-Bereich bekommt keine mobile Fassung
+  // (ENT-697). Die Abschnitte 1 bis 3 darueber betreffen die Einloeseseite
+  // des KUNDEN -- die oeffnet er am Handy, und sie ist von ENT-697
+  // ausdruecklich ausgenommen. Darum laufen sie weiter auf beiden Breiten.
+  if (art !== 'Desktop') { continue; }
   {
     const page = await browser.newPage({ viewport: { width: breite, height: hoehe } });
     const protokoll = [];
@@ -225,11 +231,6 @@ for (const [breite, hoehe, art] of [[390, 844, 'Handy'], [1280, 900, 'Desktop']]
     const zu = await page.evaluate(() => [...document.querySelectorAll('#m-inhalt button')]
       .filter(b => b.offsetParent !== null && !b.classList.contains('auf-knopf')).length);
     check(`${art}: KRITISCH: zugeklappt steht kein Handlungsknopf in der Tabelle`, zu === 0);
-    const pfeil = await page.evaluate(() => {
-      const k = document.querySelector('#m-inhalt .auf-knopf').getBoundingClientRect();
-      return { h: k.height, b: k.width };
-    });
-    if (art === 'Handy') { check('Handy: der Pfeil ist mindestens 44 px gross', pfeil.h >= 44 && pfeil.b >= 44); }
     // Ein Klick irgendwo in die Zeile klappt auf -- nicht nur auf den Pfeil.
     await page.click('#m-inhalt tr.auf-kopf >> nth=0 >> td >> nth=3');
     const nachZeilenklick = await page.evaluate(() => {
@@ -308,7 +309,6 @@ for (const [breite, hoehe, art] of [[390, 844, 'Handy'], [1280, 900, 'Desktop']]
     check(`${art}: KRITISCH: der Dialog schreibt keine Frist selbst aus`,
       !/\d+\s*(Tage|Stunden)/.test(dlg.text));
     check(`${art}: der Dialog passt in die Breite`, dlg.links >= 0 && dlg.rechts >= 0);
-    if (art === 'Handy') { check('Handy: E-Mail-Feld im Dialog mit mindestens 16 px Schrift', dlg.schrift >= 16); }
 
     // Ohne Nachname: kein Aufruf.
     await page.fill('#z_email', 'alex@example.org');
@@ -334,12 +334,13 @@ for (const [breite, hoehe, art] of [[390, 844, 'Handy'], [1280, 900, 'Desktop']]
 }
 
 // ── 5. Der Uebergabestand in der Spalte "Einrichtung" ─────────────────
+// Nur am Desktop (ENT-697, siehe Abschnitt 4).
 //
 // Vier Aussagen, vier Texte, und Farbe traegt allein "ueberfaellig" (ENT-686,
 // Klaerung 7). "Keine Einladung erfasst" steht nur bei aktiven Mandanten --
 // und heisst so, weil ein Bestandsmandant ohne Vermerk trotzdem ein Konto
 // haben kann.
-for (const [breite, hoehe, art] of [[390, 844, 'Handy'], [1280, 900, 'Desktop']]) {
+for (const [breite, hoehe, art] of [[1280, 900, 'Desktop']]) {
   const page = await browser.newPage({ viewport: { width: breite, height: hoehe } });
   const protokoll = [];
   const m = (id, name, status, uebergabe) => ({ id, name, subdomain: 's' + id, status, ist_demo: false, uebergabe });
