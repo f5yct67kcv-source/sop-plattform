@@ -291,6 +291,17 @@ function demo_mitarbeiterliste(): array
     ];
 }
 
+// Wer in der Demo die Revierdienst-Berechtigung (ENT-284) bekommt: die
+// Abteilung Revierdienst, sonst niemand (2026-09-23, Anordnung des
+// Projektinhabers). Bis dahin hatte sie keiner -- jeder Revierdienst mit
+// Zuteilung lief in die Warnung, und ein Interessent hielt das fuer einen
+// Fehler. Der Verkehrsdienst bleibt ohne, damit die Warnung in der Demo
+// weiterhin zu sehen ist, wenn man jemanden von dort einteilt.
+function demo_revierdienst_berechtigt(string $abteilung): bool
+{
+    return $abteilung === 'Revierdienst';
+}
+
 function demo_mitarbeitende_erzeugen(PDO $pdo, array $ids): array
 {
     $hash = password_hash(DEMO_PASSWORT, PASSWORD_DEFAULT, ['cost' => PASSWORT_KOSTEN]);
@@ -305,6 +316,9 @@ function demo_mitarbeitende_erzeugen(PDO $pdo, array $ids): array
     );
     $funktionZuweisen = $pdo->prepare('UPDATE mitarbeiter SET personalnummer = ? WHERE id = ?');
     $rolleZuweisen = $pdo->prepare('INSERT INTO mitarbeiter_rollen (mitarbeiter_id, rolle) VALUES (?, ?)');
+    $revierSpalte = function_exists('hat_spalte') && hat_spalte($pdo, 'mitarbeiter', 'revierdienst_berechtigt');
+    $revierSetzen = $revierSpalte
+        ? $pdo->prepare('UPDATE mitarbeiter SET revierdienst_berechtigt = 1 WHERE id = ?') : null;
 
     $angelegt = [];
     $nr = 1;
@@ -331,6 +345,7 @@ function demo_mitarbeitende_erzeugen(PDO $pdo, array $ids): array
         $id = (int)$pdo->lastInsertId();
         $funktionZuweisen->execute([str_pad((string)$nr, 3, '0', STR_PAD_LEFT), $id]);
         foreach ($rollen as $rolle) { $rolleZuweisen->execute([$id, $rolle]); }
+        if ($revierSetzen && demo_revierdienst_berechtigt($abteilung)) { $revierSetzen->execute([$id]); }
         $angelegt[] = ['id' => $id, 'login' => $login, 'vorname' => $vor, 'nachname' => $nach,
             'funktion' => $funktion, 'abteilung' => $abteilung, 'rollen' => $rollen];
         $nr++;

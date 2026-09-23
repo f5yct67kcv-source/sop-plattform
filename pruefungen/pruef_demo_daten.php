@@ -26,6 +26,14 @@ function pruef(string $name, bool $c): void { global $ok, $bad; if ($c) { $ok++;
 // -- kein eigener Stub dafuer noetig, und einer wuerde mit der echten
 // Definition kollidieren (PHP erlaubt keine doppelte Funktion).
 function hat_tabelle(PDO $pdo, string $t, bool $frisch = false): bool { return true; }
+// Fuer demo_mitarbeitende_erzeugen(): Gibt es die Spalte? In SQLite ueber
+// PRAGMA statt information_schema.
+function hat_spalte(PDO $pdo, string $tabelle, string $spalte): bool {
+    foreach ($pdo->query("PRAGMA table_info($tabelle)")->fetchAll(PDO::FETCH_ASSOC) as $z) {
+        if ($z['name'] === $spalte) { return true; }
+    }
+    return false;
+}
 function json_response($data, int $status = 200): void {
     throw new RuntimeException('json_response aufgerufen: ' . json_encode($data));
 }
@@ -419,6 +427,31 @@ pruef('KRITISCH: der heutige unbesetzte Platz bleibt "offen" -- nicht faelschlic
     $pdo4->exec("INSERT INTO objekte (name) VALUES ('Testobjekt')");
     pruef('KRITISCH: ein vorhandenes Objekt loest die "bereits erzeugt"-Sperre ebenso aus wie ein Kunde',
         demo_musterbetrieb_bereits_da($pdo4) === true);
+}
+
+// ── Revierdienst-Berechtigung in der Demo (2026-09-23) ──────────────────
+// Echt ausgefuehrt: Wer in der Abteilung Revierdienst steht, hat danach das
+// Haekchen, der Verkehrsdienst nicht -- und beide Gruppen gibt es, damit die
+// Warnung (ENT-284) in der Demo weiterhin vorfuehrbar bleibt.
+{
+    $pdoR = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    $pdoR->exec('CREATE TABLE mitarbeiter (id INTEGER PRIMARY KEY, name TEXT, password_hash TEXT,
+        ist_admin INT, vorname TEXT, nachname TEXT, ort TEXT, email TEXT, anstellungskategorie TEXT,
+        pensum_stunden INT, eintritt TEXT, geburtsdatum TEXT, personalnummer TEXT,
+        revierdienst_berechtigt INT NOT NULL DEFAULT 0)');
+    $pdoR->exec('CREATE TABLE mitarbeiter_rollen (mitarbeiter_id INT, rolle TEXT)');
+    $erzeugt = demo_mitarbeitende_erzeugen($pdoR, []);
+    $stand = [];
+    foreach ($pdoR->query('SELECT id, revierdienst_berechtigt FROM mitarbeiter')->fetchAll(PDO::FETCH_KEY_PAIR) as $id => $b) {
+        $stand[(int)$id] = (int)$b;
+    }
+    $revier = array_filter($erzeugt, fn($m) => $m['abteilung'] === 'Revierdienst');
+    $andere = array_filter($erzeugt, fn($m) => $m['abteilung'] !== 'Revierdienst');
+    pruef('Die Demo hat Leute im Revierdienst UND ausserhalb', $revier !== [] && $andere !== []);
+    pruef('KRITISCH: jede Person der Abteilung Revierdienst hat danach die Revierdienst-Berechtigung',
+        array_filter($revier, fn($m) => ($stand[$m['id']] ?? 0) !== 1) === []);
+    pruef('KRITISCH: ausserhalb des Revierdienstes bleibt sie aus -- die Warnung bleibt vorfuehrbar',
+        array_filter($andere, fn($m) => ($stand[$m['id']] ?? 1) !== 0) === []);
 }
 
 echo "\n" . $ok . ' bestanden, ' . count($bad) . " nicht bestanden\n";

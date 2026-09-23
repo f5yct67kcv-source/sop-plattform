@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 6,
+            'datum' => '2026-09-23',
+            'art'   => 'fehlerbehebung',
+            'fuer'  => ['cockpit'],
+            'titel' => '„Neuer Einsatz“ fragt beim Revierdienst nach',
+            'text'  => 'Fehlt einer eingeteilten Person die Revierdienst-Berechtigung, fragt die Maske jetzt nach, wie beim Bearbeiten eines Einsatzes. Mit „Trotzdem zuteilen“ wird der Einsatz angelegt.',
+        ],
+        [
             'nr'    => 5,
             'datum' => '2026-09-23',
             'art'   => 'verbesserung',
