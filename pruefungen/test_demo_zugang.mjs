@@ -376,6 +376,118 @@ check('KRITISCH: der Reiter "Demo" zeigt die Demo-Ansicht und blendet den Stamm 
 check('KRITISCH: die Unterzeile wechselt mit dem Reiter, die Überschrift nicht',
   demoReiter.titel === 'Mandanten' && /Demo/.test(demoReiter.unterzeile));
 
+/* ── Kachelreiter im Demo-Reiter (ENT-689) ─────────────────────────────
+   Zugänge, Plätze, Nutzung und Abgelaufene standen untereinander auf einer
+   Seite. Gemessen wird, was SICHTBAR ist -- nicht, welche Klasse gesetzt
+   ist. Eine Kachel, die markiert ist, deren Inhalt aber nicht erscheint,
+   waere der Fehler, den nur ein Bildschirmfoto zeigt. */
+const kachel = async id => {
+  await seite.click('#demoReiter .rdkr-tab[data-reiter="' + id + '"]');
+  await seite.waitForTimeout(120);
+};
+const sichtbarIn = () => seite.evaluate(() => ({
+  zugaenge:   document.getElementById('demo-inhalt').offsetHeight > 0,
+  plaetze:    document.getElementById('demo-plaetze').offsetHeight > 0,
+  nutzung:    document.getElementById('demo-nutzung-archiv').offsetHeight > 0,
+  abgelaufen: document.getElementById('demo-abgelaufen').offsetHeight > 0,
+  aktiv: [...document.querySelectorAll('#demoReiter .rdkr-tab.aktiv')]
+    .map(t => t.textContent.trim()),
+}));
+const nurEine = (v, k) => Object.keys(v).filter(x => x !== 'aktiv' && v[x]).join() === k
+  && v.aktiv.length === 1;
+
+const start = await sichtbarIn();
+check('KRITISCH: der Demo-Reiter beginnt bei den Zugängen und zeigt nur diese Kachel (ENT-689)',
+  nurEine(start, 'zugaenge') && /Zugänge/.test(start.aktiv[0]));
+
+// Die Teilung: laufend ist, was noch eine Instanz hat -- auch mit Frist um.
+const teilung = await seite.evaluate(() => {
+  const namen = id => [...document.querySelectorAll('#' + id + ' tbody tr')]
+    .map(r => r.querySelector('td strong')?.textContent.trim() || '');
+  return { laufend: namen('demo-inhalt'), zu: namen('demo-abgelaufen') };
+});
+check('KRITISCH: unter "Demo-Zugänge" stehen nur laufende -- samt dem mit abgelaufener, noch offener Frist',
+  teilung.laufend.join('|') === 'Muster Sicherheit GmbH|Beispiel Wachdienst AG');
+check('KRITISCH: der geschlossene Zugang steht unter "Abgelaufene Zugänge" und nur dort',
+  teilung.zu.join('|') === 'Probe Security GmbH');
+// Die Knoepfe entscheiden weiter je Zeile: Wer keine Instanz mehr hat, hat
+// kein Konto fuer ein neues Passwort und nichts mehr zu beenden.
+const zuKnoepfe = await seite.evaluate(() =>
+  [...document.querySelectorAll('#demo-abgelaufen tbody tr button')].map(b => b.textContent.trim()));
+check('KRITISCH: bei einem geschlossenen Zugang gibt es weder "Erneut senden" noch "Beenden" noch "Nutzung"',
+  zuKnoepfe.join('|') === 'Zurücknehmen');
+
+// Zahl nur, wo etwas offen ist -- und zusammen dieselbe wie am Abzeichen.
+const zahlen = await seite.evaluate(() => {
+  const z = id => { const el = document.getElementById(id);
+    return el && el.offsetWidth > 0 ? el.textContent.trim() : ''; };
+  return { zugaenge: z('demoZahl-zugaenge'), abgelaufen: z('demoZahl-abgelaufen'),
+    ohneZahl: ['plaetze', 'nutzung'].every(k =>
+      !document.querySelector('#demoReiter .rdkr-tab[data-reiter="' + k + '"] .chip')) };
+});
+check('KRITISCH: "Demo-Zugänge" trägt die Zahl der laufenden ohne Nachfassen',
+  zahlen.zugaenge === '2');
+check('KRITISCH: bei "Abgelaufene Zugänge" ist nichts offen -- also steht dort keine Zahl, auch keine Null',
+  zahlen.abgelaufen === '');
+check('Plätze und Nutzung tragen keine Zahl -- dort wartet nie etwas', zahlen.ohneZahl);
+
+// Die Live-Nutzung gehoert zu einer Zeile unter "Demo-Zugänge". Unter einer
+// anderen Kachel stuende nirgends mehr, woher sie kommt.
+await seite.click('#demo-inhalt [data-demo-nutzung]');
+await seite.waitForTimeout(150);
+const nuOffen = await seite.evaluate(() => document.getElementById('nu-karte').offsetHeight > 0);
+await kachel('nutzung');
+const nachWechsel = await sichtbarIn();
+const nuZu = await seite.evaluate(() => document.getElementById('nu-karte').offsetHeight === 0);
+check('KRITISCH: die Kachel "Demo-Nutzung" zeigt nur das Archiv', nurEine(nachWechsel, 'nutzung'));
+check('KRITISCH: die Live-Nutzung eines Platzes geht beim Kachelwechsel zu', nuOffen && nuZu);
+await kachel('abgelaufen');
+check('die Kachel "Abgelaufene Zugänge" zeigt nur diese Liste', nurEine(await sichtbarIn(), 'abgelaufen'));
+
+/* 1:1 wie im Cockpit (Vorgabe Projektinhaber): Die Leiste ist dort
+   abgeschrieben, nicht mitbenutzt -- betreiber.html teilt kein Stylesheet
+   mit dem Cockpit. Verglichen werden die gerenderten Masse einer Kachel
+   auf beiden Seiten, damit die Abschrift nicht still auseinanderlaeuft. */
+const masse = sel => (() => {
+  const t = document.querySelector(SEL);
+  if (!t) { return null; }
+  const c = getComputedStyle(t);
+  const ic = getComputedStyle(t.querySelector('.rdkr-tab-ic'));
+  const lbl = getComputedStyle(t.querySelector('.rdkr-tab-lbl'));
+  return [t.getBoundingClientRect().height, c.paddingLeft, c.borderRadius, c.gap,
+    ic.width, ic.borderRadius, lbl.fontSize, lbl.fontWeight].join('|');
+}).toString().replace('SEL', JSON.stringify(sel));
+const betrMass = await seite.evaluate('(' + masse('#demoReiter .rdkr-tab:not(.aktiv)') + ')()');
+{
+  const c = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  await c.goto(`file://${WURZEL}/dashboard.html`);
+  await c.waitForTimeout(300);
+  // Ohne Anmeldung ist die Supportansicht verborgen. Jede Stufe darueber,
+  // die nichts anzeigt, wird sichtbar gemacht -- gemessen wird die Kachel
+  // selbst, nicht ihre Umgebung.
+  await c.evaluate(() => {
+    let el = document.querySelector('#spReiter .rdkr-tab');
+    for (; el && el !== document.documentElement; el = el.parentElement) {
+      if (getComputedStyle(el).display === 'none') { el.style.display = 'block'; }
+    }
+  });
+  const cMass = await c.evaluate('(' + masse('#spReiter .rdkr-tab:not(.aktiv)') + ')()');
+  check('KRITISCH: die Kachel im Demo-Reiter misst gleich wie die im Support des Cockpits (' + betrMass + ' / ' + cMass + ')',
+    betrMass !== null && betrMass === cMass);
+  await c.close();
+}
+
+await kachel('plaetze');
+check('KRITISCH: die Kachel "Demo-Plätze" zeigt nur die Platztabelle', nurEine(await sichtbarIn(), 'plaetze'));
+
+// Wer von einem anderen Reiter zurueckkommt, beginnt wieder bei den
+// Zugaengen -- wie der Support im Cockpit bei "Meine Anfragen".
+await seite.evaluate(() => { mandGo('vertraege'); mandGo('demo'); });
+await seite.waitForTimeout(150);
+check('KRITISCH: zurück aus einem anderen Reiter beginnt Demo wieder bei den Zugängen',
+  nurEine(await sichtbarIn(), 'zugaenge'));
+await kachel('plaetze');
+
 /* ── Der Zustand eines Platzes steht als Wort da (ENT-627) ────────────
    Vorher trug nur der freie Platz einen Merker, und der stand in der
    Spalte "Belegt durch" -- "frei" ist aber keine Antwort darauf, WER
@@ -423,14 +535,16 @@ const sicht = await seite.evaluate(() => {
   /* Nur der erste Merker der Zelle: Seit ENT-622 steht darunter noch der
      Nachfass-Stand. Die ganze Zelle zu lesen hiesse, zwei Aussagen zu
      einer zu verruehren -- genau das, wogegen diese Pruefung da ist. */
-  const merkerWorte = [...document.querySelectorAll('#demo-inhalt tbody tr td:nth-child(4)')]
+  const merkerWorte = [...document.querySelectorAll('#demo-inhalt tbody tr td:nth-child(4), #demo-abgelaufen tbody tr td:nth-child(4)')]
     .map(e => (e.querySelector('.merker') || e).textContent.trim());
   return {
     titel: document.getElementById('leiste-titel').textContent.trim(),
     plaetze: document.querySelectorAll('#demo-plaetze tbody tr').length,
-    zugaenge: document.querySelectorAll('#demo-inhalt tbody tr').length,
+    zugaenge: document.querySelectorAll('#demo-inhalt tbody tr, #demo-abgelaufen tbody tr').length,
     merkerWorte,
-    text: document.body.innerText,
+    // textContent statt innerText: Seit ENT-689 steht nur eine Kachel
+    // offen, die Aussagen liegen verteilt auf alle vier.
+    text: document.getElementById('mv-demo').textContent,
     // Seit ENT-601 gibt es keinen Freigabe-Knopf mehr -- die Zuteilung
     // laeuft automatisch. Das Fehlen dieses Elements ist die Aussage, nicht
     // eine seiner Masse.
@@ -448,7 +562,7 @@ const sicht = await seite.evaluate(() => {
     zurueckKnoepfe:  document.querySelectorAll('[data-demo-offen]').length,
     // Die Zeile des erledigten Zugangs -- sie darf keinen offenen Merker
     // tragen und muss sagen, wer wann nachgefasst hat.
-    erledigteZeile: [...document.querySelectorAll('#demo-inhalt tbody tr')]
+    erledigteZeile: [...document.querySelectorAll('#demo-abgelaufen tbody tr')]
       .map(r => r.textContent).find(t => t.includes('probesecurity')) || '',
   };
 });
@@ -512,7 +626,7 @@ check('der erledigte nennt Datum und Konto, statt bloss zu verschwinden',
    stehen, wo der Vertrieb ohnehin hinsieht -- und zwar beim NAMEN, nicht
    in der Statusspalte zwischen Ablauf und Nachfass-Stand. */
 const weiterSicht = await seite.evaluate(() => {
-  const zeilen = [...document.querySelectorAll('#demo-inhalt tbody tr')];
+  const zeilen = [...document.querySelectorAll('#demo-inhalt tbody tr, #demo-abgelaufen tbody tr')];
   const mit = zeilen.find(r => r.textContent.includes('probesecurity'));
   return {
     merker: mit ? [...mit.querySelectorAll('td:first-child .merker')]
