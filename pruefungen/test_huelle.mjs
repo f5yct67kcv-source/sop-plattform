@@ -138,6 +138,45 @@ try {
   await p.close();
 } catch (e) { bad.push('Untermenue: ' + String(e).split('\n')[0].slice(0, 120)); }
 
+// ══════════════════════════════ JEDE ANSICHT EINER RUBRIK BEHAELT IHRE LEISTE
+//
+// Befund vom 2026-09-23: In der Supportansicht verschwand die Reiterleiste
+// der Administration. go() sucht zu jeder Ansicht den gleichnamigen
+// HAUPTpunkt ($('nav-' + view)) und markiert nur dann den passenden
+// UNTERpunkt, wenn es keinen gibt -- und der Schnellweg "Support" im
+// Fussteil trug genau diesen Namen. Ergebnis: kein markierter Unterpunkt,
+// und topSubZeichnen() zeichnet aus dem markierten Unterpunkt.
+//
+// Geprueft wird die Aussage fuer ALLE Ansichten einer Rubrik, nicht nur
+// fuer die eine, an der es auffiel: Wer einen Menuepunkt ergaenzt, dessen
+// Name schon woanders als ID vergeben ist, faellt hier auf.
+{
+  const p = await seite(1600, 900);
+  await p.evaluate(() => huelleSetzen('aus')); await p.waitForTimeout(250);
+  const kinder = await p.evaluate(() =>
+    [...document.querySelectorAll('.nav-gruppe')].flatMap(g =>
+      [...g.querySelectorAll('.nav-kind')]
+        .filter(b => getComputedStyle(b).display !== 'none')
+        .map(b => ({ id: b.id, text: b.textContent.trim(),
+                     gruppe: g.id, geschwister: g.querySelectorAll('.nav-kind').length }))
+    ).filter(k => k.geschwister > 1));
+  const ohneLeiste = [];
+  for (const k of kinder) {
+    await p.evaluate(id => document.getElementById(id).click(), k.id);
+    await p.waitForTimeout(250);
+    const lage = await p.evaluate(() => ({
+      leiste: getComputedStyle(document.getElementById('topSub')).display,
+      markiert: !!document.querySelector('.nav-kind.on'),
+    }));
+    if (lage.leiste === 'none' || !lage.markiert) { ohneLeiste.push(k.text); }
+  }
+  check('Es gibt ueberhaupt Unterpunkte zu pruefen', kinder.length >= 5);
+  check('KRITISCH: jede Ansicht einer Rubrik behaelt ihre Reiterleiste und markiert sich darin',
+    ohneLeiste.length === 0);
+  if (ohneLeiste.length) { bad.push('Ohne Reiterleiste: ' + ohneLeiste.join(', ')); }
+  await p.close();
+}
+
 // ══════════════════════════════ KEINE RUBRIK HEISST WIE EIN MENUEPUNKT
 //
 // Die Seitenleiste hatte bis ENT-682 zweimal "Betrieb": die Rubrik ueber

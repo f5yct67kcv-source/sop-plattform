@@ -77,6 +77,10 @@ if (in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true)) {
         if ($vorgang === null) {
             json_response(['status' => 'error', 'message' => 'Diesen Vorgang gibt es nicht.'], 404);
         }
+        // Wer den Vorgang öffnet, hat die Antwort gesehen (ENT-685). Beim
+        // LESEN und nicht beim Antworten: Wer die Antwort liest und nichts
+        // zu sagen hat, hat sie trotzdem gelesen.
+        sv_kunde_gesehen($stamm, $id, $mandantId);
         json_response([
             'status'       => 'ok',
             'lage'         => 'ok',
@@ -130,7 +134,24 @@ if ($geprueft['fehler'] !== []) {
         'message' => reset($geprueft['fehler'])], 400);
 }
 
-$neueId  = sv_einreichen($stamm, $mandantId, $geprueft['werte'], $wer, $rolle);
+// Die Adresse der MELDENDEN PERSON, für die Rückmeldung bei einer Antwort
+// (ENT-685). Nachgeschlagen über die Id aus der Sitzung, nie aus der
+// Anfrage gelesen -- derselbe Grundsatz wie beim Namen. Es ist die eigene
+// Adresse des Meldenden, kein vertrauliches Personalfeld
+// (ma_vertrauliche_felder), und sie verlässt den Betrieb nur als
+// Empfängeradresse seiner eigenen Rückmeldung.
+$melderEmail = '';
+try {
+    $sm = $betrieb->prepare('SELECT email FROM mitarbeiter WHERE id = ?');
+    $sm->execute([(int)$user['id']]);
+    $melderEmail = trim((string)($sm->fetchColumn() ?: ''));
+} catch (Throwable $e) {
+    // Ohne Adresse geht die Anfrage trotzdem raus -- sie ist der Weg, auf
+    // dem jemand Hilfe holt. Die Antwort erreicht ihn dann über die Glocke
+    // im Cockpit statt zusätzlich per Post.
+}
+
+$neueId  = sv_einreichen($stamm, $mandantId, $geprueft['werte'], $wer, $rolle, $melderEmail);
 $vorgang = sv_detail($stamm, $neueId, $mandantId);
 
 // Der Versand darf die Anfrage nicht scheitern lassen -- sie ist eingegangen,

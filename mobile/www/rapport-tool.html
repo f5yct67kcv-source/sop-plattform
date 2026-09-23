@@ -23,6 +23,24 @@
   document.documentElement.setAttribute('data-thema', w === 'hell' ? 'hell' : 'dunkel');
 })();
 
+/* Anmeldemaske gar nicht erst zeigen, wenn schon eine Anmeldung im Speicher
+   liegt (siehe die Regel "html.vorangemeldet #loginScreen" weiter unten).
+   Gleiche Stelle, gleicher Grund wie beim Thema, nur fuer die Maske statt
+   fuer die Farben -- und dieselbe Loesung wie in app.html und
+   dashboard.html: Ob jemand angemeldet ist, entscheidet sich sonst erst in
+   DOMContentLoaded, und bis dahin steht die Maske sichtbar da.
+   Geprueft wird dasselbe Paar, an dem auch der Start am Dateiende haengt:
+   Token UND abgelegter Nutzer. */
+(function () {
+  try {
+    var t = localStorage.getItem('rv3_token');
+    var u = localStorage.getItem('rv3_user');
+    if (t && u && u !== 'null') {
+      document.documentElement.classList.add('vorangemeldet');
+    }
+  } catch (e) {}
+})();
+
 /* Native App-Huelle (ENT-588), gleiches Muster wie in app.html: Capacitor
    haengt sich unter window.Capacitor ein -- im Browser gibt es das nie.
    Steht hier oben und nicht weiter unten beim uebrigen Skript, weil die
@@ -275,6 +293,30 @@ tr:hover td { background: var(--accent-light); }
   #printArea { display: block !important; position: absolute; top: 0; left: 0; width: 100%; padding: 24px; }
 }
 
+/* ANMELDEBILDSCHIRM
+   Die Angaben standen bis hierher als style="..." am Element selbst. Sie
+   sind hierher gezogen, damit die Vorblende darunter ueberhaupt greifen
+   kann: Ein Inline-Stil schlaegt jede Regel im Stilblock, eine Vorblende
+   haette also ein "!important" gebraucht -- und das waere eine Waffe, die
+   man spaeter an anderer Stelle bereut. Am Bild aendert sich nichts,
+   dieselben Werte in derselben Reihenfolge.
+   Umgeschaltet wird weiterhin am Element (afterLogin, sitzungBeenden):
+   style.display = 'none' blendet aus, style.display = '' gibt die Sache
+   wieder an diese Regel zurueck. */
+#loginScreen {
+  position: fixed; inset: 0; background: var(--bg); z-index: 1000;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+/* VORBLENDE FUER DEN ANGEMELDETEN NEUSTART
+   Wer angemeldet neu laedt, sah bis hierher einen Wimpernschlag lang die
+   Anmeldemaske: Sie steht im Markup und wird gezeichnet, bevor
+   DOMContentLoaded nachsieht, ob eine Anmeldung im Speicher liegt.
+   Gesetzt wird die Klasse im Kopfskript, abgenommen von
+   gateVorblendeAus(), sobald feststeht, dass die Maske gebraucht wird.
+   Eine Sperre ist sie nicht -- wer hereinkommt, entscheidet der Server;
+   hier geht es allein ums Zeichnen. */
+html.vorangemeldet #loginScreen { display: none; }
+
 @media (max-width: 500px) {
   .row2 { grid-template-columns: 1fr; }
   .stats-row { grid-template-columns: 1fr 1fr; }
@@ -283,7 +325,7 @@ tr:hover td { background: var(--accent-light); }
 </head>
 <body>
 
-<div id="loginScreen" style="position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;">
+<div id="loginScreen">
   <div class="card" style="max-width:340px;width:100%">
     <div class="card-title">Anmelden</div>
     <div class="field">
@@ -605,6 +647,10 @@ function sitzungBeenden() {
   authToken = ''; currentUser = null;
   localStorage.removeItem('rv3_token'); localStorage.removeItem('rv3_user');
   const el = document.getElementById('loginError');
+  // Ohne das bliebe die Maske verborgen: Die Vorblende vom Seitenstart
+  // haengt am <html> und weiss nichts davon, dass die Sitzung inzwischen
+  // abgelaufen ist.
+  gateVorblendeAus();
   document.getElementById('loginScreen').style.display = '';
   if (el) {
     el.textContent = 'Die Sitzung ist abgelaufen. Bitte neu anmelden.';
@@ -637,6 +683,13 @@ function togglePw(id, btn) {
 
 function showForgotPw() {
   alert('Passwort vergessen? Bitte beim Admin melden — er kann direkt ein neues Passwort setzen.');
+}
+
+// Gegenstueck zur Vorblende im Kopf dieser Datei: Die Maske wird wieder
+// gezeichnet. Aufzurufen ueberall dort, wo feststeht, dass diese Sitzung
+// nicht ins Rapport Tool fuehrt.
+function gateVorblendeAus() {
+  document.documentElement.classList.remove('vorangemeldet');
 }
 
 function afterLogin() {
@@ -1106,7 +1159,12 @@ document.addEventListener('DOMContentLoaded',()=>{
   initSchritt('Beschriftungen', applyLang);
   initSchritt('Zeitberechnung', calcNet);
   if (authToken && currentUser) { initSchritt('Anmeldung', afterLogin); }
-  else { document.getElementById('loginName').focus(); }
+  else {
+    // Niemand angemeldet -- die Maske ist hier kein Aufblitzen, sondern der
+    // Inhalt der Seite.
+    gateVorblendeAus();
+    document.getElementById('loginName').focus();
+  }
   // Zurueck-Knopf und Abmelden-Knopf sind schon direkt nach der Kopfzeile
   // gesetzt (siehe dort) -- sie duerfen nicht von dieser Kette abhaengen.
   // Service Worker bleibt in der nativen Huelle aus (ENT-588, wie in app.html).

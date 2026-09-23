@@ -81,7 +81,12 @@ function ereignis_lesen(PDO $pdo, string $sql, array &$fehler, string $art): arr
     }
 }
 
-function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
+// $stamm und $mandantId kommen fuer die Supportantwort dazu (ENT-685).
+// OPTIONAL und nicht Pflicht: Der Feed ist der Herzschlag der Uebersicht --
+// er darf nicht davon abhaengen, dass die Betreiber-Ebene erreichbar ist.
+// Fehlt sie, fehlt genau diese eine Art, und das steht in 'unvollstaendig'.
+function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
+                            ?PDO $stamm = null, ?int $mandantId = null): array
 {
     $fehler = [];
     $liste  = [];
@@ -242,6 +247,42 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12): array
             'vorfall_am' => $r['vorfall_am'],
             'hat_foto' => $r['foto_mime'] !== null,
         ];
+    }
+
+    // ── Der Support hat geantwortet (ENT-685) ─────────────────────────
+    //
+    // Die einzige Art in diesem Feed, die NICHT aus den Betriebstabellen
+    // kommt: Der Supportkanal liegt beim Betreiber (bei einem Mandanten mit
+    // eigener Datenbank in seiner eigenen -- ENT-681). Darum die zweite
+    // Verbindung, und darum sauber abgefangen: Ist sie nicht da, fehlt
+    // diese Art und der Rest des Feeds steht trotzdem.
+    //
+    // NICHT ABHAKBAR ueber den Feed (kein Eintrag in EREIGNIS_ARTEN):
+    // Gelesen ist eine Supportantwort erst, wenn jemand sie geoeffnet hat.
+    // Ein Haken in der Glocke hiesse "weg damit", ohne dass der Text je
+    // jemand gesehen haette -- genau der Fehler, den ein Fenster beim
+    // Anmelden macht.
+    if ($stamm !== null) {
+        try {
+            foreach (sv_kunde_ungelesen($stamm, $mandantId) as $v) {
+                $liste[] = [
+                    'typ'   => 'support_antwort',
+                    'id'    => (int)$v['id'],
+                    'zeit'  => $v['antwort_am'],
+                    // Ohne Person: Geantwortet hat der Hersteller, nicht
+                    // jemand aus dem Betrieb. Eine Personenzeile mit einem
+                    // fremden Namen liesse den Feed so aussehen, als sei
+                    // hier jemand aus der Mannschaft taetig gewesen.
+                    'person' => ['id' => 0, 'name' => 'GuardOpS Support',
+                                 'vorname' => '', 'nachname' => ''],
+                    'titel' => 'Support hat geantwortet',
+                    'betreff' => (string)$v['betreff'],
+                    'status'  => (string)$v['status'],
+                ];
+            }
+        } catch (Throwable $e) {
+            $fehler[] = 'support';
+        }
     }
 
     // Hier stand bis zum 23.08.2026 eine vierte Abfrage: vergangene Schichten

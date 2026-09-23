@@ -172,6 +172,13 @@
       Sie betreffen nicht den eigenen Betrieb, sondern den <b>Plattform-Betreiber</b>,
       also die Stelle, die die Software betreibt. Beschrieben sind sie bis auf
       Weiteres hier, weil das Handbuch noch kein eigenes Kapitel dafür hat.</p>
+      <p>Die Seite dort führt vier Reiter, gleiche Bauart wie „Kontrollrunde ändern"
+      im Revierdienst: <b>Meine Anfragen</b> (Startseite; trägt eine Zahl, sobald
+      eine Antwort vorliegt), <b>Anliegen melden</b>, <b>Support-Freigabe</b> und
+      <b>Protokoll</b>. Die letzten beiden erscheinen nur mit dem Recht
+      „Rollen&nbsp;&amp;&nbsp;Berechtigungen" — das Protokoll zeigt, wer wann in
+      die Anlage gesehen hat, und ist damit so vertraulich wie die Freigabe
+      selbst.</p>
       <ul>
         <li><b>Support-Freigabe:</b> befristeter Diagnose-Zugriff (4&nbsp;Std. / 24&nbsp;Std.
         [Standard] / 3&nbsp;Tage / 7&nbsp;Tage) mit Zweckangabe, jederzeit zurückziehbar.
