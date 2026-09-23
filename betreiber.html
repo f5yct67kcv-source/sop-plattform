@@ -2415,6 +2415,9 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           <h2 id="ofFormNummer">–</h2>
           <div class="sub" id="ofFormSub">–</div>
         </div>
+        <!-- Welche Fassung am Link steht (ENT-688). Ein Chip, kein eigener
+             Container: Die Angabe gehoert zum Beleg wie sein Status. -->
+        <span class="chip" id="ofFormFassung" style="display:none"></span>
         <button type="button" class="btn btn-quiet btn-sm rowmenu-btn" id="ofFormMenuBtn" onclick="ofFormMenuOeffnen(event)"
                 aria-label="Aktionen" style="display:none">
           <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
@@ -2440,6 +2443,8 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       </div>
 
       <div class="msg-err versteckt" id="ofFormErr"></div>
+      <!-- Nach einer Annahme am Link (ENT-688): lesbar, aber gesperrt. -->
+      <div id="ofFormSperre" style="display:none;font-size:12.5px;color:var(--pos);background:var(--pos-soft);border-radius:var(--r-xs);padding:8px 11px;margin-bottom:12px;line-height:1.5"></div>
 
       <div class="of-kopf-zwei">
         <div class="card"><div class="card-bd">
@@ -7153,7 +7158,10 @@ function ofFormMenuOeffnen(ev) {
   const pop = $('rowmenuPop');
   if (pop.classList.contains('on') && pop.dataset.wer === 'form') { menuSchliessen(); return; }
   const id = ofFormId;
-  const statusKnoepfe = belegStatusOptionen(ofArt, ofFormStatus).map(s =>
+  /* Ein angenommener Beleg bietet keinen Statuswechsel mehr an -- der
+     Server wiese ihn ab (ENT-688). */
+  const gesperrt = !!(ofFormFassung && ofFormFassung.gesperrt);
+  const statusKnoepfe = gesperrt ? '' : belegStatusOptionen(ofArt, ofFormStatus).map(s =>
     `<button type="button" onclick="menuSchliessen(); ofStatusSetzen(${id}, '${s.wert}', '${ofArt}')">Als „${esc(s.text)}" markieren</button>`).join('');
   /* Die bezahlt-Markierung gibt es nur bei Rechnungen, die Vorlage nur bei
      Offerten -- eine Offerte wird nicht bezahlt, und eine Rechnungsvorlage
@@ -7162,7 +7170,7 @@ function ofFormMenuOeffnen(ev) {
     ? `<button type="button" onclick="menuSchliessen(); reBezahltKlick(${id}, ${ofFormBezahlt ? 0 : 1})">${ofFormBezahlt ? 'Als unbezahlt markieren' : 'Als bezahlt markieren'}</button>`
     : '';
   pop.innerHTML = `
-    <button type="button" onclick="menuSchliessen(); ofVersenden(${id})">Per E-Mail versenden</button>
+    <button type="button" onclick="menuSchliessen(); ofVersenden(${id})">${ofNeueFassungAnstehend() ? 'Neue Fassung senden' : 'Per E-Mail versenden'}</button>
     ${bezahltKnopf}
     <button type="button" onclick="menuSchliessen(); ofHerunterladen(${id}, null)">Herunterladen</button>
     <button type="button" onclick="menuSchliessen(); ofTeilen(${id}, null)">Teilen</button>
@@ -7524,6 +7532,8 @@ function ofNeu(art) {
   ['ofFormVorschauBtn', 'ofFormDruckBtn', 'ofFormMenuBtn']
     .forEach(b => { $(b).style.display = 'none'; });
   ofZeilenZeichnen();
+  ofFormEntschiedenAm = null;
+  ofFassungZeichnen(null);
   ofFormularZeigen(true);
   setTimeout(() => $('of_kunde').focus(), 60);
 }
@@ -7842,6 +7852,84 @@ function ofSummenZeichnen() {
   $('ofSummen').innerHTML = html;
 }
 
+/* ── Fassungen und Sperre (ENT-688) ─────────────────────────────────────
+   Der Chip im Kopf sagt, welche Fassung der Empfaenger am Link sieht, und
+   faerbt sich orange, sobald der Entwurf davon abweicht. Dann heisst der
+   Menuepunkt "Neue Fassung senden": Erst der Versand macht die Aenderung
+   sichtbar (ENT-688, Punkt 2) -- speichern allein zeigt dem Empfaenger
+   nichts.
+
+   Die Sperre nach einer Annahme steht im SERVER (beleg_speichern,
+   beleg_status). Was hier passiert, erspart nur den Umweg: Felder, die
+   sich nicht speichern lassen, sollen nicht bearbeitbar aussehen.
+
+   Gleicher Code in dashboard.html und betreiber.html; test_beleg_fassung.mjs
+   haelt die beiden zusammen. */
+let ofFormFassung = null;
+let ofFormEntschiedenAm = null;
+
+function ofFassungZeichnen(f) {
+  ofFormFassung = f || null;
+  const chip = $('ofFormFassung');
+  const liste = (f && f.fassungen) || [];
+  const letzte = liste[liste.length - 1];
+  if (!letzte) {
+    /* Keine Fassung heisst: noch nie mit ENT-688 versendet -- oder die
+       Angabe fehlt, weil der Server sie nicht lesen konnte. In beiden
+       Faellen steht lieber kein Chip da als ein falscher. */
+    chip.style.display = 'none';
+  } else if (f.fassung_geaendert && !f.gesperrt) {
+    chip.className = 'chip chip-w';
+    chip.textContent = 'Geändert, noch nicht versendet';
+    chip.title = 'Am Link steht Fassung ' + letzte.nummer
+      + '. Erst „Neue Fassung senden" macht die Änderung sichtbar.';
+    chip.style.display = '';
+  } else {
+    chip.className = 'chip chip-a';
+    chip.textContent = 'Fassung ' + letzte.nummer + ' · versendet ' + dmy(letzte.versendet_am);
+    chip.title = '';
+    chip.style.display = '';
+  }
+  ofSperreSetzen(!!(f && f.gesperrt));
+}
+
+/* Nur was DIESE Funktion gesperrt hat, gibt sie wieder frei (data-sperre).
+   Sonst wuerde beim naechsten Beleg auch ein Feld frei, das aus einem
+   anderen Grund gesperrt ist -- etwa die Ansprechperson eines Betriebs
+   ohne Personen. */
+function ofSperreSetzen(gesperrt) {
+  const leiste = $('ofFormSperre');
+  leiste.textContent = gesperrt
+    ? 'Angenommen am ' + dmy(ofFormEntschiedenAm) + '. Gesperrt – für Änderungen bitte duplizieren.'
+    : '';
+  leiste.style.display = gesperrt ? '' : 'none';
+  $('ofFormSaveBtn').style.display = gesperrt ? 'none' : '';
+  const kopf = $('ofBtnZurueck').parentElement;
+  const wurzel = $('ofFormSaveBtn').closest('#of-formular, #view-offerte');
+  wurzel.querySelectorAll('input, select, textarea, button').forEach(el => {
+    if (kopf.contains(el) || el.closest('#ofFadenKarte')) { return; }
+    if (gesperrt) {
+      if (!el.disabled) { el.disabled = true; el.dataset.sperre = '1'; }
+    } else if (el.dataset.sperre) {
+      el.disabled = false;
+      delete el.dataset.sperre;
+    }
+  });
+}
+
+/* Heisst der Versand gerade "Neue Fassung senden"? */
+function ofNeueFassungAnstehend() {
+  return !!(ofFormFassung && ofFormFassung.fassung_geaendert && !ofFormFassung.gesperrt);
+}
+
+async function ofFassungNachladen(id) {
+  let a;
+  try { a = await ruf('betreiber_beleg_lesen.php?id=' + Number(id)); } catch (e) { return; }
+  if (!a || a.status !== 'ok' || ofFormId !== Number(id)) { return; }
+  ofFormEntschiedenAm = a.beleg.entscheidung_am || null;
+  ofFassungZeichnen(a.fassung);
+}
+
 /* ── Laden und Speichern ───────────────────────────────────────────── */
 async function ofOeffnen(id) {
   if (!produkte.length) { await ladeProdukte(); }
@@ -7906,6 +7994,8 @@ async function ofOeffnen(id) {
   ['ofFormVorschauBtn', 'ofFormDruckBtn', 'ofFormMenuBtn']
     .forEach(x => { $(x).style.display = ''; });
   ofZeilenZeichnen();
+  ofFormEntschiedenAm = b.entscheidung_am || null;
+  ofFassungZeichnen(a.fassung);
   ofFadenZeichnen(a.nachrichten || [], !!a.faden_da);
   ofFormularZeigen(true);
 }
@@ -8039,6 +8129,7 @@ async function ofSpeichern() {
      stehenlassen: Weichen beide ab, soll das sofort auffallen. */
   if (a.summen) { ofSummenAusServer(a.summen); }
   kurzmeldung(warNeu ? t.angelegt : t.gespeichert);
+  await ofFassungNachladen(ofFormId);
   await belegListeAktualisieren(ofArt);
 }
 
@@ -8384,11 +8475,22 @@ async function ofVorschau(id) {
 function ofVersenden(id) {
   const t = OF_ART_TEXT[ofArt];
   if (!id) { kurzmeldung('Der Beleg muss zuerst gespeichert werden.'); return; }
-  frageStellen(t.versandFrage, t.versandText, 'Versenden', async () => {
+  /* Eine neue Fassung fragt anders: Der Empfaenger bekommt keine zweite
+     Offerte, sondern dieselbe, angepasst, unter demselben Link (ENT-688). */
+  const neu = ofFormId === Number(id) && ofNeueFassungAnstehend();
+  const frage = neu ? 'Neue Fassung senden?' : t.versandFrage;
+  const text = neu
+    ? `Der Empfänger erhält eine E-Mail, dass die ${t.dokument} angepasst wurde. Der Link bleibt derselbe und zeigt ab dann die neue Fassung.`
+    : t.versandText;
+  frageStellen(frage, text, 'Versenden', async () => {
     const a = await ruf('betreiber_beleg_versenden.php', { id: Number(id) });
     if (a.status !== 'ok') { kurzmeldung(a.message || 'Versand fehlgeschlagen.'); return; }
-    kurzmeldung(t.versandErfolg);
-    if (ofFormId === Number(id)) { ofFormStatus = 'versendet'; ofFormSubZeichnen(); }
+    kurzmeldung(a.neue_fassung && Number(a.fassung) > 1
+      ? `Fassung ${Number(a.fassung)} verschickt.` : t.versandErfolg);
+    if (ofFormId === Number(id)) {
+      ofFormStatus = 'versendet'; ofFormSubZeichnen();
+      await ofFassungNachladen(id);
+    }
     await belegListeAktualisieren(ofArt);
   });
 }

@@ -329,6 +329,26 @@ function be_melde_empfaenger(PDO $pdo): array
     return $liste;
 }
 
+// Der Absender eines Belegs der Betreiberin, so wie er ins Abbild einer
+// Fassung geht (ENT-688): alles aus be_briefkopf, was auf dem Blatt steht.
+// Fehlt die Tabelle, ist er leer -- beleg_abbild() nimmt ihn so, wie er ist.
+function be_beleg_absender(PDO $pdo): array
+{
+    try {
+        $bk = hat_tabelle($pdo, 'be_briefkopf')
+            ? ($pdo->query('SELECT * FROM be_briefkopf WHERE id = 1')->fetch(PDO::FETCH_ASSOC) ?: [])
+            : [];
+    } catch (Throwable $e) {
+        $bk = [];
+    }
+    $raus = [];
+    foreach (['firma', 'absender', 'uid', 'mwst_nr', 'iban', 'qr_iban', 'qr_strasse',
+              'qr_hausnummer', 'qr_plz', 'qr_ort', 'email', 'telefon', 'webseite', 'logo'] as $f) {
+        $raus[$f] = (string)($bk[$f] ?? '');
+    }
+    return $raus;
+}
+
 const BE_NACHRICHT_ZEICHEN = 4000;
 
 function be_beleg_nachricht_tabelle_da(PDO $pdo): bool
@@ -1557,6 +1577,9 @@ function be_tabellen(): array
   versand_token CHAR(64) NULL,
   entscheidung_am DATETIME NULL,
   entscheidung_ip VARCHAR(64) NULL,
+  -- Welche Fassung entschieden wurde (ENT-688). NULL: vor ENT-688 oder
+  -- noch nicht entschieden.
+  entscheidung_fassung INT UNSIGNED NULL,
   aktiv TINYINT(1) NOT NULL DEFAULT 1,
   erstellt_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   geaendert_am DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
@@ -1630,6 +1653,30 @@ function be_tabellen(): array
   text TEXT NOT NULL,
   erstellt_am DATETIME NOT NULL,
   KEY idx_be_beleg_nachricht_beleg (beleg_id, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Die Fassungen eines Belegs (ENT-688). Jeder Versand, der etwas anderes
+// zeigt als der vorige, legt hier ein Abbild ab: Kopf, Positionen, gerechnete
+// Summen, Empfaenger und Absender, als JSON, mit SHA-256-Pruefsumme daneben.
+// Der Link zeigt die letzte Fassung, nie den Entwurf (siehe belege.php).
+//
+// NIE GEAENDERT, NIE GELOESCHT: Eine Zeile wird angelegt und bleibt. Auch das
+// Archivieren eines Belegs laesst sie stehen -- eine angenommene Offerte ist
+// ein Geschaeftsbrief und zehn Jahre aufzubewahren (Art. 958f OR).
+// pruef_beleg_fassung.php haelt fest, dass es im Backend keinen Schreibweg
+// daran gibt ausser dem Anlegen.
+//
+// MEDIUMTEXT, weil das Abbild das Logo als data:-URL traegt.
+'be_beleg_fassung' => "CREATE TABLE IF NOT EXISTS be_beleg_fassung (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  beleg_id INT UNSIGNED NOT NULL,
+  nummer INT UNSIGNED NOT NULL,
+  abbild MEDIUMTEXT NOT NULL,
+  pruefsumme CHAR(64) NOT NULL,
+  anlass ENUM('versand','annahme') NOT NULL DEFAULT 'versand',
+  versendet_am DATETIME NOT NULL,
+  versendet_von VARCHAR(120) NOT NULL DEFAULT '',
+  UNIQUE KEY uq_be_beleg_fassung (beleg_id, nummer)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
 'be_aenderungslog' => "CREATE TABLE IF NOT EXISTS be_aenderungslog (
@@ -1795,6 +1842,9 @@ function be_spalten(): array
         // Franken pro Monat, das ist kein fehlender Wert.
         ['be_belege', 'total_monat_rappen',      "ALTER TABLE be_belege ADD COLUMN total_monat_rappen INT NOT NULL DEFAULT 0 AFTER verlaengerung_monate"],
         ['be_belege', 'total_jahr_rappen',       "ALTER TABLE be_belege ADD COLUMN total_jahr_rappen INT NOT NULL DEFAULT 0 AFTER total_monat_rappen"],
+        // Welche Fassung der Empfaenger angenommen oder abgelehnt hat
+        // (ENT-688). NULL-bar: Eine Entscheidung von vorher kennt keine.
+        ['be_belege', 'entscheidung_fassung',    "ALTER TABLE be_belege ADD COLUMN entscheidung_fassung INT UNSIGNED NULL AFTER entscheidung_ip"],
         ['be_beleg_positionen', 'periode',       "ALTER TABLE be_beleg_positionen ADD COLUMN periode ENUM('einmalig','monatlich','jaehrlich') NOT NULL DEFAULT 'einmalig' AFTER mwst_satz_bp"],
         // Rueckmeldung an den Betrieb (ENT-685). Beide NULL-bar bzw. leer:
         // Ein bestehender Vorgang hat keine Adresse und gilt als nie

@@ -1264,6 +1264,8 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   -- bestritten wird. Bleibt NULL, solange keine Entscheidung vorliegt.
   entscheidung_am DATETIME NULL,
   entscheidung_ip VARCHAR(45) NULL,
+  -- Welche Fassung entschieden wurde (ENT-688).
+  entscheidung_fassung INT NULL,
   -- Getrennt von entscheidung_am, nach demselben Muster wie
   -- verfuegbarkeiten.gesehen_am (ENT-033): entscheidung_am ist der Beleg der
   -- Kundenentscheidung selbst und bleibt unberuehrt, dieser Zeitstempel
@@ -1300,6 +1302,24 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   KEY idx_position_beleg (beleg_id, sortierung),
   FOREIGN KEY (beleg_id) REFERENCES belege(id) ON DELETE CASCADE,
   FOREIGN KEY (produkt_id) REFERENCES produkte(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+// Die Fassungen eines Belegs (ENT-688) -- dieselbe Tabelle wie
+// be_beleg_fassung auf der Betreiberseite, Begruendung dort. Kurz: Jeder
+// Versand mit geaendertem Inhalt legt ein Abbild mit Pruefsumme ab, der
+// Kundenlink zeigt die letzte Fassung, und eine Zeile wird nie geaendert
+// oder geloescht. OHNE Fremdschluessel mit ON DELETE CASCADE: Eine Fassung
+// ueberlebt ihren Beleg, falls der je geloescht wuerde.
+'beleg_fassung' => "CREATE TABLE beleg_fassung (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  beleg_id INT NOT NULL,
+  nummer INT NOT NULL,
+  abbild MEDIUMTEXT NOT NULL,
+  pruefsumme CHAR(64) NOT NULL,
+  anlass VARCHAR(20) NOT NULL DEFAULT 'versand',
+  versendet_am DATETIME NOT NULL,
+  versendet_von VARCHAR(120) NOT NULL DEFAULT '',
+  UNIQUE KEY uq_beleg_fassung (beleg_id, nummer)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
 // Abwesenheitsplanung (ENT-255): Antrag/Genehmigung fuer Ferien, Krankheit,
@@ -2646,6 +2666,8 @@ function kern_spalten(): array {
      . 'ADD UNIQUE KEY uq_beleg_versand_token (versand_token)'],
     ['belege', 'entscheidung_am', 'ALTER TABLE belege ADD COLUMN entscheidung_am DATETIME NULL AFTER versand_token'],
     ['belege', 'entscheidung_ip', 'ALTER TABLE belege ADD COLUMN entscheidung_ip VARCHAR(45) NULL AFTER entscheidung_am'],
+    // Welche Fassung entschieden wurde (ENT-688).
+    ['belege', 'entscheidung_fassung', 'ALTER TABLE belege ADD COLUMN entscheidung_fassung INT NULL AFTER entscheidung_ip'],
 
     // Rundgang pausieren/abbrechen (ENT-146). pausiert_seit haelt den Beginn
     // der AKTUELLEN Pause fest -- pause_minuten ist die kumulierte Summe ueber

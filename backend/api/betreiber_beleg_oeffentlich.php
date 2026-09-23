@@ -137,29 +137,29 @@ try {
             . 'Bitte wenden Sie sich an den Absender.');
     }
 
-    $kunde = null;
-    if ($b['kunde_id']) {
-        $s = $pdo->prepare(
-            'SELECT name, zusatzfeld, strasse, hausnummer, adresszusatz, plz, ort
-               FROM be_kunden WHERE id = ?'
-        );
-        $s->execute([(int)$b['kunde_id']]);
-        $kunde = $s->fetch() ?: null;
+    // WAS DER EMPFAENGER SIEHT, IST DIE LETZTE VERSENDETE FASSUNG (ENT-688),
+    // nicht der Beleg, wie er gerade im Formular steht. Kopf, Positionen,
+    // Summen, Anschrift und Briefkopf kommen aus ihrem Abbild; aus der
+    // lebenden Zeile bleiben nur Status, Entscheidung und Token.
+    //
+    // Gibt es noch keine Fassung (versendet vor ENT-688, oder die Tabelle
+    // fehlt bis zum Einrichtungslauf), zeigt die Seite den Beleg wie bisher.
+    $fassung = beleg_letzte_fassung($pdo, (int)$b['id'], 'be_');
+    if ($fassung && !$fassung['echt']) {
+        // Die Pruefsumme passt nicht mehr zum Abbild. Dann wird nichts
+        // angezeigt: Eine veraenderte Fassung als echt auszugeben waere
+        // schlimmer als gar keine.
+        portal_fehler('Dokument nicht verfügbar', 'Dieses Dokument lässt sich gerade nicht '
+            . 'anzeigen. Bitte wenden Sie sich an den Absender.', 500);
     }
-    $person = null;
-    if ($b['person_id']) {
-        $s = $pdo->prepare('SELECT anrede, vorname, nachname FROM be_kunden_person WHERE id = ?');
-        $s->execute([(int)$b['person_id']]);
-        $person = $s->fetch() ?: null;
-    }
+    $abbild = $fassung
+        ? $fassung['abbild']
+        : beleg_abbild_lesen($pdo, (int)$b['id'], 'be_', be_beleg_absender($pdo));
+    $kunde  = $abbild['kunde'] ?? null;
+    $person = $abbild['person'] ?? null;
+    $bk     = (array)($abbild['absender'] ?? []);
+    $b      = array_merge($b, (array)($abbild['beleg'] ?? []));
 
-    // Absender aus dem Briefkopf der Betreiberin -- dieselbe Quelle und
-    // dasselbe Bild wie im internen Ausdruck (ofBlatt() in betreiber.html).
-    // Wer dieselbe Offerte einmal von innen und einmal ueber den Link sieht,
-    // soll nicht zwei verschiedene Kopfzeilen bekommen.
-    $bk = hat_tabelle($pdo, 'be_briefkopf')
-        ? ($pdo->query('SELECT * FROM be_briefkopf WHERE id = 1')->fetch() ?: [])
-        : [];
     $firma = trim((string)($bk['firma'] ?? ''));
     $absenderZeilen = array_values(array_filter(array_map('trim',
         explode("\n", (string)($bk['absender'] ?? '')))));
@@ -189,11 +189,13 @@ try {
             . '</div>';
     }
 
-    $b['positionen'] = beleg_positionen_lesen($pdo, (int)$b['id'], 'be_');
-    $summen = beleg_summen($b['positionen'], (int)$b['rabatt_bp']);
+    // Positionen und Summen aus dem Abbild -- GERECHNET gespeichert und hier
+    // nicht neu gerechnet: Eine spaetere Aenderung der Formel darf eine
+    // versendete Offerte nicht veraendern.
+    $summen = (array)$abbild['summen'];
     // Ein Vertrag rechnet je Periode (ENT-637). Offerte und Rechnung haben
     // genau eine, und fuer sie sieht das Blatt danach aus wie vorher.
-    $perioden = beleg_summen_perioden($b['positionen'], (int)$b['rabatt_bp']);
+    $perioden = (array)($abbild['perioden'] ?? []);
     if (!$perioden) { $perioden = ['einmalig' => $summen]; }
     $mehrPerioden = count($perioden) > 1;
     // Der Betrag in der Seitenspalte. Bei einem Vertrag OHNE einmalige
@@ -432,7 +434,16 @@ try {
             . '</div>';
     }
 
+    // Ab der zweiten Fassung sagt die Seite, welche sie zeigt. Bei der
+    // ersten waere "Fassung 1" ein Wort ohne Nutzen -- es gibt keine andere.
+    $fassungZeile = ($fassung && (int)$fassung['nummer'] > 1)
+        ? '<div style="font-size:12px;color:#6B7280;margin:-8px 0 14px">Fassung '
+          . (int)$fassung['nummer'] . ' vom ' . portal_dmy(substr((string)$fassung['versendet_am'], 0, 10))
+          . '</div>'
+        : '';
+
     $zusammenfassung = '<div class="zf-titel">' . portal_esc($titel) . ' ' . portal_esc($b['nummer']) . '</div>'
+        . $fassungZeile
         . $hinweis
         . '<div class="zf-label">Absender</div>'
         . '<div style="line-height:1.5;font-size:13px">' . portal_esc($firma !== '' ? $firma : 'Absender') . '</div>'
