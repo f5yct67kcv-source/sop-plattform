@@ -2081,7 +2081,6 @@ textarea.inp { resize: vertical; min-height: 92px; font-family: inherit; line-he
 .tour-box .tour-knoepfe { display: flex; gap: 8px; }
 .tour-box .tour-pfeil { position: absolute; width: 12px; height: 12px; background: var(--surface); border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); transform: rotate(45deg); display: none; }
 .tour-box.pfeil-links .tour-pfeil { left: -7px; top: 26px; display: block; }
-.tour-box .tour-nicht-mehr { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
 
 /* Demo-Hinweis: EIGENE Huelle statt .dlg-scrim (Projektinhaber-Auftrag,
    2026-09-21). Absichtlich NICHT .dlg-scrim: Jeder ".dlg-scrim" schliesst
@@ -10248,9 +10247,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   <div class="tour-schritt" id="tourSchrittLbl">Schritt 1 von 10</div>
   <h3 id="tourTitel"></h3>
   <p id="tourText"></p>
-  <div class="tour-nicht-mehr" id="tourNichtMehrWrap" style="display:none">
-    <label class="check"><input type="checkbox" id="tourNichtMehr"> Nicht mehr automatisch anzeigen</label>
-  </div>
   <div class="tour-ft">
     <div class="tour-punkte" id="tourPunkte"></div>
     <div class="tour-knoepfe">
@@ -10684,9 +10680,26 @@ const TOUR_SCHRITTE = [
 let tourIdx = 0;
 let tourAktivesZiel = null;
 
-function tourStart() {
+// automatisch = true nur beim einmaligen Aufgehen nach der Anmeldung
+// (siehe tutorialAutostartPruefen). Dann wird SOFORT gemerkt, dass diese
+// Person die Tour gesehen hat -- nicht erst am letzten Schritt.
+//
+// BEFUND des Projektinhabers (2026-09-23, an der laufenden Anlage): Die
+// Tour ging bei JEDER Anmeldung wieder auf. Gemerkt wurde sie bis dahin
+// nur, wer alle zehn Schritte bis "Fertig" durchklickte oder am letzten
+// Schritt ein Kaestchen ankreuzte. Wer sie -- wie erwartbar -- gleich im
+// ersten Schritt wegklickte, hinterliess nichts, und am naechsten Tag
+// stand sie wieder da. Das Kaestchen "Nicht mehr automatisch anzeigen" ist
+// damit hinfaellig und entfallen: Automatisch kommt die Tour genau einmal,
+// danach jederzeit ueber "Tutorial" in der Seitenleiste.
+//
+// Gemerkt wird beim AUFGEHEN, nicht beim Schliessen: Wer das Fenster
+// zuklappt oder die Seite neu laedt, statt das Kaestchen wegzuklicken,
+// erreicht kein Schliessen -- und saehe die Tour sonst wieder.
+function tourStart(automatisch) {
   tourIdx = 0;
   tourRender();
+  if (automatisch) { tourAlsGesehenMerken(); }
 }
 
 function tourRender() {
@@ -10698,7 +10711,6 @@ function tourRender() {
   $('tourText').textContent = schritt.text;
   $('tourZurueckBtn').style.visibility = tourIdx === 0 ? 'hidden' : 'visible';
   $('tourWeiterBtn').textContent = schritt.letzter ? 'Fertig' : 'Weiter';
-  $('tourNichtMehrWrap').style.display = schritt.letzter ? 'block' : 'none';
   $('tourPunkte').innerHTML = TOUR_SCHRITTE.map((_, i) =>
     `<span class="tour-punkt${i === tourIdx ? ' aktiv' : ''}"></span>`).join('');
   box.classList.add('on');
@@ -10741,15 +10753,19 @@ function tourAufraeumen() {
   if (tourAktivesZiel) { tourAktivesZiel.classList.remove('tour-ziel'); tourAktivesZiel = null; }
 }
 
+// Abschliessen und Wegklicken tun dasselbe: aufraeumen. Der Stand
+// "gesehen" haengt nicht mehr daran, sondern am Aufgehen (siehe
+// tourStart). Fuer den Fall, dass dieser erste Versuch den Server nicht
+// erreicht hat, wird am Ende der Tour noch einmal gemerkt -- die Tabelle
+// haelt je Person und Tour genau eine Zeile, ein zweiter Aufruf legt also
+// nichts Zusaetzliches an.
 function tourAbschliessen() {
   tourAufraeumen();
   tourAlsGesehenMerken();
 }
 
 function tourSchliessen() {
-  const nichtMehr = TOUR_SCHRITTE[tourIdx].letzter && $('tourNichtMehr').checked;
   tourAufraeumen();
-  if (nichtMehr) tourAlsGesehenMerken();
 }
 
 function tourAlsGesehenMerken() {
@@ -10908,7 +10924,7 @@ function tutorialAutostartPruefen(data) {
   }
   if (Array.isArray(me.rollen) && me.rollen.includes('verwaltung')
       && data && data.tutorial_gesehen && !data.tutorial_gesehen.cockpit_verwaltung) {
-    tourStart();
+    tourStart(true);
   }
 }
 
