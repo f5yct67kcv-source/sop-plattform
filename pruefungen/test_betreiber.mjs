@@ -521,8 +521,32 @@ const OEFFENTLICHE_DEMO_ENDPUNKTE = ['demo_anfordern.php', 'demo_erneut_senden.p
 const endpunkteMitOeffentlicherDemo = [...endpunkte, ...OEFFENTLICHE_DEMO_ENDPUNKTE];
 
 const MANDANT_VERBINDER = /mandant_db\s*\(|mandant_stand\s*\(/;
-const nutztMandantDb = endpunkteMitOeffentlicherDemo.filter(f =>
-  MANDANT_VERBINDER.test(nurCode(lies(`backend/api/${f}`))));
+
+// ÜBER EIN MODUL ZAEHLT MIT (2026-09-23). Bis hierher sah diese Wache nur
+// in den Endpunkt selbst. Ein Endpunkt, der die Verbindung ueber einen
+// Rechenkern aufbaut, waere ihr entgangen -- und genau so ist
+// betreiber_support_lage.php entstanden (ENT-681, ueber
+// backend/support_sammeln.php). Die Regel haette damit still aufgehoert zu
+// gelten, fuer alles Neue, das sie nicht geerbt haette.
+//
+// Ein Modul zaehlt als Verbinder, wenn es mandant_db() RUFT und nicht
+// DEFINIERT: betreiber.php definiert die Funktion (und ruft sie in
+// mandant_stand selbst), waere also sonst der Verbinder, ueber den jeder
+// Endpunkt zaehlte -- und die Liste saegte man in dem Moment ab, in dem
+// sie alle enthaelt.
+const MODULE = readdirSync(join(WURZEL, 'backend'))
+  .filter(f => f.endsWith('.php'));
+const VERBINDER_MODULE = MODULE.filter(f => {
+  const q = nurCode(lies(`backend/${f}`));
+  return MANDANT_VERBINDER.test(q) && !/function\s+mandant_db\s*\(/.test(q);
+});
+const laedtVerbinder = q => VERBINDER_MODULE.some(m =>
+  new RegExp("require(?:_once)?\\s+__DIR__\\s*\\.\\s*['\"][^'\"]*" + m.replace('.', '\\.')).test(q));
+
+const nutztMandantDb = endpunkteMitOeffentlicherDemo.filter(f => {
+  const q = nurCode(lies(`backend/api/${f}`));
+  return MANDANT_VERBINDER.test(q) || laedtVerbinder(q);
+});
 check('es gibt ueberhaupt einen Endpunkt, der die Mandantenlage prueft',
   nutztMandantDb.length > 0);
 // Erlaubt sind genau zwei betreiber_-Endpunkte, namentlich -- und der
@@ -557,6 +581,22 @@ const DARF_VERBINDEN = {
   // steht -- ein echter Mandant liefert hier nie etwas, auf zwei
   // unabhaengigen Wegen abgesichert.
   'betreiber_demo_nutzung.php':    'liest Reiter/Dauer NUR eines Demo-Platzes, nie eines echten Mandanten (ENT-653)',
+  // ENT-681: Der Betreiber HOLT AB, was auf der eigenen Datenbank eines
+  // Mandanten liegt. Beide lesen ausschliesslich, was dem Betreiber gilt --
+  // Anfragen, die ein Betrieb ausdruecklich an ihn gerichtet hat, und den
+  // Stand der Freigabe, die ihm erteilt wurde. KEINE Betriebsdaten; der
+  // Einblick in die Anlage haengt unveraendert an betreiber_support.php
+  // mit Freigabe und Protokoll. Die Grenze wird in
+  // test_support_abholen.mjs einzeln nachgewiesen.
+  'betreiber_support_vorgang.php': 'holt die Supportanfragen einer Anlage mit eigener Datenbank ab (ENT-681)',
+  'betreiber_support_lage.php':    'liest ab, ob eine Support-Freigabe vorliegt -- oeffnet nichts (ENT-681)',
+  // Von der erweiterten Wache neu gesehen (2026-09-23): Der Endpunkt
+  // verbindet ueber demo_instanz.php, nicht in eigener Zeile. Er tut
+  // dasselbe wie demo_erneut_senden.php eine Zeile weiter oben -- neues
+  // Passwort fuer das Konto EINER Demo-Instanz (ENT-649) --, war hier aber
+  // nie eingetragen, weil die Wache ihn bis heute nicht sah. Kein neuer
+  // Zugriff, nur ein bisher unsichtbarer.
+  'betreiber_demo_erneut.php':     'setzt das Passwort einer Demo-Instanz zurueck (ENT-649)',
 };
 const heimlich = nutztMandantDb.filter(f => !DARF_VERBINDEN[f]);
 check('KRITISCH: nur namentlich genannte Endpunkte verbinden zu einer Mandantendatenbank',
