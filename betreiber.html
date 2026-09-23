@@ -1953,6 +1953,10 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <button class="klein" id="knopf-sup-zu">Schliessen</button>
       </div>
       <div class="karte-leib">
+        <!-- Um eine Freigabe bitten (ENT-683). Oben im Dialog, weil ohne
+             Freigabe darunter nichts steht -- und weil das hier die einzige
+             Handlung ist, die der Betreiber selbst hat. -->
+        <div id="sup-bitte"></div>
         <div id="sup-freigabe"></div>
         <div id="sup-inhalt"></div>
         <!-- Der Sprung ins Cockpit (ENT-631). Unten in diesem Dialog und
@@ -3764,6 +3768,14 @@ function freigabeZeichnen() {
       return;
     }
     const [klasse, wort] = FREIGABE_TEXT[l.lage] || ['', l.lage];
+    /* Eine offene Bitte gehoert daneben (ENT-683) -- sonst fragt man
+       denselben Betrieb ein zweites Mal, und von dort aus sieht das aus
+       wie Draengen. Sie ersetzt die Lage nicht, sie ergaenzt sie: "nie
+       freigegeben, aber gefragt" sind zwei Aussagen. */
+    const gefragt = l.bitte
+      ? '<div class="zweit" style="margin-top:3px">gebeten am '
+        + text(String(l.bitte.am).slice(0, 10)) + '</div>'
+      : '';
     if (l.lage === 'offen' && l.freigabe) {
       el.innerHTML = '<span class="merker ' + klasse + '">' + wort + '</span>'
         + '<div class="zweit" style="margin-top:3px">bis '
@@ -3771,7 +3783,7 @@ function freigabeZeichnen() {
         + (l.freigabe.zweck ? ' · ' + text(l.freigabe.zweck) : '') + '</div>';
       return;
     }
-    el.textContent = wort;
+    el.innerHTML = text(wort) + gefragt;
   });
 }
 
@@ -3874,18 +3886,30 @@ async function supportHolen(m) {
        DIAGNOSE braucht eine Freigabe, der Sprung nicht. Sie hier
        auszublenden hiesse, den einen Weg zu verstellen, der fuer diesen
        Platz offen ist -- und genau fuer ihn ist er gebaut. */
+    /* Der Dialog bleibt jetzt in BEIDEN Fällen stehen (ENT-683). Bis
+       hierher ging er bei einem echten Mandanten zu, und der Betreiber
+       hatte von hier aus gar nichts mehr -- nur die Meldung. Jetzt steht
+       dort der eine Weg, den es gibt: bitten. */
+    $('sup-titel').textContent = 'Support: ' + (m.name || '');
+    $('sup-freigabe').innerHTML = '';
+    supBitteZeichnen(m, a.bitte || null, a.grund === 'nicht_eingerichtet');
+
     if (istDemo) {
-      $('sup-titel').textContent = 'Support: ' + (m.name || '');
-      $('sup-freigabe').innerHTML = '';
+      /* Bei einem Demo-Platz bleibt die Karte stehen (ENT-631): Die
+         DIAGNOSE braucht eine Freigabe, der Sprung nicht. Auf einem Platz
+         SITZT aber ein Interessent, der sehr wohl freigeben kann -- demo3
+         hat es getan. Die Bitte steht darum auch hier, sie ist nur selten
+         nötig, weil der Sprung ohnehin offen ist. */
       $('sup-inhalt').innerHTML = '<div class="zweit">Für die Diagnosedaten fehlt die '
         + 'Freigabe. Der Wechsel ins Cockpit steht trotzdem offen — ein Demo-Platz '
-        + 'gehört dem Betreiber, es gibt dort keinen Kunden, der freigeben könnte.</div>';
+        + 'gehört dem Betreiber.</div>';
       supSprungSetzen(m, true, 'Der Zugriff wird im Platz protokolliert.');
-      zeig($('sup-karte'), true);
-      $('sup-karte').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      return;
+    } else {
+      $('sup-inhalt').innerHTML = '';
+      zeig($('sup-sprung'), false);
     }
-    zeig($('sup-karte'), false);
+    zeig($('sup-karte'), true);
+    $('sup-karte').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     return;
   }
   if (a.status !== 'ok') {
@@ -3895,6 +3919,9 @@ async function supportHolen(m) {
   }
 
   $('sup-titel').textContent = 'Support: ' + a.mandant.name;
+  /* Liegt eine Freigabe vor, ist jede Bitte beantwortet -- der Block
+     verschwindet, statt neben der offenen Tür stehen zu bleiben. */
+  $('sup-bitte').innerHTML = '';
   $('sup-freigabe').innerHTML =
       '<div class="meldung gut" style="margin-bottom:16px">Freigegeben von '
     + text(a.freigabe.von) + ' bis ' + text(String(a.freigabe.gilt_bis).slice(0, 16))
@@ -3934,6 +3961,76 @@ async function supportHolen(m) {
     : 'Stützt sich auf die Freigabe oben. Jede Änderung wird beim Betrieb protokolliert.');
   zeig($('sup-karte'), true);
   $('sup-karte').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* ── Um eine Freigabe bitten (ENT-683) ───────────────────────────────
+ *
+ * Der eine Weg, den der Betreiber von hier aus hat. Er öffnet nichts: Die
+ * Bitte legt einen Grund in die Datenbank des Betriebs, erteilt wird
+ * weiterhin ausschliesslich dort im Cockpit. Eine Bitte, die man sich
+ * selbst erfüllen kann, wäre keine.
+ *
+ * DREI ZUSTÄNDE, DREI TEXTE (Hausregel): noch nicht gebeten, gebeten (mit
+ * Zeitpunkt und Zweck, dazu der Weg zurück) und "auf dieser Anlage nicht
+ * eingerichtet" -- dort ginge es gar nicht, und das ist etwas anderes als
+ * "noch nicht gebeten".
+ */
+let supBitteMandant = null;
+
+function supBitteZeichnen(m, bitte, nichtEingerichtet) {
+  supBitteMandant = m;
+  const ziel = $('sup-bitte');
+
+  if (nichtEingerichtet) {
+    ziel.innerHTML = '<div class="meldung warn">Auf dieser Anlage ist die Support-Freigabe '
+      + 'noch nicht eingerichtet. Solange das so ist, lässt sich dort auch nicht um '
+      + 'Einblick bitten.</div>';
+    return;
+  }
+
+  if (bitte) {
+    ziel.innerHTML = '<div class="meldung gut" style="margin-bottom:12px">'
+      + '<strong>Gebeten am ' + text(String(bitte.gebeten_am).slice(0, 16)) + '</strong>'
+      + '<div style="margin-top:6px">' + text(bitte.zweck) + '</div>'
+      + '<div style="margin-top:10px;opacity:.85;font-size:12.5px">Der Betrieb sieht die Bitte '
+      + 'in seinem Cockpit unter Administration → Einstellungen. Erteilen kann sie nur er.</div>'
+      + '</div>'
+      + '<button type="button" class="klein" id="knopf-bitte-weg">Bitte zurückziehen</button>';
+    $('knopf-bitte-weg').onclick = () => supBitteSenden(true);
+    return;
+  }
+
+  ziel.innerHTML =
+      '<div class="zweit" style="margin-bottom:8px">Ohne Freigabe ist hier nichts abrufbar. '
+    + 'Sie können den Betrieb darum bitten — er entscheidet, ob und wie lange.</div>'
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">'
+    + '<label style="flex:1 1 260px">Wofür wird der Einblick gebraucht?'
+    + '<input id="bitte-zweck" type="text" maxlength="200" '
+    + 'placeholder="z. B. Rundgänge werden nach dem Update nicht angezeigt"></label>'
+    + '<button type="button" class="haupt" id="knopf-bitte">Freigabe anfordern</button>'
+    + '</div>';
+  $('knopf-bitte').onclick = () => supBitteSenden(false);
+}
+
+async function supBitteSenden(zuruecknehmen) {
+  const m = supBitteMandant;
+  if (!m) { return; }
+  const zweck = zuruecknehmen ? '' : (($('bitte-zweck') || {}).value || '').trim();
+  if (!zuruecknehmen && !zweck) {
+    melde($('haus-meldung'), 'fehler',
+      'Bitte kurz angeben, wofür der Einblick gebraucht wird — der Betrieb entscheidet danach.');
+    return;
+  }
+  const a = await ruf('betreiber_support_bitte.php',
+    zuruecknehmen ? { id: m.id, zuruecknehmen: true } : { id: m.id, zweck }, 'POST');
+  if (a.status !== 'ok') {
+    melde($('haus-meldung'), 'fehler', a.message || 'Die Bitte liess sich nicht ablegen.');
+    return;
+  }
+  melde($('haus-meldung'), 'gut', zuruecknehmen
+    ? 'Die Bitte ist zurückgezogen.'
+    : 'Der Betrieb sieht die Bitte jetzt in seinem Cockpit.');
+  supBitteZeichnen(m, a.bitte || null, false);
 }
 
 /* ── Konten (ENT-615) und Logbuch (ENT-614) ─────────────────────────

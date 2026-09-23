@@ -64,6 +64,11 @@ async function fall(mandant, antwort) {
       knopfDa: !!knopf,
       hinweis: (document.getElementById('sup-sprung-hinweis') || {}).textContent || '',
       inhalt:  (document.getElementById('sup-inhalt') || {}).textContent || '',
+      // Der Weg, um eine Freigabe zu BITTEN (ENT-683). Gemessen wird der
+      // Knopf, nicht ein Text -- ein Kasten ohne Knopf waere keine
+      // Handlung, sondern eine Behauptung.
+      bitte:   !!document.getElementById('knopf-bitte'),
+      bitteDa: !!document.getElementById('bitte-zweck'),
     };
   }, [mandant, antwort]);
   await page.close();
@@ -93,7 +98,17 @@ const OHNE_FREIGABE = { status: 'error', grund: 'keine_freigabe', lage: 'nie_fre
 {
   const a = await fall({ id: 1, name: 'Beispiel', ist_demo: false }, OHNE_FREIGABE);
   check('ohne Freigabe bleibt der Weg ins Cockpit verschlossen', a.sprung === false);
-  check('ohne Freigabe bleibt die Karte zu', a.karte === false);
+  // GEAENDERT MIT ENT-683: Bis dahin ging die Karte hier zu, und der
+  // Betreiber hatte von hier aus gar nichts -- nur eine Meldung. Jetzt
+  // bleibt sie offen und zeigt den einen Weg, den es gibt: bitten. Das
+  // Entscheidende bleibt die Zeile darueber -- der SPRUNG bleibt zu.
+  check('ohne Freigabe steht der Weg offen, um darum zu bitten',
+    a.karte === true && a.bitte === true && a.bitteDa === true);
+  // Und die Diagnose bleibt leer: Es gibt keine Freigabe, also gibt es
+  // nichts zu sehen. Eine Karte, die trotzdem Zahlen zeigte, waere genau
+  // der Zugriff, den ENT-526 an die Freigabe bindet.
+  check('KRITISCH: ohne Freigabe stehen keine Diagnosedaten in der Karte',
+    a.inhalt.trim() === '');
   if (a.fehler.length) { bad.push('JS-Fehler (ohne Freigabe): ' + a.fehler.join('; ')); }
 }
 

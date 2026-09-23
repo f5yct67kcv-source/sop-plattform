@@ -123,6 +123,50 @@ check('KRITISCH: und im Buendel der Anlage',
   check(`${f} sperrt den Abholweg`, lies(f).includes('support_sammeln'));
 });
 
+// ── 7. Die Bitte um eine Freigabe (ENT-683) ─────────────────────────
+//
+// Sie ist der einzige Weg, den der Betreiber selbst in der Hand hat -- und
+// genau darum die Stelle, an der aus "fragen duerfen" versehentlich
+// "hereinkommen duerfen" werden koennte.
+let bitteAus = '', bitteCode = 0;
+try {
+  bitteAus = execFileSync('php', [`${HIER}/pruef_support_bitte.php`], { encoding: 'utf8' });
+} catch (e) {
+  bitteAus = String(e.stdout || '') + String(e.stderr || '');
+  bitteCode = e.status || 1;
+}
+const bitteAnzahl = Number((bitteAus.match(/^(\d+) bestanden/m) || [0, 0])[1]);
+check('KRITISCH: die Faelle der Bitte bestehen (ausgefuehrt, nicht gelesen)',
+  bitteCode === 0 && bitteAnzahl > 0 && !bitteAus.includes('\nx '));
+bitteAus.split('\n').filter(z => z.startsWith('x ')).forEach(z => bad.push('PHP: ' + z.slice(2)));
+
+const bittePhp = nurCode(lies('backend/api/betreiber_support_bitte.php'));
+// Der Betreiber schreibt eine BITTE in die Anlage des Betriebs. Er darf
+// dort nichts anderes anfassen -- vor allem keine Freigabe ausstellen.
+check('KRITISCH: die Bitte stellt keine Freigabe aus',
+  !/support_freigeben\s*\(/.test(bittePhp));
+check('KRITISCH: sie schreibt nur ueber die Bitte-Funktionen',
+  !/\b(INSERT|UPDATE|DELETE)\b/i.test(bittePhp));
+// Wer bittet, kommt aus der Sitzung -- nie aus der Anfrage. Derselbe
+// Grundsatz wie beim Freigebenden (ENT-526).
+check('KRITISCH: der Bittende kommt aus der Sitzung',
+  /\$ich\['name'\]/.test(bittePhp)
+  && !/\$daten\['gebeten_von'\]|\$daten\['wer'\]/.test(bittePhp));
+check('KRITISCH: ohne Zweck keine Bitte', /\$zweck === ''[\s\S]{0,200}400/.test(bittePhp));
+check('sie verlangt eine Betreiber-Sitzung', /require_betreiber_voll\(\)/.test(bittePhp));
+
+// Und im Cockpit: Die Bitte steht in der bestehenden Karte, nicht in einem
+// eigenen Container (Festlegung des Projektinhabers, 2026-09-23), und der
+// Zweck wandert ins Formular, damit nur noch Dauer und Klick fehlen.
+const cockpit = lies('dashboard.html');
+check('KRITISCH: das Cockpit zeigt die Bitte in der Karte Support-Freigabe',
+  /bitteBlock/.test(cockpit) && /Der Betreiber bittet um Einblick/.test(cockpit));
+check('der Zweck der Bitte steht im Freigabe-Formular',
+  /value="'\s*\+\s*\(bitte \? esc\(bitte\.zweck\)/.test(cockpit));
+// Am Handy dieselbe Datei -- sonst laufen die beiden auseinander.
+check('das Handy-Buendel traegt denselben Stand',
+  lies('mobile/www/dashboard.html').includes('Der Betreiber bittet um Einblick'));
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');
