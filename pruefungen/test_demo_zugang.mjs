@@ -270,6 +270,20 @@ const ANTWORTEN = {
   },
 };
 
+/* Live-Nutzung je Platz (ENT-690): demo1 und demo2 melden VERSCHIEDENE
+   Reiter -- sonst bliebe gruen, wenn die Ansicht immer denselben Platz
+   zeigt. "gibtsnicht" steht fuer einen Schluessel, den das Cockpit neu
+   einfuehrt und der Betreiber-Bereich noch nicht kennt. Das Archiv bleibt
+   leer: genau der Fall, der beanstandet wurde. */
+ANTWORTEN['betreiber_demo_nutzung.php'] = url => {
+  const id = new URL(url).searchParams.get('id');
+  return { status: 'ok', reiter: id === '2'
+    ? [{ reiter: 'lohnlaeufe', dauer_s: 1260, aufrufe: 1 },
+       { reiter: 'gibtsnicht', dauer_s: 20, aufrufe: 2 }]
+    : [{ reiter: 'einsatzneu', dauer_s: 360, aufrufe: 3 }] };
+};
+ANTWORTEN['betreiber_demo_nutzung_archiv.php'] = { status: 'ok', reiter: [] };
+
 const browser = await chromium.launch({ executablePath: browserPfad() });
 const seite = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 seite.on('pageerror', e => bad.push('JS-Fehler in der Ansicht: ' + e.message));
@@ -281,7 +295,9 @@ seite.on('pageerror', e => bad.push('JS-Fehler in der Ansicht: ' + e.message));
 await seite.route('**/api/**', r => {
   const datei = r.request().url().split('/').pop().split('?')[0];
   r.fulfill({ status: 200, contentType: 'application/json',
-    body: JSON.stringify(ANTWORTEN[datei] || { status: 'ok' }) });
+    // Eine Antwort darf von der Anfrage abhaengen (Nutzung je Platz-ID).
+    body: JSON.stringify((typeof ANTWORTEN[datei] === 'function'
+      ? ANTWORTEN[datei](r.request().url()) : ANTWORTEN[datei]) || { status: 'ok' }) });
 });
 await seite.addInitScript(() => {
   sessionStorage.setItem('betreiber-token', 'pruefung');
@@ -431,16 +447,80 @@ check('KRITISCH: bei "Abgelaufene Zugänge" ist nichts offen -- also steht dort 
   zahlen.abgelaufen === '');
 check('Plätze und Nutzung tragen keine Zahl -- dort wartet nie etwas', zahlen.ohneZahl);
 
-// Die Live-Nutzung gehoert zu einer Zeile unter "Demo-Zugänge". Unter einer
-// anderen Kachel stuende nirgends mehr, woher sie kommt.
-await seite.click('#demo-inhalt [data-demo-nutzung]');
+/* ── Laufende Plätze in der Kachel "Demo-Nutzung" (ENT-690) ───────────
+   Vorher stand dort nur das Archiv, und solange kein Platz geleert war,
+   sagte die Kachel "Noch nichts archiviert" -- neben laufenden Plaetzen mit
+   Nutzungsdaten. Der Knopf in der Zeile ist seither eine Abkuerzung
+   dorthin, keine zweite Ansicht. */
+const liveLesen = () => seite.evaluate(() => ({
+  wahl: [...document.querySelectorAll('#nu-wahl button')].map(b => b.textContent.trim()),
+  gewaehlt: [...document.querySelectorAll('#nu-wahl button[aria-pressed="true"]')]
+    .map(b => b.textContent.trim()),
+  reiter: [...document.querySelectorAll('#nu-inhalt tbody tr td:first-child')]
+    .map(t => t.textContent.trim()),
+  archivLeer: (() => {
+    const lb = document.querySelector('#demo-nutzung-archiv .leerblock');
+    return lb ? { text: lb.textContent.trim(),
+      abstand: parseFloat(getComputedStyle(lb).paddingTop) } : null;
+  })(),
+}));
+
+// Der zweite Platz, nicht der erste: Beim ersten stimmte es auch dann,
+// wenn der Knopf bloss die Kachel oeffnete und dort der erste vorgewaehlt ist.
+await seite.click('#demo-inhalt tbody tr:nth-child(2) [data-demo-nutzung]');
+await seite.waitForTimeout(200);
+const perKnopf = await liveLesen();
+check('KRITISCH: der Knopf "Nutzung" in der Zeile springt auf die Kachel "Demo-Nutzung"',
+  nurEine(await sichtbarIn(), 'nutzung'));
+check('KRITISCH: … und öffnet dort genau den Platz dieser Zeile',
+  perKnopf.gewaehlt.length === 1 && /^demo2 /.test(perKnopf.gewaehlt[0])
+  && perKnopf.reiter.join('|') === 'Neuer Einsatz');
+check('KRITISCH: die Kachel führt jeden laufenden Platz mit Interessent -- und keinen geschlossenen',
+  perKnopf.wahl.join('|') === 'demo1 · Muster Sicherheit GmbH|demo2 · Beispiel Wachdienst AG');
+
+await seite.click('#nu-wahl button:first-child');
+await seite.waitForTimeout(200);
+const perWahl = await liveLesen();
+check('KRITISCH: die Wahl eines anderen Platzes zeigt dessen Nutzung, nicht die des vorigen',
+  /^demo1 /.test(perWahl.gewaehlt[0]) && perWahl.reiter[0] === 'Lohnläufe');
+// Ein Schluessel, den das Cockpit neu einfuehrt, darf nicht verschwinden --
+// eine fehlende Zeile saehe aus wie "nicht benutzt".
+check('ein unbekannter Reiter bleibt mit seinem Namen stehen, statt zu verschwinden',
+  perWahl.reiter.includes('gibtsnicht'));
+// Der beanstandete Fall: leeres Archiv neben laufender Nutzung. Der Text
+// sagt, wo die laufende steht, und ist gestaltet wie jeder andere
+// Leerzustand -- nicht ein nackter Satz am Kartenrand.
+check('KRITISCH: das leere Archiv verweist auf die laufenden Plätze, statt nach "keine Nutzung" auszusehen',
+  perWahl.archivLeer !== null && /laufenden Plätze/.test(perWahl.archivLeer.text));
+check('der Leerzustand des Archivs hat Abstand zum Kartenrand (gemessen)',
+  perWahl.archivLeer !== null && perWahl.archivLeer.abstand >= 20);
+
+// Nach einem Neuladen der Liste (etwa nach "Nachgefasst") bleibt der
+// gewaehlte Platz gewaehlt -- sonst springt die Ansicht unter der Hand auf
+// einen anderen Interessenten.
+await seite.click('#nu-wahl button:nth-child(2)');
 await seite.waitForTimeout(150);
-const nuOffen = await seite.evaluate(() => document.getElementById('nu-karte').offsetHeight > 0);
-await kachel('nutzung');
-const nachWechsel = await sichtbarIn();
-const nuZu = await seite.evaluate(() => document.getElementById('nu-karte').offsetHeight === 0);
-check('KRITISCH: die Kachel "Demo-Nutzung" zeigt nur das Archiv', nurEine(nachWechsel, 'nutzung'));
-check('KRITISCH: die Live-Nutzung eines Platzes geht beim Kachelwechsel zu', nuOffen && nuZu);
+await seite.evaluate(() => ladeDemo());
+await seite.waitForTimeout(250);
+const nachNeuladen = await liveLesen();
+check('KRITISCH: nach dem Neuladen bleibt der gewählte Platz gewählt',
+  /^demo2 /.test(nachNeuladen.gewaehlt[0] || '') && nachNeuladen.reiter.join('|') === 'Neuer Einsatz');
+
+/* Die Reiternamen sind aus TITLES im Cockpit abgeschrieben. Jeder
+   Schluessel dort braucht hier einen Namen -- sonst steht nach einem neuen
+   Reiter im Cockpit hier wieder der interne Schluessel. */
+{
+  const betrNamen = await seite.evaluate(() => Object.keys(NUTZUNG_REITER));
+  const c = await browser.newPage();
+  await c.goto(`file://${WURZEL}/dashboard.html`);
+  await c.waitForTimeout(300);
+  const cockpit = await c.evaluate(() => Object.keys(TITLES));
+  await c.close();
+  const fehlt = cockpit.filter(k => !betrNamen.includes(k));
+  check('KRITISCH: jeder Reiter des Cockpits hat im Betreiber-Bereich einen lesbaren Namen'
+    + (fehlt.length ? ' -- fehlt: ' + fehlt.join(', ') : ''),
+    cockpit.length > 10 && fehlt.length === 0);
+}
 await kachel('abgelaufen');
 check('die Kachel "Abgelaufene Zugänge" zeigt nur diese Liste', nurEine(await sichtbarIn(), 'abgelaufen'));
 
