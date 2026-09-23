@@ -24,7 +24,8 @@ const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
 // ── Vier Varianten wirklich durch PHP rendern ─────────────────────────────
-const VARIANTEN = ['rechnung_offen', 'rechnung_qr', 'offerte_offen', 'offerte_entschieden', 'offerte_unterschrift'];
+const VARIANTEN = ['rechnung_offen', 'rechnung_qr', 'offerte_offen', 'offerte_entschieden', 'offerte_unterschrift',
+                   'offerte_fassung'];
 const html = {};
 for (const v of VARIANTEN) {
   let aus = '', code = 0;
@@ -199,6 +200,21 @@ try {
     check('KRITISCH: eine bereits entschiedene Offerte zeigt "Angenommen", keine Knoepfe mehr',
       /Angenommen am/.test(await page.textContent('.zusammenfassung'))
       && !(await page.isVisible('button:has-text("Annehmen")')));
+    await page.close();
+  }
+
+  // ── offerte_fassung: der Link zeigt die versendete Fassung (ENT-688) ────
+  // 40 Std. zu 99.00 = 3'960.00. Der alte Preis (45.00) und der Entwurf
+  // (12.34) duerfen nirgends stehen.
+  {
+    const page = await browser.newPage({ viewport: { width: 1200, height: 1000 } });
+    await page.goto(url('offerte_fassung'), { waitUntil: 'load' });
+    const dok = await page.textContent('.karte');
+    const zf  = await page.textContent('.zusammenfassung');
+    check('KRITISCH: der Link zeigt die zuletzt VERSENDETE Fassung, nicht den Entwurf',
+      dok.includes('99.00') && dok.includes('3\u20199' + '60.00') && !dok.includes('12.34') && !dok.includes('45.00'));
+    check('KRITISCH: die Seitenspalte sagt, welche Fassung sie zeigt',
+      /Fassung 2 vom \d\d\.\d\d\.\d{4}/.test(zf));
     await page.close();
   }
 

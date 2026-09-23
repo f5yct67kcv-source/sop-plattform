@@ -91,11 +91,18 @@ $pdo = db();
 $pdo->beginTransaction();
 try {
     if ($id > 0) {
-        $chk = $pdo->prepare('SELECT id FROM belege WHERE id = ?');
+        $chk = $pdo->prepare('SELECT id, status, entscheidung_am FROM belege WHERE id = ?');
         $chk->execute([$id]);
-        if (!$chk->fetch()) {
+        $vorhanden = $chk->fetch(PDO::FETCH_ASSOC);
+        if (!$vorhanden) {
             $pdo->rollBack();
             json_response(['status' => 'error', 'message' => 'Beleg nicht gefunden'], 404);
+        }
+        // Angenommen heisst gesperrt (ENT-688) -- im Server, nicht nur in
+        // der Oberflaeche.
+        if (beleg_gesperrt($vorhanden)) {
+            $pdo->rollBack();
+            json_response(['status' => 'error', 'message' => 'Dieser Beleg wurde vom Empfänger angenommen und ist gesperrt. Für Änderungen bitte duplizieren.'], 409);
         }
         $satz = implode(', ', array_map(fn($f) => "$f = ?", array_keys($kopf)));
         $pdo->prepare("UPDATE belege SET $satz WHERE id = ?")

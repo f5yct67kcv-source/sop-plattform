@@ -75,9 +75,28 @@ try {
 
     $neuerStatus = $wahl === 'annehmen' ? 'bestaetigt' : 'abgelehnt';
     $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    // WELCHE FASSUNG entschieden wurde (ENT-688). Hat der Beleg noch keine
+    // -- versendet vor ENT-688 --, wird jetzt festgehalten, was der
+    // Empfaenger in diesem Moment sieht: genau das hat er angenommen oder
+    // abgelehnt.
+    $fassungNr = null;
+    if (beleg_fassung_tabelle_da($pdo, 'be_')) {
+        $letzte = beleg_letzte_fassung($pdo, (int)$b['id'], 'be_');
+        if ($letzte) {
+            $fassungNr = (int)$letzte['nummer'];
+        } else {
+            $abbild = beleg_abbild_lesen($pdo, (int)$b['id'], 'be_', be_beleg_absender($pdo));
+            if ($abbild !== null) {
+                $fassungNr = (int)beleg_fassung_anlegen($pdo, (int)$b['id'], $abbild, 'annahme', '', 'be_')['nummer'];
+            }
+        }
+    }
+    $mitFassung = hat_spalte($pdo, 'be_belege', 'entscheidung_fassung');
     $pdo->prepare(
-        'UPDATE be_belege SET status = ?, entscheidung_am = NOW(), entscheidung_ip = ? WHERE id = ?'
-    )->execute([$neuerStatus, $ip, (int)$b['id']]);
+        'UPDATE be_belege SET status = ?, entscheidung_am = NOW(), entscheidung_ip = ?'
+        . ($mitFassung ? ', entscheidung_fassung = ?' : '') . ' WHERE id = ?'
+    )->execute($mitFassung ? [$neuerStatus, $ip, $fassungNr, (int)$b['id']]
+                           : [$neuerStatus, $ip, (int)$b['id']]);
 
     entscheidung_zurueck($token);
 } catch (Throwable $e) {
