@@ -312,61 +312,54 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     /PFLICHT_FEHLT/.test(workflow) && /exit 1/.test(workflow));
 }
 
-// ── Dieselbe Absicherung fuer Demo (ENT-523): kein Rueckfall auf
-// Production- ODER Staging-Secrets ──────────────────────────────────────
+// ── Die Demo-UMGEBUNG ist zurückgebaut (ENT-680) ─────────────────────────
 //
-// Warum diese Prüfung: Demo ist eine DRITTE Umgebung, nicht "Staging mit
-// anderem Namen" -- ein DEMO_DB_HOST, das GitHub bei fehlendem
-// Environment-Secret still gegen STAGING_DB_HOST oder DB_HOST aufloest,
-// waere derselbe Fehler wie oben, nur eine Umgebung weiter.
+// Bis ENT-680 gab es eine dritte Umgebung mit eigenem Environment, eigenen
+// DEMO_-Secrets und einem demo-*-Tag als Auslöser. Sie ist abgeschaltet,
+// weil die zehn Demo-Plätze dieselbe Aufgabe im Produktions-Deploy
+// erledigen. Geprüft wird die AUSSAGE "es gibt keinen Weg mehr in eine
+// Demo-Umgebung", nicht das Fehlen eines Wortes: Ein halber Rückbau --
+// Secrets weg, Zweig geblieben, oder umgekehrt -- wäre schlimmer als
+// beides ganz, weil der Zweig dann mit leeren Werten liefe.
+//
+// NICHT betroffen und ausdrücklich erlaubt sind die drei Secrets, die
+// "DEMO" nur im Namen tragen und im Environment production liegen:
+// DEMO_PLAETZE (die zehn Plätze), DEMO_EMPFAENGER (Demo-Anfrage der
+// Homepage, ENT-563) und DEMO_ABLAUF_TOKEN (Ablauf der Zugänge, ENT-600).
 {
-  const pflichtNamen = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD',
-    'HOSTPOINT_FTP_HOST', 'HOSTPOINT_FTP_USER', 'HOSTPOINT_FTP_PASSWORD'];
-  const ohneDemoGegenstueck = pflichtNamen.filter(n =>
-    new RegExp(`secrets\\.${n}\\b`).test(workflow) && !new RegExp(`secrets\\.DEMO_${n}\\b`).test(workflow));
-  check('KRITISCH: jedes Produktions-Secret hat ein eigenes DEMO_-Gegenstück im Workflow',
-    ohneDemoGegenstueck.length === 0);
-  if (ohneDemoGegenstueck.length) { bad.push('ohne DEMO_-Gegenstück: ' + ohneDemoGegenstueck.join(', ')); }
+  const ERLAUBT = ['DEMO_PLAETZE', 'DEMO_EMPFAENGER', 'DEMO_ABLAUF_TOKEN'];
+  const demoSecrets = [...workflow.matchAll(/secrets\.(DEMO_\w+)/g)]
+    .map(m => m[1])
+    .filter(n => !ERLAUBT.includes(n));
+  check('KRITISCH (ENT-680): der Workflow liest kein DEMO_-Secret der abgeschalteten Umgebung mehr',
+    demoSecrets.length === 0);
+  if (demoSecrets.length) { bad.push('noch gelesen: ' + [...new Set(demoSecrets)].join(', ')); }
 
-  // Konkreter Copy-Paste-Fehler statt nur "kommt DEMO_X irgendwo vor":
-  // JEDE D_<NAME>-Umgebungsvariable im Secrets-Prüfschritt (nicht nur die
-  // Pflichtnamen oben -- auch SMTP_*, MAPS_JS_KEY, ANTHROPIC_API_KEY usw.)
-  // muss zu IHREM EIGENEN secrets.DEMO_<NAME> gehören, nicht versehentlich
-  // auf secrets.STAGING_<NAME> oder secrets.<NAME> ohne Präfix zeigen.
-  // Ohne diese generische Prüfung (statt einer festen Namensliste) bliebe
-  // ein Copy-Paste-Fehler bei einem Namen ausserhalb der Pflichtliste --
-  // etwa D_MAPS_JS_KEY, das versehentlich STAGING_MAPS_JS_KEY läse --
-  // unentdeckt.
-  // Kein Umweg über einen extrahierten Schritt-Ausschnitt nötig: Der
-  // Präfix "D_" als env-Schlüssel ist eindeutig genug, er kommt im
-  // gesamten Workflow nur im Secrets-Prüfschritt vor.
-  const dVariablen = [...workflow.matchAll(/\bD_(\w+):\s*\$\{\{\s*secrets\.(\w+)\s*\}\}/g)];
-  check('KRITISCH: der Secrets-Prüfschritt deklariert überhaupt D_-Variablen (sonst liefe die vorherige Prüfung leer)',
-    dVariablen.length >= 10);
-  const falschVerdrahtet = dVariablen.filter(([, name, secretName]) => secretName !== `DEMO_${name}`);
-  check('KRITISCH: JEDE D_<NAME>-Variable im Secrets-Prüfschritt zeigt auf genau secrets.DEMO_<NAME>, keine andere',
-    falschVerdrahtet.length === 0);
-  if (falschVerdrahtet.length) {
-    bad.push('falsch verdrahtet: ' + falschVerdrahtet.map(([, n, s]) => `D_${n}→${s}`).join(', '));
-  }
+  // Gegenprobe der Aussage selbst: Die drei erlaubten müssen WIRKLICH noch
+  // da sein. Eine Prüfung, die nur "kein DEMO_" verlangt, bliebe grün,
+  // wenn beim Rückbau versehentlich auch die zehn Plätze mitgerissen
+  // würden -- und genau das fiele sonst erst auf, wenn ein Interessent
+  // unter seiner Adresse 403 liest.
+  check('KRITISCH (Gegenprobe): DEMO_PLAETZE, DEMO_EMPFAENGER und DEMO_ABLAUF_TOKEN bleiben erhalten -- sie gehören zu Production',
+    ERLAUBT.every(n => new RegExp(`secrets\\.${n}\\b`).test(workflow)));
 
-  // ANDERS als bei Production/Staging: DEMO_ANTHROPIC_API_KEY ist hier
-  // ERFORDERLICH (ENT-523-N1 -- der Projektinhaber hat sich bewusst fuer
-  // eine aktive KI-Funktion in der Demo entschieden). Eine Pruefung, die
-  // nur "ANTHROPIC_API_KEY kommt irgendwo vor" verlangt, wuerde grün
-  // bleiben, auch wenn er wie bei Production/Staging NICHT in die
-  // PFLICHT_FEHLT-Liste des Demo-Zweigs aufgenommen waere.
-  const demoZweig = (/elif \[ "\$IST_DEMO_REF" = "1" \][\s\S]{0,7000}?(?=\n          else)/.exec(workflow) ?? [''])[0];
-  check('KRITISCH (ENT-523-N1): DEMO_ANTHROPIC_API_KEY ist im Demo-Zweig ein PFLICHT-Secret -- anders als bei Production und Staging',
-    /\[ -z "\$EFF_ANTHROPIC_API_KEY" \][\s\S]{0,80}PFLICHT_FEHLT="\$PFLICHT_FEHLT DEMO_ANTHROPIC_API_KEY"/.test(demoZweig));
+  // Kein D_<NAME>-Umgebungsschlüssel mehr, keine Variable DEMO_DOMAIN,
+  // kein Zweig, der UMGEBUNG auf "demo" setzt, und keine Bedingung, die
+  // auf diesen Wert prüft. Jedes Einzelne davon wäre ein Rest, der ins
+  // Leere liefe.
+  check('KRITISCH (ENT-680): kein D_<NAME>-Schlüssel, kein vars.DEMO_DOMAIN, kein UMGEBUNG=demo und keine Abfrage darauf',
+    !/\bD_\w+:\s*\$\{\{\s*secrets\./.test(workflow)
+    && !/vars\.DEMO_DOMAIN/.test(workflow)
+    && !/UMGEBUNG=demo\b/.test(workflow)
+    && !/\$UMGEBUNG"\s*=\s*"demo"/.test(workflow)
+    && !/env\.UMGEBUNG\s*==\s*'demo'/.test(workflow));
 
-  // Gegenprobe der Aussage selbst: Production und Staging duerfen diese
-  // Pflicht NICHT tragen -- sonst waere die obige Prüfung bedeutungslos
-  // (sie fände die Zeile irgendwo im Workflow, nicht spezifisch im
-  // Demo-Zweig).
-  check('KRITISCH (Gegenprobe): ANTHROPIC_API_KEY bleibt fuer Production und Staging weiterhin NICHT erforderlich',
-    !/\[ -z "\$EFF_ANTHROPIC_API_KEY" \][\s\S]{0,80}PFLICHT_FEHLT="\$PFLICHT_FEHLT ANTHROPIC_API_KEY"/.test(workflow)
-    && !/\[ -z "\$EFF_ANTHROPIC_API_KEY" \][\s\S]{0,80}PFLICHT_FEHLT="\$PFLICHT_FEHLT STAGING_ANTHROPIC_API_KEY"/.test(workflow));
+  // Gegenprobe: ANTHROPIC_API_KEY bleibt für Production und Staging
+  // weiterhin NICHT erforderlich. Die Pflicht galt nur in der Demo-Umgebung
+  // (ENT-523-N1) und darf beim Rückbau nicht versehentlich in einen der
+  // beiden verbliebenen Zweige gewandert sein.
+  check('KRITISCH (Gegenprobe): ANTHROPIC_API_KEY ist in keinem Zweig ein Pflicht-Secret',
+    !/\[ -z "\$EFF_ANTHROPIC_API_KEY" \][\s\S]{0,80}PFLICHT_FEHLT=/.test(workflow));
 }
 
 // ── Staging deployt nur gegen qa-*-Tags oder den Branch "test" (ENT-372,
@@ -425,28 +418,27 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     && !/\n\s*test[^)\s]+\)\s*;;/.test(stagingGuard));
 }
 
-// ── Dieselbe Absicherung fuer Demo (ENT-523): nur gegen demo-*-Tags,
-// nie gegen einen Branch ──────────────────────────────────────────────────
+// ── Ein alter demo-*-Tag liefert nirgendwohin aus (ENT-680) ─────────────
 //
-// Warum diese Prüfung: Ohne einen eigenen Guard würde jeder Ref, der
-// weder "main" noch ein qa-*-Tag ist, automatisch als UMGEBUNG=demo
-// durchgehen (siehe die environment:-Ausdruck-Prüfung unten) -- auch ein
-// x-beliebiger Feature-Branch. Geprüft wird dieselbe AUSSAGE wie beim
-// qa-*-Guard: der Abbruch ist an github.ref_name UND exit 1 gekoppelt,
-// innerhalb des demo-Zweigs.
+// Warum diese Prüfung: Die Tags `demo-2026-09-17-001` und Konsorten
+// existieren im Repository weiter und lassen sich nicht rückwirkend
+// entwerten. Wird einer davon noch einmal ausgelöst, fällt er jetzt in den
+// Staging-Zweig -- und muss dort am Guard abbrechen, statt mit
+// Staging-Secrets auf die Testinstanz zu liefern. Geprüft wird der
+// environment:-Ausdruck (nur zwei Werte) zusammen mit dem Guard, denn
+// nur beides zusammen trägt die Aussage.
 {
-  const demoTagAbbruch = /if\s*\[\s*"\$UMGEBUNG"\s*=\s*"demo"\s*\][\s\S]{0,300}?github\.ref_name[\s\S]{0,200}?demo-\*[\s\S]{0,300}?exit 1/;
-  check('KRITISCH: ein Demo-Deploy ohne passenden demo-*-Tag bricht ab (exit 1)',
-    demoTagAbbruch.test(workflow));
+  const envAusdruck = (/^\s*environment:\s*(.+)$/m.exec(workflow) ?? [''])[1] ?? '';
+  check('KRITISCH (ENT-680): der environment:-Ausdruck kennt nur noch "production" und "staging"',
+    /github\.ref_name\s*==\s*'main'\s*&&\s*'production'\s*\|\|\s*'staging'/.test(envAusdruck)
+    && !/'demo'/.test(envAusdruck)
+    && !/startsWith/.test(envAusdruck));
 
-  // Gegenprobe der Aussage selbst: Der environment:-Ausdruck muss
-  // TATSÄCHLICH zwischen main, einem demo-*-Tag und allem anderen
-  // (Staging) unterscheiden -- ein Muster, das nur "demo" irgendwo im
-  // Workflow verlangt, bliebe grün, auch wenn environment: weiterhin
-  // binär waere und jeder Nicht-main-Ref als Staging durchginge (dann
-  // wuerde UMGEBUNG=demo nie erreicht, und der Guard oben liefe leer).
-  check('KRITISCH: der environment:-Ausdruck waehlt "demo" fuer jeden Ref, der mit "demo-" beginnt, unabhaengig von main',
-    /environment:\s*\$\{\{[\s\S]{0,50}github\.ref_name\s*==\s*'main'[\s\S]{0,50}&&\s*'production'[\s\S]{0,80}startsWith\(github\.ref_name,\s*'demo-'\)[\s\S]{0,30}&&\s*'demo'[\s\S]{0,30}\|\|\s*'staging'/.test(workflow));
+  // Und die Folge daraus, an der eigentlichen Stelle nachgewiesen: Im
+  // Staging-Guard steht kein case-Zweig, der einen demo-*-Tag durchliesse.
+  const stagingGuard2 = (/if\s*\[\s*"\$UMGEBUNG"\s*=\s*"staging"\s*\][\s\S]{0,1200}?esac/.exec(workflow) ?? [''])[0];
+  check('KRITISCH (ENT-680): der Staging-Guard lässt keinen demo-*-Tag durch -- ein alter Tag bricht ab',
+    stagingGuard2.length > 0 && !/demo-\*\)/.test(stagingGuard2));
 }
 
 // ── Hostpoint-Passwortschutz auf Staging: nie stillschweigend entfernt,
@@ -574,22 +566,23 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     !/curl\s+[^\n]*(-L\b|--location)/.test(workflow));
 }
 
-// ── Demo: automatischer Suchmaschinenausschluss statt Basic Auth
-// (ENT-523/ENT-523-N1) ──────────────────────────────────────────────────
+// ── Demo-Plätze: automatischer Suchmaschinenausschluss statt Basic Auth
+// (ENT-523/ENT-523-N1, seit ENT-680 nur noch für die zehn Plätze) ────────
 //
-// Warum diese Prüfung: Demo trägt bewusst KEINEN Passwortschutz (die
-// Vorentscheidung, die den ganzen Unterschied zu Staging ausmacht) -- die
-// .htaccess samt X-Robots-Tag entsteht stattdessen vollständig aus dem
-// Repository, bei jedem Deploy neu, ohne manuellen Hostpoint-Schritt und
-// ohne Drift-Guard. Ein unauthentifizierter Nachweis ist hier deshalb ein
-// ECHTER Nachweis -- anders als bei Staging, wo "Require valid-user"
-// jeden Pfad ohnehin mit 401 beantwortet. Vier Aussagen müssen gemeinsam
-// gelten: (1) htaccess-demo-zusatz und robots-demo.txt existieren mit dem
-// richtigen Inhalt, (2) beide werden im Deploy-Schritt AUSSCHLIESSLICH im
-// Demo-Zweig angehängt/kopiert, (3) der Nachweis ist ein echter,
-// UNAUTHENTIFIZIERTER HTTP-Test (kein -u, sonst wäre er ein Rückfall auf
-// die Staging-Bauart mit Zugangsdaten, die es für Demo gar nicht gibt),
-// (4) Netzwerkfehler brechen ab statt als "ok" durchzugehen.
+// Warum diese Prüfung: Ein Demo-Platz trägt bewusst KEINEN Passwortschutz
+// -- die .htaccess samt X-Robots-Tag entsteht stattdessen vollständig aus
+// dem Repository, bei jedem Produktions-Deploy neu, ohne manuellen
+// Hostpoint-Schritt und ohne Drift-Guard. Der Suchmaschinenausschluss ist
+// damit die einzige Schutzschicht, und die beiden Quelldateien sind sein
+// einziger Beweis.
+//
+// Mit ENT-680 ist die Demo-UMGEBUNG entfallen, die dieselben beiden
+// Dateien für ihre eine Instanz benutzte. Die Dateien bleiben -- sie
+// gehören jetzt allein den zehn Plätzen, und genau dort muss der Beweis
+// auch hängen. Drei Aussagen müssen gemeinsam gelten: (1) beide Dateien
+// existieren mit dem richtigen Inhalt, (2) sie werden im Schritt für die
+// Plätze angehängt/kopiert und nicht mehr ins Hauptbündel, (3) die
+// Startseite eines Platzes ist das Cockpit, nicht das Rapport-Tool.
 {
   check('KRITISCH: htaccess-demo-zusatz existiert und setzt X-Robots-Tag: noindex dauerhaft (mit "always")',
     existsSync(`${WURZEL}/htaccess-demo-zusatz`)
@@ -600,14 +593,19 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     && /^User-agent:\s*\*/m.test(readFileSync(`${WURZEL}/robots-demo.txt`, 'utf8'))
     && /^Disallow:\s*\/\s*$/m.test(readFileSync(`${WURZEL}/robots-demo.txt`, 'utf8')));
 
-  // Gegenprobe der Aussage selbst: Ein Muster, das nur "htaccess-demo-zusatz"
-  // irgendwo im Workflow verlangt, bliebe grün, auch wenn der Anhängevorgang
-  // unbedingt liefe (dann trüge JEDE Umgebung den Demo-Zusatz). Verlangt
-  // wird die tatsächliche Kopplung an UMGEBUNG=demo im selben Bedingungsblock.
-  const demoHtaccessBlock = /if\s*\[\s*"\$UMGEBUNG"\s*=\s*"demo"\s*\][\s\S]{0,300}?fi/.exec(workflow)?.[0] ?? '';
-  check('KRITISCH: htaccess-demo-zusatz wird NUR im Demo-Zweig angehängt, robots-demo.txt NUR dort kopiert',
-    /cat htaccess-demo-zusatz >> dist\/\.htaccess/.test(demoHtaccessBlock)
-    && /cp robots-demo\.txt dist\/robots\.txt/.test(demoHtaccessBlock));
+  // Gegenprobe der Aussage selbst: Ein Muster, das nur
+  // "htaccess-demo-zusatz" irgendwo im Workflow verlangt, bliebe grün,
+  // auch wenn der Anhängevorgang ins Hauptbündel geriete -- dann trüge die
+  // produktive Anlage den Demo-Zusatz und wäre für Suchmaschinen gesperrt.
+  // Verlangt wird darum beides: angehängt wird an den Platz-Ordner, und an
+  // dist/ ausdrücklich NICHT (seit ENT-680).
+  check('KRITISCH: htaccess-demo-zusatz und robots-demo.txt landen im Ordner eines Demo-Platzes',
+    /cat htaccess-demo-zusatz >> "dist-demo\/\$PLATZ\/\.htaccess"/.test(workflow)
+    && /cp robots-demo\.txt "dist-demo\/\$PLATZ\/robots\.txt"/.test(workflow));
+
+  check('KRITISCH (ENT-680): das Hauptbündel dist/ bekommt den Demo-Zusatz NICHT mehr -- sonst wäre Production noindex',
+    !/cat htaccess-demo-zusatz >> dist\/\.htaccess/.test(workflow)
+    && !/cp robots-demo\.txt dist\/robots\.txt/.test(workflow));
 
   // Was demo.guardops.ch unter "/" ausliefert. Ohne DirectoryIndex nimmt
   // Apache seinen Standard, und das ist index.html -- das Rapport-Tool.
@@ -630,7 +628,7 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   const hostpointText = readFileSync(`${WURZEL}/htaccess-hostpoint`, 'utf8');
   const demoZusatzText = readFileSync(`${WURZEL}/htaccess-demo-zusatz`, 'utf8');
 
-  check('KRITISCH: die Demo-Instanz liefert unter "/" das Cockpit aus, nicht das Rapport-Tool',
+  check('KRITISCH: ein Demo-Platz liefert unter "/" das Cockpit aus, nicht das Rapport-Tool',
     startseiteAus(hostpointText, demoZusatzText) === 'dashboard.html');
 
   check('Gegenprobe: dieselbe Ablesung liefert NICHT dashboard.html, wenn die DirectoryIndex-Zeile fehlt',
@@ -639,30 +637,13 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   check('KRITISCH: Production bleibt unberührt -- htaccess-hostpoint selbst legt keine Startseite fest',
     !/^[^\S\n]*DirectoryIndex/m.test(hostpointText));
 
-  const demoSuchmaschinenSchritt = (/Demo-Suchmaschinenausschluss verifizieren[\s\S]{0,2500}/.exec(workflow) ?? [''])[0];
-
-  check('KRITISCH: der Schritt "Demo-Suchmaschinenausschluss verifizieren" existiert und läuft ausschliesslich für Demo',
-    /name:\s*Demo-Suchmaschinenausschluss verifizieren[\s\S]{0,80}if:\s*\$\{\{\s*env\.UMGEBUNG\s*==\s*'demo'\s*\}\}/.test(workflow));
-
-  check('KRITISCH: die Startseiten-Prüfung verlangt HTTP 200 UND X-Robots-Tag: noindex, beides einzeln an einen Abbruch gekoppelt',
-    /grep -qE '\^HTTP\/\[0-9\.\]\+ 200'[\s\S]{0,250}exit 1/.test(demoSuchmaschinenSchritt)
-    && /grep -qi '\^X-Robots-Tag:\.\*noindex'[\s\S]{0,250}exit 1/.test(demoSuchmaschinenSchritt));
-
-  check('KRITISCH: die robots.txt-Prüfung verlangt HTTP 200 UND User-agent: * UND Disallow: /, alle drei einzeln an einen Abbruch gekoppelt',
-    /grep -qE '\^HTTP\/\[0-9\.\]\+ 200'[\s\S]{0,600}exit 1/.test(demoSuchmaschinenSchritt)
-    && /grep -qE '\^User-agent:\[\[:space:\]\]\*\\\*'[\s\S]{0,250}exit 1/.test(demoSuchmaschinenSchritt)
-    && /grep -qE '\^Disallow:\[\[:space:\]\]\*\/\[\[:space:\]\]\*\$'[\s\S]{0,250}exit 1/.test(demoSuchmaschinenSchritt));
-
-  check('KRITISCH: beide Abrufe (Startseite UND robots.txt) brechen bei DNS-/TLS-/Netzwerkfehler oder Timeout ab, statt als "ok" durchzugehen',
-    (demoSuchmaschinenSchritt.match(/\$\?\s*-ne\s*0[\s\S]{0,300}exit 1/g) ?? []).length >= 2);
-
-  // DER Kernunterschied zu Staging, konkret geprüft statt nur behauptet:
-  // kein einziger authentifizierter Abruf (-u) im Demo-Schritt. Das ist
-  // keine Bequemlichkeit, sondern die direkte Konsequenz von ENT-523-N1 --
-  // ein "-u" hier würde bedeuten, dass doch irgendwo Demo-Basic-Auth-
-  // Zugangsdaten erwartet werden, die es laut Entscheidung nicht gibt.
-  check('KRITISCH (ENT-523-N1): der Demo-Suchmaschinenausschluss-Nachweis ist UNAUTHENTIFIZIERT -- kein "-u" im Schritt, anders als bei Staging',
-    !/-u\s+"/.test(demoSuchmaschinenSchritt));
+  // Der Schritt "Demo-Suchmaschinenausschluss verifizieren" rief die EINE
+  // Demo-Instanz über vars.DEMO_DOMAIN ab und ist mit ihr entfallen
+  // (ENT-680). Er darf nicht als Leiche zurückbleiben: Ohne Umgebung
+  // "demo" liefe seine Bedingung nie, und ein Schritt, der nie läuft,
+  // behauptet einen Nachweis, den niemand mehr erbringt.
+  check('KRITISCH (ENT-680): kein toter Schritt "Demo-Suchmaschinenausschluss verifizieren" mehr im Workflow',
+    !/name:\s*Demo-Suchmaschinenausschluss verifizieren/.test(workflow));
 }
 
 // ── qa-version.json: Live-Version-Nachweis fuer den externen QA-Runner,
@@ -706,43 +687,21 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     (workflow.match(/>\s*dist\/qa-version\.json/g) ?? []).length === 1);
 }
 
-// ── demo-version.json: dieselbe Nachvollziehbarkeit für Demo (ENT-523) ───
+// ── demo-version.json ist mit der Demo-Umgebung entfallen (ENT-680) ─────
 //
-// Warum diese Prüfung: rein betrieblicher Nutzen (welcher Tag/Commit läuft
-// gerade auf der Demo), aber derselbe Fehlerfall wie bei qa-version.json:
-// ohne die Kopplung an den Demo-Zweig würde die Datei entweder nie
-// entstehen oder -- schlimmer -- auch für Production erzeugt und
-// hochgeladen.
+// Warum diese Prüfung: Die Datei hielt fest, welcher demo-*-Tag gerade auf
+// der einen Demo-Instanz lief. Ohne Instanz gibt es nichts festzuhalten.
+// Bliebe der Schritt stehen, liefe seine Bedingung nie -- und niemand
+// merkte es, weil ein übersprungener Schritt grün aussieht.
 {
-  const demoVersionSchritt = (/demo-version\.json erzeugen[\s\S]{0,700}/.exec(workflow) ?? [''])[0];
+  check('KRITISCH (ENT-680): kein Schritt erzeugt noch demo-version.json',
+    !/demo-version\.json/.test(workflow));
 
-  check('KRITISCH: der Schritt "demo-version.json erzeugen" existiert und läuft ausschliesslich für Demo (if env.UMGEBUNG == demo)',
-    /name:\s*demo-version\.json erzeugen[\s\S]{0,80}if:\s*\$\{\{\s*env\.UMGEBUNG\s*==\s*'demo'\s*\}\}/.test(workflow));
-
-  check('KRITISCH: demo_tag kommt aus github.ref_name, nicht aus einem Secret oder einem festen Text',
-    /"demo_tag":\s*"\$\{\{\s*github\.ref_name\s*\}\}"/.test(demoVersionSchritt)
-    && !/"demo_tag":\s*"\$\{\{\s*secrets\./.test(demoVersionSchritt));
-
-  check('KRITISCH: commit_sha kommt aus github.sha, nicht aus einem Secret oder einem festen Text',
-    /"commit_sha":\s*"\$\{\{\s*github\.sha\s*\}\}"/.test(demoVersionSchritt)
-    && !/"commit_sha":\s*"\$\{\{\s*secrets\./.test(demoVersionSchritt));
-
-  check('KRITISCH: demo-version.json wird VOR dem FTP-Upload erzeugt (sonst würde sie den Server nie erreichen)',
-    workflow.indexOf('demo-version.json erzeugen') > 0
-    && workflow.indexOf('demo-version.json erzeugen') < workflow.indexOf('Nach Hostpoint hochladen'));
-
-  // Gegenprobe der Aussage selbst: Verlangt die tatsächliche Kopplung von
-  // Dateinamen UND if-Bedingung im selben Schritt, nicht nur "der String
-  // demo-version.json kommt irgendwo vor".
-  check('KRITISCH: kein anderer, unbedingter Schritt erzeugt dist/demo-version.json ausserhalb des Demo-Zweigs',
-    (workflow.match(/>\s*dist\/demo-version\.json/g) ?? []).length === 1);
-
-  // Und die Gegenrichtung zu qa-version.json: die beiden Version-Dateien
-  // duerfen sich nicht vermischen -- ein Demo-Deploy darf NIE
-  // qa-version.json erzeugen und umgekehrt.
-  check('KRITISCH: qa-version.json und demo-version.json sind unabhängige Schritte, keiner erzeugt die Datei des anderen',
-    !/name:\s*qa-version\.json erzeugen[\s\S]{0,300}demo-version\.json/.test(workflow)
-    && !/name:\s*demo-version\.json erzeugen[\s\S]{0,300}qa-version\.json/.test(workflow));
+  // Gegenprobe: qa-version.json bleibt unberührt. Der Rückbau darf nicht
+  // versehentlich den Nachweis mitgenommen haben, den der externe
+  // QA-Runner vor jedem Lauf liest (ENT-435).
+  check('KRITISCH (Gegenprobe): qa-version.json wird weiterhin erzeugt',
+    /name:\s*qa-version\.json erzeugen/.test(workflow));
 }
 
 // ══════════ DIE HOMEPAGE AUF IHRER EIGENEN DOMAIN ════════════════════
@@ -1643,8 +1602,10 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   check('KRITISCH: beide cupi24-Schritte laufen nur auf Production und nur mit vorhandenem Secret',
     [bauen, laden].every(st =>
       /env\.UMGEBUNG\s*==\s*'production'/.test(st) && /env\.EFF_CUPI24_FTP_HOST\s*!=\s*''/.test(st)));
-  check('KRITISCH: sowohl der Demo- als auch der Staging-Zweig setzen das cupi24-Ziel leer, ohne Rückfall auf die Production-Werte',
-    (workflow.match(/EFF_CUPI24_FTP_HOST=""/g) || []).length >= 2);
+  // Seit ENT-680 gibt es nur noch einen Zweig neben Production. Er muss
+  // das cupi24-Ziel leeren, ohne Rückfall auf die Production-Werte.
+  check('KRITISCH: der Staging-Zweig setzt das cupi24-Ziel leer, ohne Rückfall auf die Production-Werte',
+    (workflow.match(/EFF_CUPI24_FTP_HOST=""/g) || []).length >= 1);
 
   check('KRITISCH: ein übersprungener cupi24-Deploy sagt das ausdrücklich, statt lautlos auszufallen',
     hinweis !== '' && /::notice::/.test(hinweis)
