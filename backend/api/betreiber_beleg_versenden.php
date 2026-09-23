@@ -113,6 +113,25 @@ if ($basis === null) {
 }
 $link = $basis . '/api/betreiber_beleg_oeffentlich.php?token=' . urlencode($token);
 
+// ── Fassung (ENT-688) ─────────────────────────────────────────────────
+//
+// Was der Empfaenger ab jetzt am Link sieht, wird als Abbild festgehalten.
+// Hat sich seit der letzten Fassung nichts geaendert, ist dieser Versand
+// eine Erinnerung und legt keine neue an.
+//
+// EIN ANGENOMMENER BELEG BEKOMMT KEINE NEUE FASSUNG: Er ist gesperrt, und
+// was angenommen wurde, bleibt, was der Link zeigt. Aendern liesse sich
+// ohnehin nur noch die Anschrift im Adressbestand -- und die gehoert dann
+// auf einen neuen Beleg, nicht unter eine geleistete Unterschrift.
+$fassungDa = beleg_fassung_tabelle_da($pdo, 'be_');
+$gesperrt  = beleg_gesperrt($beleg);
+$abbild    = $fassungDa ? beleg_abbild_lesen($pdo, $id, 'be_', be_beleg_absender($pdo)) : null;
+$naechste  = ($abbild !== null) ? beleg_fassung_naechste($pdo, $id, $abbild, 'be_')
+                                : ['nummer' => 1, 'neu' => false];
+if ($gesperrt) { $naechste['neu'] = false; }
+$fassungNr = $naechste['neu'] ? (int)$naechste['nummer']
+           : max(1, (int)(beleg_letzte_fassung($pdo, $id, 'be_')['nummer'] ?? 1));
+
 // Betreff, Text, HTML und die Bilder der Signatur kommen aus einer Hand
 // (ENT-674): beleg_mail() in belege.php baut sie aus derselben Vorlage wie
 // die Demo-Mail -- Rahmen, Werteblock, Knopf, Signatur mit eingebettetem
@@ -123,7 +142,7 @@ $link = $basis . '/api/betreiber_beleg_oeffentlich.php?token=' . urlencode($toke
 // (Vertraulichkeitsregel). Sind keine hinterlegt, zeichnet die Firma aus
 // dem Briefkopf -- das entscheidet beleg_mail().
 $mail = beleg_mail($beleg, $firma, $link,
-    (string)($kunde['kontaktperson'] ?? ''), mail_signatur_zeilen());
+    (string)($kunde['kontaktperson'] ?? ''), mail_signatur_zeilen(), $fassungNr);
 
 try {
     smtp_senden($anEmail, (string)$kunde['name'], $mail['betreff'],
@@ -132,11 +151,28 @@ try {
     json_response(['status' => 'error', 'message' => 'Versand fehlgeschlagen: ' . $ex->getMessage()], 502);
 }
 
+// Die Fassung erst NACH dem Versand: Scheitert die Mail, gibt es auch keine
+// Fassung, die als "versendet" dastuende, ohne dass sie jemand bekam.
+if ($naechste['neu'] && $abbild !== null) {
+    beleg_fassung_anlegen($pdo, $id, $abbild, 'versand', (string)($ich['name'] ?? ''), 'be_');
+    be_log($pdo, $ich, 'beleg', $id, 'fassung', null, 'Fassung ' . $fassungNr);
+}
+
 // Eine bereits getroffene Entscheidung wird durch einen erneuten Versand
 // nicht zurueckgesetzt -- eine Erinnerung an eine laengst angenommene
 // Offerte soll den Status nicht auf "versendet" zuruecksetzen.
+//
+// AUSNAHME: eine NEUE Fassung nach einer Ablehnung (ENT-688). Wer nach einem
+// Nein nachbessert, legt dem Empfaenger ein neues Dokument vor, und ueber
+// das hat er noch nicht entschieden. Die alte Ablehnung bleibt im Logbuch
+// und an der alten Fassung stehen.
 $alt = (string)$beleg['status'];
-if (!in_array($alt, ['bestaetigt', 'abgelehnt'], true)) {
+if ($naechste['neu'] && !$gesperrt && !empty($beleg['entscheidung_am'])) {
+    $pdo->prepare('UPDATE be_belege SET status = ?, entscheidung_am = NULL, entscheidung_ip = NULL'
+        . (hat_spalte($pdo, 'be_belege', 'entscheidung_fassung') ? ', entscheidung_fassung = NULL' : '')
+        . ' WHERE id = ?')->execute(['versendet', $id]);
+    be_log($pdo, $ich, 'beleg', $id, 'status', $alt, 'versendet');
+} elseif (!in_array($alt, ['bestaetigt', 'abgelehnt'], true)) {
     $pdo->prepare('UPDATE be_belege SET status = ? WHERE id = ?')->execute(['versendet', $id]);
 }
 
@@ -146,4 +182,5 @@ if (!in_array($alt, ['bestaetigt', 'abgelehnt'], true)) {
 // "verschickt" ohne Empfaenger nichts beantwortet.
 be_log($pdo, $ich, 'beleg', $id, 'versendet', null, $anEmail);
 
-json_response(['status' => 'ok', 'link' => $link]);
+json_response(['status' => 'ok', 'link' => $link, 'fassung' => $fassungNr,
+    'neue_fassung' => (bool)$naechste['neu']]);

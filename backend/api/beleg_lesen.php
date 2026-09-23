@@ -46,4 +46,12 @@ if ($beleg['person_id']) {
     $person = $s->fetch() ?: null;
 }
 
-json_response(['status' => 'ok', 'beleg' => $beleg, 'kunde' => $kunde, 'person' => $person]);
+// Der Stand der Fassungen (ENT-688), siehe betreiber_beleg_lesen.php.
+try {
+    $fassung = beleg_fassung_stand($pdo, $beleg, '', beleg_absender_betrieb($pdo));
+} catch (Throwable $e) {
+    $fassung = null;
+}
+
+json_response(['status' => 'ok', 'beleg' => $beleg, 'kunde' => $kunde, 'person' => $person,
+    'fassung' => $fassung]);

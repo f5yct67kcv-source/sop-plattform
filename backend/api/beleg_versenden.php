@@ -91,9 +91,26 @@ if ($basis === null) {
 }
 $link = $basis . '/api/beleg_oeffentlich.php?token=' . urlencode($token);
 
+// ── Fassung (ENT-688) ─────────────────────────────────────────────────
+// Gleiche Regel wie in betreiber_beleg_versenden.php: Was der Kunde ab
+// jetzt am Link sieht, wird als Abbild festgehalten; ohne Aenderung ist der
+// Versand eine Erinnerung; ein angenommener Beleg bekommt keine neue Fassung.
+$fassungDa = beleg_fassung_tabelle_da($pdo);
+$gesperrt  = beleg_gesperrt($beleg);
+$abbild    = $fassungDa ? beleg_abbild_lesen($pdo, $id, '', beleg_absender_betrieb($pdo)) : null;
+$naechste  = ($abbild !== null) ? beleg_fassung_naechste($pdo, $id, $abbild)
+                                : ['nummer' => 1, 'neu' => false];
+if ($gesperrt) { $naechste['neu'] = false; }
+$fassungNr = $naechste['neu'] ? (int)$naechste['nummer']
+           : max(1, (int)(beleg_letzte_fassung($pdo, $id)['nummer'] ?? 1));
+$angepasst = $fassungNr > 1;
+
 $titel = BELEG_ARTEN[$beleg['art']]['titel'] ?? 'Beleg';
 $absenderName = $firma !== '' ? $firma : 'Ihr Ansprechpartner';
-$betreff = "Neue $titel {$beleg['nummer']}" . ($firma !== '' ? " von $firma" : '');
+// Ab der zweiten Fassung "angepasst" statt "neu" -- dieselbe Offerte unter
+// derselben Nummer, keine zweite (ENT-688).
+$betreff = ($angepasst ? "Angepasste $titel" : "Neue $titel") . " {$beleg['nummer']}"
+         . ($firma !== '' ? " von $firma" : '');
 
 // Annehmen/Ablehnen gibt es nur bei der Offerte (siehe beleg_oeffentlich.php)
 // -- die Rechnung hat auf der Kundenseite keine Entscheidung, nur die Ansicht.
@@ -102,7 +119,8 @@ $ansehenText = $beleg['art'] === 'offerte'
     : "Sie können die $titel hier ansehen:";
 
 $text = "Guten Tag\n\n"
-    . "$absenderName hat Ihnen eine neue $titel erstellt: {$beleg['nummer']}.\n\n"
+    . ($angepasst ? "$absenderName hat die $titel {$beleg['nummer']} für Sie angepasst.\n\n"
+                  : "$absenderName hat Ihnen eine neue $titel erstellt: {$beleg['nummer']}.\n\n")
     . "$ansehenText\n$link\n\n"
     . "Freundliche Grüsse\n$absenderName";
 
@@ -117,9 +135,12 @@ $text = "Guten Tag\n\n"
 $schrift = "font-family:-apple-system,'Segoe UI',Arial,sans-serif";
 $html = '<div style="' . $schrift . ';color:#14161A;max-width:520px">'
     . '<p style="' . $schrift . ';margin:0 0 16px">Guten Tag</p>'
-    . '<p style="' . $schrift . ';margin:0 0 16px"><strong>' . htmlspecialchars($absenderName, ENT_QUOTES, 'UTF-8') . '</strong> hat Ihnen eine neue '
-    . htmlspecialchars(mb_strtolower($titel), ENT_QUOTES, 'UTF-8') . ' erstellt: <strong>'
-    . htmlspecialchars($beleg['nummer'], ENT_QUOTES, 'UTF-8') . '</strong>.</p>'
+    . '<p style="' . $schrift . ';margin:0 0 16px"><strong>' . htmlspecialchars($absenderName, ENT_QUOTES, 'UTF-8') . '</strong> '
+    . ($angepasst
+        ? 'hat die ' . htmlspecialchars($titel, ENT_QUOTES, 'UTF-8') . ' <strong>'
+          . htmlspecialchars($beleg['nummer'], ENT_QUOTES, 'UTF-8') . '</strong> für Sie angepasst.</p>'
+        : 'hat Ihnen eine neue ' . htmlspecialchars(mb_strtolower($titel), ENT_QUOTES, 'UTF-8') . ' erstellt: <strong>'
+          . htmlspecialchars($beleg['nummer'], ENT_QUOTES, 'UTF-8') . '</strong>.</p>')
     . '<p style="' . $schrift . ';margin:28px 0">'
     . '<a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '" '
     . 'style="' . $schrift . ';background:#2F5BD7;color:#fff;padding:12px 24px;border-radius:8px;'
@@ -136,12 +157,25 @@ try {
     json_response(['status' => 'error', 'message' => 'Versand fehlgeschlagen: ' . $e->getMessage()], 502);
 }
 
+// Die Fassung erst NACH dem Versand -- scheitert die Mail, gibt es auch
+// keine Fassung, die als versendet dastuende.
+if ($naechste['neu'] && $abbild !== null) {
+    beleg_fassung_anlegen($pdo, $id, $abbild, 'versand', (string)($user['name'] ?? ''));
+}
+
 // Eine bereits getroffene Kundenentscheidung wird durch einen erneuten
 // Versand nicht zurueckgesetzt -- eine Erinnerungsmail an eine laengst
 // angenommene Offerte soll den Status nicht auf "versendet" zuruecksetzen.
+// Ausnahme: eine NEUE Fassung nach einer Ablehnung (ENT-688) -- ueber sie
+// hat der Kunde noch nicht entschieden.
 $alt = (string)$beleg['status'];
-if (!in_array($alt, ['bestaetigt', 'abgelehnt'], true)) {
+if ($naechste['neu'] && !$gesperrt && !empty($beleg['entscheidung_am'])) {
+    $pdo->prepare('UPDATE belege SET status = ?, entscheidung_am = NULL, entscheidung_ip = NULL'
+        . (hat_spalte($pdo, 'belege', 'entscheidung_fassung') ? ', entscheidung_fassung = NULL' : '')
+        . ' WHERE id = ?')->execute(['versendet', $id]);
+} elseif (!in_array($alt, ['bestaetigt', 'abgelehnt'], true)) {
     $pdo->prepare('UPDATE belege SET status = ? WHERE id = ?')->execute(['versendet', $id]);
 }
 
-json_response(['status' => 'ok', 'link' => $link]);
+json_response(['status' => 'ok', 'link' => $link, 'fassung' => $fassungNr,
+    'neue_fassung' => (bool)$naechste['neu']]);
