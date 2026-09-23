@@ -315,7 +315,7 @@ try {
   check('Die Kopfzeile nennt "Planung"', /Planung/.test(await page.textContent('#uRole')));
   check('Planung sieht die Einsatzplanung', await sichtbar('nav-planung'));
   check('Planung sieht die Mitarbeitendenliste', await sichtbar('nav-admin-mitarbeiter'));
-  check('KRITISCH: Planung sieht die Einstellungen nicht', !(await sichtbar('nav-admin-betrieb')));
+  check('KRITISCH: Planung sieht den Betrieb nicht', !(await sichtbar('nav-admin-betrieb')));
   check('KRITISCH: Planung sieht die Einrichtung nicht', !(await sichtbar('nav-einrichtung')));
   check('KRITISCH: Planung sieht den Verlaufs-Reiter nicht',
     !(await sichtbar('mdtab-verlauf')));

@@ -59,20 +59,12 @@
 
       <p class="hb-kicker">Cockpit</p>
       <h1>Betrieb</h1>
-      <p class="hb-lead">Acht Kacheln für alles, was den Betrieb als Ganzes betrifft, statt
+      <p class="hb-lead">Sechs Kacheln für alles, was den Betrieb als Ganzes betrifft, statt
       eine einzelne Kunden- oder Personalakte — von den Anstellungsorten bis zur
       Rollenvergabe.</p>
 
-      <div class="hb-kasten hb-hinweis">
-        <p class="hb-kasten-titel">Zwei Namen für denselben Bereich</p>
-        <p>Im Cockpit selbst heisst der Knopf <b>„Einstellungen"</b> (unter
-        „Administration", nur am Desktop). Im Code, im Entscheidungsprotokoll und
-        darum auch in diesem Handbuch trägt derselbe Bereich weiterhin den älteren
-        Namen <b>„Betrieb"</b> — nicht zu verwechseln mit der gleichnamigen
-        Seitenleisten-Rubrik für das Tagesgeschäft.</p>
-      </div>
 
-      <h2 id="die-acht-kacheln">Die acht Kacheln</h2>
+      <h2 id="die-sechs-kacheln">Die sechs Kacheln</h2>
       <div class="hb-tabelle-wrap"><table>
         <tr><th>Kachel</th><th>Wofür</th></tr>
         <tr><td><b>Betrieb</b></td><td>Hauptdomizil, Anstellungsorte, Logo</td></tr>
@@ -81,8 +73,6 @@
         <tr><td><b>Rollen &amp; Berechtigungen</b></td><td>Profile, Zuteilung, Einsatzmerkmale, Login-Namen</td></tr>
         <tr><td><b>Personalnummern</b></td><td>Fehlende Personalnummern nachtragen</td></tr>
         <tr><td><b>Dienstfahrzeuge</b></td><td>Fahrzeug-Stammdaten</td></tr>
-        <tr><td><b>Support-Freigabe</b></td><td>Befristeter Diagnose-Zugriff für den Plattform-Betreiber — nur mit Recht „Rollen &amp; Berechtigungen"</td></tr>
-        <tr><td><b>Supportanfrage</b></td><td>Ticket an den Plattform-Betreiber</td></tr>
       </table></div>
 
       <h2 id="betrieb-hauptdomizil-anstellungsorte-logo">Betrieb: Hauptdomizil, Anstellungsorte, Logo</h2>
@@ -172,8 +162,11 @@
       anderer Bereich (Fahrzeugübernahme in der App) — hier nur die Stammdaten.</p>
 
       <h2 id="support-freigabe-und-supportanfrage">Support-Freigabe und Supportanfrage</h2>
-      <p>Betreffen den <b>Plattform-Betreiber</b> — eine andere Stelle als CUPI&nbsp;24
-      selbst, zuständig für den Betrieb der Software.</p>
+      <p><b>Nicht mehr hier.</b> Beides steht seit dem 23.&nbsp;September 2026 unter
+      <b>Administration&nbsp;→&nbsp;Support</b> — ein eigener Reiter neben diesem.
+      Sie betreffen nicht den eigenen Betrieb, sondern den <b>Plattform-Betreiber</b>,
+      also die Stelle, die die Software betreibt. Beschrieben sind sie bis auf
+      Weiteres hier, weil das Handbuch noch kein eigenes Kapitel dafür hat.</p>
       <ul>
         <li><b>Support-Freigabe:</b> befristeter Diagnose-Zugriff (4&nbsp;Std. / 24&nbsp;Std.
         [Standard] / 3&nbsp;Tage / 7&nbsp;Tage) mit Zweckangabe, jederzeit zurückziehbar.

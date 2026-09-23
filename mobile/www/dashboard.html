@@ -5559,7 +5559,16 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     </div>
 
     <nav class="side-nav">
-      <div class="nav-lbl">Betrieb</div>
+      <!-- "Tagesgeschaeft" seit ENT-682, vorher "Betrieb". Uebersicht,
+           Planung und Abgleich sind die taegliche Arbeit -- Betriebsdaten
+           liegen in keinem der drei. Der Name "Betrieb" ist mit ENT-682 an
+           den Administrationsreiter gegangen, der ihn traegt: Dort stehen
+           die Angaben zum Betrieb. Bis dahin hiessen beide gleich, und
+           ENT-229 hatte die Verwechslung geloest, indem es den REITER
+           umbenannte -- die schlechtere Haelfte, wie der Projektinhaber
+           am 2026-09-23 festhielt: Der Name gehoert dorthin, wo geklickt
+           wird, nicht auf eine Ueberschrift. -->
+      <div class="nav-lbl">Tagesgeschäft</div>
       <button class="nav-item on" id="nav-uebersicht" title="Übersicht" onclick="go('uebersicht')">
         <svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
         <span class="lbl">Übersicht</span>
@@ -5743,12 +5752,15 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <div class="nav-kinder">
           <button class="nav-kind" id="nav-admin-mitarbeiter" onclick="go('mitarbeiter')">Mitarbeitende</button>
           <!-- "Leistungen" hiess bis ENT-230 "Produkte" (Offerten-Positionen
-               sind Dienstleistungen), "Einstellungen" bis ENT-229 "Betrieb"
-               (Verwechslung mit der Sidebar-Gruppe "Betrieb"). Bezeichner,
-               Ansichtsnamen ('produkte', 'betrieb') und Endpunkte behalten
-               die alten Namen. -->
+               sind Dienstleistungen). "Betrieb" hiess von ENT-229 bis
+               ENT-682 "Einstellungen" -- wegen der damals gleichnamigen
+               Sidebar-Rubrik. ENT-682 hat die andere Haelfte umbenannt
+               (jetzt "Tagesgeschaeft") und den Namen hierher zurueckgeholt:
+               Was hier liegt, sind Angaben zum Betrieb, keine Einstellungen
+               an der Software. Bezeichner, Ansichtsnamen ('produkte',
+               'betrieb') und Endpunkte behalten die alten Namen. -->
           <button class="nav-kind" id="nav-admin-produkte" onclick="go('produkte')">Leistungen</button>
-          <button class="nav-kind" id="nav-admin-betrieb" onclick="go('betrieb')">Einstellungen</button>
+          <button class="nav-kind" id="nav-admin-betrieb" onclick="go('betrieb')">Betrieb</button>
           <!-- Mitteilungen an die Belegschaft (ENT-421). Unter Administration
                und nicht unter Auswertung: Hier wird etwas verfasst, nicht
                ausgewertet -- dieselbe Rubrik wie Mitarbeitende, an denen
@@ -11394,7 +11406,7 @@ const TITLES = {
   kunden:      ['Kunden', 'Stammdaten'],
   produkte:    ['Leistungen', 'Preise und Standardtexte für Offerten'],
   offerte:     ['Offerte', 'Positionen, Preise und Summen'],
-  betrieb:     ['Einstellungen', 'Betrieb, Briefkopf, Zugang, Rollen und Dienstfahrzeuge'],
+  betrieb:     ['Betrieb', 'Anstellungsorte, Briefkopf, Zugang, Rollen, Personalnummern und Dienstfahrzeuge'],
   support:     ['Support', 'Anliegen an den Betreiber und befristete Support-Freigabe'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
   lohnlaeufe:  ['Lohnläufe', 'Aus abgeglichenen Ist-Zeiten wird der Bruttolohn'],
