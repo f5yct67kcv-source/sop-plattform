@@ -31,11 +31,19 @@ if (!beleg_status_gueltig($neu)) {
 }
 
 $pdo = db();
-$s = $pdo->prepare('SELECT status FROM belege WHERE id = ?');
+$s = $pdo->prepare('SELECT status, entscheidung_am FROM belege WHERE id = ?');
 $s->execute([$id]);
-$alt = $s->fetchColumn();
-if ($alt === false) {
+$zeile = $s->fetch(PDO::FETCH_ASSOC);
+if ($zeile === false) {
     json_response(['status' => 'error', 'message' => 'Beleg nicht gefunden'], 404);
+}
+$alt = (string)$zeile['status'];
+// Eine Annahme am Link laesst sich nicht von Hand zuruecknehmen (ENT-688):
+// Ein Status "versendet" oder "Entwurf" hebe die Sperre auf, und darunter
+// stuende weiter die Annahme. Wer neu verhandelt, dupliziert.
+if (beleg_gesperrt($zeile) && $neu !== $alt) {
+    json_response(['status' => 'error', 'message' => 'Dieser Beleg wurde vom Empfänger angenommen. '
+        . 'Der Status lässt sich nicht mehr ändern; für Änderungen bitte duplizieren.'], 409);
 }
 
 $pdo->prepare('UPDATE belege SET status = ? WHERE id = ?')->execute([$neu, $id]);

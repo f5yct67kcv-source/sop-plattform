@@ -541,9 +541,16 @@ function beleg_lesen(PDO $pdo, int $id, string $tabPraefix = ''): ?array
 // Projektinhabers): Nummer, Datum und die Frist, sonst nichts. Eine
 // weitergeleitete Mail traegt damit keine Preise; der Betrag steht auf der
 // verlinkten Seite, die den Link kennt.
+//
+// $fassung (ENT-688): Ab der zweiten Fassung sagt die Mail, dass der Beleg
+// ANGEPASST wurde, und nicht, er sei neu. Wer nach seinem Aenderungswunsch
+// "eine neue Offerte" bekommt, sucht den Unterschied zu einer zweiten
+// Offerte, die es nicht gibt -- es ist dieselbe, unter derselben Nummer und
+// demselben Link.
 function beleg_mail(array $beleg, string $firma, string $link, string $person,
-                    array $signaturZeilen): array
+                    array $signaturZeilen, int $fassung = 1): array
 {
+    $angepasst = $fassung > 1;
     $art    = (string)($beleg['art'] ?? 'offerte');
     $angabe = BELEG_ARTEN[$art] ?? BELEG_ARTEN['offerte'];
     $titel  = (string)$angabe['titel'];
@@ -578,12 +585,15 @@ function beleg_mail(array $beleg, string $firma, string $link, string $person,
         ? "Sie können die $titel hier ansehen und direkt beantworten:"
         : "Sie können die $titel hier ansehen:";
 
-    $betreff = "Neue $titel $nummer von $firma";
+    $betreff = $angepasst ? "Angepasste $titel $nummer von $firma"
+                          : "Neue $titel $nummer von $firma";
+    $einleitung = $angepasst ? "wir haben die $titel $nummer für Sie angepasst."
+                             : "wir haben für Sie eine neue $titel erstellt.";
 
     $zeilen = '';
     foreach ($felder as [$b, $w]) { $zeilen .= "$b: $w\n"; }
     $text = "$anrede\n\n"
-          . "wir haben für Sie eine neue $titel erstellt.\n\n"
+          . "$einleitung\n\n"
           . $zeilen . "\n"
           . "$ansehen\n$link\n\n"
           . "Bei Fragen oder Unklarheiten melden Sie sich jederzeit bei uns.\n\n"
@@ -607,7 +617,7 @@ function beleg_mail(array $beleg, string $firma, string $link, string $person,
         // Betreff und in der Signatur -- der Satz selbst darf sprechen wie
         // ein Mensch. Der Satz schliesst an die Anrede an und faengt darum
         // klein an.
-        . mail_absatz('wir haben für Sie eine neue ' . mail_e($titel) . ' erstellt.')
+        . mail_absatz(mail_e($einleitung))
         . mail_block($block, true)
         . mail_absatz(mail_e($ansehen))
         // "oeffnen" statt "anschauen": klarer und geschaeftlicher
@@ -723,4 +733,327 @@ function beleg_mail_datum($roh): string
     if ($roh === '' || str_starts_with($roh, '0000-00-00')) { return ''; }
     $zeit = strtotime($roh);
     return $zeit === false ? '' : date('d.m.Y', $zeit);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Fassungen (ENT-688)
+// ══════════════════════════════════════════════════════════════════════════
+//
+// WOZU: Bis hierher zeigte der Link immer den LEBENDEN Beleg. Wer nach dem
+// Versand etwas aenderte, aenderte damit auch, was der Empfaenger sah -- und
+// was er angenommen hatte. Eine Annahme auf einem Dokument, das sich danach
+// noch aendern laesst, beweist nichts.
+//
+// JETZT: Jeder Versand, der etwas anderes zeigt als der vorige, legt eine
+// neue Fassung an -- ein ABBILD dessen, was der Empfaenger sieht: Kopf,
+// Positionen, gerechnete Summen, Empfaengeranschrift und Absender. Der Link
+// zeigt die letzte Fassung, nie den Entwurf daneben. Die Summen stehen
+// gerechnet im Abbild und werden beim Anzeigen NICHT neu gerechnet: Aendert
+// sich die Formel eines Tages, darf eine versendete Offerte davon nichts
+// merken (dieselbe Haltung wie bei der GAV-Rechnung: nie rueckwirkend).
+//
+// UNVERAENDERLICH: Eine Fassung wird angelegt und danach nie mehr
+// geschrieben oder geloescht. pruef_beleg_fassung.php sucht im ganzen
+// Backend nach einem UPDATE oder DELETE auf diese Tabellen und wird rot,
+// sobald eines auftaucht.
+//
+// DIE PRUEFSUMME steht neben dem Abbild und wird beim Lesen nachgerechnet.
+// Stimmt sie nicht, wird die Fassung nicht angezeigt -- eine veraenderte
+// Fassung als echt auszugeben waere schlimmer als gar keine.
+
+const BELEG_ABBILD_VERSION = 1;
+
+// Die Kopffelder, die auf dem Dokument stehen. Eine FESTE Liste und nicht
+// "alle Spalten der Zeile": Kaeme mit einem Einrichtungslauf eine Spalte
+// dazu, aenderte sich sonst die Pruefsumme jedes Belegs, und alle
+// versendeten Offerten stuenden auf einmal als "geaendert" da.
+// Status, Token, Entscheidung und interne Bemerkung gehoeren NICHT dazu --
+// sie stehen nicht auf dem Blatt.
+const BELEG_ABBILD_FELDER = [
+    'art', 'nummer', 'titel', 'referenz', 'datum', 'gueltig_bis', 'faellig_bis',
+    'rabatt_bp', 'oeffentliche_notizen', 'bedingungen', 'fusszeile_text',
+    'unterschriftsseite', 'vertrag_beginn', 'mindestlaufzeit_monate',
+    'kuendigungsfrist_monate', 'verlaengerung_monate',
+];
+const BELEG_ABBILD_DATUMSFELDER = ['datum', 'gueltig_bis', 'faellig_bis', 'vertrag_beginn'];
+const BELEG_ABBILD_ZAHLFELDER   = ['rabatt_bp', 'unterschriftsseite'];
+// Diese duerfen NULL bleiben, und NULL heisst "nicht vereinbart" -- nicht 0.
+const BELEG_ABBILD_ZAHL_ODER_NULL = ['mindestlaufzeit_monate', 'kuendigungsfrist_monate',
+                                     'verlaengerung_monate'];
+const BELEG_ABBILD_KUNDENFELDER = ['name', 'zusatzfeld', 'strasse', 'hausnummer',
+                                   'adresszusatz', 'plz', 'ort'];
+const BELEG_ABBILD_PERSONFELDER = ['anrede', 'vorname', 'nachname'];
+
+// Ein Datum als JJJJ-MM-TT oder null. MySQL liefert ein leeres DATE je nach
+// Modus als NULL, '' oder '0000-00-00' -- alle drei heissen dasselbe und
+// muessen dieselbe Pruefsumme ergeben.
+function beleg_abbild_datum($roh): ?string
+{
+    $d = substr(trim((string)($roh ?? '')), 0, 10);
+    return ($d === '' || $d === '0000-00-00') ? null : $d;
+}
+
+// Der Inhaltsteil: Kopffelder und Positionen, jeder Wert in EINER Form.
+// MySQL liefert Zahlen als Zeichenketten, SQLite als Zahlen, und "1.00" und
+// 1 ergaeben zwei Pruefsummen fuer denselben Beleg.
+function beleg_abbild_inhalt(array $b, array $positionen): array
+{
+    $kopf = [];
+    foreach (BELEG_ABBILD_FELDER as $f) {
+        $v = $b[$f] ?? null;
+        if (in_array($f, BELEG_ABBILD_DATUMSFELDER, true)) {
+            $kopf[$f] = beleg_abbild_datum($v);
+        } elseif (in_array($f, BELEG_ABBILD_ZAHLFELDER, true)) {
+            $kopf[$f] = (int)($v ?? 0);
+        } elseif (in_array($f, BELEG_ABBILD_ZAHL_ODER_NULL, true)) {
+            $kopf[$f] = ($v === null || $v === '') ? null : (int)$v;
+        } else {
+            $kopf[$f] = (string)($v ?? '');
+        }
+    }
+    $kopf['positionen'] = [];
+    foreach (array_values($positionen) as $p) {
+        $kopf['positionen'][] = [
+            'produkt_name'       => (string)($p['produkt_name'] ?? ''),
+            'beschreibung'       => (string)($p['beschreibung'] ?? ''),
+            'menge'              => sprintf('%.2f', (float)($p['menge'] ?? 0)),
+            'einheit'            => (string)($p['einheit'] ?? ''),
+            'einzelpreis_rappen' => (int)($p['einzelpreis_rappen'] ?? 0),
+            'rabatt_bp'          => (int)($p['rabatt_bp'] ?? 0),
+            'mwst_satz_bp'       => (int)($p['mwst_satz_bp'] ?? 0),
+            'periode'            => (string)($p['periode'] ?? 'einmalig'),
+        ];
+    }
+    return $kopf;
+}
+
+function beleg_abbild_zeile(?array $zeile, array $felder): ?array
+{
+    if (!$zeile) { return null; }
+    $raus = [];
+    foreach ($felder as $f) { $raus[$f] = (string)($zeile[$f] ?? ''); }
+    return $raus;
+}
+
+// Das ganze Abbild. $absender kommt von der aufrufenden Seite, weil er auf
+// beiden Seiten aus einer anderen Tabelle stammt (be_briefkopf bzw.
+// betrieb); alles andere ist auf beiden Seiten gleich gebaut.
+function beleg_abbild(array $b, array $positionen, ?array $kunde, ?array $person,
+                      array $absender): array
+{
+    $inhalt = beleg_abbild_inhalt($b, $positionen);
+    return [
+        'version'  => BELEG_ABBILD_VERSION,
+        'beleg'    => $inhalt,
+        'summen'   => beleg_summen($inhalt['positionen'], (int)$inhalt['rabatt_bp']),
+        'perioden' => beleg_summen_perioden($inhalt['positionen'], (int)$inhalt['rabatt_bp']),
+        'kunde'    => beleg_abbild_zeile($kunde, BELEG_ABBILD_KUNDENFELDER),
+        'person'   => beleg_abbild_zeile($person, BELEG_ABBILD_PERSONFELDER),
+        'absender' => $absender,
+    ];
+}
+
+// Das Abbild eines gespeicherten Belegs, mit dem Empfaenger, wie er JETZT im
+// Adressbestand steht. Der Absender kommt von aussen (siehe oben).
+function beleg_abbild_lesen(PDO $pdo, int $id, string $tabPraefix, array $absender): ?array
+{
+    $b = beleg_lesen($pdo, $id, $tabPraefix);
+    if (!$b) { return null; }
+    $kunde = null;
+    if (!empty($b['kunde_id'])) {
+        $s = $pdo->prepare('SELECT ' . implode(', ', BELEG_ABBILD_KUNDENFELDER)
+            . ' FROM ' . beleg_tabelle($tabPraefix, 'kunden') . ' WHERE id = ?');
+        $s->execute([(int)$b['kunde_id']]);
+        $kunde = $s->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+    $person = null;
+    if (!empty($b['person_id'])) {
+        $s = $pdo->prepare('SELECT ' . implode(', ', BELEG_ABBILD_PERSONFELDER)
+            . ' FROM ' . beleg_tabelle($tabPraefix, 'kunden_person') . ' WHERE id = ?');
+        $s->execute([(int)$b['person_id']]);
+        $person = $s->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+    return beleg_abbild($b, $b['positionen'], $kunde, $person, $absender);
+}
+
+// Der Absender der Mandantenseite aus `betrieb`. Das Logo liegt dort als
+// Binaerwert; im Abbild steht es als data:-URL, weil JSON keine Binaerdaten
+// traegt und die Seite es ohnehin so einbindet.
+function beleg_absender_betrieb(PDO $pdo): array
+{
+    try {
+        $z = $pdo->query(
+            'SELECT firma, fusszeile, fusszeile2, logo_mime, logo, qr_iban, qr_strasse,
+                    qr_hausnummer, qr_plz, qr_ort FROM betrieb WHERE id = 1'
+        )->fetch(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) {
+        $z = [];
+    }
+    $raus = [];
+    foreach (['firma', 'fusszeile', 'fusszeile2', 'qr_iban', 'qr_strasse', 'qr_hausnummer',
+              'qr_plz', 'qr_ort'] as $f) {
+        $raus[$f] = (string)($z[$f] ?? '');
+    }
+    $raus['logo'] = (!empty($z['logo']) && !empty($z['logo_mime']))
+        ? 'data:' . $z['logo_mime'] . ';base64,' . base64_encode((string)$z['logo'])
+        : '';
+    return $raus;
+}
+
+// Eine Form, eine Zeichenkette, eine Pruefsumme. Ohne Maskierungen, damit
+// dasselbe Abbild in PHP und in einer spaeteren Nachpruefung dieselben Bytes
+// ergibt.
+function beleg_abbild_json(array $abbild): string
+{
+    return json_encode($abbild, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+}
+
+function beleg_pruefsumme(string $json): string
+{
+    return hash('sha256', $json);
+}
+
+// Die Pruefsumme NUR des Inhalts (Kopf und Positionen). Sie entscheidet, ob
+// das Formular "geaendert, noch nicht versendet" zeigt. Die Anschrift des
+// Empfaengers und der Briefkopf bleiben dabei aussen vor: Aendert jemand das
+// Logo, stuende sonst jede versendete Offerte als geaendert da. Beim
+// Versand zaehlt dagegen das GANZE Abbild -- eine neue Anschrift ergibt dort
+// sehr wohl eine neue Fassung.
+function beleg_inhalt_pruefsumme(array $abbild): string
+{
+    return beleg_pruefsumme(beleg_abbild_json($abbild['beleg'] ?? []));
+}
+
+// Gibt es die Tabelle? Zwischen Deploy und Einrichtungslauf fehlt sie; dann
+// verhaelt sich alles wie vor ENT-688, statt mit einem SQL-Fehler abzubrechen.
+//
+// Eine Abfrage mit LIMIT 0 statt SHOW COLUMNS: Sie laeuft auf MySQL und auf
+// SQLite gleich, und die Pruefung faehrt die Fassungen auf SQLite. Gemerkt
+// wird nur ein JA -- ein Nein kann der Einrichtungslauf im selben Aufruf
+// noch aendern.
+function beleg_fassung_tabelle_da(PDO $pdo, string $tabPraefix = ''): bool
+{
+    static $da = [];
+    $tab = beleg_tabelle($tabPraefix, 'beleg_fassung');
+    if (!empty($da[spl_object_id($pdo) . $tab])) { return true; }
+    try {
+        $pdo->query("SELECT abbild FROM {$tab} LIMIT 0");
+    } catch (Throwable $e) {
+        return false;
+    }
+    return $da[spl_object_id($pdo) . $tab] = true;
+}
+
+// Alle Fassungen eines Belegs, ohne das Abbild selbst (das kann ein Logo
+// tragen und ist fuer eine Liste zu schwer).
+function beleg_fassungen(PDO $pdo, int $belegId, string $tabPraefix = ''): array
+{
+    if (!beleg_fassung_tabelle_da($pdo, $tabPraefix)) { return []; }
+    $s = $pdo->prepare(
+        'SELECT nummer, pruefsumme, anlass, versendet_am, versendet_von
+           FROM ' . beleg_tabelle($tabPraefix, 'beleg_fassung') . '
+          WHERE beleg_id = ? ORDER BY nummer'
+    );
+    $s->execute([$belegId]);
+    return array_map(static function (array $z): array {
+        $z['nummer'] = (int)$z['nummer'];
+        return $z;
+    }, $s->fetchAll(PDO::FETCH_ASSOC));
+}
+
+// Die letzte Fassung samt Abbild -- oder null, wenn es keine gibt.
+// 'echt' sagt, ob die Pruefsumme noch zum gespeicherten Abbild passt.
+function beleg_letzte_fassung(PDO $pdo, int $belegId, string $tabPraefix = ''): ?array
+{
+    if (!beleg_fassung_tabelle_da($pdo, $tabPraefix)) { return null; }
+    $s = $pdo->prepare(
+        'SELECT nummer, abbild, pruefsumme, anlass, versendet_am, versendet_von
+           FROM ' . beleg_tabelle($tabPraefix, 'beleg_fassung') . '
+          WHERE beleg_id = ? ORDER BY nummer DESC LIMIT 1'
+    );
+    $s->execute([$belegId]);
+    $z = $s->fetch(PDO::FETCH_ASSOC);
+    if (!$z) { return null; }
+    $json = (string)$z['abbild'];
+    $z['nummer'] = (int)$z['nummer'];
+    $z['echt']   = hash_equals((string)$z['pruefsumme'], beleg_pruefsumme($json));
+    $z['abbild'] = json_decode($json, true) ?: [];
+    return $z;
+}
+
+// Legt eine neue Fassung an -- aber nur, wenn sich gegenueber der letzten
+// etwas geaendert hat. Ein zweiter Versand ohne Aenderung ist eine
+// Erinnerung, keine neue Fassung.
+//
+// $anlass: 'versand' (der Normalfall) oder 'annahme' (ein Beleg, der vor
+// ENT-688 versendet wurde und nie eine Fassung bekam: Festgehalten wird
+// dann, was der Empfaenger im Moment seiner Entscheidung sah).
+//
+// Gibt ['nummer' => n, 'neu' => bool] zurueck.
+function beleg_fassung_anlegen(PDO $pdo, int $belegId, array $abbild, string $anlass,
+                               string $von, string $tabPraefix = ''): array
+{
+    $json = beleg_abbild_json($abbild);
+    $summe = beleg_pruefsumme($json);
+    $letzte = beleg_letzte_fassung($pdo, $belegId, $tabPraefix);
+    if ($letzte && hash_equals((string)$letzte['pruefsumme'], $summe)) {
+        return ['nummer' => (int)$letzte['nummer'], 'neu' => false];
+    }
+    $nummer = $letzte ? (int)$letzte['nummer'] + 1 : 1;
+    $pdo->prepare(
+        'INSERT INTO ' . beleg_tabelle($tabPraefix, 'beleg_fassung') . '
+            (beleg_id, nummer, abbild, pruefsumme, anlass, versendet_am, versendet_von)
+         VALUES (?, ?, ?, ?, ?, NOW(), ?)'
+    )->execute([$belegId, $nummer, $json, $summe, $anlass, mb_substr($von, 0, 120)]);
+    return ['nummer' => $nummer, 'neu' => true];
+}
+
+// Braucht der Versand eine neue Fassung? Dieselbe Frage wie in
+// beleg_fassung_anlegen(), aber ohne zu schreiben -- die Mail muss vor dem
+// Eintrag wissen, ob sie "neu" oder "angepasst" sagt.
+function beleg_fassung_naechste(PDO $pdo, int $belegId, array $abbild, string $tabPraefix = ''): array
+{
+    $summe = beleg_pruefsumme(beleg_abbild_json($abbild));
+    $letzte = beleg_letzte_fassung($pdo, $belegId, $tabPraefix);
+    if ($letzte && hash_equals((string)$letzte['pruefsumme'], $summe)) {
+        return ['nummer' => (int)$letzte['nummer'], 'neu' => false];
+    }
+    return ['nummer' => $letzte ? (int)$letzte['nummer'] + 1 : 1, 'neu' => true];
+}
+
+// Ist der Beleg nach einer Annahme durch den Empfaenger gesperrt?
+//
+// NUR DIE ANNAHME AM LINK sperrt (entscheidung_am gesetzt). Ein Status
+// "bestaetigt", den jemand im Formular von Hand setzt -- die Zusage kam per
+// Telefon --, sperrt nicht: Da gibt es kein angenommenes Abbild, das es zu
+// schuetzen gaelte. Eine Ablehnung sperrt ebenfalls nicht: Wer nach einem
+// Nein nachbessert, verschickt eine neue Fassung.
+function beleg_gesperrt(array $zeile): bool
+{
+    return !empty($zeile['entscheidung_am']) && (string)($zeile['status'] ?? '') === 'bestaetigt';
+}
+
+// Der Stand fuer das Formular: welche Fassungen es gibt und ob der Entwurf
+// seit der letzten davon geaendert wurde.
+function beleg_fassung_stand(PDO $pdo, array $beleg, string $tabPraefix, array $absender): array
+{
+    $fassungen = beleg_fassungen($pdo, (int)$beleg['id'], $tabPraefix);
+    $geaendert = false;
+    if ($fassungen) {
+        $letzte = beleg_letzte_fassung($pdo, (int)$beleg['id'], $tabPraefix);
+        $jetzt  = beleg_abbild_lesen($pdo, (int)$beleg['id'], $tabPraefix, $absender);
+        if ($letzte && $jetzt) {
+            $geaendert = !hash_equals(beleg_inhalt_pruefsumme($letzte['abbild']),
+                                      beleg_inhalt_pruefsumme($jetzt));
+        }
+    }
+    return [
+        'fassung_da' => beleg_fassung_tabelle_da($pdo, $tabPraefix),
+        'fassungen'  => array_map(static fn(array $f): array => [
+            'nummer' => $f['nummer'], 'anlass' => $f['anlass'],
+            'versendet_am' => $f['versendet_am'], 'versendet_von' => $f['versendet_von'],
+        ], $fassungen),
+        'fassung_geaendert' => $geaendert,
+        'gesperrt' => beleg_gesperrt($beleg),
+    ];
 }

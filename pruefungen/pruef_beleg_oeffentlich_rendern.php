@@ -75,6 +75,22 @@ $quelle = preg_replace('/^<\?php\s*/', '', $quelle, 1);
 $quelle = preg_replace('/^declare\(strict_types=1\);\s*$/m', '', $quelle);
 $quelle = preg_replace('/^require __DIR__ \. .*$/m', '', $quelle);
 
+// Variante offerte_fassung (ENT-688): Fassung 1 zu 45.00, dann
+// nachgebessert und als Fassung 2 zu 99.00 versendet, danach im Entwurf
+// auf 12.34 geaendert und NICHT versendet. Der Link muss die 99.00 zeigen --
+// weder den alten Preis noch den Entwurf.
+if ($argVariante === 'offerte_fassung') {
+    $pdo->sqliteCreateFunction('NOW', static fn(): string => date('Y-m-d H:i:s'));
+    $pdo->exec("CREATE TABLE beleg_fassung (id INTEGER PRIMARY KEY AUTOINCREMENT, beleg_id INTEGER,
+      nummer INTEGER, abbild TEXT, pruefsumme TEXT, anlass TEXT DEFAULT 'versand',
+      versendet_am TEXT, versendet_von TEXT DEFAULT '')");
+    $abs = beleg_absender_betrieb($pdo);
+    beleg_fassung_anlegen($pdo, 1, beleg_abbild_lesen($pdo, 1, '', $abs), 'versand', 'Pruefung');
+    $pdo->exec("UPDATE beleg_positionen SET einzelpreis_rappen = 9900 WHERE beleg_id = 1");
+    beleg_fassung_anlegen($pdo, 1, beleg_abbild_lesen($pdo, 1, '', $abs), 'versand', 'Pruefung');
+    $pdo->exec("UPDATE beleg_positionen SET einzelpreis_rappen = 1234 WHERE beleg_id = 1");
+}
+
 $_GET['token'] = 'tok123';
 $_SERVER['HTTP_HOST'] = 'lokal.test';
 eval($quelle);
