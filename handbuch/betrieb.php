@@ -59,19 +59,18 @@
 
       <p class="hb-kicker">Cockpit</p>
       <h1>Betrieb</h1>
-      <p class="hb-lead">Sechs Kacheln für alles, was den Betrieb als Ganzes betrifft, statt
+      <p class="hb-lead">Fünf Kacheln für alles, was den Betrieb als Ganzes betrifft, statt
       eine einzelne Kunden- oder Personalakte — von den Anstellungsorten bis zur
       Rollenvergabe.</p>
 
 
-      <h2 id="die-sechs-kacheln">Die sechs Kacheln</h2>
+      <h2 id="die-fuenf-kacheln">Die fünf Kacheln</h2>
       <div class="hb-tabelle-wrap"><table>
         <tr><th>Kachel</th><th>Wofür</th></tr>
         <tr><td><b>Betrieb</b></td><td>Hauptdomizil, Anstellungsorte, Logo</td></tr>
         <tr><td><b>Briefkopf für Rapporte</b></td><td>Kopf-/Fusszeile und QR-Rechnungsdaten auf dem Kundenrapport</td></tr>
         <tr><td><b>Mein Zugang: Zwei-Faktor-Anmeldung</b></td><td>Eigene 2FA — siehe <a href="erste-schritte.php">Erste Schritte</a></td></tr>
         <tr><td><b>Rollen &amp; Berechtigungen</b></td><td>Profile, Zuteilung, Einsatzmerkmale, Login-Namen</td></tr>
-        <tr><td><b>Personalnummern</b></td><td>Fehlende Personalnummern nachtragen</td></tr>
         <tr><td><b>Dienstfahrzeuge</b></td><td>Fahrzeug-Stammdaten</td></tr>
       </table></div>
 
@@ -141,9 +140,15 @@
       </div>
 
       <h2 id="personalnummern">Personalnummern</h2>
-      <p>Gleiches Muster (Vorschau → Bestätigung), aber ohne Abmelde-Bezug: trägt
-      ausschliesslich <b>fehlende</b> vierstellige Personalnummern nach. Sie werden
-      zufällig vergeben, nicht fortlaufend, und sind danach nicht mehr änderbar.</p>
+      <p>Jede Person bekommt beim Anlegen automatisch eine vierstellige
+      Personalnummer (1000–9999), zufällig vergeben statt fortlaufend — sie verrät
+      damit weder Anlegereihenfolge noch Mitarbeiterzahl. Das gilt für jeden Weg,
+      auf dem eine Person entsteht, einschliesslich des ersten Adminkontos beim
+      Einrichten eines Betriebs.</p>
+      <p>Einen eigenen Bildschirm zum Nachtragen gibt es seit dem 23.&nbsp;September
+      2026 nicht mehr: Es bleibt nichts nachzutragen. Fehlt in einem Altbestand doch
+      einmal eine Nummer, trägt die <b>Verwaltung</b> sie in der Personalakte der
+      betreffenden Person ein — nur sie darf das, und nur einmal.</p>
 
       <h2 id="dienstfahrzeuge">Dienstfahrzeuge</h2>
       <p>Reine Stammdaten — „hier wird nichts kontrolliert und nichts gerechnet".
