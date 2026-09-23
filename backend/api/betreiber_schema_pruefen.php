@@ -30,6 +30,7 @@ require_once __DIR__ . '/../betreiber.php';
 // zwei": Die rund 50 Tabellen des Rapport-Tools stehen nur an einer
 // Stelle, dieser Endpunkt richtet sie nur ein, er definiert sie nicht neu.
 require_once __DIR__ . '/../planung_einrichten_kern.php';
+require_once __DIR__ . '/../demo_instanz.php';   // demo_betreiber_rollen_nachtragen()
 
 require_betreiber_voll();
 $pdo = betreiber_db();
@@ -73,7 +74,7 @@ if (!$nurPruefen) {
 // nicht verhindern -- dieselbe Ueberlegung wie bei schritt() im Kern
 // selbst. $mitBetreiberEbene = false: Die Betreiber-Ebene ist oben bereits
 // EINMAL zentral eingerichtet, nicht ein zweites Mal je Mandant.
-$mandanten = $pdo->query('SELECT id, name, db_host, db_name, db_user, secret_name FROM mandant ORDER BY id')
+$mandanten = $pdo->query('SELECT id, name, subdomain, db_host, db_name, db_user, secret_name FROM mandant ORDER BY id')
     ->fetchAll(PDO::FETCH_ASSOC);
 foreach ($mandanten as $m) {
     $lage = mandant_verbindung_bereit($m);
@@ -94,6 +95,14 @@ foreach ($mandanten as $m) {
         $ergebnis = planung_einrichten_ausfuehren($mpdo, $nurPruefen, false);
         foreach ($ergebnis['getan'] as $g)  { $getan[]  = $bezug . ': ' . $g; }
         foreach ($ergebnis['fehler'] as $f) { $fehler[] = $bezug . ': ' . $f; }
+        // Bestehende Demobetreiber bekommen die Rollen nach, die neue
+        // Zugaenge schon beim Einrichten erhalten (2026-09-23). Nur, wo das
+        // Register einen aktiven Demo-Zugang fuer diesen Platz fuehrt.
+        if (hat_tabelle($pdo, 'demo_zugang') && (string)($m['subdomain'] ?? '') !== '') {
+            foreach (demo_betreiber_rollen_nachtragen($pdo, $mpdo, (string)$m['subdomain'], $nurPruefen) as $satz) {
+                if ($nurPruefen) { $offen[] = $bezug . ': ' . $satz; } else { $getan[] = $bezug . ': ' . $satz; }
+            }
+        }
     } catch (Throwable $e) {
         // Der Treibertext kann Host und Benutzer tragen und geht nicht
         // nach aussen -- dieselbe Ueberlegung wie bei mandant_stand().

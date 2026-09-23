@@ -409,3 +409,42 @@ function demo_betreiber_rollen_setzen(PDO $instanz, int $mitarbeiterId): void
         $ein->execute([$mitarbeiterId, $rolle]);
     }
 }
+
+// Traegt einem BESTEHENDEN Demobetreiber nach, was ihm an Rollen fehlt
+// (2026-09-23, Anordnung des Projektinhabers). demo_betreiber_rollen_setzen()
+// wirkt nur bei neu eingerichteten Zugaengen; die schon vergebenen Plaetze
+// holt der zentrale Einrichtungslauf (api/betreiber_schema_pruefen.php) mit
+// diesem Schritt nach.
+//
+// Angesprochen wird nur, wer im Register des Betreibers als AKTIVER
+// Demo-Zugang dieses Platzes steht -- ueber den Anmeldenamen. So kann der
+// Schritt nie ein Konto eines echten Mandanten erreichen: Dort gibt es
+// keinen Registereintrag. Nimmt nichts weg, fuegt nur hinzu, und ist damit
+// beliebig oft wiederholbar.
+//
+// Gibt je Konto einen Satz fuer die Liste "getan" (bzw. "offen" beim
+// Pruefen) zurueck; leer heisst: nichts zu tun.
+function demo_betreiber_rollen_nachtragen(PDO $betreiber, PDO $instanz, string $platz,
+                                          bool $nurPruefen): array
+{
+    $z = $betreiber->prepare("SELECT login FROM demo_zugang WHERE platz = ? AND status = 'aktiv'");
+    $z->execute([$platz]);
+    $saetze = [];
+    foreach ($z->fetchAll(PDO::FETCH_COLUMN) as $login) {
+        $ma = $instanz->prepare('SELECT id FROM mitarbeiter WHERE name = ?');
+        $ma->execute([(string)$login]);
+        $id = (int)$ma->fetchColumn();
+        if ($id <= 0) { continue; }
+        $r = $instanz->prepare('SELECT rolle FROM mitarbeiter_rollen WHERE mitarbeiter_id = ?');
+        $r->execute([$id]);
+        $fehlen = array_values(array_diff(demo_betreiber_rollen(), $r->fetchAll(PDO::FETCH_COLUMN)));
+        if (!$fehlen) { continue; }
+        if (!$nurPruefen) {
+            $ein = $instanz->prepare('INSERT INTO mitarbeiter_rollen (mitarbeiter_id, rolle) VALUES (?, ?)');
+            foreach ($fehlen as $rolle) { $ein->execute([$id, $rolle]); }
+        }
+        $saetze[] = 'Demobetreiber „' . $login . '“: ' . count($fehlen)
+            . ($nurPruefen ? ' Rolle(n) fehlen noch' : ' Rolle(n) nachgetragen');
+    }
+    return $saetze;
+}

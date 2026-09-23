@@ -647,6 +647,45 @@ $rollenStelle = strpos($rumpf, 'demo_betreiber_rollen_setzen(');
 $pruef('KRITISCH: die Einrichtung traegt die Rollen nach dem Anlegen des Kontos ein',
     $kontoStelle !== false && $rollenStelle !== false && $rollenStelle > $kontoStelle);
 
+// ── Bestehende Demobetreiber holt der zentrale Einrichtungslauf nach ──
+// Zwei Datenbanken wie im Betrieb: das Register beim Betreiber, das Konto
+// in der Instanz. Ein aktiver Zugang mit nur "mitarbeitend", ein
+// abgelaufener und ein Konto ohne Registereintrag (steht fuer jedes Konto
+// eines echten Mandanten).
+$regDb = new PDO('sqlite::memory:');
+$regDb->exec("CREATE TABLE demo_zugang (platz TEXT, login TEXT, status TEXT)");
+$regDb->exec("INSERT INTO demo_zugang VALUES ('demo3', 'interessent', 'aktiv'), ('demo3', 'frueher', 'abgelaufen')");
+$instDb = new PDO('sqlite::memory:');
+$instDb->exec('CREATE TABLE mitarbeiter (id INTEGER PRIMARY KEY, name TEXT)');
+$instDb->exec('CREATE TABLE mitarbeiter_rollen (mitarbeiter_id INTEGER, rolle TEXT)');
+$instDb->exec("INSERT INTO mitarbeiter VALUES (7, 'interessent'), (8, 'frueher'), (9, 'fremd')");
+$instDb->exec("INSERT INTO mitarbeiter_rollen VALUES (7, 'mitarbeitend'), (8, 'mitarbeitend'), (9, 'mitarbeitend')");
+$rollenVon = function (int $id) use ($instDb): array {
+    return $instDb->query("SELECT rolle FROM mitarbeiter_rollen WHERE mitarbeiter_id = $id")
+        ->fetchAll(PDO::FETCH_COLUMN);
+};
+$gemeldet = demo_betreiber_rollen_nachtragen($regDb, $instDb, 'demo3', true);
+$pruef('KRITISCH: das Pruefen meldet den fehlenden Stand, schreibt aber nichts',
+    count($gemeldet) === 1 && $rollenVon(7) === ['mitarbeitend']);
+$gemeldet = demo_betreiber_rollen_nachtragen($regDb, $instDb, 'demo3', false);
+$pruef('KRITISCH: der aktive Demobetreiber hat nach dem Lauf jedes Recht',
+    count($gemeldet) === 1
+    && array_diff(array_keys(rechte_katalog()), rechte_aus_rollen($rollenVon(7))) === []);
+$pruef('KRITISCH: ein abgelaufener Zugang und ein Konto ohne Registereintrag bleiben unberuehrt',
+    $rollenVon(8) === ['mitarbeitend'] && $rollenVon(9) === ['mitarbeitend']);
+$pruef('Ein zweiter Lauf hat nichts mehr zu tun und doppelt keine Rolle',
+    demo_betreiber_rollen_nachtragen($regDb, $instDb, 'demo3', false) === []
+    && count($rollenVon(7)) === count(array_unique($rollenVon(7))));
+$pruef('Ein anderer Platz fasst das Konto nicht an',
+    demo_betreiber_rollen_nachtragen($regDb, $instDb, 'demo4', false) === []);
+// Und der zentrale Lauf ruft den Schritt fuer jeden Mandanten auf -- am
+// Quelltext, weil ein echter Lauf eine Betreiber-Datenbank braeuchte.
+$lauf = (string)file_get_contents(dirname(__DIR__) . '/backend/api/betreiber_schema_pruefen.php');
+$schleife = substr($lauf, (int)strpos($lauf, 'foreach ($mandanten as $m)'));
+$pruef('KRITISCH: der zentrale Einrichtungslauf traegt die Rollen je Mandant nach',
+    str_contains($schleife, 'demo_betreiber_rollen_nachtragen(')
+    && preg_match("/SELECT[^']*subdomain[^']*FROM mandant/", $lauf) === 1);
+
 // ══ Die offene Anfrage vor der Bestaetigung (ENT-624) ═════════════════
 require_once __DIR__ . '/../backend/demo_bestaetigung.php';
 
