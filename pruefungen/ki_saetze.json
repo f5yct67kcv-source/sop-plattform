@@ -1,0 +1,34 @@
+{
+  "_zweck": "Feste Testsätze für den Messlauf der Spracheingabe (ENT-695). Alle Namen erfunden. 'kritisch' heisst: eine Verwechslung hier wäre der Fehler, der zum Ausbau geführt hat, und lässt den Lauf scheitern, egal wie gut der Rest ist.",
+  "listen": {
+    "kunden": [{"id": 7, "name": "Beispiel AG"}, {"id": 9, "name": "Muster GmbH"}, {"id": 11, "name": "Seeblick Immobilien AG"}],
+    "mitarbeiter": [{"name": "hmuster", "vorname": "Hans", "nachname": "Muster"}, {"name": "abeispiel", "vorname": "Anna", "nachname": "Beispiel"}],
+    "produkte": [{"id": 3, "name": "Verkehrsdienst", "einheit": "Std."}, {"id": 4, "name": "Objektschutz", "einheit": "Std."}, {"id": 5, "name": "Revierkontrolle", "einheit": "Stk."}, {"id": 6, "name": "Anfahrtspauschale", "einheit": "Pauschal"}]
+  },
+  "saetze": [
+    {"text": "Erstelle mir eine Offerte für die Beispiel AG über 16 Stunden Verkehrsdienst", "absicht": "beleg_neu", "kritisch": true, "art": "offerte", "kunde_id": 7, "produkte": [3]},
+    {"text": "Offerte Muster GmbH, zwei Mann Objektschutz am Samstag von 18 bis 6 Uhr", "absicht": "beleg_neu", "kritisch": true, "art": "offerte", "kunde_id": 9, "produkte": [4]},
+    {"text": "Mach mir es Angebot für d Seeblick Immobilien, 20 Revierkontrollen im Monat", "absicht": "beleg_neu", "kritisch": true, "art": "offerte", "kunde_id": 11, "produkte": [5]},
+    {"text": "Kostenvoranschlag für die Beispiel Neubau AG, Verkehrsdienst für ein Dorffest am 12. Juni, dazu die Anfahrtspauschale", "absicht": "beleg_neu", "kritisch": true, "art": "offerte", "kunde_id": null, "produkte": [3, 6]},
+    {"text": "Offerte für die Beispiel AG, 8 Stunden Verkehrsdienst und 10 Absperrgitter", "absicht": "beleg_neu", "kritisch": true, "art": "offerte", "kunde_id": 7, "produkte": [3], "freitext": 1},
+    {"text": "Stell der Muster GmbH eine Rechnung über 12 Stunden Objektschutz", "absicht": "beleg_neu", "kritisch": true, "art": "rechnung", "kunde_id": 9, "produkte": [4]},
+    {"text": "Rechnung an die Beispiel AG für den Verkehrsdienst von letzter Woche, 24 Stunden", "absicht": "beleg_neu", "kritisch": true, "art": "rechnung", "kunde_id": 7, "produkte": [3]},
+
+    {"text": "Neuer Einsatz für die Beispiel AG morgen von 7 bis 16 Uhr in Olten, zwei Leute", "absicht": "einsatz_neu", "kritisch": true},
+    {"text": "Plan mir en Verkehrsdienst für d Muster GmbH am Fritig vo 18 bis 23 Uhr", "absicht": "einsatz_neu", "kritisch": true},
+    {"text": "Am 3. Oktober braucht die Seeblick Immobilien AG drei Personen für den Objektschutz, 20 bis 6 Uhr", "absicht": "einsatz_neu", "kritisch": true},
+    {"text": "Trag Hans Muster für übermorgen beim Verkehrsdienst Beispiel AG ein, 6 bis 14 Uhr", "absicht": "einsatz_neu", "kritisch": true},
+
+    {"text": "Neuer Kunde Bergblick Treuhand AG, Hauptstrasse 5, 4600 Olten", "absicht": "kunde_neu", "kritisch": true},
+    {"text": "Leg en neue Kund a: Sonnenhof Verwaltung GmbH in Aarau", "absicht": "kunde_neu", "kritisch": true},
+    {"text": "Neuer Mitarbeiter Peter Beispiel, geboren am 4. Mai 1990, Mobile 079 000 00 00", "absicht": "mitarbeiter_neu", "kritisch": true},
+    {"text": "Anna Beispiel hat eine neue Telefonnummer, 079 111 11 11", "absicht": "mitarbeiter_aendern", "kritisch": true},
+    {"text": "Ändere die Adresse von Hans Muster auf Ringweg 3, 4600 Olten", "absicht": "mitarbeiter_aendern", "kritisch": true},
+
+    {"text": "Zeig mir die Planung vom Oktober", "absicht": "anderes", "kritisch": true},
+    {"text": "Öffne die Auswertung der Stunden für September", "absicht": "anderes", "kritisch": true},
+    {"text": "Wer ist morgen noch nicht eingeteilt?", "absicht": "anderes", "kritisch": false},
+    {"text": "Lösch den Einsatz von gestern", "absicht": "anderes", "kritisch": true},
+    {"text": "äh ja also das da", "absicht": "unklar", "kritisch": false}
+  ]
+}
