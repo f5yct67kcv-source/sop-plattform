@@ -54,6 +54,11 @@ const OHNE_LOGBUCH = {
     + 'Seite, Zeitpunkt und -- wenn angegeben -- Namen am Beleg. Ein zweiter Eintrag '
     + 'im Logbuch waere dieselbe Zeile ein zweites Mal. Die ANTWORT der Betreiberin '
     + 'schreibt sehr wohl mit (betreiber_beleg_nachricht.php).',
+  'betreiber_beleg_unterschrift.php':
+    'Hier nimmt der EMPFAENGER ueber den oeffentlichen Link an (ENT-688). Es gibt '
+    + 'keinen angemeldeten Akteur; die Unterschrift IST der Eintrag -- mit Name, '
+    + 'Funktion, Codeadresse, Zeitpunkten, Adresse und Browser in be_beleg_unterschrift '
+    + 'und im Pruefprotokoll am Dokument. Ein Logbuchsatz waere dieselbe Zeile noch einmal.',
   'betreiber_demo_beenden.php':
     'Demo-Instanzen sind Wegwerfumgebungen (ENT-523), kein Bestand dieser Ebene.',
   'betreiber_demo_ablauf.php':
