@@ -228,6 +228,55 @@ function require_betreiber(): array
 // Bezug nachvollziehbar in den Daten, ohne dass der Wert selbst dort liegt.
 const BE_STATUS = ['aktiv', 'gesperrt', 'gekuendigt'];
 
+// Der vierte Zustand (ENT-686): eine vorbereitete Anlage im Vorrat, die noch
+// keinem Kunden gehoert.
+//
+// BEWUSST NICHT IN BE_STATUS. Diese Liste sagt, was der Betreiber von Hand
+// setzen darf (api/betreiber_mandant_status.php). "vorrat" darf er nicht: Ein
+// laufender Mandant, von Hand zurueck in den Vorrat gestellt, saehe aus wie
+// eine freie Anlage -- mit den Personaldaten eines Kunden darin. Zurueck in
+// den Vorrat kommt eine Anlage erst, wenn sie geleert ist (ENT-686,
+// Klaerung 6), und dieser Weg ist noch nicht gebaut. Hinein kommt sie nur
+// beim Anlegen, heraus nur durch Zuteilung auf "aktiv".
+const MANDANT_STATUS_VORRAT = 'vorrat';
+
+// EINE Stelle fuer die Frage, ob eine Mandantenzeile ein Kunde ist. Die
+// Listen, die ueber alle Mandanten laufen (Vertraege, Zaehlstand,
+// Support-Lage), fragen hier -- sonst lernt beim naechsten neuen Zustand
+// genau eine von ihnen ihn nicht.
+function mandant_ist_vorrat(array $m): bool
+{
+    return (string)($m['status'] ?? '') === MANDANT_STATUS_VORRAT;
+}
+
+// Kennt die Mandantentabelle den Status "vorrat" schon? Er kommt ueber einen
+// Nachtrag (be_auswahlwerte in betreiber.php). Solange der nicht gelaufen
+// ist, kann keine Anlage im Vorrat stehen -- und das ist "nicht
+// eingerichtet", nicht "Vorrat leer".
+//
+// STEHT HIER UND NICHT IN mandant_vorrat.php: Auch der Anlegeweg braucht
+// sie, und der verbindet zu keiner Mandantendatenbank. Laege sie im
+// Verbinder-Modul, zaehlte er fuer die Wache in test_betreiber.mjs als
+// Verbinder.
+//
+// GEFRAGT WIRD DIE DATENBANK SELBST, wie in be_auswahlwerte_nachtragen():
+// Ob der Wert erlaubt ist, weiss sie, und ein Merker daneben koennte von ihr
+// abweichen. Auf den Wert IN ANFUEHRUNGSZEICHEN geprueft, damit kein
+// laengerer Wert, der "vorrat" enthaelt, als Treffer durchgeht.
+function mandant_vorrat_status_da(PDO $stamm): bool
+{
+    try {
+        $s = $stamm->prepare(
+            "SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mandant' AND COLUMN_NAME = 'status'"
+        );
+        $s->execute();
+        return str_contains((string)($s->fetchColumn() ?: ''), "'" . MANDANT_STATUS_VORRAT . "'");
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
 function be_mandant_status_gueltig(string $status): bool
 {
     return in_array($status, BE_STATUS, true);
@@ -1325,7 +1374,9 @@ function be_tabellen(): array
   -- Datenbankangaben zu finden. Leer, solange ein Mandant noch unter der
   -- geteilten Testadresse laeuft.
   subdomain VARCHAR(100) NOT NULL DEFAULT '',
-  status ENUM('aktiv','gesperrt','gekuendigt') NOT NULL DEFAULT 'aktiv',
+  -- 'vorrat' (ENT-686): eine vorbereitete Anlage, die noch keinem Kunden
+  -- gehoert. Datenbank, Schema und Secret stehen, Adresse und Kunde nicht.
+  status ENUM('aktiv','gesperrt','gekuendigt','vorrat') NOT NULL DEFAULT 'aktiv',
   kanton CHAR(2) NULL,
   vertrag_beginn DATE NULL,
   mindestlaufzeit_monate INT NULL,
@@ -2045,6 +2096,11 @@ function be_auswahlwerte(): array
          "ALTER TABLE be_belege MODIFY COLUMN status "
          . "ENUM('entwurf','versendet','angeschaut','aenderung','bestaetigt','abgelehnt') "
          . "NOT NULL DEFAULT 'entwurf'"],
+        // Der Vorrat vorbereiteter Anlagen (ENT-686). Die vollstaendige
+        // Aufzaehlung muss mit der CREATE-TABLE-Fassung oben uebereinstimmen.
+        ['mandant', 'status', 'vorrat',
+         "ALTER TABLE mandant MODIFY COLUMN status "
+         . "ENUM('aktiv','gesperrt','gekuendigt','vorrat') NOT NULL DEFAULT 'aktiv'"],
         // Die dritte Belegart (ENT-637).
         ['be_belege', 'art', 'vertrag',
          "ALTER TABLE be_belege MODIFY COLUMN art "

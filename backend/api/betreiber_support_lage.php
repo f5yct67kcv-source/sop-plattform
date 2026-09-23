@@ -42,6 +42,13 @@ $mandanten = $stamm->query(
        FROM mandant ORDER BY id'
 )->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+// Der Vorrat faellt heraus (ENT-686): Eine Anlage, die noch keinem Kunden
+// gehoert, hat niemanden, der eine Freigabe erteilen koennte. "Nie
+// freigegeben" waere fuer sie eine falsche Aussage -- und jede Zeile hier
+// kostet eine Verbindung zu ihrer Datenbank.
+$mandanten = array_values(array_filter($mandanten,
+    static fn(array $m): bool => !mandant_ist_vorrat($m)));
+
 $lagen = be_freigabe_lagen($stamm, $mandanten);
 
 json_response([

@@ -77,9 +77,15 @@ if (!$m) {
 // "gibt es nicht" darueber.
 if ((string)$m['status'] !== 'aktiv') {
     json_response(['status' => 'error',
-        'message' => (string)$m['status'] === 'gekuendigt'
-            ? 'Dieser Mandant ist gekündigt. Für eine gekündigte Anlage wird kein Zugang übergeben.'
-            : 'Dieser Mandant ist gesperrt. Solange das so ist, wird kein Zugang übergeben.'], 409);
+        'message' => [
+            'gekuendigt' => 'Dieser Mandant ist gekündigt. Für eine gekündigte Anlage wird kein Zugang übergeben.',
+            'gesperrt'   => 'Dieser Mandant ist gesperrt. Solange das so ist, wird kein Zugang übergeben.',
+            // ENT-686: Erst zuteilen, dann einladen. Eine Vorratsanlage hat
+            // noch keinen Kunden und keine Adresse, unter der er arbeiten
+            // koennte.
+            MANDANT_STATUS_VORRAT => 'Diese Anlage liegt noch im Vorrat. '
+                . 'Sie muss zuerst einem Kunden zugeteilt werden, dann lässt sich der Zugang übergeben.',
+        ][(string)$m['status']] ?? 'Dieser Mandant ist nicht aktiv. Solange das so ist, wird kein Zugang übergeben.'], 409);
 }
 
 // ── Erst pruefen, ob sich ueberhaupt verschicken laesst ───────────────

@@ -634,6 +634,15 @@ const DARF_VERBINDEN = {
   // `mitarbeiter` an, und der Einloeseweg nur, solange dort kein Mensch steht.
   'betreiber_mandant_einladen.php':   'prueft die Anlage vor dem Versand, legt nichts an (ENT-686)',
   'mandant_einladung_einloesen.php':  'legt das Erstkonto in der leeren Anlage an, ohne Anmeldung (ENT-686)',
+  // ENT-686: die taegliche Pruefung des Vorrats. Verbindet ueber
+  // backend/mandant_vorrat.php, nicht in eigener Zeile -- und wird von der
+  // Wache genau darum gesehen: Die Pruefung steht absichtlich in einem
+  // eigenen Modul und nicht in betreiber.php, das mandant_db() definiert und
+  // darum ausgenommen ist. Gelesen wird ausschliesslich der Bauplan jeder
+  // Vorratsanlage (kern_schema_fehlend), keine Verwaltungstabelle; die
+  // Anlagen gehoeren noch keinem Kunden. Nachgewiesen in
+  // test_mandant_vorrat.mjs.
+  'betreiber_vorrat_pruefen.php':     'prueft Erreichbarkeit und Bauplan jeder Vorratsanlage (ENT-686)',
 };
 const heimlich = nutztMandantDb.filter(f => !DARF_VERBINDEN[f]);
 check('KRITISCH: nur namentlich genannte Endpunkte verbinden zu einer Mandantendatenbank',

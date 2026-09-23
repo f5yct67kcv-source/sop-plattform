@@ -35,6 +35,12 @@ $schreiben = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST';
 $festgehalten = 0;
 if ($schreiben && $tabelleDa) {
     foreach ($mandanten as $m) {
+        // KEIN ZAEHLSTAND FUER DEN VORRAT (ENT-686). Ein festgehaltener Stand
+        // ist die Grundlage der Abrechnung; fuer eine Anlage, die noch keinem
+        // Kunden gehoert, waere er ein Abrechnungsvermerk ohne Kunden. Die
+        // Tagesanzeige darunter nimmt sie weiterhin mit -- "nie benutzt"
+        // stimmt fuer sie, und die Mandantentabelle zeigt sie.
+        if (mandant_ist_vorrat($m)) { continue; }
         $r = zaehlstand_festhalten($pdo, (int)$m['id'], mandant_groesse($m));
         if ($r && !empty($r['neu'])) { $festgehalten++; }
     }

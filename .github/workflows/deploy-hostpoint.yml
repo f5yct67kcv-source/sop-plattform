@@ -672,6 +672,7 @@ jobs:
           # betreiber_support_vorgang.php (Vorrat) -- die kommen ueber
           # backend/api/*.php mit.
           cp backend/supportvorgang.php dist/supportvorgang.php
+          cp backend/mandant_vorrat.php dist/mandant_vorrat.php
           # Abholweg des Betreibers (ENT-681), nur eingebunden: gesperrt.
           cp backend/support_sammeln.php dist/support_sammeln.php
           # Pruefung und Mailtext der Demo-Anfrage (ENT-469), eingebunden
@@ -1249,6 +1250,7 @@ jobs:
           cp backend/rechte.php        dist-betreiber/rechte.php
           cp backend/support.php       dist-betreiber/support.php
           cp backend/supportvorgang.php dist-betreiber/supportvorgang.php
+          cp backend/mandant_vorrat.php dist-betreiber/mandant_vorrat.php
           # Der Abholweg (Befund 2026-09-23) -- ohne ihn stirbt der
           # Arbeitsvorrat beim ersten Aufruf, weil betreiber_support_vorgang.php
           # ihn per require_once einbindet.
@@ -1502,6 +1504,14 @@ jobs:
           # (api/betreiber_demo_ablauf.php). Derselbe Wert wie beim
           # naechtlichen Demo-Reset -- es ist derselbe Cron-Dienst.
           sed -i "s|__DEMO_ABLAUF_TOKEN__|$EFF_DEMO_ABLAUF_TOKEN|g" dist-betreiber/api/betreiber_demo_ablauf.php
+          # Die taegliche Pruefung des Mandanten-Vorrats (ENT-686,
+          # api/betreiber_vorrat_pruefen.php). Derselbe Schluessel wie beim
+          # Demo-Ablauf darueber -- es ist derselbe Cron-Dienst beim Hoster,
+          # und ein zweites Secret waere ein zweiter Wert, der von Hand
+          # gleich gehalten werden muss. Der Endpunkt liest nur den Stand
+          # und schreibt Post an die Betreiber-Konten; mehr oeffnet der
+          # Schluessel dort nicht.
+          sed -i "s|__VORRAT_ZEITGEBER_TOKEN__|$EFF_DEMO_ABLAUF_TOKEN|g" dist-betreiber/api/betreiber_vorrat_pruefen.php
           # Die Deploy-Geheimnisse der einzelnen Mandanten-Datenbanken
           # (OP-526, mandant_secret() in backend/betreiber.php) -- als
           # base64(JSON), nicht als rohes JSON, siehe Begruendung bei
@@ -1773,6 +1783,7 @@ jobs:
           cp backend/guardops-signatur-hell.png dist-cupi24/guardops-signatur-hell.png
           cp backend/support.php dist-cupi24/support.php
           cp backend/supportvorgang.php dist-cupi24/supportvorgang.php
+          cp backend/mandant_vorrat.php dist-cupi24/mandant_vorrat.php
           # Der Abholweg des Betreibers (ENT-681) -- eingebunden von
           # betreiber_support_vorgang.php, das hier ebenfalls liegt.
           cp backend/support_sammeln.php dist-cupi24/support_sammeln.php

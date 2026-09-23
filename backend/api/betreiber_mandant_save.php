@@ -142,6 +142,26 @@ if ($id > 0) {
     json_response(['status' => 'ok', 'id' => $id, 'angelegt' => false]);
 }
 
+// ALS VORRAT ANLEGEN (ENT-686): nur hier, beim Anlegen -- nie ueber das
+// Aendern darueber. Eine bestehende Zeile in den Vorrat zu stellen hiesse,
+// eine Anlage mit Kundendaten als frei auszugeben; das Aendern-Formular kennt
+// den Status darum gar nicht (er steht nicht in BE_MANDANT_FELDER).
+//
+// Der Wert kommt nicht aus der Eingabe, sondern aus einem Ja/Nein: Wer hier
+// einen beliebigen Status mitschickt, soll nicht "gekuendigt" oder etwas
+// Erfundenes anlegen koennen.
+if (!empty($daten['vorrat'])) {
+    // Ohne den Nachtrag kennt die Tabelle den Wert nicht, und MySQL wiese
+    // ihn mit einem Fehler ab, den niemand lesen kann. "Nicht eingerichtet"
+    // ist eine eigene Aussage (Hausregel).
+    if (!mandant_vorrat_status_da($pdo)) {
+        json_response(['status' => 'error',
+            'message' => 'Der Vorrat ist in dieser Anlage noch nicht nachgetragen. '
+                       . 'Ein Lauf der Einrichtung holt das nach.'], 503);
+    }
+    $werte['status'] = MANDANT_STATUS_VORRAT;
+}
+
 $spalten = array_keys($werte);
 $stmt = $pdo->prepare(
     'INSERT INTO mandant (' . implode(', ', $spalten) . ') VALUES ('
@@ -149,5 +169,6 @@ $stmt = $pdo->prepare(
 );
 $stmt->execute(array_values($werte));
 $neueId = (int)$pdo->lastInsertId();
-be_log($pdo, $ich, 'mandant', $neueId, 'angelegt', null, $werte['name']);
+be_log($pdo, $ich, 'mandant', $neueId,
+       isset($werte['status']) ? 'als Vorrat angelegt' : 'angelegt', null, $werte['name']);
 json_response(['status' => 'ok', 'id' => $neueId, 'angelegt' => true]);

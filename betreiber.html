@@ -3194,6 +3194,9 @@ const STATUS_TEXT = {
   aktiv:      ['m-pos',  'aktiv'],
   gesperrt:   ['m-warn', 'gesperrt'],
   gekuendigt: ['m-neg',  'gekündigt'],
+  /* ENT-686: vorbereitete Anlage ohne Kunden. Ruhig, nicht farbig -- ein
+     Vorrat ist kein Handlungsbedarf; ob er reicht, meldet der Zeitgeber. */
+  vorrat:     ['m-ruhe', 'Vorrat'],
 };
 function merker(karte, schluessel) {
   const [klasse, wort] = karte[schluessel] || ['m-ruhe', schluessel];

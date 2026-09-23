@@ -90,6 +90,10 @@ $schluessel = static fn(?int $mandantId, ?int $kundeId): string =>
 
 foreach ($mandanten as $m) {
     if (in_array((string)$m['subdomain'], DEMO_PLAETZE, true)) { continue; }
+    // Eine Anlage im Vorrat hat keinen Vertrag, weil sie keinen Kunden hat
+    // (ENT-686). In der Liste stuende sie als "nicht erfasst" -- das saehe
+    // aus wie ein Kunde, dem der Vertrag fehlt.
+    if (mandant_ist_vorrat($m)) { continue; }
     $lage = be_vertrag_lage($m, $heute);
     $zeilen[$schluessel((int)$m['id'], null)] = [
         'firma'          => (string)$m['name'],

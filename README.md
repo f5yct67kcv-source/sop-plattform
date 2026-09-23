@@ -650,6 +650,68 @@ jedes Laufs namentlich, welche Plätze ohne Dateien geblieben sind.
 auch im Mandantenstamm fehlt; steht er dort und hat nur keine Dateien,
 greift diese Sperre **nicht**.
 
+## Mandanten-Vorrat (ENT-686)
+
+Vorbereitete, leere Anlagen, aus denen bei Vertragsabschluss eine einem
+Kunden zugeteilt wird. Soll: **drei**. Gemeldet wird, sobald weniger als
+**zwei** übergabefähig sind.
+
+**Was vorrätig ist und was nicht.** Eine Vorratsanlage ist eine
+Mandantenzeile mit Status `vorrat`: Datenbank beim Hoster, eingerichtetes
+Schema, Zugang in `MANDANT_SECRETS`. Kunde und **Adresse** fehlen noch —
+der Kunde bekommt seine eigene Domain, und die Adresse einer Anlage steht
+fest im Deploy-Bündel (ENT-501). Sie entsteht erst bei der Zuteilung.
+
+### Eine Anlage in den Vorrat legen
+
+1. Datenbank beim Hoster anlegen.
+2. Ihren Zugang in `MANDANT_SECRETS` eintragen (Aufbau: Abschnitt zu
+   OP-526) und einmal nach `main` pushen.
+3. Im Betreiber-Bereich als Mandant erfassen, **als Vorrat**
+   (`api/betreiber_mandant_save.php` mit `"vorrat": true`). Als Name genügt
+   etwas Neutrales; er wird bei der Zuteilung überschrieben.
+4. Die Einrichtung laufen lassen (`api/betreiber_schema_pruefen.php`). Sie
+   nimmt Vorratsanlagen mit — darüber bleibt ihr Schema auch später aktuell.
+
+### Täglich prüfen lassen
+
+Hostpoint-Kundencenter → Cronjobs, einmal täglich:
+
+```
+0 6 * * *  curl -s -X POST "https://betreiber.guardops.ch/api/betreiber_vorrat_pruefen.php?schluessel=<DEMO_ABLAUF_TOKEN>"
+```
+
+**POST, nicht GET** — nur ein POST verschickt die Meldung. Der Schlüssel ist
+derselbe wie beim Ablauf der Demo-Zugänge; es ist derselbe Cron-Dienst.
+
+Die Prüfung sieht jede Vorratsanlage einzeln an — erreichbar, ganzer
+Bauplan über `kern_schema_fehlend()` — und mailt an **alle aktiven
+Betreiber-Konten**, solange weniger als zwei übergabefähig sind. Jeden Tag,
+bis es wieder reicht; einen Vermerk „schon gemeldet" gibt es bewusst nicht.
+Die Antwort sagt, was geschah: `nicht_noetig`, `versandt`, `kein_versand`
+(SMTP fehlt), `niemand_da` (kein aktives Konto) oder
+`versand_fehlgeschlagen`.
+
+**Ohne Cronjob prüft niemand.** Ein angemeldeter Betreiber sieht den Stand
+jederzeit per GET auf denselben Endpunkt, aber gemeldet wird nichts.
+
+### Zuteilen
+
+Status von `vorrat` auf `aktiv` (`api/betreiber_mandant_status.php`), nachdem
+Name, Kanton und Subdomain des Kunden gesetzt sind. Danach lässt sich das
+Erstkonto einladen.
+
+**Was sich nicht vorbereiten lässt:** die eigene Adresse des Kunden. Sie
+braucht heute noch einen Deploy-Block wie bei cupi24 — Verzeichnis,
+FTP-Zugang, Subdomain beim Hoster, eine Änderung an
+`deploy-hostpoint.yml`. Das ist der Teil der Übergabe, der Handarbeit
+bleibt, bis der Deploy die Mandanten aus einer Liste baut statt aus
+einzelnen Blöcken.
+
+**Zurück in den Vorrat geht nichts von Hand** — ein
+laufender Mandant sähe sonst aus wie eine freie Anlage, mit den
+Personaldaten eines Kunden darin.
+
 ## Betreiber-Bereich in Betrieb nehmen (ENT-519 bis ENT-526)
 
 Einmaliger Vorgang. Die Reihenfolge zaehlt — Schritt 4 laesst sich nur
