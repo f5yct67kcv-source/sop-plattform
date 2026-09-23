@@ -3397,6 +3397,7 @@ async function ladeMandanten() {
           + '<button class="klein" data-bearbeiten="' + m.id + '">Ändern</button> '
           + '<button class="klein" data-gav="' + m.id + '">GAV</button> '
           + '<button class="klein" data-support="' + m.id + '">Support</button>'
+          + freigabeFeld(m.id)
           + '</td>'
       + '</tr>').join('')
     + '</tbody></table></div>'
@@ -3416,6 +3417,12 @@ async function ladeMandanten() {
     b.onclick = () => gavFragen(liste.find(m => m.id === +b.dataset.gav)));
   inhalt.querySelectorAll('[data-support]').forEach(b =>
     b.onclick = () => supportHolen(liste.find(m => m.id === +b.dataset.support)));
+
+  /* Der Freigabe-Stand kommt nach (siehe ladeFreigabeLagen): Ein bereits
+     bekannter Stand wird sofort gezeichnet, damit die Felder beim
+     Neuzeichnen der Tabelle nicht auf "wird abgefragt" zurückfallen. */
+  if (freigabeLagen) { freigabeZeichnen(); }
+  ladeFreigabeLagen();
 }
 
 /* Unbekannt darf nie wie "keine" aussehen: Kommt der Stand nicht, sagt die
@@ -3706,6 +3713,81 @@ async function gavFragen(m) {
   if (a.status !== 'ok') { melde($('haus-meldung'), 'fehler', a.message); return; }
   melde($('haus-meldung'), 'gut', 'Bestätigt und mit Zeitpunkt festgehalten.');
   await ladeMandanten();
+}
+
+/* ── Wo eine Support-Freigabe offen ist ──────────────────────────────
+ *
+ * Der Betreiber sah bisher nirgends, dass ein Betrieb ihm die Tür geöffnet
+ * hat -- er musste je Mandant auf "Support" klicken, um es zu erfahren
+ * (Befund des Projektinhabers, 2026-09-22). Die Freigabe bleibt, wo sie
+ * ist: in der Datenbank des Betriebs. Sie wird hier nur abgelesen.
+ *
+ * NACHGELADEN, nicht in der Mandantenliste: Der Endpunkt öffnet eine
+ * Verbindung je Mandant. Stünde er in der Liste, hielte eine einzige
+ * langsame Anlage das Laden aller übrigen auf. So steht die Tabelle
+ * zuerst, und das Feld füllt sich, sobald die Antwort da ist.
+ *
+ * SECHS AUSSAGEN, SECHS TEXTE (Hausregel). Farbe trägt nur "offen" -- das
+ * ist der Zustand, der eine Handlung verlangt, und der einzige, der
+ * zeitlich abläuft. "Nicht feststellbar" ist ausdrücklich kein "keine
+ * Freigabe": Dann hat die Anlage nur nicht geantwortet.
+ */
+let freigabeLagen = null;
+
+const FREIGABE_TEXT = {
+  offen:              ['m-pos',  'Freigabe offen'],
+  nie_freigegeben:    ['',       'nie freigegeben'],
+  abgelaufen:         ['',       'Freigabe abgelaufen'],
+  widerrufen:         ['',       'Freigabe widerrufen'],
+  nicht_eingerichtet: ['',       'Freigabe nicht eingerichtet'],
+  nicht_feststellbar: ['',       'Stand nicht feststellbar'],
+};
+
+/* Das leere Feld, das die Zeile schon beim Zeichnen bekommt. "Wird
+   abgefragt" statt nichts: Ein leeres Feld sähe aus wie "keine Freigabe",
+   und genau das ist die Aussage, die hier nie versehentlich entstehen
+   darf. */
+function freigabeFeld(mandantId) {
+  return '<div class="zweit" data-freigabe="' + mandantId + '" style="margin-top:6px">'
+    + (freigabeLagen ? '' : 'wird abgefragt …') + '</div>';
+}
+
+function freigabeZeichnen() {
+  document.querySelectorAll('[data-freigabe]').forEach(el => {
+    const id = +el.dataset.freigabe;
+    const l = freigabeLagen ? freigabeLagen[id] : null;
+    if (!freigabeLagen) { el.textContent = 'wird abgefragt …'; return; }
+    if (!l) {
+      /* Kein Eintrag heisst: Diesen Mandanten kennt der Stamm nicht (mehr).
+         Das ist etwas anderes als eine Anlage, die nicht geantwortet hat. */
+      el.textContent = 'nicht im Stamm';
+      return;
+    }
+    const [klasse, wort] = FREIGABE_TEXT[l.lage] || ['', l.lage];
+    if (l.lage === 'offen' && l.freigabe) {
+      el.innerHTML = '<span class="merker ' + klasse + '">' + wort + '</span>'
+        + '<div class="zweit" style="margin-top:3px">bis '
+        + text(String(l.freigabe.gilt_bis).slice(0, 16))
+        + (l.freigabe.zweck ? ' · ' + text(l.freigabe.zweck) : '') + '</div>';
+      return;
+    }
+    el.textContent = wort;
+  });
+}
+
+async function ladeFreigabeLagen() {
+  const a = await ruf('betreiber_support_lage.php');
+  if (a.status !== 'ok') {
+    /* Ein Fehlschlag darf nicht als "keine Freigabe" enden -- dann bleibt
+       jedes Feld auf "Stand nicht feststellbar" stehen, und das ist die
+       wahre Aussage. */
+    freigabeLagen = {};
+    freigabeZeichnen();
+    return;
+  }
+  freigabeLagen = {};
+  (a.lagen || []).forEach(l => { freigabeLagen[l.mandant_id] = l; });
+  freigabeZeichnen();
 }
 
 /* ── Supportzugriff ─────────────────────────────────────────────── */
@@ -4499,7 +4581,8 @@ function demoPlatzKnoepfe(platz) {
   if (!mandantenAlle.length) { return '<span class="zweit">noch nicht geladen</span>'; }
   if (!demoPlatzMandant(platz)) { return '<span class="zweit">nicht im Mandantenstamm</span>'; }
   return '<button class="klein" data-platz-aendern="' + text(platz) + '">Ändern</button> '
-       + '<button class="klein" data-platz-support="' + text(platz) + '">Support</button>';
+       + '<button class="klein" data-platz-support="' + text(platz) + '">Support</button>'
+       + freigabeFeld(demoPlatzMandant(platz).id);
 }
 function demoPlatzKnoepfeVerdrahten(wurzel) {
   wurzel.querySelectorAll('[data-platz-aendern]').forEach(b =>
@@ -4569,6 +4652,8 @@ async function ladeDemo() {
          + (a.kennt_weiter && a.weiter_offen
              ? ' · ' + a.weiter_offen + ' will weitermachen' : '')) + '</div>';
   demoPlatzKnoepfeVerdrahten(plaetze);
+  if (freigabeLagen) { freigabeZeichnen(); }
+  ladeFreigabeLagen();
 
   const liste = a.zugaenge || [];
   const kenntNachfassen = a.kennt_nachfassen === true;
@@ -4902,7 +4987,8 @@ async function ladeSupport() {
 
   if (!alle.length) {
     inhalt.innerHTML = leerBlock('◇', 'Noch keine Anfrage',
-      'Sobald ein Mandant etwas meldet, erscheint es hier.');
+      'Sobald ein Mandant etwas meldet, erscheint es hier.')
+      + svAnlagenHinweis(a.anlagen);
     return;
   }
   /* "Kein Treffer" und "nichts vorhanden" sind verschiedene Aussagen --
@@ -4931,12 +5017,39 @@ async function ladeSupport() {
         + '<td>' + merker(SV_STATUS_TEXT, v.status) + '</td>'
         + '<td>' + text(svDatum(v.eroeffnet_am)) + '</td>'
         + '<td style="text-align:right;white-space:nowrap">'
-          + '<button class="klein" data-sv="' + v.id + '">Öffnen</button></td>'
+          /* Die Anlage steht am Knopf, nicht nur die Id: Ein ferner Vorgang
+             liegt in einer anderen Datenbank, und die 7 des einen Platzes
+             ist nicht die 7 des anderen. */
+          + '<button class="klein" data-sv="' + v.id + '" data-sv-mandant="'
+          + (v.fern ? v.mandant_id : 0) + '">Öffnen</button></td>'
       + '</tr>').join('')
-    + '</tbody></table></div>';
+    + '</tbody></table></div>'
+    + svAnlagenHinweis(a.anlagen);
 
   inhalt.querySelectorAll('[data-sv]').forEach(b =>
-    b.onclick = () => svOeffnen(+b.dataset.sv));
+    b.onclick = () => svOeffnen(+b.dataset.sv, +b.dataset.svMandant));
+}
+
+/* Welche Anlagen abgefragt wurden -- und welche nicht antworteten.
+
+   OHNE DIESEN HINWEIS sähe eine stumme Anlage aus wie eine ohne Anfragen
+   (Hausregel: unbekannt darf nie wie keine aussehen). Wer hier nichts
+   sieht, soll wissen, ob wirklich nichts da ist oder ob nur niemand
+   geantwortet hat.
+
+   Eine Anlage OHNE Supportkanal ist etwas Drittes: Dort kann noch gar keine
+   Anfrage entstanden sein, weil die Tabellen fehlen. */
+const SV_ANLAGE_TEXT = {
+  nicht_erreichbar: 'nicht erreichbar — von dort wissen wir gerade nichts',
+  kein_kanal:       'ohne Supportkanal — dort kann noch keine Anfrage entstehen',
+};
+function svAnlagenHinweis(anlagen) {
+  const stumm = (anlagen || []).filter(a => a.lage !== 'ok');
+  if (!stumm.length) { return ''; }
+  return '<div class="zweit" style="margin-top:12px">'
+    + stumm.map(a => text(a.mandant) + ': ' + (SV_ANLAGE_TEXT[a.lage] || text(a.lage)))
+           .join('<br>')
+    + '</div>';
 }
 
 /* Datum ohne Uhrzeit-Genauigkeit, die niemand braucht -- aber MIT dem
@@ -5000,9 +5113,15 @@ async function svEinrichten() {
   await ladeSupport();
 }
 
-async function svOeffnen(id) {
+/* Welche Anlage der offene Vorgang bewohnt. 0 heisst Stamm. Steht neben
+   svAktuell, weil beide zusammen einen Vorgang erst eindeutig machen. */
+let svAktuellMandant = 0;
+
+async function svOeffnen(id, mandant) {
   svAktuell = id;
-  const a = await ruf('betreiber_support_vorgang.php?id=' + id);
+  svAktuellMandant = mandant || 0;
+  const a = await ruf('betreiber_support_vorgang.php?id=' + id
+    + (svAktuellMandant ? '&mandant=' + svAktuellMandant : ''));
   if (a.status !== 'ok') {
     melde($('sv-meldung'), 'fehler', a.message || 'Der Vorgang liess sich nicht laden.');
     return;
@@ -5037,21 +5156,23 @@ function sv_wort(v) {
 async function svAntworten() {
   const txt = $('sv-antwort').value.trim();
   if (!txt) { melde($('sv-meldung'), 'fehler', 'Bitte etwas schreiben.'); return; }
-  const a = await ruf('betreiber_support_vorgang.php', { id: svAktuell, text: txt });
+  const a = await ruf('betreiber_support_vorgang.php',
+    { id: svAktuell, mandant: svAktuellMandant, text: txt });
   if (a.status !== 'ok') {
     melde($('sv-meldung'), 'fehler', a.message || 'Nicht gespeichert.'); return;
   }
   melde($('sv-meldung'), 'gut', 'Antwort gespeichert — der Vorgang wartet jetzt auf den Betrieb.');
-  await svOeffnen(svAktuell);
+  await svOeffnen(svAktuell, svAktuellMandant);
   await ladeSupport();
 }
 
 async function svStatus(status) {
-  const a = await ruf('betreiber_support_vorgang.php', { id: svAktuell, status: status });
+  const a = await ruf('betreiber_support_vorgang.php',
+    { id: svAktuell, mandant: svAktuellMandant, status: status });
   if (a.status !== 'ok') {
     melde($('sv-meldung'), 'fehler', a.message || 'Nicht gespeichert.'); return;
   }
-  await svOeffnen(svAktuell);
+  await svOeffnen(svAktuell, svAktuellMandant);
   await ladeSupport();
 }
 
