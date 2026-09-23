@@ -798,11 +798,12 @@ check('KRITISCH: Treiberfehler werden nicht weitergereicht',
 // Supportzugriff. Sie gehoert darum genauso geprueft wie die Endpunkte.
 const cockpit = readFileSync(join(WURZEL, 'dashboard.html'), 'utf8');
 check('das Cockpit hat einen Abschnitt fuer die Support-Freigabe',
-  cockpit.includes('bkAb-sf') && cockpit.includes('bkKachelSf'));
-// Die Kachel haengt am Recht -- das erspart den Umweg, die Sperre sitzt im
-// Server.
-check('KRITISCH: die Kachel erscheint nur mit dem Recht "Rollen & Berechtigungen"',
-  /bkKachelSfSetzen[\s\S]{0,400}darf\('rechte_/.test(cockpit));
+  cockpit.includes('sfKarte') && cockpit.includes('sfProtokollKarte'));
+// Der Block haengt am Recht -- das erspart den Umweg, die Sperre sitzt im
+// Server. Seit ENT-682 steht er in der eigenen Supportansicht statt hinter
+// einer Kachel unter "Einstellungen".
+check('KRITISCH: die Support-Freigabe erscheint nur mit dem Recht "Rollen & Berechtigungen"',
+  /spFreigabeSetzen[\s\S]{0,400}darf\('rechte_/.test(cockpit));
 // Der Zweck ist auch in der Oberflaeche Pflicht, damit niemand erst nach
 // dem Absenden erfaehrt, dass etwas fehlt.
 check('die Oberflaeche verlangt den Zweck, bevor sie absendet',

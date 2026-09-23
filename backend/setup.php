@@ -49,7 +49,15 @@ if ($pwFehler !== null) {
 }
 
 $hash = password_hash($password, PASSWORD_DEFAULT, ['cost' => PASSWORT_KOSTEN]);
-$stmt = db()->prepare('INSERT INTO mitarbeiter (name, password_hash, ist_admin) VALUES (?, ?, 1)');
-$stmt->execute([$name, $hash]);
+// Personalnummer gleich mit (ENT-684): Bis hierher bekam das Erstkonto
+// eines neuen Betriebs KEINE -- als einziger Anlegeweg neben
+// mitarbeiter_create.php, das seit ENT-387 immer eine vergibt. Bei jedem
+// neuen Mandanten entstand damit genau eine Person ohne Nummer, und dafuer
+// gab es einen eigenen Nachtrags-Bildschirm. Die Luecke gehoert hierher
+// geschlossen, nicht hinterher aufgeraeumt.
+$stmt = db()->prepare(
+    'INSERT INTO mitarbeiter (name, password_hash, ist_admin, personalnummer) VALUES (?, ?, 1, ?)'
+);
+$stmt->execute([$name, $hash, ma_personalnummer_generieren(db())]);
 
 json_response(['status' => 'ok', 'message' => 'Admin-Account erstellt. Diese Datei jetzt loeschen.']);
