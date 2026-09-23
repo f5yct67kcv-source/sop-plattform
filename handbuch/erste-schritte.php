@@ -220,7 +220,8 @@
       <div class="hb-kasten hb-regel">
         <p class="hb-kasten-titel">Zwei Sicherheitsregeln, die im Cockpit sichtbar werden</p>
         <p><b>403 statt 401:</b> Verlangt eine Aktion ein Recht, das fehlt,
-        meldet das Cockpit „Dafür fehlt dir die Berechtigung" — anders als bei
+        meldet das Cockpit ausdrücklich, dass die Rolle der Grund ist, welches
+        Recht fehlt und welche Rolle es mitbringt — anders als bei
         einer abgelaufenen Sitzung, die zur Anmeldeseite zurückschickt. Wer das
         unterscheidet, weiss sofort, ob ein erneutes Anmelden überhaupt hilft.</p>
         <p><b>Augenhöhe:</b> An ein Konto, das selbst Rollen vergeben darf, kommt

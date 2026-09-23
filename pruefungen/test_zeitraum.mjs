@@ -41,6 +41,10 @@ const EINSAETZE = [];
 let idSeq = 500;
 const rufe = [];
 let speicherFehlerBei = null;   // Datum, bei dem das Speichern scheitern soll
+// Antwortet wie require_recht() in backend/rechte.php, wenn der Rolle das
+// Recht fehlt: 403, der Name des Rechts und ein Satz, der die Rolle nennt.
+let rechtFehlt = false;
+const ROLLE_FEHLT = 'Deiner Rolle fehlt das Recht „Einsätze & Zuteilung: schreiben“.';
 // Bremse fuer die Speicherantwort. Ohne sie ist eine Reihe schneller fertig,
 // als sich der Zustand "laeuft gerade" ueberhaupt ablesen laesst -- die
 // Pruefung auf die gesperrten Knoepfe waere dann keine.
@@ -69,6 +73,10 @@ await page.route('**/api/**', async route => {
   }
   if (p.includes('einsatz_save')) {
     if (bremse) { await new Promise(r => setTimeout(r, bremse)); }
+    if (rechtFehlt) {
+      return route.fulfill({ status: 403, contentType: 'application/json',
+        body: JSON.stringify({ status: 'error', recht: 'einsaetze_schreiben', message: ROLLE_FEHLT }) });
+    }
     if (speicherFehlerBei && body && body.datum === speicherFehlerBei) {
       return send({ status: 'error', message: 'Speichern fehlgeschlagen.' });
     }
@@ -256,6 +264,25 @@ check('KRITISCH: der misslungene Tag wird gemeldet, nicht verschwiegen',
   /nicht angelegt/.test(meldung));
 check('Und die anderen werden als angelegt gemeldet', /2 Einsätze angelegt/.test(meldung));
 speicherFehlerBei = null;
+
+// ── Fehlt der Rolle das Recht, steht das da -- nicht "Anlegen fehlgeschlagen."
+// Anlass: Demo-Platz 3 (2026-09-23). Der Server hatte den Grund genannt, die
+// Maske zeigte nur den Sammelsatz, und man suchte den Fehler in den
+// Pflichtfeldern.
+rechtFehlt = true;
+await page.evaluate(() => { document.getElementById('toast').textContent = ''; });
+await formular(tag(40), '', '07:30', '16:30');
+await page.evaluate(() => createEinsatz());
+await page.waitForTimeout(700);
+const rolleErr = await page.evaluate(() => {
+  const e = document.getElementById('enNeuErr');
+  return e.style.display === 'none' ? '' : e.textContent;
+});
+check('KRITISCH: fehlt der Rolle das Recht, nennt die Anlegen-Maske genau diesen Grund',
+  rolleErr.includes(ROLLE_FEHLT));
+check('KRITISCH: jeder Schreibweg mit fehlendem Recht meldet ihn auch zentral',
+  (await page.textContent('#toast')).includes(ROLLE_FEHLT));
+rechtFehlt = false;
 
 // ── Dokumente haengen an JEDEM Tag der Reihe
 const anhaenge = () => rufe.filter(r => r.body && r.body.aktion === 'hochladen');
