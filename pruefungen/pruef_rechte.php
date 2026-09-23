@@ -495,5 +495,40 @@ pruef('Die Kurzliste nennt jedes Profil mit Titel und Systemkennzeichen',
     count($kurz) === count(rollen_definitionen($pdo))
     && count(array_filter($kurz, fn($p) => isset($p['schluessel'], $p['titel'], $p['system']))) === count($kurz));
 
+// ── Die Meldung zu einem fehlenden Recht (2026-09-23) ──────────────────
+// Geprueft wird die Aussage, nicht der Wortlaut: Fuer JEDES Recht im
+// Katalog muss die Meldung (a) den Bereich beim Namen nennen, (b) die Rolle
+// als Grund nennen und (c) genau die Systemrollen aufzaehlen, die das
+// Recht wirklich mitbringen -- nachgerechnet ueber rechte_aus_rollen(),
+// nicht ueber dieselbe Schleife, die die Meldung baut.
+$meldungFalsch = [];
+foreach (array_keys(rechte_katalog()) as $recht) {
+    $m = recht_fehlt_meldung($recht);
+    $bereich = substr($recht, 0, (int)strrpos($recht, '_'));
+    if (!str_contains($m, bereiche_katalog()[$bereich]['titel'])) { $meldungFalsch[] = "$recht: Bereich fehlt"; }
+    if (!str_contains($m, 'Rolle')) { $meldungFalsch[] = "$recht: Rolle als Grund fehlt"; }
+    foreach (system_rollen() as $schl => $rolle) {
+        $gibt = in_array($recht, rechte_aus_rollen([$schl]), true);
+        $genannt = preg_match('/(Rolle |, | oder )' . preg_quote($rolle['titel'], '/') . '(,| oder |\.)/u', $m) === 1;
+        if ($gibt !== $genannt) {
+            $meldungFalsch[] = "$recht: {$rolle['titel']} " . ($gibt ? 'fehlt' : 'faelschlich genannt');
+        }
+    }
+}
+pruef('Jede Meldung zu einem fehlenden Recht nennt Bereich, Rolle als Grund und genau '
+    . 'die Rollen, die es mitbringen' . ($meldungFalsch ? ': ' . implode('; ', array_slice($meldungFalsch, 0, 3)) : ''),
+    $meldungFalsch === []);
+pruef('Auch ein unbekanntes Recht nennt die Rolle als Grund, statt nur "fehlgeschlagen"',
+    str_contains(recht_fehlt_meldung('gibt_es_nicht'), 'Rolle'));
+try {
+    require_recht(['rollen' => [ROLLE_MITARBEITEND]], 'einsaetze_schreiben');
+    pruef('require_recht weist Mitarbeitend beim Einsatz-Anlegen ab', false);
+} catch (RuntimeException $e) {
+    $a = $GLOBALS['abgewiesen'];
+    pruef('require_recht antwortet 403 mit dem Recht und der ausfuehrlichen Meldung',
+        $a['status'] === 403 && $a['daten']['recht'] === 'einsaetze_schreiben'
+        && $a['daten']['message'] === recht_fehlt_meldung('einsaetze_schreiben'));
+}
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

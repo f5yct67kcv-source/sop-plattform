@@ -1,6 +1,7 @@
 // Begrüssungs-Container mit Diktat-Router und Bild-Erfassung (ENT-032).
 import { WURZEL, HIER, OUT, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
+import { execFileSync } from 'child_process';
 
 const EXE = browserPfad();
 // Ein winziges Testbild, im Lauf erzeugt statt als Binaerdatei im
@@ -208,15 +209,31 @@ await page.screenshot({ path: OUT + '/81-router-einsatz.png' });
 await page.evaluate(() => enNeuAbbrechen());
 routerAntwort = null;
 
-// ══════════ ROUTER: FEHLER DES MODELLS
-routerAntwort = [{ status: 'error', message: 'Konnte keinem Bereich zugeordnet werden -- bitte im jeweiligen Bereich direkt diktieren.' }, 422];
-await page.fill('#rtText', 'irgendwas Unklares');
-await page.click('#rtBtn');
-await page.waitForTimeout(400);
-check('Fehler des Modells wird gezeigt', (await page.textContent('#rtErr')).includes('keinem Bereich'));
-check('Kein Dialog öffnet sich dabei',
-  !(await page.isVisible('#mv-bearbeiten.on')) && !(await page.isVisible('#dlgKunde.on')) && !(await page.isVisible('#view-einsatzneu.on')));
-check('Der Text bleibt für eine Korrektur stehen', (await page.inputValue('#rtText')) === 'irgendwas Unklares');
+// ══════════ ROUTER: NICHT ABGEDECKT / NICHT VERSTANDEN / KEIN RECHT (ENT-692/693)
+// Die Antwort kommt aus der echten Auswertung des Servers, nicht aus einer
+// hier ausgedachten -- sonst prueft der Test eine Antwort, die der Server
+// gar nicht mehr gibt. Anlass: Eine diktierte Offerte oeffnete "Neuer
+// Einsatz".
+const serverAntwort = (modell, darf) => JSON.parse(execFileSync('php', ['-r',
+  `require '${WURZEL}/backend/ai.php'; [$c, $a] = ki_absicht_pruefen(json_decode($argv[1], true), fn($r) => ${darf ? 'true' : 'false'}); echo json_encode([$c, $a]);`,
+  JSON.stringify(modell)]).toString());
+for (const [fall, modell, darf, text] of [
+  ['nicht abgedeckt', { absicht: 'anderes', anliegen: 'Planung öffnen' }, true, 'Zeig mir die Planung vom Oktober'],
+  ['nicht verstanden', { absicht: 'unklar' }, true, 'irgendwas Unklares'],
+  ['kein Recht', { absicht: 'beleg_neu', anliegen: 'Offerte erstellen' }, false, 'Offerte für die Beispiel AG'],
+]) {
+  const [code, antwort] = serverAntwort(modell, darf);
+  routerAntwort = [antwort, code];
+  await page.fill('#rtText', text);
+  await page.click('#rtBtn');
+  await page.waitForTimeout(400);
+  check(`${fall}: die Meldung des Servers wird gezeigt`,
+    await page.isVisible('#rtErr') && (await page.textContent('#rtErr')) === antwort.message);
+  check(`${fall}: kein Dialog öffnet sich`,
+    !(await page.isVisible('#mv-bearbeiten.on')) && !(await page.isVisible('#dlgKunde.on'))
+    && !(await page.isVisible('#view-einsatzneu.on')) && !(await page.isVisible('#view-offerte.on')));
+  check(`${fall}: der Text bleibt für eine Korrektur stehen`, (await page.inputValue('#rtText')) === text);
+}
 routerAntwort = null;
 await page.fill('#rtText', '');
 

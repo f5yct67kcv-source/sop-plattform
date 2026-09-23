@@ -128,10 +128,18 @@ check('KRITISCH: der gemeinsame BELEG_STATUS bleibt ohne den neuen Zustand',
   /const BELEG_STATUS = \['entwurf', 'versendet', 'angeschaut', 'bestaetigt', 'abgelehnt'\]/.test(kern));
 
 // ── 7. Der Beleg bringt seinen Faden mit ──────────────────────────────
+// Direkt in der Antwort oder ueber eine Variable (seit ENT-697 nutzt auch
+// der Verlauf den Faden) -- geprueft wird, woher das Antwortfeld kommt.
+const feldAus = (feld, fn) => new RegExp(`'${feld}' => ${fn}\\(`).test(lesen)
+  || [...lesen.matchAll(new RegExp(`'${feld}' => \\$(\\w+)`, 'g'))]
+       .some(m => new RegExp(`\\$${m[1]} = ${fn}\\(`).test(lesen));
 check('KRITISCH: wer den Beleg liest, bekommt den Faden dazu',
-  /'nachrichten' => be_beleg_nachrichten\(/.test(lesen));
+  feldAus('nachrichten', 'be_beleg_nachrichten'));
 check('KRITISCH: und die Auskunft, ob der Rueckkanal ueberhaupt eingerichtet ist',
-  /'faden_da' => be_beleg_nachricht_tabelle_da\(/.test(lesen));
+  feldAus('faden_da', 'be_beleg_nachricht_tabelle_da'));
+check('GEGENPROBE: ein Antwortfeld aus einer anderen Quelle zaehlt nicht',
+  !(() => { const l = "$x = anderes($pdo); 'nachrichten' => $x"; return new RegExp(`'nachrichten' => be_beleg_nachrichten\\(`).test(l)
+    || [...l.matchAll(/'nachrichten' => \$(\w+)/g)].some(m => new RegExp(`\\$${m[1]} = be_beleg_nachrichten\\(`).test(l)); })());
 
 // ── 8. Die Oberflaeche ────────────────────────────────────────────────
 check('KRITISCH: der dritte Weg heisst "Änderungen anbringen"',

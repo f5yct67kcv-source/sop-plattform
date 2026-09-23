@@ -1343,6 +1343,49 @@ tr.rapp-gruppe-offen td:not(.rapp-klammer) { border-bottom: none; }
    Blatt steht, und nicht irgendwo im Formularfluss. */
 .of-abschluss { display: grid; grid-template-columns: 1fr 380px; gap: 14px; align-items: start; }
 @media (max-width: 900px) { .of-abschluss { grid-template-columns: 1fr; } }
+
+/* ── Verlauf am Beleg (ENT-697) ──────────────────────────────────────
+   Gleiche Regeln in dashboard.html und betreiber.html. Unter 700 px wird
+   jede Zeile ein Block: Zeit und Wer oben, Was darunter (Entscheid des
+   Projektinhabers) -- keine waagrechte Scrollleiste. */
+.of-verlauf { margin-top: 14px; }
+.of-verlauf-titel { font-size: 11px; font-weight: 650; letter-spacing: .4px; text-transform: uppercase;
+  color: var(--ink-2); margin-bottom: 12px; }
+.of-vl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.of-vl th { text-align: left; font-size: 11px; font-weight: 650; letter-spacing: .4px; text-transform: uppercase;
+  color: var(--ink-3); padding: 0 12px 8px 0; border-bottom: 1px solid var(--line); }
+.of-vl td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.45; }
+.of-vl tr:last-child td { border-bottom: 0; }
+.of-vl .vl-zeit { white-space: nowrap; color: var(--ink-2); width: 1%; font-variant-numeric: tabular-nums; }
+.of-vl .vl-wer { white-space: nowrap; width: 1%; }
+.of-vl .vl-auto { color: var(--ink-3); font-style: italic; }
+.vl-etikett { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px; font-size: 11px;
+  font-weight: 600; color: var(--ink-2); background: var(--line); vertical-align: 1px; }
+.of-vl .vl-pos { color: var(--pos); font-weight: 650; }
+.of-vl .vl-neg { color: var(--neg); font-weight: 650; }
+/* Die allgemeine Knopfregel (Betreiber: min-height 44 px, inline-flex) gilt
+   hier nicht -- am Desktop steht das Aufklappen auf der Textzeile. */
+.vl-auf { background: none; border: 0; border-radius: 0; padding: 0; margin: 0; min-height: 0; display: inline;
+  font: inherit; color: inherit; cursor: pointer; text-align: left;
+  text-decoration: underline dotted; text-underline-offset: 3px; }
+.vl-auf::after { content: ' ▸'; }
+.vl-auf[aria-expanded="true"]::after { content: ' ▾'; }
+.vl-details { margin: 6px 0 0; padding: 0; list-style: none; color: var(--ink-2); font-size: 12.5px; }
+.vl-details li { padding: 2px 0; overflow-wrap: anywhere; }
+.vl-hinweis { font-size: 12.5px; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 6px; padding: 8px 11px; margin-bottom: 12px; line-height: 1.5; }
+.vl-leer { color: var(--ink-3); font-size: 13px; }
+@media (max-width: 700px) {
+  .of-vl thead { display: none; }
+  .of-vl, .of-vl tbody, .of-vl tr, .of-vl td { display: block; width: auto; }
+  .of-vl tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .of-vl tr:last-child { border-bottom: 0; }
+  .of-vl td { border: 0; padding: 0; }
+  .of-vl .vl-zeit, .of-vl .vl-wer { display: inline; font-size: 12.5px; color: var(--ink-2); }
+  .of-vl .vl-wer::before { content: ' · '; }
+  .of-vl .vl-was { margin-top: 3px; }
+  .vl-auf { min-height: 44px; display: inline-flex; align-items: center; }
+}
 /* Kopfzeile in drei gleich behandelten Boxen -- Empfaenger, Unterschriften,
    Termine/Nummer (ENT-187). Alle drei denselben Stellenwert: keine breiter
    als die andere, wie es "gleiches Muster auf beiden/allen Seiten" verlangt. */
@@ -2029,6 +2072,12 @@ html:not(.hat-reinigung) [data-sparte-feld] { display: none !important; }
 /* Aus dem Internet ergaenzt — bewusst eine andere Farbe als das Diktat,
    weil hier niemand die Angabe gesagt hat und sie geprueft gehoert. */
 .inp.web { border-color: var(--warn); background: var(--warn-soft); }
+/* Aus der Spracheingabe, aber nicht zugeordnet (ENT-695): ein gesagter
+   Kunde, der nicht in der Liste steht, eine Leistung, die nicht im Katalog
+   ist. Orange statt blau -- blau heisst "uebernommen", orange "bitte
+   pruefen". */
+.inp.ki-offen { border-color: var(--warn); background: var(--warn-soft); }
+.f-hint.ki-offen { color: var(--warn); }
 .ki-hint { display: none; align-items: flex-start; gap: 9px; background: var(--accent-soft); border: 1px solid var(--accent-line); border-radius: var(--r-sm); padding: 10px 12px; font-size: 12.5px; color: var(--accent); line-height: 1.5; margin-bottom: 16px; }
 .ki-hint.on { display: flex; }
 .ki-hint.web { background: var(--warn-soft); border-color: var(--warn-line); color: var(--warn); }
@@ -2067,6 +2116,38 @@ html:not(.hat-reinigung) [data-sparte-feld] { display: none !important; }
 .dlg-hd p { font-size: 12.5px; color: var(--ink-3); margin-top: 5px; line-height: 1.55; }
 .dlg-bd { padding: 18px 22px; overflow-y: auto; flex: 1; }
 .dlg-ft { padding: 14px 22px; border-top: 1px solid var(--line-soft); display: flex; gap: 9px; justify-content: flex-end; flex: none; }
+/* Update-Fenster (ENT-698) */
+.dlg.upd { max-width: 520px; }
+.upd-griff { display: none; }
+.upd-kopf { display: flex; align-items: center; gap: 14px; padding-bottom: 16px; }
+.upd-ikone { flex: none; width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.upd-ikone.erforderlich { background: var(--warn-soft); color: var(--warn); }
+.upd-ikone.fertig { background: var(--pos-soft); color: var(--pos); }
+.upd-kopf-text h2 { font-size: 17px; }
+.upd-kopf-text p { margin-top: 3px; }
+.upd-gruppe + .upd-gruppe { margin-top: 18px; }
+.upd-gruppe > .titel { font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink-3); }
+.upd-gruppe ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.upd-gruppe li { padding-left: 14px; position: relative; }
+.upd-gruppe li::before { content: ''; position: absolute; left: 0; top: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.upd-gruppe[data-art="fehlerbehebung"] li::before { background: var(--pos); }
+.upd-gruppe[data-art="verbesserung"] li::before { background: var(--warn); }
+.upd-gruppe b { display: block; font-size: 13.5px; font-weight: 620; color: var(--ink); }
+.upd-gruppe span { display: block; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; margin-top: 2px; }
+.upd-lauf { margin-top: 20px; }
+.upd-lauf-zeile { display: grid; grid-template-columns: 1fr auto; gap: 12px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 8px; }
+.upd-lauf-zeile span:last-child { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.upd-balken { position: relative; height: 8px; border-radius: 99px; background: var(--line-soft); overflow: hidden; }
+.upd-balken > span { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent-hi)); transition: width .45s cubic-bezier(.3,.7,.4,1), background-color .3s; }
+/* Waehrend eine Etappe laeuft, zieht ein Glanz ueber den gefuellten Teil.
+   Er behauptet keinen Fortschritt: Die Breite waechst nur, wenn eine
+   Etappe wirklich fertig ist (ENT-698, Punkt 6). */
+.upd-balken.laeuft > span::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent); transform: translateX(-100%); animation: updGlanz 1.2s ease-in-out infinite; }
+.upd-balken.fertig > span { background: var(--pos); }
+.upd-balken.fehler > span { background: var(--neg); }
+@keyframes updGlanz { to { transform: translateX(100%); } }
+@keyframes updHoch { from { transform: translateY(100%); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .upd-balken.laeuft > span::after { animation: none; } }
 textarea.inp { resize: vertical; min-height: 92px; font-family: inherit; line-height: 1.55; }
 .check { display: flex; align-items: center; gap: 9px; cursor: pointer; font-size: 13.5px; }
 .check input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
@@ -4613,6 +4694,20 @@ html[data-desktop="an"] { touch-action: auto; }
   }
   .dlg-bd, .drawer-bd { flex: 1; overflow-y: auto; }
   .dlg-ft, .drawer-ft { flex: none; }
+  /* Update-Fenster als Blatt von unten (ENT-698, Punkt 9) statt Vollbild.
+     Der Selektor ist absichtlich spezifischer als die Vollbild-Regel
+     darueber, sonst bliebe er wirkungslos. */
+  .dlg-scrim.upd-blatt { align-items: flex-end; padding: 0; }
+  .dlg-scrim.upd-blatt .dlg.upd { position: relative; inset: auto; height: auto; max-height: 82vh;
+    border-radius: 18px 18px 0 0; animation: updHoch .28s cubic-bezier(.3,.7,.4,1); }
+  .dlg-scrim.upd-blatt .dlg.upd .dlg-hd { padding-top: 10px; cursor: default; }
+  .dlg-scrim.upd-blatt .upd-griff { display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto 14px; }
+  .dlg-scrim.upd-blatt .dlg.upd .dlg-ft { padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+  /* Das Umgebungsschild (testumgebung.js) liegt unten rechts ueber allem,
+     rund 33 px hoch ab Rand. Ohne diesen Abstand verdeckte es in der Demo
+     den Knopf "Verstanden" -- gemessen, nicht angenommen. */
+  .mit-umgebungsschild .dlg-scrim.upd-blatt .dlg.upd .dlg-ft { padding-bottom: calc(44px + env(safe-area-inset-bottom)); }
+  .dlg.upd .dlg-ft .btn { min-height: 44px; }
   /* iOS zoomt beim Antippen in jedes Feld unter 16 px hinein -- und bleibt
      dann dort. 16 px ist keine Geschmacksfrage, sondern die Schwelle. */
   .inp, .search input, input, select, textarea { font-size: 16px; }
@@ -5821,7 +5916,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     </nav>
 
     <div class="side-foot" id="sideFoot">
-      <button class="nav-item nur-desktop" id="nav-einrichtung" title="Einrichtung" onclick="openDlg('dlgEinrichtung'); eiBetreiberPruefen();">
+      <button class="nav-item nur-desktop" id="nav-einrichtung" title="Einrichtung" onclick="eiOeffnen()">
         <span class="ico-wrap">
           <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.5.66.86 1.19.91H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           <span class="update-punkt" id="updatePunkt"></span>
@@ -7092,6 +7187,11 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <div class="msg-err" id="ofFormErr" style="display:none;margin-bottom:12px"></div>
         <!-- Nach einer Annahme am Link (ENT-688): lesbar, aber gesperrt. -->
         <div id="ofFormSperre" style="display:none;font-size:12.5px;color:var(--pos);background:var(--pos-soft);border-radius:var(--r-xs);padding:8px 11px;margin-bottom:12px;line-height:1.5"></div>
+        <!-- Spracheingabe (ENT-695): dasselbe Band wie bei "Neuer Einsatz". -->
+        <div class="ki-hint" id="ofKiHint">
+          <svg class="i i-sm" viewBox="0 0 24 24" style="margin-top:1px;flex:none"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+          <span id="ofKiText"></span>
+        </div>
 
         <!-- Zwei Boxen -- Empfaenger, Termine/Nummer -- nach dem Vorbild des
              bisherigen Fremdsystems (ENT-187), urspruenglich mit einer
@@ -7106,7 +7206,8 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           <div class="card"><div class="card-bd">
             <div class="f"><label for="of_kunde">Empfänger *</label>
               <input class="inp" id="of_kunde" list="dlKunden" autocomplete="off"
-                     placeholder="Kunde suchen …" oninput="ofKundeGewaehlt()"></div>
+                     placeholder="Kunde suchen …" oninput="ofKundeGewaehlt()">
+              <div class="f-hint ki-offen" id="ofKundeHinweis" style="display:none">Nicht in der Kundenliste</div></div>
             <div class="f" style="margin-bottom:10px"><label for="of_person">Ansprechperson</label>
               <select class="inp" id="of_person"></select></div>
             <button class="btn btn-plain btn-sm" type="button" onclick="ofNeueAdresse()">
@@ -7217,6 +7318,14 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
             </div></div>
           </div>
         </div>
+        <!-- Verlauf am Beleg (ENT-697). Volle Breite unter dem Formular: wer was
+             wann gesendet hat und was der Empfaenger getan hat, neueste zuoberst.
+             Zusammengesetzt im Server (beleg_verlauf in belege.php), hier nur
+             gezeichnet. Bleibt weg, solange der Beleg nicht gespeichert ist. -->
+        <div class="card of-verlauf" id="ofVerlaufKarte" style="display:none"><div class="card-bd">
+          <div class="of-verlauf-titel">Verlauf</div>
+          <div id="ofVerlauf"></div>
+        </div></div>
       </section>
 
       <!-- ══════════════════════ PRODUKTE (ENT-181) ══════════════════════
@@ -9938,17 +10047,30 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 <datalist id="dlProdukte"></datalist>
 <datalist id="dlEinsatzarten"><option>Verkehrsdienst</option><option>Revierdienst</option><option>Sicherheitsdienst</option><option data-sparte="reinigung">Reinigung</option></datalist>
 
-<!-- Einrichtung: Tabellen der Planung und Verfügbarkeit anlegen -->
+<!-- Update-Fenster (ENT-698). Zugleich die Einrichtung: Es oeffnet sich
+     von selbst, wenn ein Update aussteht oder es Neuerungen gibt, und ueber
+     "Einrichtung" im Kontomenue von Hand. Ein Fenster, ein Weg -- zwei
+     Fenster fuer denselben Vorgang liefen frueher oder spaeter auseinander.
+     Am Handy ein Blatt von unten (.upd-blatt am Scrim). -->
 <div class="dlg-scrim" id="dlgEinrichtung">
-  <div class="dlg">
+  <div class="dlg upd" role="dialog" aria-labelledby="updTitel">
     <div class="dlg-hd">
-      <h2>Einrichtung</h2>
-      <p>Legt fehlende Tabellen an — für die Planung (ENT-020/ENT-021) und die Sperrtage (ENT-028). Bereits vorhandene bleiben unverändert; es wird nichts gelöscht oder geleert. Gefahrlos mehrfach ausführbar.</p>
+      <div class="upd-griff" aria-hidden="true"></div>
+      <div class="upd-kopf">
+        <span class="upd-ikone" id="updIkone" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 21v-5h-5"/></svg></span>
+        <div class="upd-kopf-text">
+          <h2 id="updTitel">Einrichtung</h2>
+          <p id="updUnter">Es wird nichts gelöscht oder geleert.</p>
+        </div>
+      </div>
     </div>
     <div class="dlg-bd">
-      <div id="eiInhalt">
-        <p class="zone-note">Ein Klick auf „Prüfen und einrichten“ zeigt, was fehlt, und ergänzt es sofort.</p>
+      <div id="updNeu"></div>
+      <div class="upd-lauf" id="updLauf" hidden>
+        <div class="upd-lauf-zeile"><span id="updEtappe">Bereit</span><span id="updSchritt"></span></div>
+        <div class="upd-balken" id="updBalken" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="updFuellung"></span></div>
       </div>
+      <div id="eiInhalt"></div>
       <!-- Betreiber-Bereich (ENT-519 ff.). Erscheint NUR, solange der
            Bootstrap offen ist -- also bis das erste Betreiber-Konto steht.
            Danach blendet er sich von selbst aus: Ein weiteres Konto legt
@@ -9961,8 +10083,8 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       </div>
     </div>
     <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgEinrichtung')">Schliessen</button>
-      <button class="btn btn-primary" id="eiBtn" onclick="planungEinrichten()">Prüfen und einrichten</button>
+      <button class="btn btn-plain" id="updZu" onclick="updSchliessen()">Schliessen</button>
+      <button class="btn btn-primary" id="eiBtn" onclick="updHauptknopf()">Prüfen und einrichten</button>
     </div>
   </div>
 </div>
@@ -10754,9 +10876,9 @@ function initials(s) {
   const p = String(s || '').replace(/[._-]+/g, ' ').trim().split(/\s+/).filter(Boolean);
   return ((p[0] || '?')[0] + (p[1] ? p[1][0] : '')).toUpperCase();
 }
-function toast(msg) {
+function toast(msg, dauer) {
   const el = $('toast'); el.textContent = msg; el.classList.add('on');
-  clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('on'), 2600);
+  clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('on'), dauer || 2600);
 }
 
 /* Tutorial-Tour fuers Cockpit, zunaechst fuer die Rolle Verwaltung (ENT-XXX).
@@ -11019,7 +11141,28 @@ function api(path, opts) {
     method: opts.method || 'GET',
     headers,
     body: opts.body ? JSON.stringify(opts.body) : undefined
-  }).then(r => r.json().then(data => ({ ok: r.ok, status: r.status, data })).catch(() => ({ ok: false, status: r.status, data: {} })));
+  }).then(r => r.json().then(data => ({ ok: r.ok, status: r.status, data })).catch(() => ({ ok: false, status: r.status, data: {} })))
+    .then(antwort => { rolleFehltMelden(opts, antwort); return antwort; });
+}
+
+// Fehlt ein Recht, sagt der Server das ausdruecklich -- welches Recht,
+// welche Rolle es mitbringt (recht_fehlt_meldung() in backend/rechte.php).
+// Viele Aufrufer zeigen bei einem Fehlschlag aber nur einen festen Satz
+// wie "Anlegen fehlgeschlagen.", und dann sucht man den Fehler in den
+// eigenen Eingaben (2026-09-23, Demo-Platz 3). Darum hier an EINER Stelle
+// fuer jeden Schreibweg, statt in hundert Aufrufern einzeln.
+// Nur beim Schreiben: Lesende Anfragen laufen beim Laden der Seite zu
+// Dutzenden, und die Oberflaeche blendet aus, was man nicht sehen darf --
+// dort waere jede Meldung Laerm. Ein 403 ohne "recht" (etwa die Augenhoehe
+// oder die Verwaltungssperre) hat einen anderen Grund und bleibt dem
+// Aufrufer ueberlassen.
+function rolleFehltMelden(opts, antwort) {
+  const methode = String((opts && opts.method) || 'GET').toUpperCase();
+  if (methode === 'GET' || methode === 'HEAD') { return; }
+  if (!antwort || antwort.status !== 403 || !antwort.data || !antwort.data.recht) { return; }
+  if (typeof toast === 'function' && $('toast')) {
+    toast(antwort.data.message || 'Deiner Rolle fehlt das Recht für diese Aktion.', 8000);
+  }
 }
 
 // ══════════════════════════════════════════ NUTZUNGSAUSWERTUNG (ENT-653)
@@ -12284,10 +12427,11 @@ function zeitTaktStarten() {
 // ══════════════════════════════════════════ BEGRÜSSUNG UND DIKTAT-ROUTER (ENT-032)
 // Persoenliche Begruessung mit wechselnden Formulierungen, ein Kurzueberblick
 // und ein Diktat-/Bild-Router, der erkennt, in welchen Bereich ein Eingabe
-// gehoert, und den passenden bestehenden Dialog vorbefuellt oeffnet. Deckt
-// bewusst nur die NEUANLAGE ab (Mitarbeiter, Kunde, Einsatz) -- eine
-// Aenderung bestehender Datensaetze braucht einen eindeutig getroffenen
-// Datensatz und bleibt den bestehenden Einzel-Diktaten vorbehalten.
+// gehoert, und den passenden bestehenden Dialog vorbefuellt oeffnet. Welche
+// Faehigkeiten es gibt, steht seit ENT-695 an EINER Stelle: im Katalog
+// ki_faehigkeiten() in backend/ai.php (heute: Mitarbeitende anlegen und
+// aendern, Kunde, Einsatz, Offerte/Rechnung). Eine neue Faehigkeit braucht
+// dort einen Eintrag und hier einen Zweig in rtDialogOeffnen().
 const BEGR_GRUSS = {
   morgen: ['Guten Morgen', 'Guten Morgen', 'Einen guten Start'],
   tag: ['Guten Tag', 'Schön, dass du da bist', 'Willkommen zurück'],
@@ -12356,6 +12500,8 @@ function rtErkennen(prefix) {
 function rtDialogOeffnen(data) {
   const bereich = data.bereich;
   const aktion = data.aktion || 'neu';
+  // Offerte und Rechnung (ENT-695) laden ihre Listen selbst.
+  if (bereich === 'beleg') { ofAusDiktat(data); return; }
   const bereit = bereich === 'einsatz'
     ? Promise.all([mitarbeiter.length ? null : loadMitarbeiter(), kunden.length ? null : loadKunden()])
     : bereich === 'kunde' ? (kunden.length ? Promise.resolve() : loadKunden())
@@ -13424,7 +13570,7 @@ function loadEinsaetze() {
       // Die Meldung kommt vom Server -- er weiss, ob eine Tabelle fehlt.
       $('plTable').innerHTML = EMPTY('Planung nicht verfügbar',
         esc(data.message || 'Die Einsätze konnten nicht geladen werden.') +
-        '<div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="eiOeffnen()">Datenbank jetzt einrichten</button></div>');
+        '<div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="eiOeffnen(true)">Datenbank jetzt einrichten</button></div>');
       return;
     }
     einsaetze = data.einsaetze || [];
@@ -14940,7 +15086,8 @@ function ofStatusSetzen(id, neu, art) {
     // Ist gerade dieser Beleg im Formular offen, muss auch dessen Anzeige
     // nachziehen -- sonst zeigt das Formular nach einer Aenderung ueber sein
     // eigenes Menue kurzzeitig den alten Status, bis man es neu oeffnet.
-    if (ofFormId === Number(id)) { ofFormStatus = neu; ofFormSubZeichnen(); }
+    // Der Verlauf (ENT-697) zieht mit -- der Statuswechsel ist seine neueste Zeile.
+    if (ofFormId === Number(id)) { ofFormStatus = neu; ofFormSubZeichnen(); ofFassungNachladen(id); }
     belegListeAktualisieren(art);
   });
 }
@@ -14950,7 +15097,7 @@ function ofArchivKlick(id, aktiv, art) {
   api('beleg_archivieren.php', { method: 'POST', body: { id, aktiv } }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
     toast(aktiv ? `${dokument} zurückgeholt.` : `${dokument} archiviert.`);
-    if (ofFormId === Number(id)) { ofFormAktiv = Number(aktiv); ofFormSubZeichnen(); }
+    if (ofFormId === Number(id)) { ofFormAktiv = Number(aktiv); ofFormSubZeichnen(); ofFassungNachladen(id); }
     belegListeAktualisieren(art);
   });
 }
@@ -14967,6 +15114,7 @@ function reBezahltKlick(id, bezahlt) {
       ofFormBezahlt = Number(bezahlt);
       ofFormBezahltAm = data.bezahlt_am || null;
       ofFormSubZeichnen();
+      ofFassungNachladen(id);
     }
     loadRechnungen();
   });
@@ -15085,6 +15233,11 @@ function ofNeu(art) {
   $('of_bedingungen').value = '';
   $('of_fusszeile').value = '';
   $('of_unterschriftsseite').checked = false;
+  // Reste einer vorigen Spracheingabe weg (ENT-695) -- sonst stuende eine
+  // von Hand begonnene Offerte blau markiert da.
+  ['of_kunde', 'of_titel', 'of_bemerkung'].forEach(id => $(id).classList.remove('ki', 'ki-offen'));
+  $('ofKundeHinweis').style.display = 'none';
+  $('ofKiHint').classList.remove('on');
   $('of_nummer').value = naechsteNummer || 'wird beim Speichern vergeben';
   // Direkt gesetzt statt ueber ofRabattEinheitSetzen(): die hiesse hier nur
   // "von irgendeinem Altwert auf 0 umrechnen", was fuer einen leeren Entwurf
@@ -15106,6 +15259,7 @@ function ofNeu(art) {
   ofFormEntschiedenAm = null;
   ofFormToken = '';
   ofFassungZeichnen(null);
+  ofVerlaufZeichnen(null, false);
   go('offerte');
   setTimeout(() => $('of_kunde').focus(), 60);
 }
@@ -15117,6 +15271,85 @@ function ofNeuStarten(art) {
   const vorlauf = produkte.length ? Promise.resolve() : loadProdukte();
   const kundenDa = kunden.length ? Promise.resolve() : loadKunden();
   Promise.all([vorlauf, kundenDa]).then(() => ofNeu(art));
+}
+
+// Offerte oder Rechnung aus der Spracheingabe (ENT-695). Oeffnet dasselbe
+// Formular wie "Neue Offerte" und fuellt es vor; gespeichert wird per Klick
+// (ENT-015). Blau: uebernommen. Orange: gesagt, aber nicht zugeordnet --
+// ein Kunde, der nicht in der Liste steht, eine Leistung, die nicht im
+// Katalog ist. Ein Preis kommt nie aus dem Diktat, nur aus dem Katalog.
+function ofAusDiktat(data) {
+  const art = data.art === 'rechnung' ? 'rechnung' : 'offerte';
+  Promise.all([
+    produkte.length ? null : loadProdukte(),
+    kunden.length ? null : loadKunden(),
+    belege.length || ofNaechsteNummer ? null : loadBelege(),
+  ]).then(() => {
+    ofNeu(art);
+    const felder = data.felder || {};
+    const blau = [], offen = [];
+
+    const k = data.kunde || null;
+    const treffer = k && k.id ? kunden.find(x => Number(x.id) === Number(k.id)) : null;
+    if (treffer) {
+      $('of_kunde').value = treffer.name;
+      ofFormKundeId = Number(treffer.id);
+      ofPersonenFuellen(null);
+      $('of_kunde').classList.add('ki');
+      blau.push('Empfänger');
+    } else if (k && k.name) {
+      $('of_kunde').value = k.name;
+      ofFormKundeId = null;
+      $('of_kunde').classList.add('ki-offen');
+      $('ofKundeHinweis').style.display = '';
+      offen.push(`Empfänger „${esc(k.name)}“ steht nicht in der Kundenliste – über „Neue Adresse erstellen“ anlegen`);
+    } else {
+      offen.push('Empfänger');
+    }
+    for (const [feld, id, text] of [['titel', 'of_titel', 'Titel'], ['bemerkung', 'of_bemerkung', 'Bemerkung']]) {
+      if (felder[feld]) { $(id).value = felder[feld]; $(id).classList.add('ki'); blau.push(text); }
+    }
+
+    const aktiv = produkte.filter(p => Number(p.aktiv ?? 1) === 1);
+    const zeilen = (data.positionen || []).map(p => {
+      const z = ofLeereZeile();
+      const menge = Number(p.menge);
+      z.menge = Number.isFinite(menge) && menge > 0 ? menge : 1;
+      const prod = p.produkt_id ? aktiv.find(x => Number(x.id) === Number(p.produkt_id)) : null;
+      if (prod) {
+        // Einheit und Preis gehoeren zum Katalogeintrag -- ein Preis je
+        // Stunde mit einer gesagten Einheit "Tag" ergaebe einen falschen Betrag.
+        z.produkt_id = Number(prod.id);
+        z.produkt_name = prod.name;
+        z.beschreibung = prod.beschreibung || '';
+        z.einzelpreis_rappen = Number(prod.einzelpreis_rappen) || 0;
+        z.einheit = prod.einheit || 'Std.';
+        z.mwst_satz_bp = Number(prod.mwst_satz_bp) || 0;
+        z.ki = 'katalog';
+      } else {
+        z.produkt_name = p.produkt_name || p.gesagt || '';
+        if (p.einheit) { z.einheit = p.einheit; }
+        z.ki = 'offen';
+      }
+      return z;
+    }).filter(z => z.produkt_name);
+    if (zeilen.length) { ofPos = zeilen; }
+    ofZeilenZeichnen();
+
+    const imKatalog = zeilen.filter(z => z.ki === 'katalog').length;
+    const frei = zeilen.length - imKatalog;
+    if (imKatalog) { blau.push(imKatalog === 1 ? '1 Position aus dem Katalog' : `${imKatalog} Positionen aus dem Katalog`); }
+    if (frei) { offen.push(frei === 1 ? '1 Position nicht im Katalog – Preis eintragen' : `${frei} Positionen nicht im Katalog – Preis eintragen`); }
+    if (!zeilen.length) { offen.push('Positionen'); }
+
+    let t = blau.length
+      ? `Blau markiert wurde aus dem Diktat übernommen: ${esc(blau.join(', '))}.`
+      : 'Aus dem Diktat liess sich kein Feld zuordnen.';
+    if (offen.length) { t += ` Noch offen: ${offen.join('; ')}.`; }
+    t += ' Es ist noch nichts gespeichert.';
+    $('ofKiText').innerHTML = t;
+    $('ofKiHint').classList.add('on');
+  });
 }
 
 // Eine neue Offerte mit bereits gesetztem Empfaenger -- aus dem Zeilenmenue
@@ -15220,6 +15453,12 @@ function ofKundeGewaehlt() {
   const vorher = ofFormKundeId;
   ofFormKundeId = k ? Number(k.id) : null;
   if (ofFormKundeId !== vorher) { ofPersonenFuellen(null); }
+  // Ein aus der Spracheingabe unbekannter Name ist erledigt, sobald ein
+  // echter Kunde dasteht -- oder das Feld leer ist.
+  if (ofFormKundeId || !name) {
+    $('of_kunde').classList.remove('ki-offen');
+    $('ofKundeHinweis').style.display = 'none';
+  }
 }
 
 // "Neue Adresse erstellen" direkt aus dem Offert-Formular (ENT-187): oeffnet
@@ -15234,8 +15473,12 @@ function ofNeueAdresse() {
     $('of_kunde').value = k.name;
     ofFormKundeId = Number(k.id);
     ofPersonenFuellen(null);
+    ofKundeGewaehlt();
   };
-  openKundeNeu();
+  // Steht ein gesagter, aber unbekannter Name im Feld (ENT-695), kommt er
+  // gleich in den neuen Kunden mit -- sonst tippte man ihn ein zweites Mal.
+  const gesagt = $('of_kunde').classList.contains('ki-offen') ? $('of_kunde').value.trim() : '';
+  openKundeNeu(gesagt ? { name: gesagt } : undefined, gesagt ? {} : undefined);
 }
 
 // ── Positionszeilen ───────────────────────────────────────────────────────
@@ -15324,16 +15567,17 @@ function ofZeileHtml(p, i, produktListe) {
   return `<div class="of-pos">
     <div class="of-pos-kopf">
       <div class="f"><label for="ofp_name${i}">Leistung</label>
-        <input class="inp" id="ofp_name${i}" list="dlProdukte" value="${esc(p.produkt_name)}"
+        <input class="inp${p.ki === 'katalog' ? ' ki' : p.ki === 'offen' ? ' ki-offen' : ''}" id="ofp_name${i}" list="dlProdukte" value="${esc(p.produkt_name)}"
                oninput="ofZeileFeld(${i}, 'produkt_name', this.value)"
-               onchange="ofProduktUebernehmen(${i}, this.value)"></div>
+               onchange="ofProduktUebernehmen(${i}, this.value)">
+        ${p.ki === 'offen' ? `<div class="f-hint ki-offen" id="ofp_hint${i}">Nicht im Katalog – Preis eintragen</div>` : ''}</div>
       <div class="f"><label for="ofp_menge${i}">Menge</label>
         <input class="inp num" id="ofp_menge${i}" inputmode="decimal" value="${esc(String(p.menge))}"
                oninput="ofZeileFeld(${i}, 'menge', this.value)"></div>
       <div class="f"><label for="ofp_einheit${i}">Einheit</label>
         ${einheitHtml('ofp_einheit' + i, p.einheit, `ofZeileFeld(${i}, 'einheit', this.value)`)}</div>
       <div class="f"><label for="ofp_preis${i}">Einzelpreis</label>
-        <input class="inp num" id="ofp_preis${i}" inputmode="decimal" value="${rappenZuChf(p.einzelpreis_rappen)}"
+        <input class="inp num" id="ofp_preis${i}" inputmode="decimal" value="${p.ki === 'offen' && !p.einzelpreis_rappen ? '' : rappenZuChf(p.einzelpreis_rappen)}"
                oninput="ofZeileFeld(${i}, 'einzelpreis_rappen', this.value)"></div>
       <div class="f"><label for="ofp_rabatt${i}">Rabatt %</label>
         <input class="inp num" id="ofp_rabatt${i}" inputmode="decimal" value="${bpText(p.rabatt_bp)}"
@@ -15395,6 +15639,12 @@ function ofProduktUebernehmen(i, name) {
   if (!z.einzelpreis_rappen) { z.einzelpreis_rappen = Number(p.einzelpreis_rappen) || 0; }
   if (!z.einheit || z.einheit === 'Std.') { z.einheit = p.einheit || 'Std.'; }
   z.mwst_satz_bp = Number(p.mwst_satz_bp) || 0;
+  // Aus der Spracheingabe offen, jetzt zugeordnet (ENT-695).
+  if (z.ki === 'offen') {
+    delete z.ki;
+    const n = $('ofp_name' + i); if (n) { n.classList.remove('ki-offen'); }
+    const h = $('ofp_hint' + i); if (h) { h.remove(); }
+  }
   // Die Felder DIESER Zeile einzeln nachziehen statt die ganze Liste neu zu
   // zeichnen. Das Ereignis kommt aus 'change', also beim Verlassen des
   // Feldes -- ein Neuzeichnen loeschte genau das Element, das den Wechsel
@@ -15593,7 +15843,7 @@ function ofSperreSetzen(gesperrt) {
   const kopf = $('ofBtnZurueck').parentElement;
   const wurzel = $('ofFormSaveBtn').closest('#of-formular, #view-offerte');
   wurzel.querySelectorAll('input, select, textarea, button').forEach(el => {
-    if (kopf.contains(el) || el.closest('#ofFadenKarte')) { return; }
+    if (kopf.contains(el) || el.closest('#ofFadenKarte') || el.closest('#ofVerlaufKarte')) { return; }
     if (gesperrt) {
       if (!el.disabled) { el.disabled = true; el.dataset.sperre = '1'; }
     } else if (el.dataset.sperre) {
@@ -15608,12 +15858,114 @@ function ofNeueFassungAnstehend() {
   return !!(ofFormFassung && ofFormFassung.fassung_geaendert && !ofFormFassung.gesperrt);
 }
 
+/* ── Verlauf am Beleg (ENT-697) ──────────────────────────────────────
+   Zeichnet, was beleg_verlauf() im Server zusammengesetzt hat: interne
+   Schritte, Fassungen, was der Empfaenger getan hat. Neueste zuoberst.
+
+   UNBEKANNT IST NICHT KEINE (Hausregel): Nicht abrufbar, Logbuch nicht
+   eingerichtet, Beleg aelter als die Erfassung und "noch nichts" sind vier
+   verschiedene Saetze.
+
+   Alles ueber textContent -- Namen und Wortlaut kommen vom Empfaenger.
+
+   Gleicher Code in dashboard.html und betreiber.html; test_beleg_verlauf.mjs
+   haelt die beiden zusammen. */
+function ofVerlaufZeit(z) {
+  const m = String(z || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  return m ? m[3] + '.' + m[2] + '.' + m[1] + ' ' + m[4] + ':' + m[5] : '–';
+}
+
+function ofVerlaufZeichnen(v, gespeichert) {
+  const karte = document.getElementById('ofVerlaufKarte');
+  const ziel = document.getElementById('ofVerlauf');
+  karte.style.display = gespeichert ? '' : 'none';
+  ziel.textContent = '';
+  if (!gespeichert) { return; }
+  const el = (tag, klasse, text) => {
+    const e = document.createElement(tag);
+    if (klasse) { e.className = klasse; }
+    if (text !== undefined) { e.textContent = text; }
+    return e;
+  };
+  if (!v) {
+    ziel.appendChild(el('div', 'vl-leer', 'Nicht abrufbar – der Verlauf liess sich nicht laden. Bitte später erneut versuchen.'));
+    return;
+  }
+  if (!v.log_da) {
+    ziel.appendChild(el('div', 'vl-hinweis', 'Interne Schritte werden auf diesem Server noch nicht erfasst: '
+      + 'Das Logbuch ist nicht eingerichtet. Ein Lauf der Einrichtung legt es an. Was der Empfänger '
+      + 'getan hat und die versendeten Fassungen stehen trotzdem da.'));
+  } else if (v.vor_log) {
+    ziel.appendChild(el('div', 'vl-hinweis', v.log_seit
+      ? 'Dieser Beleg ist älter als die Erfassung. Interne Schritte stehen erst ab dem '
+        + ofVerlaufZeit(v.log_seit).slice(0, 10) + ' da; was davor geschah, lässt sich nicht nachtragen.'
+      : 'Dieser Beleg ist älter als die Erfassung. Interne Schritte werden ab jetzt festgehalten; '
+        + 'was davor geschah, lässt sich nicht nachtragen.'));
+  }
+  const liste = v.eintraege || [];
+  if (!liste.length) {
+    ziel.appendChild(el('div', 'vl-leer', 'Noch nichts erfasst.'));
+    return;
+  }
+  const tab = el('table', 'of-vl');
+  const kopf = el('thead');
+  const kz = el('tr');
+  ['Zeit', 'Wer', 'Was'].forEach(t => kz.appendChild(el('th', '', t)));
+  kopf.appendChild(kz);
+  tab.appendChild(kopf);
+  const rumpf = el('tbody');
+  liste.forEach((e, i) => {
+    const tr = el('tr');
+    tr.dataset.art = e.wer_art || '';
+    tr.appendChild(el('td', 'vl-zeit', ofVerlaufZeit(e.zeit)));
+    const wer = el('td', 'vl-wer');
+    if (e.wer_art === 'auto') {
+      wer.appendChild(el('span', 'vl-auto', 'automatisch'));
+    } else {
+      wer.appendChild(document.createTextNode(e.wer || (e.wer_art === 'empfaenger' ? 'ohne Namen' : '–')));
+      if (e.wer_art === 'empfaenger') { wer.appendChild(el('span', 'vl-etikett', 'Empfänger')); }
+    }
+    tr.appendChild(wer);
+    const was = el('td', 'vl-was');
+    const ton = e.ton === 'pos' ? 'vl-pos' : (e.ton === 'neg' ? 'vl-neg' : '');
+    const details = e.details || [];
+    if (details.length) {
+      const knopf = el('button', 'vl-auf', e.was);
+      knopf.type = 'button';
+      knopf.setAttribute('aria-expanded', 'false');
+      const ul = el('ul', 'vl-details');
+      ul.id = 'vlDetails' + i;
+      ul.hidden = true;
+      knopf.setAttribute('aria-controls', ul.id);
+      details.forEach(d => {
+        ul.appendChild(el('li', '', d.verborgen || d.alt === null
+          ? d.feld + ': geändert'
+          : d.feld + ': ' + (d.alt === '' ? '–' : d.alt) + ' → ' + (d.neu === '' ? '–' : d.neu)));
+      });
+      knopf.addEventListener('click', () => {
+        const auf = knopf.getAttribute('aria-expanded') !== 'true';
+        knopf.setAttribute('aria-expanded', auf ? 'true' : 'false');
+        ul.hidden = !auf;
+      });
+      was.appendChild(knopf);
+      was.appendChild(ul);
+    } else {
+      was.appendChild(el('span', ton, (e.ton === 'pos' ? '✓ ' : (e.ton === 'neg' ? '✗ ' : '')) + e.was));
+    }
+    tr.appendChild(was);
+    rumpf.appendChild(tr);
+  });
+  tab.appendChild(rumpf);
+  ziel.appendChild(tab);
+}
+
 function ofFassungNachladen(id) {
   return api('beleg_lesen.php?id=' + Number(id)).then(({ ok, data }) => {
     if (!ok || !data || data.status !== 'ok' || ofFormId !== Number(id)) { return; }
     ofFormEntschiedenAm = data.beleg.entscheidung_am || null;
     ofFormToken = data.beleg.versand_token || '';
     ofFassungZeichnen(data.fassung);
+    ofVerlaufZeichnen(data.verlauf, true);
   }).catch(() => {});
 }
 
@@ -15675,6 +16027,7 @@ function ofOeffnen(id) {
       ofFormEntschiedenAm = b.entscheidung_am || null;
       ofFormToken = b.versand_token || '';
       ofFassungZeichnen(data.fassung);
+      ofVerlaufZeichnen(data.verlauf, true);
       go('offerte');
     });
 }
@@ -18707,7 +19060,12 @@ function enZeitraum() {
     + ` <b>Die Verfügbarkeitsprüfung unten gilt nur für den ersten Tag.</b>`;
 }
 
-function createEinsatz() {
+// trotzFehlenderBerechtigung: Der Planer hat die Warnung zur fehlenden
+// Revierdienst-Berechtigung bestaetigt (ENT-284). Dieselbe Nachfrage wie in
+// der Schublade (saveEinsatz) -- bis 2026-09-23 fehlte sie hier, und der
+// Server wies ab, ohne dass jemand bestaetigen konnte.
+function createEinsatz(trotzFehlenderBerechtigung) {
+  trotzFehlenderBerechtigung = trotzFehlenderBerechtigung === true;
   const err = $('enNeuErr'); err.style.display = 'none';
   const body = enSammeln('enN');
   if (!body) { err.textContent = 'Kunde, Arbeitsort, Datum, Von und Bis sind Pflicht.'; err.style.display = ''; return; }
@@ -18748,6 +19106,8 @@ function createEinsatz() {
   // sonst dreissig gleichzeitige Anfragen mit je mehreren Megabyte (ENT-116).
   const angelegt = [], ohne = [];
   let anhangFehler = [];
+  let grund = '';
+  let ohneBerechtigung = null;   // Personen aus der 409-Antwort, siehe unten
   // Zusammengehoerigkeit der Reihe (ENT-119). Die Kennung vergibt der Server:
   // Der erste Tag bekommt seine eigene Nummer als Serienkennung zurueck, die
   // uebrigen bekommen sie mit. Eine im Browser gewuerfelte Zahl koennte sich
@@ -18759,12 +19119,29 @@ function createEinsatz() {
   const naechster = i => {
     if (i >= tage.length) { return Promise.resolve(); }
     const tagBody = Object.assign({}, body, { datum: tage[i] });
+    if (trotzFehlenderBerechtigung) { tagBody.trotz_fehlender_berechtigung = true; }
     if (reihe) {
       if (serieId) { tagBody.serie_id = serieId; } else { tagBody.serie_neu = true; }
     }
     return api('einsatz_save.php', { method: 'POST', body: tagBody })
       .then(({ ok, data }) => {
-        if (!ok || data.status !== 'ok') { ohne.push(dmy(tage[i])); return; }
+        // Fehlende Revierdienst-Berechtigung ist eine Warnung, keine Sperre
+        // (ENT-284): Die Reihe haelt an, der Planer wird gefragt. Die
+        // Berechtigung haengt an der Person, nicht am Tag -- scheitert der
+        // erste Tag daran, scheitern alle. Darum hier aufhoeren, statt
+        // dieselbe Absage fuer jeden Tag einzusammeln.
+        if (!ok && data && data.unberechtigt && !trotzFehlenderBerechtigung) {
+          ohneBerechtigung = data.personen || [];
+          return 'halt';
+        }
+        if (!ok || data.status !== 'ok') {
+          ohne.push(dmy(tage[i]));
+          // Den Grund behalten, nicht nur das Datum: Ohne ihn stand hier
+          // "Anlegen fehlgeschlagen.", auch wenn der Server genau gesagt
+          // hatte, dass der Rolle ein Recht fehlt (2026-09-23).
+          if (!grund && data && data.message) { grund = String(data.message); }
+          return;
+        }
         angelegt.push(data.id);
         if (reihe && !serieId && data.serie_id) { serieId = Number(data.serie_id); }
         // Dokumente erst jetzt: Vorher gab es keine Nummer, an der sie haengen
@@ -18777,13 +19154,20 @@ function createEinsatz() {
       // Ein misslungener Tag darf die uebrigen nicht abbrechen -- sonst steht
       // die Reihe halb da, und niemand sieht, wo sie aufgehoert hat.
       .catch(() => { ohne.push(dmy(tage[i])); })
-      .then(() => naechster(i + 1));
+      .then(r => (r === 'halt' ? null : naechster(i + 1)));
   };
 
   naechster(0).then(() => {
     enNeuSperre(false);
+    if (ohneBerechtigung && !angelegt.length) {
+      // Nachfragen statt abweisen: dieselbe Warnung wie in der Schublade.
+      // "Trotzdem zuteilen" legt die ganze Reihe mit Bestaetigung neu an.
+      revierWarnungZeigen(ohneBerechtigung, () => createEinsatz(true));
+      return;
+    }
     if (!angelegt.length) {
-      err.textContent = 'Anlegen fehlgeschlagen.'; err.style.display = ''; return;
+      err.textContent = grund ? `Anlegen fehlgeschlagen: ${grund}` : 'Anlegen fehlgeschlagen.';
+      err.style.display = ''; return;
     }
     enNDok = [];
     return loadEinsaetze().then(() => {
@@ -18791,7 +19175,7 @@ function createEinsatz() {
         ? 'Einsatz angelegt' : `${angelegt.length} Einsätze angelegt`];
       // Ein misslungener Tag oder Anhang darf nicht unter „angelegt“
       // verschwinden — der Einsatz steht, das Dokument fehlt.
-      if (ohne.length) { teile.push(`nicht angelegt: ${ohne.join(', ')}`); }
+      if (ohne.length) { teile.push(`nicht angelegt: ${ohne.join(', ')}${grund ? ` (${grund})` : ''}`); }
       if (anhangFehler.length) {
         teile.push(`nicht angehängt: ${[...new Set(anhangFehler)].join(', ')}`);
       }
@@ -19846,7 +20230,7 @@ function loadObjekte() {
     if (!ok || data.status !== 'ok') {
       $('oTable').innerHTML = EMPTY('Objekte nicht verfügbar',
         esc(data.message || 'Die Objekte konnten nicht geladen werden.') +
-        '<div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="eiOeffnen()">Datenbank jetzt einrichten</button></div>');
+        '<div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="eiOeffnen(true)">Datenbank jetzt einrichten</button></div>');
       return;
     }
     objekte = data.objekte || [];
@@ -29892,19 +30276,173 @@ function pruefeUpdate() {
     $('nav-einrichtung').classList.toggle('hat-update', hat);
     $('nav-einrichtung').title = hat ? 'Update verfügbar: neue Einrichtung steht aus' : 'Einrichtung';
     $('navEinrichtungLbl').textContent = hat ? 'Update' : 'Einrichtung';
-    // Der Punkt am Konto-Logo faellt nicht auf, solange niemand dort
-    // hinschaut (Rueckmeldung des Projektinhabers). Derselbe Toast wie
-    // ueberall sonst im Cockpit statt eines neuen Bausteins -- nur ein
-    // zusaetzlicher Ausloeser beim Anmelden. Nur am Desktop: "Einrichtung"
-    // ist .nur-desktop (ENT-235), ein Toast dazu am Handy zeigte auf einen
-    // Menuepunkt, den es dort gar nicht gibt.
-    if (hat && !window.matchMedia('(max-width: 900px)').matches) {
-      toast('Update verfügbar — unter „Einrichtung“ im Kontomenü nachholen.');
-    }
+    if (ok && data && data.etappen) { updEtappen = data.etappen; }
   }).catch(() => {});
+  // Der Punkt am Konto-Logo faellt nicht auf, solange niemand dort
+  // hinschaut (ENT-698). Darum oeffnet sich beim Anmelden das Fenster
+  // selbst -- fuer alle im Cockpit, nicht nur fuer die, die einspielen
+  // duerfen: Neuerungen betreffen jeden.
+  updVonSelbst();
 }
 
-function eiOeffnen() { openDlg('dlgEinrichtung'); planungEinrichten(); eiBetreiberPruefen(); }
+// ══════════════════════════════════════════ UPDATE-FENSTER (ENT-698)
+// Zustaende, jeder mit eigenem Titel -- "unbekannt" darf nie wie "nichts
+// Neues" aussehen:
+//   einspielen  Update steht aus, diese Person darf es einspielen (Desktop)
+//   warten      Update steht aus, die Verwaltung spielt es ein
+//   handy       Update steht aus, darf einspielen, ist aber am Handy
+//   neu         kein Update offen, aber ungelesene Neuerungen
+//   aktuell     nichts offen, nichts Neues (nur von Hand geoeffnet)
+//   unbekannt   der Stand liess sich nicht abrufen
+//   fertig      soeben eingespielt
+let updStand = null;
+let updEtappen = null;       // aus planung_einrichten.php (GET), Reihenfolge = Laufreihenfolge
+let updModus = 'aktuell';
+let updLaeuft = false;
+let updVonSelbstGezeigt = false;
+const updHandy = () => window.matchMedia('(max-width: 900px)').matches;
+
+function updLaden() {
+  return api('neuerungen_stand.php?ziel=cockpit')
+    .then(({ ok, data }) => (ok && data && data.status === 'ok') ? data : null)
+    .catch(() => null);
+}
+
+// Einmal je Anmeldung. "Spaeter" schliesst nur; solange eine Einrichtung
+// aussteht, kommt das Fenster beim naechsten Anmelden wieder (Punkt 4).
+function updVonSelbst() {
+  if (updVonSelbstGezeigt) { return; }
+  updLaden().then(d => {
+    if (!d || updVonSelbstGezeigt) { return; }
+    const neu = (d.neuerungen || []).length > 0;
+    const offen = Number(d.einrichtung_ausstehend) > 0;
+    // Am Handy nur Neuerungen (Punkt 7): Ein offenes Update allein laesst
+    // sich dort nicht einspielen, ein Fenster dazu waere eine Sackgasse.
+    if (updHandy() ? !neu : !(neu || offen)) { return; }
+    // Die Einfuehrungstour hat Vorrang -- zwei Fenster uebereinander
+    // verdecken einander.
+    const tour = document.querySelector('.tour-box.on');
+    if (tour) { return; }
+    updVonSelbstGezeigt = true;
+    updStand = d;
+    updZeigen();
+  });
+}
+
+// sofort: gleich einspielen -- fuer "Datenbank jetzt einrichten", wo eine
+// Tabelle fehlt und der Knopf genau das verspricht.
+function eiOeffnen(sofort) {
+  // Von Hand geoeffnet: Stand frisch holen, dann zeigen. Bis die Antwort
+  // da ist, heisst es "wird geprueft" -- nicht "unbekannt".
+  updVonSelbstGezeigt = true;
+  if (updLaeuft) { openDlg('dlgEinrichtung'); return; }
+  updStand = null;
+  $('eiInhalt').innerHTML = '';
+  $('updLauf').hidden = true;
+  updZeigen('laden');
+  eiBetreiberPruefen();
+  if (sofort) { planungEinrichten(); }
+  updLaden().then(d => { updStand = d; if (!updLaeuft) { updZeigen(); } });
+}
+
+function updModusBestimmen() {
+  const d = updStand;
+  if (!d) { return 'unbekannt'; }
+  const offen = Number(d.einrichtung_ausstehend) > 0;
+  if (offen && d.darf_einspielen) { return updHandy() ? 'handy' : 'einspielen'; }
+  if (offen) { return 'warten'; }
+  if ((d.neuerungen || []).length) { return 'neu'; }
+  return 'aktuell';
+}
+
+function updNeuerungenHtml(liste) {
+  if (!liste || !liste.length) { return ''; }
+  const arten = [['neu', 'Neu'], ['verbesserung', 'Verbesserungen'], ['fehlerbehebung', 'Fehlerbehebungen']];
+  return arten.map(([art, titel]) => {
+    const teil = liste.filter(n => n.art === art);
+    if (!teil.length) { return ''; }
+    return `<div class="upd-gruppe" data-art="${art}"><div class="titel">${esc(titel)}</div><ul>`
+      + teil.map(n => `<li><b>${esc(n.titel)}</b><span>${esc(n.text)}</span></li>`).join('')
+      + '</ul></div>';
+  }).join('');
+}
+
+function updZeigen(modus) {
+  const scrim = $('dlgEinrichtung');
+  if (!scrim) { return; }
+  if (modus) { updModus = modus; } else if (!updLaeuft) { updModus = updModusBestimmen(); }
+  scrim.classList.toggle('upd-blatt', updHandy());
+  const d = updStand || {};
+  const liste = d.neuerungen || [];
+  const neuestes = liste.length ? liste[0].datum : '';
+  const datum = neuestes ? new Date(neuestes + 'T12:00:00').toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  const TEXT = {
+    einspielen: ['Update erforderlich', 'Neue Funktionen und Korrekturen warten darauf, eingespielt zu werden. Es wird nichts gelöscht oder geleert.', 'erforderlich'],
+    warten:     ['Update verfügbar', 'Die Verwaltung spielt das Update ein. Bis dahin arbeitest du wie gewohnt weiter.', ''],
+    handy:      ['Update verfügbar', 'Eingespielt wird am Desktop unter „Einrichtung“ im Kontomenü.', 'erforderlich'],
+    neu:        ['Neu in GuardOpS', datum, ''],
+    aktuell:    ['Alles auf dem neusten Stand', 'Es steht kein Update aus. Es wird nichts gelöscht oder geleert, wenn du erneut prüfst.', 'fertig'],
+    unbekannt:  ['Stand unbekannt', 'Ob ein Update aussteht, liess sich nicht abrufen.', ''],
+    laden:      ['Einrichtung', 'Der Stand wird geprüft … Es wird nichts gelöscht oder geleert.', ''],
+    fertig:     ['Update eingespielt', 'Alles ist auf dem neusten Stand.', 'fertig'],
+    geprueft:   ['Alles auf dem neusten Stand', 'Geprüft: Es war nichts einzuspielen.', 'fertig'],
+  };
+  const [titel, unter, ton] = TEXT[updModus] || TEXT.aktuell;
+  $('updTitel').textContent = titel;
+  $('updUnter').textContent = unter;
+  $('updIkone').className = 'upd-ikone' + (ton ? ' ' + ton : '');
+  $('updNeu').innerHTML = updNeuerungenHtml(liste);
+  const zu = $('updZu'), haupt = $('eiBtn');
+  const knopf = {
+    einspielen: ['Später', 'Jetzt einspielen'],
+    warten:     [null, 'Verstanden'],
+    handy:      [null, 'Verstanden'],
+    neu:        [null, 'Verstanden'],
+    aktuell:    ['Schliessen', 'Erneut prüfen'],
+    unbekannt:  ['Schliessen', 'Erneut versuchen'],
+    laden:      ['Schliessen', 'Prüfen und einrichten'],
+    fertig:     [null, 'Schliessen'],
+    geprueft:   [null, 'Schliessen'],
+  }[updModus] || ['Schliessen', 'Erneut prüfen'];
+  zu.style.display = knopf[0] ? '' : 'none';
+  if (knopf[0]) { zu.textContent = knopf[0]; }
+  haupt.textContent = knopf[1];
+  haupt.disabled = updLaeuft;
+  zu.disabled = updLaeuft;
+  if (!scrim.classList.contains('on')) { openDlg('dlgEinrichtung'); }
+}
+
+function updSchliessen() {
+  if (updLaeuft) { return; }
+  closeDlg('dlgEinrichtung');
+}
+
+// Gelesen ist, was die Person bestaetigt oder eingespielt hat -- nicht,
+// was sie mit "Spaeter" weggeklickt hat.
+function updGelesen() {
+  const bis = updStand && updStand.neueste;
+  if (!bis || updStand.stand_unbekannt) { return; }
+  api('neuerungen_stand.php', { method: 'POST', body: { bis } }).catch(() => {});
+}
+
+function updHauptknopf() {
+  if (updLaeuft) { return; }
+  if (updModus === 'einspielen' || updModus === 'aktuell' || updModus === 'laden') { planungEinrichten(); return; }
+  if (updModus === 'unbekannt') { eiOeffnen(); return; }
+  if (updModus !== 'fertig' && updModus !== 'geprueft') { updGelesen(); }
+  closeDlg('dlgEinrichtung');
+}
+
+function updBalken(anteil, zustand) {
+  const b = $('updBalken');
+  $('updLauf').hidden = false;
+  b.classList.toggle('laeuft', zustand === 'laeuft');
+  b.classList.toggle('fertig', zustand === 'fertig');
+  b.classList.toggle('fehler', zustand === 'fehler');
+  const prozent = Math.round(Math.max(0, Math.min(1, anteil)) * 100);
+  $('updFuellung').style.width = prozent + '%';
+  b.setAttribute('aria-valuenow', String(prozent));
+}
 
 /* ── Einmalige Einrichtung des Betreiber-Bereichs ────────────────────
  *
@@ -29969,49 +30507,89 @@ function eiBetreiberKonto() {
     }).catch(() => toast('Das Konto konnte nicht angelegt werden.'));
 }
 
+// Spielt die Einrichtung Etappe fuer Etappe ein (ENT-698, Punkt 6). Jede
+// Etappe ist eine eigene Anfrage; der Balken waechst erst, wenn eine
+// Etappe wirklich fertig ist. Angezeigt wird danach nur, was schiefging --
+// was eingerichtet wurde oder schon da war, steht nicht mehr im Fenster
+// (Punkt 1). Die Neuerungen darueber sagen, was sich geaendert hat.
 function planungEinrichten() {
-  const b = $('eiBtn'); if (b) b.disabled = true;
+  if (updLaeuft) { return; }
   // Der Betreiber-Abschnitt wird nach dem Lauf neu geprueft: Seine Tabellen
   // entstehen seit ENT-529 hier mit, der Abschnitt muss das mitbekommen.
   const nachher = () => { try { eiBetreiberPruefen(); } catch (e) { /* egal */ } };
-  $('eiInhalt').innerHTML = '<p class="zone-note">Prüfe …</p>';
-  api('planung_einrichten.php', { method: 'POST' }).then(({ ok, status, data }) => {
-    if (b) b.disabled = false;
+  const holeEtappen = updEtappen
+    ? Promise.resolve(updEtappen)
+    : api('planung_einrichten.php').then(({ ok, data }) => (ok && data && data.etappen) || null).catch(() => null);
+  updLaeuft = true;
+  $('eiInhalt').innerHTML = '';
+  updZeigen();
+  $('updEtappe').textContent = 'Vorbereiten …';
+  $('updSchritt').textContent = '';
+  updBalken(0, 'laeuft');
+
+  const fehler = [], meldungen = [];
+  let abbruch = null, ergaenzt = 0;
+  holeEtappen.then(etappen => {
+    if (etappen) { updEtappen = etappen; }
+    // Ohne Etappenliste (aelterer Server) laeuft alles in einem Zug -- der
+    // Balken sagt dann ehrlich "1 von 1" statt Etappen zu erfinden.
+    const liste = etappen ? Object.entries(etappen) : [[null, 'Einrichtung']];
+    const n = liste.length;
+    const lauf = i => {
+      if (i >= n) { return Promise.resolve(); }
+      const [schluessel, titel] = liste[i];
+      $('updEtappe').textContent = titel;
+      $('updSchritt').textContent = `Etappe ${i + 1} von ${n}`;
+      return api('planung_einrichten.php', { method: 'POST', body: schluessel ? { etappe: schluessel } : undefined })
+        .then(({ ok, status, data }) => {
+          if (!ok) {
+            // Ohne lesbare Antwort blieb frueher nur "Einrichtung
+            // fehlgeschlagen." -- eine Sackgasse. Der Statuscode kommt mit:
+            // 403 fehlendes Recht, 500 Abbruch im Server, 0 keine Verbindung.
+            abbruch = (data && data.message)
+              || `Einrichtung fehlgeschlagen — der Server hat keine lesbare Antwort geschickt (HTTP ${status || 'keine Antwort'}).`;
+            return;
+          }
+          (data.fehler || []).forEach(f => fehler.push(f));
+          ergaenzt += (data.getan || []).length;
+          if (data.status !== 'ok' && data.message) { meldungen.push(data.message); }
+          updBalken((i + 1) / n, 'laeuft');
+          return lauf(i + 1);
+        });
+    };
+    return lauf(0);
+  }).then(() => {
+    updLaeuft = false;
     nachher();
-    if (!ok) {
-      // Ohne lesbare Antwort blieb hier nur "Einrichtung fehlgeschlagen." --
-      // eine Sackgasse, die genau nichts sagt. Der Statuscode kommt mit:
-      // 403 heisst fehlendes Recht, 500 ein Abbruch im Server, 0 keine
-      // Verbindung. Drei verschiedene Ursachen, drei verschiedene Wege.
-      $('eiInhalt').innerHTML = `<div class="msg-err">${esc(data.message
-        || `Einrichtung fehlgeschlagen — der Server hat keine lesbare Antwort geschickt (HTTP ${status || 'keine Antwort'}).`)}</div>`;
-      return;
-    }
-    // Der Abstand haengt an der POSITION, nicht am Titeltext: Die erste
-    // vorhandene Liste steht direkt unter dem Kasten, jede weitere bekommt
-    // Luft. Vorher entschied darueber das Wort "Jetzt ergänzt" -- sobald
-    // eine andere Liste zuerst kam, sass der Abstand am falschen Platz.
     const zeile = (t, liste, farbe) => !liste || !liste.length ? '' : `
       <div class="titel" data-ei-liste style="margin-top:14px${farbe ? ';color:' + farbe : ''}">${esc(t)}</div>
       <ul style="margin:0;padding-left:18px;font-size:13px;color:var(--ink-2);line-height:1.7">
         ${liste.map(x => `<li>${esc(x)}</li>`).join('')}
       </ul>`;
-    $('eiInhalt').innerHTML =
-      `<div class="msg-err" style="background:${data.status === 'ok' ? 'var(--pos-soft)' : 'var(--neg-soft)'};color:${data.status === 'ok' ? 'var(--pos)' : 'var(--neg)'}">${esc(data.message)}</div>`
-      // Fehlgeschlagenes zuerst: Wer den Dialog oeffnet, weil etwas nicht
-      // geht, soll den Grund lesen, ohne an zwei gruenen Listen vorbeizurollen.
-      + zeile('Fehlgeschlagen', data.fehler, 'var(--neg)')
-      + zeile('Jetzt ergänzt', data.getan)
-      + zeile('War schon vorhanden', data.unveraendert);
-    const erste = $('eiInhalt').querySelector('[data-ei-liste]');
-    if (erste) { erste.style.marginTop = '0'; }
-    if (data.status === 'ok') {
-      Promise.all([loadEinsaetze(), loadObjekte(), ladeFeiertagMap(), ladeSperren()]);
+    if (abbruch || fehler.length || meldungen.length) {
+      updBalken(Number($('updBalken').getAttribute('aria-valuenow')) / 100, 'fehler');
+      $('updEtappe').textContent = abbruch ? 'Abgebrochen' : 'Teilweise eingespielt';
+      $('eiInhalt').innerHTML =
+        `<div class="msg-err" style="margin-top:14px">${esc(abbruch || meldungen[0] || (fehler.length + ' Schritt(e) sind fehlgeschlagen — die übrigen sind gelaufen.'))}</div>`
+        + zeile('Fehlgeschlagen', fehler, 'var(--neg)');
+      updZeigen(updStand && Number(updStand.einrichtung_ausstehend) > 0 && updStand.darf_einspielen ? 'einspielen' : 'aktuell');
+      $('eiBtn').textContent = 'Erneut versuchen';
+      return;
     }
+    updBalken(1, 'fertig');
+    $('updEtappe').textContent = 'Fertig';
+    updGelesen();
+    // "Nichts zu tun" ist etwas anderes als "eingespielt".
+    updZeigen(ergaenzt ? 'fertig' : 'geprueft');
+    Promise.all([loadEinsaetze(), loadObjekte(), ladeFeiertagMap(), ladeSperren()]).catch(() => {});
     pruefeUpdate();
   }).catch(() => {
-    if (b) b.disabled = false;
-    $('eiInhalt').innerHTML = '<div class="msg-err">Netzwerkfehler.</div>';
+    updLaeuft = false;
+    updBalken(0, 'fehler');
+    $('updEtappe').textContent = 'Abgebrochen';
+    $('eiInhalt').innerHTML = '<div class="msg-err" style="margin-top:14px">Netzwerkfehler.</div>';
+    updZeigen('aktuell');
+    $('eiBtn').textContent = 'Erneut versuchen';
   });
 }
 

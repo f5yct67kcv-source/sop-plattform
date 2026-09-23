@@ -30,12 +30,30 @@ require_once __DIR__ . '/../betreiber.php';
 // zwei": Die rund 50 Tabellen des Rapport-Tools stehen nur an einer
 // Stelle, dieser Endpunkt richtet sie nur ein, er definiert sie nicht neu.
 require_once __DIR__ . '/../planung_einrichten_kern.php';
+require_once __DIR__ . '/../demo_instanz.php';   // demo_betreiber_rollen_nachtragen()
 
 require_betreiber_voll();
 $pdo = betreiber_db();
 
 $nurPruefen = in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true);
 
+// In Teilen (ENT-698): Der Ladebalken zeigt echten Fortschritt, darum
+// kann das Fenster erst den Betreiber-Teil ({teil: 'betreiber'}) und dann
+// jeden Mandanten einzeln ({mandant_id: n}) einspielen. Ohne Angabe laeuft
+// alles in einem Zug wie bisher.
+$teil = null; $nurMandant = null;
+if (!$nurPruefen) {
+    $eingabe = json_decode((string)file_get_contents('php://input'), true);
+    if (is_array($eingabe) && ($eingabe['teil'] ?? null) === 'betreiber') { $teil = 'betreiber'; }
+    if (is_array($eingabe) && isset($eingabe['mandant_id'])) {
+        $teil = 'mandant'; $nurMandant = (int)$eingabe['mandant_id'];
+    }
+}
+$betreiberTeil = $teil === null || $teil === 'betreiber';
+$mandantTeil   = $teil === null || $teil === 'mandant';
+
+$getan = []; $offen = []; $fehler = [];
+if ($betreiberTeil) {
 $tabellenErgebnis = be_tabellen_anlegen($pdo, $nurPruefen);
 $spaltenErgebnis  = be_spalten_anlegen($pdo, $nurPruefen);
 
@@ -55,6 +73,7 @@ if (!$nurPruefen) {
        && (int)$pdo->query('SELECT COUNT(*) FROM mandant')->fetchColumn() === 0) {
     $offen[] = 'Bestandsbetrieb als Mandant 1';
 }
+}   // Ende Betreiber-Teil
 
 // ── Die Betriebstabellen JEDES Mandanten (ENT-612) ───────────────────
 //
@@ -73,9 +92,12 @@ if (!$nurPruefen) {
 // nicht verhindern -- dieselbe Ueberlegung wie bei schritt() im Kern
 // selbst. $mitBetreiberEbene = false: Die Betreiber-Ebene ist oben bereits
 // EINMAL zentral eingerichtet, nicht ein zweites Mal je Mandant.
-$mandanten = $pdo->query('SELECT id, name, db_host, db_name, db_user, secret_name FROM mandant ORDER BY id')
+$mandanten = $pdo->query('SELECT id, name, subdomain, db_host, db_name, db_user, secret_name FROM mandant ORDER BY id')
     ->fetchAll(PDO::FETCH_ASSOC);
+// Fuer das Fenster: welche Mandanten es nacheinander einzeln einspielt.
+$mandantenListe = array_map(static fn($m) => ['id' => (int)$m['id'], 'name' => (string)$m['name']], $mandanten);
 foreach ($mandanten as $m) {
+    if (!$mandantTeil || ($nurMandant !== null && (int)$m['id'] !== $nurMandant)) { continue; }
     $lage = mandant_verbindung_bereit($m);
     $bezug = 'Mandant „' . $m['name'] . '“';
     if ($lage !== 'bereit' && $lage !== 'standardverbindung') {
@@ -94,6 +116,14 @@ foreach ($mandanten as $m) {
         $ergebnis = planung_einrichten_ausfuehren($mpdo, $nurPruefen, false);
         foreach ($ergebnis['getan'] as $g)  { $getan[]  = $bezug . ': ' . $g; }
         foreach ($ergebnis['fehler'] as $f) { $fehler[] = $bezug . ': ' . $f; }
+        // Bestehende Demobetreiber bekommen die Rollen nach, die neue
+        // Zugaenge schon beim Einrichten erhalten (2026-09-23). Nur, wo das
+        // Register einen aktiven Demo-Zugang fuer diesen Platz fuehrt.
+        if (hat_tabelle($pdo, 'demo_zugang') && (string)($m['subdomain'] ?? '') !== '') {
+            foreach (demo_betreiber_rollen_nachtragen($pdo, $mpdo, (string)$m['subdomain'], $nurPruefen) as $satz) {
+                if ($nurPruefen) { $offen[] = $bezug . ': ' . $satz; } else { $getan[] = $bezug . ': ' . $satz; }
+            }
+        }
     } catch (Throwable $e) {
         // Der Treibertext kann Host und Benutzer tragen und geht nicht
         // nach aussen -- dieselbe Ueberlegung wie bei mandant_stand().
@@ -109,6 +139,7 @@ json_response([
     'getan'  => $getan,
     'offen'  => $offen,
     'fehler' => $fehler,
+    'mandanten' => $mandantenListe,
     'message' => $fehler
         ? 'Einrichtung teilweise fehlgeschlagen — siehe Liste.'
         : ($getan

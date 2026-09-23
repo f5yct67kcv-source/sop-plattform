@@ -1706,3 +1706,304 @@ function beleg_unterschrift_kurz(?array $u): ?array
         'pdf_da' => (bool)($u['pdf_da'] ?? false),
     ];
 }
+
+// ── Verlauf am Beleg (ENT-697) ────────────────────────────────────────────
+//
+// WER HAT WAS WANN GESENDET, WAS HAT DER EMPFAENGER GETAN. Der Stand eines
+// Belegs steht an vier Stellen: im Logbuch (interne Schritte), in den
+// Fassungen, in den Unterschriftszeilen und -- nur Betreiber -- im Faden.
+// beleg_verlauf() liest sie zusammen, damit wer uebernimmt nicht nachfragen
+// muss. Geschrieben wird hier nichts; jede Quelle bleibt, wie sie ist.
+//
+// DAS OEFFNEN DES LINKS STEHT BEWUSST NICHT DARIN (ENT-697, Punkt 4):
+// Mailprogramme und Virenscanner oeffnen Links selbst. Ein angeforderter
+// Code belegt das Oeffnen ohnehin.
+
+// Die Felder aus $kopf der beiden Speicher-Endpunkte, wie sie im Formular
+// heissen. Ein Feld, das hier fehlt, erscheint mit seinem Spaltennamen --
+// sichtbar statt verschluckt.
+const BELEG_VERLAUF_FELDER = [
+    'kunde_id' => 'Empfänger', 'person_id' => 'Kontaktperson', 'titel' => 'Titel',
+    'referenz' => 'Referenz', 'datum' => 'Datum', 'gueltig_bis' => 'Gültig bis',
+    'faellig_bis' => 'Fällig am', 'status' => 'Status', 'bemerkung' => 'Interne Bemerkung',
+    'ist_vorlage' => 'Vorlage', 'unterschriftsseite' => 'Unterschriftsfelder',
+    'oeffentliche_notizen' => 'Öffentliche Notizen', 'bedingungen' => 'Bedingungen',
+    'fusszeile_text' => 'Fusszeile', 'vertrag_beginn' => 'Vertragsbeginn',
+    'mindestlaufzeit_monate' => 'Mindestlaufzeit (Monate)',
+    'kuendigungsfrist_monate' => 'Kündigungsfrist (Monate)',
+    'verlaengerung_monate' => 'Verlängerung (Monate)',
+    'positionen' => 'Positionen', 'summe' => 'Total',
+];
+const BELEG_VERLAUF_STATUS = [
+    'entwurf' => 'Entwurf', 'versendet' => 'Versendet', 'angeschaut' => 'Angeschaut',
+    'aenderung' => 'Änderungswunsch', 'bestaetigt' => 'Bestätigt', 'abgelehnt' => 'Abgelehnt',
+];
+// Verweise auf andere Tabellen: Die Nummer allein sagt niemandem etwas.
+const BELEG_VERLAUF_VERWEISE = ['kunde_id', 'person_id'];
+// Ja/Nein-Felder.
+const BELEG_VERLAUF_SCHALTER = ['ist_vorlage', 'unterschriftsseite'];
+
+// Ein Abdruck von Positionen UND Gesamtrabatt. Die Positionen werden bei
+// jedem Speichern neu geschrieben (beleg_positionen_schreiben), ein
+// Zeilenvergleich ergaebe Rauschen (ENT-614). Der Abdruck sagt nur, OB sich
+// etwas geaendert hat -- das genuegt fuer die Zeile "Positionen geaendert".
+function beleg_positionen_abdruck(PDO $pdo, int $belegId, string $tabPraefix = ''): string
+{
+    $tab = beleg_tabelle($tabPraefix, 'beleg_positionen');
+    $s = $pdo->prepare(
+        "SELECT produkt_id, produkt_name, beschreibung, menge, einheit, einzelpreis_rappen,
+                rabatt_bp, mwst_satz_bp" . (beleg_periode_spalte_da($pdo, $tabPraefix) ? ', periode' : '') . "
+           FROM {$tab} WHERE beleg_id = ? ORDER BY sortierung, id"
+    );
+    $s->execute([$belegId]);
+    $zeilen = array_map(fn($z) => array_map(fn($w) => $w === null ? null : (string)$w, $z),
+                        $s->fetchAll(PDO::FETCH_ASSOC) ?: []);
+    $k = $pdo->prepare('SELECT rabatt_bp, total_rappen FROM ' . beleg_tabelle($tabPraefix, 'belege') . ' WHERE id = ?');
+    $k->execute([$belegId]);
+    $kopf = $k->fetch(PDO::FETCH_ASSOC) ?: [];
+    return hash('sha256', json_encode([$zeilen, (string)($kopf['rabatt_bp'] ?? '')]))
+        . ':' . (int)($kopf['total_rappen'] ?? 0);
+}
+
+// Schreibt nach dem Speichern, was sich an Positionen und Total geaendert
+// hat. Zwei Zeilen hoechstens: "Positionen: geaendert" (ohne Werte) und
+// "Total: alt -> neu". Braucht logbuch.php.
+function beleg_positionen_loggen(PDO $pdo, array $akteur, int $belegId, string $vorher,
+                                 string $nachher, string $tabPraefix = ''): void
+{
+    if ($vorher === '' || $vorher === $nachher) { return; }
+    [$abdAlt, $totAlt] = explode(':', $vorher) + [1 => '0'];
+    [$abdNeu, $totNeu] = explode(':', $nachher) + [1 => '0'];
+    if ($abdAlt !== $abdNeu) {
+        logbuch_schreiben($pdo, $akteur, 'beleg', $belegId, 'positionen', null, null, true, $tabPraefix);
+    }
+    if ((int)$totAlt !== (int)$totNeu) {
+        logbuch_schreiben($pdo, $akteur, 'beleg', $belegId, 'summe',
+            'CHF ' . beleg_chf((int)$totAlt), 'CHF ' . beleg_chf((int)$totNeu), false, $tabPraefix);
+    }
+}
+
+function beleg_chf(int $rappen): string
+{
+    $neg = $rappen < 0;
+    $s = number_format(abs($rappen) / 100, 2, '.', "'");
+    return ($neg ? '-' : '') . $s;
+}
+
+function beleg_verlauf_auszug(string $text, int $max = 160): string
+{
+    $t = trim((string)preg_replace('/\s+/u', ' ', $text));
+    return mb_strlen($t) > $max ? rtrim(mb_substr($t, 0, $max - 1)) . '…' : $t;
+}
+
+// Eine Feldaenderung lesbar machen: Verweise ohne Nummer, Schalter als
+// Ja/Nein, Status mit seinem Titel.
+function beleg_verlauf_detail(array $e): array
+{
+    $feld = (string)$e['feld'];
+    $alt = $e['wert_alt']; $neu = $e['wert_neu'];
+    $verborgen = !empty($e['werte_verborgen']) || in_array($feld, BELEG_VERLAUF_VERWEISE, true);
+    if (in_array($feld, BELEG_VERLAUF_SCHALTER, true)) {
+        $alt = $alt === '1' ? 'ja' : 'nein';
+        $neu = $neu === '1' ? 'ja' : 'nein';
+    } elseif ($feld === 'status') {
+        $alt = BELEG_VERLAUF_STATUS[(string)$alt] ?? $alt;
+        $neu = BELEG_VERLAUF_STATUS[(string)$neu] ?? $neu;
+    }
+    return [
+        'feld' => BELEG_VERLAUF_FELDER[$feld] ?? $feld,
+        'alt' => $verborgen ? null : (($alt === null || $alt === '') ? '' : (string)$alt),
+        'neu' => $verborgen ? null : (($neu === null || $neu === '') ? '' : (string)$neu),
+        'verborgen' => $verborgen,
+    ];
+}
+
+// Der ganze Verlauf eines Belegs, neueste zuoberst.
+//
+// $beleg: die Zeile aus belege/be_belege (id, status, entscheidung_am).
+// $nachrichten: der Faden (nur Betreiber), null = es gibt keinen.
+//
+// Jeder Eintrag: zeit, wer, wer_art ('intern' | 'empfaenger' | 'auto'),
+// was, ton ('' | 'pos' | 'neg'), details (aufklappbar, sonst leer).
+//
+// Dazu, was UNBEKANNT ist -- das darf nicht wie "nichts passiert" aussehen:
+//   log_da:     gibt es das Logbuch auf diesem Server?
+//   vor_log:    ist der Beleg aelter als die Erfassung (kein "angelegt")?
+//   log_seit:   seit wann werden Belege erfasst (erster Eintrag), oder null.
+function beleg_verlauf(PDO $pdo, array $beleg, string $tabPraefix = '', ?array $nachrichten = null): array
+{
+    $id = (int)$beleg['id'];
+    $eintraege = [];
+    $n = 0;
+    $neu = function (string $zeit, string $wer, string $art, string $was, string $ton = '',
+                     array $details = []) use (&$eintraege, &$n): void {
+        $eintraege[] = ['zeit' => $zeit, 'wer' => $wer, 'wer_art' => $art, 'was' => $was,
+                        'ton' => $ton, 'details' => $details, '_n' => $n++];
+    };
+
+    // ── Fassungen
+    $fassungen = [];
+    if (beleg_fassung_tabelle_da($pdo, $tabPraefix)) {
+        $s = $pdo->prepare('SELECT nummer, anlass, versendet_am, versendet_von FROM '
+            . beleg_tabelle($tabPraefix, 'beleg_fassung') . ' WHERE beleg_id = ? ORDER BY nummer');
+        $s->execute([$id]);
+        foreach ($s->fetchAll(PDO::FETCH_ASSOC) ?: [] as $f) {
+            $fassungen[] = $f + ['_zeit' => strtotime((string)$f['versendet_am']) ?: 0, '_benutzt' => false];
+        }
+    }
+
+    // ── Logbuch
+    $logDa = logbuch_tabelle_da($pdo, $tabPraefix);
+    $log = $logDa ? array_reverse(logbuch_lesen($pdo, 'beleg', $id, 1000, $tabPraefix)) : [];
+    $angelegt = false;
+    $gruppen = [];   // Feldaenderungen je Person und Sekunde
+    foreach ($log as $e) {
+        $feld = (string)$e['feld'];
+        $zeit = (string)$e['zeitpunkt'];
+        $wer  = (string)$e['akteur_name'];
+        switch ($feld) {
+            case 'angelegt':
+                $angelegt = true;
+                $neu($zeit, $wer, 'intern', 'Angelegt' . (str_contains((string)$e['wert_neu'], 'Doppel von')
+                    ? ' als Doppel von ' . trim(explode('Doppel von', (string)$e['wert_neu'])[1]) : ''));
+                break;
+            case 'fassung':
+                // Steht als Fassung da (siehe unten) -- sonst doppelt.
+                break;
+            case 'nachricht':
+                // Steht im Faden mit Wortlaut -- ausser es gibt ihn nicht.
+                if ($nachrichten === null) { $neu($zeit, $wer, 'intern', 'Antwort an den Empfänger gesendet'); }
+                break;
+            case 'versendet':
+                // Gehoert zu einer Fassung, die in derselben Anfrage entstand?
+                $t = strtotime($zeit) ?: 0;
+                $treffer = null;
+                foreach ($fassungen as $i => $f) {
+                    if (!$f['_benutzt'] && abs($f['_zeit'] - $t) <= 10) { $treffer = $i; break; }
+                }
+                $an = trim((string)$e['wert_neu']);
+                if ($treffer !== null) {
+                    $fassungen[$treffer]['_benutzt'] = true;
+                    $neu($zeit, $wer, 'intern', 'Fassung ' . (int)$fassungen[$treffer]['nummer']
+                        . ' versendet' . ($an !== '' ? ' an ' . $an : ''));
+                } else {
+                    $stand = 0;
+                    foreach ($fassungen as $f) { if ($f['_zeit'] <= $t + 10) { $stand = (int)$f['nummer']; } }
+                    $neu($zeit, $wer, 'intern', 'Erneut versendet' . ($stand ? ' (Fassung ' . $stand . ')' : '')
+                        . ($an !== '' ? ' an ' . $an : ''));
+                }
+                break;
+            case 'bezahlt':
+                $neu($zeit, $wer, 'intern', str_starts_with((string)$e['wert_neu'], 'bezahlt')
+                    ? 'Als ' . (string)$e['wert_neu'] . ' markiert' : 'Wieder als offen markiert');
+                break;
+            case 'zustand':
+                $neu($zeit, $wer, 'intern', (string)$e['wert_neu'] === 'archiviert' ? 'Archiviert' : 'Aus dem Archiv geholt');
+                break;
+            default:
+                $schluessel = (int)$e['akteur_id'] . '|' . $zeit;
+                if (!isset($gruppen[$schluessel])) {
+                    $gruppen[$schluessel] = ['zeit' => $zeit, 'wer' => $wer, 'zeilen' => []];
+                }
+                $gruppen[$schluessel]['zeilen'][] = $e;
+        }
+    }
+    foreach ($gruppen as $g) {
+        $details = array_map('beleg_verlauf_detail', $g['zeilen']);
+        if (count($details) === 1) {
+            $d = $details[0];
+            $was = $d['feld'] === 'Status' && !$d['verborgen']
+                ? 'Status: ' . ($d['alt'] !== '' ? $d['alt'] : '–') . ' → ' . $d['neu']
+                : $d['feld'] . ' geändert';
+            // Eine einzelne Aenderung steht ausgeschrieben da, sofern sie
+            // kurz ist; lange Texte bleiben zum Aufklappen.
+            $kurz = !$d['verborgen'] && mb_strlen((string)$d['alt']) <= 40 && mb_strlen((string)$d['neu']) <= 40;
+            if ($d['feld'] !== 'Status' && $kurz) {
+                $was = $d['feld'] . ': ' . ($d['alt'] !== '' ? $d['alt'] : '–') . ' → ' . ($d['neu'] !== '' ? $d['neu'] : '–');
+                $details = [];
+            } elseif ($d['feld'] === 'Status') {
+                $details = [];
+            }
+            $neu($g['zeit'], $g['wer'], 'intern', $was, '', $details);
+        } else {
+            $neu($g['zeit'], $g['wer'], 'intern', count($details) . ' Felder geändert', '', $details);
+        }
+    }
+
+    // ── Fassungen, die keinem Versand-Eintrag zugeordnet sind: vor dem
+    // Logbuch versendet, oder bei einer Entscheidung festgehalten.
+    foreach ($fassungen as $f) {
+        if ($f['_benutzt']) { continue; }
+        if ((string)$f['anlass'] === 'annahme') {
+            $neu((string)$f['versendet_am'], '', 'auto',
+                'Fassung ' . (int)$f['nummer'] . ' festgehalten, so wie der Empfänger sie bei seiner Entscheidung sah');
+        } else {
+            $neu((string)$f['versendet_am'], (string)$f['versendet_von'], 'intern',
+                'Fassung ' . (int)$f['nummer'] . ' versendet');
+        }
+    }
+
+    // ── Was der Empfaenger getan hat
+    $entschieden = false;
+    if (beleg_unterschrift_tabelle_da($pdo, $tabPraefix)) {
+        $s = $pdo->prepare('SELECT fassung, art, name, funktion, firma, email, zeichnungsberechtigt,
+                                   grund, empfaenger_email, code_gesendet_am, code_versuche, bestaetigt_am, erstellt_am
+                              FROM ' . beleg_tabelle($tabPraefix, 'beleg_unterschrift') . '
+                             WHERE beleg_id = ? ORDER BY id');
+        $s->execute([$id]);
+        foreach ($s->fetchAll(PDO::FETCH_ASSOC) ?: [] as $u) {
+            $name = (string)$u['name'];
+            $fnr = (int)$u['fassung'];
+            if ($u['art'] === 'ablehnung') {
+                $entschieden = true;
+                $grund = beleg_verlauf_auszug((string)($u['grund'] ?? ''));
+                $neu((string)($u['bestaetigt_am'] ?: $u['erstellt_am']), $name, 'empfaenger',
+                    'Abgelehnt (Fassung ' . $fnr . ')' . ($grund !== '' ? ' — Grund: «' . $grund . '»' : ''), 'neg');
+                continue;
+            }
+            $email = trim((string)$u['email']);
+            $abw = mb_strtolower($email) !== mb_strtolower(trim((string)$u['empfaenger_email']));
+            $was = 'Code angefordert an ' . $email
+                . ($abw ? ' — weicht von der Empfängeradresse ' . trim((string)$u['empfaenger_email']) . ' ab' : '');
+            $fehl = (int)$u['code_versuche'];
+            if ($fehl > 0 && empty($u['bestaetigt_am'])) {
+                $was .= ' · ' . $fehl . '× falscher Code' . ($fehl >= BELEG_CODE_VERSUCHE ? ', gesperrt' : '');
+            }
+            $neu((string)($u['code_gesendet_am'] ?: $u['erstellt_am']), $name, 'empfaenger', $was);
+            if (!empty($u['bestaetigt_am'])) {
+                $entschieden = true;
+                $als = trim(implode(', ', array_filter([(string)$u['funktion'], (string)$u['firma']])));
+                $neu((string)$u['bestaetigt_am'], $name, 'empfaenger',
+                    'Angenommen (Fassung ' . $fnr . ')' . ($als !== '' ? ' als ' . $als : '')
+                    . (!empty($u['zeichnungsberechtigt']) ? ' · zeichnungsberechtigt' : ''), 'pos');
+            }
+        }
+    }
+    // Eine Entscheidung ohne Unterschriftszeile: der Klick von vor ENT-688.
+    if (!$entschieden && !empty($beleg['entscheidung_am'])
+        && in_array((string)$beleg['status'], ['bestaetigt', 'abgelehnt'], true)) {
+        $ja = (string)$beleg['status'] === 'bestaetigt';
+        $neu((string)$beleg['entscheidung_am'], '', 'empfaenger',
+            ($ja ? 'Angenommen' : 'Abgelehnt') . ' per Klick, ohne Code und ohne Namen (vor ENT-688)',
+            $ja ? 'pos' : 'neg');
+    }
+
+    foreach ($nachrichten ?? [] as $m) {
+        $kunde = (string)$m['seite'] === 'kunde';
+        $neu((string)$m['erstellt_am'], (string)$m['autor'], $kunde ? 'empfaenger' : 'intern',
+            ($kunde ? 'Änderungswunsch: ' : 'Antwort an den Empfänger: ')
+            . '«' . beleg_verlauf_auszug((string)$m['text']) . '»');
+    }
+
+    usort($eintraege, fn($a, $b) => [strtotime($b['zeit']) ?: 0, $b['_n']] <=> [strtotime($a['zeit']) ?: 0, $a['_n']]);
+    foreach ($eintraege as &$e) { unset($e['_n']); }
+    unset($e);
+
+    $seit = null;
+    if ($logDa) {
+        $s = $pdo->query('SELECT MIN(zeitpunkt) FROM ' . logbuch_tabelle($tabPraefix) . " WHERE bereich = 'beleg'");
+        $seit = $s ? ($s->fetchColumn() ?: null) : null;
+    }
+    return ['eintraege' => $eintraege, 'log_da' => $logDa, 'vor_log' => $logDa && !$angelegt,
+            'log_seit' => $seit !== null ? (string)$seit : null];
+}

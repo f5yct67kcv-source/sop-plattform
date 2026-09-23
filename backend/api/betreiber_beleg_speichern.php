@@ -152,6 +152,7 @@ foreach ((array)($in['positionen'] ?? []) as $p) {
 $pdo->beginTransaction();
 try {
     $vorher = [];
+    $abdruckVorher = '';
     if ($id > 0) {
         // Angenommen heisst gesperrt (ENT-688) -- hier im Server, nicht nur
         // in der Oberflaeche. Wer am Formular vorbei speichert, veraendert
@@ -169,6 +170,7 @@ try {
             $pdo->rollBack();
             json_response(['status' => 'error', 'message' => 'Beleg nicht gefunden'], 404);
         }
+        $abdruckVorher = beleg_positionen_abdruck($pdo, $id, 'be_');
         $satz = implode(', ', array_map(fn($f) => "$f = ?", array_keys($kopf)));
         $pdo->prepare("UPDATE be_belege SET $satz WHERE id = ?")
             ->execute(array_merge(array_values($kopf), [$id]));
@@ -198,10 +200,13 @@ try {
 // Logbuch (ENT-614) NACH dem Commit -- ein Eintrag ueber eine Aenderung, die
 // dann zurueckgerollt wird, waere schlimmer als keiner. Die Positionszeilen
 // bleiben aussen vor: Sie werden bei jedem Speichern neu geschrieben, ein
-// Zeilenvergleich ergaebe Rauschen statt Verlauf. Was zaehlt, sind Kopf und
-// Summe -- und die Summe steht im Kopf.
+// Zeilenvergleich ergaebe Rauschen statt Verlauf. Seit ENT-697 steht
+// stattdessen EINE Zeile "Positionen geaendert" (ohne Werte) und das Total
+// mit alt und neu -- sonst bliebe eine reine Preisaenderung unsichtbar,
+// denn die Summe steht NICHT in $kopf.
 if ($nummer === null) {
     be_log_vergleich($pdo, $ich, 'beleg', $id, $vorher, $kopf);
+    beleg_positionen_loggen($pdo, $ich, $id, $abdruckVorher, beleg_positionen_abdruck($pdo, $id, 'be_'), 'be_');
 } else {
     be_log($pdo, $ich, 'beleg', $id, 'angelegt', null, $art . ' ' . $nummer);
 }

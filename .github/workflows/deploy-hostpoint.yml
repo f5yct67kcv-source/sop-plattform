@@ -702,6 +702,7 @@ jobs:
           cp backend/anmeldung.php dist/anmeldung.php
           cp backend/zweifaktor.php dist/zweifaktor.php
           cp backend/rechte.php dist/rechte.php
+          cp backend/neuerungen.php dist/neuerungen.php
           cp backend/logbuch.php dist/logbuch.php
           cp backend/ereignisse.php dist/ereignisse.php
           cp backend/auslagen.php dist/auslagen.php
@@ -1253,6 +1254,7 @@ jobs:
           cp backend/anmeldung.php     dist-betreiber/anmeldung.php
           cp backend/zweifaktor.php    dist-betreiber/zweifaktor.php
           cp backend/rechte.php        dist-betreiber/rechte.php
+          cp backend/neuerungen.php    dist-betreiber/neuerungen.php
           cp backend/support.php       dist-betreiber/support.php
           cp backend/supportvorgang.php dist-betreiber/supportvorgang.php
           cp backend/mandant_vorrat.php dist-betreiber/mandant_vorrat.php
@@ -1816,6 +1818,7 @@ jobs:
           cp backend/anmeldung.php dist-cupi24/anmeldung.php
           cp backend/zweifaktor.php dist-cupi24/zweifaktor.php
           cp backend/rechte.php dist-cupi24/rechte.php
+          cp backend/neuerungen.php dist-cupi24/neuerungen.php
           cp backend/logbuch.php dist-cupi24/logbuch.php
           cp backend/ereignisse.php dist-cupi24/ereignisse.php
           cp backend/auslagen.php dist-cupi24/auslagen.php

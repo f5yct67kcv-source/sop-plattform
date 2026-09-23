@@ -987,6 +987,24 @@ button.rd-aufg:active .rd-aufg-kopf { color: var(--ink); }
 .blatt-bd { padding: 18px 20px; overflow-y: auto; flex: 1; }
 .blatt-ft { padding: 14px 20px calc(14px + env(safe-area-inset-bottom) + var(--sockel)); border-top: 1px solid var(--line-soft); display: flex; gap: 10px; flex: none; }
 .blatt-ft .btn { flex: 1; }
+/* Kurze Variante fuer die Neuerungen (ENT-698, Punkt 9): etwa zwei Drittel
+   hoch statt Vollbild, und der eine Knopf wird nicht ueber die volle
+   Breite gezogen. */
+.blatt.kurz { top: auto; max-height: 82vh; border-radius: 18px 18px 0 0; }
+.blatt.kurz .blatt-ft { justify-content: flex-end; }
+.blatt.kurz .blatt-ft .btn { flex: none; min-height: 44px; padding: 0 24px; }
+/* Das Umgebungsschild (testumgebung.js) liegt unten rechts ueber allem --
+   in der Demo verdeckte es sonst genau diesen Knopf (gemessen). */
+.mit-umgebungsschild .blatt.kurz .blatt-ft { padding-bottom: calc(44px + env(safe-area-inset-bottom) + var(--sockel)); }
+.neu-gruppe + .neu-gruppe { margin-top: 18px; }
+.neu-gruppe > .neu-art { font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink-3); }
+.neu-gruppe ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.neu-gruppe li { padding-left: 14px; position: relative; }
+.neu-gruppe li::before { content: ''; position: absolute; left: 0; top: 8px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.neu-gruppe[data-art="fehlerbehebung"] li::before { background: var(--pos); }
+.neu-gruppe[data-art="verbesserung"] li::before { background: var(--warn); }
+.neu-gruppe b { display: block; font-size: 15px; font-weight: 620; }
+.neu-gruppe span { display: block; font-size: 14px; color: var(--ink-2); line-height: 1.5; margin-top: 2px; }
 /* Beantworteter Zustand (ENT-120): erst die Aussage, darunter die Knoepfe.
    Ueberschrift oben, Wert darunter -- und die Knoepfe stehen nebeneinander,
    damit keiner allein ueber die volle Breite gezogen wird. */
@@ -3175,6 +3193,10 @@ const W = {
     spOrt: 'Ort', spTreffpunkt: 'Treffpunkt', spBemerkung: 'Bemerkung', spStatus: 'Status',
     drucken: 'Drucken',
     dienstplan: 'Dienstplan',
+    // ══ Neuerungen (ENT-698) ══
+    neuTitel: 'Neu in GuardOpS',
+    neuArtNeu: 'Neu', neuArtVerbesserung: 'Verbesserungen', neuArtFehlerbehebung: 'Fehlerbehebungen',
+    neuVerstanden: 'Verstanden',
 };
 const w = k => W[k] || k;
 
@@ -3640,6 +3662,9 @@ function allesLaden() {
       // Erst NACH dem Zeichnen: Das Fenster legt sich ueber die fertige
       // Oberflaeche, nicht ueber einen halb aufgebauten Bildschirm.
       mitFensterPruefen();
+      // Danach die Neuerungen (ENT-698) -- sie weichen jedem anderen
+      // Fenster, darum erst, wenn die Mitteilungen ihres geoeffnet haben.
+      neuPruefen();
       // Noch einmal nachmessen: Die erste Messung laeuft unmittelbar nach
       // der Anmeldung, bevor irgendetwas gezeichnet ist. Ist sie nicht
       // messbar gewesen, bleibt der bisherige Wert stehen -- ein zweiter
@@ -13186,8 +13211,47 @@ function blattZeigen() {
 function blattZu() {
   $('abdunkeln').classList.remove('on');
   $('blatt').classList.remove('on');
+  $('blatt').classList.remove('kurz');
   $('blatt').setAttribute('aria-hidden', 'true');
   blattId = null;
+}
+
+// ══════════════════════════════════════════ NEUERUNGEN (ENT-698)
+// Einmal je Start, nur wenn es fuer die App ungelesene Neuerungen gibt.
+// Eingespielt wird hier nie -- das ist Sache der Verwaltung am Desktop.
+// Das Kreuz oben schliesst ohne "gelesen" (wie "Spaeter"), erst
+// "Verstanden" merkt es sich am Konto.
+let neuGezeigt = false, neuStand = null;
+function neuPruefen() {
+  if (neuGezeigt || rundgangAktiv) { return; }
+  api('neuerungen_stand.php?ziel=app').then(({ ok, data }) => {
+    if (!ok || !data || data.status !== 'ok' || !(data.neuerungen || []).length) { return; }
+    // Andere Fenster haben Vorrang: eine Mitteilung, die bestaetigt werden
+    // muss, eine offene Runde, ein offenes Blatt. Die Neuerungen kommen
+    // dann beim naechsten Start.
+    if (neuGezeigt || rundgangAktiv || $('blatt').classList.contains('on')
+        || $('mitDlg').classList.contains('on') || $('roDlg').classList.contains('on')) { return; }
+    neuGezeigt = true;
+    neuStand = data;
+    const arten = [['neu', 'neuArtNeu'], ['verbesserung', 'neuArtVerbesserung'], ['fehlerbehebung', 'neuArtFehlerbehebung']];
+    blattId = null;
+    $('blTitel').textContent = w('neuTitel');
+    $('blBody').innerHTML = arten.map(([art, k]) => {
+      const teil = data.neuerungen.filter(n => n.art === art);
+      return !teil.length ? '' : `<div class="neu-gruppe" data-art="${art}"><div class="neu-art">${esc(w(k))}</div><ul>`
+        + teil.map(n => `<li><b>${esc(n.titel)}</b><span>${esc(n.text)}</span></li>`).join('') + '</ul></div>';
+    }).join('');
+    $('blFuss').className = 'blatt-ft';
+    $('blFuss').innerHTML = `<button class="btn btn-primary" id="neuVerstanden" onclick="neuVerstanden()">${esc(w('neuVerstanden'))}</button>`;
+    $('blatt').classList.add('kurz');
+    blattZeigen();
+  });
+}
+function neuVerstanden() {
+  if (neuStand && neuStand.neueste && !neuStand.stand_unbekannt) {
+    api('neuerungen_stand.php', { method: 'POST', body: { bis: neuStand.neueste } });
+  }
+  blattZu();
 }
 
 // ══════════════════════════════════════════ START

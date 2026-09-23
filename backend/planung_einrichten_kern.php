@@ -2844,6 +2844,12 @@ function kern_spalten(): array {
     // waffentragberechtigt: eine bewusst gesetzte Berechtigung statt einer
     // Vermutung aus vergangenen Einsaetzen.
     ['mitarbeiter', 'revierdienst_berechtigt', 'ALTER TABLE mitarbeiter ADD COLUMN revierdienst_berechtigt TINYINT(1) NOT NULL DEFAULT 0'],
+    // ENT-698: Bis zu welcher Neuerung (backend/neuerungen.php) diese Person
+    // gelesen hat. NULL heisst "noch nie gefragt" und wird beim ersten
+    // Abruf auf die neueste Nummer gesetzt -- ein neues Konto sieht nichts
+    // Altes. Die Konten, die es beim Einfuehren schon gibt, setzt Abschnitt
+    // 2a1b einmalig auf 0: Sie sehen die erste Ankuendigung.
+    ['mitarbeiter', 'neuerungen_gesehen_bis', 'ALTER TABLE mitarbeiter ADD COLUMN neuerungen_gesehen_bis INT UNSIGNED NULL DEFAULT NULL'],
     ];
 }
 }
@@ -2998,7 +3004,25 @@ function kern_schema_fehlend(PDO $pdo): array {
 }
 
 if (!function_exists('planung_einrichten_ausfuehren')) {
-function planung_einrichten_ausfuehren(PDO $pdo, bool $nurPruefen, bool $mitBetreiberEbene = true): array {
+function kern_etappen(): array {
+    // Reihenfolge ist Laufreihenfolge. Die Titel stehen unter dem Balken.
+    return [
+        'tabellen'  => 'Tabellen anlegen',
+        'spalten'   => 'Spalten und Daten nachtragen',
+        'verweise'  => 'Verweise prüfen',
+        'betreiber' => 'Betreiber-Ebene',
+    ];
+}
+
+function planung_einrichten_ausfuehren(PDO $pdo, bool $nurPruefen, bool $mitBetreiberEbene = true,
+                                       ?string $etappe = null): array {
+// Etappen (ENT-698): Der Ladebalken zeigt echten Fortschritt, darum laeuft
+// jede Etappe als eigene Anfrage. Ohne $etappe laeuft alles in einem Zug
+// wie bisher -- der Pruefmodus und der zentrale Betreiber-Lauf brauchen es
+// so. Die Grenzen folgen den Abschnitten unten; Spalten und Datenpflege
+// sind EINE Etappe, weil die einmaligen Nachtraege (2a1, 2a1b) wissen
+// muessen, ob die Spalte in DIESEM Lauf entstanden ist.
+$laeuft = static fn(string $e): bool => $etappe === null || $etappe === $e;
 $getan = [];
 $schon = [];
 // Was nicht durchging. Bis hierher riss der erste fehlgeschlagene Schritt den
@@ -3012,6 +3036,7 @@ $fehler = [];
 // ── 1. Tabellen. Reihenfolge zaehlt: worauf verwiesen wird, muss zuerst da sein.
 $tabellen = kern_tabellen();
 
+if ($laeuft('tabellen')) {   // ═══ Etappe „tabellen" (1 bis 1d) ═══
 foreach ($tabellen as $name => $sql) {
     if (hat_tabelle_jetzt($pdo, $name)) {
         $schon[] = "Tabelle $name war bereits vorhanden";
@@ -3155,6 +3180,9 @@ if (hat_tabelle_jetzt($pdo, 'lohn_abzug')) {
     }
 }
 
+}   // ═══ Ende Etappe „tabellen" ═══
+
+if ($laeuft('spalten')) {   // ═══ Etappe „spalten" (2 bis 2c2) ═══
 // ── 2. Spalten nachtragen, falls die erste Fassung schon lief
 $spalten = kern_spalten();
 // Vor dem Loop merken, ob die neue Berechtigungs-Spalte schon da war -- nur
@@ -3165,6 +3193,8 @@ $spalten = kern_spalten();
 // NICHT wieder auf 1 zuruecksetzen -- das waere das genaue Gegenteil einer
 // bewusst gesetzten Berechtigung.
 $revierBerechtigungWarSchonDa = hat_spalte($pdo, 'mitarbeiter', 'revierdienst_berechtigt');
+// Gleiches Muster fuer ENT-698, siehe 2a1b.
+$neuerungenWarSchonDa = hat_spalte($pdo, 'mitarbeiter', 'neuerungen_gesehen_bis');
 foreach ($spalten as [$tabelle, $spalte, $sql]) {
     if (!hat_tabelle_jetzt($pdo, $tabelle) || hat_spalte($pdo, $tabelle, $spalte)) {
         continue;
@@ -3261,6 +3291,20 @@ if (!$revierBerechtigungWarSchonDa && hat_spalte($pdo, 'mitarbeiter', 'revierdie
                   JOIN kontrollpunkt k ON k.objekt_id = e.objekt_id AND k.aktiv = 1
              )',
             'Revierdienst-Berechtigung fuer bestehende Waechter nachgetragen', $getan, $fehler);
+    }
+}
+
+// ── 2a1b. Neuerungen: bestehende Konten einmalig auf "nichts gelesen"
+// (ENT-698). Nur in dem Lauf, in dem die Spalte entsteht -- danach heisst
+// NULL "neues Konto" und wird beim ersten Abruf auf die neueste Nummer
+// gesetzt, damit ein neues Konto nichts Altes sieht. Liefe das hier jedes
+// Mal, saehe jedes neue Konto die ganze Liste.
+if (!$neuerungenWarSchonDa && hat_spalte($pdo, 'mitarbeiter', 'neuerungen_gesehen_bis')) {
+    if ($nurPruefen) {
+        $getan[] = 'Neuerungen: Stand der bestehenden Konten fehlt noch';
+    } else {
+        schritt($pdo, 'UPDATE mitarbeiter SET neuerungen_gesehen_bis = 0 WHERE neuerungen_gesehen_bis IS NULL',
+            'Neuerungen: bestehende Konten sehen die erste Ankuendigung', $getan, $fehler);
     }
 }
 
@@ -3564,6 +3608,9 @@ if (hat_tabelle_jetzt($pdo, 'einsaetze') && hat_tabelle_jetzt($pdo, 'einsatz_zut
     }
 }
 
+}   // ═══ Ende Etappe „spalten" ═══
+
+if ($laeuft('verweise')) {   // ═══ Etappe „verweise" (3) ═══
 // ── 3. Verweise und Index nachtragen, wenn die Spalten neu dazugekommen sind.
 // Liste steht in kern_verweise() (siehe dort), damit kern_verweise_fehlend()
 // dieselbe Quelle prueft.
@@ -3578,6 +3625,8 @@ foreach (kern_verweise() as [$tabelle, $spalte, $sql]) {
     schritt($pdo, $sql, "Verweis $tabelle.$spalte", $getan, $fehler);
 }
 
+}   // ═══ Ende Etappe „verweise" ═══
+
 // ── 3b. Betreiber-Ebene (ENT-529) ─────────────────────────────────────
 //
 // Laeuft NUR, solange der Bootstrap offen ist -- also bis das erste
@@ -3588,7 +3637,7 @@ foreach (kern_verweise() as [$tabelle, $spalte, $sql]) {
 // Ein Fehlschlag hier bricht die uebrige Einrichtung NICHT ab. Die
 // Betriebstabellen sind das Wichtigere; was hier schiefgeht, wird gemeldet
 // und laesst sich ueber api/betreiber_einrichten.php nachholen.
-if ($mitBetreiberEbene) {
+if ($mitBetreiberEbene && $laeuft('betreiber')) {   // Etappe „betreiber"
 try {
     $stamm = betreiber_db();
     if (be_bootstrap_offen($stamm)) {
