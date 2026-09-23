@@ -533,8 +533,47 @@ function require_recht(array $user, string $recht): void
     json_response([
         'status'  => 'error',
         'recht'   => $recht,
-        'message' => 'Dafür fehlt dir die Berechtigung.',
+        'message' => recht_fehlt_meldung($recht),
     ], 403);
+}
+
+// Die Meldung zu einem fehlenden Recht (2026-09-23, Anordnung des
+// Projektinhabers). Vorher stand hier nur "Dafuer fehlt dir die
+// Berechtigung." -- und die meisten Oberflaechen zeigten nicht einmal
+// das, sondern "Anlegen fehlgeschlagen.". Wer abgewiesen wird, muss lesen
+// koennen, dass die ROLLE der Grund ist, welches Recht fehlt und welche
+// Rolle es mitbringt. Sonst sucht er den Fehler in seinen Eingaben.
+//
+// Die Rollen kommen aus dem Code-Katalog, nicht aus der Datenbank: Eigene
+// Profile koennen das Recht ebenfalls tragen, darum "zum Beispiel". Ohne
+// Datenbank, damit sie sich fuer sich allein pruefen laesst.
+function recht_fehlt_meldung(string $recht): string
+{
+    $k = bereiche_katalog();
+    $trenner = strrpos($recht, '_');
+    $bereich = $trenner === false ? $recht : substr($recht, 0, $trenner);
+    $stufe   = $trenner === false ? '' : substr($recht, $trenner + 1);
+    if (!isset($k[$bereich]) || !in_array($stufe, $k[$bereich]['stufen'], true)) {
+        // Ein Recht, das der Katalog nicht kennt, bekommt trotzdem eine
+        // Auskunft, die die Rolle als Grund nennt -- nur ohne Namen.
+        return 'Deiner Rolle fehlt das Recht für diese Aktion. '
+             . 'Rollen werden unter Administration → Einstellungen → „Rollen & Berechtigungen“ vergeben.';
+    }
+    $titel = $k[$bereich]['titel'] . ': ' . $stufe;
+    $mit = [];
+    foreach (system_rollen() as $rolle) {
+        $hat = $rolle['stufen'][$bereich] ?? null;
+        if ($hat === STUFE_SCHREIBEN || ($hat !== null && $hat === $stufe)) {
+            $mit[] = $rolle['titel'];
+        }
+    }
+    $satz = 'Deiner Rolle fehlt das Recht „' . $titel . '“.';
+    if ($mit) {
+        $letzte = array_pop($mit);
+        $satz .= ' Es gehört zum Beispiel zur Rolle '
+               . ($mit ? implode(', ', $mit) . ' oder ' : '') . $letzte . '.';
+    }
+    return $satz . ' Rollen werden unter Administration → Einstellungen → „Rollen & Berechtigungen“ vergeben.';
 }
 
 // Fuer Endpunkte, die lesen UND schreiben (etwa objekt_personen.php: GET
@@ -580,7 +619,9 @@ function require_verwaltung(array $user): void
     if (darf_verwaltung($user)) { return; }
     json_response([
         'status'  => 'error',
-        'message' => 'Dieser Bereich ist der Verwaltung vorbehalten.',
+        'message' => 'Dieser Bereich ist der Verwaltung vorbehalten. Deine Rolle trägt '
+                   . 'kein Recht im Cockpit. Rollen werden unter Administration → '
+                   . 'Einstellungen → „Rollen & Berechtigungen“ vergeben.',
     ], 403);
 }
 
