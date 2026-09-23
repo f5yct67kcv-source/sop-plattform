@@ -34,6 +34,11 @@
 // ersten echten Vorfuehrung nachholen.
 (function () {
   var APP_ENV = 'production';
+  // Fuer den Assistenten (ENT-699): Er erscheint nur ausserhalb von
+  // Produktion und Demo. VOR dem return gesetzt, damit auch Produktion den
+  // Wert traegt -- sonst saehe "production" im Cockpit aus wie "unbekannt".
+  // Die massgebliche Sperre steht im Server (ki_assistent_erlaubt()).
+  window.APP_UMGEBUNG = APP_ENV;
   if (APP_ENV === 'production') { return; }
 
   var istDemo = APP_ENV === 'demo';

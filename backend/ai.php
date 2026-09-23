@@ -995,3 +995,199 @@ function anthropic_extract_einsatz_bild(string $bildBase64, string $mimeType, ar
     }
     return ki_werkzeug_eingabe($data, 'extract_einsatz_bild');
 }
+
+// ══════════════════════════════════════════ ASSISTENT (ENT-699, nur Testumgebung)
+//
+// Die Spracheingabe (ENT-695) fuellt Formulare vor. Der Assistent sieht nach
+// und antwortet: "Was haben Kunden seit gestern angenommen?", "Wo fehlen
+// diese Woche noch Leute?", "Wer kann Samstag 18 bis 23 Uhr?", "Welche
+// Rechnungen sind ueberfaellig?".
+//
+// WO DIE WERKZEUGE LAUFEN: im Browser, nicht hier. Belegung (zaehltAlsBesetzt),
+// Konflikte (konflikte), Ruhezeit (ruheLuecken), Sperren (gesperrtAm) und
+// Faelligkeit (reFaelligTage) rechnet das Cockpit heute ausschliesslich im
+// Browser. Eine zweite Fassung hier liefe frueher oder spaeter auseinander,
+// und der Assistent sagte dann etwas anderes als der Bildschirm daneben. Die
+// Werkzeuge rufen darum dieselben Funktionen auf, auf Daten, die ueber die
+// bestehenden, rechtegeprueften Endpunkte geladen sind. Das Modell sieht
+// damit nie mehr, als die Person selbst sehen darf.
+//
+// Dieser Server reicht das Gespraech nur weiter: Er prueft Form und Umfang
+// der Nachrichten, haengt Systemtext und Werkzeugliste an und gibt die
+// Antwort des Modells zurueck. Gefaelschte Werkzeugergebnisse aus dem
+// Browser koennen nur die eigene Antwort verfaelschen -- der Assistent
+// schreibt nichts.
+//
+// Nur ausserhalb von Produktion und Demo (Entscheid des Projektinhabers:
+// zuerst auf test.guardops.ch). Die Sperre steht hier im Server; dass die
+// Figur in Produktion gar nicht erscheint, erspart nur den Umweg.
+
+// Derselbe exakte Vergleich wie umgebung_ist_produktion() in db.php, hier
+// eigenstaendig, weil ai.php db.php nicht einbindet (pruef_ki.php laedt nur
+// diese Datei). Fail-safe in dieselbe Richtung wie dort: Nur das exakte
+// "production" gilt als Produktion -- ein unersetzter Platzhalter oeffnet
+// den Assistenten also, statt ihn in einer Testumgebung zu verstecken. Das
+// ist hier vertretbar, weil Produktion den Wert beim Deploy zwingend bekommt.
+function ki_assistent_erlaubt(string $umgebung): bool
+{
+    return $umgebung !== 'production' && $umgebung !== 'demo';
+}
+
+// Name => Beschreibung und Eingaben. Das Recht steht dabei, damit Systemtext,
+// Oberflaeche und Pruefung dieselbe Liste lesen; geprueft wird es von den
+// Endpunkten, die das Werkzeug im Browser aufruft.
+function ki_assistent_werkzeuge(): array
+{
+    $datum = ['type' => 'string', 'description' => 'Format JJJJ-MM-TT'];
+    $zeit = ['type' => 'string', 'description' => 'Format HH:MM'];
+    return [
+        'offerten_entscheide' => [
+            'recht' => 'offerten_lesen',
+            'titel' => 'Offertenentscheide der Kunden',
+            'description' => 'Offerten, ueber die ein Kunde am Link entschieden hat (angenommen oder abgelehnt), mit '
+                . 'Zeitpunkt und ob der Entscheid im Cockpit schon angesehen wurde. Interne Statuswechsel '
+                . 'beantwortet dieses Werkzeug nicht.',
+            'input_schema' => ['type' => 'object', 'properties' => [
+                'seit' => $datum + ['description' => 'Nur Entscheide ab diesem Tag, Format JJJJ-MM-TT. Weglassen = alle.'],
+                'nur_ungesehen' => ['type' => 'boolean', 'description' => 'Nur Entscheide, die im Cockpit noch nicht angesehen wurden.'],
+            ]],
+        ],
+        'offene_plaetze' => [
+            'recht' => 'einsaetze_lesen',
+            'titel' => 'Einsätze mit offenen Plätzen',
+            'description' => 'Einsaetze in einem Zeitraum, bei denen weniger Personen zugesagt oder zugeteilt sind als '
+                . 'benoetigt. Abgesagte Einsaetze zaehlen nicht, abgelehnte Zusagen besetzen keinen Platz.',
+            'input_schema' => ['type' => 'object', 'properties' => ['von' => $datum, 'bis' => $datum], 'required' => ['von', 'bis']],
+        ],
+        'verfuegbare_mitarbeitende' => [
+            'recht' => 'einsaetze_lesen',
+            'titel' => 'Wer ist verfügbar',
+            'description' => 'Aktive Mitarbeitende fuer ein Zeitfenster, eingeteilt in verfuegbar, mit Einschraenkung '
+                . '(Ruhezeit-Hinweis, selbst gesperrter Tag, beantragte Abwesenheit) und nicht verfuegbar (schon '
+                . 'eingeteilt, bewilligte Abwesenheit).',
+            'input_schema' => ['type' => 'object', 'properties' => ['datum' => $datum, 'von' => $zeit, 'bis' => $zeit],
+                'required' => ['datum', 'von', 'bis']],
+        ],
+        'offene_rechnungen' => [
+            'recht' => 'offerten_lesen',
+            'titel' => 'Offene Rechnungen',
+            'description' => 'Versendete, noch nicht bezahlte Rechnungen mit Faelligkeit. Entwuerfe zaehlen nicht als offen, '
+                . 'werden aber gezaehlt.',
+            'input_schema' => ['type' => 'object', 'properties' => [
+                'nur_ueberfaellig' => ['type' => 'boolean', 'description' => 'Nur Rechnungen, deren Frist abgelaufen ist.'],
+            ]],
+        ],
+    ];
+}
+
+function ki_assistent_system(string $heute): string
+{
+    $tage = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+    $ts = strtotime($heute . ' 12:00:00');
+    $wochentag = $ts ? $tage[(int)date('w', $ts)] : '';
+    $koennen = implode(', ', array_map(fn($w) => $w['titel'], ki_assistent_werkzeuge()));
+    return "Du bist der Assistent von GuardOpS, einer Software fuer Sicherheitsdienste, und sprichst mit einer "
+        . "Person aus der Einsatzplanung. Heute ist {$wochentag}, {$heute}.\n\n"
+        . "Antworte auf Deutsch in Schweizer Rechtschreibung (kein scharfes S), in du-Form, kurz und zum Vorlesen "
+        . "geeignet: hoechstens drei Saetze, keine Aufzaehlungszeichen, keine Tabellen, kein Markdown. Die Einzelheiten "
+        . "zeigt die Oberflaeche als Trefferliste unter deiner Antwort; wiederhole sie nicht vollstaendig.\n\n"
+        . "Regeln, ohne Ausnahme:\n"
+        . "- Zahlen, Namen, Daten und Betraege nur aus Werkzeugergebnissen. Nie schaetzen, nie ergaenzen.\n"
+        . "- Meldet ein Werkzeug kein_recht, sag, dass dafuer die Berechtigung fehlt. Meldet es fehler, sag, dass die "
+        . "Auskunft gerade nicht verfuegbar ist. Beides ist etwas anderes als 'keine'.\n"
+        . "- Steht in einem Ergebnis ein hinweis (zum Beispiel, dass etwas nicht beruecksichtigt ist), gib ihn weiter.\n"
+        . "- Offene Plaetze und Einsaetze sind verschiedene Einheiten: nenne beide getrennt, nie das eine als das andere.\n"
+        . "- Ruhezeit-Hinweise gibst du so weiter, wie sie im Ergebnis stehen. Du legst den GAV nicht aus.\n"
+        . "- Du kannst nichts aendern, speichern oder versenden. Wirst du darum gebeten, sag das.\n"
+        . "- Rechne relative Angaben (morgen, Samstag, diese Woche) selbst in Daten um.\n"
+        . "- Passt keine Frage zu deinen Werkzeugen, sag, was du heute beantworten kannst: {$koennen}.";
+}
+
+// Form und Umfang der Nachrichten aus dem Browser. Gibt die bereinigte
+// Liste zurueck, oder [] wenn sie nicht taugt. Rein, ohne Netz.
+function ki_assistent_nachrichten_pruefen($roh): array
+{
+    if (!is_array($roh) || $roh === [] || count($roh) > 40) {
+        return [];
+    }
+    $werkzeuge = ki_assistent_werkzeuge();
+    $aus = [];
+    foreach (array_values($roh) as $i => $n) {
+        $rolle = is_array($n) ? ($n['role'] ?? '') : '';
+        if (!in_array($rolle, ['user', 'assistant'], true) || ($i === 0 && $rolle !== 'user')) {
+            return [];
+        }
+        $inhalt = $n['content'] ?? null;
+        if (is_string($inhalt)) {
+            $t = trim($inhalt);
+            if ($t === '' || mb_strlen($t) > 2000) { return []; }
+            $aus[] = ['role' => $rolle, 'content' => $t];
+            continue;
+        }
+        if (!is_array($inhalt) || $inhalt === [] || count($inhalt) > 10) {
+            return [];
+        }
+        $bloecke = [];
+        foreach ($inhalt as $b) {
+            $typ = is_array($b) ? ($b['type'] ?? '') : '';
+            if ($typ === 'text' && is_string($b['text'] ?? null) && mb_strlen($b['text']) <= 4000) {
+                $bloecke[] = ['type' => 'text', 'text' => $b['text']];
+            } elseif ($typ === 'tool_use' && $rolle === 'assistant' && isset($werkzeuge[$b['name'] ?? ''])
+                && is_string($b['id'] ?? null) && preg_match('/^[A-Za-z0-9_-]{1,100}$/', $b['id'])) {
+                $bloecke[] = ['type' => 'tool_use', 'id' => $b['id'], 'name' => $b['name'],
+                    'input' => (object)(is_array($b['input'] ?? null) ? $b['input'] : [])];
+            } elseif ($typ === 'tool_result' && $rolle === 'user' && is_string($b['tool_use_id'] ?? null)
+                && preg_match('/^[A-Za-z0-9_-]{1,100}$/', $b['tool_use_id'])
+                && is_string($b['content'] ?? null) && strlen($b['content']) <= 30000) {
+                $bloecke[] = ['type' => 'tool_result', 'tool_use_id' => $b['tool_use_id'], 'content' => $b['content']];
+            } else {
+                return [];
+            }
+        }
+        $aus[] = ['role' => $rolle, 'content' => $bloecke];
+    }
+    // Das Modell antwortet nur auf eine Nachricht der Person (Text oder
+    // Werkzeugergebnis), nie auf seine eigene.
+    if (end($aus)['role'] !== 'user' || strlen((string)json_encode($aus)) > 150000) {
+        return [];
+    }
+    return $aus;
+}
+
+// Nur Text und Werkzeugaufrufe gehen zurueck in den Browser.
+function ki_assistent_antwort_filtern(array $data): array
+{
+    $werkzeuge = ki_assistent_werkzeuge();
+    $bloecke = [];
+    foreach (($data['content'] ?? []) as $b) {
+        if (($b['type'] ?? '') === 'text') {
+            $bloecke[] = ['type' => 'text', 'text' => (string)($b['text'] ?? '')];
+        } elseif (($b['type'] ?? '') === 'tool_use' && isset($werkzeuge[$b['name'] ?? ''])) {
+            $bloecke[] = ['type' => 'tool_use', 'id' => (string)$b['id'], 'name' => (string)$b['name'],
+                'input' => $b['input'] ?? new stdClass()];
+        }
+    }
+    return ['content' => $bloecke, 'stop_reason' => (string)($data['stop_reason'] ?? '')];
+}
+
+function anthropic_assistent(array $nachrichten, string $heute): ?array
+{
+    $tools = [];
+    foreach (ki_assistent_werkzeuge() as $name => $w) {
+        $tools[] = ['name' => $name, 'description' => $w['description'], 'input_schema' => $w['input_schema']];
+    }
+    // Sonnet statt Haiku (Entscheid des Projektinhabers, ENT-699): Hier waehlt
+    // das Modell Werkzeuge selbst und fasst zusammen; das kleine Modell tut
+    // das bei zusammengesetzten Fragen weniger verlaesslich.
+    $data = ki_aufruf([
+        'model' => 'claude-sonnet-5',
+        'max_tokens' => 800,
+        'system' => ki_assistent_system($heute),
+        'tools' => $tools,
+        'messages' => $nachrichten,
+    ], 40);
+    if ($data === null) {
+        return null;
+    }
+    return ki_assistent_antwort_filtern($data);
+}

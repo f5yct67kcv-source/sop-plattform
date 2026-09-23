@@ -1,0 +1,280 @@
+// Assistent (ENT-699, nur Testumgebung).
+//
+// Geprueft wird, was der Assistent AUSSAGT, nicht wie er es formuliert:
+//  - er erscheint nur ausserhalb von Produktion und Demo;
+//  - die Werkzeuge rechnen mit denselben Regeln wie das Cockpit (abgelehnte
+//    Zusage besetzt nicht, abgesagter Einsatz zaehlt nicht, Ueberfaelligkeit
+//    aus reFaelligTage, Konflikte aus konflikte());
+//  - "kein Recht", "nicht geladen" und "nichts gefunden" kommen beim Modell
+//    als drei verschiedene Ergebnisse an;
+//  - Einsaetze und offene Plaetze bleiben getrennte Zahlen;
+//  - die Figur laesst sich verschieben, stummschalten und schliessen --
+//    gemessen am gerenderten Zustand.
+//
+// Das Modell selbst ist hier ein Drehbuch: Es ruft ein vorgegebenes Werkzeug
+// auf und antwortet danach. Geprueft wird, was der Browser daraus macht.
+import { WURZEL, OUT, browserPfad } from './pfade.mjs';
+import { chromium } from 'playwright';
+import { readFileSync } from 'fs';
+
+const EXE = browserPfad();
+const ok = [], bad = [];
+const check = (n, c) => (c ? ok : bad).push(n);
+
+const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+const tag = n => iso(new Date(Date.now() + n * 864e5));
+
+const MA = [
+  { id: 1, name: 'hmuster', vorname: 'Hans', nachname: 'Muster', aktiv: 1, ist_admin: 1 },
+  { id: 2, name: 'abeispiel', vorname: 'Anna', nachname: 'Beispiel', aktiv: 1 },
+  { id: 3, name: 'ptest', vorname: 'Peter', nachname: 'Test', aktiv: 1 },
+  { id: 4, name: 'lprobe', vorname: 'Lea', nachname: 'Probe', aktiv: 1 },
+  { id: 5, name: 'amuster', vorname: 'Alt', nachname: 'Muster', aktiv: 0 },
+];
+// Einsatz 11: Bedarf 2, eine Zusage, eine Absage -> 1 Platz offen.
+// Einsatz 12: voll. Einsatz 13: abgesagt (zaehlt nicht). Einsatz 14: ausserhalb.
+// Einsatz 15: Bedarf 3, niemand -> 3 offen. Zusammen: 2 Einsaetze, 4 Plaetze.
+const EI = [
+  { id: 11, datum: tag(2), von: '18:00:00', bis: '23:00:00', bedarf: 2, status: 'geplant', kunde_name: 'Beispiel AG', titel: 'Verkehrsdienst',
+    mitarbeiter: [{ id: 1, name: 'hmuster', zusage: 'zugesagt' }, { id: 2, name: 'abeispiel', zusage: 'abgelehnt' }] },
+  { id: 12, datum: tag(3), von: '07:00:00', bis: '16:00:00', bedarf: 1, status: 'geplant', kunde_name: 'Muster GmbH', titel: 'Objektschutz',
+    mitarbeiter: [{ id: 3, name: 'ptest', zusage: 'offen' }] },
+  { id: 13, datum: tag(3), von: '07:00:00', bis: '16:00:00', bedarf: 3, status: 'abgesagt', kunde_name: 'Beispiel AG', titel: 'Abgesagt', mitarbeiter: [] },
+  { id: 14, datum: tag(40), von: '07:00:00', bis: '16:00:00', bedarf: 5, status: 'geplant', kunde_name: 'Beispiel AG', titel: 'Spaeter', mitarbeiter: [] },
+  { id: 15, datum: tag(4), von: '20:00:00', bis: '06:00:00', bedarf: 3, status: 'geplant', kunde_name: 'Muster GmbH', titel: 'Nachtwache', mitarbeiter: [] },
+];
+const OFFERTEN = [
+  { id: 21, art: 'offerte', nummer: 'OF-1', kunde_name: 'Beispiel AG', titel: 'Umzug', status: 'bestaetigt', total_rappen: 150000, aktiv: 1,
+    entscheidung_am: tag(-1) + ' 10:00:00', entscheidung_gesehen_am: null },
+  { id: 22, art: 'offerte', nummer: 'OF-2', kunde_name: 'Muster GmbH', titel: 'Fest', status: 'abgelehnt', total_rappen: 90000, aktiv: 1,
+    entscheidung_am: tag(-5) + ' 09:00:00', entscheidung_gesehen_am: tag(-4) + ' 08:00:00' },
+  { id: 23, art: 'offerte', nummer: 'OF-3', kunde_name: 'Beispiel AG', titel: 'Intern', status: 'bestaetigt', total_rappen: 50000, aktiv: 1,
+    entscheidung_am: null, entscheidung_gesehen_am: null },
+];
+const RECHNUNGEN = [
+  { id: 31, art: 'rechnung', nummer: 'RE-1', kunde_name: 'Beispiel AG', status: 'versendet', bezahlt: 0, faellig_bis: tag(-3), total_rappen: 120000, aktiv: 1 },
+  { id: 32, art: 'rechnung', nummer: 'RE-2', kunde_name: 'Muster GmbH', status: 'versendet', bezahlt: 0, faellig_bis: tag(10), total_rappen: 80000, aktiv: 1 },
+  { id: 33, art: 'rechnung', nummer: 'RE-3', kunde_name: 'Muster GmbH', status: 'versendet', bezahlt: 1, faellig_bis: tag(-20), total_rappen: 70000, aktiv: 1 },
+  { id: 34, art: 'rechnung', nummer: 'RE-4', kunde_name: 'Beispiel AG', status: 'entwurf', bezahlt: 0, faellig_bis: null, total_rappen: 10000, aktiv: 1 },
+];
+
+// Drehbuch des Modells: Auf eine Frage ruft es `aufruf` auf, auf das
+// Ergebnis antwortet es mit `antwort`. Was es zurueckbekam, wird gemerkt.
+let drehbuch = null, belegeGesperrt = false, abwesenheitGesperrt = true, assistentAntwort = null;
+const zurueck = [];
+const umgebung = { wert: '__APP_ENV__' };
+
+const browser = await chromium.launch({ executablePath: EXE });
+async function neueSeite() {
+  const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } });
+  page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
+  await page.addInitScript(() => {
+    // Die Stimme des Browsers wird mitgeschrieben statt abgespielt.
+    window.__gesprochen = [];
+    const synth = { speak: u => { window.__gesprochen.push(u.text); if (u.onstart) u.onstart(); setTimeout(() => u.onend && u.onend(), 30); },
+      cancel: () => {}, getVoices: () => [{ lang: 'de-CH', name: 'Test' }] };
+    Object.defineProperty(window, 'speechSynthesis', { value: synth, configurable: true });
+    window.SpeechSynthesisUtterance = function (t) { this.text = t; };
+  });
+  await page.route('**/testumgebung.js', r => r.fulfill({ contentType: 'text/javascript',
+    body: readFileSync(`${WURZEL}/testumgebung.js`, 'utf8').replace(/__APP_ENV__/g, umgebung.wert) }));
+  await page.route('**/api/**', route => {
+    const req = route.request(), p = req.url().split('/api/')[1];
+    const send = (b, s) => route.fulfill({ status: s || 200, contentType: 'application/json', body: JSON.stringify(b) });
+    if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'hmuster', ist_admin: true });
+    if (p.startsWith('ki_assistent')) {
+      if (assistentAntwort) return send(assistentAntwort[0], assistentAntwort[1]);
+      const body = JSON.parse(req.postData() || '{}');
+      const letzte = body.messages[body.messages.length - 1];
+      if (typeof letzte.content === 'string') {
+        return send({ status: 'ok', stop_reason: 'tool_use', content: [
+          { type: 'text', text: 'Ich sehe nach.' },
+          { type: 'tool_use', id: 'wz_' + zurueck.length, name: drehbuch.name, input: drehbuch.input }] });
+      }
+      const r = letzte.content.find(b => b.type === 'tool_result');
+      zurueck.push(JSON.parse(r.content));
+      return send({ status: 'ok', stop_reason: 'end_turn', content: [{ type: 'text', text: drehbuch.antwort }] });
+    }
+    if (p.startsWith('einsatz_list')) return send({ status: 'ok', einsaetze: EI });
+    if (p.startsWith('mitarbeiter_list')) return send({ status: 'ok', mitarbeiter: MA, listen: {} });
+    if (p.startsWith('verfuegbarkeit_list')) return send({ status: 'ok', sperren: [{ mitarbeiter_id: 4, datum: tag(2), bemerkung: 'Familienfest' }] });
+    if (p.startsWith('abwesenheit_list')) return abwesenheitGesperrt
+      ? send({ status: 'error', message: 'Dafür fehlt dir die Berechtigung.' }, 403)
+      : send({ status: 'ok', abwesenheiten: [{ id: 1, mitarbeiter_id: 3, typ: 'Ferien', von: tag(1), bis: tag(5), status: 'genehmigt' }] });
+    if (p.startsWith('beleg_list')) {
+      if (belegeGesperrt) return send({ status: 'error', message: 'Dafür fehlt dir die Berechtigung.' }, 403);
+      return send({ status: 'ok', belege: p.includes('art=rechnung') ? RECHNUNGEN : OFFERTEN, naechste_nummer: 'X' });
+    }
+    if (p.startsWith('dashboard_stats')) return send({ status: 'ok', kpi: { rapporte_monat: 0, rapporte_vormonat: 0,
+      stunden_monat: 0, stunden_vormonat: 0, mitarbeiter: 4, kunden: 2, rapporte_total: 0 },
+      verlauf: [], angemeldet: [], pro_mitarbeiter: [], letzte_rapporte: [], sperr_ereignisse: [] });
+    return send({ status: 'ok', einsaetze: [], rapporte: [], objekte: [], feiertage: [], gepflegt: {}, sperren: [], kunden: [] });
+  });
+  await page.goto(`file://${WURZEL}/dashboard.html`);
+  await page.fill('#gName', 'hmuster'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
+  await page.waitForSelector('#shell.on'); await page.waitForTimeout(600);
+  return page;
+}
+const box = (page, sel) => page.evaluate(s => { const r = document.querySelector(s).getBoundingClientRect();
+  return { x: r.x, y: r.y, w: r.width, h: r.height, r: r.right, b: r.bottom }; }, sel);
+
+// ══════════ NUR AUSSERHALB VON PRODUKTION UND DEMO
+for (const env of ['production', 'demo']) {
+  umgebung.wert = env;
+  const p = await neueSeite();
+  check(`KRITISCH: in „${env}" erscheint der Assistent nicht`, !(await p.isVisible('#asWidget')));
+  await p.close();
+}
+umgebung.wert = 'staging';
+const page = await neueSeite();
+check('Auf der Testumgebung ist die Figur da', await page.isVisible('#asFigur'));
+const f = await box(page, '#asFigur');
+check(`Die Figur ist rund 76 px gross (${Math.round(f.w)}×${Math.round(f.h)})`, Math.abs(f.w - 76) <= 1 && Math.abs(f.h - 76) <= 1);
+check('Die Figur steht rechts unten, ganz im Bild (gemessen)', f.r <= 1500 && f.b <= 1000 && f.x > 1300 && f.y > 850);
+check('Das Fenster ist zu Beginn zu', !(await page.isVisible('#asPanel')));
+const marke = await page.evaluate(() => {
+  const el = [...document.body.querySelectorAll('div')].find(d => d.textContent === 'TESTUMGEBUNG' && getComputedStyle(d).position === 'fixed');
+  if (!el) { return null; } const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, r: r.right, b: r.bottom };
+});
+check('Die Figur verdeckt den Aufkleber TESTUMGEBUNG nicht (gemessen)',
+  marke !== null && (f.b <= marke.y || f.x >= marke.r || f.r <= marke.x || f.y >= marke.b));
+
+await page.click('#asFigur');
+await page.waitForTimeout(200);
+check('Ein Klick auf die Figur öffnet das Fenster', await page.isVisible('#asPanel'));
+const pn = await box(page, '#asPanel');
+check('Das Fenster steht ganz im Bild, über der Figur (gemessen)', pn.x >= 0 && pn.y >= 0 && pn.r <= 1500 && pn.b <= f.y + 1);
+check('Das Fenster sagt, dass es nichts ändert', /ändere nichts/.test(await page.textContent('#asVerlauf')));
+
+const fragen = async (text, d) => {
+  drehbuch = d;
+  await page.fill('#asText', text);
+  await page.click('#asBtn');
+  await page.waitForFunction(() => !document.getElementById('asBtn').disabled, null, { timeout: 5000 });
+  await page.waitForTimeout(80);
+  return zurueck[zurueck.length - 1];
+};
+// Nur der Antworttext, ohne die Trefferliste darunter.
+const letzteAntwort = () => page.evaluate(() => { const m = [...document.querySelectorAll('#asVerlauf .as-msg.er')].pop(); return m ? m.firstChild.textContent : ''; });
+
+// ══════════ OFFENE PLAETZE
+let r = await fragen('Wo fehlen diese Woche noch Leute?', { name: 'offene_plaetze', input: { von: tag(0), bis: tag(6) }, antwort: 'Zwei Einsätze haben noch vier offene Plätze.' });
+check('Offene Plätze: nur Einsätze mit Lücke (11 und 15), nicht der volle, nicht der abgesagte, nicht der spätere',
+  r.einsaetze_mit_offenen_plaetzen === 2 && r.posten.length === 2);
+check('KRITISCH: eine abgelehnte Zusage besetzt keinen Platz (Einsatz 11: 1 von 2)',
+  r.posten.some(x => x.besetzt === 1 && x.offen === 1 && x.bedarf === 2));
+check('KRITISCH: Einsätze und offene Plätze sind getrennte Zahlen (2 Einsätze, 4 Plätze)',
+  r.einsaetze_mit_offenen_plaetzen === 2 && r.offene_plaetze_gesamt === 4 && r.einsaetze_im_zeitraum === 3);
+const treffer = await page.$$eval('#asVerlauf .as-msg.er:last-child .as-treffer button', b => b.map(x => x.textContent));
+check('Die Treffer darunter nennen dieselben Einsätze', treffer.length === 2 && treffer.every(t => /(Platz|Plätze) offen/.test(t)));
+check('Die Antwort wird vorgelesen', (await page.evaluate(() => window.__gesprochen)).includes('Zwei Einsätze haben noch vier offene Plätze.'));
+await page.evaluate(() => { window.__epAuf = null; window.epAuf = id => { window.__epAuf = id; }; });
+await page.click('#asVerlauf .as-msg.er:last-child .as-treffer button');
+check('Ein Klick auf einen Treffer öffnet den Einsatz', await page.evaluate(() => window.__epAuf === 11));
+
+// ══════════ WER IST VERFUEGBAR
+r = await fragen('Wer kann übermorgen von 18 bis 23 Uhr?', { name: 'verfuegbare_mitarbeitende', input: { datum: tag(2), von: '18:00', bis: '23:00' }, antwort: 'Einer ist frei.' });
+const inGruppe = (g, n) => (r[g] || []).some(x => x.name.includes(n));
+check('KRITISCH: wer zur selben Zeit eingeteilt ist, ist nicht verfügbar (konflikte())', inGruppe('nicht_verfuegbar', 'Muster') && inGruppe('nicht_verfuegbar', 'Hans'));
+// Anna hat den Einsatz zur selben Zeit abgelehnt. konflikte() im Cockpit
+// zaehlt auch eine abgelehnte Zuteilung als "bereits eingeteilt" -- der
+// Assistent sagt dasselbe wie der Zuteil-Dialog, nicht etwas anderes. Ob
+// das so bleiben soll, ist eine eigene Frage (als Befund gemeldet).
+check('Dieselbe Regel wie der Zuteil-Dialog: auch eine abgelehnte Zuteilung zählt als eingeteilt (Anna)', inGruppe('nicht_verfuegbar', 'Anna'));
+check('Ein selbst gesperrter Tag ist eine Einschränkung, keine Absage (Lea)', inGruppe('mit_einschraenkung', 'Lea'));
+check('Inaktive Mitarbeitende zählen nicht', !JSON.stringify(r).includes('Alt Muster'));
+check('KRITISCH: ohne Recht auf Abwesenheiten steht im Ergebnis, dass sie fehlen -- nicht stillschweigend „verfügbar"',
+  /Abwesenheiten.*nicht beruecksichtigt/.test(r.hinweis) && !inGruppe('nicht_verfuegbar', 'Peter'));
+check('Ruhezeit-Hinweis: Peter arbeitet am Folgetag um 7 Uhr -- mit Einschränkung, nicht verfügbar',
+  inGruppe('mit_einschraenkung', 'Peter') && r.mit_einschraenkung.find(x => x.name.includes('Peter')).gruende.some(g => /Ruhezeit/.test(g)));
+abwesenheitGesperrt = false;
+r = await fragen('Und jetzt?', { name: 'verfuegbare_mitarbeitende', input: { datum: tag(2), von: '18:00', bis: '23:00' }, antwort: 'Niemand ist ganz frei.' });
+check('Mit Recht: bewilligte Ferien machen nicht verfügbar (Peter)', inGruppe('nicht_verfuegbar', 'Peter') && !/nicht beruecksichtigt/.test(r.hinweis));
+
+// ══════════ OFFERTENENTSCHEIDE
+r = await fragen('Was haben Kunden entschieden?', { name: 'offerten_entscheide', input: {}, antwort: 'Eine angenommen, eine abgelehnt.' });
+check('Entscheide: nur Offerten mit Kundenentscheid am Link (OF-3 ohne Entscheid fehlt)', r.anzahl === 2 && !JSON.stringify(r).includes('OF-3'));
+check('Angenommen und abgelehnt getrennt', r.angenommen === 1 && r.abgelehnt === 1);
+check('Der Hinweis, dass interne Statuswechsel nicht enthalten sind, geht mit', /Interne Statuswechsel/.test(r.hinweis));
+r = await fragen('Was ist neu und ungesehen?', { name: 'offerten_entscheide', input: { nur_ungesehen: true }, antwort: 'Eine.' });
+check('Nur ungesehene: OF-1', r.anzahl === 1 && r.posten[0].nummer === 'OF-1');
+r = await fragen('Seit vorgestern?', { name: 'offerten_entscheide', input: { seit: tag(-2) }, antwort: 'Eine.' });
+check('Seit einem Tag: OF-2 von vor fünf Tagen fällt weg', r.anzahl === 1 && r.posten[0].nummer === 'OF-1');
+
+// ══════════ OFFENE RECHNUNGEN
+r = await fragen('Welche Rechnungen sind offen?', { name: 'offene_rechnungen', input: {}, antwort: 'Zwei offen.' });
+check('Offen sind versendete, unbezahlte (RE-1, RE-2) -- nicht die bezahlte, nicht der Entwurf', r.anzahl === 2 && !JSON.stringify(r.posten).includes('RE-3') && !JSON.stringify(r.posten).includes('RE-4'));
+check('Entwürfe werden gezählt, aber nicht als offen', r.entwuerfe_nicht_versendet === 1);
+check('KRITISCH: überfällig nach derselben Regel wie die Rechnungsliste (RE-1, 3 Tage)', r.ueberfaellig === 1 && r.posten[0].stand === '3 Tage überfällig');
+r = await fragen('Nur überfällige?', { name: 'offene_rechnungen', input: { nur_ueberfaellig: true }, antwort: 'Eine.' });
+check('Nur überfällige: RE-1', r.anzahl === 1 && r.posten[0].nummer === 'RE-1');
+
+// ══════════ KEIN RECHT, FALSCHE EINGABE
+belegeGesperrt = true;
+r = await fragen('Welche Rechnungen sind offen?', { name: 'offene_rechnungen', input: {}, antwort: 'Dafür fehlt dir die Berechtigung.' });
+check('KRITISCH: ohne Recht meldet das Werkzeug kein_recht -- keine leere Liste, die wie „keine" aussähe',
+  r.kein_recht === true && r.anzahl === undefined && r.posten === undefined);
+belegeGesperrt = false;
+r = await fragen('Offen?', { name: 'offene_plaetze', input: { von: 'morgen', bis: tag(3) }, antwort: 'Das Datum fehlte.' });
+check('Eine ungültige Eingabe ergibt einen Fehler, keine erfundene Liste', !!r.fehler && r.posten === undefined);
+
+// ══════════ FEHLER DES SERVERS
+assistentAntwort = [{ status: 'error', grund: 'nur_testumgebung', message: 'Der Assistent ist erst auf der Testumgebung freigeschaltet.' }, 403];
+await page.fill('#asText', 'Hallo?'); await page.click('#asBtn');
+await page.waitForTimeout(400);
+check('Eine Absage des Servers wird als Meldung gezeigt', /erst auf der Testumgebung/.test(await page.textContent('#asVerlauf')));
+assistentAntwort = null;
+const vorher = zurueck.length;
+await fragen('Wo fehlen Leute?', { name: 'offene_plaetze', input: { von: tag(0), bis: tag(6) }, antwort: 'Wieder da.' });
+check('Danach funktioniert die nächste Frage wieder (das Gespräch blieb gültig)', zurueck.length === vorher + 1 && (await letzteAntwort()) === 'Wieder da.');
+
+// ══════════ STUMM, VERSCHIEBEN, SCHLIESSEN
+await page.click('#asStumm');
+const gesprochenVorher = (await page.evaluate(() => window.__gesprochen)).length;
+await fragen('Wo fehlen Leute?', { name: 'offene_plaetze', input: { von: tag(0), bis: tag(6) }, antwort: 'Leise Antwort.' });
+check('Stumm: die Antwort steht da, wird aber nicht vorgelesen',
+  (await letzteAntwort()) === 'Leise Antwort.' && (await page.evaluate(() => window.__gesprochen)).length === gesprochenVorher);
+check('Der Stumm-Knopf zeigt seinen Zustand an (Farbe gemessen)', await page.evaluate(() => {
+  const b = document.getElementById('asStumm'); return b.classList.contains('aus') && getComputedStyle(b).color !== getComputedStyle(document.querySelector('.as-kopf button:last-child')).color; }));
+await page.screenshot({ path: OUT + '/assistent-desktop.png' });
+
+await page.click('#asPanel .as-kopf button[aria-label="Fenster zuklappen"]');
+const vor = await box(page, '#asFigur');
+await page.mouse.move(vor.x + 38, vor.y + 38); await page.mouse.down();
+await page.mouse.move(vor.x - 200, vor.y - 300, { steps: 8 }); await page.mouse.up();
+await page.waitForTimeout(100);
+const nach = await box(page, '#asFigur');
+check(`Die Figur lässt sich verschieben (${Math.round(vor.x - nach.x)} px links, ${Math.round(vor.y - nach.y)} px hoch)`,
+  Math.abs(vor.x - nach.x - 238) <= 3 && Math.abs(vor.y - nach.y - 338) <= 3);
+check('Verschieben öffnet das Fenster nicht (kein Klick)', !(await page.isVisible('#asPanel')));
+await page.mouse.move(nach.x + 38, nach.y + 38); await page.mouse.down();
+await page.mouse.move(5000, 5000, { steps: 4 }); await page.mouse.up();
+const rand = await box(page, '#asFigur');
+check('Die Figur bleibt beim Verschieben im Bild (gemessen)', rand.r <= 1500 && rand.b <= 1000 && rand.x >= 0 && rand.y >= 0);
+
+// Position und Stummschaltung ueberstehen das Neuladen (pro Browser).
+await page.mouse.move(rand.x + 38, rand.y + 38); await page.mouse.down();
+await page.mouse.move(rand.x - 400, rand.y - 200, { steps: 6 }); await page.mouse.up();
+const gemerkt = await box(page, '#asFigur');
+await page.reload(); await page.waitForSelector('#shell.on'); await page.waitForTimeout(600);
+const wieder = await box(page, '#asFigur');
+check('Nach dem Neuladen steht die Figur wieder dort (gemessen)', Math.abs(wieder.x - gemerkt.x) <= 2 && Math.abs(wieder.y - gemerkt.y) <= 2);
+check('... und bleibt stumm', await page.evaluate(() => document.getElementById('asStumm').classList.contains('aus')));
+
+await page.click('#asFigur');
+await page.waitForTimeout(150);
+const oben = await box(page, '#asPanel');
+check('Auch nach dem Verschieben öffnet sich das Fenster ganz im Bild (gemessen)', oben.x >= 0 && oben.y >= 0 && oben.r <= 1500 && oben.b <= 1000);
+await page.click('#asPanel .as-kopf button[aria-label="Assistent schliessen"]');
+check('Schliessen blendet die Figur aus', !(await page.isVisible('#asWidget')));
+
+// Am Handy nicht (mobiler Zuschnitt nicht entschieden).
+await page.reload(); await page.waitForSelector('#shell.on'); await page.waitForTimeout(400);
+await page.setViewportSize({ width: 390, height: 844 });
+await page.waitForTimeout(150);
+check('Am Handy ist der Assistent ausgeblendet (mobiler Zuschnitt noch nicht entschieden)', !(await page.isVisible('#asFigur')));
+
+console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
+if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
+console.log('Alle Pruefungen bestanden.');
+await browser.close();

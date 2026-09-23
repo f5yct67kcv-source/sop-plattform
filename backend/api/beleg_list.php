@@ -1,6 +1,12 @@
 <?php
 // Belegliste, heute nur Offerten (ENT-181).
 //
+// entscheidung_am / entscheidung_gesehen_am seit ENT-699: Der Assistent
+// beantwortet daraus "was haben Kunden angenommen oder abgelehnt, und was
+// habe ich noch nicht gesehen". Beide stehen im Grundschema der Tabelle
+// (planung_einrichten_kern.php) -- dieselbe Abfrage liest sie schon in
+// ereignisse.php.
+//
 // Die Liste braucht KEINE Positionen -- sie zeigt je Beleg nur Kopfdaten und
 // die bereits gerechnete Gesamtsumme. Bei zweihundert Offerten mit je fuenf
 // Positionen waeren das tausend Zeilen, von denen keine einzige auf den
@@ -29,6 +35,7 @@ $s = $pdo->prepare(
             b.zwischensumme_rappen, b.rabatt_rappen, b.mwst_rappen,
             b.rundung_rappen, b.total_rappen, b.ist_vorlage, b.aktiv,
             b.erstellt_am, b.geaendert_am,
+            b.entscheidung_am, b.entscheidung_gesehen_am,
             k.name AS kunde_name, k.kundennummer
        FROM belege b
        LEFT JOIN kunden k ON k.id = b.kunde_id
