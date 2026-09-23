@@ -2073,6 +2073,38 @@ html:not(.hat-reinigung) [data-sparte-feld] { display: none !important; }
 .dlg-hd p { font-size: 12.5px; color: var(--ink-3); margin-top: 5px; line-height: 1.55; }
 .dlg-bd { padding: 18px 22px; overflow-y: auto; flex: 1; }
 .dlg-ft { padding: 14px 22px; border-top: 1px solid var(--line-soft); display: flex; gap: 9px; justify-content: flex-end; flex: none; }
+/* Update-Fenster (ENT-698) */
+.dlg.upd { max-width: 520px; }
+.upd-griff { display: none; }
+.upd-kopf { display: flex; align-items: center; gap: 14px; padding-bottom: 16px; }
+.upd-ikone { flex: none; width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.upd-ikone.erforderlich { background: var(--warn-soft); color: var(--warn); }
+.upd-ikone.fertig { background: var(--pos-soft); color: var(--pos); }
+.upd-kopf-text h2 { font-size: 17px; }
+.upd-kopf-text p { margin-top: 3px; }
+.upd-gruppe + .upd-gruppe { margin-top: 18px; }
+.upd-gruppe > .titel { font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink-3); }
+.upd-gruppe ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.upd-gruppe li { padding-left: 14px; position: relative; }
+.upd-gruppe li::before { content: ''; position: absolute; left: 0; top: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.upd-gruppe[data-art="fehlerbehebung"] li::before { background: var(--pos); }
+.upd-gruppe[data-art="verbesserung"] li::before { background: var(--warn); }
+.upd-gruppe b { display: block; font-size: 13.5px; font-weight: 620; color: var(--ink); }
+.upd-gruppe span { display: block; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; margin-top: 2px; }
+.upd-lauf { margin-top: 20px; }
+.upd-lauf-zeile { display: grid; grid-template-columns: 1fr auto; gap: 12px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 8px; }
+.upd-lauf-zeile span:last-child { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.upd-balken { position: relative; height: 8px; border-radius: 99px; background: var(--line-soft); overflow: hidden; }
+.upd-balken > span { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent-hi)); transition: width .45s cubic-bezier(.3,.7,.4,1), background-color .3s; }
+/* Waehrend eine Etappe laeuft, zieht ein Glanz ueber den gefuellten Teil.
+   Er behauptet keinen Fortschritt: Die Breite waechst nur, wenn eine
+   Etappe wirklich fertig ist (ENT-698, Punkt 6). */
+.upd-balken.laeuft > span::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent); transform: translateX(-100%); animation: updGlanz 1.2s ease-in-out infinite; }
+.upd-balken.fertig > span { background: var(--pos); }
+.upd-balken.fehler > span { background: var(--neg); }
+@keyframes updGlanz { to { transform: translateX(100%); } }
+@keyframes updHoch { from { transform: translateY(100%); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .upd-balken.laeuft > span::after { animation: none; } }
 textarea.inp { resize: vertical; min-height: 92px; font-family: inherit; line-height: 1.55; }
 .check { display: flex; align-items: center; gap: 9px; cursor: pointer; font-size: 13.5px; }
 .check input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
@@ -4619,6 +4651,20 @@ html[data-desktop="an"] { touch-action: auto; }
   }
   .dlg-bd, .drawer-bd { flex: 1; overflow-y: auto; }
   .dlg-ft, .drawer-ft { flex: none; }
+  /* Update-Fenster als Blatt von unten (ENT-698, Punkt 9) statt Vollbild.
+     Der Selektor ist absichtlich spezifischer als die Vollbild-Regel
+     darueber, sonst bliebe er wirkungslos. */
+  .dlg-scrim.upd-blatt { align-items: flex-end; padding: 0; }
+  .dlg-scrim.upd-blatt .dlg.upd { position: relative; inset: auto; height: auto; max-height: 82vh;
+    border-radius: 18px 18px 0 0; animation: updHoch .28s cubic-bezier(.3,.7,.4,1); }
+  .dlg-scrim.upd-blatt .dlg.upd .dlg-hd { padding-top: 10px; cursor: default; }
+  .dlg-scrim.upd-blatt .upd-griff { display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto 14px; }
+  .dlg-scrim.upd-blatt .dlg.upd .dlg-ft { padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+  /* Das Umgebungsschild (testumgebung.js) liegt unten rechts ueber allem,
+     rund 33 px hoch ab Rand. Ohne diesen Abstand verdeckte es in der Demo
+     den Knopf "Verstanden" -- gemessen, nicht angenommen. */
+  .mit-umgebungsschild .dlg-scrim.upd-blatt .dlg.upd .dlg-ft { padding-bottom: calc(44px + env(safe-area-inset-bottom)); }
+  .dlg.upd .dlg-ft .btn { min-height: 44px; }
   /* iOS zoomt beim Antippen in jedes Feld unter 16 px hinein -- und bleibt
      dann dort. 16 px ist keine Geschmacksfrage, sondern die Schwelle. */
   .inp, .search input, input, select, textarea { font-size: 16px; }
@@ -5827,7 +5873,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     </nav>
 
     <div class="side-foot" id="sideFoot">
-      <button class="nav-item nur-desktop" id="nav-einrichtung" title="Einrichtung" onclick="openDlg('dlgEinrichtung'); eiBetreiberPruefen();">
+      <button class="nav-item nur-desktop" id="nav-einrichtung" title="Einrichtung" onclick="eiOeffnen()">
         <span class="ico-wrap">
           <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.5.66.86 1.19.91H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           <span class="update-punkt" id="updatePunkt"></span>
@@ -9950,17 +9996,30 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 <datalist id="dlProdukte"></datalist>
 <datalist id="dlEinsatzarten"><option>Verkehrsdienst</option><option>Revierdienst</option><option>Sicherheitsdienst</option><option data-sparte="reinigung">Reinigung</option></datalist>
 
-<!-- Einrichtung: Tabellen der Planung und Verfügbarkeit anlegen -->
+<!-- Update-Fenster (ENT-698). Zugleich die Einrichtung: Es oeffnet sich
+     von selbst, wenn ein Update aussteht oder es Neuerungen gibt, und ueber
+     "Einrichtung" im Kontomenue von Hand. Ein Fenster, ein Weg -- zwei
+     Fenster fuer denselben Vorgang liefen frueher oder spaeter auseinander.
+     Am Handy ein Blatt von unten (.upd-blatt am Scrim). -->
 <div class="dlg-scrim" id="dlgEinrichtung">
-  <div class="dlg">
+  <div class="dlg upd" role="dialog" aria-labelledby="updTitel">
     <div class="dlg-hd">
-      <h2>Einrichtung</h2>
-      <p>Legt fehlende Tabellen an — für die Planung (ENT-020/ENT-021) und die Sperrtage (ENT-028). Bereits vorhandene bleiben unverändert; es wird nichts gelöscht oder geleert. Gefahrlos mehrfach ausführbar.</p>
+      <div class="upd-griff" aria-hidden="true"></div>
+      <div class="upd-kopf">
+        <span class="upd-ikone" id="updIkone" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 21v-5h-5"/></svg></span>
+        <div class="upd-kopf-text">
+          <h2 id="updTitel">Einrichtung</h2>
+          <p id="updUnter">Es wird nichts gelöscht oder geleert.</p>
+        </div>
+      </div>
     </div>
     <div class="dlg-bd">
-      <div id="eiInhalt">
-        <p class="zone-note">Ein Klick auf „Prüfen und einrichten“ zeigt, was fehlt, und ergänzt es sofort.</p>
+      <div id="updNeu"></div>
+      <div class="upd-lauf" id="updLauf" hidden>
+        <div class="upd-lauf-zeile"><span id="updEtappe">Bereit</span><span id="updSchritt"></span></div>
+        <div class="upd-balken" id="updBalken" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="updFuellung"></span></div>
       </div>
+      <div id="eiInhalt"></div>
       <!-- Betreiber-Bereich (ENT-519 ff.). Erscheint NUR, solange der
            Bootstrap offen ist -- also bis das erste Betreiber-Konto steht.
            Danach blendet er sich von selbst aus: Ein weiteres Konto legt
@@ -9973,8 +10032,8 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       </div>
     </div>
     <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgEinrichtung')">Schliessen</button>
-      <button class="btn btn-primary" id="eiBtn" onclick="planungEinrichten()">Prüfen und einrichten</button>
+      <button class="btn btn-plain" id="updZu" onclick="updSchliessen()">Schliessen</button>
+      <button class="btn btn-primary" id="eiBtn" onclick="updHauptknopf()">Prüfen und einrichten</button>
     </div>
   </div>
 </div>
@@ -30038,19 +30097,170 @@ function pruefeUpdate() {
     $('nav-einrichtung').classList.toggle('hat-update', hat);
     $('nav-einrichtung').title = hat ? 'Update verfügbar: neue Einrichtung steht aus' : 'Einrichtung';
     $('navEinrichtungLbl').textContent = hat ? 'Update' : 'Einrichtung';
-    // Der Punkt am Konto-Logo faellt nicht auf, solange niemand dort
-    // hinschaut (Rueckmeldung des Projektinhabers). Derselbe Toast wie
-    // ueberall sonst im Cockpit statt eines neuen Bausteins -- nur ein
-    // zusaetzlicher Ausloeser beim Anmelden. Nur am Desktop: "Einrichtung"
-    // ist .nur-desktop (ENT-235), ein Toast dazu am Handy zeigte auf einen
-    // Menuepunkt, den es dort gar nicht gibt.
-    if (hat && !window.matchMedia('(max-width: 900px)').matches) {
-      toast('Update verfügbar — unter „Einrichtung“ im Kontomenü nachholen.');
-    }
+    if (ok && data && data.etappen) { updEtappen = data.etappen; }
   }).catch(() => {});
+  // Der Punkt am Konto-Logo faellt nicht auf, solange niemand dort
+  // hinschaut (ENT-698). Darum oeffnet sich beim Anmelden das Fenster
+  // selbst -- fuer alle im Cockpit, nicht nur fuer die, die einspielen
+  // duerfen: Neuerungen betreffen jeden.
+  updVonSelbst();
 }
 
-function eiOeffnen() { openDlg('dlgEinrichtung'); planungEinrichten(); eiBetreiberPruefen(); }
+// ══════════════════════════════════════════ UPDATE-FENSTER (ENT-698)
+// Zustaende, jeder mit eigenem Titel -- "unbekannt" darf nie wie "nichts
+// Neues" aussehen:
+//   einspielen  Update steht aus, diese Person darf es einspielen (Desktop)
+//   warten      Update steht aus, die Verwaltung spielt es ein
+//   handy       Update steht aus, darf einspielen, ist aber am Handy
+//   neu         kein Update offen, aber ungelesene Neuerungen
+//   aktuell     nichts offen, nichts Neues (nur von Hand geoeffnet)
+//   unbekannt   der Stand liess sich nicht abrufen
+//   fertig      soeben eingespielt
+let updStand = null;
+let updEtappen = null;       // aus planung_einrichten.php (GET), Reihenfolge = Laufreihenfolge
+let updModus = 'aktuell';
+let updLaeuft = false;
+let updVonSelbstGezeigt = false;
+const updHandy = () => window.matchMedia('(max-width: 900px)').matches;
+
+function updLaden() {
+  return api('neuerungen.php?ziel=cockpit')
+    .then(({ ok, data }) => (ok && data && data.status === 'ok') ? data : null)
+    .catch(() => null);
+}
+
+// Einmal je Anmeldung. "Spaeter" schliesst nur; solange eine Einrichtung
+// aussteht, kommt das Fenster beim naechsten Anmelden wieder (Punkt 4).
+function updVonSelbst() {
+  if (updVonSelbstGezeigt) { return; }
+  updLaden().then(d => {
+    if (!d || updVonSelbstGezeigt) { return; }
+    const neu = (d.neuerungen || []).length > 0;
+    const offen = Number(d.einrichtung_ausstehend) > 0;
+    // Am Handy nur Neuerungen (Punkt 7): Ein offenes Update allein laesst
+    // sich dort nicht einspielen, ein Fenster dazu waere eine Sackgasse.
+    if (updHandy() ? !neu : !(neu || offen)) { return; }
+    // Die Einfuehrungstour hat Vorrang -- zwei Fenster uebereinander
+    // verdecken einander.
+    const tour = document.querySelector('.tour-box.on');
+    if (tour) { return; }
+    updVonSelbstGezeigt = true;
+    updStand = d;
+    updZeigen();
+  });
+}
+
+function eiOeffnen() {
+  // Von Hand geoeffnet: Stand frisch holen, dann zeigen. Bis die Antwort
+  // da ist, heisst es "wird geprueft" -- nicht "unbekannt".
+  updVonSelbstGezeigt = true;
+  if (updLaeuft) { openDlg('dlgEinrichtung'); return; }
+  updStand = null;
+  $('eiInhalt').innerHTML = '';
+  $('updLauf').hidden = true;
+  updZeigen('laden');
+  eiBetreiberPruefen();
+  updLaden().then(d => { updStand = d; if (!updLaeuft) { updZeigen(); } });
+}
+
+function updModusBestimmen() {
+  const d = updStand;
+  if (!d) { return 'unbekannt'; }
+  const offen = Number(d.einrichtung_ausstehend) > 0;
+  if (offen && d.darf_einspielen) { return updHandy() ? 'handy' : 'einspielen'; }
+  if (offen) { return 'warten'; }
+  if ((d.neuerungen || []).length) { return 'neu'; }
+  return 'aktuell';
+}
+
+function updNeuerungenHtml(liste) {
+  if (!liste || !liste.length) { return ''; }
+  const arten = [['neu', 'Neu'], ['verbesserung', 'Verbesserungen'], ['fehlerbehebung', 'Fehlerbehebungen']];
+  return arten.map(([art, titel]) => {
+    const teil = liste.filter(n => n.art === art);
+    if (!teil.length) { return ''; }
+    return `<div class="upd-gruppe" data-art="${art}"><div class="titel">${esc(titel)}</div><ul>`
+      + teil.map(n => `<li><b>${esc(n.titel)}</b><span>${esc(n.text)}</span></li>`).join('')
+      + '</ul></div>';
+  }).join('');
+}
+
+function updZeigen(modus) {
+  const scrim = $('dlgEinrichtung');
+  if (!scrim) { return; }
+  if (modus) { updModus = modus; } else if (!updLaeuft) { updModus = updModusBestimmen(); }
+  scrim.classList.toggle('upd-blatt', updHandy());
+  const d = updStand || {};
+  const liste = d.neuerungen || [];
+  const neuestes = liste.length ? liste[0].datum : '';
+  const datum = neuestes ? new Date(neuestes + 'T12:00:00').toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  const TEXT = {
+    einspielen: ['Update erforderlich', 'Neue Funktionen und Korrekturen warten darauf, eingespielt zu werden. Es wird nichts gelöscht oder geleert.', 'erforderlich'],
+    warten:     ['Update verfügbar', 'Die Verwaltung spielt das Update ein. Bis dahin arbeitest du wie gewohnt weiter.', ''],
+    handy:      ['Update verfügbar', 'Eingespielt wird am Desktop unter „Einrichtung“ im Kontomenü.', 'erforderlich'],
+    neu:        ['Neu in GuardOpS', datum, ''],
+    aktuell:    ['Alles auf dem neusten Stand', 'Es steht kein Update aus. Es wird nichts gelöscht oder geleert, wenn du erneut prüfst.', 'fertig'],
+    unbekannt:  ['Stand unbekannt', 'Ob ein Update aussteht, liess sich nicht abrufen.', ''],
+    laden:      ['Einrichtung', 'Der Stand wird geprüft … Es wird nichts gelöscht oder geleert.', ''],
+    fertig:     ['Update eingespielt', 'Alles ist auf dem neusten Stand.', 'fertig'],
+    geprueft:   ['Alles auf dem neusten Stand', 'Geprüft: Es war nichts einzuspielen.', 'fertig'],
+  };
+  const [titel, unter, ton] = TEXT[updModus] || TEXT.aktuell;
+  $('updTitel').textContent = titel;
+  $('updUnter').textContent = unter;
+  $('updIkone').className = 'upd-ikone' + (ton ? ' ' + ton : '');
+  $('updNeu').innerHTML = updNeuerungenHtml(liste);
+  const zu = $('updZu'), haupt = $('eiBtn');
+  const knopf = {
+    einspielen: ['Später', 'Jetzt einspielen'],
+    warten:     [null, 'Verstanden'],
+    handy:      [null, 'Verstanden'],
+    neu:        [null, 'Verstanden'],
+    aktuell:    ['Schliessen', 'Erneut prüfen'],
+    unbekannt:  ['Schliessen', 'Erneut versuchen'],
+    laden:      ['Schliessen', 'Prüfen und einrichten'],
+    fertig:     [null, 'Schliessen'],
+    geprueft:   [null, 'Schliessen'],
+  }[updModus] || ['Schliessen', 'Erneut prüfen'];
+  zu.style.display = knopf[0] ? '' : 'none';
+  if (knopf[0]) { zu.textContent = knopf[0]; }
+  haupt.textContent = knopf[1];
+  haupt.disabled = updLaeuft;
+  zu.disabled = updLaeuft;
+  if (!scrim.classList.contains('on')) { openDlg('dlgEinrichtung'); }
+}
+
+function updSchliessen() {
+  if (updLaeuft) { return; }
+  closeDlg('dlgEinrichtung');
+}
+
+// Gelesen ist, was die Person bestaetigt oder eingespielt hat -- nicht,
+// was sie mit "Spaeter" weggeklickt hat.
+function updGelesen() {
+  const bis = updStand && updStand.neueste;
+  if (!bis || updStand.stand_unbekannt) { return; }
+  api('neuerungen.php', { method: 'POST', body: { bis } }).catch(() => {});
+}
+
+function updHauptknopf() {
+  if (updLaeuft) { return; }
+  if (updModus === 'einspielen' || updModus === 'aktuell' || updModus === 'laden') { planungEinrichten(); return; }
+  if (updModus === 'unbekannt') { eiOeffnen(); return; }
+  if (updModus !== 'fertig' && updModus !== 'geprueft') { updGelesen(); }
+  closeDlg('dlgEinrichtung');
+}
+
+function updBalken(anteil, zustand) {
+  const b = $('updBalken');
+  $('updLauf').hidden = false;
+  b.classList.toggle('laeuft', zustand === 'laeuft');
+  b.classList.toggle('fertig', zustand === 'fertig');
+  b.classList.toggle('fehler', zustand === 'fehler');
+  const prozent = Math.round(Math.max(0, Math.min(1, anteil)) * 100);
+  $('updFuellung').style.width = prozent + '%';
+  b.setAttribute('aria-valuenow', String(prozent));
+}
 
 /* ── Einmalige Einrichtung des Betreiber-Bereichs ────────────────────
  *
@@ -30115,49 +30325,89 @@ function eiBetreiberKonto() {
     }).catch(() => toast('Das Konto konnte nicht angelegt werden.'));
 }
 
+// Spielt die Einrichtung Etappe fuer Etappe ein (ENT-698, Punkt 6). Jede
+// Etappe ist eine eigene Anfrage; der Balken waechst erst, wenn eine
+// Etappe wirklich fertig ist. Angezeigt wird danach nur, was schiefging --
+// was eingerichtet wurde oder schon da war, steht nicht mehr im Fenster
+// (Punkt 1). Die Neuerungen darueber sagen, was sich geaendert hat.
 function planungEinrichten() {
-  const b = $('eiBtn'); if (b) b.disabled = true;
+  if (updLaeuft) { return; }
   // Der Betreiber-Abschnitt wird nach dem Lauf neu geprueft: Seine Tabellen
   // entstehen seit ENT-529 hier mit, der Abschnitt muss das mitbekommen.
   const nachher = () => { try { eiBetreiberPruefen(); } catch (e) { /* egal */ } };
-  $('eiInhalt').innerHTML = '<p class="zone-note">Prüfe …</p>';
-  api('planung_einrichten.php', { method: 'POST' }).then(({ ok, status, data }) => {
-    if (b) b.disabled = false;
+  const holeEtappen = updEtappen
+    ? Promise.resolve(updEtappen)
+    : api('planung_einrichten.php').then(({ ok, data }) => (ok && data && data.etappen) || null).catch(() => null);
+  updLaeuft = true;
+  $('eiInhalt').innerHTML = '';
+  updZeigen();
+  $('updEtappe').textContent = 'Vorbereiten …';
+  $('updSchritt').textContent = '';
+  updBalken(0, 'laeuft');
+
+  const fehler = [], meldungen = [];
+  let abbruch = null, ergaenzt = 0;
+  holeEtappen.then(etappen => {
+    if (etappen) { updEtappen = etappen; }
+    // Ohne Etappenliste (aelterer Server) laeuft alles in einem Zug -- der
+    // Balken sagt dann ehrlich "1 von 1" statt Etappen zu erfinden.
+    const liste = etappen ? Object.entries(etappen) : [[null, 'Einrichtung']];
+    const n = liste.length;
+    const lauf = i => {
+      if (i >= n) { return Promise.resolve(); }
+      const [schluessel, titel] = liste[i];
+      $('updEtappe').textContent = titel;
+      $('updSchritt').textContent = `Etappe ${i + 1} von ${n}`;
+      return api('planung_einrichten.php', { method: 'POST', body: schluessel ? { etappe: schluessel } : undefined })
+        .then(({ ok, status, data }) => {
+          if (!ok) {
+            // Ohne lesbare Antwort blieb frueher nur "Einrichtung
+            // fehlgeschlagen." -- eine Sackgasse. Der Statuscode kommt mit:
+            // 403 fehlendes Recht, 500 Abbruch im Server, 0 keine Verbindung.
+            abbruch = (data && data.message)
+              || `Einrichtung fehlgeschlagen — der Server hat keine lesbare Antwort geschickt (HTTP ${status || 'keine Antwort'}).`;
+            return;
+          }
+          (data.fehler || []).forEach(f => fehler.push(f));
+          ergaenzt += (data.getan || []).length;
+          if (data.status !== 'ok' && data.message) { meldungen.push(data.message); }
+          updBalken((i + 1) / n, 'laeuft');
+          return lauf(i + 1);
+        });
+    };
+    return lauf(0);
+  }).then(() => {
+    updLaeuft = false;
     nachher();
-    if (!ok) {
-      // Ohne lesbare Antwort blieb hier nur "Einrichtung fehlgeschlagen." --
-      // eine Sackgasse, die genau nichts sagt. Der Statuscode kommt mit:
-      // 403 heisst fehlendes Recht, 500 ein Abbruch im Server, 0 keine
-      // Verbindung. Drei verschiedene Ursachen, drei verschiedene Wege.
-      $('eiInhalt').innerHTML = `<div class="msg-err">${esc(data.message
-        || `Einrichtung fehlgeschlagen — der Server hat keine lesbare Antwort geschickt (HTTP ${status || 'keine Antwort'}).`)}</div>`;
-      return;
-    }
-    // Der Abstand haengt an der POSITION, nicht am Titeltext: Die erste
-    // vorhandene Liste steht direkt unter dem Kasten, jede weitere bekommt
-    // Luft. Vorher entschied darueber das Wort "Jetzt ergänzt" -- sobald
-    // eine andere Liste zuerst kam, sass der Abstand am falschen Platz.
     const zeile = (t, liste, farbe) => !liste || !liste.length ? '' : `
       <div class="titel" data-ei-liste style="margin-top:14px${farbe ? ';color:' + farbe : ''}">${esc(t)}</div>
       <ul style="margin:0;padding-left:18px;font-size:13px;color:var(--ink-2);line-height:1.7">
         ${liste.map(x => `<li>${esc(x)}</li>`).join('')}
       </ul>`;
-    $('eiInhalt').innerHTML =
-      `<div class="msg-err" style="background:${data.status === 'ok' ? 'var(--pos-soft)' : 'var(--neg-soft)'};color:${data.status === 'ok' ? 'var(--pos)' : 'var(--neg)'}">${esc(data.message)}</div>`
-      // Fehlgeschlagenes zuerst: Wer den Dialog oeffnet, weil etwas nicht
-      // geht, soll den Grund lesen, ohne an zwei gruenen Listen vorbeizurollen.
-      + zeile('Fehlgeschlagen', data.fehler, 'var(--neg)')
-      + zeile('Jetzt ergänzt', data.getan)
-      + zeile('War schon vorhanden', data.unveraendert);
-    const erste = $('eiInhalt').querySelector('[data-ei-liste]');
-    if (erste) { erste.style.marginTop = '0'; }
-    if (data.status === 'ok') {
-      Promise.all([loadEinsaetze(), loadObjekte(), ladeFeiertagMap(), ladeSperren()]);
+    if (abbruch || fehler.length || meldungen.length) {
+      updBalken(Number($('updBalken').getAttribute('aria-valuenow')) / 100, 'fehler');
+      $('updEtappe').textContent = abbruch ? 'Abgebrochen' : 'Teilweise eingespielt';
+      $('eiInhalt').innerHTML =
+        `<div class="msg-err" style="margin-top:14px">${esc(abbruch || meldungen[0] || (fehler.length + ' Schritt(e) sind fehlgeschlagen — die übrigen sind gelaufen.'))}</div>`
+        + zeile('Fehlgeschlagen', fehler, 'var(--neg)');
+      updZeigen(updStand && Number(updStand.einrichtung_ausstehend) > 0 && updStand.darf_einspielen ? 'einspielen' : 'aktuell');
+      $('eiBtn').textContent = 'Erneut versuchen';
+      return;
     }
+    updBalken(1, 'fertig');
+    $('updEtappe').textContent = 'Fertig';
+    updGelesen();
+    // "Nichts zu tun" ist etwas anderes als "eingespielt".
+    updZeigen(ergaenzt ? 'fertig' : 'geprueft');
+    Promise.all([loadEinsaetze(), loadObjekte(), ladeFeiertagMap(), ladeSperren()]).catch(() => {});
     pruefeUpdate();
   }).catch(() => {
-    if (b) b.disabled = false;
-    $('eiInhalt').innerHTML = '<div class="msg-err">Netzwerkfehler.</div>';
+    updLaeuft = false;
+    updBalken(0, 'fehler');
+    $('updEtappe').textContent = 'Abgebrochen';
+    $('eiInhalt').innerHTML = '<div class="msg-err" style="margin-top:14px">Netzwerkfehler.</div>';
+    updZeigen('aktuell');
+    $('eiBtn').textContent = 'Erneut versuchen';
   });
 }
 
