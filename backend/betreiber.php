@@ -1831,6 +1831,11 @@ function be_spalten(): array
         // meldet der Endpunkt "noch nicht nachgetragen", statt mit einem
         // SQL-Fehler abzubrechen.
         ['betreiber', 'archiviert_am', "ALTER TABLE betreiber ADD COLUMN archiviert_am DATETIME NULL AFTER letzte_anmeldung"],
+        // ENT-698: bis zu welcher Neuerung (backend/neuerungen.php) dieses
+        // Konto gelesen hat. Anders als bei den Mandanten-Konten heisst NULL
+        // hier "noch nichts gelesen": Betreiber-Konten sind wenige und intern,
+        // die ganze Liste zu sehen schadet niemandem.
+        ['betreiber', 'neuerungen_gesehen_bis', "ALTER TABLE betreiber ADD COLUMN neuerungen_gesehen_bis INT UNSIGNED NULL DEFAULT NULL"],
         ['betreiber', 'anrede',   "ALTER TABLE betreiber ADD COLUMN anrede VARCHAR(20) NOT NULL DEFAULT '' AFTER name"],
         ['betreiber', 'nachname', "ALTER TABLE betreiber ADD COLUMN nachname VARCHAR(100) NOT NULL DEFAULT '' AFTER anrede"],
         ['betreiber', 'vorname',  "ALTER TABLE betreiber ADD COLUMN vorname VARCHAR(100) NOT NULL DEFAULT '' AFTER anrede"],

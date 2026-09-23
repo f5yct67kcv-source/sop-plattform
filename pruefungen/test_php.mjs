@@ -590,6 +590,7 @@ for (const ordner of ['icons', 'img']) {
 // Rechteregel nie vorbei.
 for (const [datei, titel] of [
   ['pruef_rechte.php',  'KRITISCH: die Rollen geben genau die entschiedenen Rechte'],
+  ['pruef_neuerungen.php', 'KRITISCH: Neuerungsliste und Etappen der Einrichtung stimmen (ENT-698)'],
   ['pruef_lohn.php', 'KRITISCH: Lohnform, Mindestlohn, Ferienentschaedigung und PaKo-Beitrag stimmen mit dem GAV ueberein (ENT-451)'],
   ['pruef_lohnlauf.php', 'KRITISCH: der Lohnlauf zaehlt nur abgeglichene Schichten, sperrt Reinigung und rechnet nichts auf fehlender Grundlage (ENT-451)'],
   ['pruef_logbuch.php', 'KRITISCH: das Logbuch haelt fest, wer was geaendert hat'],
@@ -948,6 +949,7 @@ const NUR_EIGENE_DATEN = [
   // mitarbeiter_id stammt ausnahmslos aus der Sitzung, nie aus der Anfrage.
   'tutorial_gesehen.php',
   'demo_hinweis_bestaetigen.php',
+  'neuerungen.php',               // was die eigene Person gelesen hat (ENT-698); einspielen verlangt betrieb_schreiben in planung_einrichten.php
 ];
 const ohnePruefung = apiDateien.filter(f => {
   const q = ohneKommentar(f);
