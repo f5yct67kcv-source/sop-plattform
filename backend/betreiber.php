@@ -249,15 +249,158 @@ function mandant_ist_vorrat(array $m): bool
     return (string)($m['status'] ?? '') === MANDANT_STATUS_VORRAT;
 }
 
+// ── Der Mandanten-Vorrat: die reinen Teile (ENT-686/ENT-691) ──────────
+//
+// Befund je Anlage, Zusammenzaehlen, Meldetext und Zeitgeber-Schluessel --
+// alles ohne Verbindung zu einer Anlage. Die Schleife, die zu den
+// Vorratsanlagen VERBINDET, steht bewusst im Endpunkt
+// (api/betreiber_vorrat_pruefen.php): Dort sieht sie die Wache ueber die
+// mandant_db()-Aufrufer (test_betreiber.mjs), die betreiber.php selbst
+// ausnimmt, weil sie mandant_db() hier definiert.
+//
+// Bis zum Zusammenfuehren mit main (2026-09-23) stand das alles in einem
+// eigenen Modul backend/mandant_vorrat.php. Das brauchte je Buendel eine
+// Kopierzeile -- und im Hauptbuendel war dafuer kein Platz mehr: Der
+// Deploy-Schritt "Platzhalter durch echte Werte ersetzen" stand 9 Zeichen
+// unter der Grenze, ab der GitHub ihn komplett abweist. Hier, in einer
+// Datei, die jedes Buendel ohnehin traegt, braucht es keine Zeile.
+
+// Die Mandantenzeilen im Vorrat -- nur die Abfrage, ohne Verbindung. Rein
+// genug, um sie gegen SQLite zu pruefen: Der Status-Filter ist die Aussage,
+// dass kein Kunde in die Vorratspruefung geraet.
+function mandant_vorrat_zeilen(PDO $stamm): array
+{
+    $s = $stamm->prepare(
+        'SELECT id, name, status, db_host, db_name, db_user, secret_name
+           FROM mandant WHERE status = ? ORDER BY id'
+    );
+    $s->execute([MANDANT_STATUS_VORRAT]);
+    return $s->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+// Soll-Groesse und Meldeschwelle (ENT-686, Klaerung 5): drei Anlagen, und
+// gemeldet wird, sobald weniger als zwei wirklich uebergabefaehig sind. Dann
+// bleibt nach einem Vertragsabschluss Zeit fuer den Hoster-Schritt, bevor
+// der naechste kommt.
+const MANDANT_VORRAT_SOLL     = 3;
+const MANDANT_VORRAT_SCHWELLE = 2;
+
+// Wie es um EINE Vorratsanlage steht -- aus dem, was die Pruefung
+// herausgefunden hat. Rein, damit sich jede Lage mit frei gewaehlten Werten
+// pruefen laesst, ohne Datenbank.
+//
+// $verbindung: das Ergebnis von mandant_verbindung_bereit(), oder
+//              'fehlgeschlagen', wenn die Verbindung trotz "bereit" nicht
+//              zustande kam.
+// $luecken:    die Liste aus kern_schema_fehlend(), oder null, wenn gar
+//              nicht geprueft werden konnte.
+//
+// VIER AUSSAGEN, VIER TEXTE (Hausregel): nicht eingetragen, nicht
+// erreichbar, halb eingerichtet und bereit sind verschiedene Dinge -- und
+// verlangen verschiedene Handgriffe an verschiedenen Orten. Eine nicht
+// erreichbare Anlage ist ausdruecklich NICHT uebergabefaehig: Ob sie es
+// waere, wissen wir nicht, und "unbekannt" darf nie wie "bereit" aussehen.
+function mandant_vorrat_befund(string $verbindung, ?array $luecken): array
+{
+    if ($verbindung === 'standardverbindung' || $verbindung === 'unvollstaendig') {
+        return ['lage' => 'nicht_eingetragen', 'bereit' => false,
+                'text' => 'Datenbankangaben fehlen im Mandantenstamm'];
+    }
+    if ($verbindung === 'secret_fehlt') {
+        return ['lage' => 'secret_fehlt', 'bereit' => false,
+                'text' => 'Zugangsdaten fehlen im Deploy (MANDANT_SECRETS)'];
+    }
+    if ($verbindung !== 'bereit' || $luecken === null) {
+        return ['lage' => 'nicht_erreichbar', 'bereit' => false,
+                'text' => 'Datenbank nicht erreichbar'];
+    }
+    if ($luecken !== []) {
+        // Mit Zahl UND Beispielen, wie bei der Demo-Zuteilung: "unvollstaendig"
+        // allein sagt niemandem, ob eine Spalte fehlt oder die halbe Anlage.
+        return ['lage' => 'schema_unvollstaendig', 'bereit' => false,
+                'text' => 'Schema unvollständig — ' . count($luecken) . ' fehlende Stellen, darunter: '
+                        . implode(', ', array_slice($luecken, 0, 3))];
+    }
+    return ['lage' => 'bereit', 'bereit' => true, 'text' => 'übergabefähig'];
+}
+
+// Zaehlt aus den Einzelbefunden zusammen. Rein, aus demselben Grund wie
+// mandant_vorrat_befund().
+//
+// ZWEI ZAHLEN, NICHT EINE (Hausregel "Einheiten nie vermischen"):
+// "eingetragen" zaehlt Mandantenzeilen mit Status vorrat, "bereit" die davon,
+// die heute wirklich uebergeben werden koennten. Eine Anlage, die eingetragen
+// ist und nicht antwortet, gehoert zur ersten Zahl und nicht zur zweiten.
+function mandant_vorrat_zusammenfassen(array $plaetze): array
+{
+    $bereit = count(array_filter($plaetze, static fn(array $p): bool => $p['bereit']));
+    return [
+        'plaetze'     => $plaetze,
+        'eingetragen' => count($plaetze),
+        'bereit'      => $bereit,
+        'soll'        => MANDANT_VORRAT_SOLL,
+        'schwelle'    => MANDANT_VORRAT_SCHWELLE,
+        'zu_wenig'    => $bereit < MANDANT_VORRAT_SCHWELLE,
+    ];
+}
+
+// Die Nachricht an die Betreiber-Konten -- oder null, wenn nichts zu melden
+// ist. Rein: Ob gemeldet wird und was drinsteht, laesst sich so ohne
+// Mailserver pruefen.
+//
+// JEDEN TAG, SOLANGE ES SO BLEIBT (ENT-686, Festlegung vom 2026-09-23). Kein
+// gespeicherter Vermerk "schon gemeldet": Er koennte verloren gehen oder vom
+// tatsaechlichen Stand abweichen. Die Meldung hoert von selbst auf, sobald
+// wieder genug Anlagen bereit sind.
+function mandant_vorrat_meldung(array $lage): ?array
+{
+    if (!$lage['zu_wenig']) { return null; }
+
+    $bereit = (int)$lage['bereit'];
+    // "Keine Zahl ohne Bezug": "1" allein sagte nicht, ob von einer oder von
+    // drei. Darum immer mit dem, worauf sie sich bezieht.
+    $betreff = $bereit === 0
+        ? 'GuardOpS: Kein Mandanten-Vorrat übergabefähig'
+        : "GuardOpS: Nur noch $bereit Anlage im Vorrat übergabefähig";
+
+    $zeilen = [];
+    foreach ($lage['plaetze'] as $p) {
+        $zeilen[] = '- ' . $p['name'] . ': ' . $p['text'];
+    }
+    $liste = $zeilen === []
+        ? "Im Mandantenstamm ist keine Anlage mit Status „Vorrat\" eingetragen.\n"
+        : implode("\n", $zeilen) . "\n";
+
+    $text = "Übergabefähig: $bereit von {$lage['eingetragen']} eingetragenen Anlagen "
+          . "(Soll: {$lage['soll']}, Meldung unter {$lage['schwelle']}).\n\n"
+          . $liste . "\n"
+          . "Solange das so bleibt, kommt diese Nachricht jeden Tag. Sie hört von selbst auf, "
+          . "sobald wieder genug Anlagen übergabefähig sind.\n\n"
+          . "Nachfüllen: Datenbank beim Hoster anlegen, Zugang in MANDANT_SECRETS eintragen, "
+          . "Anlage im Betreiber-Bereich mit Status „Vorrat\" erfassen und die Einrichtung laufen lassen.";
+
+    return ['betreff' => $betreff, 'text' => $text];
+}
+
+// Prueft den Zeitgeber-Schluessel. Dieselbe Bauart wie
+// demo_ablauf_zeitgeber_lage(), mit eigenem Platzhalter: Ein unersetzter
+// Platzhalter heisst "nicht eingerichtet", nicht "falscher Schluessel" --
+// sonst waere der Endpunkt in jedem Buendel ohne Schluessel fuer jeden offen,
+// der den Platzhaltertext kennt.
+function mandant_vorrat_zeitgeber_lage(string $erwartet, string $mitgegeben): string
+{
+    if ($erwartet === '' || str_starts_with($erwartet, '__')) { return 'nicht_eingerichtet'; }
+    if ($mitgegeben === '') { return 'kein_schluessel_in_der_adresse'; }
+    return hash_equals($erwartet, $mitgegeben) ? 'ok' : 'falscher_schluessel';
+}
+
 // Kennt die Mandantentabelle den Status "vorrat" schon? Er kommt ueber einen
 // Nachtrag (be_auswahlwerte in betreiber.php). Solange der nicht gelaufen
 // ist, kann keine Anlage im Vorrat stehen -- und das ist "nicht
 // eingerichtet", nicht "Vorrat leer".
 //
-// STEHT HIER UND NICHT IN mandant_vorrat.php: Auch der Anlegeweg braucht
-// sie, und der verbindet zu keiner Mandantendatenbank. Laege sie im
-// Verbinder-Modul, zaehlte er fuer die Wache in test_betreiber.mjs als
-// Verbinder.
+// STEHT HIER, in betreiber.php: Auch der Anlegeweg braucht sie, und er
+// verbindet zu keiner Mandantendatenbank.
 //
 // GEFRAGT WIRD DIE DATENBANK SELBST, wie in be_auswahlwerte_nachtragen():
 // Ob der Wert erlaubt ist, weiss sie, und ein Merker daneben koennte von ihr

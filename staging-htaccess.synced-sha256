@@ -24,18 +24,6 @@
 # auf einmal erledigt. Geprueft: ohne Anmeldung 401, neuerungen.php nach
 # der Anmeldung 403. Kein Hash eilt mehr einem Nachtrag voraus.
 
-# ── OFFEN seit dem Zusammenfuehren von ENT-686 (2026-09-23) ──────────
-# EIN Nachtrag steht aus: mandant_vorrat in der FilesMatch-Sperre. Das
-# Modul prueft den Mandanten-Vorrat und wird nur per require_once aus
-# backend/api/betreiber_vorrat_pruefen.php gezogen, nie direkt aufgerufen.
-# Der Hash unten gehoert zur zusammengefuehrten htaccess-hostpoint und ist
-# diesem Nachtrag vorausgeeilt -- ohne ihn waere test_deploy.mjs dauerhaft
-# rot. Die Datei enthaelt nur Funktionsdefinitionen und Konstanten und gibt
-# bei direktem Aufruf nichts aus; Staging liegt zusaetzlich hinter der
-# Basic-Auth-Schicht (ENT-384). Zu tun: den Block unterhalb von
-# #@__HCP_END__@# neu erzeugen (staging-htaccess-bauen.py) und bei Hostpoint
-# eintragen, danach diesen Absatz loeschen.
-#
-htaccess-hostpoint:e60b95a7faebfd32bb6320d5e846089ab694b1bf0e53241e2daf95c3e2db0149
+htaccess-hostpoint:0d22426bb0ee1c25ed40a39569371f498704c85d926864dc4352cff66c1dbf6e
 htaccess-staging-zusatz:7b6df04b9fd9decbeb68442a6080b3e39c384e31d59273e53f938549c8e26208
 robots-staging.txt:e120f27381f482e2de05b11355c7d1818e8266d282cec8cf04bc8b33916e7583

@@ -33,7 +33,12 @@ const nurCode = q => q
   .replace(/([;{}),])\s*\/\/(?!\/).*$/gm, '$1');
 
 const API     = 'backend/api/';
-const modul   = nurCode(lies('backend/mandant_vorrat.php'));
+// Die reinen Teile des Vorrats stehen seit dem Zusammenfuehren mit main in
+// betreiber.php (siehe Kommentar dort); geprueft wird genau dieser
+// Abschnitt, nicht die ganze Datei.
+const betrQ   = nurCode(lies('backend/betreiber.php'));
+const modul   = betrQ.slice(betrQ.indexOf('function mandant_vorrat_zeilen('),
+                            betrQ.indexOf('function mandant_vorrat_status_da('));
 const pruefen = nurCode(lies(API + 'betreiber_vorrat_pruefen.php'));
 const status  = nurCode(lies(API + 'betreiber_mandant_status.php'));
 const save    = nurCode(lies(API + 'betreiber_mandant_save.php'));
@@ -128,8 +133,16 @@ check('KRITISCH: GEGENPROBE — die Einrichtung nimmt den Vorrat mit',
 // Anlage selbst.
 check('KRITISCH: die Vorratspruefung liest keine Verwaltungstabelle',
   !/\bFROM\s+`?(mitarbeiter|sessions|kunden_sessions)\b/i.test(modul + pruefen));
-check('KRITISCH: sie prueft den GANZEN Bauplan, nicht die fuenf Kerntabellen',
-  /kern_schema_fehlend\s*\(\s*mandant_db\s*\(/.test(modul) && !/mandant_stand\s*\(/.test(modul));
+check('der Vorratsabschnitt in betreiber.php ist auffindbar', modul.length > 500);
+check('KRITISCH: sie prueft den GANZEN Bauplan jeder verbundenen Anlage, nicht die fuenf Kerntabellen',
+  /\$anlage\s*=\s*mandant_db\s*\(\s*\$m\s*\)/.test(pruefen)
+  && /kern_schema_fehlend\s*\(\s*\$anlage\s*\)/.test(pruefen)
+  && !/mandant_stand\s*\(/.test(pruefen + modul));
+// Die Schleife verbindet IM ENDPUNKT -- sonst saehe die Wache ueber die
+// mandant_db()-Aufrufer (test_betreiber.mjs) ihn nicht. Die reinen Teile in
+// betreiber.php verbinden nicht.
+check('KRITISCH: die reinen Vorratsteile in betreiber.php verbinden zu keiner Anlage',
+  !/mandant_db\s*\(/.test(modul));
 
 // ── 6. Kein gespeicherter Vermerk "schon gemeldet" ────────────────────
 //

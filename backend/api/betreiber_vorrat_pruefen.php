@@ -23,7 +23,6 @@ require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../mailer.php';
 require_once __DIR__ . '/../planung_einrichten_kern.php'; // kern_schema_fehlend()
 require_once __DIR__ . '/../supportvorgang.php';          // sv_empfaenger()
-require_once __DIR__ . '/../mandant_vorrat.php';
 
 // DERSELBE SCHLUESSEL WIE BEIM DEMO-ABLAUF: Es ist derselbe Cron-Dienst beim
 // Hoster, und dieselbe Ueberlegung steht schon am Demo-Ablauf selbst. Der
@@ -59,7 +58,37 @@ if (!mandant_vorrat_status_da($stamm)) {
                    . 'Ein Lauf der Einrichtung holt das nach.'], 503);
 }
 
-$vorrat = mandant_vorrat_lage($stamm);
+// ── Jede Vorratsanlage einzeln pruefen ────────────────────────────────
+//
+// DIE SCHLEIFE STEHT HIER, nicht in betreiber.php: Sie verbindet zu den
+// Anlagen, und die Wache ueber mandant_db()-Aufrufer (test_betreiber.mjs)
+// sieht nur, was im Endpunkt selbst oder in einem eigenen Modul steht.
+//
+// ALLE werden angesehen, nicht bis zur ersten brauchbaren -- dieselbe Lehre
+// wie bei demo_zugang_einrichten(): Ein Vorrat, der lautlos schrumpft, faellt
+// erst auf, wenn er leer ist. Jede untaugliche Anlage steht mit ihrem Grund
+// im Ergebnis.
+//
+// GELESEN WIRD NUR DER BAUPLAN (kern_schema_fehlend, aus information_schema).
+// Keine Verwaltungstabelle. Ob in einer Vorratsanlage schon jemand steht,
+// prueft diese Schleife bewusst NICHT: Das duerfte sie von der
+// Betreiber-Ebene aus gar nicht, und die Sperre dagegen sitzt im Einloeseweg.
+$plaetze = [];
+foreach (mandant_vorrat_zeilen($stamm) as $m) {
+    $verbindung = mandant_verbindung_bereit($m);
+    $luecken = null;
+    if ($verbindung === 'bereit') {
+        try {
+            $anlage = mandant_db($m);
+            $luecken = kern_schema_fehlend($anlage);
+        } catch (Throwable $e) {
+            $verbindung = 'fehlgeschlagen';
+        }
+    }
+    $plaetze[] = ['id' => (int)$m['id'], 'name' => (string)$m['name']]
+               + mandant_vorrat_befund($verbindung, $luecken);
+}
+$vorrat = mandant_vorrat_zusammenfassen($plaetze);
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
     json_response(['status' => 'ok'] + $vorrat);

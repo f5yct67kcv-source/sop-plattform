@@ -30,13 +30,8 @@ function hat_spalte(PDO $pdo, string $tabelle, string $spalte): bool {
     }
     return false;
 }
-// Der Bauplan-Pruefer wird nur fuer erreichbare Anlagen gerufen; in dieser
-// Datei ist keine erreichbar. Steht er trotzdem im Lauf, ist das ein Fehler.
-$bauplanGerufen = 0;
-function kern_schema_fehlend(PDO $pdo): array { global $bauplanGerufen; $bauplanGerufen++; return []; }
 
 require __DIR__ . '/../backend/betreiber.php';
-require __DIR__ . '/../backend/mandant_vorrat.php';
 
 $ok = 0; $bad = [];
 $pruef = function (string $name, bool $bedingung) use (&$ok, &$bad) {
@@ -157,17 +152,21 @@ $db->exec("CREATE TABLE mandant (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT
 $db->exec("INSERT INTO mandant (name, status) VALUES
   ('Vorrat A', 'vorrat'), ('Beispielwache AG', 'aktiv'), ('Vorrat B', 'vorrat'),
   ('Musterdienst GmbH', 'gekuendigt')");
-$lage = mandant_vorrat_lage($db);
-$pruef('KRITISCH: der Lauf nimmt genau die Vorratsanlagen, keinen Kunden',
-    $lage['eingetragen'] === 2
-    && array_column($lage['plaetze'], 'name') === ['Vorrat A', 'Vorrat B']);
+// Die Abfrage, ueber die der Endpunkt seine Schleife fuehrt. Die
+// Verbindung zu den Anlagen selbst steht im Endpunkt und laesst sich hier
+// nicht ausfuehren; ihre Zusagen prueft test_mandant_vorrat.mjs.
+$zeilen = mandant_vorrat_zeilen($db);
+$pruef('KRITISCH: die Vorratspruefung nimmt genau die Vorratsanlagen, keinen Kunden',
+    array_column($zeilen, 'name') === ['Vorrat A', 'Vorrat B']);
+// Und aus diesen Zeilen, ohne Datenbankangaben: nicht eingetragen, nicht
+// bereit -- durchgerechnet mit denselben Funktionen wie im Endpunkt.
+$lage = mandant_vorrat_zusammenfassen(array_map(static fn(array $m): array =>
+    ['id' => (int)$m['id'], 'name' => (string)$m['name']]
+    + mandant_vorrat_befund(mandant_verbindung_bereit($m), null), $zeilen));
 $pruef('Anlagen ohne Datenbankangaben sind "nicht eingetragen", nicht "bereit"',
-    $lage['bereit'] === 0
+    $lage['bereit'] === 0 && $lage['eingetragen'] === 2
     && array_unique(array_column($lage['plaetze'], 'lage')) === ['nicht_eingetragen']);
-$pruef('KRITISCH: fuer eine nicht erreichbare Anlage wird der Bauplan gar nicht erst gefragt',
-    $bauplanGerufen === 0);
-$pruef('und der Lauf meldet: zu wenig',
-    $lage['zu_wenig'] === true);
+$pruef('und der Lauf meldet: zu wenig', $lage['zu_wenig'] === true);
 
 // Ohne information_schema (hier: SQLite) weiss die Funktion es nicht -- und
 // sagt "nicht da", statt zu brechen.
