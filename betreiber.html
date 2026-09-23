@@ -783,6 +783,27 @@ svg.i-sm { width: 15px; height: 15px; }
 .search svg.i { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--ink-3); }
 .search .inp { padding-left: 34px; }
 
+/* ── Kachelreiter (ENT-689) ──
+   Zeichen fuer Zeichen die Leiste aus dem Cockpit (.rdkr-reiter/.rdkr-tab,
+   ENT-261, dort seit ENT-687 auch in der Supportansicht) -- ausdrueckliche
+   Vorgabe des Projektinhabers, 1:1 wie dort. Abgeschrieben statt
+   mitbenutzt, weil betreiber.html kein Stylesheet mit dem Cockpit teilt;
+   test_demo_zugang.mjs vergleicht die gerenderten Masse beider Seiten,
+   damit die Abschrift nicht still auseinanderlaeuft. */
+.rdkr-reiter { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 18px; }
+.rdkr-tab { display: inline-flex; align-items: center; gap: 9px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--sh-1);
+  padding: 7px 12px; min-height: 40px; cursor: pointer; font: inherit; color: inherit; }
+.rdkr-tab:hover { border-color: var(--accent-line); box-shadow: var(--sh-2); }
+.rdkr-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rdkr-tab-ic { width: 26px; height: 26px; border-radius: 8px; background: var(--accent-soft);
+  color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.rdkr-tab-ic svg.i { width: 15px; height: 15px; }
+.rdkr-tab-lbl { font-size: 13px; font-weight: 600; line-height: 1.2; }
+.rdkr-tab.aktiv { border-color: var(--accent); background: var(--accent-soft); }
+.rdkr-tab.aktiv .rdkr-tab-ic { background: var(--accent); color: #fff; }
+@media (max-width: 720px) { .rdkr-tab { min-height: 44px; } }
+
 /* ── Tabellen ── */
 .tw table { width: 100%; border-collapse: collapse; font-size: 13px; }
 /* Kopf und Zelle Zeichen fuer Zeichen wie im Cockpit (thead th / tbody td
@@ -1791,38 +1812,81 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
          und sofort. Kein Betreiber schaltet mehr frei -- wer bei
          Werbe-Anfragen auf einen freien Menschen wartet, ist zu spaet. -->
     <div class="m-tab" id="mv-demo">
-    <div class="karte">
-      <div class="karte-kopf">
-        <div>
-          <h2>Demo — Plätze</h2>
-          <div class="sub">Zuteilung läuft automatisch über die Anmeldemaske</div>
-        </div>
-      </div>
-      <div id="demo-plaetze"></div>
+    <!-- Kachelreiter (ENT-689). Bis hierher standen Plaetze, Zugaenge und
+         Nutzungsarchiv untereinander auf einer Seite. Die Leiste ist die aus
+         der Supportansicht des Cockpits (ENT-687), 1:1 -- ausdrueckliche
+         Vorgabe des Projektinhabers.
+
+         ZWEI LISTEN AUS EINER: "Zugänge" und "Abgelaufene" lesen dieselbe
+         Antwort von betreiber_demo_list.php und teilen sie am Status.
+         Laufend ist, was noch eine Instanz hat (status "aktiv") -- auch mit
+         abgelaufener Frist, denn genau dieser Fall braucht noch eine
+         Handlung ("Abgelaufene schliessen"). Alles andere ist geschlossen:
+         abgelaufen oder per Not-Aus beendet.
+
+         ZAHL NUR, WO ETWAS OFFEN IST, wie im Support: Zugänge und
+         Abgelaufene tragen je die Zahl der Interessenten ohne Nachfassen.
+         Zusammen ergeben sie das Abzeichen am Reiter "Mandanten". Plaetze
+         und Nutzung tragen keine -- dort wartet nie etwas.
+
+         Am Handy nicht angepasst: Der Betreiber-Bereich hat keinen
+         mobilen Zuschnitt (CLAUDE.md, Gestaltung). -->
+    <div class="rdkr-reiter" id="demoReiter">
+      <button type="button" class="rdkr-tab" data-reiter="zugaenge" onclick="demoReiterZeigen('zugaenge')">
+        <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></span>
+        <span class="rdkr-tab-lbl">Demo-Zugänge</span>
+        <span class="chip chip-w" id="demoZahl-zugaenge" style="display:none">0</span>
+      </button>
+      <button type="button" class="rdkr-tab" data-reiter="plaetze" onclick="demoReiterZeigen('plaetze')">
+        <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></span>
+        <span class="rdkr-tab-lbl">Demo-Plätze</span>
+      </button>
+      <button type="button" class="rdkr-tab" data-reiter="nutzung" onclick="demoReiterZeigen('nutzung')">
+        <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+        <span class="rdkr-tab-lbl">Demo-Nutzung</span>
+      </button>
+      <button type="button" class="rdkr-tab" data-reiter="abgelaufen" onclick="demoReiterZeigen('abgelaufen')">
+        <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg></span>
+        <span class="rdkr-tab-lbl">Abgelaufene Zugänge</span>
+        <span class="chip chip-w" id="demoZahl-abgelaufen" style="display:none">0</span>
+      </button>
     </div>
 
+    <div class="demo-panel" id="demoAb-zugaenge" hidden>
     <div class="karte">
       <div class="karte-kopf">
         <div>
-          <h2>Demo — Zugänge</h2>
-          <div class="sub">Laufende und beendete, neuste zuerst</div>
+          <h2>Demo-Zugänge</h2>
+          <div class="sub">Laufende, neuste zuerst</div>
         </div>
         <button class="klein" id="knopf-demo-ablauf">Abgelaufene schliessen</button>
       </div>
       <div id="demo-inhalt"></div>
     </div>
+    </div>
 
-    <!-- Dritte Karte auf demselben Reiter, nicht daneben (Antwort des
-         Projektinhabers, 2026-09-21, auf die Gestaltungsfrage vor dieser
-         Karte): anonymisierte Summe ueber ALLE bisher geleerten
-         Demo-Plaetze, aus be_demo_nutzung_archiv (ENT-653). Die Live-
-         Ansicht EINES laufenden Platzes haengt dagegen an dessen eigener
-         Zeile in der Karte "Demo — Zugänge" oben, nicht hier -- diese
-         Karte zeigt nie einen einzelnen Platz oder Interessenten. -->
+    <div class="demo-panel" id="demoAb-plaetze" hidden>
     <div class="karte">
       <div class="karte-kopf">
         <div>
-          <h2>Demo — Nutzung</h2>
+          <h2>Demo-Plätze</h2>
+          <div class="sub">Zuteilung läuft automatisch über die Anmeldemaske</div>
+        </div>
+      </div>
+      <div id="demo-plaetze"></div>
+    </div>
+    </div>
+
+    <!-- Anonymisierte Summe ueber ALLE bisher geleerten Demo-Plaetze, aus
+         be_demo_nutzung_archiv (ENT-653). Die Live-Ansicht EINES laufenden
+         Platzes haengt dagegen an dessen eigener Zeile unter "Demo-Zugänge",
+         nicht hier -- diese Karte zeigt nie einen einzelnen Platz oder
+         Interessenten. -->
+    <div class="demo-panel" id="demoAb-nutzung" hidden>
+    <div class="karte">
+      <div class="karte-kopf">
+        <div>
+          <h2>Demo-Nutzung</h2>
           <div class="sub">Anonym, über alle bisherigen Interessenten hinweg — archiviert beim Leeren eines Platzes</div>
         </div>
       </div>
@@ -1830,8 +1894,21 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     </div>
     </div>
 
+    <div class="demo-panel" id="demoAb-abgelaufen" hidden>
+    <div class="karte">
+      <div class="karte-kopf">
+        <div>
+          <h2>Abgelaufene Zugänge</h2>
+          <div class="sub">Geschlossen — abgelaufen oder vorzeitig beendet, neuste zuerst</div>
+        </div>
+      </div>
+      <div id="demo-abgelaufen"></div>
+    </div>
+    </div>
+    </div>
+
     <!-- Live-Nutzung EINES laufenden Demo-Platzes (ENT-653) -- geoeffnet
-         ueber den Knopf "Nutzung" bei "Demo — Zugänge". Gleiche Bauart wie
+         ueber den Knopf "Nutzung" bei "Demo-Zugänge". Gleiche Bauart wie
          #sup-karte daneben: eine Karte neben den Reitern, aus mehreren
          Zeilen erreichbar, statt eines Dialogs. -->
     <div class="karte versteckt" id="nu-karte">
@@ -2910,6 +2987,11 @@ let mandTab = 'mandanten';
 
 function mandGo(t) {
   if (!MANDANTEN_REITER[t]) { t = 'mandanten'; }
+  /* Wer von einem anderen Reiter zu Demo kommt, beginnt bei den Zugaengen
+     -- wie der Support im Cockpit bei "Meine Anfragen" (ENT-689). Bleibt
+     der Reiter derselbe (Rueckkehr aus einem anderen Bereich), bleibt
+     auch die Kachel. */
+  const neuAufDemo = t === 'demo' && mandTab !== 'demo';
   mandTab = t;
   Object.keys(MANDANTEN_REITER).forEach(k => {
     $('mv-' + k).classList.toggle('on', k === t);
@@ -2926,6 +3008,7 @@ function mandGo(t) {
      Endpunkt liest Belege, Mandanten und Adressen zusammen, und wer nur in
      den Mandantenstamm will, soll das nicht bezahlen. */
   if (t === 'vertraege') { ladeVertraege(); }
+  if (neuAufDemo) { demoReiterZeigen('zugaenge'); }
   /* Die Reiter stehen ueber 1210 px oben in der Werkzeugleiste. Wird hier
      umgeschaltet, muss die Kopie dort mitkommen. */
   unterreiterZeichnen();
@@ -4626,6 +4709,50 @@ function demoAbzeichenSetzen(offen) {
   }
 }
 
+/* ── Kachelreiter im Demo-Reiter (ENT-689) ────────────────────────
+   Gleiche Bauart wie spReiterZeigen() in der Supportansicht des Cockpits:
+   Die Leiste bleibt stehen, gewechselt wird nur der Inhalt darunter, und
+   die offene Kachel ist markiert -- sonst sieht man der Seite nicht an,
+   wo man ist. */
+const DEMO_REITER = ['zugaenge', 'plaetze', 'nutzung', 'abgelaufen'];
+let demoReiter = 'zugaenge';
+
+function demoReiterZeigen(id) {
+  if (!DEMO_REITER.includes(id)) { id = 'zugaenge'; }
+  demoReiter = id;
+  DEMO_REITER.forEach(k => { $('demoAb-' + k).hidden = k !== id; });
+  document.querySelectorAll('#demoReiter .rdkr-tab').forEach(t => {
+    const ist = t.dataset.reiter === id;
+    t.classList.toggle('aktiv', ist);
+    t.setAttribute('aria-current', ist ? 'true' : 'false');
+  });
+  /* Die Karten neben den Kacheln gehen beim Wechsel zu, aus demselben
+     Grund wie in mandGo(): Die Live-Nutzung gehoert zu einer Zeile unter
+     "Demo-Zugänge", Formular und Supportzugriff zu einer unter
+     "Demo-Plätze". Unter einer anderen Kachel stuende nirgends mehr,
+     woraus sie geoeffnet wurden. */
+  zeig($('nu-karte'), false);
+  zeig($('m-form-karte'), false);
+  zeig($('sup-karte'), false);
+}
+
+/* Die Zahlen an "Demo-Zugänge" und "Abgelaufene Zugänge": Interessenten
+   ohne Nachfassen, je Liste. Nur bei etwas Offenem -- eine Null am Reiter
+   sagt dasselbe wie keine Zahl, kostet aber Aufmerksamkeit. `null` heisst
+   "unbekannt" (Vermerk nicht eingerichtet, Register nicht abrufbar): Dann
+   steht keine Zahl da statt einer erfundenen Null. */
+function demoReiterZahlen(zahlen) {
+  ['zugaenge', 'abgelaufen'].forEach(k => {
+    const el = $('demoZahl-' + k);
+    if (!el) { return; }
+    const n = zahlen ? zahlen[k] : 0;
+    el.textContent = n > 99 ? '99+' : String(n);
+    el.style.display = n > 0 ? '' : 'none';
+    el.title = n === 1 ? 'Ein Interessent ohne Nachfassen'
+                       : n + ' Interessenten ohne Nachfassen';
+  });
+}
+
 /* Der Nachfass-Stand, unter dem Status derselben Zelle.
 
    DREI AUSSAGEN, DREI TEXTE (Hausregel) -- und die dritte ist die, die man
@@ -4705,16 +4832,24 @@ async function ladeDemo() {
 
   if (a.code === 503) {
     /* Nicht eingerichtet ist etwas anderes als "keine Zugänge". */
-    plaetze.innerHTML = '';
-    inhalt.innerHTML = leerBlock('⚙', 'Noch nicht eingerichtet',
+    /* Beide Listen und die Plaetze sagen dasselbe -- eine leere Kachel
+       daneben saehe aus wie "nichts abgelaufen". */
+    const nichtDa = leerBlock('⚙', 'Noch nicht eingerichtet',
       'Das Register der Demo-Zugänge ist auf diesem Server noch nicht angelegt.');
+    plaetze.innerHTML = nichtDa;
+    inhalt.innerHTML = nichtDa;
+    $('demo-abgelaufen').innerHTML = nichtDa;
     demoAbzeichenSetzen(0);
+    demoReiterZahlen(null);
     return;
   }
   if (a.status !== 'ok') {
-    plaetze.innerHTML = '';
-    inhalt.innerHTML = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
+    const fehler = leerBlock('⚠', 'Nicht abrufbar', text(a.message || 'Unbekannter Fehler.'));
+    plaetze.innerHTML = fehler;
+    inhalt.innerHTML = fehler;
+    $('demo-abgelaufen').innerHTML = fehler;
     demoAbzeichenSetzen(0);
+    demoReiterZahlen(null);
     return;
   }
 
@@ -4761,13 +4896,48 @@ async function ladeDemo() {
   const kenntNachfassen = a.kennt_nachfassen === true;
   const kenntWeiter = a.kennt_weiter === true;
   demoAbzeichenSetzen(a.nachfassen_offen || 0);
+
+  /* Geteilt am Status, nicht am Feld `abgelaufen` (ENT-689): Ein Zugang
+     mit abgelaufener Frist hat noch seine Instanz und braucht noch eine
+     Handlung -- er gehoert zu den laufenden, bis er geschlossen ist. */
+  const laufend = liste.filter(z => z.status === 'aktiv');
+  const zu      = liste.filter(z => z.status !== 'aktiv');
+  demoReiterZahlen(kenntNachfassen ? {
+    zugaenge:   laufend.filter(z => !z.nachgefasst_am).length,
+    abgelaufen: zu.filter(z => !z.nachgefasst_am).length,
+  } : null);
+
+  /* Vier Aussagen, vier Texte: Noch nie ein Zugang, keiner laeuft gerade,
+     keiner ist abgelaufen -- und "nicht eingerichtet" weiter oben. Eine
+     leere Liste, die gleich aussieht wie die andere, liesse offen, ob die
+     Zugaenge nebenan stehen oder es schlicht keine gibt. */
   if (!liste.length) {
-    inhalt.innerHTML = leerBlock('◇', 'Noch kein Zugang vergeben',
+    const nie = leerBlock('◇', 'Noch kein Zugang vergeben',
       'Sobald ein Interessent sich über die Anmeldemaske einen Demo-Zugang holt, steht er hier.');
+    inhalt.innerHTML = nie;
+    $('demo-abgelaufen').innerHTML = nie;
     return;
   }
+  if (laufend.length) {
+    demoZugangTabelle(inhalt, laufend, kenntNachfassen, kenntWeiter);
+  } else {
+    inhalt.innerHTML = leerBlock('◇', 'Kein Zugang läuft gerade',
+      zu.length + ' ' + (zu.length === 1 ? 'geschlossener Zugang steht' : 'geschlossene Zugänge stehen')
+      + ' unter „Abgelaufene Zugänge".');
+  }
+  if (zu.length) {
+    demoZugangTabelle($('demo-abgelaufen'), zu, kenntNachfassen, kenntWeiter);
+  } else {
+    $('demo-abgelaufen').innerHTML = leerBlock('◇', 'Noch kein Zugang abgelaufen',
+      'Ein Zugang landet hier, sobald seine Frist um ist und er geschlossen wurde — oder per „Beenden".');
+  }
+}
 
-  inhalt.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
+/* Eine Zugangstabelle -- fuer laufende und fuer geschlossene dieselbe
+   (ENT-689). Die Knoepfe entscheiden weiterhin je Zeile am Status, nicht
+   an der Liste, in der sie stehen: So bleibt die Regel an einer Stelle. */
+function demoZugangTabelle(ziel, liste, kenntNachfassen, kenntWeiter) {
+  ziel.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
     + '<th>Interessent</th><th>Platz</th><th>Anmeldename</th><th>Status</th><th>Rest</th><th></th>'
     + '</tr></thead><tbody>'
     + liste.map(z => '<tr>'
@@ -4807,15 +4977,15 @@ async function ladeDemo() {
       + '</tr>').join('')
     + '</tbody></table></div>';
 
-  inhalt.querySelectorAll('[data-demo-nutzung]').forEach(b =>
+  ziel.querySelectorAll('[data-demo-nutzung]').forEach(b =>
     b.onclick = () => nutzungHolen(demoPlatzMandant(b.dataset.demoNutzung)));
-  inhalt.querySelectorAll('[data-demo-beenden]').forEach(b =>
+  ziel.querySelectorAll('[data-demo-beenden]').forEach(b =>
     b.onclick = () => demoBeenden(liste.find(z => z.id === +b.dataset.demoBeenden)));
-  inhalt.querySelectorAll('[data-demo-nachgefasst]').forEach(b =>
+  ziel.querySelectorAll('[data-demo-nachgefasst]').forEach(b =>
     b.onclick = () => demoNachgefasst(+b.dataset.demoNachgefasst, true));
-  inhalt.querySelectorAll('[data-demo-offen]').forEach(b =>
+  ziel.querySelectorAll('[data-demo-offen]').forEach(b =>
     b.onclick = () => demoNachgefasst(+b.dataset.demoOffen, false));
-  inhalt.querySelectorAll('[data-demo-erneut]').forEach(b =>
+  ziel.querySelectorAll('[data-demo-erneut]').forEach(b =>
     b.onclick = () => demoErneut(b, liste.find(z => z.id === +b.dataset.demoErneut)));
 }
 
@@ -8452,6 +8622,7 @@ $('knopf-einrichtung-lauf').onclick = einrichtungLauf;
 $('knopf-neu').onclick        = () => formularOeffnen(null);
 $('knopf-vertrag-neu').onclick = () => ofNeuStarten('vertrag');
 $('knopf-demo-ablauf').onclick    = demoAblauf;
+demoReiterZeigen(demoReiter);
 $('knopf-speichern').onclick  = mandantSpeichern;
 $('knopf-abbrechen').onclick  = () => zeig($('m-form-karte'), false);
 $('knopf-sup-zu').onclick      = () => zeig($('sup-karte'), false);
