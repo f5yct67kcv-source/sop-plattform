@@ -344,6 +344,55 @@ $gefiltert = ki_assistent_antwort_filtern(['stop_reason' => 'tool_use', 'content
 pruef('An den Browser gehen nur Text und bekannte Werkzeugaufrufe',
     count($gefiltert['content']) === 2 && $gefiltert['content'][1]['name'] === 'offene_rechnungen' && $gefiltert['stop_reason'] === 'tool_use');
 
+// ══════════ WECKWORT-MODELL (ENT-702) ══════════════════════════════════
+pruef('Ein vollstaendiges Modell hat keine fehlenden Dateien',
+    weckwort_fehlende(array_map(fn($f) => 'vosk-model-small-de-0.15/' . $f, WECKWORT_PFLICHT)) === []);
+pruef('Fehlt eine Pflichtdatei, wird sie genannt',
+    weckwort_fehlende(['x/am/final.mdl', 'x/conf/mfcc.conf', 'x/conf/model.conf']) === ['graph/phones/word_boundary.int']);
+pruef('KRITISCH: Pfade, die aus dem Zielordner hinauszeigen, gelten als unsicher (Zip-Slip)',
+    !weckwort_pfad_sicher('../x') && !weckwort_pfad_sicher('a/../../x') && !weckwort_pfad_sicher('/etc/x')
+    && !weckwort_pfad_sicher('C:/x') && weckwort_pfad_sicher('vosk/am/final.mdl'));
+pruef('Die Quelle ist fest und verschluesselt (https), keine Adresse aus der Anfrage',
+    str_starts_with(WECKWORT_MODELL_QUELLE, 'https://'));
+
+if (class_exists('ZipArchive') && class_exists('PharData')) {
+    $tmp = sys_get_temp_dir() . '/pruef-weckwort-' . bin2hex(random_bytes(3));
+    @mkdir($tmp, 0700, true);
+    $bauen = function (string $datei, array $eintraege) {
+        $z = new ZipArchive(); $z->open($datei, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        foreach ($eintraege as $n => $inhalt) { $z->addFromString($n, $inhalt); }
+        $z->close();
+    };
+    $gut = [];
+    foreach (WECKWORT_PFLICHT as $f) { $gut['vosk-model-small-de-0.15/' . $f] = 'inhalt ' . $f; }
+    $gut['vosk-model-small-de-0.15/graph/HCLr.fst'] = 'x';
+    $bauen("$tmp/gut.zip", $gut);
+    $g = weckwort_umpacken("$tmp/gut.zip", "$tmp/gut.tar.gz");
+    $namen = [];
+    if ($g === '') {
+        foreach (new RecursiveIteratorIterator(new PharData("$tmp/gut.tar.gz")) as $e) {
+            $namen[] = preg_replace('#^.*?\.tar\.gz/#', '', str_replace('\\', '/', $e->getPathname()));
+        }
+    }
+    sort($namen);
+    pruef('Umpacken: ein echtes Modell wird tar.gz mit dem Ordner "model/", den vosk-browser erwartet',
+        $g === '' && in_array('model/am/final.mdl', $namen, true) && in_array('model/graph/HCLr.fst', $namen, true)
+        && !array_filter($namen, fn($n) => str_contains($n, 'vosk-model-small-de')));
+    $bauen("$tmp/fremd.zip", ['ordner/liesmich.txt' => 'hallo']);
+    $f = weckwort_umpacken("$tmp/fremd.zip", "$tmp/fremd.tar.gz");
+    pruef('KRITISCH: ein fremdes Archiv wird nicht ausgeliefert', $f !== '' && !is_file("$tmp/fremd.tar.gz"));
+    $boese = $gut; $boese['vosk-model-small-de-0.15/../../ausbruch.txt'] = 'x';
+    $bauen("$tmp/boese.zip", $boese);
+    $b = weckwort_umpacken("$tmp/boese.zip", "$tmp/boese.tar.gz");
+    pruef('KRITISCH: ein Archiv mit Ausbruchspfad wird abgelehnt und nichts geschrieben',
+        $b !== '' && !is_file("$tmp/boese.tar.gz") && !is_file(dirname($tmp) . '/ausbruch.txt'));
+    file_put_contents("$tmp/kaputt.zip", 'kein zip');
+    pruef('Kein Zip ergibt einen Grund, keinen Absturz', weckwort_umpacken("$tmp/kaputt.zip", "$tmp/k.tar.gz") !== '');
+    weckwort_aufraeumen($tmp);
+} else {
+    $bad[] = 'Weckwort-Modell: ZipArchive oder PharData fehlen -- Umpacken nicht geprueft';
+}
+
 // ══════════ DER GRUND UEBERLEBT DEN RUECKWEG ══════════════════════════
 // Die Funktionen geben weiterhin null zurueck; der Grund steht daneben.
 ki_fehlergrund('dienst_gestoert');

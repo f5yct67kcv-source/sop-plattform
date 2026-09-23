@@ -61,6 +61,7 @@ const RECHNUNGEN = [
 
 // Drehbuch des Modells: Auf eine Frage ruft es `aufruf` auf, auf das
 // Ergebnis antwortet es mit `antwort`. Was es zurueckbekam, wird gemerkt.
+let modellAntwort = null;
 let drehbuch = null, belegeGesperrt = false, abwesenheitGesperrt = true, assistentAntwort = null, routerAntwort = null;
 const rufe = [];
 // Katalog und Kunden fuer die Formular-Werkzeuge (ENT-700). Die Antwort der
@@ -87,6 +88,28 @@ async function neueSeite() {
       cancel: () => {}, getVoices: () => [{ lang: 'de-CH', name: 'Test' }] };
     Object.defineProperty(window, 'speechSynthesis', { value: synth, configurable: true });
     window.SpeechSynthesisUtterance = function (t) { this.text = t; };
+    // Weckwort (ENT-702): Vosk, Mikrofon und Ton als Attrappen. Echte
+    // Erkennung laesst sich hier nicht pruefen -- geprueft wird, was die
+    // Seite mit einem erkannten Wort macht, und dass ohne Einschalten nichts
+    // zuhoert.
+    window.__vosk = { modelle: 0, grammatik: null, hoerer: {}, mikro: 0, gestoppt: 0, modellAdresse: null };
+    window.Vosk = { createModel: async adresse => {
+      window.__vosk.modelle++; window.__vosk.modellAdresse = adresse;
+      return { terminate() {}, KaldiRecognizer: function (rate, gram) {
+        window.__vosk.grammatik = gram;
+        this.on = (ev, fn) => { window.__vosk.hoerer[ev] = fn; };
+        this.acceptWaveform = () => {}; this.remove = () => {};
+      } };
+    } };
+    window.__voskSagt = text => { const h = window.__vosk.hoerer.result; if (h) h({ result: { text } }); };
+    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: async () => {
+      window.__vosk.mikro++; return { getTracks: () => [{ stop: () => { window.__vosk.gestoppt++; } }] }; } } });
+    window.AudioContext = function () {
+      this.sampleRate = 48000; this.state = 'running'; this.destination = {};
+      this.createScriptProcessor = () => ({ connect() {}, disconnect() {} });
+      this.createMediaStreamSource = () => ({ connect() {} });
+      this.close = () => {}; this.resume = () => {};
+    };
   });
   await page.route('**/testumgebung.js', r => r.fulfill({ contentType: 'text/javascript',
     body: readFileSync(`${WURZEL}/testumgebung.js`, 'utf8').replace(/__APP_ENV__/g, umgebung.wert) }));
@@ -108,6 +131,9 @@ async function neueSeite() {
       zurueck.push(JSON.parse(r.content));
       return send({ status: 'ok', stop_reason: 'end_turn', content: [{ type: 'text', text: drehbuch.antwort }] });
     }
+    if (p.startsWith('assistent_weckwort_modell')) return modellAntwort
+      ? route.fulfill({ status: modellAntwort[0], contentType: modellAntwort[0] === 200 ? 'application/gzip' : 'application/json', body: modellAntwort[1] })
+      : route.fulfill({ status: 200, contentType: 'application/gzip', body: 'MODELL' });
     if (p.startsWith('ki_router_parse')) return routerAntwort ? send(routerAntwort[1], routerAntwort[0]) : send({ status: 'error', message: 'kein Mock' }, 502);
     if (p.startsWith('produkt_list')) return send({ status: 'ok', produkte: PR });
     if (p.startsWith('kunden_list')) return send({ status: 'ok', kunden: KU });
@@ -138,28 +164,68 @@ const box = (page, sel) => page.evaluate(s => { const r = document.querySelector
 for (const env of ['production', 'demo']) {
   umgebung.wert = env;
   const p = await neueSeite();
-  check(`KRITISCH: in „${env}" erscheint der Assistent nicht`, !(await p.isVisible('#asWidget')));
+  check(`KRITISCH: in „${env}" erscheint der Assistent nicht`, !(await p.isVisible('#asWidget')) && !(await p.isVisible('#asDock')));
   await p.close();
 }
 umgebung.wert = 'staging';
 const page = await neueSeite();
-check('Auf der Testumgebung ist die Figur da', await page.isVisible('#asFigur'));
+// ══════════ RUHEPLATZ IN DER KOPFZEILE (ENT-702)
+check('Zu Beginn schläft der Assistent: kleine Figur in der Kopfzeile, keine grosse Figur',
+  await page.isVisible('#asDock') && !(await page.isVisible('#asWidget')));
+const dk = await box(page, '#asDock'), gl = await box(page, '.glocke-wrap');
+check(`Der Ruheplatz ist klein und rund, etwa 40 px (${Math.round(dk.w)}×${Math.round(dk.h)})`, Math.abs(dk.w - 40) <= 1 && Math.abs(dk.h - 40) <= 1);
+check('Der Ruheplatz steht direkt links neben der Glocke, auf derselben Höhe (gemessen)',
+  dk.r <= gl.x + 1 && gl.x - dk.r <= 24 && Math.abs((dk.y + dk.h / 2) - (gl.y + gl.h / 2)) <= 4);
+await page.screenshot({ path: OUT + '/assistent-ruheplatz.png', clip: { x: 700, y: 0, width: 800, height: 70 } });
+check('Beim Schlafen hört nichts zu und nichts wird geladen', await page.evaluate(() => window.__vosk.modelle === 0 && window.__vosk.mikro === 0));
+
+// In der Kopfleiste (Projektinhaber) wandert die Glocke neben das Logo --
+// der Ruheplatz muss mitwandern, links daneben.
+await page.evaluate(() => huelleSetzen('aus', false));
+await page.waitForTimeout(250);
+const dkK = await box(page, '#asDock'), glK = await box(page, '.glocke-wrap');
+check('Kopfleiste: der Ruheplatz wandert mit der Glocke und steht links daneben, auf derselben Höhe (gemessen)',
+  await page.evaluate(() => document.getElementById('asDock').parentElement === document.querySelector('.glocke-wrap').parentElement
+    && document.getElementById('asDock').nextElementSibling === document.querySelector('.glocke-wrap'))
+  && dkK.r <= glK.x + 1 && glK.x - dkK.r <= 24 && Math.abs((dkK.y + dkK.h / 2) - (glK.y + glK.h / 2)) <= 4);
+await page.screenshot({ path: OUT + '/assistent-ruheplatz-kopfleiste.png', clip: { x: 900, y: 0, width: 600, height: 90 } });
+// Schmale Kopfleiste: neben Glocke und Logo ist kein Platz mehr -- dann
+// ruht die Figur eine Zeile tiefer, vorne in der Werkzeugleiste.
+await page.setViewportSize({ width: 1000, height: 1000 });
+await page.waitForTimeout(250);
+check('Schmale Kopfleiste (1000 px): der Ruheplatz steht vorne in der Werkzeugleiste, sichtbar und ganz im Bild',
+  await page.evaluate(() => document.getElementById('asDock').parentElement === document.querySelector('.tb-rechts'))
+  && await page.isVisible('#asDock') && (await box(page, '#asDock')).r <= 1000);
+await page.setViewportSize({ width: 1500, height: 1000 });
+await page.waitForTimeout(250);
+check('Wieder breit: zurück neben die Glocke', await page.evaluate(() => document.getElementById('asDock').nextElementSibling === document.querySelector('.glocke-wrap')));
+await page.evaluate(() => huelleSetzen('voll', false));
+await page.waitForTimeout(250);
+
+await page.click('#asDock');
+await page.waitForTimeout(200);
+const leer = () => page.evaluate(() => document.getElementById('asDock').classList.contains('leer'));
+check('Ein Klick auf den Ruheplatz weckt ihn: grosse Figur da, Fenster offen, Ruheplatz leer',
+  await page.isVisible('#asFigur') && await page.isVisible('#asPanel') && await leer());
+const dkWach = await box(page, '#asDock'), glWach = await box(page, '.glocke-wrap');
+check('Die Leiste springt beim Wecken nicht: Ruheplatz und Glocke bleiben am Ort (gemessen)',
+  Math.abs(dkWach.x - dk.x) <= 1 && Math.abs(glWach.x - gl.x) <= 1);
 const f = await box(page, '#asFigur');
 check(`Die Figur ist rund 76 px gross (${Math.round(f.w)}×${Math.round(f.h)})`, Math.abs(f.w - 76) <= 1 && Math.abs(f.h - 76) <= 1);
 check('Die Figur steht rechts unten, ganz im Bild (gemessen)', f.r <= 1500 && f.b <= 1000 && f.x > 1300 && f.y > 850);
-check('Das Fenster ist zu Beginn zu', !(await page.isVisible('#asPanel')));
 const marke = await page.evaluate(() => {
   const el = [...document.body.querySelectorAll('div')].find(d => d.textContent === 'TESTUMGEBUNG' && getComputedStyle(d).position === 'fixed');
   if (!el) { return null; } const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, r: r.right, b: r.bottom };
 });
 check('Die Figur verdeckt den Aufkleber TESTUMGEBUNG nicht (gemessen)',
   marke !== null && (f.b <= marke.y || f.x >= marke.r || f.r <= marke.x || f.y >= marke.b));
-
-await page.click('#asFigur');
-await page.waitForTimeout(200);
-check('Ein Klick auf die Figur öffnet das Fenster', await page.isVisible('#asPanel'));
 const pn = await box(page, '#asPanel');
 check('Das Fenster steht ganz im Bild, über der Figur (gemessen)', pn.x >= 0 && pn.y >= 0 && pn.r <= 1500 && pn.b <= f.y + 1);
+await page.click('#asFigur');
+await page.waitForTimeout(100);
+check('Ein Klick auf die wache Figur klappt das Fenster zu', !(await page.isVisible('#asPanel')));
+await page.click('#asFigur');
+await page.waitForTimeout(100);
 check('Das Fenster sagt, dass Speichern bei der Person bleibt', /Speichern tust du selbst/.test(await page.textContent('#asVerlauf')));
 
 const fragen = async (text, d) => {
@@ -328,22 +394,79 @@ await page.mouse.move(rand.x + 38, rand.y + 38); await page.mouse.down();
 await page.mouse.move(rand.x - 400, rand.y - 200, { steps: 6 }); await page.mouse.up();
 const gemerkt = await box(page, '#asFigur');
 await page.reload(); await page.waitForSelector('#shell.on'); await page.waitForTimeout(600);
+check('Nach dem Neuladen schläft er wieder in der Kopfzeile', await page.isVisible('#asDock') && !(await leer()) && !(await page.isVisible('#asWidget')));
+await page.click('#asDock'); await page.waitForTimeout(150);
 const wieder = await box(page, '#asFigur');
-check('Nach dem Neuladen steht die Figur wieder dort (gemessen)', Math.abs(wieder.x - gemerkt.x) <= 2 && Math.abs(wieder.y - gemerkt.y) <= 2);
+check('Geweckt steht die Figur wieder am gemerkten Platz (gemessen)', Math.abs(wieder.x - gemerkt.x) <= 2 && Math.abs(wieder.y - gemerkt.y) <= 2);
 check('... und bleibt stumm', await page.evaluate(() => document.getElementById('asStumm').classList.contains('aus')));
-
-await page.click('#asFigur');
-await page.waitForTimeout(150);
 const oben = await box(page, '#asPanel');
 check('Auch nach dem Verschieben öffnet sich das Fenster ganz im Bild (gemessen)', oben.x >= 0 && oben.y >= 0 && oben.r <= 1500 && oben.b <= 1000);
 await page.click('#asPanel .as-kopf button[aria-label="Assistent schliessen"]');
-check('Schliessen blendet die Figur aus', !(await page.isVisible('#asWidget')));
+check('Schliessen legt ihn zurück auf den Ruheplatz', !(await page.isVisible('#asWidget')) && !(await leer()));
+
+// Herausziehen weckt ihn und setzt ihn dorthin, wo man loslaesst.
+const d2 = await box(page, '#asDock');
+await page.mouse.move(d2.x + 20, d2.y + 20); await page.mouse.down();
+// Weit genug unten, dass das Fenster darueber Platz hat -- sonst rueckt die
+// Figur absichtlich nach unten (asInSicht).
+await page.mouse.move(700, 800, { steps: 8 }); await page.mouse.up();
+await page.waitForTimeout(150);
+const gezogen = await box(page, '#asFigur');
+check('Herausziehen weckt ihn: die Figur steht dort, wo man loslässt (gemessen)',
+  await page.isVisible('#asWidget') && Math.abs(gezogen.x + gezogen.w / 2 - 700) <= 3 && Math.abs(gezogen.y + gezogen.h / 2 - 800) <= 3);
+check('... und das Fenster ist offen', await page.isVisible('#asPanel'));
+// Zurueck in die Kopfzeile gezogen, schlaeft er wieder.
+await page.click('#asPanel .as-kopf button[aria-label="Fenster zuklappen"]');
+const vorZurueck = await box(page, '#asFigur');
+await page.mouse.move(vorZurueck.x + 38, vorZurueck.y + 38); await page.mouse.down();
+await page.mouse.move(d2.x + 20, d2.y + 20, { steps: 10 }); await page.mouse.up();
+await page.waitForTimeout(150);
+check('Zurück in die Kopfzeile gezogen, schläft er wieder', !(await page.isVisible('#asWidget')) && !(await leer()));
+await page.click('#asDock'); await page.waitForTimeout(100);
+await page.click('#asDock'); await page.waitForTimeout(100);
+check('Wach legt ein Klick auf den leeren Platz ihn schlafen', !(await page.isVisible('#asWidget')) && !(await leer()));
+check('... ohne dass die Kopfzeile als neuer Platz gemerkt wird', await page.evaluate(() => { const p = JSON.parse(localStorage.getItem('as_pos') || 'null'); return !p || p.unten < window.innerHeight - 120; }));
+
+// ══════════ WECKWORT „HALLO WAECHTER" (ENT-702)
+await page.click('#asDock'); await page.waitForTimeout(150);
+check('Das Weckwort ist standardmässig aus', await page.evaluate(() => window.__vosk.mikro === 0 && document.getElementById('asHorch').getAttribute('aria-pressed') === 'false'));
+await page.click('#asHorch');
+await page.waitForFunction(() => document.getElementById('asHorch').classList.contains('an'), null, { timeout: 5000 });
+const weck = await page.evaluate(() => window.__vosk);
+check('Eingeschaltet: Modell vom eigenen Server geladen, Mikrofon offen', weck.modelle === 1 && weck.mikro === 1 && /^blob:/.test(weck.modellAdresse));
+check('KRITISCH: die Erkennung kennt nur das Weckwort (Wortliste), sonst nichts', typeof weck.grammatik === 'string' && JSON.stringify(JSON.parse(weck.grammatik)) === JSON.stringify(['hallo wächter', '[unk]']));
+check('Der Ruheplatz bzw. die Figur zeigen, dass zugehört wird', await page.evaluate(() => document.getElementById('asWidget').classList.contains('horcht')));
+await page.click('#asPanel .as-kopf button[aria-label="Assistent schliessen"]');
+check('Auch schlafend zeigt der Ruheplatz das Zuhören an', await page.evaluate(() => document.getElementById('asDock').classList.contains('horcht')));
+await page.evaluate(() => { window.__mik = 0; window.sprachUm = () => { window.__mik++; }; });
+await page.evaluate(() => window.__voskSagt('guten morgen'));
+await page.waitForTimeout(100);
+check('Ein anderes Wort weckt ihn nicht', !(await page.isVisible('#asWidget')) && await page.evaluate(() => window.__mik === 0));
+await page.evaluate(() => window.__voskSagt('hallo wächter'));
+await page.waitForTimeout(200);
+check('KRITISCH: „Hallo Wächter“ weckt ihn, öffnet das Fenster und startet gleich die Spracheingabe für die Frage',
+  await page.isVisible('#asWidget') && await page.isVisible('#asPanel') && await page.evaluate(() => window.__mik === 1));
+await page.evaluate(() => window.__voskSagt('hallo wächter'));
+check('Ein Echo innert Sekunden startet nicht nochmals', await page.evaluate(() => window.__mik === 1));
+await page.click('#asHorch');
+await page.waitForTimeout(100);
+check('Ausgeschaltet: Mikrofon zu, Anzeige weg', await page.evaluate(() => window.__vosk.gestoppt >= 1 && !document.getElementById('asWidget').classList.contains('horcht')));
+check('Die Einstellung bleibt gemerkt (aus)', await page.evaluate(() => localStorage.getItem('as_horchen') === '0'));
+
+modellAntwort = [503, JSON.stringify({ status: 'error', grund: 'modell_fehlt', message: 'Das Modell liess sich nicht herunterladen.' })];
+await page.evaluate(() => caches && caches.delete && caches.delete('guardops-weckwort')).catch(() => {});
+await page.click('#asHorch');
+await page.waitForTimeout(400);
+check('Fehlt das Modell, steht der Grund des Servers da, und das Zuhören schaltet sich aus',
+  /liess sich nicht herunterladen/.test(await page.textContent('#asVerlauf'))
+  && await page.evaluate(() => !document.getElementById('asHorch').classList.contains('an') && localStorage.getItem('as_horchen') === '0'));
+modellAntwort = null;
 
 // Am Handy nicht (mobiler Zuschnitt nicht entschieden).
 await page.reload(); await page.waitForSelector('#shell.on'); await page.waitForTimeout(400);
 await page.setViewportSize({ width: 390, height: 844 });
 await page.waitForTimeout(150);
-check('Am Handy ist der Assistent ausgeblendet (mobiler Zuschnitt noch nicht entschieden)', !(await page.isVisible('#asFigur')));
+check('Am Handy ist der Assistent ausgeblendet (mobiler Zuschnitt noch nicht entschieden)', !(await page.isVisible('#asFigur')) && !(await page.isVisible('#asDock')));
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

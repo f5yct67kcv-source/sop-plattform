@@ -1231,3 +1231,183 @@ function anthropic_assistent(array $nachrichten, string $heute): ?array
     }
     return ki_assistent_antwort_filtern($data);
 }
+
+// ══════════════════════════════════════════ WECKWORT (ENT-702, nur Testumgebung)
+//
+// Weckwort "Hallo Waechter" fuer den Assistenten.
+//
+// Erkannt wird das Wort im BROWSER, mit Vosk (quelloffen, Apache-2.0) und
+// einem kleinen deutschen Modell. Kein Ton verlaesst das Geraet, bevor das
+// Wort gefallen ist; erst danach startet die gewohnte Spracheingabe.
+//
+// Diese Datei besorgt nur das Modell: Der Server holt es EINMAL von der
+// Projektseite, prueft, dass es ein Vosk-Modell ist, packt es in das Format,
+// das vosk-browser erwartet (tar.gz mit einem Ordner "model/"), und legt es
+// im Temp-Bereich des Kontos ab -- nie im ausgelieferten Verzeichnis. Wird
+// der Temp-Bereich geleert, holt er es beim naechsten Mal neu.
+//
+// Warum nicht beim Deploy: Der Deploy ist querliegend und wird von mehreren
+// Sitzungen angefasst; ein 45-MB-Schritt dort betraefe jeden Lauf. Und warum
+// hier in ai.php statt in einer eigenen Datei: Der Deploy kopiert die Module
+// einzeln und namentlich -- eine neue Datei verlangte eine Deploy-Aenderung.
+
+const WECKWORT_MODELL_QUELLE = 'https://alphacephei.com/vosk/models/vosk-model-small-de-0.15.zip';
+const WECKWORT_MODELL_MAX_BYTES = 120 * 1024 * 1024;   // Obergrenze beim Herunterladen
+// Diese Dateien muss ein Vosk-Modell enthalten (README von vosk-browser,
+// Abschnitt "Model format"). Fehlt eine, ist es kein Modell -- dann wird
+// nichts ausgeliefert, statt etwas Fremdes an den Browser zu geben.
+const WECKWORT_PFLICHT = ['am/final.mdl', 'conf/mfcc.conf', 'conf/model.conf', 'graph/phones/word_boundary.int'];
+
+function weckwort_verzeichnis(): string
+{
+    return sys_get_temp_dir() . '/guardops-weckwort';
+}
+
+function weckwort_modell_datei(): string
+{
+    return weckwort_verzeichnis() . '/model-de-0.15.tar.gz';
+}
+
+// Welche Pflichtdateien fehlen in einer Liste von Pfaden im Archiv? Die Pfade
+// liegen unter einem Ordner beliebigen Namens (im Original
+// "vosk-model-small-de-0.15/"). Rein, ohne Dateizugriff.
+function weckwort_fehlende(array $pfade): array
+{
+    $relativ = [];
+    foreach ($pfade as $p) {
+        $p = str_replace('\\', '/', (string)$p);
+        $teile = explode('/', $p, 2);
+        if (count($teile) === 2 && $teile[1] !== '') {
+            $relativ[$teile[1]] = true;
+        }
+    }
+    return array_values(array_filter(WECKWORT_PFLICHT, fn($f) => !isset($relativ[$f])));
+}
+
+// Ein Pfad aus dem Archiv, der aus dem Zielordner hinauszeigt ("../", absolut),
+// wird nie entpackt (Zip-Slip). Rein.
+function weckwort_pfad_sicher(string $pfad): bool
+{
+    $p = str_replace('\\', '/', $pfad);
+    return $p !== '' && $p[0] !== '/' && !preg_match('#(^|/)\.\.(/|$)#', $p) && !preg_match('/^[A-Za-z]:/', $p);
+}
+
+// Zip -> tar.gz mit Ordner "model/". Gibt '' zurueck oder den Grund.
+function weckwort_umpacken(string $zipDatei, string $zielTarGz): string
+{
+    if (!class_exists('ZipArchive') || !class_exists('PharData')) {
+        return 'Auf dem Server fehlt ZipArchive oder PharData.';
+    }
+    $zip = new ZipArchive();
+    if ($zip->open($zipDatei) !== true) {
+        return 'Das heruntergeladene Archiv ist kein gültiges Zip.';
+    }
+    $pfade = [];
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $pfade[] = (string)$zip->getNameIndex($i);
+    }
+    $fehlt = weckwort_fehlende($pfade);
+    if ($fehlt) {
+        $zip->close();
+        return 'Das Archiv ist kein Vosk-Modell (es fehlt: ' . implode(', ', $fehlt) . ').';
+    }
+    $arbeit = weckwort_verzeichnis() . '/arbeit-' . bin2hex(random_bytes(4));
+    @mkdir($arbeit . '/model', 0700, true);
+    foreach ($pfade as $p) {
+        if (!weckwort_pfad_sicher($p)) {
+            $zip->close();
+            weckwort_aufraeumen($arbeit);
+            return 'Das Archiv enthält einen unzulässigen Pfad.';
+        }
+        $teile = explode('/', str_replace('\\', '/', $p), 2);
+        if (count($teile) < 2 || $teile[1] === '' || substr($p, -1) === '/') {
+            continue;
+        }
+        $ziel = $arbeit . '/model/' . $teile[1];
+        @mkdir(dirname($ziel), 0700, true);
+        $inhalt = $zip->getFromName($p);
+        if ($inhalt === false || file_put_contents($ziel, $inhalt) === false) {
+            $zip->close();
+            weckwort_aufraeumen($arbeit);
+            return 'Das Modell liess sich nicht entpacken.';
+        }
+    }
+    $zip->close();
+    try {
+        $tar = $arbeit . '/model.tar';
+        $phar = new PharData($tar);
+        $phar->buildFromDirectory($arbeit, '#^' . preg_quote($arbeit . '/model/', '#') . '#');
+        $phar->compress(Phar::GZ);
+        unset($phar);
+        if (!rename($tar . '.gz', $zielTarGz)) {
+            throw new RuntimeException('verschieben');
+        }
+    } catch (Throwable $e) {
+        weckwort_aufraeumen($arbeit);
+        return 'Das Modell liess sich nicht neu verpacken.';
+    }
+    weckwort_aufraeumen($arbeit);
+    return '';
+}
+
+function weckwort_aufraeumen(string $pfad): void
+{
+    if (is_dir($pfad)) {
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($pfad, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST) as $f) {
+            $f->isDir() ? @rmdir($f->getPathname()) : @unlink($f->getPathname());
+        }
+        @rmdir($pfad);
+    } elseif (is_file($pfad)) {
+        @unlink($pfad);
+    }
+}
+
+// Sorgt dafuer, dass das Modell bereitliegt. Gibt '' oder den Grund zurueck.
+// Nur eine Anfrage laedt; weitere warten auf die Sperre und finden danach die
+// fertige Datei.
+function weckwort_bereitstellen(): string
+{
+    $ziel = weckwort_modell_datei();
+    if (is_file($ziel) && filesize($ziel) > 1000000) {
+        return '';
+    }
+    $dir = weckwort_verzeichnis();
+    if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
+        return 'Kein Ablageort für das Modell auf dem Server.';
+    }
+    $sperre = fopen($dir . '/.sperre', 'c');
+    if (!$sperre || !flock($sperre, LOCK_EX)) {
+        return 'Das Modell wird gerade von einer anderen Anfrage bereitgestellt.';
+    }
+    try {
+        if (is_file($ziel) && filesize($ziel) > 1000000) {
+            return '';
+        }
+        @set_time_limit(600);
+        $zip = $dir . '/download.zip';
+        $f = fopen($zip, 'w');
+        $ch = curl_init(WECKWORT_MODELL_QUELLE);
+        curl_setopt_array($ch, [
+            CURLOPT_FILE => $f, CURLOPT_FOLLOWLOCATION => true, CURLOPT_MAXREDIRS => 3,
+            CURLOPT_CONNECTTIMEOUT => 20, CURLOPT_TIMEOUT => 480, CURLOPT_FAILONERROR => true,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS, CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
+            CURLOPT_NOPROGRESS => false,
+            CURLOPT_PROGRESSFUNCTION => fn($c, $gesamt, $geladen) => $geladen > WECKWORT_MODELL_MAX_BYTES ? 1 : 0,
+        ]);
+        $ok = curl_exec($ch);
+        $fehler = curl_error($ch);
+        curl_close($ch);
+        fclose($f);
+        if (!$ok) {
+            @unlink($zip);
+            return 'Das Modell liess sich nicht herunterladen' . ($fehler !== '' ? " ({$fehler})" : '') . '.';
+        }
+        $grund = weckwort_umpacken($zip, $ziel);
+        @unlink($zip);
+        return $grund;
+    } finally {
+        flock($sperre, LOCK_UN);
+        fclose($sperre);
+    }
+}

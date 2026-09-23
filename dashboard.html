@@ -2125,6 +2125,20 @@ html:not(.hat-reinigung) [data-sparte-feld] { display: none !important; }
 .as-fuss .as-reihe { display: flex; gap: 8px; align-items: center; }
 .as-fuss .as-reihe .sprach { flex: 1; margin: 0; }
 .as-fuss textarea { resize: none; }
+/* Ruheplatz in der Kopfzeile (ENT-702): klein, gedaempft, links der Glocke. */
+.as-dock { width: 40px; height: 40px; flex: none; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: none; cursor: grab; opacity: .7; position: relative; align-self: center; }
+.as-dock:hover, .as-dock:focus-visible { opacity: 1; }
+.as-dock[hidden] { display: none; }
+.as-dock.leer { opacity: .45; border-style: dashed; cursor: pointer; }
+.as-dock.leer svg { visibility: hidden; }
+.as-dock svg { width: 100%; height: 100%; display: block; border-radius: 50%; }
+@media (max-width: 900px) { .as-dock { display: none !important; } }
+/* Hoert auf das Weckwort: ein kleiner gruener Punkt, an Ruheplatz und Figur. */
+.as-dock.horcht::after, .as-widget.horcht .as-figur::before { content: ''; position: absolute; right: 1px; bottom: 1px; width: 10px; height: 10px; border-radius: 50%; background: var(--pos); border: 2px solid var(--surface); }
+.as-widget.horcht .as-figur::before { right: 4px; bottom: 4px; width: 14px; height: 14px; z-index: 1; }
+.as-kopf button.an { color: var(--pos); }
+.as-kopf button.laedt { color: var(--accent); animation: as-puls-leise 1.2s ease-in-out infinite; }
+@keyframes as-puls-leise { 50% { opacity: .4; } }
 /* Sprechblase ueber der Figur (ENT-700): nur solange das Fenster zu ist. */
 .as-blase { max-width: 300px; padding: 10px 13px; border-radius: 12px; background: var(--surface); border: 1px solid var(--accent-line); box-shadow: 0 8px 24px rgba(0,0,0,.28); font-size: 13px; line-height: 1.45; cursor: pointer; position: relative; }
 .as-blase[hidden] { display: none; }
@@ -9946,6 +9960,9 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   <div class="as-panel" id="asPanel" hidden role="dialog" aria-label="Assistent">
     <div class="as-kopf" id="asKopf">
       <b>Assistent</b><span class="as-beta">Beta</span><span class="as-luft"></span>
+      <button type="button" id="asHorch" onclick="asHorchenUm()" aria-label="Auf „Hallo Wächter“ hören: aus" title="Auf „Hallo Wächter“ hören: aus" aria-pressed="false">
+        <svg class="i i-sm" viewBox="0 0 24 24"><path d="M6 8.5a6 6 0 0 1 12 0c0 3.5-3 4.5-3 7.5a3 3 0 0 1-6 0"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-1.5 2-1.5 3.5"/></svg>
+      </button>
       <button type="button" id="asStumm" onclick="asStummUm()" aria-label="Stimme aus" title="Stimme aus">
         <svg class="i i-sm" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
       </button>
@@ -12690,7 +12707,10 @@ function asMerk(k, v) {
 function asStart() {
   if (asAktiv || !asUmgebungErlaubt() || !$('asWidget')) { return; }
   asAktiv = true;
-  $('asWidget').hidden = false;
+  // Zu Beginn schlaeft er in der Kopfzeile (ENT-702); die grosse Figur
+  // erscheint erst nach Klicken oder Herausziehen.
+  $('asWidget').hidden = true;
+  asDockBauen();
   sprachBereit('as');
   // Der Erklaersatz von sprachBereit() spricht von "Erkennen" -- den Knopf
   // gibt es hier nicht. Nur der Satz wird ersetzt, Warnungen (kein
@@ -12703,6 +12723,9 @@ function asStart() {
   asPositionLaden();
   asZiehbar($('asFigur'), () => asPanelUm());
   asZiehbar($('asKopf'), null);
+  asWeckZustand = 'aus';
+  asHorchZeichnen();
+  if (asHorcht()) { asWeckStart(); }
   if (!$('asVerlauf').children.length) {
     asNachricht('er', 'Hallo. Ich kann nachsehen, was Kunden bei Offerten entschieden haben, wo in Einsätzen noch Leute fehlen, '
       + 'wer in einem Zeitfenster verfügbar ist und welche Rechnungen offen sind. Offerten, Rechnungen, Einsätze, Kunden '
@@ -12721,14 +12744,8 @@ function asPanelZu() {
   if (sprach && sprachPrefix === 'as') { sprachStop(); }
   $('asPanel').hidden = true;
 }
-// Schliessen blendet die Figur bis zum naechsten Laden der Seite aus. Kein
-// Merken ueber das Neuladen hinaus: Auf der Testumgebung soll sie nicht
-// unauffindbar verschwinden.
-function asSchliessen() {
-  asPanelZu();
-  asStimmeAus();
-  $('asWidget').hidden = true;
-}
+// Schliessen legt ihn zurueck auf den Ruheplatz in der Kopfzeile (ENT-702).
+function asSchliessen() { asSchlafen(); }
 
 // ── Verschieben. Ein Klick ohne Bewegung ist ein Klick (Figur: Fenster auf
 // und zu), erst ab 5 px Weg wird verschoben.
@@ -12738,8 +12755,9 @@ function asZiehbar(griff, beiKlick) {
     const w = $('asWidget');
     const r = w.getBoundingClientRect();
     const start = { x: e.clientX, y: e.clientY, rechts: window.innerWidth - r.right, unten: window.innerHeight - r.bottom };
-    let bewegt = false;
+    let bewegt = false, lastX = e.clientX, lastY = e.clientY;
     const bewegen = ev => {
+      lastX = ev.clientX; lastY = ev.clientY;
       const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
       if (!bewegt && Math.hypot(dx, dy) < 5) { return; }
       bewegt = true;
@@ -12748,7 +12766,8 @@ function asZiehbar(griff, beiKlick) {
     const los = () => {
       window.removeEventListener('pointermove', bewegen);
       window.removeEventListener('pointerup', los);
-      if (bewegt) { asMerk('pos', JSON.stringify(asPosition())); }
+      if (bewegt && asImRuhebereich(lastX, lastY)) { asSchlafen(); }
+      else if (bewegt) { asMerk('pos', JSON.stringify(asPosition())); }
       else if (beiKlick) { beiKlick(); }
     };
     window.addEventListener('pointermove', bewegen);
@@ -13231,6 +13250,257 @@ function asBlase(text) {
   b.hidden = false;
   clearTimeout(asBlaseZeit);
   asBlaseZeit = setTimeout(() => { b.hidden = true; }, Math.min(15000, 4000 + text.length * 60));
+}
+
+// ── Ruheplatz in der Kopfzeile (ENT-702). Zu Beginn schlaeft der Assistent:
+// eine kleine Figur links neben der Glocke. Herausziehen oder Klicken weckt
+// ihn, zurueck in die Kopfzeile ziehen oder "Schliessen" legt ihn schlafen.
+// Die Figur wandert mit der Glocke (glockeVerorten), weil diese je nach
+// Layout in der Kopfleiste oder in der Werkzeugleiste steht.
+let asWach = false;
+
+function asDockBauen() {
+  if ($('asDock')) { return; }
+  const d = document.createElement('button');
+  d.type = 'button';
+  d.id = 'asDock';
+  d.className = 'as-dock';
+  d.title = 'Assistent: klicken oder herausziehen';
+  d.setAttribute('aria-label', 'Assistent aktivieren');
+  // Dieselbe Zeichnung wie die grosse Figur, mit eigenen IDs fuer Verlauf und
+  // Beschnitt -- doppelte IDs im Dokument waeren ungueltig.
+  d.innerHTML = $('asFigur').querySelector('svg').outerHTML.replace(/asHg/g, 'asHgD').replace(/asKreis/g, 'asKreisD');
+  asDockVerorten(d);
+  asDockZiehbar(d);
+}
+// In einer schmalen Kopfleiste (unter 1200 px) ist neben Glocke und Logo
+// kein Platz: Die Navigation verrutschte aus der Mitte, bei 901 px liefe die
+// Leiste ueber (test_huelle, test_marke_huelle). Dann ruht die Figur eine
+// Zeile tiefer, vorne in der Werkzeugleiste.
+const AS_DOCK_KOPF_MIN = 1200;
+function asDockVerorten(d) {
+  d = d || $('asDock');
+  const g = document.querySelector('.glocke-wrap');
+  const leiste = document.querySelector('.tb-rechts');
+  if (!d || !g || !g.parentElement) { return; }
+  const eng = typeof kopfleisteAktiv === 'function' && kopfleisteAktiv() && window.innerWidth < AS_DOCK_KOPF_MIN;
+  if (eng && leiste) {
+    if (leiste.firstElementChild !== d) { leiste.insertBefore(d, leiste.firstChild); }
+  } else if (g.previousElementSibling !== d) {
+    g.parentElement.insertBefore(d, g);
+  }
+}
+window.matchMedia(`(min-width: ${AS_DOCK_KOPF_MIN}px)`).addEventListener('change', () => { if (typeof asDockVerorten === 'function') { asDockVerorten(); } });
+// Die Zone, in der eine losgelassene Figur wieder schlafen geht: die Leiste,
+// in der der Ruheplatz steht.
+function asImRuhebereich(x, y) {
+  const d = $('asDock');
+  const zone = d && d.parentElement ? d.parentElement.getBoundingClientRect() : null;
+  return !!zone && x >= zone.left - 8 && x <= zone.right + 8 && y >= zone.top - 8 && y <= zone.bottom + 8;
+}
+
+// Wach bleibt der Ruheplatz als leerer, gestrichelter Kreis stehen: Die
+// Leiste springt nicht, und man sieht, wohin man ihn zurueckziehen kann.
+function asAktivieren(oeffnen) {
+  asWach = true;
+  asDockLeer(true);
+  $('asWidget').hidden = false;
+  asPositionLaden();
+  if (oeffnen !== false) { asPanelAuf(); }
+}
+function asSchlafen() {
+  asPanelZu();
+  asStimmeAus();
+  $('asBlase').hidden = true;
+  $('asWidget').hidden = true;
+  asDockLeer(false);
+  asWach = false;
+}
+function asDockLeer(leer) {
+  const d = $('asDock');
+  d.classList.toggle('leer', leer);
+  d.title = leer ? 'Assistent schlafen legen (oder die Figur hierher ziehen)' : 'Assistent: klicken oder herausziehen';
+  d.setAttribute('aria-label', leer ? 'Assistent schlafen legen' : 'Assistent aktivieren');
+}
+
+function asDockZiehbar(d) {
+  d.addEventListener('pointerdown', e => {
+    if (e.button !== 0) { return; }
+    // Wach: der leere Platz legt ihn mit einem Klick schlafen, gezogen wird nichts.
+    if (asWach) { e.preventDefault(); asSchlafen(); return; }
+    const start = { x: e.clientX, y: e.clientY };
+    let bewegt = false;
+    const bewegen = ev => {
+      if (!bewegt && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 5) { return; }
+      if (!bewegt) {
+        bewegt = true;
+        asWach = true;
+        asDockLeer(true);
+        $('asWidget').hidden = false;
+      }
+      // Die Figur haengt mittig unter dem Zeiger.
+      const f = $('asFigur').getBoundingClientRect();
+      asSetzen(window.innerWidth - ev.clientX - f.width / 2, window.innerHeight - ev.clientY - f.height / 2);
+    };
+    const los = ev => {
+      window.removeEventListener('pointermove', bewegen);
+      window.removeEventListener('pointerup', los);
+      if (!bewegt) { asAktivieren(); return; }
+      if (asImRuhebereich(ev.clientX, ev.clientY)) { asSchlafen(); return; }
+      asMerk('pos', JSON.stringify(asPosition()));
+      asPanelAuf();
+    };
+    window.addEventListener('pointermove', bewegen);
+    window.addEventListener('pointerup', los);
+    e.preventDefault();
+  });
+}
+
+// ── Weckwort "Hallo Waechter" (ENT-702). Erkannt wird mit Vosk IM BROWSER,
+// mit einer Wortliste, die nur das Weckwort kennt. Kein Ton verlaesst das
+// Geraet, bevor es gefallen ist; danach startet die gewohnte Spracheingabe.
+// Standardmaessig aus: Zuhoeren heisst, dass das Mikrofon dauernd offen ist.
+// Das soll man bewusst einschalten (Ohr-Knopf im Fenster), pro Browser gemerkt.
+const AS_VOSK_URL = 'https://cdn.jsdelivr.net/npm/vosk-browser@0.0.8/dist/vosk.js';
+const AS_VOSK_SRI = 'sha384-nqyY8clHf93uBYFkgkACShMTuvE3U57yXSJaf0Ws+XgzcoUe6OB/1BiOfHqKOWeg';
+const AS_WECKWORT = 'hallo wächter';
+let asWeck = null;             // { ctx, stream, node, model, recognizer }
+let asWeckZustand = 'aus';     // aus | laedt | an | fehler
+let asWeckLetzt = 0;
+
+function asHorcht() { return asMerk('horchen') === '1'; }
+function asHorchZeichnen() {
+  const b = $('asHorch');
+  const z = asWeckZustand;
+  b.classList.toggle('an', z === 'an');
+  b.classList.toggle('laedt', z === 'laedt');
+  b.classList.toggle('aus', z === 'fehler');
+  const text = { aus: 'Auf „Hallo Wächter“ hören: aus', laedt: 'Weckwort wird geladen …', an: 'Hört auf „Hallo Wächter“', fehler: 'Weckwort nicht verfügbar' }[z];
+  b.title = text;
+  b.setAttribute('aria-label', text);
+  b.setAttribute('aria-pressed', String(z === 'an' || z === 'laedt'));
+  $('asWidget').classList.toggle('horcht', z === 'an');
+  if ($('asDock')) { $('asDock').classList.toggle('horcht', z === 'an'); }
+}
+function asHorchenUm() {
+  if (asHorcht() || asWeckZustand === 'an' || asWeckZustand === 'laedt') {
+    asMerk('horchen', '0');
+    asWeckStop();
+    asWeckZustand = 'aus';
+    asHorchZeichnen();
+    return;
+  }
+  asMerk('horchen', '1');
+  asWeckStart();
+}
+
+function asSkriptLaden(url, sri) {
+  return new Promise((ok, fehler) => {
+    if (window.Vosk) { ok(); return; }
+    const s = document.createElement('script');
+    s.src = url;
+    s.integrity = sri;
+    s.crossOrigin = 'anonymous';
+    s.onload = () => ok();
+    s.onerror = () => fehler(new Error('Die Erkennungsbibliothek liess sich nicht laden.'));
+    document.head.appendChild(s);
+  });
+}
+
+// Das Modell kommt vom eigenen Server (assistent_weckwort_modell.php) und bleibt im
+// Browser zwischengespeichert. Der Worker von Vosk kann keinen Anmeldekopf
+// mitschicken -- darum laedt es diese Seite selbst und reicht eine lokale
+// Adresse weiter.
+async function asModellAdresse() {
+  let blob = null;
+  try { const c = await caches.open('guardops-weckwort'); const r = await c.match('modell-de-0.15'); if (r) { blob = await r.blob(); } }
+  catch (e) { blob = null; }
+  if (!blob) {
+    const res = await fetch(API + 'assistent_weckwort_modell.php', { headers: token ? { 'X-Auth-Token': token } : {} });
+    if (!res.ok) {
+      let m = '';
+      try { m = (await res.json()).message || ''; } catch (e) { m = ''; }
+      throw new Error(m || 'Das Sprachmodell für das Weckwort ist nicht verfügbar.');
+    }
+    blob = await res.blob();
+    try { const c = await caches.open('guardops-weckwort'); await c.put('modell-de-0.15', new Response(blob)); } catch (e) { /* ohne Zwischenspeicher weiter */ }
+  }
+  return URL.createObjectURL(blob);
+}
+
+function asWeckFehler(text) {
+  asWeckStop();
+  asWeckZustand = 'fehler';
+  asMerk('horchen', '0');
+  asHorchZeichnen();
+  asNachricht('fehler', text);
+}
+
+async function asWeckStart() {
+  if (asWeck || asWeckZustand === 'laedt') { return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    asWeckFehler('Dieser Browser erlaubt kein dauerndes Zuhören über das Mikrofon.');
+    return;
+  }
+  asWeckZustand = 'laedt';
+  asHorchZeichnen();
+  const hinweis = asNachricht('leise', 'Lade die Erkennung für „Hallo Wächter“ (beim ersten Mal rund 45 MB) …');
+  try {
+    await asSkriptLaden(AS_VOSK_URL, AS_VOSK_SRI);
+    const adresse = await asModellAdresse();
+    const model = await window.Vosk.createModel(adresse);
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // Nur das Weckwort und "unbekannt": Mehr soll diese Erkennung gar nicht
+    // verstehen koennen.
+    const recognizer = new model.KaldiRecognizer(ctx.sampleRate, JSON.stringify([AS_WECKWORT, '[unk]']));
+    const pruefen = t => { if (String(t || '').toLowerCase().includes(AS_WECKWORT)) { asGeweckt(); } };
+    recognizer.on('result', m => pruefen(m && m.result && m.result.text));
+    recognizer.on('partialresult', m => pruefen(m && m.result && m.result.partial));
+    const node = ctx.createScriptProcessor(4096, 1, 1);
+    node.onaudioprocess = ev => {
+      // Waehrend die gewohnte Spracheingabe laeuft, hoert das Weckwort nicht mit.
+      if (sprach) { return; }
+      try { recognizer.acceptWaveform(ev.inputBuffer); } catch (e) { /* einzelne Bloecke duerfen fehlen */ }
+    };
+    const quelle = ctx.createMediaStreamSource(stream);
+    quelle.connect(node);
+    node.connect(ctx.destination);
+    // Safari startet den Ton ohne vorherigen Klick oft angehalten. Dann
+    // laeuft er ab dem naechsten Klick irgendwo auf der Seite.
+    if (ctx.state === 'suspended') { document.addEventListener('pointerdown', () => ctx.resume(), { once: true }); }
+    asWeck = { ctx, stream, node, model, recognizer };
+    asWeckZustand = 'an';
+    asHorchZeichnen();
+    hinweis.textContent = 'Ich höre auf „Hallo Wächter“. Das Mikrofon bleibt offen, erkannt wird nur auf diesem Gerät.';
+  } catch (e) {
+    hinweis.remove();
+    const verweigert = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
+    asWeckFehler(verweigert ? 'Das Mikrofon ist nicht erlaubt. Im Browser unter den Website-Einstellungen freigeben.'
+      : (e && e.message) || 'Das Weckwort liess sich nicht starten.');
+  }
+}
+
+function asWeckStop() {
+  const w = asWeck;
+  asWeck = null;
+  if (!w) { return; }
+  try { w.node.disconnect(); } catch (e) { /* schon getrennt */ }
+  try { w.stream.getTracks().forEach(t => t.stop()); } catch (e) { /* schon gestoppt */ }
+  try { w.ctx.close(); } catch (e) { /* schon zu */ }
+  try { w.recognizer.remove(); } catch (e) { /* schon weg */ }
+  try { w.model.terminate(); } catch (e) { /* schon beendet */ }
+}
+
+// Geweckt: aufwachen, Fenster auf und gleich zuhoeren -- die Frage folgt dem
+// Weckwort. Ein zweites Weckwort innert drei Sekunden wird ignoriert (die
+// Teilergebnisse melden dasselbe Wort mehrmals).
+function asGeweckt() {
+  const jetzt = Date.now();
+  if (jetzt - asWeckLetzt < 3000 || asLaeuft || sprach) { return; }
+  asWeckLetzt = jetzt;
+  if (!asWach) { asAktivieren(); } else { asPanelAuf(); }
+  asMikKlick();
 }
 
 function rtZuruecksetzen(prefix) {
@@ -13730,10 +14000,13 @@ function glockeVerorten() {
   const leiste = document.querySelector('.tb-rechts');
   if (!glocke || !marke || !leiste) { return; }
   const ziel = kopfleisteAktiv() ? marke : leiste;
-  if (glocke.parentElement === ziel) { return; }
-  // Jeweils ganz vorne: in der Kopfleiste links vom Logo, in der
-  // Werkzeugleiste als erstes Symbol (ENT-197).
-  ziel.insertBefore(glocke, ziel.firstChild);
+  if (glocke.parentElement !== ziel) {
+    // Jeweils ganz vorne: in der Kopfleiste links vom Logo, in der
+    // Werkzeugleiste als erstes Symbol (ENT-197).
+    ziel.insertBefore(glocke, ziel.firstChild);
+  }
+  // Der Ruheplatz des Assistenten (ENT-702) wandert mit, links daneben.
+  if (typeof asDockVerorten === 'function') { asDockVerorten(); }
 }
 
 // Der Zustandswechsel laeuft ueber huelleSetzen(); die Fensterbreite kann
