@@ -24417,7 +24417,13 @@ function saUmgebung() {
              : /Firefox\//.test(ua) ? 'Firefox'
              : /Safari\//.test(ua)  ? 'Safari'
              : 'Browser unbekannt';
-  return name + ' · ' + window.innerWidth + '×' + window.innerHeight;
+  // Der Software-Stand gehoert dazu (ENT-696): Er sagt dem Betreiber, ob der
+  // Browser noch alten Code hatte. Angehaengt statt eigenes Feld -- keine
+  // Aenderung an der Betreiber-Datenbank, die Ansicht dort zeigt ihn mit.
+  // Unbekannt wird als solches gemeldet, nicht weggelassen.
+  const stand = appStand();
+  return name + ' · ' + window.innerWidth + '×' + window.innerHeight
+    + ' · ' + (stand ? 'Stand ' + stand : 'Stand nicht bekannt');
 }
 
 

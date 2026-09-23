@@ -90,6 +90,8 @@ const browser = await chromium.launch({ executablePath: browserPfad() });
 
 // Ueber eine erfundene Adresse ausliefern statt per file:// -- nur so laesst
 // sich die deployte Fassung zeigen, ohne eine Datei ins Repository zu legen.
+// Was an support_anfrage.php hinausging -- gelesen am Netz, nicht am Code.
+const gesendet = [];
 async function seiteMit(html, breite) {
   const seite = await browser.newPage({ viewport: { width: breite, height: 900 } });
   await seite.route('**/*', route => {
@@ -97,6 +99,10 @@ async function seiteMit(html, breite) {
     if (url.hostname !== 'pruef.lokal') { return route.abort(); }
     if (url.pathname.startsWith('/api/')) {
       const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
+      if (url.pathname.endsWith('/support_anfrage.php') && route.request().method() === 'POST') {
+        gesendet.push(JSON.parse(route.request().postData() || '{}'));
+        return send({ status: 'ok', id: 1, post: 'ok' });
+      }
       if (url.pathname.includes('login')) { return send({ status: 'ok', token: 't', name: 'a', ist_admin: true }); }
       return send({ status: 'ok', einsaetze: [], kunden: [], rapporte: [], objekte: [], vorgaenge: [],
                     mitarbeiter: [], feiertage: [], gepflegt: {}, sperren: [] });
@@ -169,6 +175,39 @@ function messen(seite) {
   const m = await messen(seite);
   check('Ein leer eingesetzter Stand zeigt "nicht bekannt"', m && /nicht bekannt/.test(m.text));
   await seite.close();
+}
+
+// ── Die Supportanfrage schickt den Stand mit (ENT-696, Weg 1) ──
+//
+// Geprueft wird, was beim Server ANKOMMT: Eine Anfrage, die den Stand nur
+// im Formular zeigt, aber nicht mitsendet, nuetzt dem Betreiber nichts.
+async function anfrageSenden(html) {
+  gesendet.length = 0;
+  const seite = await seiteMit(html, 1400);
+  await seite.evaluate(() => spReiterZeigen('melden'));
+  await seite.fill('#saBetreff', 'Rundgang bricht ab');
+  await seite.fill('#saText', 'Beim dritten Punkt.');
+  await seite.evaluate(() => saSenden());
+  await seite.waitForTimeout(300);
+  await seite.close();
+  return gesendet[0] || null;
+}
+{
+  const mit = await anfrageSenden(deployt);
+  check('KRITISCH: die Supportanfrage geht hinaus', !!mit);
+  check('KRITISCH: sie traegt den ausgelieferten Stand in der Umgebung',
+    !!mit && String(mit.umgebung || '').includes(`${DATUM} · ${KURZ}`));
+  // Die bisherigen Angaben bleiben: angehaengt, nicht ersetzt.
+  check('Browser und Fenstergroesse stehen weiterhin darin',
+    !!mit && /\d+×\d+/.test(String(mit.umgebung || '')));
+  check('Die Umgebung passt in das Feld der Betreiber-Datenbank (200 Zeichen)',
+    !!mit && String(mit.umgebung || '').length <= 200);
+
+  const ohne = await anfrageSenden(quelle);
+  check('KRITISCH: ohne Deploy meldet die Anfrage "Stand nicht bekannt", statt ihn wegzulassen',
+    !!ohne && /Stand nicht bekannt/.test(String(ohne.umgebung || '')));
+  check('KRITISCH: ohne Deploy geht nie der rohe Platzhalter hinaus',
+    !!ohne && !!platzhalter && !String(ohne.umgebung || '').includes(platzhalter));
 }
 
 // ── Am Handy ausgeblendet (ENT-235: mobile Umsetzung ist eigene Entscheidung) ──
