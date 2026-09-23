@@ -2705,12 +2705,15 @@ function kern_spalten(): array {
     ['belege', 'entscheidung_ip', 'ALTER TABLE belege ADD COLUMN entscheidung_ip VARCHAR(45) NULL AFTER entscheidung_am'],
     // Welche Fassung entschieden wurde (ENT-688).
     ['belege', 'entscheidung_fassung', 'ALTER TABLE belege ADD COLUMN entscheidung_fassung INT NULL AFTER entscheidung_ip'],
-    // Die ausdrueckliche Freigabe beim Versenden (ENT-688, Punkt 7).
+    // Die ausdrueckliche Freigabe beim Versenden (ENT-688, Punkt 7). Muss
+    // VOR versendet_von_id stehen, das "AFTER freigegeben" angelegt wird --
+    // umgekehrt scheiterte der Einrichtungslauf am 2026-09-23 an jedem
+    // Mandanten (test_spalten_reihenfolge.mjs).
+    ['beleg_fassung', 'freigegeben', 'ALTER TABLE beleg_fassung ADD COLUMN freigegeben TINYINT(1) NOT NULL DEFAULT 0 AFTER versendet_von'],
     // Das unterschriebene PDF und wer versendet hat (ENT-688, Schritt 3).
     ['beleg_unterschrift', 'pdf', 'ALTER TABLE beleg_unterschrift ADD COLUMN pdf MEDIUMBLOB NULL AFTER erstellt_am'],
     ['beleg_unterschrift', 'pdf_pruefsumme', "ALTER TABLE beleg_unterschrift ADD COLUMN pdf_pruefsumme CHAR(64) NOT NULL DEFAULT '' AFTER pdf"],
     ['beleg_fassung', 'versendet_von_id', 'ALTER TABLE beleg_fassung ADD COLUMN versendet_von_id INT NULL AFTER freigegeben'],
-    ['beleg_fassung', 'freigegeben', 'ALTER TABLE beleg_fassung ADD COLUMN freigegeben TINYINT(1) NOT NULL DEFAULT 0 AFTER versendet_von'],
 
     // Rundgang pausieren/abbrechen (ENT-146). pausiert_seit haelt den Beginn
     // der AKTUELLEN Pause fest -- pause_minuten ist die kumulierte Summe ueber
