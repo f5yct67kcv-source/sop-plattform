@@ -311,6 +311,19 @@ svg.i-sm { width: 15px; height: 15px; }
      nicht sichtbar, und eine abgeschriebene Kopie des Werts liefe beim
      naechsten Mal auseinander. */
 }
+/* VORBLENDE FUER DEN ANGEMELDETEN NEUSTART
+   Wer angemeldet neu laedt, sah bis hierher einen Wimpernschlag lang die
+   Anmeldemaske: Sie steht im Markup und wird gezeichnet, lange bevor das
+   Skript am Dateiende ueberhaupt nachsieht, ob eine Anmeldung im Speicher
+   liegt (siehe unten, "token && me"). Dazwischen liegen Zehntausende
+   Zeilen, die der Browser erst lesen muss -- gezeichnet wird laengst.
+   Derselbe Grund wie beim Hell/Dunkel-Schalter im Kopf dieser Datei: Was
+   vor dem ersten Zeichnen feststehen muss, gehoert in den Kopf.
+   Die Klasse setzt das Kopfskript, gateVorblendeAus() nimmt sie wieder ab,
+   sobald feststeht, dass die Maske doch gebraucht wird. Eine Sperre ist
+   sie nicht und soll sie nicht sein -- wer hereinkommt, entscheidet der
+   Server. Hier geht es allein darum, was gezeichnet wird. */
+html.vorangemeldet #gate { display: none; }
 :root { --gate-schleier: linear-gradient(rgba(10,11,15,.66), rgba(10,11,15,.82)); }
 /* margin:auto statt align-items/justify-content:center (wie app.html):
    reicht die Hoehe nicht (kleines Geraet, offene Tastatur, 2FA-Feld
@@ -5294,6 +5307,22 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   try { g = localStorage.getItem('rv3_glas') === 'aus' ? 'aus' : 'an'; } catch (e) {}
   document.documentElement.setAttribute('data-glas', g);
 })();
+/* Anmeldemaske gar nicht erst zeigen, wenn schon eine Anmeldung im
+   Speicher liegt (siehe die Regel "html.vorangemeldet #gate" oben).
+   Geprueft wird dasselbe Paar, an dem auch der Start am Dateiende haengt:
+   Token UND abgelegter Nutzer. Ein halber Speicher -- Token ohne Nutzer --
+   fuehrt unten nicht in enter() und darf darum auch hier nichts ausblenden.
+   Eigener try, aus demselben Grund wie oben: Ein Speicher, der nicht lesbar
+   ist (privates Fenster), darf die Farbwahl nicht mitreissen. */
+(function () {
+  try {
+    var t = localStorage.getItem('rv3_token');
+    var u = localStorage.getItem('rv3_user');
+    if (t && u && u !== 'null') {
+      document.documentElement.classList.add('vorangemeldet');
+    }
+  } catch (e) {}
+})();
 /* Desktop-Ansicht am Handy (ENT-427) -- die Notfalloption.
    Auch dies muss VOR dem ersten Zeichnen laufen, aus einem staerkeren Grund
    als bei hell/dunkel: Wer die Wahl getroffen hat und neu laedt, saehe sonst
@@ -5410,7 +5439,15 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   // WKWebView den Abruf unabhaengig von der Sichtbarkeit beginnt.
   // nativeAppHuelle() ist an dieser fruehen Stelle noch nicht definiert,
   // darum hier dieselbe Pruefung wie dort (ENT-588).
-  if (!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())) {
+  // Zweiter Grund, die Quellen wegzulassen: Wer angemeldet neu laedt, sieht
+  // diese Maske gar nicht (Klasse "vorangemeldet", siehe Kopf) -- das Video
+  // wuerde bei JEDEM Neuladen des Cockpits mehrere Megabyte nachziehen, fuer
+  // ein Bild, das nie erscheint. Traegt die Anmeldung wider Erwarten nicht
+  // und die Maske kommt doch, bleibt das Foto aus dem CSS-Hintergrund
+  // stehen -- dieselbe Ausweiche wie auf dem Handy, wo das Video ohnehin nie
+  // laeuft.
+  if (!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
+      && !document.documentElement.classList.contains('vorangemeldet')) {
     var gv = document.getElementById('gate-video');
     gv.insertAdjacentHTML('beforeend',
       '<source src="img/anmeldung-nacht.webm" type="video/webm">' +
@@ -11179,6 +11216,13 @@ function doLogout() {
   location.reload();
 }
 
+// Gegenstueck zur Vorblende im Kopf dieser Datei: Die Maske wird wieder
+// gezeichnet. Aufzurufen ueberall dort, wo feststeht, dass diese Sitzung
+// NICHT ins Cockpit fuehrt -- sonst bliebe ein leerer Bildschirm stehen.
+function gateVorblendeAus() {
+  document.documentElement.classList.remove('vorangemeldet');
+}
+
 function enter() {
   // Sparten aus dem letzten Besuch (ENT-650), bevor irgendetwas gezeichnet
   // wird. me.php bestaetigt sie gleich -- dies hier erspart nur das kurze
@@ -11212,7 +11256,11 @@ function enter() {
     // Seite wechselt (gemessen am Desktop, 2026-09-17). Die Meldung bleibt
     // nur als Auffangnetz, falls die Weiterleitung aus irgendeinem Grund
     // nicht greift -- darum verzoegert statt entfernt.
-    setTimeout(() => { $('gateDenied').style.display = ''; }, 800);
+    // Die Vorblende faellt zusammen mit der Meldung, nicht frueher: Bis
+    // dahin ist die Weiterleitung meist vollzogen, und bis dahin soll
+    // genauso wenig eine Anmeldemaske aufblitzen wie bisher der
+    // abgewiesene Text.
+    setTimeout(() => { gateVorblendeAus(); $('gateDenied').style.display = ''; }, 800);
     return;
   }
   $('gate').style.display = 'none';
@@ -34002,6 +34050,10 @@ const sprungTreffer = location.hash.match(/(?:^#|[#&])support=([0-9a-f]{64})(?:$
 if (sprungTreffer) {
   // Der normale Start bleibt aus: Es gibt noch keine Sitzung, und gleich
   // wird ohnehin neu geladen.
+  // Die Maske gehoert hier sichtbar: In ihr steht der Hinweis
+  // "Supportzugang wird geoeffnet ..." und, wenn der Schluessel nicht mehr
+  // gilt, der Grund.
+  gateVorblendeAus();
   supportSprungEinloesen(sprungTreffer[1]);
 } else if (token && me) {
   enter();
@@ -34024,6 +34076,10 @@ if (sprungTreffer) {
   } else if (TITLES[v]) {
     go(v);
   }
+} else {
+  // Niemand angemeldet -- die Maske ist hier kein Aufblitzen, sondern der
+  // Inhalt der Seite.
+  gateVorblendeAus();
 }
 </script>
 <!-- skizze:start -->
