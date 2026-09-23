@@ -22,7 +22,7 @@ DirectoryIndex index.html
 # offen. Genau die Dateien, die dieses Buendel tatsaechlich mitbringt
 # (siehe deploy-hostpoint.yml, Schritt "Betreiber-Buendel fuer
 # betreiber.guardops.ch bauen"); test_deploy.mjs gleicht beides ab.
-<FilesMatch "^(db|anmeldung|zweifaktor|rechte|support|supportvorgang|support_sammeln|betreiber|demo_zugang|demo_bestaetigung|demo_instanz|demo_reset|demo_daten|demo_bremse|mailer|belege|belegpdf|fpdf|kunden|produkte|qrrechnung|mitarbeiter|planung|gavzeit|lohnlauf|logbuch|lohn|planung_einrichten_kern|rundgang|fahrzeug|mail_vorlage)\.php$">
+<FilesMatch "^(db|anmeldung|zweifaktor|rechte|support|supportvorgang|support_sammeln|betreiber|demo_zugang|demo_bestaetigung|demo_instanz|demo_reset|demo_daten|demo_bremse|mailer|belege|belegpdf|fpdf|kunden|produkte|qrrechnung|mitarbeiter|planung|gavzeit|lohnlauf|logbuch|lohn|planung_einrichten_kern|rundgang|fahrzeug|mail_vorlage|neuerungen)\.php$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>

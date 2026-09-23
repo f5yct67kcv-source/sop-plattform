@@ -464,6 +464,34 @@ button.klein { min-height: 36px; padding: 0 12px; font-size: 13px; }
   max-height: 88vh; display: flex; flex-direction: column;
 }
 .dlg-kopf { padding: 20px 22px 0; flex: none; }
+/* Update-Fenster (ENT-698), dieselbe Gestaltung wie im Cockpit */
+.dlg.upd { max-width: 520px; }
+.upd-kopf { display: flex; align-items: center; gap: 14px; padding-bottom: 16px; }
+.upd-ikone { flex: none; width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.upd-ikone.erforderlich { background: var(--warn-soft); color: var(--warn); }
+.upd-ikone.fertig { background: var(--pos-soft); color: var(--pos); }
+.upd-kopf-text h2 { font-size: 17px; }
+/* Spezifischer als .dlg-kopf p weiter unten, sonst bliebe es bei 8 px (gemessen). */
+.dlg-kopf .upd-kopf-text p { margin-top: 3px; }
+.upd-gruppe + .upd-gruppe { margin-top: 18px; }
+.upd-gruppe > .upd-art { font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink-3); }
+.upd-gruppe ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.upd-gruppe li { padding-left: 14px; position: relative; }
+.upd-gruppe li::before { content: ''; position: absolute; left: 0; top: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.upd-gruppe[data-art="fehlerbehebung"] li::before { background: var(--pos); }
+.upd-gruppe[data-art="verbesserung"] li::before { background: var(--warn); }
+.upd-gruppe b { display: block; font-size: 13.5px; font-weight: 620; color: var(--ink); }
+.upd-gruppe span { display: block; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; margin-top: 2px; }
+.upd-lauf { margin-top: 20px; }
+.upd-lauf-zeile { display: grid; grid-template-columns: 1fr auto; gap: 12px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 8px; }
+.upd-lauf-zeile span:last-child { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.upd-balken { position: relative; height: 8px; border-radius: 99px; background: var(--line-soft); overflow: hidden; }
+.upd-balken > span { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent-hi)); transition: width .45s cubic-bezier(.3,.7,.4,1); }
+.upd-balken.laeuft > span::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent); transform: translateX(-100%); animation: updGlanz 1.2s ease-in-out infinite; }
+.upd-balken.fertig > span { background: var(--pos); }
+.upd-balken.fehler > span { background: var(--neg); }
+@keyframes updGlanz { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .upd-balken.laeuft > span::after { animation: none; } }
 .dlg-kopf h2 { font-size: 16px; font-weight: 660; letter-spacing: -.2px; }
 .dlg-kopf p { font-size: 12.5px; color: var(--ink-3); margin-top: 8px; line-height: 1.55; }
 .dlg-leib { padding: 16px 22px; overflow-y: auto; flex: 1; }
@@ -1598,16 +1626,28 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   <!-- Dialog "Einrichtung" -- dasselbe Muster wie dlgEinrichtung im Cockpit
        (dashboard.html): eigenes Overlay statt einer Karte im Fluss der
        Seite, weil es ein einmaliger Vorgang ist, kein taeglicher Anblick. -->
+  <!-- Update-Fenster (ENT-698): oeffnet sich von selbst, wenn ein Update
+       aussteht oder es Neuerungen gibt, und ueber das Zahnrad von Hand.
+       Eingespielt wird in Teilen -- erst die Betreiber-Datenbank, dann
+       jeder Mandant einzeln --, damit der Balken echten Fortschritt zeigt. -->
   <div class="dlg-schleier" id="dlgEinrichtung">
-    <div class="dlg">
+    <div class="dlg upd" role="dialog" aria-labelledby="be-upd-titel">
       <div class="dlg-kopf">
-        <h2>Einrichtung</h2>
-        <p>Legt fehlende Tabellen und Spalten dieser Ebene nach — ohne Umweg
-           über das Cockpit eines Mandanten. Ergänzt nur Fehlendes, löscht
-           nichts, leert nichts. Gefahrlos mehrfach ausführbar.</p>
+        <div class="upd-kopf">
+          <span class="upd-ikone" id="be-upd-ikone" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 21v-5h-5"/></svg></span>
+          <div class="upd-kopf-text">
+            <h2 id="be-upd-titel">Einrichtung</h2>
+            <p id="be-upd-unter">Ergänzt nur Fehlendes, löscht nichts, leert nichts.</p>
+          </div>
+        </div>
       </div>
       <div class="dlg-leib">
-        <div id="einrichtung-meldung" class="meldung versteckt"></div>
+        <div id="be-upd-neu"></div>
+        <div class="upd-lauf" id="be-upd-lauf" hidden>
+          <div class="upd-lauf-zeile"><span id="be-upd-etappe">Bereit</span><span id="be-upd-schritt"></span></div>
+          <div class="upd-balken" id="be-upd-balken" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="be-upd-fuellung"></span></div>
+        </div>
+        <div id="einrichtung-meldung" class="meldung versteckt" style="margin-top:14px"></div>
         <div id="einrichtung-inhalt"></div>
       </div>
       <div class="dlg-fuss">
@@ -8677,13 +8717,115 @@ async function pruefeEinrichtungUpdate() {
   const knopf = $('knopf-einrichtung');
   knopf.classList.toggle('hat-update', hat);
   knopf.title = hat ? 'Update verfügbar: Einrichtung steht aus' : 'Einrichtung';
+  beUpdSchema = a || null;
+  // Der Punkt am Zahnrad faellt nicht auf (ENT-698): Beim Anmelden oeffnet
+  // sich das Fenster von selbst, wenn ein Update aussteht oder es
+  // ungelesene Neuerungen gibt.
+  beUpdVonSelbst();
 }
 
-function einrichtungOeffnen() {
+/* ── Update-Fenster (ENT-698) ──────────────────────────────────────
+   Zustaende wie im Cockpit: einspielen, neu, aktuell, laden, unbekannt,
+   fertig, geprueft. "Unbekannt" darf nie wie "nichts Neues" aussehen. */
+let beUpdSchema = null;      // letzte GET-Antwort von betreiber_schema_pruefen.php
+let beUpdNeu = null;         // letzte Antwort von betreiber_neuerungen.php
+let beUpdModus = 'laden';
+let beUpdLaeuft = false;
+let beUpdGezeigt = false;
+
+async function beUpdNeuLaden() {
+  try {
+    const a = await ruf('betreiber_neuerungen.php', undefined, 'GET');
+    return a && a.status === 'ok' ? a : null;
+  } catch (e) { return null; }
+}
+
+async function beUpdVonSelbst() {
+  if (beUpdGezeigt) { return; }
+  const n = await beUpdNeuLaden();
+  if (beUpdGezeigt) { return; }
+  beUpdNeu = n;
+  const offen = !!(beUpdSchema && ((beUpdSchema.offen || []).length || (beUpdSchema.fehler || []).length));
+  if (!offen && !(n && (n.neuerungen || []).length)) { return; }
+  beUpdGezeigt = true;
+  beUpdZeigen();
+}
+
+function beUpdModusBestimmen() {
+  if (!beUpdSchema) { return 'unbekannt'; }
+  if ((beUpdSchema.offen || []).length || (beUpdSchema.fehler || []).length) { return 'einspielen'; }
+  if (beUpdNeu && (beUpdNeu.neuerungen || []).length) { return 'neu'; }
+  return 'aktuell';
+}
+
+function beUpdZeigen(modus) {
+  if (modus) { beUpdModus = modus; } else if (!beUpdLaeuft) { beUpdModus = beUpdModusBestimmen(); }
+  const liste = (beUpdNeu && beUpdNeu.neuerungen) || [];
+  const datum = liste.length ? new Date(liste[0].datum + 'T12:00:00')
+    .toLocaleDateString('de-CH', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  const T = {
+    einspielen: ['Update erforderlich', 'Neue Funktionen und Korrekturen warten darauf, eingespielt zu werden — hier und bei jedem Mandanten. Es wird nichts gelöscht oder geleert.', 'erforderlich'],
+    neu:        ['Neu in GuardOpS', datum, ''],
+    aktuell:    ['Alles auf dem neusten Stand', 'Es steht kein Update aus. Erneutes Prüfen löscht nichts und leert nichts.', 'fertig'],
+    laden:      ['Einrichtung', 'Der Stand wird geprüft … Es wird nichts gelöscht oder geleert.', ''],
+    unbekannt:  ['Stand unbekannt', 'Ob ein Update aussteht, liess sich nicht abrufen.', ''],
+    fertig:     ['Update eingespielt', 'Die Betreiber-Datenbank und alle erreichbaren Mandanten sind auf dem neusten Stand.', 'fertig'],
+    geprueft:   ['Alles auf dem neusten Stand', 'Geprüft: Es war nichts einzuspielen.', 'fertig'],
+  };
+  const K = {
+    einspielen: ['Später', 'Jetzt einspielen'], neu: [null, 'Verstanden'],
+    aktuell: ['Schliessen', 'Erneut prüfen'], laden: ['Schliessen', 'Prüfen und einrichten'],
+    unbekannt: ['Schliessen', 'Erneut versuchen'], fertig: [null, 'Schliessen'], geprueft: [null, 'Schliessen'],
+  };
+  const [titel, unter, ton] = T[beUpdModus] || T.aktuell;
+  $('be-upd-titel').textContent = titel;
+  $('be-upd-unter').textContent = unter;
+  $('be-upd-ikone').className = 'upd-ikone' + (ton ? ' ' + ton : '');
+  const arten = [['neu', 'Neu'], ['verbesserung', 'Verbesserungen'], ['fehlerbehebung', 'Fehlerbehebungen']];
+  $('be-upd-neu').innerHTML = arten.map(([art, t]) => {
+    const teil = liste.filter(x => x.art === art);
+    return !teil.length ? '' : '<div class="upd-gruppe" data-art="' + art + '"><div class="upd-art">' + text(t) + '</div><ul>'
+      + teil.map(x => '<li><b>' + text(x.titel) + '</b><span>' + text(x.text) + '</span></li>').join('') + '</ul></div>';
+  }).join('');
+  const [zu, haupt] = K[beUpdModus] || K.aktuell;
+  const zuK = $('knopf-einrichtung-zu'), hK = $('knopf-einrichtung-lauf');
+  zuK.style.display = zu ? '' : 'none';
+  if (zu) { zuK.textContent = zu; }
+  hK.textContent = haupt;
+  hK.disabled = beUpdLaeuft; zuK.disabled = beUpdLaeuft;
   $('dlgEinrichtung').classList.add('on');
-  einrichtungLauf();
+}
+
+function beUpdBalken(anteil, zustand) {
+  const b = $('be-upd-balken');
+  $('be-upd-lauf').hidden = false;
+  ['laeuft', 'fertig', 'fehler'].forEach(k => b.classList.toggle(k, zustand === k));
+  const prozent = Math.round(Math.max(0, Math.min(1, anteil)) * 100);
+  $('be-upd-fuellung').style.width = prozent + '%';
+  b.setAttribute('aria-valuenow', String(prozent));
+}
+
+function beUpdGelesen() {
+  const bis = beUpdNeu && beUpdNeu.neueste;
+  if (!bis || beUpdNeu.stand_unbekannt) { return; }
+  ruf('betreiber_neuerungen.php', { bis }, 'POST').catch(() => {});
+}
+
+async function einrichtungOeffnen() {
+  beUpdGezeigt = true;
+  if (beUpdLaeuft) { $('dlgEinrichtung').classList.add('on'); return; }
+  stumm($('einrichtung-meldung'));
+  $('einrichtung-inhalt').innerHTML = '';
+  $('be-upd-lauf').hidden = true;
+  beUpdZeigen('laden');
+  let a = null;
+  try { a = await ruf('betreiber_schema_pruefen.php', undefined, 'GET'); } catch (e) { a = null; }
+  beUpdSchema = a && a.getan !== undefined ? a : null;
+  beUpdNeu = await beUpdNeuLaden();
+  if (!beUpdLaeuft) { beUpdZeigen(); }
 }
 function einrichtungSchliessen() {
+  if (beUpdLaeuft) { return; }
   $('dlgEinrichtung').classList.remove('on');
   /* Der Offertenteil (ENT-605) haengt an denselben Tabellen. Wurden sie
      gerade nachgetragen, sollen seine Listen das sofort zeigen und nicht
@@ -8691,40 +8833,77 @@ function einrichtungSchliessen() {
   if (typeof offertenteilNachladen === 'function') { offertenteilNachladen(); }
 }
 
+function einrichtungHauptknopf() {
+  if (beUpdLaeuft) { return; }
+  if (['einspielen', 'aktuell', 'laden'].includes(beUpdModus)) { einrichtungLauf(); return; }
+  if (beUpdModus === 'unbekannt') { einrichtungOeffnen(); return; }
+  if (beUpdModus === 'neu') { beUpdGelesen(); }
+  einrichtungSchliessen();
+}
+
+/* Spielt in Teilen ein: erst die Betreiber-Datenbank, dann jeden Mandanten
+   einzeln. Der Balken waechst erst, wenn ein Teil wirklich fertig ist.
+   Angezeigt wird danach nur, was schiefging oder noch offen ist --
+   nicht, was ergaenzt wurde (ENT-698, Punkt 1). */
 async function einrichtungLauf() {
-  const b = $('knopf-einrichtung-lauf'); if (b) { b.disabled = true; }
+  if (beUpdLaeuft) { return; }
   stumm($('einrichtung-meldung'));
-  $('einrichtung-inhalt').innerHTML = '<p class="zone-note">Prüfe …</p>';
-  let a;
-  try {
-    a = await ruf('betreiber_schema_pruefen.php', {}, 'POST');
-  } catch (e) {
-    if (b) { b.disabled = false; }
-    melde($('einrichtung-meldung'), 'fehler', 'Netzwerkfehler.');
-    return;
+  $('einrichtung-inhalt').innerHTML = '';
+  const mandanten = (beUpdSchema && beUpdSchema.mandanten) || null;
+  // Ohne Mandantenliste (aelterer Server) in einem Zug -- ehrlich "1 von 1".
+  const teile = mandanten
+    ? [{ body: { teil: 'betreiber' }, titel: 'Betreiber-Datenbank' }]
+        .concat(mandanten.map(m => ({ body: { mandant_id: m.id }, titel: 'Mandant „' + m.name + '“' })))
+    : [{ body: {}, titel: 'Einrichtung' }];
+  beUpdLaeuft = true;
+  beUpdZeigen();
+  beUpdBalken(0, 'laeuft');
+  const fehler = [], offen = [];
+  let ergaenzt = 0, abbruch = null;
+  for (let i = 0; i < teile.length; i++) {
+    $('be-upd-etappe').textContent = teile[i].titel;
+    $('be-upd-schritt').textContent = 'Teil ' + (i + 1) + ' von ' + teile.length;
+    let a;
+    try { a = await ruf('betreiber_schema_pruefen.php', teile[i].body, 'POST'); }
+    catch (e) { abbruch = 'Netzwerkfehler.'; break; }
+    if (!a || (a.getan === undefined && a.offen === undefined)) {
+      abbruch = (a && a.message) || 'Einrichtung nicht abrufbar.'; break;
+    }
+    (a.fehler || []).forEach(f => fehler.push(f));
+    (a.offen || []).forEach(o => offen.push(o));
+    ergaenzt += (a.getan || []).length;
+    beUpdBalken((i + 1) / teile.length, 'laeuft');
   }
-  if (b) { b.disabled = false; }
-  if (!a || (a.getan === undefined && a.offen === undefined)) {
-    melde($('einrichtung-meldung'), 'fehler', (a && a.message) || 'Einrichtung nicht abrufbar.');
-    return;
-  }
+  beUpdLaeuft = false;
   const liste = (titel, arr, farbe) => !arr || !arr.length ? '' :
     '<div class="zweit" style="margin-top:10px' + (farbe ? ';color:' + farbe : '') + '"><b>' + text(titel) + '</b></div>'
     + '<ul style="margin:4px 0 0;padding-left:18px;font-size:13px;color:var(--ink-2);line-height:1.6">'
     + arr.map(x => '<li>' + text(x) + '</li>').join('') + '</ul>';
-  $('einrichtung-inhalt').innerHTML =
-      liste('Ergänzt', a.getan)
-    + liste('Noch offen', a.offen, 'var(--warn)')
-    + liste('Fehlgeschlagen', a.fehler, 'var(--neg)');
-  melde($('einrichtung-meldung'), a.fehler.length ? 'fehler' : (a.getan.length ? 'gut' : 'warn'),
-    a.message || (a.fehler.length ? 'Einrichtung teilweise fehlgeschlagen.' : 'Alles vollständig eingerichtet.'));
+  $('einrichtung-inhalt').innerHTML = liste('Fehlgeschlagen', fehler, 'var(--neg)')
+    + liste('Noch offen', offen, 'var(--warn)');
+  if (abbruch || fehler.length) {
+    beUpdBalken(Number($('be-upd-balken').getAttribute('aria-valuenow')) / 100, 'fehler');
+    $('be-upd-etappe').textContent = abbruch ? 'Abgebrochen' : 'Teilweise eingespielt';
+    melde($('einrichtung-meldung'), 'fehler', abbruch || 'Einrichtung teilweise fehlgeschlagen — siehe Liste.');
+    beUpdZeigen('einspielen');
+    $('knopf-einrichtung-lauf').textContent = 'Erneut versuchen';
+  } else {
+    beUpdBalken(1, 'fertig');
+    $('be-upd-etappe').textContent = 'Fertig';
+    beUpdGelesen();
+    if (offen.length) {
+      // Etwas liess sich von hier aus nicht erledigen (etwa fehlende
+      // Zugangsdaten eines Mandanten) -- kein Fehler, aber auch nicht fertig.
+      melde($('einrichtung-meldung'), 'warn', 'Eingespielt, soweit möglich — siehe „Noch offen“.');
+    }
+    beUpdZeigen(ergaenzt ? 'fertig' : 'geprueft');
+  }
   // Das Zahnrad selbst muss den neuen Stand mitbekommen -- sonst bliebe es
   // gefaerbt, obwohl der Lauf gerade alles nachgetragen hat.
   pruefeEinrichtungUpdate();
   // Und die Mandantenliste: Gerade wurde vielleicht genau die Spalte
-  // ergaenzt, an der sie bisher scheiterte -- ohne Neuladen bliebe "Nicht
-  // abrufbar" stehen, obwohl der Grund dafuer soeben behoben wurde.
-  if (a.getan.length) { ladeMandanten(); }
+  // ergaenzt, an der sie bisher scheiterte.
+  if (ergaenzt) { ladeMandanten(); }
 }
 
 async function ladeAlles() {
@@ -8776,7 +8955,7 @@ $('knopf-zf-weiter').onclick = async () => {
 };
 $('knopf-einrichtung').onclick     = einrichtungOeffnen;
 $('knopf-einrichtung-zu').onclick  = einrichtungSchliessen;
-$('knopf-einrichtung-lauf').onclick = einrichtungLauf;
+$('knopf-einrichtung-lauf').onclick = einrichtungHauptknopf;
 $('knopf-neu').onclick        = () => formularOeffnen(null);
 $('knopf-vertrag-neu').onclick = () => ofNeuStarten('vertrag');
 $('knopf-demo-ablauf').onclick    = demoAblauf;

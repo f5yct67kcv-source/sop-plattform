@@ -38,6 +38,11 @@
 
   var istDemo = APP_ENV === 'demo';
 
+  // Fuer Gestaltung, die dem Schild unten rechts ausweichen muss (etwa das
+  // Update-Blatt am Handy, ENT-698): Das Schild liegt ueber allem und laesst
+  // sich nicht wegschieben -- also weicht, was darunter laege.
+  document.documentElement.classList.add('mit-umgebungsschild');
+
   // Fuer andere Skripte auf derselben Seite lesbar, z. B. den Gruss auf der
   // Anmeldemaske in dashboard.html -- ohne eigene __APP_ENV__-Ersetzung dort
   // anzulegen, die die Deploy-sed-Zeile (siehe oben) erst noch kennen muesste.

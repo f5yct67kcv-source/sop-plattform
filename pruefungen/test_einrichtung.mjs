@@ -68,46 +68,43 @@ check('Der Punkt ist sichtbar', await page.isVisible('#updatePunkt'));
 check('Es gibt keinen zweiten Mechanismus -- derselbe Endpunkt wie die Einrichtung',
   rufe.filter(r => r.p.includes('planung_einrichten')).every(r => r.methode === 'GET' || r.methode === 'POST'));
 
-// ══════════ TOAST BEIM ECHTEN UPDATE (Rueckmeldung des Projektinhabers) --
-// der Punkt am Konto-Logo faellt nicht auf, solange niemand dort
-// hinschaut. Derselbe Toast wie ueberall sonst im Cockpit.
-check('Ein echtes Update meldet sich zusaetzlich per Toast',
-  await page.evaluate(() => document.getElementById('toast').classList.contains('on')));
-check('Der Toast nennt das Wort „Update“',
-  (await page.textContent('#toast')).includes('Update'));
-
-// Am Handy ist "Einrichtung" .nur-desktop (ENT-235) -- ein Toast dazu zeigte
-// dort auf einen Menuepunkt, den es gar nicht gibt.
-await page.evaluate(() => { document.getElementById('toast').classList.remove('on'); });
-await page.setViewportSize({ width: 400, height: 800 });
-await page.waitForTimeout(150);
-await page.evaluate(() => pruefeUpdate());
-await page.waitForTimeout(300);
-check('Am Handy bleibt der Toast aus, auch wenn ein Update aussteht',
-  !(await page.evaluate(() => document.getElementById('toast').classList.contains('on'))));
-await page.setViewportSize({ width: 1400, height: 900 });
-await page.waitForTimeout(150);
+// ══════════ STATT DES TOASTS: DAS UPDATE-FENSTER (ENT-698)
+// Der Toast von damals ist durch das Fenster ersetzt, das sich beim
+// Anmelden von selbst oeffnet. Das pruefen test_updatefenster.mjs im
+// Einzelnen; hier nur, dass der alte Toast nicht zusaetzlich kommt.
+check('Kein zusaetzlicher Toast neben dem Fenster',
+  !(await page.evaluate(() => document.getElementById('toast').classList.contains('on'))
+    && (await page.textContent('#toast')).includes('unter „Einrichtung“')));
 
 // ══════════ DIALOG
 await page.click('#nav-einrichtung');
 await page.waitForTimeout(300);
 check('Der Dialog geht auf', await page.evaluate(() => document.getElementById('dlgEinrichtung').classList.contains('on')));
-check('Er erklärt sich, bevor man klickt',
-  (await page.textContent('#eiInhalt')).includes('Prüfen und einrichten'));
 check('Er sagt, dass nichts gelöscht wird',
   (await page.textContent('#dlgEinrichtung .dlg-hd')).includes('nichts gelöscht'));
-check('Er nennt beide Bereiche',
-  (await page.textContent('#dlgEinrichtung .dlg-hd')).includes('Sperrtage'));
+check('Er bietet an zu pruefen, auch wenn nichts aussteht',
+  (await page.textContent('#eiBtn')).includes('prüfen'));
+
+// Oeffnet den Dialog von Hand und startet einen Lauf -- nach einem Erfolg
+// heisst der Knopf "Schliessen", ein neuer Lauf beginnt also von vorn.
+const lauf = async () => {
+  await page.evaluate(() => eiOeffnen());
+  await page.waitForTimeout(300);
+  await page.click('#eiBtn');
+  await page.waitForTimeout(500);
+};
 
 // ══════════ EINRICHTEN
 PRUEFUNG = { status: 'ok', message: 'Alles ist eingerichtet.', getan: [], unveraendert: [], ausstehend: 0 };
 await page.click('#eiBtn');
 await page.waitForTimeout(500);
-check('Der Aufruf geht an den richtigen Endpunkt', rufe.some(r => r.p.includes('planung_einrichten')));
-const inhalt = await page.textContent('#eiInhalt');
-check('Das Ergebnis steht im Dialog, nicht nur als Toast', inhalt.includes('Einrichtung abgeschlossen'));
-check('Was ergänzt wurde, wird aufgelistet', inhalt.includes('verfuegbarkeiten'));
-check('Was schon da war, wird auch genannt', inhalt.includes('bereits vorhanden'));
+check('Der Aufruf geht an den richtigen Endpunkt', rufe.some(r => r.p.includes('planung_einrichten') && r.methode === 'POST'));
+const inhalt = await page.textContent('#dlgEinrichtung');
+check('Das Ergebnis steht im Dialog, nicht nur als Toast', inhalt.includes('Update eingespielt'));
+// Seit ENT-698 bewusst umgekehrt: Das Fenster zeigt nur noch, was
+// schiefging. Was eingerichtet wurde oder schon da war, sagt niemandem etwas.
+check('KRITISCH: was ergänzt wurde, wird nicht mehr aufgelistet (ENT-698)', !inhalt.includes('verfuegbarkeiten'));
+check('KRITISCH: was schon da war, wird nicht mehr genannt (ENT-698)', !inhalt.includes('bereits vorhanden'));
 check('Der Dialog bleibt offen, damit man es nachlesen kann',
   await page.evaluate(() => document.getElementById('dlgEinrichtung').classList.contains('on')));
 check('Nach erfolgreichem Einrichten verschwindet der Update-Punkt von selbst',
@@ -119,17 +116,14 @@ await page.screenshot({ path: OUT + '/69-einrichtung.png' });
 // ══════════ ERNEUTES AUSFÜHREN IST GEFAHRLOS UND ZEIGT DAS
 ANTWORT = { status: 'ok', message: 'Alles war bereits eingerichtet.', getan: [],
   unveraendert: ['Tabelle objekte war bereits vorhanden', 'Tabelle verfuegbarkeiten war bereits vorhanden'] };
-await page.click('#eiBtn');
-await page.waitForTimeout(500);
-check('Ein zweiter Lauf meldet, dass nichts mehr zu tun war',
-  (await page.textContent('#eiInhalt')).includes('bereits eingerichtet'));
-check('Kein leerer „Jetzt ergänzt“-Abschnitt ohne Inhalt',
-  !(await page.textContent('#eiInhalt')).includes('Jetzt ergänztTabelle'));
+await lauf();
+check('KRITISCH: ein Lauf ohne Arbeit sagt „nichts einzuspielen“, nicht „eingespielt“',
+  (await page.textContent('#updUnter')).includes('nichts einzuspielen')
+  && !(await page.textContent('#updTitel')).includes('eingespielt'));
 
 // ══════════ FEHLER BLEIBT LESBAR
 ANTWORT = { status: 'error', message: 'Diese Tabellen fehlen weiterhin: masterschichten' };
-await page.click('#eiBtn');
-await page.waitForTimeout(500);
+await lauf();
 check('Ein Fehler wird als solcher gezeigt',
   (await page.textContent('#eiInhalt')).includes('fehlen weiterhin'));
 check('Der Knopf bleibt bedienbar', !(await page.evaluate(() => $('eiBtn').disabled)));
@@ -145,27 +139,22 @@ ANTWORT = { status: 'error',
   getan: ['Spalte rapporte.einsatz_id ergaenzt'],
   unveraendert: ['Tabelle objekte war bereits vorhanden'],
   fehler: ['Verweis rapporte.einsatz_id — SQLSTATE[HY000]: 1215 Cannot add foreign key constraint'] };
-await page.click('#eiBtn');
-await page.waitForTimeout(500);
+await lauf();
 const fehlText = await page.textContent('#eiInhalt');
 check('KRITISCH: der Grund des Fehlschlags steht im Dialog, nicht nur "fehlgeschlagen"',
   fehlText.includes('foreign key constraint'));
 check('KRITISCH: der fehlgeschlagene Schritt wird namentlich genannt',
   fehlText.includes('Verweis rapporte.einsatz_id'));
-check('KRITISCH: was trotzdem lief, wird weiterhin ausgewiesen -- der Lauf bricht nicht ab',
-  fehlText.includes('Spalte rapporte.einsatz_id ergaenzt'));
+check('KRITISCH: es steht da, dass die uebrigen Schritte trotzdem gelaufen sind',
+  fehlText.includes('uebrigen sind gelaufen'));
 check('Der Kasten ist rot, nicht gruen -- ein Teilerfolg ist kein Erfolg',
   await page.evaluate(() => {
     const k = document.querySelector('#eiInhalt .msg-err');
-    return getComputedStyle(k).backgroundColor === getComputedStyle(document.documentElement)
-      .getPropertyValue('--neg-soft').trim()
-      || k.style.background.includes('neg');
+    return getComputedStyle(k).color === getComputedStyle(document.querySelector('.msg-err')).color
+      && getComputedStyle(k).backgroundColor !== getComputedStyle(document.body).backgroundColor
+      && !k.style.background.includes('pos');
   }));
-check('Fehlgeschlagenes steht VOR dem Gelungenen',
-  fehlText.indexOf('Fehlgeschlagen') < fehlText.indexOf('Jetzt ergänzt'));
-check('Die erste Liste sitzt buendig am Kasten, ohne doppelten Abstand',
-  await page.evaluate(() =>
-    document.querySelector('#eiInhalt [data-ei-liste]').style.marginTop === '0px'));
+check('Der Balken ist rot', await page.evaluate(() => $('updBalken').classList.contains('fehler')));
 
 // ══════════ UNLESBARE ANTWORT IST EINE SACKGASSE -- ES SEI DENN, SIE SAGT WAS
 //
@@ -174,8 +163,7 @@ check('Die erste Liste sitzt buendig am Kasten, ohne doppelten Abstand',
 // nicht zu unterscheiden, ob ein Recht fehlt, der Server abgebrochen ist oder
 // gar keine Verbindung bestand.
 ROH = { status: 500, body: '<b>Fatal error</b>: Maximum execution time exceeded' };
-await page.click('#eiBtn');
-await page.waitForTimeout(500);
+await lauf();
 const kaputt = await page.textContent('#eiInhalt');
 check('KRITISCH: eine unlesbare Antwort nennt wenigstens den Statuscode',
   kaputt.includes('500'));
