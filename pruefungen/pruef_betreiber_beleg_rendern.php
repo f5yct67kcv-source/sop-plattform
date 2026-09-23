@@ -89,13 +89,17 @@ if (in_array($variante, ['signatur', 'angenommen', 'abgelehnt'], true)) {
       email TEXT DEFAULT '', zeichnungsberechtigt INTEGER DEFAULT 0, zeichnung TEXT, grund TEXT,
       empfaenger_email TEXT DEFAULT '', code_abdruck TEXT DEFAULT '', code_gesendet_am TEXT,
       code_versuche INTEGER DEFAULT 0, bestaetigt_am TEXT, ip TEXT DEFAULT '', browser TEXT DEFAULT '',
-      erstellt_am TEXT)");
+      erstellt_am TEXT, pdf BLOB, pdf_pruefsumme TEXT DEFAULT '')");
 }
 if ($variante === 'angenommen') {
     $u = beleg_unterschrift_anlegen($pdo, 'be_', 1, 2, ['name' => 'Erika Beispiel', 'funktion' => 'Geschäftsführerin',
         'firma' => 'Muster Sicherheit AG', 'email' => 'leitung@muster.invalid', 'zeichnung' => ''],
         'post@muster.invalid', '192.0.2.10', 'Pruefbrowser/1.0');
     $pdo->exec("UPDATE be_beleg_unterschrift SET bestaetigt_am = NOW() WHERE id = " . (int)$u['id']);
+    // Ein gespeichertes PDF (Schritt 3) -- der Inhalt spielt fuer die Seite
+    // keine Rolle, nur dass eines da ist.
+    $pdo->exec("UPDATE be_beleg_unterschrift SET pdf = '%PDF-1.3 Pruefung', pdf_pruefsumme = '"
+        . hash('sha256', '%PDF-1.3 Pruefung') . "' WHERE id = " . (int)$u['id']);
     $pdo->exec("UPDATE be_belege SET status = 'bestaetigt', entscheidung_am = NOW() WHERE id = 1");
 }
 if ($variante === 'abgelehnt') {

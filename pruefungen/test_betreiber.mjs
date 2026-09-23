@@ -80,6 +80,8 @@ const OEFFENTLICH = {
     'Änderungswunsch am selben Link, nur POST, eigene Bremse (ENT-677)',
   'betreiber_beleg_unterschrift.php':
     'Annahme mit Bestätigungscode am selben Link, nur POST, Bremse je Beleg (ENT-688)',
+  'betreiber_beleg_pdf.php':
+    'Das gespeicherte, unterschriebene PDF am selben Link, nur lesend (ENT-688)',
 };
 // DRITTE Kategorie (ENT-667), und wieder aus einem anderen Grund als die
 // beiden oben. Ein Einstieg erzeugt die Sitzung, die er nicht verlangen
@@ -212,6 +214,7 @@ const ROHTOKEN_LINK = {
   'betreiber_beleg_entscheidung.php': 'versand_token, kein Sitzungsausweis (ENT-501)',
   'betreiber_beleg_nachricht_oeffentlich.php': 'versand_token, kein Sitzungsausweis (ENT-501)',
   'betreiber_beleg_unterschrift.php': 'versand_token, kein Sitzungsausweis (ENT-501)',
+  'betreiber_beleg_pdf.php': 'versand_token, kein Sitzungsausweis (ENT-501)',
   'betreiber_beleg_versenden.php':   'erzeugt den versand_token und legt ihn am Beleg ab',
 };
 const rohDurchgereicht = [['modul', modul], ...endpunkte.map(f => [f, lies(`backend/api/${f}`)])]

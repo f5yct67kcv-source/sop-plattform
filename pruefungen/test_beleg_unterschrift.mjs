@@ -75,7 +75,7 @@ for (const [name, praefix, tab] of [['Betreiber', 'betreiber_', 'be_belege'], ['
     iPruef > 0 && iPruef < vers.indexOf('smtp_senden(')
     && /\$naechste\['neu'\] && beleg_unterschreibbar\([\s\S]{0,60}\) && !\$freigabe/.test(vers));
   check(`${name} — die Freigabe landet an der Fassung`,
-    /beleg_fassung_anlegen\([^;]*\$freigabe\);/.test(vers));
+    /beleg_fassung_anlegen\([^;]*\$freigabe[,)]/.test(vers));
 }
 
 // Die beiden Oberflaechen verlangen den Haken, bevor sie senden.

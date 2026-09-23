@@ -166,7 +166,8 @@ try {
 // Die Fassung erst NACH dem Versand: Scheitert die Mail, gibt es auch keine
 // Fassung, die als "versendet" dastuende, ohne dass sie jemand bekam.
 if ($naechste['neu'] && $abbild !== null) {
-    beleg_fassung_anlegen($pdo, $id, $abbild, 'versand', (string)($ich['name'] ?? ''), 'be_', $freigabe);
+    beleg_fassung_anlegen($pdo, $id, $abbild, 'versand', (string)($ich['name'] ?? ''), 'be_', $freigabe,
+        isset($ich['id']) ? (int)$ich['id'] : null);
     be_log($pdo, $ich, 'beleg', $id, 'fassung', null, 'Fassung ' . $fassungNr);
 }
 

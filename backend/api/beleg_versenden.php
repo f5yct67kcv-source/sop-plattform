@@ -172,7 +172,8 @@ try {
 // Die Fassung erst NACH dem Versand -- scheitert die Mail, gibt es auch
 // keine Fassung, die als versendet dastuende.
 if ($naechste['neu'] && $abbild !== null) {
-    beleg_fassung_anlegen($pdo, $id, $abbild, 'versand', (string)($user['name'] ?? ''), '', $freigabe);
+    beleg_fassung_anlegen($pdo, $id, $abbild, 'versand', (string)($user['name'] ?? ''), '', $freigabe,
+        isset($user['id']) ? (int)$user['id'] : null);
 }
 
 // Eine bereits getroffene Kundenentscheidung wird durch einen erneuten

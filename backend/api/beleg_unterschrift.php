@@ -14,6 +14,8 @@ require_once __DIR__ . '/../anmeldung.php';
 require_once __DIR__ . '/../belege.php';
 require_once __DIR__ . '/../mail_vorlage.php';
 require_once __DIR__ . '/../mailer.php';
+// Das unterschriebene PDF und die Bestaetigungen (ENT-688, Schritt 3).
+require_once __DIR__ . '/../belegpdf.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'nur POST'], 405);
