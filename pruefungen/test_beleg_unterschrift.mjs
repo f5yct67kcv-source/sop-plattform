@@ -191,11 +191,11 @@ for (const [name, breite, hoehe] of [['Desktop', 1280, 900], ['Handy', 390, 844]
   check(`${name} — das Zeichenfeld (unterschrift.js) ist eingebunden`, auf.zeichnen);
   check(`KRITISCH: ${name} — Eingabefelder mindestens 16 px (${auf.feldMin})`, auf.feldMin >= 16);
   check(`KRITISCH: ${name} — Knoepfe mindestens 44 px hoch (${auf.knopfMin.toFixed(1)})`, auf.knopfMin >= 44);
-  // Gemessen wird, ob der DIALOG die Seite verbreitert -- nicht die Seite an
-  // sich: Deren Positionstabelle ist am Handy schon ohne Dialog breiter als
-  // der Bildschirm (Bestandsbefund, gemeldet, nicht Teil von ENT-688).
-  check(`KRITISCH: ${name} — der Dialog macht die Seite nicht breiter (${zu.breite} -> ${auf.breite})`,
-    auf.breite <= zu.breite);
+  // Die Seite rollt weder vor noch mit dem Dialog seitlich. Bis zu diesem
+  // Stand war die Positionstabelle am Handy breiter als der Bildschirm (414
+  // auf 390 px); sie steht jetzt in einem eigenen Rahmen und passt.
+  check(`KRITISCH: ${name} — nichts rollt seitlich (${zu.breite} / ${auf.breite} bei ${breite} px)`,
+    zu.breite <= breite && auf.breite <= breite);
   check(`${name} — der Dialog passt in die Breite (${auf.karteBreite.toFixed(0)} px)`,
     auf.karteBreite > 0 && auf.karteBreite <= breite - 16);
   const anf = anfragen.find(a => a.was === 'anfordern') || {};

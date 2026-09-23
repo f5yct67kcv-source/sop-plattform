@@ -90,7 +90,11 @@ function portal_seite(string $titel, string $inhalt): void
             @media print{body{background:#fff;padding:0}.buehne{display:block}
                          .zusammenfassung{display:none}.karte{box-shadow:none;padding:0}
                          .keindruck{display:none}}
-            @media (max-width:720px){.buehne{display:block}.zusammenfassung{margin-bottom:20px}}
+            .pos-rahmen{overflow-x:auto;-webkit-overflow-scrolling:touch}
+            @media print{.pos-rahmen{overflow:visible}}
+            @media (max-width:720px){.buehne{display:block}.zusammenfassung{margin-bottom:20px}
+                                     .karte,.zusammenfassung{padding:22px 16px}
+                                     .pos-rahmen td,.pos-rahmen th{padding-left:4px!important;padding-right:4px!important;font-size:11px!important}}
           ' . beleg_unterschrift_css() . '</style></head><body><div class="buehne">' . $inhalt . '</div></body></html>';
     exit;
 }
@@ -423,13 +427,17 @@ try {
         . '<div style="line-height:1.5;font-size:12px;min-width:200px;text-align:right;margin-left:auto">' . implode('<br>', array_map('portal_esc', $empfaenger)) . '</div>'
         . '</div>'
         . '<div style="font-size:19px;font-weight:700;margin-bottom:14px">' . portal_esc($b['titel'] ?: $titel) . ' ' . portal_esc($b['nummer']) . '</div>'
-        . '<table><thead><tr>'
+        // Die Positionstabelle in einem eigenen Rahmen, der am Handy seitlich
+        // rollt, statt die ganze Seite breiter zu machen als den Bildschirm
+        // (Befund vom 2026-09-23: 414 px auf 390 px). Beim Drucken gilt der
+        // Rahmen nicht (@media print).
+        . '<div class="pos-rahmen"><table><thead><tr>'
         . '<th style="padding:7px 8px;text-align:left;font-size:11px;font-weight:700;background:#EDEFF2">Leistung</th>'
         . '<th style="padding:7px 8px;text-align:left;font-size:11px;font-weight:700;background:#EDEFF2">Beschreibung</th>'
         . '<th style="padding:7px 8px;text-align:right;font-size:11px;font-weight:700;background:#EDEFF2">Einzelpreis</th>'
         . '<th style="padding:7px 8px;text-align:right;font-size:11px;font-weight:700;background:#EDEFF2">Menge</th>'
         . '<th style="padding:7px 8px;text-align:right;font-size:11px;font-weight:700;background:#EDEFF2">Summe</th>'
-        . '</tr></thead><tbody>' . $zeilen . '</tbody></table>'
+        . '</tr></thead><tbody>' . $zeilen . '</tbody></table></div>'
         . '<table style="margin-left:auto;margin-top:14px;width:auto">' . $summenHtml . '</table>'
         . $qrZahlteil
         . $abschnitt('Notizen', $b['oeffentliche_notizen'])

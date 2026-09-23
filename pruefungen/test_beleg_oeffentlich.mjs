@@ -237,6 +237,15 @@ try {
     const dok = await page.locator('.karte').boundingBox();
     check('KRITISCH: auf schmalem Bildschirm stehen die Spalten UNTEREINANDER, nicht ueberlappend',
       dok.y >= zf.y + zf.height - 2);
+    // Die Positionstabelle passt in die Breite (Befund 2026-09-23: 414 px auf
+    // 390 px). Sie steht in einem eigenen Rahmen und rueckt am Handy enger.
+    const breite = await page.evaluate(() => ({
+      seite: document.documentElement.scrollWidth, fenster: window.innerWidth,
+      rahmen: (() => { const r = document.querySelector('.pos-rahmen'); return r ? r.scrollWidth - r.clientWidth : -1; })(),
+    }));
+    check(`KRITISCH: mobil rollt die Seite nicht seitlich (${breite.seite} px bei ${breite.fenster})`,
+      breite.seite <= breite.fenster);
+    check('KRITISCH: mobil passt die Positionstabelle ganz in ihren Rahmen', breite.rahmen === 0);
     await page.close();
   }
 } finally {
