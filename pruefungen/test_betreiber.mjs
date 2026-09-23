@@ -590,6 +590,12 @@ const DARF_VERBINDEN = {
   // test_support_abholen.mjs einzeln nachgewiesen.
   'betreiber_support_vorgang.php': 'holt die Supportanfragen einer Anlage mit eigener Datenbank ab (ENT-681)',
   'betreiber_support_lage.php':    'liest ab, ob eine Support-Freigabe vorliegt -- oeffnet nichts (ENT-681)',
+  // ENT-683: Der Betreiber legt eine BITTE in die Datenbank des Betriebs.
+  // Sie oeffnet nichts -- erteilt wird weiterhin ausschliesslich im
+  // Cockpit, mit dem Recht 'rechte'. Nachgewiesen in
+  // test_support_abholen.mjs und pruef_support_bitte.php: Nach dem Bitten
+  // gibt es keine gueltige Freigabe.
+  'betreiber_support_bitte.php':   'legt die Bitte um eine Freigabe beim Betrieb ab (ENT-683)',
   // Von der erweiterten Wache neu gesehen (2026-09-23): Der Endpunkt
   // verbindet ueber demo_instanz.php, nicht in eigener Zeile. Er tut
   // dasselbe wie demo_erneut_senden.php eine Zeile weiter oben -- neues
