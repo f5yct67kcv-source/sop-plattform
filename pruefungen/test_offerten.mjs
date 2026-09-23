@@ -923,10 +923,18 @@ await page.waitForTimeout(150);
 check('KRITISCH: der Versand fragt erst nach, statt sofort eine Mail zu verschicken',
   await page.evaluate(() => document.getElementById('dlgConfirm').classList.contains('on'))
   && versendenRufe.length === 0);
+// Freigabe (ENT-688, Punkt 7): Eine Offerte geht erst hinaus, wenn die
+// Erklaerung angehakt ist -- vorher ist "Versenden" gesperrt.
+check('KRITISCH: ohne Freigabe-Haken ist "Versenden" gesperrt',
+  await page.evaluate(() => document.getElementById('cfBtn').disabled
+    && document.getElementById('cfHakenZeile').style.display !== 'none'));
+await page.check('#cfHaken');
+check('mit Haken ist "Versenden" frei', await page.evaluate(() => !document.getElementById('cfBtn').disabled));
 await page.click('#cfBtn');
 await page.waitForTimeout(300);
 check('KRITISCH: die Bestätigung ruft beleg_versenden.php mit der richtigen Id auf',
   versendenRufe.length === 1 && versendenRufe[0].id === 21);
+check('KRITISCH: … und schickt die Freigabe mit', versendenRufe[0].freigabe === true);
 check('KRITISCH: nach erfolgreichem Versand steht der Status auf "Versendet"',
   (await page.textContent('#ofFormSub')).includes('Versendet'));
 
@@ -943,6 +951,7 @@ await page.click('#ofFormMenuBtn');
 await page.waitForTimeout(200);
 await page.click('#rowmenuPop button:has-text("Per E-Mail versenden")');
 await page.waitForTimeout(150);
+await page.check('#cfHaken');
 await page.click('#cfBtn');
 await page.waitForTimeout(300);
 check('KRITISCH: ein fehlgeschlagener Versand wirft den Status NICHT auf "Versendet"',
