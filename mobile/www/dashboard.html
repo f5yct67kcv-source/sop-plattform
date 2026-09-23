@@ -19432,7 +19432,12 @@ function enZeitraum() {
     + ` <b>Die Verfügbarkeitsprüfung unten gilt nur für den ersten Tag.</b>`;
 }
 
-function createEinsatz() {
+// trotzFehlenderBerechtigung: Der Planer hat die Warnung zur fehlenden
+// Revierdienst-Berechtigung bestaetigt (ENT-284). Dieselbe Nachfrage wie in
+// der Schublade (saveEinsatz) -- bis 2026-09-23 fehlte sie hier, und der
+// Server wies ab, ohne dass jemand bestaetigen konnte.
+function createEinsatz(trotzFehlenderBerechtigung) {
+  trotzFehlenderBerechtigung = trotzFehlenderBerechtigung === true;
   const err = $('enNeuErr'); err.style.display = 'none';
   const body = enSammeln('enN');
   if (!body) { err.textContent = 'Kunde, Arbeitsort, Datum, Von und Bis sind Pflicht.'; err.style.display = ''; return; }
@@ -19474,6 +19479,7 @@ function createEinsatz() {
   const angelegt = [], ohne = [];
   let anhangFehler = [];
   let grund = '';
+  let ohneBerechtigung = null;   // Personen aus der 409-Antwort, siehe unten
   // Zusammengehoerigkeit der Reihe (ENT-119). Die Kennung vergibt der Server:
   // Der erste Tag bekommt seine eigene Nummer als Serienkennung zurueck, die
   // uebrigen bekommen sie mit. Eine im Browser gewuerfelte Zahl koennte sich
@@ -19485,11 +19491,21 @@ function createEinsatz() {
   const naechster = i => {
     if (i >= tage.length) { return Promise.resolve(); }
     const tagBody = Object.assign({}, body, { datum: tage[i] });
+    if (trotzFehlenderBerechtigung) { tagBody.trotz_fehlender_berechtigung = true; }
     if (reihe) {
       if (serieId) { tagBody.serie_id = serieId; } else { tagBody.serie_neu = true; }
     }
     return api('einsatz_save.php', { method: 'POST', body: tagBody })
       .then(({ ok, data }) => {
+        // Fehlende Revierdienst-Berechtigung ist eine Warnung, keine Sperre
+        // (ENT-284): Die Reihe haelt an, der Planer wird gefragt. Die
+        // Berechtigung haengt an der Person, nicht am Tag -- scheitert der
+        // erste Tag daran, scheitern alle. Darum hier aufhoeren, statt
+        // dieselbe Absage fuer jeden Tag einzusammeln.
+        if (!ok && data && data.unberechtigt && !trotzFehlenderBerechtigung) {
+          ohneBerechtigung = data.personen || [];
+          return 'halt';
+        }
         if (!ok || data.status !== 'ok') {
           ohne.push(dmy(tage[i]));
           // Den Grund behalten, nicht nur das Datum: Ohne ihn stand hier
@@ -19510,11 +19526,17 @@ function createEinsatz() {
       // Ein misslungener Tag darf die uebrigen nicht abbrechen -- sonst steht
       // die Reihe halb da, und niemand sieht, wo sie aufgehoert hat.
       .catch(() => { ohne.push(dmy(tage[i])); })
-      .then(() => naechster(i + 1));
+      .then(r => (r === 'halt' ? null : naechster(i + 1)));
   };
 
   naechster(0).then(() => {
     enNeuSperre(false);
+    if (ohneBerechtigung && !angelegt.length) {
+      // Nachfragen statt abweisen: dieselbe Warnung wie in der Schublade.
+      // "Trotzdem zuteilen" legt die ganze Reihe mit Bestaetigung neu an.
+      revierWarnungZeigen(ohneBerechtigung, () => createEinsatz(true));
+      return;
+    }
     if (!angelegt.length) {
       err.textContent = grund ? `Anlegen fehlgeschlagen: ${grund}` : 'Anlegen fehlgeschlagen.';
       err.style.display = ''; return;
