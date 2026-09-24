@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 10,
+            'datum' => '2026-09-24',
+            'art'   => 'neu',
+            'fuer'  => ['betreiber'],
+            'titel' => 'Deine Unterschrift auf Offerten und Verträgen',
+            'text'  => 'Zeichne deine Unterschrift einmal unter Konten → dein Konto. Sie steht danach auf jeder Offerte und jedem Vertrag, die du freigibst. Ohne sie lässt sich nichts freigeben. Die Unterschrift des Kunden erscheint im PDF grösser und kräftiger.',
+        ],
+        [
             'nr'    => 9,
             'datum' => '2026-09-24',
             'art'   => 'fehlerbehebung',

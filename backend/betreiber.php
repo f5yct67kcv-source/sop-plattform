@@ -608,6 +608,20 @@ function be_beleg_nachricht_tabelle_da(PDO $pdo): bool
 // darum fragt die Oberflaeche ueber be_beleg_nachricht_tabelle_da() nach,
 // bevor sie ein Eingabefeld anbietet, statt ein leeres Gespraech zu zeigen,
 // das nichts entgegennimmt.
+// Die hinterlegte Unterschrift eines Kontos (ENT-704).
+//   null -- auf diesem Server noch nicht eingerichtet (Spalte fehlt)
+//   ''   -- eingerichtet, aber nicht gezeichnet
+//   sonst die PNG-Zeichnung als data-URL
+// Drei Aussagen, drei Werte: "nicht eingerichtet" darf nie wie "nicht
+// gezeichnet" aussehen (CLAUDE.md).
+function be_unterschrift_von(PDO $pdo, int $kontoId): ?string
+{
+    if (!hat_spalte($pdo, 'betreiber', 'unterschrift')) { return null; }
+    $s = $pdo->prepare('SELECT unterschrift FROM betreiber WHERE id = ?');
+    $s->execute([$kontoId]);
+    return trim((string)($s->fetchColumn() ?: ''));
+}
+
 function be_beleg_nachrichten(PDO $pdo, int $belegId): array
 {
     if (!be_beleg_nachricht_tabelle_da($pdo)) { return []; }
@@ -1594,6 +1608,11 @@ function be_tabellen(): array
   -- Es beantwortet zusaetzlich die Frage, WANN -- und die stellt sich genau
   -- dann, wenn jemand rueckblickend wissen will, wer hier Zugang hatte.
   archiviert_am DATETIME NULL,
+  -- Die gezeichnete Unterschrift (ENT-704): PNG als data-URL, gezeichnet
+  -- nur von der Person selbst. Beim Freigeben einer Offerte oder eines
+  -- Vertrags wird sie in die Fassung kopiert; eine neue aendert alte nicht.
+  unterschrift MEDIUMTEXT NULL,
+  unterschrift_am DATETIME NULL,
   UNIQUE KEY uq_betreiber_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
@@ -2310,6 +2329,9 @@ function be_spalten(): array
         // meldet der Endpunkt "noch nicht nachgetragen", statt mit einem
         // SQL-Fehler abzubrechen.
         ['betreiber', 'archiviert_am', "ALTER TABLE betreiber ADD COLUMN archiviert_am DATETIME NULL AFTER letzte_anmeldung"],
+        // Die gezeichnete Unterschrift (ENT-704).
+        ['betreiber', 'unterschrift',    "ALTER TABLE betreiber ADD COLUMN unterschrift MEDIUMTEXT NULL"],
+        ['betreiber', 'unterschrift_am', "ALTER TABLE betreiber ADD COLUMN unterschrift_am DATETIME NULL"],
         // ENT-698: bis zu welcher Neuerung (backend/neuerungen.php) dieses
         // Konto gelesen hat. Anders als bei den Mandanten-Konten heisst NULL
         // hier "noch nichts gelesen": Betreiber-Konten sind wenige und intern,

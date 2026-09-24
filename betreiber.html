@@ -1148,6 +1148,14 @@ tr.auf-leib > td { background: var(--surface-2); padding-top: 4px; }
 /* Die Karten der Uebersicht nebeneinander, solange Platz ist. Kein festes
    Dreierraster: Auf dieser Ebene traegt ein Konto zwei Karten, und eine
    dritte leere Spalte sieht aus wie eine fehlende. */
+/* Die Unterschrift (ENT-704): ueber die ganze Breite, das Bild auf einer
+   ruhigen Flaeche mit Linie, wie auf dem Dokument. */
+.kd-usig { grid-column: 1 / -1; }
+.kd-usig-blatt { border-bottom: 1px solid var(--ink); padding: 6px 0 4px; max-width: 360px; min-height: 60px;
+  display: flex; align-items: flex-end; }
+.kd-usig-blatt img { max-height: 72px; max-width: 100%; }
+/* Dunkle Tinte auf dunkler Flaeche waere unsichtbar. */
+html[data-thema="dunkel"] .kd-usig-blatt img { filter: invert(1); }
 .kd-raster { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
   gap: 14px; align-items: start; }
 /* Die Karten der Kontoseite tragen Schrift und Innenabstand der
@@ -1435,6 +1443,10 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   #druckflaeche { display: block !important; }
 }
 </style>
+<!-- Das Zeichenfeld fuer die eigene Unterschrift (ENT-704), dieselbe Datei
+     wie im Unterschriftsdialog des Kunden. Der Deploy legt sie ins Wurzel-
+     verzeichnis des Betreiber-Buendels. -->
+<script src="unterschrift.js" defer></script>
 </head>
 <body>
 <!-- ═══════════ MARKE GUARD OPS ═══════════
@@ -4799,7 +4811,8 @@ function kdZeichnen() {
           ${kZeile('Zwei-Faktor',        kZfMerker(k))}
           ${kZeile('Angelegt',           strich(String(k.angelegt_am || '').slice(0, 10)))}
           ${kZeile('Zuletzt angemeldet', kAnmeldung(k))}
-        </dl></div></div>`;
+        </dl></div></div>
+      ${kdUnterschriftKarte(k)}`;
   }
   if (kdTab === 'zugang')  { kdZugang(k); }
   if (kdTab === 'verlauf') { kdVerlaufZeichnen(k); }
@@ -4927,6 +4940,58 @@ async function kdVerlaufZeichnen(k) {
   }
   ziel.innerHTML = '<div class="card"><div class="card-bd flush"><div class="tw">'
     + kLogTabelle(d.eintraege, false) + '</div></div></div>' + kLogFussnote(d);
+}
+
+/* ── Unterschrift (ENT-704) ────────────────────────────────────────
+   Eine Karte in der Uebersicht, ueber die ganze Breite. Zeichnen kann nur
+   die Person selbst an ihrem eigenen Konto -- der Server nimmt die Sitzung,
+   nicht eine id. Andere Konten sehen nur, ob eine hinterlegt ist.
+
+   DREI LAGEN, DREI TEXTE: nicht eingerichtet (Spalte fehlt), nicht
+   hinterlegt, hinterlegt. */
+function kdUnterschriftKarte(k) {
+  let inhalt;
+  if (k.unterschrift_da === null || k.unterschrift_da === undefined) {
+    inhalt = `<div class="sec">Auf diesem Server noch nicht eingerichtet. Ein Einrichtungslauf legt die Stelle an.</div>`;
+  } else if (k.ich) {
+    inhalt = (k.unterschrift
+      ? `<div class="kd-usig-blatt"><img id="kdUsigBild" src="${esc(k.unterschrift)}" alt="Deine Unterschrift"></div>
+         <div class="sec" style="margin:10px 0 12px">Steht auf jeder Offerte und jedem Vertrag, die du freigibst. Eine neue Unterschrift ändert bereits versendete Fassungen nicht.</div>
+         <button type="button" class="btn btn-plain btn-sm" id="kdUsigKnopf" onclick="kdUnterschriftZeichnen()">Neu zeichnen</button>`
+      : `<div class="sec" style="margin-bottom:12px">Noch keine Unterschrift hinterlegt. Ohne sie kannst du keine Offerte und keinen Vertrag freigeben.</div>
+         <button type="button" class="btn btn-primary btn-sm" id="kdUsigKnopf" onclick="kdUnterschriftZeichnen()">Unterschrift zeichnen</button>`);
+  } else {
+    inhalt = k.unterschrift_da
+      ? `<div class="sec">Hinterlegt.</div>`
+      : `<div class="sec">Nicht hinterlegt. Ohne Unterschrift kann dieses Konto keine Offerte und keinen Vertrag freigeben.</div>`;
+  }
+  return `<div class="card kd-usig" id="kdUsigKarte"><div class="card-hd"><h3>Unterschrift</h3></div>
+    <div class="card-bd">${inhalt}</div></div>`;
+}
+
+function kdUnterschriftZeichnen() {
+  const k = kFindet(kdId);
+  if (!k || !k.ich) { return; }
+  if (!window.Unterschrift) { kurzmeldung('Das Zeichenfeld liess sich nicht laden. Bitte die Seite neu laden.'); return; }
+  Unterschrift.zeichnen({
+    kraeftig: true,
+    kontext: () => ({ zeilen: ['Deine Unterschrift für Offerten und Verträge'], name: k.name || '' }),
+    fertig: async bild => {
+      const a = await ruf('betreiber_unterschrift_speichern.php', { zeichnung: bild });
+      if (a.status !== 'ok') { kurzmeldung(a.message || 'Die Unterschrift liess sich nicht speichern.'); return; }
+      kurzmeldung('Unterschrift gespeichert.');
+      ofEigeneUnterschrift = true;
+      await ladeKonten();
+    },
+  });
+}
+
+/* Aus dem Versanddialog: direkt zum eigenen Konto. */
+async function kontoEigenesOeffnen() {
+  bereichZeigen('konten');
+  await ladeKonten();
+  const k = konten.find(x => x.ich);
+  if (k) { kOeffnen(k.id); }
 }
 
 /* ── Konto anlegen und ändern ──────────────────────────────────── */
@@ -8925,10 +8990,15 @@ function ofVerlaufZeichnen(v, gespeichert) {
   ziel.appendChild(tab);
 }
 
+/* Kann ich freigeben? (ENT-704) null = unbekannt oder nicht eingerichtet --
+   dann entscheidet der Server beim Versand und sagt es selbst. */
+let ofEigeneUnterschrift = null;
+
 async function ofFassungNachladen(id) {
   let a;
   try { a = await ruf('betreiber_beleg_lesen.php?id=' + Number(id)); } catch (e) { return; }
   if (!a || a.status !== 'ok' || ofFormId !== Number(id)) { return; }
+  ofEigeneUnterschrift = typeof a.unterschrift_eigen === 'boolean' ? a.unterschrift_eigen : null;
   ofFormEntschiedenAm = a.beleg.entscheidung_am || null;
   ofFormToken = a.beleg.versand_token || '';
   ofFassungZeichnen(a.fassung);
@@ -9004,6 +9074,7 @@ async function ofOeffnen(id) {
   ofFassungZeichnen(a.fassung);
   ofFadenZeichnen(a.nachrichten || [], !!a.faden_da);
   ofVerlaufZeichnen(a.verlauf, true);
+  ofEigeneUnterschrift = typeof a.unterschrift_eigen === 'boolean' ? a.unterschrift_eigen : null;
   ofFormularZeigen(true);
 }
 
@@ -9496,6 +9567,15 @@ function ofVersenden(id) {
   const erste = ofFormId === Number(id) && !(ofFormFassung && (ofFormFassung.fassungen || []).length);
   const haken = (ofArt === 'offerte' || ofArt === 'vertrag') && (neu || erste || ofFormId !== Number(id))
     ? `Ich gebe diese Fassung der ${t.dokument} verbindlich frei.` : '';
+  /* Ohne eigene Unterschrift keine Freigabe (ENT-704). Der Server sperrt
+     selbst (unterschrift_fehlt); hier steht vorher, warum und wohin. */
+  if (haken && ofEigeneUnterschrift === false) {
+    frageStellen('Deine Unterschrift fehlt',
+      `Zum Freigeben einer ${t.dokument} braucht es deine Unterschrift. Sie steht danach auf jeder Fassung, `
+      + 'die du freigibst. Zeichne sie einmal in deinem Konto, dann geht der Versand.',
+      'Zu meinem Konto', () => { kontoEigenesOeffnen(); });
+    return;
+  }
   frageStellen(frage, text, 'Versenden', async () => {
     const a = await ruf('betreiber_beleg_versenden.php', { id: Number(id), freigabe: !!haken });
     if (a.status !== 'ok') { kurzmeldung(a.message || 'Versand fehlgeschlagen.'); return; }

@@ -309,7 +309,7 @@ function beleg_pdf(array $abbild, array $fassung, ?array $u, bool $komprimiert =
     // ── Unterschriften ─────────────────────────────────────────────────
     $angenommen = $u !== null && ($u['art'] ?? '') === 'annahme';
     if (!empty($b['unterschriftsseite']) || $angenommen) {
-        $pdf->platz(52);
+        $pdf->platz(60);
         $pdf->Ln(8);
         $pdf->SetFont('Helvetica', 'B', 7.5);
         $pdf->SetTextColor(107, 114, 128);
@@ -319,21 +319,31 @@ function beleg_pdf(array $abbild, array $fassung, ?array $u, bool $komprimiert =
         $pdf->SetTextColor(20, 22, 26);
         $t = $angenommen ? strtotime((string)$u['bestaetigt_am']) : false;
         $pdf->Cell(70, 6, $angenommen ? $T('Elektronisch angenommen am ' . ($t ? date('d.m.Y', $t) : '–')) : '', 'B', 1);
-        $pdf->Ln(12);
+        // 18 mm Hoehe fuer die Unterschriften (ENT-704). Mit 12 mm wurde eine
+        // Zeichnung vom ganzen Bildschirm zum Haarstrich.
+        $pdf->Ln(20);
         $y = $pdf->GetY();
         $links = 20; $rechts = 110; $breite = 80;
+        $unterschriftSetzen = function (array $bild, float $x) use ($pdf, $y, $breite, &$bilder): void {
+            $bilder[] = $bild['datei'];
+            $h = 18; $w = $h * $bild['b'] / $bild['h'];
+            if ($w > $breite) { $w = $breite; $h = $w * $bild['h'] / $bild['b']; }
+            $pdf->Image($bild['datei'], $x, $y - $h - 0.5, $w, $h, $bild['typ']);
+        };
+        // Unsere Unterschrift aus der Freigabe (ENT-704), fest in der Fassung.
+        $fu = !empty($fassung['freigegeben']) ? beleg_freigabe_unterschrift($abbild) : null;
+        $fuBild = $fu ? beleg_pdf_bild($fu['bild']) : null;
+        if ($fuBild) { $unterschriftSetzen($fuBild, $rechts); }
         if ($angenommen) {
             $zeichnung = !empty($u['zeichnung']) ? beleg_pdf_bild((string)$u['zeichnung']) : null;
             if ($zeichnung) {
-                $bilder[] = $zeichnung['datei'];
-                $h = 12; $w = min($breite, $h * $zeichnung['b'] / $zeichnung['h']);
-                $pdf->Image($zeichnung['datei'], $links, $y - $h, $w, 0, $zeichnung['typ']);
+                $unterschriftSetzen($zeichnung, $links);
             } else {
                 $pdf->SetFont('Helvetica', 'I', 14);
                 $pdf->SetXY($links, $y - 8);
                 $pdf->Cell($breite, 7, $T((string)$u['name']), 0, 0);
             }
-            if (!empty($fassung['freigegeben']) && trim((string)($fassung['versendet_von'] ?? '')) !== '') {
+            if (!$fuBild && !empty($fassung['freigegeben']) && trim((string)($fassung['versendet_von'] ?? '')) !== '') {
                 $pdf->SetFont('Helvetica', 'I', 14);
                 $pdf->SetXY($rechts, $y - 8);
                 $pdf->Cell($breite, 7, $T((string)$fassung['versendet_von']), 0, 0);

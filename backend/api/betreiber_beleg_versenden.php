@@ -141,6 +141,26 @@ if ($naechste['neu'] && beleg_unterschreibbar((string)$beleg['art']) && !$freiga
     json_response(['status' => 'error', 'freigabe_noetig' => true,
         'message' => 'Bitte bestätigen, dass Sie diese Fassung verbindlich freigeben.'], 400);
 }
+// UNSERE UNTERSCHRIFT (ENT-704): Wer eine neue Fassung einer Offerte oder
+// eines Vertrags freigibt, braucht eine hinterlegte Unterschrift. Sie wird
+// ins Abbild kopiert und steht damit unter der Pruefsumme der Fassung --
+// eine spaeter neu gezeichnete aendert diese Fassung nicht. Geprueft VOR
+// dem Versand der Mail: Sonst ginge ein Link hinaus zu einer Fassung, die
+// es nicht gibt.
+if ($naechste['neu'] && beleg_unterschreibbar((string)$beleg['art']) && $abbild !== null) {
+    $meine = be_unterschrift_von($pdo, (int)$ich['id']);
+    if ($meine === null) {
+        json_response(['status' => 'error', 'unterschrift_fehlt' => true, 'lage' => 'nicht_eingerichtet',
+            'message' => 'Die Unterschrift ist auf diesem Server noch nicht eingerichtet. '
+                       . 'Bitte zuerst einen Einrichtungslauf machen.'], 503);
+    }
+    if ($meine === '' || beleg_zeichnung_pruefen($meine) === null) {
+        json_response(['status' => 'error', 'unterschrift_fehlt' => true,
+            'message' => 'Zum Freigeben braucht es deine Unterschrift. Bitte zuerst unter '
+                       . 'Konten → dein Konto → Unterschrift zeichnen.'], 400);
+    }
+    $abbild[BELEG_FREIGABE_UNTERSCHRIFT] = ['name' => (string)($ich['name'] ?? ''), 'bild' => $meine];
+}
 $fassungNr = $naechste['neu'] ? (int)$naechste['nummer']
            : max(1, (int)(beleg_letzte_fassung($pdo, $id, 'be_')['nummer'] ?? 1));
 
