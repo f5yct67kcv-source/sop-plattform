@@ -12842,6 +12842,12 @@ function asSprechen(text) {
 
 // ── Mikrofon: Nochmals tippen beendet die Aufnahme UND stellt die Frage.
 function asMikKlick() {
+  // Hoert das Weckwort schon zu, nimmt auch der Mikrofon-Knopf die Frage
+  // ueber Vosk auf (ENT-703): kein zweiter Zugriff, keine Rueckfrage.
+  if (asWeck) {
+    if (asWeck.frage) { asFrageEnde(asWeck, true); } else { asFrageStart(); }
+    return;
+  }
   if (sprach && sprachPrefix === 'as') {
     sprachStop();
     $('asWidget').classList.remove('hoert');
@@ -13459,9 +13465,12 @@ async function asWeckStart() {
     recognizer.on('partialresult', m => pruefen(m && m.result && m.result.partial));
     const node = ctx.createScriptProcessor(4096, 1, 1);
     node.onaudioprocess = ev => {
-      // Waehrend die gewohnte Spracheingabe laeuft, hoert das Weckwort nicht mit.
-      if (sprach) { return; }
-      try { recognizer.acceptWaveform(ev.inputBuffer); } catch (e) { /* einzelne Bloecke duerfen fehlen */ }
+      // Waehrend die Spracheingabe des Browsers laeuft (Weckwort aus), hoert
+      // Vosk nicht mit. Sonst geht der Ton an das Weckwort ODER, nach dem
+      // Weckwort, an die Erkennung der Frage (ENT-703) -- nie an beide.
+      if (sprach || !asWeck) { return; }
+      const r = asWeck.frage ? asWeck.frage.rec : asWeck.recognizer;
+      try { r.acceptWaveform(ev.inputBuffer); } catch (e) { /* einzelne Bloecke duerfen fehlen */ }
     };
     const quelle = ctx.createMediaStreamSource(stream);
     quelle.connect(node);
@@ -13469,10 +13478,10 @@ async function asWeckStart() {
     // Safari startet den Ton ohne vorherigen Klick oft angehalten. Dann
     // laeuft er ab dem naechsten Klick irgendwo auf der Seite.
     if (ctx.state === 'suspended') { document.addEventListener('pointerdown', () => ctx.resume(), { once: true }); }
-    asWeck = { ctx, stream, node, model, recognizer };
+    asWeck = { ctx, stream, node, model, recognizer, frage: null };
     asWeckZustand = 'an';
     asHorchZeichnen();
-    hinweis.textContent = 'Ich höre auf „Hallo Wächter“. Das Mikrofon bleibt offen, erkannt wird nur auf diesem Gerät.';
+    hinweis.textContent = 'Ich höre auf „Hallo Wächter“. Das Mikrofon bleibt offen. Weckwort und Frage werden nur auf diesem Gerät erkannt.';
   } catch (e) {
     hinweis.remove();
     const verweigert = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
@@ -13489,18 +13498,68 @@ function asWeckStop() {
   try { w.stream.getTracks().forEach(t => t.stop()); } catch (e) { /* schon gestoppt */ }
   try { w.ctx.close(); } catch (e) { /* schon zu */ }
   try { w.recognizer.remove(); } catch (e) { /* schon weg */ }
+  asFrageEnde(w, false);
   try { w.model.terminate(); } catch (e) { /* schon beendet */ }
 }
 
+// ── Die Frage nach dem Weckwort, ebenfalls mit Vosk (ENT-703). Vorher nahm
+// die Spracherkennung des Browsers die Frage auf: ein zweiter Zugriff aufs
+// Mikrofon, in Safari eine zweite Rueckfrage, die den Ablauf anhielt, und
+// der Ton ging an Apple. Jetzt laeuft alles ueber das eine, schon offene
+// Mikrofon und bleibt auf dem Geraet. Der Preis: Das kleine Modell versteht
+// freie Saetze schlechter als Apple -- der erkannte Text steht darum sichtbar
+// im Feld, bevor er gestellt wird.
+let asFrageStille = 8000;      // ohne ein Wort so lange: zurueck zum Weckwort
+let asFrageMax = 30000;        // laengstens so lange zuhoeren
+function asFrageStart() {
+  const w = asWeck;
+  if (!w || w.frage) { return; }
+  asStimmeAus();
+  const rec = new w.model.KaldiRecognizer(w.ctx.sampleRate);   // ohne Wortliste: freie Saetze
+  const f = { rec, fest: '', uhrStille: null, uhrMax: null };
+  w.frage = f;
+  $('asText').value = '';
+  $('asWidget').classList.add('hoert');
+  $('asSprachHint').textContent = 'Ich höre zu … Nach einer kurzen Pause stelle ich die Frage.';
+  const zeigen = teil => { $('asText').value = (f.fest + ' ' + (teil || '')).trim(); };
+  rec.on('partialresult', m => {
+    const t = m && m.result && m.result.partial;
+    if (t) { clearTimeout(f.uhrStille); }
+    zeigen(t);
+  });
+  // "result" kommt nach einer Sprechpause: Das ist das Ende der Frage.
+  rec.on('result', m => {
+    const t = String((m && m.result && m.result.text) || '').trim();
+    if (!t) { return; }
+    f.fest = (f.fest + ' ' + t).trim();
+    zeigen('');
+    asFrageEnde(w, true);
+  });
+  f.uhrStille = setTimeout(() => asFrageEnde(w, false, 'Nichts gehört. Ich höre wieder auf „Hallo Wächter“.'), asFrageStille);
+  f.uhrMax = setTimeout(() => asFrageEnde(w, !!f.fest), asFrageMax);
+}
+// Beendet die Frage; mit stellen=true wird der Text gleich gestellt.
+function asFrageEnde(w, stellen, hinweis) {
+  const f = w && w.frage;
+  if (!f) { return; }
+  w.frage = null;
+  clearTimeout(f.uhrStille);
+  clearTimeout(f.uhrMax);
+  try { f.rec.remove(); } catch (e) { /* schon weg */ }
+  $('asWidget').classList.remove('hoert');
+  $('asSprachHint').textContent = hinweis || '';
+  if (stellen && $('asText').value.trim()) { asSenden(); }
+}
+
 // Geweckt: aufwachen, Fenster auf und gleich zuhoeren -- die Frage folgt dem
-// Weckwort. Ein zweites Weckwort innert drei Sekunden wird ignoriert (die
+// Weckwort und wird seit ENT-703 ebenfalls mit Vosk erkannt. Ein zweites Weckwort innert drei Sekunden wird ignoriert (die
 // Teilergebnisse melden dasselbe Wort mehrmals).
 function asGeweckt() {
   const jetzt = Date.now();
-  if (jetzt - asWeckLetzt < 3000 || asLaeuft || sprach) { return; }
+  if (jetzt - asWeckLetzt < 3000 || asLaeuft || sprach || (asWeck && asWeck.frage)) { return; }
   asWeckLetzt = jetzt;
   if (!asWach) { asAktivieren(); } else { asPanelAuf(); }
-  asMikKlick();
+  asFrageStart();
 }
 
 function rtZuruecksetzen(prefix) {

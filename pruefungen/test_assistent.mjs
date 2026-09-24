@@ -92,16 +92,25 @@ async function neueSeite() {
     // Erkennung laesst sich hier nicht pruefen -- geprueft wird, was die
     // Seite mit einem erkannten Wort macht, und dass ohne Einschalten nichts
     // zuhoert.
-    window.__vosk = { modelle: 0, grammatik: null, hoerer: {}, mikro: 0, gestoppt: 0, modellAdresse: null };
+    // Jeder Erkenner wird gemerkt: der fuer das Weckwort (mit Wortliste) und
+    // der fuer die Frage (ohne, ENT-703).
+    window.__vosk = { modelle: 0, grammatik: null, erkenner: [], mikro: 0, gestoppt: 0, modellAdresse: null };
     window.Vosk = { createModel: async adresse => {
       window.__vosk.modelle++; window.__vosk.modellAdresse = adresse;
       return { terminate() {}, KaldiRecognizer: function (rate, gram) {
-        window.__vosk.grammatik = gram;
-        this.on = (ev, fn) => { window.__vosk.hoerer[ev] = fn; };
-        this.acceptWaveform = () => {}; this.remove = () => {};
+        const e = { gram: gram === undefined ? null : gram, hoerer: {}, weg: false };
+        window.__vosk.erkenner.push(e);
+        if (window.__vosk.grammatik === null && gram !== undefined) { window.__vosk.grammatik = gram; }
+        this.on = (ev, fn) => { e.hoerer[ev] = fn; };
+        this.acceptWaveform = () => {}; this.remove = () => { e.weg = true; };
       } };
     } };
-    window.__voskSagt = text => { const h = window.__vosk.hoerer.result; if (h) h({ result: { text } }); };
+    // art: 'wort' (Erkenner mit Wortliste) oder 'frage' (ohne); typ: 'result' oder 'partialresult'.
+    window.__voskSagt = (text, art = 'wort', typ = 'result') => {
+      const e = window.__vosk.erkenner.filter(x => !x.weg && (art === 'wort' ? x.gram !== null : x.gram === null)).pop();
+      if (e && e.hoerer[typ]) { e.hoerer[typ]({ result: typ === 'result' ? { text } : { partial: text } }); }
+    };
+    window.__frageOffen = () => window.__vosk.erkenner.some(x => !x.weg && x.gram === null);
     Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: async () => {
       window.__vosk.mikro++; return { getTracks: () => [{ stop: () => { window.__vosk.gestoppt++; } }] }; } } });
     window.AudioContext = function () {
@@ -442,12 +451,42 @@ await page.evaluate(() => { window.__mik = 0; window.sprachUm = () => { window._
 await page.evaluate(() => window.__voskSagt('guten morgen'));
 await page.waitForTimeout(100);
 check('Ein anderes Wort weckt ihn nicht', !(await page.isVisible('#asWidget')) && await page.evaluate(() => window.__mik === 0));
+drehbuch = { name: 'offene_plaetze', input: { von: tag(0), bis: tag(6) }, antwort: 'Zwei Einsätze haben noch Lücken.' };
+const vorFrage = zurueck.length;
 await page.evaluate(() => window.__voskSagt('hallo wächter'));
 await page.waitForTimeout(200);
-check('KRITISCH: „Hallo Wächter“ weckt ihn, öffnet das Fenster und startet gleich die Spracheingabe für die Frage',
-  await page.isVisible('#asWidget') && await page.isVisible('#asPanel') && await page.evaluate(() => window.__mik === 1));
+check('KRITISCH: „Hallo Wächter“ weckt ihn und öffnet das Fenster', await page.isVisible('#asWidget') && await page.isVisible('#asPanel'));
+check('KRITISCH: die Frage nimmt Vosk auf, nicht die Spracherkennung des Browsers (kein zweiter Mikrofonzugriff, kein Ton an Apple)',
+  await page.evaluate(() => window.__mik === 0 && window.__frageOffen() && window.__vosk.mikro === 1));
+check('Für die Frage versteht Vosk freie Sätze (Erkenner ohne Wortliste)', await page.evaluate(() => window.__vosk.erkenner.some(x => !x.weg && x.gram === null)));
+check('Die Figur zeigt, dass sie zuhört', await page.evaluate(() => document.getElementById('asWidget').classList.contains('hoert')));
 await page.evaluate(() => window.__voskSagt('hallo wächter'));
-check('Ein Echo innert Sekunden startet nicht nochmals', await page.evaluate(() => window.__mik === 1));
+check('Ein Echo des Weckworts startet keine zweite Frage', await page.evaluate(() => window.__vosk.erkenner.filter(x => !x.weg && x.gram === null).length === 1));
+await page.evaluate(() => window.__voskSagt('wo fehlen', 'frage', 'partialresult'));
+check('Was schon verstanden ist, steht sofort im Feld', (await page.inputValue('#asText')) === 'wo fehlen');
+await page.evaluate(() => window.__voskSagt('wo fehlen diese woche noch leute', 'frage', 'result'));
+await page.waitForFunction(() => !document.getElementById('asBtn').disabled, null, { timeout: 5000 });
+await page.waitForTimeout(150);
+check('KRITISCH: nach der Sprechpause wird die Frage gestellt und beantwortet',
+  zurueck.length === vorFrage + 1 && (await letzteAntwort()) === 'Zwei Einsätze haben noch Lücken.'
+  && await page.evaluate(() => [...document.querySelectorAll('#asVerlauf .as-msg.du')].pop().textContent === 'wo fehlen diese woche noch leute'));
+check('Danach hört er wieder nur auf das Weckwort (Frage-Erkenner weg, Anzeige aus)',
+  await page.evaluate(() => !window.__frageOffen() && !document.getElementById('asWidget').classList.contains('hoert')));
+
+// Nichts gesagt: nach der Stille zurueck zum Weckwort, nichts gestellt.
+await page.evaluate(() => { asFrageStille = 200; asWeckLetzt = 0; });
+const vorStille = zurueck.length;
+await page.evaluate(() => window.__voskSagt('hallo wächter'));
+await page.waitForTimeout(500);
+check('Kommt nach dem Weckwort nichts, hört er wieder auf „Hallo Wächter“ und stellt nichts',
+  await page.evaluate(() => !window.__frageOffen()) && zurueck.length === vorStille && /Nichts gehört/.test(await page.textContent('#asSprachHint')));
+// Auch der Mikrofon-Knopf nimmt ueber Vosk auf, solange das Weckwort zuhoert.
+await page.evaluate(() => { asFrageStille = 8000; });
+await page.click('#asMik'); await page.waitForTimeout(100);
+check('Mikrofon-Knopf bei eingeschaltetem Weckwort: Aufnahme über Vosk, ohne Browser-Erkennung',
+  await page.evaluate(() => window.__frageOffen() && window.__mik === 0));
+await page.click('#asMik'); await page.waitForTimeout(100);
+check('Nochmals tippen beendet die Aufnahme', await page.evaluate(() => !window.__frageOffen()));
 await page.click('#asHorch');
 await page.waitForTimeout(100);
 check('Ausgeschaltet: Mikrofon zu, Anzeige weg', await page.evaluate(() => window.__vosk.gestoppt >= 1 && !document.getElementById('asWidget').classList.contains('horcht')));
