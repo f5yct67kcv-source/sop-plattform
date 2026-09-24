@@ -12973,6 +12973,7 @@ async function asWerkzeug(name, e) {
   if (name === 'offene_plaetze') { return asWzOffen(e); }
   if (name === 'verfuegbare_mitarbeitende') { return asWzVerfuegbar(e); }
   if (name === 'offene_rechnungen') { return asWzRechnungen(e); }
+  if (name === 'offene_enden') { return asWzOffeneEnden(e); }
   if (name === 'formular_vorbereiten') { return asWzVorbereiten(e); }
   if (name === 'formular_ergaenzen') { return asWzErgaenzen(e); }
   return { modell: { fehler: 'unbekanntes Werkzeug' } };
@@ -13038,6 +13039,126 @@ async function asWzOffen(e) {
       oeffnen: () => epAuf(o.x.id),
     })),
   };
+}
+
+// ── Offene Enden (ENT-709). Vier Bereiche, jeder mit seinem eigenen Recht
+// ueber die bestehenden Endpunkte: Fehlt eines, meldet der Bereich kein_recht
+// -- das ist etwas anderes als "nichts offen". Die Regeln sind die des
+// Cockpits (zaehltAlsBesetzt, reFaelligTage, agZeilenBauen), nicht neue.
+const AS_PLANUNG_TAGE = 14;       // Planung: heute und die naechsten 13 Tage
+const AS_LISTE_MAX = 20;          // je Bereich hoechstens so viele Zeilen in der Liste
+function asTageSeit(d) {
+  const t = String(d || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) { return null; }
+  return Math.round((new Date(isoTag() + 'T12:00:00') - new Date(t + 'T12:00:00')) / 864e5);
+}
+
+async function asWzOffeneEnden(e) {
+  const alle = ['offerten', 'planung', 'rechnungen', 'personal'];
+  const bereiche = alle.includes(e.bereich) ? [e.bereich] : alle;
+  const heute = isoTag();
+  const modell = {}, gruppen = [];
+  const liste = (bereich, zeilen) => { if (zeilen.length) { gruppen.push(zeilen.slice(0, AS_LISTE_MAX).map(z => ({ ...z, text: `${bereich} · ${z.text}` }))); } };
+  const stand = r => (r.kein_recht ? { kein_recht: true } : r.fehler ? { fehler: r.fehler } : null);
+
+  if (bereiche.includes('offerten')) {
+    const r = await asLaden('beleg_list.php?art=offerte');
+    const s = stand(r);
+    if (s) { modell.offerten = s; } else {
+      const aktiv = (r.data.belege || []).filter(b => Number(b.aktiv ?? 1) === 1 && !Number(b.ist_vorlage));
+      const entwuerfe = aktiv.filter(b => b.status === 'entwurf');
+      const ohneEntscheid = aktiv.filter(b => ['versendet', 'angeschaut'].includes(b.status) && leeresDatum(b.entscheidung_am))
+        .sort((a, b) => String(a.datum).localeCompare(String(b.datum)));
+      const ungesehen = aktiv.filter(b => !leeresDatum(b.entscheidung_am) && leeresDatum(b.entscheidung_gesehen_am));
+      const abgelaufen = ohneEntscheid.filter(b => !leeresDatum(b.gueltig_bis) && String(b.gueltig_bis).slice(0, 10) < heute);
+      modell.offerten = { entwuerfe: entwuerfe.length, versendet_ohne_entscheid: ohneEntscheid.length,
+        davon_gueltigkeit_abgelaufen: abgelaufen.length, entscheide_nicht_angesehen: ungesehen.length,
+        aelteste_ohne_entscheid: ohneEntscheid.slice(0, 5).map(b => ({ nummer: b.nummer, kunde: b.kunde_name || '', tage_seit_belegdatum: asTageSeit(b.datum) })) };
+      const zeile = (b, sub) => ({ text: `${b.nummer} · ${b.kunde_name || '(ohne Kunde)'}`, sub, oeffnen: () => ofOeffnen(b.id) });
+      liste('Offerte', [
+        ...ungesehen.map(b => zeile(b, `Kunde hat ${b.status === 'abgelehnt' ? 'abgelehnt' : 'angenommen'}, noch nicht angesehen`)),
+        ...ohneEntscheid.map(b => { const t = asTageSeit(b.datum);
+          return zeile(b, `versendet, kein Entscheid${t !== null ? ` · Belegdatum vor ${t} Tagen` : ''}${abgelaufen.includes(b) ? ' · Gültigkeit abgelaufen' : ''}`); }),
+        ...entwuerfe.map(b => zeile(b, 'Entwurf, nicht versendet')),
+      ]);
+    }
+  }
+
+  let ein = null;
+  if (bereiche.includes('planung') || bereiche.includes('personal')) { ein = await asEinsaetzeFrisch(); }
+
+  if (bereiche.includes('planung')) {
+    const s = stand(ein);
+    if (s) { modell.planung = s; } else {
+      const bis = plusTage(heute, AS_PLANUNG_TAGE - 1);
+      const im = einsaetze.filter(x => { const d = String(x.datum).slice(0, 10); return d >= heute && d <= bis && x.status !== 'abgesagt'; })
+        .sort((a, b) => (String(a.datum) + hm(a.von)).localeCompare(String(b.datum) + hm(b.von)));
+      const offen = im.map(x => ({ x, fehlt: Math.max(0, (Number(x.bedarf) || 0) - (x.mitarbeiter || []).filter(m => zaehltAlsBesetzt(m.zusage)).length) }))
+        .filter(o => o.fehlt > 0);
+      const absagen = im.filter(x => hatAbgelehnt(x));
+      modell.planung = { zeitraum: { von: heute, bis }, einsaetze_im_zeitraum: im.length,
+        einsaetze_mit_offenen_plaetzen: offen.length, offene_plaetze: offen.reduce((t, o) => t + o.fehlt, 0),
+        einsaetze_mit_absage: absagen.length };
+      liste('Planung', offen.map(o => ({
+        text: `${asTag(o.x.datum)} ${hm(o.x.von)}–${hm(o.x.bis)} · ${o.x.kunde_name || o.x.titel || 'Einsatz'}`,
+        sub: `${o.fehlt} ${o.fehlt === 1 ? 'Platz' : 'Plätze'} offen${hatAbgelehnt(o.x) ? ' · jemand hat abgesagt' : ''}`,
+        oeffnen: () => epAuf(o.x.id) })));
+    }
+  }
+
+  if (bereiche.includes('rechnungen')) {
+    const r = await asLaden('beleg_list.php?art=rechnung');
+    const s = stand(r);
+    if (s) { modell.rechnungen = s; } else {
+      const aktiv = (r.data.belege || []).filter(b => Number(b.aktiv ?? 1) === 1 && !Number(b.ist_vorlage));
+      const entwuerfe = aktiv.filter(b => b.status === 'entwurf' && !Number(b.bezahlt));
+      const ueber = aktiv.filter(b => b.status !== 'entwurf' && !Number(b.bezahlt)).filter(b => { const t = reFaelligTage(b); return t !== null && t < 0; })
+        .sort((a, b) => reFaelligTage(a) - reFaelligTage(b));
+      modell.rechnungen = { entwuerfe: entwuerfe.length, ueberfaellig: ueber.length,
+        summe_ueberfaellig_chf: chf(ueber.reduce((t, b) => t + (Number(b.total_rappen) || 0), 0)) };
+      const zeile = (b, sub) => ({ text: `${b.nummer} · ${b.kunde_name || '(ohne Kunde)'}`, sub, oeffnen: () => ofOeffnen(b.id) });
+      liste('Rechnung', [
+        ...ueber.map(b => zeile(b, `${-reFaelligTage(b)} Tage überfällig · CHF ${chf(Number(b.total_rappen) || 0)}`)),
+        ...entwuerfe.map(b => zeile(b, 'Entwurf, nicht versendet')),
+      ]);
+    }
+  }
+
+  if (bereiche.includes('personal')) {
+    const aw = await asLaden(`abwesenheit_list.php?von=${plusTage(heute, -365)}&bis=${plusTage(heute, 365)}`);
+    const sAw = stand(aw);
+    if (!mitarbeiter.length) { try { await loadMitarbeiter(); } catch (x) { /* Namen fehlen dann */ } }
+    const wer = id => { const m = mitarbeiter.find(x => Number(x.id) === Number(id)); return m ? (fullName(m) || m.name) : 'Person unbekannt'; };
+    const antraege = sAw ? [] : ((aw.data.abwesenheiten || []).filter(a => a.status === 'beantragt')
+      .sort((a, b) => String(a.von).localeCompare(String(b.von))));
+    const sEin = stand(ein);
+    // Wie die Abgleich-Ansicht: vergangene Schichten mit Person, nicht
+    // abgesagt, Zusage nicht abgelehnt/entfallen, noch ohne Abgleich.
+    const nichtAbgeglichen = sEin ? [] : agZeilenBauen()
+      .filter(z => z.mitarbeiter_id && String(z.datum).slice(0, 10) < heute && zaehltAlsBesetzt(z.zusage) && leeresDatum(z.abgeglichen_am));
+    modell.personal = {
+      abwesenheitsantraege: sAw || { offen: antraege.length },
+      abgleich: sEin || { schichten_nicht_abgeglichen: nichtAbgeglichen.length,
+        aelteste: nichtAbgeglichen.length ? String(nichtAbgeglichen[0].datum).slice(0, 10) : null },
+    };
+    liste('Abwesenheit', antraege.map(a => ({ text: `${wer(a.mitarbeiter_id)} · ${a.typ || 'Abwesenheit'}`,
+      sub: `${asTag(a.von)}–${asTag(a.bis)} · beantragt, nicht entschieden`, oeffnen: () => go('abwesenheiten') })));
+    liste('Abgleich', nichtAbgeglichen.map(z => ({ text: `${asTag(z.datum)} ${hm(z.von)}–${hm(z.bis)} · ${z.wer}`,
+      sub: `${z.kunde_name || z.titel || 'Einsatz'} · noch nicht abgeglichen, zählt im Lohn nicht mit`, oeffnen: () => go('abgleich') })));
+  }
+
+  modell.hinweis = 'Nicht erkennbar ist, ob aus einer angenommenen Offerte schon ein Einsatz oder eine Rechnung entstanden ist: '
+    + 'Offerten und Einsaetze sind nicht verknuepft.';
+  // Sichtbar sind nur AS_TREFFER_MAX Zeilen. Reihum verteilt, damit jeder
+  // Bereich vorkommt und nicht der erste alle Plaetze belegt; angezeigt wird
+  // trotzdem nach Bereichen geordnet.
+  const anteil = gruppen.map(() => 0);
+  for (let frei = AS_TREFFER_MAX, weiter = true; frei > 0 && weiter;) {
+    weiter = false;
+    gruppen.forEach((g, i) => { if (frei > 0 && anteil[i] < g.length) { anteil[i]++; frei--; weiter = true; } });
+  }
+  const treffer = gruppen.flatMap((g, i) => g.slice(0, anteil[i])).concat(gruppen.flatMap((g, i) => g.slice(anteil[i])));
+  return { modell, treffer };
 }
 
 async function asWzVerfuegbar(e) {

@@ -1068,6 +1068,20 @@ function ki_assistent_werkzeuge(): array
             'input_schema' => ['type' => 'object', 'properties' => ['datum' => $datum, 'von' => $zeit, 'bis' => $zeit],
                 'required' => ['datum', 'von', 'bis']],
         ],
+        // Offene Enden (ENT-709): vier Bereiche, jeder mit seinem eigenen
+        // Leserecht. Der Browser laedt sie ueber die bestehenden Endpunkte;
+        // fehlt ein Recht, meldet der Bereich kein_recht statt "nichts offen".
+        'offene_enden' => [
+            'recht' => ['offerten_lesen', 'einsaetze_lesen', 'abwesenheiten_lesen'],
+            'titel' => 'Was noch offen ist',
+            'description' => 'Ueberblick ueber offene Enden: Offerten (Entwuerfe, versendet ohne Entscheid, Entscheide '
+                . 'noch nicht angesehen), Planung (unbesetzte Plaetze und Absagen in den naechsten 14 Tagen), '
+                . 'Rechnungen (Entwuerfe, ueberfaellige) sowie Personal und Abgleich (offene Abwesenheitsantraege, '
+                . 'vergangene Schichten noch nicht abgeglichen). Ohne bereich alle vier.',
+            'input_schema' => ['type' => 'object', 'properties' => [
+                'bereich' => ['type' => 'string', 'enum' => ['offerten', 'planung', 'rechnungen', 'personal']],
+            ]],
+        ],
         // Die beiden Formular-Werkzeuge (ENT-700) schreiben nichts: Sie oeffnen
         // ein vorbefuelltes Formular bzw. aendern ein offenes, gespeichert
         // wird per Klick (ENT-015). Ihr Recht haengt an der Faehigkeit, die
@@ -1135,6 +1149,9 @@ function ki_assistent_system(string $heute): string
         . "Auskunft gerade nicht verfuegbar ist. Beides ist etwas anderes als 'keine'.\n"
         . "- Steht in einem Ergebnis ein hinweis (zum Beispiel, dass etwas nicht beruecksichtigt ist), gib ihn weiter.\n"
         . "- Offene Plaetze und Einsaetze sind verschiedene Einheiten: nenne beide getrennt, nie das eine als das andere.\n"
+        . "- Bei offene_enden nennst du nur Bereiche, in denen etwas offen ist, je mit der wichtigsten Zahl, das "
+        . "Dringendste zuerst (ueberfaellig, abgelaufen, nicht angesehen). Einen Bereich mit kein_recht nennst du als "
+        . "nicht einsehbar, nie als erledigt. Ist nirgends etwas offen, sag das in einem Satz.\n"
         . "- Ruhezeit-Hinweise gibst du so weiter, wie sie im Ergebnis stehen. Du legst den GAV nicht aus.\n"
         . "- Soll etwas angelegt oder eine Person geaendert werden, rufe formular_vorbereiten sofort mit dem ganzen "
         . "Auftrag auf, auch wenn Angaben fehlen. Frag nicht vorher nach.\n"

@@ -43,6 +43,14 @@ const EI = [
   { id: 13, datum: tag(3), von: '07:00:00', bis: '16:00:00', bedarf: 3, status: 'abgesagt', kunde_name: 'Beispiel AG', titel: 'Abgesagt', mitarbeiter: [] },
   { id: 14, datum: tag(40), von: '07:00:00', bis: '16:00:00', bedarf: 5, status: 'geplant', kunde_name: 'Beispiel AG', titel: 'Spaeter', mitarbeiter: [] },
   { id: 15, datum: tag(4), von: '20:00:00', bis: '06:00:00', bedarf: 3, status: 'geplant', kunde_name: 'Muster GmbH', titel: 'Nachtwache', mitarbeiter: [] },
+  // Vergangen (offene Enden, ENT-709): 16 noch nicht abgeglichen, 17 abgeglichen,
+  // 18 abgelehnt (zaehlt nicht).
+  { id: 16, datum: tag(-2), von: '07:00:00', bis: '12:00:00', bedarf: 1, status: 'geplant', kunde_name: 'Beispiel AG', titel: 'Frueh',
+    mitarbeiter: [{ id: 3, name: 'ptest', zusage: 'zugesagt', abgeglichen_am: null }] },
+  { id: 17, datum: tag(-3), von: '07:00:00', bis: '12:00:00', bedarf: 1, status: 'geplant', kunde_name: 'Beispiel AG', titel: 'Erledigt',
+    mitarbeiter: [{ id: 4, name: 'lprobe', zusage: 'zugesagt', abgeglichen_am: tag(-1) + ' 08:00:00' }] },
+  { id: 18, datum: tag(-3), von: '13:00:00', bis: '17:00:00', bedarf: 1, status: 'geplant', kunde_name: 'Muster GmbH', titel: 'Abgelehnt',
+    mitarbeiter: [{ id: 2, name: 'abeispiel', zusage: 'abgelehnt', abgeglichen_am: null }] },
 ];
 const OFFERTEN = [
   { id: 21, art: 'offerte', nummer: 'OF-1', kunde_name: 'Beispiel AG', titel: 'Umzug', status: 'bestaetigt', total_rappen: 150000, aktiv: 1,
@@ -50,6 +58,16 @@ const OFFERTEN = [
   { id: 22, art: 'offerte', nummer: 'OF-2', kunde_name: 'Muster GmbH', titel: 'Fest', status: 'abgelehnt', total_rappen: 90000, aktiv: 1,
     entscheidung_am: tag(-5) + ' 09:00:00', entscheidung_gesehen_am: tag(-4) + ' 08:00:00' },
   { id: 23, art: 'offerte', nummer: 'OF-3', kunde_name: 'Beispiel AG', titel: 'Intern', status: 'bestaetigt', total_rappen: 50000, aktiv: 1,
+    entscheidung_am: null, entscheidung_gesehen_am: null },
+  // Offene Enden (ENT-709): ein Entwurf, zwei versendete ohne Entscheid (eine
+  // davon abgelaufen), eine archivierte (zaehlt nicht).
+  { id: 24, art: 'offerte', nummer: 'OF-4', kunde_name: 'Muster GmbH', status: 'entwurf', total_rappen: 10000, aktiv: 1, datum: tag(-1),
+    entscheidung_am: null, entscheidung_gesehen_am: null },
+  { id: 25, art: 'offerte', nummer: 'OF-5', kunde_name: 'Beispiel AG', status: 'versendet', total_rappen: 10000, aktiv: 1, datum: tag(-20),
+    gueltig_bis: tag(-2), entscheidung_am: null, entscheidung_gesehen_am: null },
+  { id: 26, art: 'offerte', nummer: 'OF-6', kunde_name: 'Muster GmbH', status: 'angeschaut', total_rappen: 10000, aktiv: 1, datum: tag(-3),
+    gueltig_bis: tag(20), entscheidung_am: null, entscheidung_gesehen_am: null },
+  { id: 27, art: 'offerte', nummer: 'OF-7', kunde_name: 'Muster GmbH', status: 'versendet', total_rappen: 10000, aktiv: 0, datum: tag(-9),
     entscheidung_am: null, entscheidung_gesehen_am: null },
 ];
 const RECHNUNGEN = [
@@ -191,7 +209,8 @@ async function neueSeite() {
     if (p.startsWith('verfuegbarkeit_list')) return send({ status: 'ok', sperren: [{ mitarbeiter_id: 4, datum: tag(2), bemerkung: 'Familienfest' }] });
     if (p.startsWith('abwesenheit_list')) return abwesenheitGesperrt
       ? send({ status: 'error', message: 'Dafür fehlt dir die Berechtigung.' }, 403)
-      : send({ status: 'ok', abwesenheiten: [{ id: 1, mitarbeiter_id: 3, typ: 'Ferien', von: tag(1), bis: tag(5), status: 'genehmigt' }] });
+      : send({ status: 'ok', abwesenheiten: [{ id: 1, mitarbeiter_id: 3, typ: 'Ferien', von: tag(1), bis: tag(5), status: 'genehmigt' },
+        { id: 2, mitarbeiter_id: 5, typ: 'Ferien', von: tag(20), bis: tag(22), status: 'beantragt' }] });
     if (p.startsWith('beleg_list')) {
       if (belegeGesperrt) return send({ status: 'error', message: 'Dafür fehlt dir die Berechtigung.' }, 403);
       return send({ status: 'ok', belege: p.includes('art=rechnung') ? RECHNUNGEN : OFFERTEN, naechste_nummer: 'X' });
@@ -420,6 +439,35 @@ r = await fragen('Offerte für die Muster GmbH', { name: 'formular_vorbereiten',
 check('KRITISCH: ohne Recht öffnet sich nichts, und der Grund der Spracheingabe geht unverändert ans Modell',
   r.geoeffnet === false && r.grund === 'kein_recht' && /Berechtigung/.test(r.meldung));
 routerAntwort = null;
+
+// ══════════ OFFENE ENDEN (ENT-709)
+abwesenheitGesperrt = false;
+r = await fragen('Was ist noch offen?', { name: 'offene_enden', input: {}, antwort: 'Einiges.' });
+check('Offerten: Entwurf, versendet ohne Entscheid (davon abgelaufen), Entscheid nicht angesehen -- Archiviertes zählt nicht',
+  r.offerten.entwuerfe === 1 && r.offerten.versendet_ohne_entscheid === 2 && r.offerten.davon_gueltigkeit_abgelaufen === 1
+  && r.offerten.entscheide_nicht_angesehen === 1 && r.offerten.aelteste_ohne_entscheid[0].nummer === 'OF-5');
+check('Planung: nächste 14 Tage, offene Plätze und Einsätze getrennt gezählt, Absagen erkannt',
+  r.planung.einsaetze_mit_offenen_plaetzen === 2 && r.planung.offene_plaetze === 4 && r.planung.einsaetze_mit_absage === 1
+  && r.planung.zeitraum.von === tag(0) && r.planung.zeitraum.bis === tag(13));
+check('Rechnungen: Entwurf und überfällige, Bezahltes zählt nicht', r.rechnungen.entwuerfe === 1 && r.rechnungen.ueberfaellig === 1);
+check('Personal: offener Abwesenheitsantrag und vergangene Schicht ohne Abgleich (abgeglichene und abgelehnte zählen nicht)',
+  r.personal.abwesenheitsantraege.offen === 1 && r.personal.abgleich.schichten_nicht_abgeglichen === 1 && r.personal.abgleich.aelteste === tag(-2));
+check('Die Liste nennt den Bereich vorne in jeder Zeile', await page.evaluate(() => {
+  const t = document.getElementById('asVerlauf').textContent;
+  return ['Offerte · OF-1', 'Offerte · OF-5', 'Planung · ', 'Rechnung · RE-1', 'Abwesenheit · ', 'Abgleich · '].every(x => t.includes(x));
+}));
+check('Nennt, was es nicht erkennen kann (Offerte ohne Verknüpfung zum Einsatz)', /nicht verknuepft/.test(r.hinweis));
+abwesenheitGesperrt = true;
+belegeGesperrt = true;
+r = await fragen('Was ist noch offen?', { name: 'offene_enden', input: {}, antwort: 'Teilweise.' });
+check('KRITISCH: fehlt ein Recht, meldet der Bereich kein_recht statt null offen -- die übrigen Bereiche laufen weiter',
+  r.offerten.kein_recht === true && r.offerten.entwuerfe === undefined && r.rechnungen.kein_recht === true
+  && r.personal.abwesenheitsantraege.kein_recht === true && r.personal.abgleich.schichten_nicht_abgeglichen === 1
+  && r.planung.offene_plaetze === 4);
+belegeGesperrt = false;
+r = await fragen('Was ist in der Planung offen?', { name: 'offene_enden', input: { bereich: 'planung' }, antwort: 'Vier Plätze.' });
+check('Mit bereich nur dieser Bereich', Object.keys(r).filter(k => k !== 'hinweis').join() === 'planung');
+abwesenheitGesperrt = false;
 
 // ══════════ KEIN RECHT, FALSCHE EINGABE
 belegeGesperrt = true;

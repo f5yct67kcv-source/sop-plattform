@@ -22,6 +22,7 @@ $ok = 0; $bad = [];
 function pruef(string $name, bool $c) { global $ok, $bad; if ($c) { $ok++; } else { $bad[] = $name; } }
 
 require __DIR__ . '/../backend/ai.php';
+require_once __DIR__ . '/../backend/rechte.php';
 // Die Regel aus db.php, zum Vergleich -- db.php selbst verbindet sich beim
 // Einbinden mit der Datenbank.
 function umgebung_ist_produktion_kopie(string $w): ?bool
@@ -299,8 +300,11 @@ $wz = ki_assistent_werkzeuge();
 // Recht faellt hier auf.
 $ohneRecht = array_keys(array_filter($wz, fn($w) => $w['recht'] === null));
 sort($ohneRecht);
-pruef('Jedes Werkzeug zum Nachsehen traegt ein Leserecht aus dem Rechtekatalog',
-    array_reduce(array_filter($wz, fn($w) => $w['recht'] !== null), fn($ok, $w) => $ok && preg_match('/^[a-z_]+_lesen$/', $w['recht']), true));
+// Ein Werkzeug ueber mehrere Bereiche (offene_enden, ENT-709) traegt eine
+// Liste: jedes davon ein Leserecht, das es im Katalog wirklich gibt.
+pruef('Jedes Werkzeug zum Nachsehen traegt nur Leserechte, die im Rechtekatalog stehen',
+    array_reduce(array_filter($wz, fn($w) => $w['recht'] !== null), fn($ok, $w) => $ok
+        && array_reduce((array)$w['recht'], fn($o, $r) => $o && preg_match('/^[a-z_]+_lesen$/', $r) && recht_gueltig($r), (array)$w['recht'] !== []), true));
 pruef('KRITISCH: ohne eigenes Recht sind nur die zwei Formular-Werkzeuge (Recht je Faehigkeit im Router)',
     $ohneRecht === ['formular_ergaenzen', 'formular_vorbereiten']);
 pruef('Kein Werkzeug fragt einen Preis ab', !preg_match('/preis|rappen|betrag/i', json_encode(array_column($wz, 'input_schema'))));
