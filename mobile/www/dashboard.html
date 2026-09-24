@@ -95,6 +95,10 @@
   --accent-hi:    #2549B0;
   --accent-soft:  #EDF2FE;
   --accent-line:  #CBD9F9;
+  /* Finanzgrafik (ENT-712): "bezahlt" hebt sich vom Akzent "verrechnet" ab,
+     die Lohnlinie ist eine dritte, klar andere Farbe. */
+  --fin-bezahlt:  #1B2B52;
+  --fin-lohn:     #7C4DDB;
 
   /* Semantik */
   --pos:      #0E7C55;  --pos-soft:  #E6F6EF;
@@ -195,6 +199,8 @@ html[data-thema="dunkel"] {
   --accent-hi:    #8DAEFA;
   --accent-soft:  #1A2440;
   --accent-line:  #2D3D63;
+  --fin-bezahlt:  #E4EAF8;
+  --fin-lohn:     #B69BFA;
 
   --pos:      #4FCE96;  --pos-soft:  #10281E;
   --neg:      #F27F70;  --neg-soft:  #2E1A18;
@@ -974,6 +980,80 @@ html[data-desktop="an"] .desktop-zurueck { display: inline-flex; }
 .rdkr-tab.aktiv .rdkr-tab-ic { background: var(--accent); color: #fff; }
 /* Auf dem Handy bleiben es Bedienelemente, also mindestens 44px hoch. */
 @media (max-width: 720px) { .rdkr-tab { min-height: 44px; } }
+
+/* ── Finanzen (ENT-712) ─────────────────────────────────────────────────
+   Kartenkopf mit Titel und Unterzeile gestapelt: Die Unterzeile nennt den
+   Bezug (Zeitraum, MWST), und eine Zahl ohne Bezug liest sich wie die
+   Gesamtzahl. Kleiner als der Titel, sonst kippt die Rangfolge. */
+.fin-titel { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.fin-titel h2 { margin: 0; }
+.fin-unter { font-size: 11.5px; color: var(--ink-3); line-height: 1.3; }
+.fin-chart { position: relative; height: 290px; }
+.fin-chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.fin-gitter { stroke: var(--line-soft); stroke-width: 1; }
+.fin-gitter.null { stroke: var(--line); }
+.fin-achse { fill: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+.fin-monat.jetzt { fill: var(--ink); font-weight: 650; }
+.fin-jahr { font-size: 10px; }
+.fin-laufend { fill: var(--accent-soft); opacity: .7; }
+.fin-laufend-lbl { fill: var(--accent); font-size: 10.5px; font-weight: 650; letter-spacing: .3px; }
+.fin-l-verrechnet, .fin-l-bezahlt, .fin-l-lohn { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.fin-l-verrechnet { stroke: var(--accent); stroke-width: 2.5; }
+.fin-l-bezahlt { stroke: var(--fin-bezahlt); stroke-width: 2; }
+.fin-l-lohn { stroke: var(--fin-lohn); stroke-width: 1.5; }
+.fin-l-verrechnet.gestrichelt, .fin-l-bezahlt.gestrichelt { stroke-dasharray: 4 5; }
+.fin-l-verrechnet-pkt { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.fin-l-bezahlt-pkt { fill: var(--fin-bezahlt); stroke: var(--surface); stroke-width: 2; }
+.fin-l-lohn-pkt { fill: var(--surface); stroke: var(--fin-lohn); stroke-width: 1.8; }
+.fin-chart circle.laufend { fill: var(--surface); stroke-width: 2; }
+.fin-l-verrechnet-pkt.laufend { stroke: var(--accent); }
+.fin-l-bezahlt-pkt.laufend { stroke: var(--fin-bezahlt); }
+.fin-chart circle.hervor { r: 5.5; }
+.fin-hilfslinie { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 3 4; }
+.fin-treffer { fill: transparent; cursor: crosshair; outline: none; }
+.fin-treffer:focus-visible { fill: var(--accent-soft); fill-opacity: .5; }
+.fin-tip { position: absolute; z-index: 3; pointer-events: none; min-width: 220px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: var(--sh-2); padding: 11px 13px; font-size: 12px; }
+.fin-tip-kopf { font-weight: 700; font-size: 13px; margin-bottom: 7px; display: flex; align-items: center; gap: 7px; }
+.fin-tip-z { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; padding: 2px 0; }
+.fin-tip-z b { font-variant-numeric: tabular-nums; font-weight: 650; text-align: right; }
+.fin-tip-z.fein { color: var(--ink-3); }
+.fin-tip-z.fein b { font-weight: 550; }
+.fin-tip-z.ohne b { color: var(--ink-3); font-weight: 550; font-style: italic; }
+.fin-tip-trenner { border-top: 1px solid var(--line-soft); margin: 7px 0 5px; }
+.fin-tip-hinweis { color: var(--ink-3); font-size: 11px; margin-top: 3px; }
+.fin-sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; box-sizing: border-box; }
+.fin-sw.verrechnet { background: var(--accent); }
+.fin-sw.bezahlt { background: var(--fin-bezahlt); }
+.fin-sw.lohn { background: var(--surface); border: 2px solid var(--fin-lohn); }
+.fin-legende { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; font-size: 12px; color: var(--ink-2); }
+.fin-leg { display: inline-flex; align-items: center; gap: 7px; padding: 4px 0; }
+.fin-leg-ohne { color: var(--ink-3); font-style: italic; }
+.fin-leg-knopf { border: 0; background: none; font: inherit; color: inherit; cursor: pointer; border-radius: 6px; padding: 4px 6px; margin: 0 -6px; }
+.fin-leg-knopf:hover { background: var(--line-soft); }
+.fin-leg-knopf.aus { opacity: .5; }
+.fin-leg-knopf.aus .fin-sw { background: transparent; border-style: dashed; }
+.fin-leg-zusatz { color: var(--ink-3); }
+.fin-ohne { color: var(--ink-3); font-weight: 600; }
+.fin-zeile { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(80px, 2fr) auto 52px;
+  gap: 14px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 13px; }
+.fin-zeile:last-child { border-bottom: 0; }
+.fin-zeile.status { grid-template-columns: minmax(0, 1.2fr) 42px 52px minmax(80px, 2fr); }
+.fin-zeile.weitere .fin-name { color: var(--ink-3); }
+.fin-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fin-zeile b { font-variant-numeric: tabular-nums; font-weight: 650; text-align: right; }
+.fin-anteil { color: var(--ink-3); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.fin-balken { display: block; height: 8px; border-radius: 6px; background: var(--line-soft); overflow: hidden; }
+.fin-balken i { display: block; height: 100%; border-radius: 6px; background: var(--accent); }
+.fin-balken.pos i { background: var(--pos); }
+.fin-balken.neg i { background: var(--neg); }
+.fin-balken.unbekannt i { background: var(--ink-3); }
+.fin-auslagen td.fin-leer { color: var(--ink-3); }
+.fin-gesperrt { color: var(--warn); font-size: 11px; }
+.fin-auslagen tfoot td { padding: 11px 18px; border-top: 1px solid var(--line); }
+.fin-auslagen td .fin-gesperrt { display: block; }
+.fin-fuss { color: var(--ink-3); font-size: 12px; margin: 10px 2px 0; }
 /* Der Reiter "Allgemeines" traegt das Formular -- weiterhin in begrenzter
    Breite links (Vorgabe Projektinhaber aus ENT-258), nur steht jetzt die
    Reiterleiste darueber statt das Kachel-Raster daneben. */
@@ -1226,7 +1306,7 @@ tr.klickbar.gewaehlt td { background: var(--accent-soft); }
    "%". Gemessen am gerenderten Zustand aufgefallen, nicht im Quelltext.
    Bewusst nur hier und nicht an ".delta" selbst: Die Klasse gehoert der
    Haupt-Uebersicht, und dort ist nichts zu reparieren. */
-#kuLageKpi .kpi-foot .delta { white-space: nowrap; flex: none; }
+#kuLageKpi .kpi-foot .delta, #finKpi .kpi-foot .delta { white-space: nowrap; flex: none; }
 .kpi-val .waehrung { font-size: 15px; font-weight: 600; color: var(--ink-3); letter-spacing: 0; margin-right: 3px; }
 .kpi-foot { margin-top: 9px; display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--ink-3); }
 .delta { display: inline-flex; align-items: center; gap: 3px; font-weight: 650; border-radius: 20px; padding: 1.5px 7px; font-size: 11px; }
@@ -5786,13 +5866,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                (ENT-181). Die Produkte dagegen sind Preis-Stammdaten und
                liegen unter Administration -- sie gehoeren zu keinem Kunden. -->
           <button class="nav-kind" id="nav-kunden-offerten" onclick="go('kunden'); kuGoTab('offerten')">Offerten</button>
-          <!-- Rechnungen (ENT-181): Grundgeruest, gleicher Aufbau wie die
-               Offerten-Liste (Reiter Alle/Archiviert, Suche, Statusfilter,
-               sortierbare Tabelle) -- noch OHNE eigene Erfassung. belege.art
-               'rechnung' ist serverseitig bereits vorgesehen (Nummernkreis
-               RE-, Summenrechnung), nur die Erfassungsmaske selbst fehlt noch
-               (naechster Schritt, eigene Entscheidung). -->
-          <button class="nav-kind" id="nav-kunden-rechnungen" onclick="go('kunden'); kuGoTab('rechnungen')">Rechnungen</button>
         </div>
       </div>
 
@@ -5846,26 +5919,28 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         </div>
       </div>
 
-      <!-- Lohn (ENT-451). Eigene Rubrik und ausdruecklich NICHT unter
-           "Auswertung": Dort wird gelesen, hier entsteht ein Dokument mit
-           Rechtswirkung. Auch nicht "Buchhaltung" -- der Name verspraeche
-           Debitoren, Kreditoren und Hauptbuch; Rechnungen und Offerten
-           liegen unter "Kunden", eine Finanzbuchhaltung gibt es nicht.
-           Ein Reiter, der mehr ankuendigt als dahintersteht, ist dieselbe
-           Fehlerfamilie wie "unbekannt sieht aus wie keine".
-           Die Lohnstammdaten JE PERSON stehen nicht hier, sondern in der
-           Personalakte -- zwei Formulare fuer dieselben Daten waeren zwei
-           Orte, an denen ein Feld fehlen kann. -->
-      <div class="nav-gruppe nur-desktop" id="navg-lohn">
-        <button class="nav-item nav-eltern" id="nav-lohn" title="Lohn" onclick="lohnNavKlick()">
-          <svg class="i" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>
-          <span class="lbl">Lohn</span>
+      <!-- Finanzen (ENT-712, ersetzt die Rubrik "Lohn" aus ENT-451 an deren
+           Stelle). Das Geld des Betriebs an einem Ort: eine Uebersicht, die
+           Rechnungen (von Kunden hierher gezogen) und der Lohn.
+           NICHT "Buchhaltung" -- die Begruendung aus ENT-451 gilt weiter:
+           Der Name verspraeche Debitoren, Kreditoren und Hauptbuch. Hier gibt
+           es keine Ausgabenerfassung und keine Kreditoren; Kosten sind nur,
+           was die Plattform selbst kennt (Bruttolohn, Auslagenersatz).
+           Der Punkt "Lohn" fuehrt auf eine Kachelleiste (Lohnlaeufe,
+           Lohnarten, Saetze, Auslagenersatz) nach dem Muster von Support
+           (.rdkr-reiter, ENT-687) -- ausdruecklicher Wunsch des
+           Projektinhabers. Die Lohnstammdaten JE PERSON bleiben in der
+           Personalakte. Nur am Desktop, wie bisher der Lohn (ENT-235). -->
+      <div class="nav-gruppe nur-desktop" id="navg-finanzen">
+        <button class="nav-item nav-eltern" id="nav-finanzen" title="Finanzen" onclick="finanzenNavKlick()">
+          <svg class="i" viewBox="0 0 24 24"><line x1="4" y1="21" x2="20" y2="21"/><rect x="5" y="13" width="3" height="6" rx="0.8"/><rect x="10.5" y="10" width="3" height="9" rx="0.8"/><rect x="16" y="7" width="3" height="12" rx="0.8"/><polyline points="4 10 9.5 5.5 13 8 20 2.5"/></svg>
+          <span class="lbl">Finanzen</span>
           <svg class="i chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <div class="nav-kinder">
-          <button class="nav-kind" id="nav-lohn-laeufe" onclick="go('lohnlaeufe')">Lohnläufe</button>
-          <button class="nav-kind" id="nav-lohn-lohnarten" onclick="go('lohnarten')">Lohnarten</button>
-          <button class="nav-kind" id="nav-lohn-saetze" onclick="go('lohnsaetze')">Sätze und Regelwerk</button>
+          <button class="nav-kind" id="nav-finanzen-uebersicht" onclick="go('finanzen')">Übersicht</button>
+          <button class="nav-kind" id="nav-finanzen-rechnungen" onclick="go('rechnungen')">Rechnungen</button>
+          <button class="nav-kind" id="nav-finanzen-lohn" onclick="finLohnKlick()">Lohn</button>
         </div>
       </div>
 
@@ -6872,40 +6947,17 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
                zurueck, sobald das Recht da ist. -->
           <div class="card" id="kuLageSperre" hidden><div class="card-bd"></div></div>
           <div id="kuLageInhalt">
-          <div class="grid g-kpi" id="kuLageKpi"></div>
-          <!-- Kartenkoepfe nach dem Haus-Muster der Uebersicht: Titel links,
-               Abstandhalter, Kurzinfo als Pille rechts (".card-hd .note").
-               Ein gestapelter Untertitel unter dem Titel waere hier neu und
-               haette ohne eigene Regel die volle Grundschriftgroesse --
-               groesser als die Ueberschrift darueber. -->
-          <div class="card" style="margin-bottom:16px">
+          <!-- Seit ENT-712 nur noch Offerten: Die Rechnungsteile (offener
+               Betrag, Altersbaender, Mahnliste, bezahlt im Monat) stehen
+               unter Finanzen -> Uebersicht. Jede Zahl an genau einem Ort. -->
+          <div class="grid g-1-1" id="kuLageKpi" style="margin-bottom:16px"></div>
+          <div class="card">
             <div class="card-hd">
-              <h2>Offene Beträge nach Alter</h2>
+              <h2>Offerten, die bald ablaufen</h2>
               <div class="sp"></div>
-              <!-- Der Bezug steht am Bild, nicht im Kleingedruckten: Die
-                   Seite sieht nur AKTIVE Belege an, und das ist eine Auswahl.
-                   Eine Zahl ohne ihren Bezug liest sich wie die Gesamtzahl. -->
-              <span class="note" id="kuLageAlterNote"></span>
+              <span class="note" id="kuLageOfNote"></span>
             </div>
-            <div class="card-bd" id="kuLageAlter"></div>
-          </div>
-          <div class="grid g-1-1">
-            <div class="card">
-              <div class="card-hd">
-                <h2>Am längsten überfällig</h2>
-                <div class="sp"></div>
-                <span class="note" id="kuLageMahnNote"></span>
-              </div>
-              <div class="card-bd flush"><div class="tw" id="kuLageMahn"></div></div>
-            </div>
-            <div class="card">
-              <div class="card-hd">
-                <h2>Offerten, die bald ablaufen</h2>
-                <div class="sp"></div>
-                <span class="note" id="kuLageOfNote"></span>
-              </div>
-              <div class="card-bd flush"><div class="tw" id="kuLageOf"></div></div>
-            </div>
+            <div class="card-bd flush"><div class="tw" id="kuLageOf"></div></div>
           </div>
           </div>
         </div>
@@ -7031,37 +7083,6 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           <div class="card"><div class="card-bd flush"><div class="tw" id="ofTable"></div></div></div>
         </div>
 
-        <!-- ── Reiter: Rechnungen (ENT-181) ─────────────────────────────────
-             Aufbau wie die Offerten-Liste (Suche, Statusfilter, sortierbare
-             Tabelle), Spalten und Reiter nach dem Vorbild des bisherigen
-             Fremdsystems (Screenshot vom Projektinhaber, 28.08.2026): Status,
-             Faellig, Nr., Referenz, Titel, Empfaenger, Rechnungsdatum, Betrag,
-             Offener Betrag, Aktion. "Erledigt" statt "Inbox"/"Offen" wie im
-             Vorbild -- eine Inbox fuer eingehende Rechnungen gibt es hier
-             nicht, das waere ein anderes Feature (Kreditorenseite). ── -->
-        <div class="ku-tab" id="kv-rechnungen">
-          <div class="tabs" id="reArchivTabs" style="margin-bottom:10px">
-            <button class="tab on" id="reatab-alle" onclick="reArchivGo('alle')">Alle</button>
-            <button class="tab" id="reatab-erledigt" onclick="reArchivGo('erledigt')">Erledigt</button>
-            <button class="tab" id="reatab-archiv" onclick="reArchivGo('archiv')">Archiviert</button>
-          </div>
-          <div class="bar-tools">
-            <div class="search">
-              <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input class="inp" type="search" id="reQ" placeholder="Nummer, Titel, Empfänger oder Referenz …" oninput="renderRechnungen()">
-            </div>
-            <select class="inp" id="reStatus" style="width:auto" onchange="renderRechnungen()">
-              <option value="">Alle Status</option>
-            </select>
-            <div class="sp" style="flex:1"></div>
-            <button class="btn btn-primary" onclick="ofNeuStarten('rechnung')">
-              <svg class="i" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Rechnung erstellen
-            </button>
-          </div>
-          <div class="card"><div class="card-bd flush"><div class="tw" id="reTable"></div></div></div>
-        </div>
-
         <!-- ── Detailseite eines einzelnen Kunden (ENT-040), nur per Klick auf
              eine Zeile erreichbar -- kein eigener Reiter oben, kein eigener
              Seitenleisten-Eintrag. ── -->
@@ -7148,6 +7169,101 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
            kein Formular, das in ein Fenster passt, ohne dass man darin
            scrollt und dabei den Summenblock verliert. Gleiche Entscheidung
            wie beim Einsatzplan (ENT-150). -->
+      <!-- ══════════════════════ FINANZEN: ÜBERSICHT (ENT-712) ═════════════
+           Einnahmen, offene Rechnungen und Lohnkosten auf einen Blick.
+           Aufbau nach dem Nachtrag "Grafik und Seitenaufbau": Kennzahlen,
+           darunter die Grafik ueber die volle Breite, dann zwei Spalten.
+           JEDER BLOCK AN SEINEM RECHT. Ein Block ohne Recht faellt nicht
+           weg, sondern sagt "Kein Zugriff" -- das Raster springt nicht, und
+           eine fehlende Zahl sieht nie aus wie eine 0.
+           KEINE DIFFERENZ, KEINE MARGE: Die Lohnkosten sind ohne
+           Arbeitgeberbeitraege und liegen darum systematisch zu tief
+           (ENT-712, Punkt 15). -->
+      <section class="view" id="view-finanzen">
+        <div class="grid g-kpi" id="finKpi"></div>
+        <div class="card fin-chart-karte" style="margin-bottom:16px">
+          <div class="card-hd">
+            <div class="fin-titel">
+              <h2>Einnahmen</h2>
+              <div class="fin-unter" id="finChartUnter">exkl. MWST</div>
+            </div>
+            <div class="sp"></div>
+            <!-- Der einzige Zeitraum-Umschalter der Seite (Nachtrag, Punkt 6).
+                 Er steuert die Grafik, die Einnahmen nach Kunden und den
+                 Rechnungsstatus; jede dieser Karten nennt ihren Zeitraum. -->
+            <div class="seg2" id="finZeitraum" role="group" aria-label="Zeitraum">
+              <button type="button" data-zr="6" onclick="finZeitraumSetzen('6')">6 M</button>
+              <button type="button" data-zr="12" class="on" onclick="finZeitraumSetzen('12')">12 M</button>
+              <button type="button" data-zr="jahr" onclick="finZeitraumSetzen('jahr')">Jahr</button>
+            </div>
+          </div>
+          <div class="card-bd">
+            <div class="fin-chart" id="finChart"></div>
+            <div class="fin-legende" id="finLegende"></div>
+          </div>
+        </div>
+        <div class="grid g-1-1" style="margin-bottom:16px">
+          <div class="card">
+            <div class="card-hd">
+              <div class="fin-titel"><h2>Einnahmen nach Kunden</h2><div class="fin-unter" id="finKundenUnter"></div></div>
+            </div>
+            <div class="card-bd" id="finKunden"></div>
+          </div>
+          <div class="card">
+            <div class="card-hd">
+              <div class="fin-titel"><h2>Rechnungsstatus</h2><div class="fin-unter" id="finStatusUnter"></div></div>
+            </div>
+            <div class="card-bd" id="finStatus"></div>
+          </div>
+        </div>
+        <div class="grid g-1-1">
+          <div class="card">
+            <div class="card-hd">
+              <div class="fin-titel"><h2>Offene Rechnungen nach Alter</h2><div class="fin-unter" id="finAlterUnter"></div></div>
+            </div>
+            <div class="card-bd" id="finAlter" style="padding-bottom:26px"></div>
+            <div class="card-bd flush"><div class="tw" id="finMahn"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-hd">
+              <div class="fin-titel"><h2>Letzte Lohnläufe</h2><div class="fin-unter">Bruttolohn, ohne Arbeitgeberbeiträge</div></div>
+            </div>
+            <div class="card-bd flush"><div class="tw" id="finLaeufe"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Rechnungen (ENT-181; seit ENT-712 unter Finanzen statt Kunden) ────────────────
+             Aufbau wie die Offerten-Liste (Suche, Statusfilter, sortierbare
+             Tabelle), Spalten und Reiter nach dem Vorbild des bisherigen
+             Fremdsystems (Screenshot vom Projektinhaber, 28.08.2026): Status,
+             Faellig, Nr., Referenz, Titel, Empfaenger, Rechnungsdatum, Betrag,
+             Offener Betrag, Aktion. "Erledigt" statt "Inbox"/"Offen" wie im
+             Vorbild -- eine Inbox fuer eingehende Rechnungen gibt es hier
+             nicht, das waere ein anderes Feature (Kreditorenseite). ── -->
+      <section class="view" id="view-rechnungen">
+          <div class="tabs" id="reArchivTabs" style="margin-bottom:10px">
+            <button class="tab on" id="reatab-alle" onclick="reArchivGo('alle')">Alle</button>
+            <button class="tab" id="reatab-erledigt" onclick="reArchivGo('erledigt')">Erledigt</button>
+            <button class="tab" id="reatab-archiv" onclick="reArchivGo('archiv')">Archiviert</button>
+          </div>
+          <div class="bar-tools">
+            <div class="search">
+              <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input class="inp" type="search" id="reQ" placeholder="Nummer, Titel, Empfänger oder Referenz …" oninput="renderRechnungen()">
+            </div>
+            <select class="inp" id="reStatus" style="width:auto" onchange="renderRechnungen()">
+              <option value="">Alle Status</option>
+            </select>
+            <div class="sp" style="flex:1"></div>
+            <button class="btn btn-primary" onclick="ofNeuStarten('rechnung')">
+              <svg class="i" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Rechnung erstellen
+            </button>
+          </div>
+          <div class="card"><div class="card-bd flush"><div class="tw" id="reTable"></div></div></div>
+      </section>
+
       <section class="view" id="view-offerte">
         <div class="ku-detail-hd">
           <button class="ku-zurueck" id="ofBtnZurueck" onclick="ofZurueck()" aria-label="Zurück zur Offertenliste">
@@ -7405,6 +7521,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
            Stunden und Franken stehen getrennt — „Einheiten nie vermischen“.
            Und was gesperrt ist, steht mit Grund da, nicht als Null. -->
       <section class="view" id="view-lohnlaeufe">
+        <div class="rdkr-reiter fin-lohn-reiter"></div>
         <div class="bar-tools">
           <input class="inp" type="month" id="llMonat" style="width:auto" onchange="lohnVorschauLaden()" aria-label="Monat">
           <button class="btn btn-quiet btn-sm" onclick="lohnVorschauLaden()">Vorschau rechnen</button>
@@ -7424,6 +7541,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       </section>
 
       <section class="view" id="view-lohnarten">
+        <div class="rdkr-reiter fin-lohn-reiter"></div>
         <div class="bar-tools">
           <button class="btn btn-primary btn-sm" id="laNeuKnopf" onclick="lohnartOeffnen(null)">Lohnart erfassen</button>
           <div class="sp" style="flex:1"></div>
@@ -7444,6 +7562,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
            vermischt, kann spaeter nicht mehr sagen, welche Zahl aus dem
            Vertrag stammt und welche jemand gesetzt hat. -->
       <section class="view" id="view-lohnsaetze">
+        <div class="rdkr-reiter fin-lohn-reiter"></div>
         <div class="bar-tools">
           <button class="btn btn-primary btn-sm" id="lsNeuKnopf" onclick="lohnSatzOeffnen(null)">Satz erfassen</button>
         </div>
@@ -7452,6 +7571,24 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <div id="lsListe"></div>
         <div id="lsWirkungslos"></div>
         <div id="lsRegelwerk"></div>
+      </section>
+
+      <!-- ══════════════════════ AUSLAGENERSATZ ALS GELDSICHT (ENT-712) ════
+           Zweiter Blickwinkel auf dieselben Zeilen wie Auswertung ->
+           Auslagenersatz: dort die Kontrolle je Schicht (wer, wann, wie
+           weit), hier die Monatssummen je Person. Keine zweite Tabelle --
+           finanzen_auslagen.php liest einsatz_auslagen wie auslagen_list.php.
+           Eine gesperrte Zeile hat keinen Betrag und wird in der Zelle
+           GENANNT, nicht als 0 mitgezaehlt. -->
+      <section class="view" id="view-lohnauslagen">
+        <div class="rdkr-reiter fin-lohn-reiter"></div>
+        <div class="bar-tools">
+          <select class="inp" id="faJahr" style="width:auto" onchange="finAuslagenLaden()" aria-label="Jahr"></select>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-quiet btn-sm" onclick="go('auslagen')">Kontrolle je Schicht</button>
+        </div>
+        <div class="card"><div class="card-bd flush"><div class="tw" id="faTabelle"></div></div></div>
+        <div id="faHinweis"></div>
       </section>
 
       <!-- ══════════════════════ ABWESENHEITEN (ENT-255) ══════════════════
@@ -10890,10 +11027,10 @@ const TOUR_SCHRITTE = [
   { ziel: 'nav-uebersicht', titel: 'Übersicht', text: 'Hier landest du nach der Anmeldung. Die Kennzahlen zeigen den aktuellen Stand des Betriebs.' },
   { ziel: 'nav-planung', titel: 'Planung', text: 'Einsätze anlegen, die Objektplanung und den Tagesplan führst du hier.' },
   { ziel: 'nav-abgleich', titel: 'Abgleich', text: 'Geleistete Schichten gleichst du hier mit der Planung ab. Eine abgeglichene Schicht ist danach festgeschrieben.' },
-  { ziel: 'nav-kunden', titel: 'Kunden', text: 'Adressen, Objekte, Rapporte, Offerten und Rechnungen deiner Kundschaft.' },
+  { ziel: 'nav-kunden', titel: 'Kunden', text: 'Adressen, Objekte, Rapporte und Offerten deiner Kundschaft.' },
   { ziel: 'nav-revierdienst', titel: 'Revierdienst', text: 'Kontrollpunkte und Kontrollrunden für den Wächtereinsatz.' },
   { ziel: 'nav-kontrolle', titel: 'Auswertung', text: 'Pensen, Auslagenersatz, Abwesenheiten und Arbeitsergebnisse im Überblick.' },
-  { ziel: 'nav-lohn', titel: 'Lohn', text: 'Lohnläufe, Lohnarten und das Regelwerk für die Abrechnung.' },
+  { ziel: 'nav-finanzen', titel: 'Finanzen', text: 'Einnahmen, offene Rechnungen und Lohnkosten auf einen Blick, dazu die Rechnungen und der ganze Lohnbereich.' },
   { ziel: 'nav-admin', titel: 'Administration', text: 'Mitarbeitende, Leistungen, Einstellungen, Mitteilungen und Kundenzugänge.' },
   { ziel: 'nav-einrichtung', titel: 'Einrichtung & Handbuch', text: 'Ein farbiger Punkt hier zeigt, wenn ein Update aussteht. Das Handbuch findest du direkt darunter, dieses Tutorial jederzeit über den Punkt daneben.', letzter: true },
 ];
@@ -11544,15 +11681,8 @@ const NAV_RECHTE = {
   // Offerten haengen am eigenen Recht, nicht an 'kunden' (ENT-181): Wer
   // Adressen pflegt, sieht darum noch keine Preise.
   'nav-kunden-offerten':    'offerten_lesen',
-  // Rechnungen laufen durch DIESELBE Tabelle und DENSELBEN Endpunkt wie die
-  // Offerten (beleg_list.php, Recht 'offerten_lesen') -- der Menuepunkt stand
-  // hier trotzdem nicht und war damit fuer jeden mit 'kunden_lesen' sichtbar
-  // (OP-559 vorgelagert, behoben unter OP-558). Wer nur Adressen pflegt,
-  // klickte auf "Rechnungen" und bekam vom Server ein 403, das die Oberflaeche
-  // still verschluckte: eine leere Flaeche ohne einen einzigen Satz.
-  'nav-kunden-rechnungen':  'offerten_lesen',
-  // Die Uebersicht (ENT-555) zeigt ausschliesslich Betraege aus Offerten und
-  // Rechnungen -- sie haengt darum am selben Recht wie diese, nicht an
+  // Die Uebersicht (ENT-555, seit ENT-712 nur noch Offerten) zeigt
+  // ausschliesslich Betraege -- sie haengt darum am selben Recht wie diese, nicht an
   // 'kunden_lesen'. Ohne das Recht bleibt der Punkt weg UND der Bereich
   // startet auf Adressen (kuStartReiter()); beides gehoert zusammen, sonst
   // fuehrt der Bereich auf eine Seite, die es fuer diesen Benutzer nicht gibt.
@@ -11579,12 +11709,21 @@ const NAV_RECHTE = {
   'nav-kontrolle-auslagen':          'auslagen_lesen',
   'nav-kontrolle-abwesenheiten':     'abwesenheiten_lesen',
   'nav-kontrolle-arbeitsergebnisse': 'einsaetze_lesen',
-  // Lohn (ENT-451) haengt am eigenen Recht und nicht an 'personal_lesen':
-  // Wer die Personalakte pflegt, muss darum nicht wissen, was jemand
-  // verdient. Genau dafuer gibt es den eigenen Bereich.
-  'nav-lohn-laeufe':    'lohn_lesen',
-  'nav-lohn-lohnarten': 'lohn_lesen',
-  'nav-lohn-saetze':    'lohn_lesen',
+  // Finanzen (ENT-712). Jeder Punkt an dem Recht dessen, was dahinter
+  // liegt -- kein eigenes Finanzrecht, das die Lohnsumme an Leute ohne
+  // 'lohn_lesen' herausgaebe.
+  //  - Die Uebersicht steht, sobald EINER ihrer Bloecke sichtbar ist; die
+  //    uebrigen zeigen dort "Kein Zugriff" statt einer 0.
+  //  - Rechnungen laufen durch DIESELBE Tabelle und DENSELBEN Endpunkt wie
+  //    die Offerten (beleg_list.php, Recht 'offerten_lesen') -- ohne diese
+  //    Zeile fuehrte der Punkt auf ein 403 (OP-558).
+  //  - "Lohn" traegt die Kachelleiste mit Lohnlaeufen, Lohnarten und Saetzen
+  //    (lohn_lesen) UND dem Auslagenersatz (auslagen_lesen). Lohn haengt am
+  //    eigenen Recht und nicht an 'personal_lesen' (ENT-451): Wer die
+  //    Personalakte pflegt, muss nicht wissen, was jemand verdient.
+  'nav-finanzen-uebersicht': ['offerten_lesen', 'lohn_lesen', 'auslagen_lesen'],
+  'nav-finanzen-rechnungen': 'offerten_lesen',
+  'nav-finanzen-lohn':       ['lohn_lesen', 'auslagen_lesen'],
   'nav-revierdienst-uebersicht':   'rundgaenge_lesen',
   'nav-revierdienst-einrichtung':  'kontrollpunkte_lesen',
   // Die Einrichtung legt Tabellen und Spalten an -- das ist Schreiben,
@@ -11603,7 +11742,7 @@ const NAV_GRUPPEN = {
   'navg-kontrolle': ['nav-kontrolle-pensen', 'nav-kontrolle-auslagen',
                      'nav-kontrolle-abwesenheiten', 'nav-kontrolle-arbeitsergebnisse'],
   'navg-revierdienst': ['nav-revierdienst-uebersicht', 'nav-revierdienst-einrichtung'],
-  'navg-lohn': ['nav-lohn-laeufe', 'nav-lohn-lohnarten', 'nav-lohn-saetze'],
+  'navg-finanzen': ['nav-finanzen-uebersicht', 'nav-finanzen-rechnungen', 'nav-finanzen-lohn'],
 };
 
 // Ein Recht oder eine Liste davon (ODER-verknuepft).
@@ -11632,6 +11771,23 @@ function rechteAnwenden() {
 // Welche Ansicht offen ist und welche es davor war (ENT-682, siehe go()).
 let goAnsicht = '';
 let goVorherigeAnsicht = '';
+// Die Seiten hinter "Lohn" (ENT-712, Punkt 4) -- in der Reihenfolge der
+// Kachelleiste. Der Einstieg sind die LAEUFE, nicht der Katalog: Sie sind
+// der Vorgang, Lohnarten und Saetze die Einrichtung dahinter. Wer nur den
+// Auslagenersatz sehen darf, landet dort.
+const FIN_LOHN_KACHELN = [
+  { ansicht: 'lohnlaeufe',   titel: 'Lohnläufe',           recht: 'lohn_lesen',
+    ic: '<rect x="3" y="4.5" width="18" height="17" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/>' },
+  { ansicht: 'lohnarten',    titel: 'Lohnarten',           recht: 'lohn_lesen',
+    ic: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>' },
+  { ansicht: 'lohnsaetze',   titel: 'Sätze und Regelwerk', recht: 'lohn_lesen',
+    ic: '<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>' },
+  { ansicht: 'lohnauslagen', titel: 'Auslagenersatz',      recht: 'auslagen_lesen',
+    ic: '<rect x="1" y="3" width="15" height="13" rx="1.5"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>' },
+];
+const FIN_LOHN_ANSICHTEN = FIN_LOHN_KACHELN.map(k => k.ansicht);
+const FIN_ANSICHTEN = ['finanzen', 'rechnungen', ...FIN_LOHN_ANSICHTEN];
+
 const TITLES = {
   uebersicht:  ['Übersicht', 'Laufender Monat'],
   planung:     ['Planung', 'Geplante Einsätze'],
@@ -11643,6 +11799,9 @@ const TITLES = {
   betrieb:     ['Betrieb', 'Anstellungsorte, Briefkopf, Zugang, Rollen und Dienstfahrzeuge'],
   support:     ['Support', 'Anliegen an den Betreiber und befristete Support-Freigabe'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
+  finanzen:    ['Finanzen', 'Übersicht und Kennzahlen'],
+  rechnungen:  ['Rechnungen', 'Rechnungen an Kunden'],
+  lohnauslagen: ['Auslagenersatz', 'Monatssummen je Person aus abgeglichenen Schichten — Art. 18 GAV'],
   lohnlaeufe:  ['Lohnläufe', 'Aus abgeglichenen Ist-Zeiten wird der Bruttolohn'],
   lohnarten:   ['Lohnarten', 'Woraus eine Abrechnung besteht — und was in welche Bemessungsgrundlage zählt'],
   lohnsaetze:  ['Sätze und Regelwerk', 'Abzugssätze mit Gültigkeitszeitraum, GAV-Mindestlöhne'],
@@ -12737,7 +12896,8 @@ function glasUm() {
 // 'arbeitsergebnisse' bleibt ebenfalls draussen: Es zeichnet seit ENT-243
 // Karten statt Tabellen, und eine 1900 px breite Karte gewinnt nichts.
 const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'revierdienst', 'einsatzplan', 'einsatzneu', 'offerte', 'objekt',
-                        'kunden', 'mitarbeiter', 'produkte', 'abwesenheiten'];
+                        'kunden', 'mitarbeiter', 'produkte', 'abwesenheiten',
+                        'finanzen', 'rechnungen', 'lohnauslagen'];
 const PLANUNG_WEIT   = ['uebersicht', 'einsaetze', 'objektplan', 'tag'];
 // Dieselbe Nachentscheidung je Reiter wie PLANUNG_WEIT, hier fuer die
 // Mitarbeitenden: Liste und Personalakte sind Tabellen, "bearbeiten" ist ein
@@ -12849,15 +13009,26 @@ function go(view) {
   $('nav-kontrolle-arbeitsergebnisse').classList.toggle('on', view === 'arbeitsergebnisse');
   if (view === 'arbeitsergebnisse') { arbeitsergebnisseOeffnen(); }
   if (view === 'pensen') { ladePensen(); }
-  const lohnView = view === 'lohnarten' || view === 'lohnsaetze' || view === 'lohnlaeufe';
-  $('navg-lohn').classList.toggle('offen', lohnView);
-  if (lohnView) { $('nav-lohn').classList.add('on'); }
-  $('nav-lohn-lohnarten').classList.toggle('on', view === 'lohnarten');
-  $('nav-lohn-saetze').classList.toggle('on', view === 'lohnsaetze');
-  $('nav-lohn-laeufe').classList.toggle('on', view === 'lohnlaeufe');
+  // Finanzen (ENT-712): Uebersicht, Rechnungen und die vier Lohnseiten
+  // gehoeren zur selben Rubrik. Die vier Lohnseiten markieren gemeinsam den
+  // Punkt "Lohn" -- welche davon offen ist, zeigt die Kachelleiste darin.
+  const finView = FIN_ANSICHTEN.includes(view);
+  const lohnView = FIN_LOHN_ANSICHTEN.includes(view);
+  $('navg-finanzen').classList.toggle('offen', finView);
+  if (finView) { $('nav-finanzen').classList.add('on'); }
+  $('nav-finanzen-uebersicht').classList.toggle('on', view === 'finanzen');
+  $('nav-finanzen-rechnungen').classList.toggle('on', view === 'rechnungen');
+  $('nav-finanzen-lohn').classList.toggle('on', lohnView);
+  if (lohnView) { finLohnReiterZeichnen(view); }
+  if (view === 'finanzen') { finLaden(); }
+  if (view === 'rechnungen') {
+    if (!kunden.length) { loadKunden(); }
+    rechnungen.length ? renderRechnungen() : loadRechnungen();
+  }
   if (view === 'lohnlaeufe') { lohnLaeufeLaden(); }
   if (view === 'lohnarten')  { lohnartenLaden(); }
   if (view === 'lohnsaetze') { lohnSaetzeLaden(); }
+  if (view === 'lohnauslagen') { finAuslagenLaden(); }
   if (view === 'auslagen') { auslagenVorgabe(); ladeAuslagen(); }
   if (view === 'abwesenheiten') { awLaden(); }
   // Revierdienst (ENT-224): Uebersicht (Rundgaenge, Durchfuehrung) und
@@ -15168,7 +15339,7 @@ const OF_ART_TEXT = {
   offerte: {
     dokument: 'Offerte', neu: 'Neue Offerte', liste: 'Offertenliste',
     datumLabel: 'Offertendatum', nummerLabel: 'Offertennummer', zweitLabel: 'Gültig bis',
-    zweitFeld: 'gueltig_bis', kuTab: 'offerten',
+    zweitFeld: 'gueltig_bis',
     fehlerDatum: 'Ein Offertendatum ist erforderlich.',
     fehlerZweit: '„Gültig bis" liegt vor dem Offertendatum.',
     angelegt: 'Offerte angelegt.', gespeichert: 'Offerte gespeichert.',
@@ -15179,7 +15350,7 @@ const OF_ART_TEXT = {
   rechnung: {
     dokument: 'Rechnung', neu: 'Neue Rechnung', liste: 'Rechnungsliste',
     datumLabel: 'Rechnungsdatum', nummerLabel: 'Rechnungsnummer', zweitLabel: 'Fällig am',
-    zweitFeld: 'faellig_bis', kuTab: 'rechnungen',
+    zweitFeld: 'faellig_bis',
     fehlerDatum: 'Ein Rechnungsdatum ist erforderlich.',
     fehlerZweit: '„Fällig am" liegt vor dem Rechnungsdatum.',
     angelegt: 'Rechnung angelegt.', gespeichert: 'Rechnung gespeichert.',
@@ -15201,9 +15372,12 @@ function ofFormLabelZeichnen() {
   $('ofBtnZurueck').setAttribute('aria-label', 'Zurück zur ' + t.liste);
 }
 
+// Rechnungen leben seit ENT-712 unter Finanzen, Offerten weiter unter
+// Kunden -- das Zurueck fuehrt dorthin, wo die Liste der Belegart steht.
 function ofZurueck() {
+  if (ofArt === 'rechnung') { go('rechnungen'); return; }
   go('kunden');
-  kuGoTab(OF_ART_TEXT[ofArt].kuTab);
+  kuGoTab('offerten');
 }
 
 function ofLeereZeile() {
@@ -19694,6 +19868,10 @@ function planungNavKlick() {
 }
 
 function kuGoTab(t) {
+  // Rechnungen sind seit ENT-712 unter Finanzen. Ein alter Einstieg (ein
+  // gemerkter Reiter, ein Sprung von woanders) landet dort, statt auf einem
+  // Reiter, den es nicht mehr gibt.
+  if (t === 'rechnungen') { go('rechnungen'); return; }
   kuTab = t;
   document.querySelectorAll('#view-kunden .ku-tab').forEach(v => v.classList.remove('on'));
   document.querySelectorAll('.nav-kind').forEach(b => b.classList.remove('on'));
@@ -19711,8 +19889,7 @@ function kuGoTab(t) {
   $('pgCrumb').textContent = t === 'objekte' ? 'Daueraufträge und ihre Masterschichten'
     : t === 'rapporte' ? 'Alle erfassten Einsätze'
     : t === 'offerten' ? 'Angebote an Kunden'
-    : t === 'rechnungen' ? 'Rechnungen an Kunden'
-    : t === 'lage' ? 'Offene Beträge aus Offerten und Rechnungen'
+    : t === 'lage' ? 'Offerten beim Kunden und was bald abläuft'
     : t === 'detail' ? 'Kundendetails' : 'Stammdaten';
   if (t === 'uebersicht') { kunden.length ? renderKunden() : loadKunden(); }
   if (t === 'objekte') { objekte.length ? renderObjekte() : loadObjekte(); }
@@ -19724,21 +19901,13 @@ function kuGoTab(t) {
     if (!kunden.length) { loadKunden(); }
     belege.length ? renderOfferten() : loadBelege();
   }
-  if (t === 'rechnungen') {
-    if (!kunden.length) { loadKunden(); }
-    rechnungen.length ? renderRechnungen() : loadRechnungen();
-  }
-  // Die Uebersicht (ENT-555) braucht BEIDE Listen und wird darum erst
-  // gezeichnet, wenn beide da sind. Das Geruest dazwischen ist keine Zierde:
-  // Eine leere Seite waehrend des Ladens saehe aus wie "nichts offen" -- und
-  // "noch nicht bekannt" darf nie wie "keine" aussehen.
+  // Die Uebersicht (ENT-555) ist seit ENT-712 nur noch die Offertenlage --
+  // die Rechnungsteile stehen unter Finanzen -> Uebersicht. Das Geruest
+  // waehrend des Ladens ist keine Zierde: Eine leere Seite saehe aus wie
+  // "nichts offen", und "noch nicht bekannt" darf nie wie "keine" aussehen.
   if (t === 'lage') {
-    const fehlt = !rechnungen.length || !belege.length;
-    if (fehlt) { kuLageSkelett(); }
-    Promise.all([
-      rechnungen.length ? Promise.resolve() : loadRechnungen(),
-      belege.length     ? Promise.resolve() : loadBelege(),
-    ]).then(() => renderKundenLage());
+    if (!belege.length) { kuLageSkelett(); }
+    (belege.length ? Promise.resolve() : loadBelege()).then(() => renderKundenLage());
   }
 }
 
@@ -19837,108 +20006,72 @@ const KU_LAGE_FRIST = 30;
 function kuLageSkelett() {
   $('kuLageSperre').hidden = true;
   $('kuLageInhalt').hidden = false;
-  $('kuLageKpi').innerHTML = Array.from({ length: 4 }, () =>
+  $('kuLageKpi').innerHTML = Array.from({ length: 2 }, () =>
     `<div class="kpi"><div class="sk" style="height:12px;width:52%"></div>
      <div class="sk" style="height:28px;width:46%;margin-top:14px"></div>
      <div class="sk" style="height:11px;width:64%;margin-top:12px"></div></div>`).join('');
-  $('kuLageAlter').innerHTML = '<div class="sk" style="height:152px"></div>';
-  ['kuLageMahn', 'kuLageOf'].forEach(id => {
-    $(id).innerHTML = `<div style="padding:18px">${Array.from({ length: 3 },
-      () => '<div class="sk" style="height:14px;margin-bottom:12px"></div>').join('')}</div>`;
-  });
-  ['kuLageAlterNote', 'kuLageMahnNote', 'kuLageOfNote'].forEach(id => { $(id).textContent = ''; });
+  $('kuLageOf').innerHTML = `<div style="padding:18px">${Array.from({ length: 3 },
+    () => '<div class="sk" style="height:14px;margin-bottom:12px"></div>').join('')}</div>`;
+  $('kuLageOfNote').textContent = '';
 }
 
 // Ein Frankenbetrag als Kachelwert: Währung klein VOR der Zahl, wie auf jedem
 // Beleg im Haus ("CHF 1'234.50").
 const kuLageChf = rappen => `<span class="waehrung">CHF</span>${chf(rappen)}`;
 
+// Seit ENT-712 nur noch die Offertenlage. Die Rechnungsteile, die hier bis
+// dahin standen (offener Betrag, davon überfällig, Altersbänder, Mahnliste,
+// bezahlt im Monat), sind nach Finanzen -> Übersicht gezogen -- dieselben
+// Rechenwege, siehe finRechnungenZeichnen(). Zwei Orte mit derselben Zahl
+// würden irgendwann zwei verschiedene zeigen.
 function renderKundenLage() {
-  // Beide Listen haengen am selben Recht -- verweigert der Server eine,
-  // verweigert er beide. Ein einziger Satz statt vier Kacheln mit CHF 0.00
-  // (OP-558): "kein Zugriff" und "nichts offen" sind verschiedene Aussagen,
-  // und die zweite waere hier eine beruhigende Luege.
-  const gesperrt = belegZugriff.offerte === false || belegZugriff.rechnung === false;
+  // "Kein Zugriff" und "nichts offen" sind verschiedene Aussagen (OP-558) --
+  // ein einziger Satz statt Kacheln mit CHF 0.00.
+  const gesperrt = belegZugriff.offerte === false;
   $('kuLageSperre').hidden = !gesperrt;
   $('kuLageInhalt').hidden = gesperrt;
   if (gesperrt) {
     $('kuLageSperre').querySelector('.card-bd').innerHTML = EMPTY(...BELEG_KEIN_ZUGRIFF);
     return;
   }
-  const rAktiv = rechnungen.filter(kuLageAktiv);
-  const offen  = rAktiv.filter(b => !Number(b.bezahlt));
-  const mitTagen = offen.map(b => ({ b, t: kuLageUeberTage(b) }));
-  const ueber = mitTagen.filter(x => x.t !== null && x.t >= 1)
-                        .sort((a, b) => b.t - a.t);
-
   // "Offen" bei einer Offerte heisst: beim Kunden und noch nicht entschieden.
   // Ein Entwurf liegt nicht beim Kunden, bestätigt und abgelehnt sind die
   // beiden Endpunkte (siehe OF_STATUS).
   const ofAktiv = belege.filter(kuLageAktiv);
   const ofOffen = ofAktiv.filter(b => b.status === 'versendet' || b.status === 'angeschaut');
 
-  renderKuLageKpi(rAktiv, offen, ueber, ofOffen);
-  renderKuLageAlter(mitTagen, offen);
-  renderKuLageMahn(rAktiv, offen, ueber);
+  renderKuLageKpi(ofOffen);
   renderKuLageOfferten(ofAktiv, ofOffen);
 }
 
-function renderKuLageKpi(rAktiv, offen, ueber, ofOffen) {
+function renderKuLageKpi(ofOffen) {
   const ic = {
-    geld:  '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
-    uhr:   '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
     blatt: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
-    haken: '<path d="M22 11.1V12a10 10 0 1 1-5.9-9.1"/><polyline points="22 4 12 14.01 9 11.01"/>',
+    uhr:   '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
   };
-
-  // Bezahlt im laufenden Monat, gegen den Vormonat. Beides aus bezahlt_am --
-  // wer das Feld nicht trägt, lässt sich keinem Monat zuordnen und wird
-  // ausdrücklich genannt statt stillschweigend weggelassen.
-  const jetzt  = new Date();
-  const mJetzt = isoTag(jetzt).slice(0, 7);
-  const mVor   = isoTag(new Date(jetzt.getFullYear(), jetzt.getMonth() - 1, 1)).slice(0, 7);
-  const bezahlt = rechnungen.filter(kuLageAktiv).filter(b => Number(b.bezahlt));
-  const imMonat = m => bezahlt.filter(b => !leeresDatum(b.bezahlt_am)
-                                        && String(b.bezahlt_am).slice(0, 7) === m);
-  const sJetzt = kuLageSumme(imMonat(mJetzt));
-  const sVor   = kuLageSumme(imMonat(mVor));
-  const ohneZahltag = bezahlt.filter(b => leeresDatum(b.bezahlt_am)).length;
-
   // Offerten, die innerhalb der Frist ablaufen ODER schon abgelaufen sind.
   const ofFrist = ofOffen.filter(b => {
     const t = kuLageAbgelaufenTage(b);
     return t !== null && t >= -KU_LAGE_FRIST;
-  }).length;
-
-  const aeltester = ueber.length ? ueber[0].t : 0;
+  });
+  const ohneFrist = ofOffen.filter(b => kuLageAbgelaufenTage(b) === null).length;
   const anz = (n, ein, viele) => `${nf(n)} ${n === 1 ? ein : viele}`;
 
   const karten = [
     {
-      i: ic.geld, l: 'Offener Betrag', v: kuLageChf(kuLageSumme(offen)),
-      f: offen.length
-        ? `<span>aus ${anz(offen.length, 'Rechnung', 'Rechnungen')}</span>`
-        : '<span>keine offene Rechnung</span>',
-    },
-    {
-      // "Davon" statt "Überfällig" allein: Die Zahl ist eine Teilmenge der
-      // Kachel links, und eine Teilmenge ohne ihren Bezug liest sich wie
-      // eine eigene Gesamtgrösse.
-      i: ic.uhr, l: 'Davon überfällig', v: kuLageChf(kuLageSumme(ueber.map(x => x.b))),
-      f: ueber.length
-        ? `<span>${anz(ueber.length, 'Rechnung', 'Rechnungen')} · älteste seit ${anz(aeltester, 'Tag', 'Tagen')}</span>`
-        : '<span>keine überfällige Rechnung</span>',
-    },
-    {
       i: ic.blatt, l: 'Offene Offerten', v: kuLageChf(kuLageSumme(ofOffen)),
       f: ofOffen.length
-        ? `<span>${anz(ofOffen.length, 'Offerte', 'Offerten')}${ofFrist ? ` · ${nf(ofFrist)} ${ofFrist === 1 ? 'läuft' : 'laufen'} bald ab` : ''}</span>`
+        ? `<span>${anz(ofOffen.length, 'Offerte', 'Offerten')} beim Kunden</span>`
         : '<span>keine Offerte beim Kunden</span>',
     },
     {
-      i: ic.haken, l: 'Bezahlt im Monat', v: kuLageChf(sJetzt),
-      f: `${delta(sJetzt, sVor)} <span>Vormonat CHF ${chf(sVor)}`
-         + `${ohneZahltag ? ` · ${nf(ohneZahltag)} ohne Zahldatum` : ''}</span>`,
+      // "Davon" wie bei den Rechnungen: eine Teilmenge der Kachel links.
+      i: ic.uhr, l: 'Davon laufen bald ab', v: kuLageChf(kuLageSumme(ofFrist)),
+      f: ofFrist.length
+        ? `<span>${anz(ofFrist.length, 'Offerte', 'Offerten')} in ${nf(KU_LAGE_FRIST)} Tagen oder abgelaufen`
+          + `${ohneFrist ? ` · ${nf(ohneFrist)} ohne Gültigkeitsdatum` : ''}</span>`
+        : `<span>keine in den nächsten ${nf(KU_LAGE_FRIST)} Tagen`
+          + `${ohneFrist ? ` · ${nf(ohneFrist)} ohne Gültigkeitsdatum` : ''}</span>`,
     },
   ];
 
@@ -19948,70 +20081,6 @@ function renderKuLageKpi(rAktiv, offen, ueber, ofOffen) {
       <div class="kpi-val">${c.v}</div>
       <div class="kpi-foot">${c.f}</div>
     </div>`).join('');
-}
-
-function renderKuLageAlter(mitTagen, offen) {
-  $('kuLageAlterNote').textContent = offen.length
-    ? `${nf(offen.length)} offene ${offen.length === 1 ? 'Rechnung' : 'Rechnungen'} · ohne archivierte`
-    : 'ohne archivierte';
-
-  if (!offen.length) {
-    $('kuLageAlter').innerHTML = rechnungen.filter(kuLageAktiv).length
-      ? EMPTY('Alles bezahlt', 'Zurzeit ist keine Rechnung offen.')
-      : EMPTY('Noch keine Rechnungen', 'Sobald eine Rechnung erfasst ist, erscheint sie hier.');
-    return;
-  }
-
-  const baender = KU_LAGE_BAENDER.map(band => {
-    const treffer = mitTagen.filter(x => band.trifft(x.t));
-    return { titel: band.titel, stil: band.stil,
-             rappen: kuLageSumme(treffer.map(x => x.b)), anzahl: treffer.length };
-  });
-  const max = Math.max(1, ...baender.map(b => b.rappen));
-
-  $('kuLageAlter').innerHTML =
-    '<div class="bars">' + baender.map(b => {
-      // Anteil statt Pixel, wie beim Stundenverlauf. Ein Band ohne Betrag
-      // bekommt die Stummel-Marke ".leer" und KEINE Farbe -- null Franken
-      // in "über 60 Tage" rot einzufärben wäre ein Alarm ohne Anlass.
-      const leer = !b.rappen;
-      const h = Math.round((b.rappen / max) * 710) / 10;
-      const titel = `${b.titel}: CHF ${chf(b.rappen)} aus ${nf(b.anzahl)} `
-                  + (b.anzahl === 1 ? 'Rechnung' : 'Rechnungen');
-      return `<div class="bar" title="${esc(titel)}">
-        <div class="bar-val">${b.rappen ? chf(b.rappen) : ''}</div>
-        <div class="bar-fill${leer ? ' leer' : (b.stil ? ' ' + b.stil : '')}" style="flex-basis:${leer ? '4px' : h + '%'}"></div>
-        <div class="bar-lbl">${esc(b.titel)}</div>
-      </div>`;
-    }).join('') + '</div><div class="bars-axis"></div>';
-}
-
-function renderKuLageMahn(rAktiv, offen, ueber) {
-  // Vier verschiedene Aussagen, vier verschiedene Texte: nichts erfasst,
-  // alles bezahlt, alles noch in der Frist -- und der Normalfall.
-  if (!ueber.length) {
-    $('kuLageMahnNote').textContent = '';
-    $('kuLageMahn').innerHTML =
-      !rAktiv.length ? EMPTY('Noch keine Rechnungen', 'Sobald eine Rechnung erfasst ist, erscheint sie hier.')
-      : !offen.length ? EMPTY('Alles bezahlt', 'Zurzeit ist keine Rechnung offen.')
-      : EMPTY('Nichts überfällig', 'Alle offenen Rechnungen sind noch innerhalb ihrer Frist.');
-    return;
-  }
-
-  const zeigen = ueber.slice(0, KU_LAGE_ZEILEN);
-  $('kuLageMahnNote').textContent = ueber.length > zeigen.length
-    ? `die ältesten ${nf(zeigen.length)} von ${nf(ueber.length)}`
-    : `${nf(ueber.length)} ${ueber.length === 1 ? 'Rechnung' : 'Rechnungen'}`;
-
-  $('kuLageMahn').innerHTML = `<table><thead><tr>
-      <th>Nr.</th><th>Empfänger</th><th class="num">Überfällig</th><th class="num">Betrag</th>
-    </tr></thead><tbody>` + zeigen.map(x => `
-      <tr class="click" onclick="ofOeffnen(${Number(x.b.id)})">
-        <td class="nowrap strong">${esc(x.b.nummer)}</td>
-        <td>${esc(reEmpfaenger(x.b) || '–')}<div class="sec">${esc(x.b.titel || '')}</div></td>
-        <td class="num nowrap" style="color:var(--neg)">${nf(x.t)} ${x.t === 1 ? 'Tag' : 'Tage'}</td>
-        <td class="num nowrap strong">CHF ${chf(x.b.total_rappen)}</td>
-      </tr>`).join('') + '</tbody></table>';
 }
 
 function renderKuLageOfferten(ofAktiv, ofOffen) {
@@ -20057,6 +20126,757 @@ function renderKuLageOfferten(ofAktiv, ofOffen) {
         <td class="num nowrap strong">CHF ${chf(x.b.total_rappen)}</td>
       </tr>`;
     }).join('') + '</tbody></table>';
+}
+
+// ══════════════════════════════════════════ FINANZEN: ÜBERSICHT (ENT-712)
+//
+// Einnahmen, offene Rechnungen und Lohnkosten auf einen Blick.
+//
+// ZWEI QUELLEN, JEDE AN IHREM RECHT:
+//  - Die Rechnungsseite rechnet aus derselben Liste, die Finanzen ->
+//    Rechnungen zeigt (beleg_list.php, 'offerten_lesen'). Eine zweite
+//    Summenbildung auf dem Server waere eine zweite Wahrheit ueber dieselben
+//    Belege (so schon ENT-555 fuer die Kunden-Uebersicht, deren
+//    Rechnungsteile hierher gezogen sind).
+//  - Die Kostenseite kommt aus finanzen_kosten.php. Der Server gibt Lohn und
+//    Auslagenersatz nur mit 'lohn_lesen' bzw. 'auslagen_lesen' heraus; ohne
+//    Recht steht dort {zugriff:false} und hier "Kein Zugriff" -- nie eine 0.
+//
+// BETRAEGE IN DER GRAFIK OHNE MWST, offene Betraege MIT (Nachtrag, Punkt 9):
+// Die MWST ist kein Ertrag, geschuldet ist aber das Total.
+//
+// "NOCH OFFEN" im Tooltip ist NICHT verrechnet minus bezahlt (Nachtrag,
+// Punkt 3). Geld eines Monats begleicht oft Rechnungen aus Vormonaten; die
+// Differenz waere kein offener Betrag und koennte negativ werden. Gezeigt
+// wird, was von den Rechnungen DIESES Monats heute noch unbezahlt ist.
+//
+// KEINE DIFFERENZ UND KEINE MARGE: Die Lohnkosten sind ohne
+// Arbeitgeberbeitraege und liegen systematisch zu tief (Punkt 15).
+
+let finZr = '12';
+let finKosten = null;     // Antwort von finanzen_kosten.php
+let finKostenFehler = ''; // Grund, wenn die Kostenseite nicht kam
+let finLohnSichtbar = true;
+let finLaedt = 0;
+
+// Rechnungsbetrag ohne MWST: Zwischensumme abzueglich Rabatt. Die Rundung
+// gehoert zum Total mit MWST und bleibt darum aussen vor.
+const finNetto = b => (Number(b.zwischensumme_rappen) || 0) - (Number(b.rabatt_rappen) || 0);
+
+// Monat 'YYYY-MM' eines Datums relativ zu heute.
+function finMonat(versatz, basis) {
+  const h = basis || new Date();
+  const d = new Date(h.getFullYear(), h.getMonth() + versatz, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+const FIN_MONAT_KURZ = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+const FIN_MONAT_LANG = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August',
+                        'September', 'Oktober', 'November', 'Dezember'];
+const finMonatKurz = m => FIN_MONAT_KURZ[Number(m.slice(5, 7)) - 1];
+const finMonatLang = m => `${FIN_MONAT_LANG[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
+
+// Die Monate des gewaehlten Zeitraums, aeltester zuerst, bis zum laufenden.
+// "Jahr" ist das Kalenderjahr bis heute -- Monate, die noch nicht begonnen
+// haben, stehen nicht als 0 da, sondern gar nicht.
+function finMonate(zr) {
+  const jetzt = new Date();
+  const n = zr === '6' ? 6 : zr === 'jahr' ? jetzt.getMonth() + 1 : 12;
+  return Array.from({ length: n }, (_, i) => finMonat(i - n + 1));
+}
+function finZeitraumText(monate) {
+  if (!monate.length) { return ''; }
+  const a = monate[0], b = monate[monate.length - 1];
+  return finZr === 'jahr' ? `Jahr ${b.slice(0, 4)} bis ${finMonatKurz(b)}`
+    : `${finMonatKurz(a)} ${a.slice(0, 4)} – ${finMonatKurz(b)} ${b.slice(0, 4)}`;
+}
+
+// Franken ohne Rappen fuer Achse und Balken, mit Rappen, wo ein Betrag
+// fuer sich steht.
+const finFr0 = rappen => 'CHF ' + nf(Math.round((Number(rappen) || 0) / 100));
+const finChfHtml = rappen => `<span class="waehrung">CHF</span>${chf(rappen)}`;
+
+function finZeitraumSetzen(zr) {
+  finZr = zr;
+  document.querySelectorAll('#finZeitraum button').forEach(b => {
+    const ist = b.dataset.zr === zr;
+    b.classList.toggle('on', ist);
+    b.setAttribute('aria-pressed', ist ? 'true' : 'false');
+  });
+  finLaden();
+}
+
+// Laden. Die Kosten werden fuer den gewaehlten Zeitraum UND die letzten 13
+// Monate geholt -- die Kennzahl "Lohnkosten" braucht den letzten Monat mit
+// Lauf und seinen Vormonat, auch wenn der Zeitraum kuerzer ist.
+function finLaden() {
+  const lauf = ++finLaedt;
+  finSkelett();
+  const monate = finMonate(finZr);
+  const von = [monate[0], finMonat(-12)].sort()[0];
+  const bis = finMonat(0);
+  const rechnungenDa = darf('offerten_lesen') ? loadRechnungen() : Promise.resolve();
+  const kostenDa = api(`finanzen_kosten.php?von=${von}&bis=${bis}`).then(({ ok, status, data }) => {
+    if (status === 401) { doLogout(); return; }
+    // Eine Antwort ohne einen der beiden Bloecke ist unvollstaendig -- sie
+    // wird nicht als "kein Zugriff" gelesen, sondern als "nicht geladen".
+    if (!ok || !data || data.status !== 'ok' || !data.lohn || !data.auslagen) {
+      finKosten = null;
+      finKostenFehler = (data && data.message) || 'Die Lohnkosten konnten nicht geladen werden.';
+      return;
+    }
+    finKosten = data; finKostenFehler = '';
+  }).catch(() => { finKosten = null; finKostenFehler = 'Die Lohnkosten konnten nicht geladen werden.'; });
+  Promise.all([rechnungenDa, kostenDa]).then(() => {
+    if (lauf !== finLaedt || !$('view-finanzen').classList.contains('on')) { return; }
+    finZeichnen();
+  });
+}
+
+function finSkelett() {
+  $('finKpi').innerHTML = Array.from({ length: 4 }, () =>
+    `<div class="kpi"><div class="sk" style="height:12px;width:52%"></div>
+     <div class="sk" style="height:28px;width:46%;margin-top:14px"></div>
+     <div class="sk" style="height:11px;width:64%;margin-top:12px"></div></div>`).join('');
+  $('finChart').innerHTML = '<div class="sk" style="height:100%"></div>';
+  $('finLegende').innerHTML = '';
+  ['finKunden', 'finStatus', 'finAlter'].forEach(id => { $(id).innerHTML = '<div class="sk" style="height:120px"></div>'; });
+  ['finMahn', 'finLaeufe'].forEach(id => {
+    $(id).innerHTML = `<div style="padding:18px">${Array.from({ length: 3 },
+      () => '<div class="sk" style="height:14px;margin-bottom:12px"></div>').join('')}</div>`;
+  });
+}
+
+// Welche Aussage gilt fuer die Rechnungsseite? Vier verschiedene, vier Texte.
+function finRechnungenZugriff() {
+  if (!darf('offerten_lesen') || belegZugriff.rechnung === false) { return 'kein_zugriff'; }
+  if (belegZugriff.rechnung !== true) { return 'unbekannt'; }
+  return 'ok';
+}
+const FIN_KEIN_ZUGRIFF_RE = () => EMPTY('Kein Zugriff', 'Rechnungsbeträge brauchen das Recht „Offerten & Rechnungen“.');
+const FIN_UNBEKANNT_RE = () => EMPTY('Rechnungen nicht geladen', 'Die Rechnungsliste kam nicht an. Seite neu öffnen oder später erneut versuchen.');
+
+// Die Monatszeilen der Grafik -- eine Stelle, die alles je Monat rechnet.
+function finMonatsDaten(monate) {
+  const aktiv = rechnungen.filter(kuLageAktiv);
+  const lohn = finKosten && finKosten.lohn;
+  const ausl = finKosten && finKosten.auslagen;
+  return monate.map(m => {
+    const imMonat = aktiv.filter(b => String(b.datum || '').slice(0, 7) === m);
+    const bezahlt = aktiv.filter(b => Number(b.bezahlt) && !leeresDatum(b.bezahlt_am)
+                                   && String(b.bezahlt_am).slice(0, 7) === m);
+    const lm = lohn && lohn.zugriff && lohn.eingerichtet ? (lohn.monate || {})[m] : undefined;
+    const am = ausl && ausl.zugriff && ausl.eingerichtet ? (ausl.monate || {})[m] : undefined;
+    return {
+      m,
+      verrechnet: imMonat.reduce((s, b) => s + finNetto(b), 0),
+      bezahlt: bezahlt.reduce((s, b) => s + finNetto(b), 0),
+      offen: imMonat.filter(b => !Number(b.bezahlt)).reduce((s, b) => s + finNetto(b), 0),
+      // null heisst: fuer diesen Monat gibt es noch keinen zaehlenden Lauf.
+      brutto: lm ? Number(lm.brutto_rappen) || 0 : null,
+      auslagen: am ? Number(am.rappen) || 0 : (ausl && ausl.zugriff && ausl.eingerichtet ? 0 : null),
+      auslagenGesperrt: am ? Number(am.gesperrt) || 0 : 0,
+      offeneSchichten: ausl && ausl.zugriff && ausl.eingerichtet ? Number((ausl.offene_schichten || {})[m]) || 0 : 0,
+    };
+  });
+}
+
+function finZeichnen() {
+  const monate = finMonate(finZr);
+  const daten = finMonatsDaten(monate);
+  const zr = finZeitraumText(monate);
+  $('finChartUnter').textContent = `exkl. MWST · ${zr}`;
+  $('finKundenUnter').textContent = `verrechnet, exkl. MWST · ${zr}`;
+  $('finStatusUnter').textContent = `Anzahl Rechnungen nach Rechnungsdatum · ${zr}`;
+  finKpiZeichnen();
+  finChartZeichnen(daten);
+  finKundenZeichnen(monate);
+  finStatusZeichnen(monate);
+  finAlterZeichnen();
+  finLaeufeZeichnen();
+}
+
+// ── Kennzahlen: Stichtag heute bzw. laufender Monat, je gegen den Vormonat
+// (Nachtrag, Punkt 4). "Offener Betrag" und "überfällig" am Ende des
+// Vormonats werden aus bezahlt_am zurueckgerechnet; eine Rechnung, die als
+// bezahlt markiert ist, aber kein Zahldatum traegt, laesst sich keinem
+// Stichtag zuordnen und wird genannt statt geraten.
+function finOffenAm(aktiv, stichtag) {
+  return aktiv.filter(b => {
+    if (leeresDatum(b.datum) || String(b.datum).slice(0, 10) > stichtag) { return false; }
+    if (!Number(b.bezahlt)) { return true; }
+    return !leeresDatum(b.bezahlt_am) && String(b.bezahlt_am).slice(0, 10) > stichtag;
+  });
+}
+function finUeberAm(offen, stichtag) {
+  return offen.filter(b => !leeresDatum(b.faellig_bis) && String(b.faellig_bis).slice(0, 10) < stichtag);
+}
+// Vergleich mit Richtung: Bei offenen Betraegen ist "mehr" schlecht, bei
+// Kosten ist es weder gut noch schlecht und bleibt neutral.
+function finDelta(jetzt, vorher, richtung) {
+  if (!vorher) { return jetzt ? '<span class="delta flat">neu</span>' : '<span class="delta flat">–</span>'; }
+  const p = Math.round(((jetzt - vorher) / vorher) * 100);
+  if (p === 0) { return '<span class="delta flat">±0 %</span>'; }
+  const hoch = p > 0;
+  const klasse = richtung === 'neutral' ? 'flat' : (hoch === (richtung === 'hoch_gut') ? 'up' : 'down');
+  return `<span class="delta ${klasse}">${hoch ? '▲' : '▼'} ${Math.abs(p)} %</span>`;
+}
+
+function finKpiZeichnen() {
+  const ic = {
+    geld:  '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+    uhr:   '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
+    haken: '<path d="M22 11.1V12a10 10 0 1 1-5.9-9.1"/><polyline points="22 4 12 14.01 9 11.01"/>',
+    lohn:  '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/>',
+  };
+  const karte = c => `
+    <div class="kpi">
+      <div class="kpi-top"><svg class="i i-sm" viewBox="0 0 24 24">${c.i}</svg><span>${c.l}</span></div>
+      <div class="kpi-val">${c.v}</div>
+      <div class="kpi-foot">${c.f}</div>
+    </div>`;
+  const ohne = (i, l, text) => karte({ i, l, v: '<span class="fin-ohne">–</span>', f: `<span>${text}</span>` });
+  const anz = (n, ein, viele) => `${nf(n)} ${n === 1 ? ein : viele}`;
+  const karten = [];
+
+  const re = finRechnungenZugriff();
+  if (re !== 'ok') {
+    const text = re === 'kein_zugriff' ? 'Kein Zugriff auf Rechnungen' : 'Rechnungen nicht geladen';
+    karten.push(ohne(ic.geld, 'Offener Betrag', text), ohne(ic.uhr, 'Davon überfällig', text),
+                ohne(ic.haken, 'Bezahlt im Monat', text));
+  } else {
+    const aktiv = rechnungen.filter(kuLageAktiv);
+    const heute = isoTag();
+    const jetzt = new Date();
+    const endeVor = isoTag(new Date(jetzt.getFullYear(), jetzt.getMonth(), 0));
+    const offen = aktiv.filter(b => !Number(b.bezahlt));
+    const ueber = finUeberAm(offen, heute);
+    const offenVor = finOffenAm(aktiv, endeVor);
+    const ueberVor = finUeberAm(offenVor, endeVor);
+    const ohneZahltag = aktiv.filter(b => Number(b.bezahlt) && leeresDatum(b.bezahlt_am)).length;
+    const hinweis = ohneZahltag ? ` · ${nf(ohneZahltag)} bezahlt ohne Zahldatum` : '';
+    const mJ = finMonat(0), mV = finMonat(-1);
+    const bezIm = m => aktiv.filter(b => Number(b.bezahlt) && !leeresDatum(b.bezahlt_am)
+                                      && String(b.bezahlt_am).slice(0, 7) === m);
+    const sJ = kuLageSumme(bezIm(mJ)), sV = kuLageSumme(bezIm(mV));
+    karten.push(karte({
+      i: ic.geld, l: 'Offener Betrag', v: finChfHtml(kuLageSumme(offen)),
+      f: `${finDelta(kuLageSumme(offen), kuLageSumme(offenVor), 'tief_gut')} <span>inkl. MWST · ${offen.length
+        ? 'aus ' + anz(offen.length, 'Rechnung', 'Rechnungen') : 'keine offene Rechnung'}${hinweis}</span>`,
+    }));
+    karten.push(karte({
+      i: ic.uhr, l: 'Davon überfällig', v: finChfHtml(kuLageSumme(ueber)),
+      f: `${finDelta(kuLageSumme(ueber), kuLageSumme(ueberVor), 'tief_gut')} <span>${ueber.length
+        ? anz(ueber.length, 'Rechnung', 'Rechnungen') + ' · älteste seit ' + anz(Math.max(...ueber.map(kuLageUeberTage)), 'Tag', 'Tagen')
+        : 'keine überfällige Rechnung'} · Ende Vormonat CHF ${chf(kuLageSumme(ueberVor))}</span>`,
+    }));
+    karten.push(karte({
+      i: ic.haken, l: 'Bezahlt im Monat', v: finChfHtml(sJ),
+      f: `${finDelta(sJ, sV, 'hoch_gut')} <span>inkl. MWST · Vormonat CHF ${chf(sV)}${hinweis}</span>`,
+    }));
+  }
+
+  // Lohnkosten: der letzte Monat mit zaehlendem Lauf, gegen den Monat davor.
+  const lohn = finKosten && finKosten.lohn;
+  if (!finKosten) {
+    karten.push(ohne(ic.lohn, 'Lohnkosten', esc(finKostenFehler || 'nicht geladen')));
+  } else if (!lohn.zugriff) {
+    karten.push(ohne(ic.lohn, 'Lohnkosten', 'Kein Zugriff auf den Lohn'));
+  } else if (!lohn.eingerichtet) {
+    karten.push(ohne(ic.lohn, 'Lohnkosten', 'Lohnbereich noch nicht eingerichtet'));
+  } else {
+    const monate = Object.keys(lohn.monate || {}).filter(m => m <= finMonat(0)).sort();
+    const letzter = monate[monate.length - 1];
+    if (!letzter) {
+      karten.push(ohne(ic.lohn, 'Lohnkosten', 'noch kein freigegebener Lohnlauf'));
+    } else {
+      const d = new Date(letzter + '-01T00:00:00');
+      const vor = finMonat(-1, d);
+      const b = Number(lohn.monate[letzter].brutto_rappen) || 0;
+      const bVor = lohn.monate[vor] ? Number(lohn.monate[vor].brutto_rappen) || 0 : null;
+      const ausl = finKosten.auslagen;
+      const aM = ausl && ausl.zugriff && ausl.eingerichtet ? (ausl.monate || {})[letzter] : null;
+      const auslText = !ausl || !ausl.zugriff ? ''
+        : ` · Auslagenersatz ${aM ? 'CHF ' + chf(aM.rappen) : 'CHF 0.00'}`;
+      karten.push(karte({
+        i: ic.lohn, l: `Lohnkosten ${finMonatKurz(letzter)} ${letzter.slice(0, 4)}`, v: finChfHtml(b),
+        f: `${bVor === null ? '<span class="delta flat">–</span>' : finDelta(b, bVor, 'neutral')} <span>Bruttolohn, ohne Arbeitgeberbeiträge${auslText}${bVor === null ? ' · Vormonat: noch kein Lohnlauf' : ''}</span>`,
+      }));
+    }
+  }
+  $('finKpi').innerHTML = karten.join('');
+}
+
+// ── Die Hauptgrafik (Nachtrag, Punkte 1–3): zwei weiche Kurven mit Flaeche,
+// der laufende Monat gestrichelt und hinterlegt, die Lohnkosten als feine
+// Linie mit Punkten. Selbst gezeichnet als SVG, wie der Stundenverlauf.
+//
+// MONOTON interpoliert (Fritsch-Carlson): Eine gewoehnliche Kurve schwingt
+// zwischen zwei Monaten ueber oder unter die Punkte und zeigt damit Werte,
+// die es nicht gibt -- etwa eine Delle unter null. Die y-Achse beginnt immer
+// bei 0.
+function finMonotonPfad(pkte) {
+  const n = pkte.length;
+  if (!n) { return ''; }
+  if (n === 1) { return `M${pkte[0][0]},${pkte[0][1]}`; }
+  const dx = [], dy = [], m = [];
+  for (let i = 0; i < n - 1; i++) {
+    dx.push(pkte[i + 1][0] - pkte[i][0]);
+    dy.push(pkte[i + 1][1] - pkte[i][1]);
+    m.push(dy[i] / dx[i]);
+  }
+  const t = [m[0]];
+  for (let i = 1; i < n - 1; i++) { t.push(m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2); }
+  t.push(m[n - 2]);
+  for (let i = 0; i < n - 1; i++) {
+    if (m[i] === 0) { t[i] = 0; t[i + 1] = 0; continue; }
+    const a = t[i] / m[i], b = t[i + 1] / m[i], h = a * a + b * b;
+    if (h > 9) { const k = 3 / Math.sqrt(h); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; }
+  }
+  let d = `M${pkte[0][0]},${pkte[0][1]}`;
+  for (let i = 0; i < n - 1; i++) {
+    const h = dx[i] / 3;
+    d += ` C${pkte[i][0] + h},${pkte[i][1] + t[i] * h} ${pkte[i + 1][0] - h},${pkte[i + 1][1] - t[i + 1] * h} ${pkte[i + 1][0]},${pkte[i + 1][1]}`;
+  }
+  return d;
+}
+
+// Eine runde Obergrenze fuer die Achse, durch vier teilbar in runde
+// Schritte (die Achse hat vier Abschnitte). Zu grobe Stufen liessen die
+// Kurven in der unteren Haelfte kleben.
+function finRundeGrenze(wert) {
+  if (wert <= 0) { return 100000; }
+  const p = Math.pow(10, Math.floor(Math.log10(wert)));
+  for (const f of [1, 1.2, 1.6, 2, 2.4, 3, 4, 6, 8, 10]) { if (f * p >= wert) { return f * p; } }
+  return 10 * p;
+}
+
+let finChartDaten = [];
+
+function finChartZeichnen(daten) {
+  finChartDaten = daten;
+  const box = $('finChart');
+  const re = finRechnungenZugriff();
+  const lohn = finKosten && finKosten.lohn;
+  const lohnDa = !!(lohn && lohn.zugriff && lohn.eingerichtet);
+  if (re !== 'ok' && !lohnDa) {
+    box.innerHTML = re === 'kein_zugriff' ? FIN_KEIN_ZUGRIFF_RE() : FIN_UNBEKANNT_RE();
+    $('finLegende').innerHTML = '';
+    return;
+  }
+  // Ohne eine einzige Rechnung und ohne Lohnlinie waere die Grafik eine
+  // Nulllinie -- sie saehe aus wie zwoelf Monate ohne Umsatz. "Noch nichts
+  // erfasst" ist eine andere Aussage.
+  if (re === 'ok' && !lohnDa && !rechnungen.filter(kuLageAktiv).length) {
+    box.innerHTML = EMPTY('Noch keine Rechnungen', 'Sobald eine Rechnung erfasst ist, entsteht hier die Einnahmenkurve.');
+    $('finLegende').innerHTML = '';
+    return;
+  }
+  const breite = Math.max(320, box.clientWidth || 800);
+  const hoehe = box.clientHeight || 280;
+  const L = 78, R = 18, O = 26, U = 34;
+  const n = daten.length;
+  const schritt = (breite - L - R) / n;
+  const x = i => L + schritt * (i + 0.5);
+  const werte = [];
+  if (re === 'ok') { daten.forEach(d => werte.push(d.verrechnet, d.bezahlt)); }
+  if (lohnDa && finLohnSichtbar) {
+    daten.forEach(d => { if (d.brutto !== null) { werte.push(d.brutto + (d.auslagen || 0)); } });
+  }
+  const max = finRundeGrenze(Math.max(0, ...werte) * 1.08);
+  const y = v => O + (hoehe - O - U) * (1 - v / max);
+  const laufend = n - 1;
+
+  let svg = `<svg viewBox="0 0 ${breite} ${hoehe}" role="img" aria-label="Einnahmen je Monat, verrechnet und bezahlt">
+    <defs>
+      <linearGradient id="finVerlaufV" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="var(--accent)" stop-opacity=".30"/>
+        <stop offset="1" stop-color="var(--accent)" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="finVerlaufB" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="var(--fin-bezahlt)" stop-opacity=".14"/>
+        <stop offset="1" stop-color="var(--fin-bezahlt)" stop-opacity="0"/>
+      </linearGradient>
+    </defs>`;
+  // Der laufende Monat: hinterlegt und beschriftet.
+  svg += `<rect class="fin-laufend" x="${x(laufend) - schritt / 2}" y="${O - 8}" width="${schritt}" height="${hoehe - O - U + 8}" rx="8"/>`;
+  svg += `<text class="fin-laufend-lbl" x="${x(laufend)}" y="${O - 12}" text-anchor="middle">laufend</text>`;
+  // Achse: 5 Linien von 0 bis zur Obergrenze.
+  for (let k = 0; k <= 4; k++) {
+    const v = max * k / 4;
+    svg += `<line class="fin-gitter${k === 0 ? ' null' : ''}" x1="${L}" x2="${breite - R}" y1="${y(v)}" y2="${y(v)}"/>`;
+    svg += `<text class="fin-achse" x="${L - 10}" y="${y(v) + 4}" text-anchor="end">${esc(finFr0(v))}</text>`;
+  }
+  daten.forEach((d, i) => {
+    svg += `<text class="fin-achse fin-monat${i === laufend ? ' jetzt' : ''}" x="${x(i)}" y="${hoehe - U + 18}" text-anchor="middle">${finMonatKurz(d.m)}</text>`;
+    if (i === 0 || d.m.endsWith('-01')) {
+      svg += `<text class="fin-achse fin-jahr" x="${x(i)}" y="${hoehe - U + 31}" text-anchor="middle">${d.m.slice(0, 4)}</text>`;
+    }
+  });
+
+  // Zwei Kurven. Der Abschnitt zum laufenden Monat ist gestrichelt: Sein
+  // Wert ist unfertig, und eine durchgezogene Linie liesse den halben Monat
+  // wie einen Einbruch aussehen.
+  const kurve = (feld, klasse, verlauf) => {
+    const p = daten.map((d, i) => [x(i), y(d[feld])]);
+    const fest = p.slice(0, Math.max(1, n - 1));
+    const pfad = finMonotonPfad(fest);
+    let s = '';
+    // Die Flaeche reicht bis zum laufenden Monat (gerade zum letzten Punkt),
+    // sonst bricht sie vor ihm mit einer harten Kante ab.
+    if (p.length > 1) {
+      const bisEnde = n > 1 ? `${pfad} L${p[n - 1][0]},${p[n - 1][1]}` : pfad;
+      s += `<path d="${bisEnde} L${p[n - 1][0]},${y(0)} L${p[0][0]},${y(0)} Z" fill="url(#${verlauf})"/>`;
+    }
+    s += `<path class="${klasse}" d="${pfad}"/>`;
+    if (n > 1) {
+      s += `<path class="${klasse} gestrichelt" d="M${p[n - 2][0]},${p[n - 2][1]} L${p[n - 1][0]},${p[n - 1][1]}"/>`;
+    }
+    s += p.map(([px, py], i) => `<circle class="${klasse}-pkt${i === laufend ? ' laufend' : ''}" data-i="${i}" cx="${px}" cy="${py}" r="3.5"/>`).join('');
+    return s;
+  };
+  if (re === 'ok') {
+    svg += kurve('verrechnet', 'fin-l-verrechnet', 'finVerlaufV');
+    svg += kurve('bezahlt', 'fin-l-bezahlt', 'finVerlaufB');
+  }
+  // Die Lohnlinie: gerade Abschnitte zwischen Monaten MIT Lauf. Ein Monat
+  // ohne Lauf hat keinen Punkt -- und die Linie springt nicht auf 0.
+  if (lohnDa && finLohnSichtbar) {
+    let seg = [];
+    const segmente = [];
+    daten.forEach((d, i) => {
+      if (d.brutto === null) { if (seg.length) { segmente.push(seg); } seg = []; return; }
+      seg.push([x(i), y(d.brutto + (d.auslagen || 0))]);
+    });
+    if (seg.length) { segmente.push(seg); }
+    segmente.forEach(sg => {
+      if (sg.length > 1) { svg += `<path class="fin-l-lohn" d="M${sg.map(p => p.join(',')).join(' L')}"/>`; }
+    });
+    daten.forEach((d, i) => {
+      if (d.brutto !== null) {
+        svg += `<circle class="fin-l-lohn-pkt" cx="${x(i)}" cy="${y(d.brutto + (d.auslagen || 0))}" r="3.5"/>`;
+      }
+    });
+  }
+  // Hilfslinie und Trefferflaechen je Monat (auch per Tastatur erreichbar).
+  svg += `<line class="fin-hilfslinie" id="finHilfslinie" x1="0" x2="0" y1="${O - 8}" y2="${hoehe - U}" style="display:none"/>`;
+  daten.forEach((d, i) => {
+    svg += `<rect class="fin-treffer" x="${x(i) - schritt / 2}" y="${O - 8}" width="${schritt}" height="${hoehe - O - U + 8}"
+      tabindex="0" aria-label="${esc(finMonatLang(d.m))}" onmouseenter="finTipZeigen(${i})" onfocus="finTipZeigen(${i})"
+      onmouseleave="finTipWeg()" onblur="finTipWeg()"/>`;
+  });
+  svg += '</svg><div class="fin-tip" id="finTip" hidden></div>';
+  box.innerHTML = svg;
+  box.dataset.schritt = String(schritt);
+  box.dataset.links = String(L);
+
+  // Legende. Die Lohnlinie laesst sich ausblenden; ohne Recht sagt die
+  // Legende "kein Zugriff" statt die Linie stillschweigend wegzulassen.
+  const leg = [];
+  if (re === 'ok') {
+    leg.push('<span class="fin-leg"><i class="fin-sw verrechnet"></i>verrechnet</span>');
+    leg.push('<span class="fin-leg"><i class="fin-sw bezahlt"></i>bezahlt</span>');
+  } else {
+    leg.push(`<span class="fin-leg fin-leg-ohne">Rechnungen: ${re === 'kein_zugriff' ? 'kein Zugriff' : 'nicht geladen'}</span>`);
+  }
+  if (!finKosten) {
+    leg.push('<span class="fin-leg fin-leg-ohne">Lohnkosten: nicht geladen</span>');
+  } else if (!lohn.zugriff) {
+    leg.push('<span class="fin-leg fin-leg-ohne">Lohnkosten: kein Zugriff</span>');
+  } else if (!lohn.eingerichtet) {
+    leg.push('<span class="fin-leg fin-leg-ohne">Lohnkosten: Lohnbereich nicht eingerichtet</span>');
+  } else {
+    leg.push(`<button type="button" class="fin-leg fin-leg-knopf${finLohnSichtbar ? '' : ' aus'}" aria-pressed="${finLohnSichtbar}"
+      onclick="finLohnUmschalten()" title="Lohnlinie ein- oder ausblenden"><i class="fin-sw lohn"></i>Lohnkosten
+      <span class="fin-leg-zusatz">ohne Arbeitgeberbeiträge</span></button>`);
+  }
+  $('finLegende').innerHTML = leg.join('');
+}
+
+function finLohnUmschalten() {
+  finLohnSichtbar = !finLohnSichtbar;
+  finChartZeichnen(finChartDaten);
+}
+
+function finTipZeigen(i) {
+  const d = finChartDaten[i];
+  const tip = $('finTip');
+  const box = $('finChart');
+  if (!d || !tip || !box) { return; }
+  const schritt = Number(box.dataset.schritt), links = Number(box.dataset.links);
+  const svg = box.querySelector('svg');
+  const faktor = svg ? svg.getBoundingClientRect().width / svg.viewBox.baseVal.width : 1;
+  const xPx = (links + schritt * (i + 0.5)) * faktor;
+  const linie = $('finHilfslinie');
+  if (linie) {
+    linie.setAttribute('x1', links + schritt * (i + 0.5));
+    linie.setAttribute('x2', links + schritt * (i + 0.5));
+    linie.style.display = '';
+  }
+  box.querySelectorAll('circle[data-i]').forEach(c => c.classList.toggle('hervor', Number(c.dataset.i) === i));
+  const re = finRechnungenZugriff() === 'ok';
+  const lohn = finKosten && finKosten.lohn;
+  const ausl = finKosten && finKosten.auslagen;
+  const zeile = (sw, text, wert, klasse) =>
+    `<div class="fin-tip-z${klasse ? ' ' + klasse : ''}">${sw ? `<i class="fin-sw ${sw}"></i>` : '<i></i>'}<span>${text}</span><b>${wert}</b></div>`;
+  let html = `<div class="fin-tip-kopf">${esc(finMonatLang(d.m))}${i === finChartDaten.length - 1 ? ' <span class="chip">laufend</span>' : ''}</div>`;
+  if (re) {
+    html += zeile('verrechnet', 'verrechnet', 'CHF ' + chf(d.verrechnet));
+    html += zeile('bezahlt', 'bezahlt', 'CHF ' + chf(d.bezahlt));
+    html += zeile('', 'davon heute noch offen', 'CHF ' + chf(d.offen), 'fein');
+  }
+  if (lohn && lohn.zugriff && lohn.eingerichtet) {
+    html += '<div class="fin-tip-trenner"></div>';
+    if (d.brutto === null) {
+      html += zeile('lohn', 'Lohnkosten', 'noch kein Lohnlauf', 'ohne');
+    } else {
+      html += zeile('lohn', 'Lohnkosten', 'CHF ' + chf(d.brutto + (d.auslagen || 0)));
+      html += zeile('', 'Bruttolohn', 'CHF ' + chf(d.brutto), 'fein');
+    }
+    if (ausl && ausl.zugriff && ausl.eingerichtet) {
+      html += zeile('', 'Auslagenersatz', 'CHF ' + chf(d.auslagen || 0), 'fein');
+    } else if (ausl && !ausl.zugriff) {
+      html += zeile('', 'Auslagenersatz', 'kein Zugriff', 'fein ohne');
+    }
+    if (d.auslagenGesperrt) { html += `<div class="fin-tip-hinweis">${nf(d.auslagenGesperrt)} Auslagen ohne Betrag (gesperrt)</div>`; }
+    if (d.offeneSchichten) {
+      html += `<div class="fin-tip-hinweis">${nf(d.offeneSchichten)} ${d.offeneSchichten === 1 ? 'Schicht' : 'Schichten'} noch nicht abgeglichen</div>`;
+    }
+    html += '<div class="fin-tip-hinweis">ohne Arbeitgeberbeiträge</div>';
+  }
+  tip.innerHTML = html;
+  tip.hidden = false;
+  const bw = box.clientWidth, tw = tip.offsetWidth;
+  let links2 = xPx + 16;
+  if (links2 + tw > bw) { links2 = xPx - tw - 16; }
+  tip.style.left = Math.max(0, links2) + 'px';
+  tip.style.top = '8px';
+}
+function finTipWeg() {
+  const tip = $('finTip'); if (tip) { tip.hidden = true; }
+  const linie = $('finHilfslinie'); if (linie) { linie.style.display = 'none'; }
+  document.querySelectorAll('#finChart circle.hervor').forEach(c => c.classList.remove('hervor'));
+}
+
+// ── Einnahmen nach Kunden (Nachtrag, Punkt 5): die fuenf mit dem hoechsten
+// verrechneten Betrag im Zeitraum, der Rest zusammengefasst.
+function finKundenZeichnen(monate) {
+  const el = $('finKunden');
+  const re = finRechnungenZugriff();
+  if (re !== 'ok') { el.innerHTML = re === 'kein_zugriff' ? FIN_KEIN_ZUGRIFF_RE() : FIN_UNBEKANNT_RE(); return; }
+  const von = monate[0], bis = monate[monate.length - 1];
+  const imZr = rechnungen.filter(kuLageAktiv).filter(b => {
+    const m = String(b.datum || '').slice(0, 7);
+    return m >= von && m <= bis;
+  });
+  if (!imZr.length) {
+    el.innerHTML = rechnungen.filter(kuLageAktiv).length
+      ? EMPTY('Keine Rechnung im Zeitraum', 'In diesem Zeitraum wurde nichts verrechnet.')
+      : EMPTY('Noch keine Rechnungen', 'Sobald eine Rechnung erfasst ist, erscheint sie hier.');
+    return;
+  }
+  const je = new Map();
+  imZr.forEach(b => {
+    const name = reEmpfaenger(b) || 'Ohne Empfänger';
+    je.set(name, (je.get(name) || 0) + finNetto(b));
+  });
+  const liste = [...je.entries()].sort((a, b) => b[1] - a[1]);
+  const total = liste.reduce((s, [, v]) => s + v, 0);
+  const oben = liste.slice(0, 5);
+  const rest = liste.slice(5);
+  const zeilen = oben.map(([name, v]) => ({ name, v }));
+  if (rest.length) { zeilen.push({ name: `Weitere Kunden (${nf(rest.length)})`, v: rest.reduce((s, [, v]) => s + v, 0), weitere: true }); }
+  const max = Math.max(1, ...zeilen.map(z => z.v));
+  el.innerHTML = zeilen.map(z => `
+    <div class="fin-zeile${z.weitere ? ' weitere' : ''}">
+      <span class="fin-name" title="${esc(z.name)}">${esc(z.name)}</span>
+      <span class="fin-balken"><i style="width:${Math.max(0, Math.round(z.v / max * 1000) / 10)}%"></i></span>
+      <b class="num">CHF ${chf(z.v)}</b>
+      <span class="num fin-anteil">${total ? nf(z.v / total * 100, 1) : '0.0'} %</span>
+    </div>`).join('');
+}
+
+// ── Rechnungsstatus (Nachtrag, Punkt 5): Anzahl im Zeitraum. "Teilweise
+// bezahlt" gibt es nicht -- die Plattform kennt keine Teilzahlungen. Eine
+// offene Rechnung ohne Faelligkeitsdatum ist weder "nicht faellig" noch
+// "ueberfaellig" und bekommt ihre eigene Zeile.
+function finStatusZeichnen(monate) {
+  const el = $('finStatus');
+  const re = finRechnungenZugriff();
+  if (re !== 'ok') { el.innerHTML = re === 'kein_zugriff' ? FIN_KEIN_ZUGRIFF_RE() : FIN_UNBEKANNT_RE(); return; }
+  const von = monate[0], bis = monate[monate.length - 1];
+  const heute = isoTag();
+  const imZr = rechnungen.filter(kuLageAktiv).filter(b => {
+    const m = String(b.datum || '').slice(0, 7);
+    return m >= von && m <= bis;
+  });
+  if (!imZr.length) {
+    el.innerHTML = rechnungen.filter(kuLageAktiv).length
+      ? EMPTY('Keine Rechnung im Zeitraum', 'In diesem Zeitraum wurde nichts verrechnet.')
+      : EMPTY('Noch keine Rechnungen', 'Sobald eine Rechnung erfasst ist, erscheint sie hier.');
+    return;
+  }
+  const gruppen = [
+    { titel: 'Bezahlt',                  stil: 'pos',  trifft: b => Number(b.bezahlt) },
+    { titel: 'Offen, noch nicht fällig', stil: '',     trifft: b => !Number(b.bezahlt) && !leeresDatum(b.faellig_bis) && String(b.faellig_bis).slice(0, 10) >= heute },
+    { titel: 'Überfällig',               stil: 'neg',  trifft: b => !Number(b.bezahlt) && !leeresDatum(b.faellig_bis) && String(b.faellig_bis).slice(0, 10) < heute },
+    { titel: 'Offen, ohne Fälligkeit',   stil: 'unbekannt', trifft: b => !Number(b.bezahlt) && leeresDatum(b.faellig_bis), nurWennDa: true },
+  ];
+  const n = imZr.length;
+  el.innerHTML = gruppen.map(g => ({ ...g, anzahl: imZr.filter(g.trifft).length }))
+    .filter(g => !g.nurWennDa || g.anzahl)
+    .map(g => `
+    <div class="fin-zeile status">
+      <span class="fin-name">${esc(g.titel)}</span>
+      <b class="num">${nf(g.anzahl)}</b>
+      <span class="num fin-anteil">${nf(g.anzahl / n * 100)} %</span>
+      <span class="fin-balken ${g.stil}"><i style="width:${Math.round(g.anzahl / n * 1000) / 10}%"></i></span>
+    </div>`).join('');
+}
+
+// ── Offene Rechnungen nach Alter und die Mahnliste. Aus der Kunden-
+// Uebersicht (ENT-555) hierher gezogen, mit denselben Baendern und Grenzen
+// (KU_LAGE_BAENDER, kuLageUeberTage) -- Stichtag heute, Betraege inkl. MWST.
+function finAlterZeichnen() {
+  const re = finRechnungenZugriff();
+  if (re !== 'ok') {
+    $('finAlterUnter').textContent = '';
+    $('finAlter').innerHTML = re === 'kein_zugriff' ? FIN_KEIN_ZUGRIFF_RE() : FIN_UNBEKANNT_RE();
+    $('finMahn').innerHTML = '';
+    return;
+  }
+  const rAktiv = rechnungen.filter(kuLageAktiv);
+  const offen = rAktiv.filter(b => !Number(b.bezahlt));
+  const mitTagen = offen.map(b => ({ b, t: kuLageUeberTage(b) }));
+  const ueber = mitTagen.filter(x => x.t !== null && x.t >= 1).sort((a, b) => b.t - a.t);
+  $('finAlterUnter').textContent = offen.length
+    ? `inkl. MWST · Stand heute · ${nf(offen.length)} offene ${offen.length === 1 ? 'Rechnung' : 'Rechnungen'}`
+    : 'inkl. MWST · Stand heute';
+
+  if (!offen.length) {
+    $('finAlter').innerHTML = rAktiv.length
+      ? EMPTY('Alles bezahlt', 'Zurzeit ist keine Rechnung offen.')
+      : EMPTY('Noch keine Rechnungen', 'Sobald eine Rechnung erfasst ist, erscheint sie hier.');
+    $('finMahn').innerHTML = '';
+    return;
+  }
+  const baender = KU_LAGE_BAENDER.map(band => {
+    const treffer = mitTagen.filter(x => band.trifft(x.t));
+    return { titel: band.titel, stil: band.stil, rappen: kuLageSumme(treffer.map(x => x.b)), anzahl: treffer.length };
+  });
+  const max = Math.max(1, ...baender.map(b => b.rappen));
+  $('finAlter').innerHTML =
+    '<div class="bars">' + baender.map(b => {
+      // Ein Band ohne Betrag bekommt die Stummel-Marke und KEINE Farbe --
+      // null Franken in "über 60 Tage" rot einzufärben wäre ein Alarm ohne Anlass.
+      const leer = !b.rappen;
+      const h = Math.round((b.rappen / max) * 710) / 10;
+      const titel = `${b.titel}: CHF ${chf(b.rappen)} aus ${nf(b.anzahl)} ` + (b.anzahl === 1 ? 'Rechnung' : 'Rechnungen');
+      return `<div class="bar" title="${esc(titel)}">
+        <div class="bar-val">${b.rappen ? chf(b.rappen) : ''}</div>
+        <div class="bar-fill${leer ? ' leer' : (b.stil ? ' ' + b.stil : '')}" style="flex-basis:${leer ? '4px' : h + '%'}"></div>
+        <div class="bar-lbl">${esc(b.titel)}</div>
+      </div>`;
+    }).join('') + '</div><div class="bars-axis"></div>';
+
+  if (!ueber.length) {
+    $('finMahn').innerHTML = EMPTY('Nichts überfällig', 'Alle offenen Rechnungen sind noch innerhalb ihrer Frist.');
+    return;
+  }
+  const zeigen = ueber.slice(0, KU_LAGE_ZEILEN);
+  const bezug = ueber.length > zeigen.length ? `die ältesten ${nf(zeigen.length)} von ${nf(ueber.length)}` : '';
+  $('finMahn').innerHTML = `<table><thead><tr>
+      <th>Am längsten überfällig${bezug ? ` <span class="sec">· ${bezug}</span>` : ''}</th><th>Empfänger</th><th class="num">Überfällig</th><th class="num">Betrag</th>
+    </tr></thead><tbody>` + zeigen.map(x => `
+      <tr class="click" onclick="ofOeffnen(${Number(x.b.id)})">
+        <td class="nowrap strong">${esc(x.b.nummer)}</td>
+        <td>${esc(reEmpfaenger(x.b) || '–')}<div class="sec">${esc(x.b.titel || '')}</div></td>
+        <td class="num nowrap" style="color:var(--neg)">${nf(x.t)} ${x.t === 1 ? 'Tag' : 'Tage'}</td>
+        <td class="num nowrap strong">CHF ${chf(x.b.total_rappen)}</td>
+      </tr>`).join('') + '</tbody></table>';
+}
+
+// ── Letzte Lohnlaeufe (ENT-712, Punkt 7): Periode, Status, Bruttosumme,
+// mit Klick in den Lauf.
+function finLaeufeZeichnen() {
+  const el = $('finLaeufe');
+  const lohn = finKosten && finKosten.lohn;
+  if (!finKosten) { el.innerHTML = EMPTY('Lohnläufe nicht geladen', esc(finKostenFehler || 'Bitte später erneut versuchen.')); return; }
+  if (!lohn.zugriff) { el.innerHTML = EMPTY('Kein Zugriff', 'Lohnläufe brauchen das Recht „Lohn“.'); return; }
+  if (!lohn.eingerichtet) { el.innerHTML = EMPTY('Lohnbereich nicht eingerichtet', 'Die Tabellen für Lohnläufe fehlen noch. Einrichtung ausführen.'); return; }
+  const laeufe = lohn.letzte || [];
+  if (!laeufe.length) { el.innerHTML = EMPTY('Noch kein Lohnlauf', 'Lohnläufe entstehen unter Finanzen → Lohn → Lohnläufe.'); return; }
+  el.innerHTML = `<table><thead><tr><th>Periode</th><th>Status</th><th class="num">Personen</th><th class="num">Bruttolohn</th></tr></thead><tbody>`
+    + laeufe.map(l => {
+      const [t, k] = LL_STATUS[l.status] || [l.status, 'chip'];
+      const m = String(l.periode_von || '').slice(0, 7);
+      return `<tr class="click" onclick="finLaufOeffnen(${Number(l.id)})">
+        <td class="nowrap strong">${m ? esc(finMonatLang(m)) : '–'}<div class="sec">${dmy(l.periode_von)} – ${dmy(l.periode_bis)}</div></td>
+        <td><span class="chip ${k}">${esc(t)}</span></td>
+        <td class="num">${nf(l.personen)}</td>
+        <td class="num nowrap strong">CHF ${chf(l.brutto_rappen)}</td>
+      </tr>`;
+    }).join('') + '</tbody></table>';
+}
+function finLaufOeffnen(id) {
+  go('lohnlaeufe');
+  if (typeof lohnLaufOeffnen === 'function') { lohnLaufOeffnen(id); }
+}
+
+// ══════════════════════════════════════════ FINANZEN: AUSLAGENERSATZ (ENT-712)
+// Geldsicht auf den Auslagenersatz: Monatssummen je Person fuer ein Jahr.
+// Dieselben Zeilen wie die Kontrolle unter Auswertung, nur anders gebuendelt.
+function finAuslagenLaden() {
+  const sel = $('faJahr');
+  const jahrJetzt = new Date().getFullYear();
+  if (!sel.options.length) {
+    for (let j = jahrJetzt; j >= jahrJetzt - 4; j--) { sel.add(new Option(String(j), String(j))); }
+  }
+  const jahr = Number(sel.value) || jahrJetzt;
+  const bisMonat = jahr === jahrJetzt ? finMonat(0) : `${jahr}-12`;
+  $('faTabelle').innerHTML = `<div style="padding:18px">${Array.from({ length: 4 },
+    () => '<div class="sk" style="height:14px;margin-bottom:12px"></div>').join('')}</div>`;
+  $('faHinweis').innerHTML = '';
+  api(`finanzen_auslagen.php?von=${jahr}-01&bis=${bisMonat}`).then(({ ok, status, data }) => {
+    if (status === 401) { doLogout(); return; }
+    if (status === 403) { $('faTabelle').innerHTML = EMPTY('Kein Zugriff', 'Der Auslagenersatz braucht das Recht „Auslagenersatz“.'); return; }
+    if (!ok || !data || data.status !== 'ok') { $('faTabelle').innerHTML = EMPTY('Nicht geladen', esc((data && data.message) || 'Bitte später erneut versuchen.')); return; }
+    if (!data.eingerichtet) { $('faTabelle').innerHTML = EMPTY('Nicht eingerichtet', 'Die Tabelle für den Auslagenersatz fehlt noch. Einrichtung ausführen.'); return; }
+    finAuslagenZeichnen(data, jahr, bisMonat);
+  });
+}
+
+function finAuslagenZeichnen(data, jahr, bisMonat) {
+  const monate = Array.from({ length: Number(bisMonat.slice(5, 7)) }, (_, i) => `${jahr}-${String(i + 1).padStart(2, '0')}`);
+  const personen = data.personen || [];
+  if (!personen.length) {
+    $('faTabelle').innerHTML = EMPTY('Kein Auslagenersatz im Jahr ' + jahr,
+      'Auslagenersatz entsteht im Abgleich einer Schicht. Für dieses Jahr gibt es keinen.');
+    return;
+  }
+  const betrag = z => z ? (Number(z.fahrzeit_rappen) || 0) + (Number(z.fahrkosten_rappen) || 0) : 0;
+  let gesperrtTotal = 0;
+  const summeMonat = Object.fromEntries(monate.map(m => [m, null]));
+  const zeilen = personen.map(p => {
+    let total = 0;
+    const zellen = monate.map(m => {
+      const z = (p.monate || {})[m];
+      if (!z) { return '<td class="num fin-leer">–</td>'; }
+      const r = betrag(z);
+      total += r; summeMonat[m] = (summeMonat[m] || 0) + r;
+      gesperrtTotal += Number(z.gesperrt) || 0;
+      const titel = `Fahrzeitersatz CHF ${chf(z.fahrzeit_rappen)} · Fahrkostenersatz CHF ${chf(z.fahrkosten_rappen)} · ${nf(z.schichten)} ${z.schichten === 1 ? 'Schicht' : 'Schichten'}`
+        + (z.gesperrt ? ` · ${nf(z.gesperrt)} ohne Betrag (gesperrt)` : '');
+      return `<td class="num nowrap" title="${esc(titel)}">${chf(r)}${z.gesperrt ? `<span class="fin-gesperrt">+${nf(z.gesperrt)} gesperrt</span>` : ''}</td>`;
+    }).join('');
+    return `<tr><td class="nowrap strong">${esc(p.name)}</td>${zellen}<td class="num nowrap strong">${chf(total)}</td></tr>`;
+  }).join('');
+  const gesamt = Object.values(summeMonat).reduce((s, v) => s + (v || 0), 0);
+  $('faTabelle').innerHTML = `<table class="fin-auslagen"><thead><tr><th>Person</th>${monate.map(m => `<th class="num">${finMonatKurz(m)}</th>`).join('')}<th class="num">Total CHF</th></tr></thead>
+    <tbody>${zeilen}</tbody>
+    <tfoot><tr><td class="strong">Summe</td>${monate.map(m => summeMonat[m] === null ? '<td class="num fin-leer">–</td>' : `<td class="num nowrap strong">${chf(summeMonat[m])}</td>`).join('')}<td class="num nowrap strong">${chf(gesamt)}</td></tr></tfoot></table>`;
+  $('faHinweis').innerHTML = `<p class="fin-fuss">Beträge in CHF, nach Monat der Schicht, nur abgeglichene Schichten. „–“ heisst: in diesem Monat kein Auslagenersatz.`
+    + (gesperrtTotal ? ` ${nf(gesperrtTotal)} ${gesperrtTotal === 1 ? 'Zeile hat' : 'Zeilen haben'} keinen Betrag (gesperrt) und ${gesperrtTotal === 1 ? 'ist' : 'sind'} nicht mitgezählt — Gründe unter „Kontrolle je Schicht“.` : '')
+    + '</p>';
 }
 
 // ── Kunden-Detailseite (ENT-040) ──────────────────────────────────────────
@@ -21431,17 +22251,42 @@ function kontrolleNavKlick() {
 // Lohnstammdaten JE PERSON stehen nicht hier, sondern in der Personalakte --
 // zwei Formulare fuer dieselben Daten waeren zwei Orte, an denen ein Feld
 // fehlen kann.
-function lohnNavKlick() {
-  // Der Einstieg sind die LAEUFE, nicht der Katalog: Sie sind der Vorgang,
-  // Lohnarten und Saetze die Einrichtung dahinter.
-  const ziel = 'lohnlaeufe';
+// Klick auf "Finanzen" selbst (ENT-712): Einstieg ist die Uebersicht.
+// Gleiches Auf-/Zuklappmuster wie die uebrigen Rubriken.
+function finanzenNavKlick() {
+  const ziel = 'finanzen';
   if (navGruppeKompakt(ziel)) { return; }
-  const offen = $('navg-lohn').classList.contains('offen');
+  const offen = $('navg-finanzen').classList.contains('offen');
   if (offen && $('view-' + ziel).classList.contains('on')) {
-    $('navg-lohn').classList.toggle('offen');
+    $('navg-finanzen').classList.toggle('offen');
     return;
   }
   go(ziel);
+}
+
+
+function finLohnKlick() {
+  const erste = FIN_LOHN_KACHELN.find(k => darf(k.recht));
+  if (erste) { go(erste.ansicht); }
+}
+
+// Die Kachelleiste ueber jeder Lohnseite. EINE Leiste, in jede der vier
+// Seiten gezeichnet statt viermal im Markup: Vier Kopien liefen beim
+// naechsten neuen Reiter auseinander. Bauart und Klassen von Support
+// (.rdkr-reiter/.rdkr-tab, ENT-687), mitbenutzt statt nachgebaut.
+// Eine Kachel ohne Recht fehlt -- ein Reiter, der auf ein 403 fuehrt, ist
+// schlimmer als keiner.
+function finLohnReiterZeichnen(aktiv) {
+  const leiste = document.querySelector('#view-' + aktiv + ' .fin-lohn-reiter');
+  if (!leiste) { return; }
+  leiste.innerHTML = FIN_LOHN_KACHELN.filter(k => darf(k.recht)).map(k => {
+    const ist = k.ansicht === aktiv;
+    return `<button type="button" class="rdkr-tab${ist ? ' aktiv' : ''}" data-reiter="${k.ansicht}"
+        aria-current="${ist ? 'true' : 'false'}" onclick="go('${k.ansicht}')">
+        <span class="rdkr-tab-ic"><svg class="i" viewBox="0 0 24 24">${k.ic}</svg></span>
+        <span class="rdkr-tab-lbl">${esc(k.titel)}</span>
+      </button>`;
+  }).join('');
 }
 
 // Darf die angemeldete Person im Lohnbereich schreiben? EINE Stelle, an
