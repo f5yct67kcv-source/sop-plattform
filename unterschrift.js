@@ -57,6 +57,8 @@ window.Unterschrift = (function () {
   // Pixel. Dreht der Kunde das Geraet mitten im Unterschreiben, wird die
   // Leinwand neu vermessen; aus Pixeln waere die Unterschrift dann weg.
   let striche = [];
+  let kraeftig = false;           // siehe bildErzeugen() -- nur Belege
+  let fertig = null;              // Rueckruf nach "Bestaetigen", siehe zeichnen()
   let laufend = null;
   let bild = null;               // bestaetigte Unterschrift als data:-URL
   let ziel = null;
@@ -321,6 +323,7 @@ window.Unterschrift = (function () {
     bild = bildErzeugen();
     schliessen();
     karteZeichnen();
+    if (fertig) { fertig(bild); }
   }
 
   // Nur die Unterschrift, zugeschnitten und in fester Groesse -- unabhaengig
@@ -335,7 +338,13 @@ window.Unterschrift = (function () {
       if (p[0] < x0) { x0 = p[0]; } if (p[0] > x1) { x1 = p[0]; }
       if (p[1] < y0) { y0 = p[1]; } if (p[1] > y1) { y1 = p[1]; }
     }));
-    const strich = STRICH * m;
+    // KRAEFTIG (ENT-704, nur Belege): Die Strichdicke richtet sich nach der
+    // Groesse der Unterschrift, nicht nach dem Blatt. Wer auf einem grossen
+    // Bildschirm klein unterschreibt, bekaeme sonst ein Bild mit Haarstrich,
+    // das auf 18 mm verkleinert grau und kaum sichtbar wird. Der Rapport der
+    // App bleibt beim bisherigen Strich.
+    const hoehe = Math.max(1, py(y1) - py(y0));
+    const strich = kraeftig ? Math.max(STRICH * m, hoehe / 24) : STRICH * m;
     const luft = RAND + strich;
     const lx = Math.max(0, px(x0) - luft), ly = Math.max(0, py(y0) - luft);
     const rx = Math.min(px(1), px(x1) + luft), ry = Math.min(py(1), py(y1) + luft);
@@ -393,9 +402,23 @@ window.Unterschrift = (function () {
       huelleBauen();
       ziel = typeof o.ziel === 'string' ? document.getElementById(o.ziel) : o.ziel;
       kontext = o.kontext || (() => ({}));
+      kraeftig = !!o.kraeftig;
+      fertig = null;
       striche = []; laufend = null; bild = null;
       schliessen();
       karteZeichnen();
+    },
+    // Das Blatt direkt oeffnen, ohne Knopf und Vorschau im Formular
+    // (ENT-704: die eigene Unterschrift im Betreiber-Bereich). o.fertig(bild)
+    // bekommt nach "Bestaetigen" die zugeschnittene PNG-Zeichnung.
+    zeichnen(o) {
+      huelleBauen();
+      ziel = null;
+      kontext = o.kontext || (() => ({}));
+      kraeftig = !!o.kraeftig;
+      fertig = o.fertig || null;
+      striche = []; laufend = null; bild = null;
+      oeffnen();
     },
     daten() { return bild; },
     gesetzt() { return !!bild; },

@@ -10,7 +10,7 @@ require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
 require_once __DIR__ . '/../belege.php';
 
-require_betreiber_voll();
+$ich = require_betreiber_voll();
 
 $id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) {
@@ -84,4 +84,11 @@ json_response(['status' => 'ok', 'beleg' => $beleg, 'kunde' => $kunde, 'person' 
     'fassung' => $fassung,
     'faden_da' => $fadenDa,
     'nachrichten' => $nachrichten,
-    'verlauf' => $verlauf]);
+    'verlauf' => $verlauf,
+    // Kann ICH freigeben? (ENT-704) null = nicht eingerichtet, sonst ob
+    // meine Unterschrift hinterlegt ist. Der Versanddialog erklaert es vor
+    // dem Klick; gesperrt wird im Versand selbst.
+    'unterschrift_eigen' => (static function () use ($pdo, $ich): ?bool {
+        $b = be_unterschrift_von($pdo, (int)$ich['id']);
+        return $b === null ? null : $b !== '';
+    })()]);

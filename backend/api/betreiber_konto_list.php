@@ -61,6 +61,12 @@ $liste = array_map(static function (array $k) use ($ich, $pdo, $geteilt, $hatArc
     // Ohne die Spalte gilt "nicht archiviert" -- das ist der Zustand, den
     // eine Anlage vor dem Nachtrag tatsaechlich hat, keine Annahme.
     $k['archiviert'] = $hatArchiv && ($k['archiviert_am'] ?? null) !== null;
+    // Die Unterschrift (ENT-704): null = nicht eingerichtet, sonst ob
+    // gezeichnet. Das Bild selbst nur am eigenen Konto -- es ist die
+    // Unterschrift einer Person, keine Angabe fuer die ganze Liste.
+    $bild = be_unterschrift_von($pdo, $k['id']);
+    $k['unterschrift_da'] = $bild === null ? null : $bild !== '';
+    $k['unterschrift'] = ($k['ich'] && $bild !== null && $bild !== '') ? $bild : null;
     return $k;
 }, $zeilen);
 
