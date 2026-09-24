@@ -43,7 +43,7 @@ function neuerungen_katalog(): array
             'art'   => 'verbesserung',
             'fuer'  => ['cockpit'],
             'titel' => 'Cockpit startet schneller',
-            'text'  => 'Beim Start lädt das Cockpit die Unterschriften der Rapporte nicht mehr mit. Eine Unterschrift kommt erst, wenn du einen Rapport öffnest, druckst oder teilst. Je mehr Rapporte erfasst sind, desto mehr Zeit spart das.',
+            'text'  => 'Seiten und Daten kommen jetzt komprimiert, und was sich nicht geändert hat, lädt dein Browser nicht noch einmal. Die Unterschriften der Rapporte kommen erst, wenn du einen Rapport öffnest, druckst oder teilst.',
         ],
         [
             'nr'    => 16,
