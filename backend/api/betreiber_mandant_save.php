@@ -22,6 +22,14 @@ $daten = json_decode(file_get_contents('php://input') ?: '', true) ?: [];
 $id    = (int)($daten['id'] ?? 0);
 $name  = trim((string)($daten['name'] ?? ''));
 
+// Ein Vorratsplatz bekommt seinen Namen vom Server (ENT-705): "Vorrat 1",
+// "Vorrat 2" ... Er wird beim Zuteilen durch den Kundennamen ersetzt. Nur
+// beim Anlegen -- ein bestehender Platz behaelt, was er hat.
+if ($name === '' && $id === 0 && !empty($daten['vorrat'])) {
+    $name = mandant_vorrat_naechster_name(
+        $pdo->query('SELECT name FROM mandant')->fetchAll(PDO::FETCH_COLUMN) ?: []);
+}
+
 if ($name === '') {
     json_response(['status' => 'error', 'message' => 'Der Name wird gebraucht.'], 400);
 }
@@ -58,48 +66,12 @@ $werte = [
 ];
 
 // ── Vertragsangaben (ENT-617) ────────────────────────────────────────
-//
-// LEER BLEIBT NULL, nicht 0. Ein Vertrag ohne eingetragene Laufzeit hat
-// keine Laufzeit von null Monaten -- er ist unbekannt, und die Oberflaeche
-// muss die beiden auseinanderhalten koennen (Hausregel).
-//
-// Die Spalten kommen ueber be_spalten_anlegen() nach; zwischen Deploy und
-// Einrichtungslauf gibt es sie noch nicht. Was fehlt, wird nicht
-// geschrieben, statt den ganzen Speicherweg an einem SQL-Fehler scheitern
-// zu lassen.
-$datumOderNull = static function ($roh): ?string {
-    $t = trim((string)$roh);
-    if ($t === '' || $t === '0000-00-00') { return null; }
-    $d = DateTimeImmutable::createFromFormat('!Y-m-d', substr($t, 0, 10));
-    return $d && $d->format('Y-m-d') === substr($t, 0, 10) ? $d->format('Y-m-d') : null;
-};
-$monateOderNull = static function ($roh): ?int {
-    if ($roh === null || trim((string)$roh) === '') { return null; }
-    // 600 Monate sind fuenfzig Jahre. Was darueber liegt, ist ein Vertipper.
-    return max(0, min(600, (int)$roh));
-};
-$vertrag = [
-    'vertrag_beginn'          => $datumOderNull($daten['vertrag_beginn'] ?? null),
-    'mindestlaufzeit_monate'  => $monateOderNull($daten['mindestlaufzeit_monate'] ?? null),
-    'kuendigungsfrist_monate' => $monateOderNull($daten['kuendigungsfrist_monate'] ?? null),
-    'verlaengerung_monate'    => $monateOderNull($daten['verlaengerung_monate'] ?? null),
-    'gekuendigt_per'          => $datumOderNull($daten['gekuendigt_per'] ?? null),
-];
-foreach ($vertrag as $feld => $wert) {
-    // Nur was mitgeschickt wurde: Ein Formular, das die Vertragsfelder gar
-    // nicht kennt, soll sie nicht stillschweigend leeren.
-    if (array_key_exists($feld, $daten) && hat_spalte($pdo, 'mandant', $feld)) {
-        $werte[$feld] = $wert;
-    }
-}
-
-// Ein Enddatum vor dem Beginn ist kein Vertrag, sondern ein Vertipper -- und
-// er wuerde die Lage "gekuendigt, beendet" ergeben, die niemand erklaeren
-// kann.
-if (!empty($werte['gekuendigt_per']) && !empty($werte['vertrag_beginn'])
-    && $werte['gekuendigt_per'] < $werte['vertrag_beginn']) {
-    json_response(['status' => 'error',
-        'message' => 'Das Kündigungsdatum liegt vor dem Vertragsbeginn.'], 400);
+// Die Regeln stehen in be_mandant_vertrag_werte() -- gemeinsam mit dem
+// Zuteilen aus dem Vorrat (ENT-705).
+$werte += be_mandant_vertrag_werte($pdo, $daten);
+$vertragFehler = be_mandant_vertrag_fehler($werte);
+if ($vertragFehler !== null) {
+    json_response(['status' => 'error', 'message' => $vertragFehler], 400);
 }
 
 // Ein Passwort kommt hier nie an, und wenn doch, wird es nicht gespeichert:

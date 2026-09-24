@@ -134,10 +134,15 @@ check('KRITISCH: GEGENPROBE — die Einrichtung nimmt den Vorrat mit',
 check('KRITISCH: die Vorratspruefung liest keine Verwaltungstabelle',
   !/\bFROM\s+`?(mitarbeiter|sessions|kunden_sessions)\b/i.test(modul + pruefen));
 check('der Vorratsabschnitt in betreiber.php ist auffindbar', modul.length > 500);
+// Seit ENT-705 pruefen Meldung und Zuteilen EINE Anlage mit derselben
+// Funktion (mandant_vorrat_platz_pruefen); verbunden wird im Endpunkt, und
+// der Bauplan, den er uebergibt, ist der ganze (kern_schema_fehlend).
+const zuteilen = nurCode(lies(API + 'betreiber_vorrat_zuteilen.php'));
+const entfernen = nurCode(lies(API + 'betreiber_vorrat_entfernen.php'));
+const GANZER_BAUPLAN = /\$bauplan\s*=\s*static fn\(array \$\w+\): array => kern_schema_fehlend\(mandant_db\(\$\w+\)\)/;
 check('KRITISCH: sie prueft den GANZEN Bauplan jeder verbundenen Anlage, nicht die fuenf Kerntabellen',
-  /\$anlage\s*=\s*mandant_db\s*\(\s*\$m\s*\)/.test(pruefen)
-  && /kern_schema_fehlend\s*\(\s*\$anlage\s*\)/.test(pruefen)
-  && !/mandant_stand\s*\(/.test(pruefen + modul));
+  [pruefen, zuteilen].every(q => GANZER_BAUPLAN.test(q) && /mandant_vorrat_platz_pruefen\(\$\w+, \$bauplan\)/.test(q))
+  && !/mandant_stand\s*\(/.test(pruefen + zuteilen + modul));
 // Die Schleife verbindet IM ENDPUNKT -- sonst saehe die Wache ueber die
 // mandant_db()-Aufrufer (test_betreiber.mjs) ihn nicht. Die reinen Teile in
 // betreiber.php verbinden nicht.
@@ -195,6 +200,65 @@ check('ohne gueltigen Schluessel verlangt der Endpunkt die volle Betreiber-Wache
 // Einladewegs haette einer Vorratsanlage "gesperrt" gesagt.
 check('KRITISCH: das Einladen sagt einer Vorratsanlage etwas anderes als "gesperrt"',
   /MANDANT_STATUS_VORRAT\s*=>/.test(einladen));
+
+// ── 10. Der Reiter Vorrat (ENT-705) ────────────────────────────────────
+//
+// Die Sperren stehen im Server. Geprueft wird, dass sie dort stehen, und
+// zwar VOR dem Schreiben -- eine Pruefung nach dem UPDATE sperrte nichts.
+{
+  const update = zuteilen.search(/UPDATE mandant SET/);
+  check('Zuteilen: der Endpunkt ist auffindbar und schreibt', update > 0);
+  check('KRITISCH: Zuteilen verlangt die volle Betreiber-Wache und nur POST',
+    /require_betreiber_voll\s*\(\s*\)/.test(zuteilen) && /!== 'POST'[\s\S]{0,120}405/.test(zuteilen));
+  check('KRITISCH: nur ein Platz im Vorrat laesst sich zuteilen -- vorher geprueft UND in der Anweisung selbst',
+    /!== MANDANT_STATUS_VORRAT\)\s*\{\s*json_response\([^;]*409\)/.test(zuteilen)
+    && /WHERE id = \? AND status = \?/.test(zuteilen)
+    && /\$id, MANDANT_STATUS_VORRAT\]/.test(zuteilen)
+    && /rowCount\(\)\s*===\s*0\)\s*\{\s*json_response\([^;]*409\)/.test(zuteilen));
+  const sperre = zuteilen.search(/if \(!\$befund\['bereit'\]\)\s*\{\s*json_response\([^;]*409\)/);
+  check('KRITISCH: ein nicht uebergabefaehiger Platz wird VOR dem Schreiben abgewiesen, mit Grund',
+    sperre > 0 && sperre < update && /\$befund\['text'\]/.test(zuteilen));
+  for (const [feld, muster] of [['Name', /\$name === ''\)\s*\{\s*json_response\([^;]*400\)/],
+                                ['Subdomain', /\$subdomain === ''\)\s*\{\s*json_response\([^;]*400\)/],
+                                ['Kanton', /\$kanton === null\)\s*\{\s*json_response\([^;]*400\)/]]) {
+    const i = zuteilen.search(muster);
+    check(`KRITISCH: ohne ${feld} wird nicht zugeteilt (vor dem Schreiben)`, i > 0 && i < update);
+  }
+  check('KRITISCH: die Subdomain wird auf Gueltigkeit und Eindeutigkeit geprueft, vor dem Schreiben',
+    zuteilen.search(/!mandant_subdomain_gueltig\(\$subdomain\)/) > 0
+    && zuteilen.search(/subdomain = \? AND id <> \?/) > 0
+    && zuteilen.search(/subdomain = \? AND id <> \?/) < update);
+  check('die Zuteilung steht als eigener Eintrag im Logbuch',
+    /be_log\([^;]*'aus dem Vorrat zugeteilt'/.test(zuteilen));
+
+  check('KRITISCH: Entfernen verlangt die volle Betreiber-Wache und nur POST',
+    /require_betreiber_voll\s*\(\s*\)/.test(entfernen) && /!== 'POST'[\s\S]{0,120}405/.test(entfernen));
+  const loeschen = [...entfernen.matchAll(/DELETE FROM (\w+)([^'"]*)/g)];
+  check('KRITISCH: Entfernen loescht genau eine Mandantenzeile im Vorrat -- nie einen Kunden, nichts sonst',
+    loeschen.length === 1 && loeschen[0][1] === 'mandant'
+    && /WHERE id = \? AND status = \?/.test(loeschen[0][2])
+    && /\$id, MANDANT_STATUS_VORRAT\]/.test(entfernen)
+    && /rowCount\(\)\s*===\s*0\)\s*\{\s*json_response\([^;]*409\)/.test(entfernen));
+  check('das Entfernen steht im Logbuch', /be_log\([^;]*'aus dem Vorrat entfernt'/.test(entfernen));
+
+  check('KRITISCH: den Namen eines neuen Platzes vergibt der Server, und nur beim Anlegen als Vorrat',
+    /\$name === '' && \$id === 0 && !empty\(\$daten\['vorrat'\]\)[\s\S]{0,160}mandant_vorrat_naechster_name\(/.test(save));
+}
+// Die Oberflaeche: Vorratsplaetze stehen nicht unter den Kunden, der Stand
+// kommt aus der Pruefung, und ein nicht bereiter Platz hat keinen
+// anklickbaren Zuteilen-Knopf.
+{
+  const seite = lies('betreiber.html');
+  check('KRITISCH: die Mandantentabelle laesst Vorratsplaetze aus',
+    /alle\.filter\(m => !m\.ist_demo && m\.status !== 'vorrat'\)/.test(seite));
+  check('der Reiter Vorrat liest den Stand aus der taeglichen Pruefung',
+    /ruf\('betreiber_vorrat_pruefen\.php'\)/.test(seite));
+  check('KRITISCH: ein nicht bereiter Platz bekommt einen ausgegrauten Knopf mit Grund, keinen anklickbaren',
+    /p\.bereit\s*\?\s*'<button class="klein" data-vorrat-zuteilen=[\s\S]{0,80}:\s*'<button class="klein" disabled title="/.test(seite));
+  check('KRITISCH: fuenf Lagen, fuenf Texte',
+    ['bereit', 'nicht_eingetragen', 'secret_fehlt', 'nicht_erreichbar', 'schema_unvollstaendig']
+      .every(k => new RegExp('\\n\\s*' + k + ':\\s*\\[').test(seite.slice(seite.indexOf('const VORRAT_TEXT'), seite.indexOf('let vorratPlaetze')))));
+}
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

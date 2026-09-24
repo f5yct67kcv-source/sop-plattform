@@ -806,6 +806,11 @@ svg.i-sm { width: 15px; height: 15px; }
   border-bottom: 2px solid transparent; white-space: nowrap; }
 .tab:hover { color: var(--ink); }
 .tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+/* Punkt am Reiter (ENT-705): dieselbe Fassung wie am Zahnrad
+   (.nav-item .update-punkt), nur im Textfluss statt ueber einem Icon. */
+.tab-punkt { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--warn); margin-left: 6px; vertical-align: 2px; }
+.tab-punkt[hidden] { display: none; }
 .bar-tools { display: flex; align-items: flex-start; gap: 9px; flex-wrap: wrap; padding: 10px 0; margin-bottom: 16px; }
 .bar-tools .sp { flex: 1; }
 .search { position: relative; flex: 1; min-width: 200px; max-width: 340px; }
@@ -1148,7 +1153,8 @@ tr.auf-leib > td { background: var(--surface-2); padding-top: 4px; }
 .kd-usig { grid-column: 1 / -1; }
 .kd-usig-blatt { border-bottom: 1px solid var(--ink); padding: 6px 0 4px; max-width: 360px; min-height: 60px;
   display: flex; align-items: flex-end; }
-.kd-usig-blatt img { max-height: 72px; max-width: 100%; }
+/* Auf der Linie wie auf dem Dokument (ENT-706). */
+.kd-usig-blatt img { max-height: 72px; max-width: 100%; margin-bottom: -14px; position: relative; }
 /* Dunkle Tinte auf dunkler Flaeche waere unsichtbar. */
 html[data-thema="dunkel"] .kd-usig-blatt img { filter: invert(1); }
 .kd-raster { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
@@ -1910,6 +1916,9 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
       <button type="button" class="tab on" id="mtab-mandanten" onclick="mandGo('mandanten')">Mandanten</button>
       <button type="button" class="tab" id="mtab-vertraege" onclick="mandGo('vertraege')">Verträge</button>
       <button type="button" class="tab" id="mtab-demo" onclick="mandGo('demo')">Demo</button>
+      <!-- Der Punkt faerbt sich, sobald weniger Plaetze bereit sind als die
+           Schwelle verlangt (ENT-705) -- dieselbe Fassung wie am Zahnrad. -->
+      <button type="button" class="tab" id="mtab-vorrat" onclick="mandGo('vorrat')">Vorrat<span class="tab-punkt" id="vorratPunkt" hidden></span></button>
     </div>
 
     <!-- ── Reiter: Mandanten ── -->
@@ -1949,6 +1958,26 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <button class="klein" id="knopf-vertrag-neu">Vertrag erstellen</button>
       </div>
       <div id="vertrag-inhalt"></div>
+    </div>
+    </div>
+
+    <!-- ── Reiter: Vorrat (ENT-705) ─────────────────────────────
+         Vorbereitete, leere Anlagen, aus denen ein neuer Kunde am selben
+         Tag seinen Zugang bekommt (ENT-686). Eigener Reiter wie die
+         Demo-Plaetze: Ein Vorratsplatz ist noch kein Kunde und zaehlt in
+         der Mandantentabelle nicht mit. Der Stand je Platz kommt aus
+         derselben Pruefung wie die taegliche Meldung. -->
+    <div class="m-tab" id="mv-vorrat">
+    <div class="karte">
+      <div class="karte-kopf">
+        <div>
+          <h2>Vorrat</h2>
+          <div class="sub">Vorbereitete Anlagen, bereit für den nächsten Kunden</div>
+        </div>
+        <button class="klein" id="knopf-vorrat-neu" onclick="vDlgOeffnen(null)">Vorratsplatz anlegen</button>
+      </div>
+      <div class="zahlen" id="vorrat-zahlen"></div>
+      <div id="vorrat-inhalt"></div>
     </div>
     </div>
 
@@ -2980,6 +3009,83 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   </div>
 </div>
 
+<!-- Vorratsplatz anlegen oder aendern (ENT-705). Nur die Datenbank: Der
+     Name kommt vom Server ("Vorrat 1", "Vorrat 2" ...) und wird beim
+     Zuteilen durch den Kundennamen ersetzt. Kein Passwortfeld -- es kommt
+     aus MANDANT_SECRETS, hier steht nur der Name des Eintrags. -->
+<div class="of-dlg-huelle" id="dlgVorrat">
+  <div class="of-dlg">
+    <div class="of-dlg-hd">
+      <h2 id="vDlgTitel">Vorratsplatz anlegen</h2>
+      <p id="vDlgUnter"></p>
+    </div>
+    <div class="of-dlg-bd">
+      <div class="meldung fehler versteckt" id="vErr"></div>
+      <div class="raster2">
+        <div class="f"><label for="v_host">DB-Host *</label>
+          <input class="inp" id="v_host" autocomplete="off"></div>
+        <div class="f"><label for="v_db">DB-Name *</label>
+          <input class="inp" id="v_db" autocomplete="off"></div>
+        <div class="f"><label for="v_user">DB-User *</label>
+          <input class="inp" id="v_user" autocomplete="off"></div>
+        <div class="f"><label for="v_secret">Secret-Name *</label>
+          <input class="inp" id="v_secret" autocomplete="off" placeholder="z. B. DB_PASS_VORRAT_1"></div>
+      </div>
+      <div class="ki-hint web on" style="margin-bottom:0">
+        <span><b>Ausserhalb dieser Seite nötig:</b> die Datenbank beim Hoster anlegen,
+        ihr Passwort unter dem Secret-Namen in MANDANT_SECRETS eintragen und
+        deployen, danach einmal die Einrichtung laufen lassen. Erst dann steht der
+        Platz hier als bereit.</span>
+      </div>
+    </div>
+    <div class="of-dlg-ft">
+      <button type="button" class="btn btn-plain" onclick="dlgZu('dlgVorrat')">Abbrechen</button>
+      <button type="button" class="btn btn-primary" id="vSaveBtn" onclick="vSpeichern()">Anlegen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Einen Vorratsplatz einem Kunden zuteilen (ENT-705). Ein Schritt: Der
+     Server traegt die Kundendaten ein und aktiviert in einer Anweisung. Ob
+     die Anlage uebergabefaehig ist, prueft er selbst -- der Knopf dazu ist
+     sonst gar nicht erst anklickbar. -->
+<div class="of-dlg-huelle" id="dlgZuteilen">
+  <div class="of-dlg">
+    <div class="of-dlg-hd">
+      <h2>Einem Kunden zuteilen</h2>
+      <p id="tDlgUnter"></p>
+    </div>
+    <div class="of-dlg-bd">
+      <div class="meldung fehler versteckt" id="tErr"></div>
+      <div class="raster2">
+        <div class="f"><label for="t_name">Name des Kunden *</label>
+          <input class="inp" id="t_name" autocomplete="off"></div>
+        <div class="f"><label for="t_kanton">Kanton *</label>
+          <input class="inp" id="t_kanton" maxlength="2" autocomplete="off" placeholder="z. B. BE"></div>
+        <div class="f"><label for="t_subdomain">Subdomain *</label>
+          <input class="inp" id="t_subdomain" autocomplete="off" placeholder="z. B. musterag"></div>
+        <div class="f"><label for="t_beginn">Vertragsbeginn</label>
+          <input class="inp" id="t_beginn" type="date"></div>
+        <div class="f"><label for="t_mindest">Mindestlaufzeit (Monate)</label>
+          <input class="inp" id="t_mindest" type="number" min="0" max="600"></div>
+        <div class="f"><label for="t_frist">Kündigungsfrist (Monate)</label>
+          <input class="inp" id="t_frist" type="number" min="0" max="600"></div>
+        <div class="f"><label for="t_verlaengerung">Verlängerung (Monate)</label>
+          <input class="inp" id="t_verlaengerung" type="number" min="0" max="600"></div>
+      </div>
+      <div class="ki-hint web on" style="margin-bottom:0">
+        <span><b>Danach gehört die Anlage dem Kunden.</b> Sie steht unter Mandanten,
+        und dort wird der erste Zugang per Einladung übergeben. Zurück in den Vorrat
+        kommt sie nicht.</span>
+      </div>
+    </div>
+    <div class="of-dlg-ft">
+      <button type="button" class="btn btn-plain" onclick="dlgZu('dlgZuteilen')">Abbrechen</button>
+      <button type="button" class="btn btn-primary" id="tSaveBtn" onclick="tZuteilen()">Zuteilen</button>
+    </div>
+  </div>
+</div>
+
 <!-- Eigenes Passwort wechseln (ENT-615). -->
 <div class="of-dlg-huelle" id="dlgPasswort">
   <div class="of-dlg">
@@ -3195,6 +3301,7 @@ const MANDANTEN_REITER = {
   mandanten: 'Betriebe, die diese Plattform nutzen',
   vertraege: 'Abmachungen mit den Betrieben und ihre Fristen',
   demo:      'Plätze der Demo-Anlage und ihre Zugänge',
+  vorrat:    'Vorbereitete Anlagen für neue Kunden',
 };
 let mandTab = 'mandanten';
 
@@ -3260,6 +3367,11 @@ function unterreiterZeichnen() {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = orig.textContent;
+    /* Ein sichtbarer Punkt (Reiter "Vorrat", ENT-705) kommt mit -- sonst
+       verschwaende er genau auf den breiten Bildschirmen, auf denen der
+       Betreiber-Bereich benutzt wird. */
+    const punkt = orig.querySelector('.tab-punkt:not([hidden])');
+    if (punkt) { b.appendChild(punkt.cloneNode(true)); }
     b.className = orig.classList.contains('on') ? 'on' : '';
     b.onclick = () => orig.click();
     leiste.appendChild(b);
@@ -3599,8 +3711,12 @@ async function ladeMandanten() {
      `ist_demo` kommt vom Server (DEMO_PLAETZE); fehlt das Feld, weil der
      Server noch aelter ist, bleibt die Liste vollstaendig statt still
      halb leer. */
-  const liste = alle.filter(m => !m.ist_demo);
-  const demoZeilen = alle.length - liste.length;
+  /* Vorratsplaetze ebenso (ENT-705): Sie gehoeren noch keinem Kunden und
+     stehen im Reiter Vorrat. Gezaehlt je fuer sich -- "Demo" und "Vorrat"
+     sind zwei Aussagen, und der Hinweis unter der Tabelle nennt beide. */
+  const liste = alle.filter(m => !m.ist_demo && m.status !== 'vorrat');
+  const demoZeilen = alle.filter(m => m.ist_demo).length;
+  const vorratZeilen = alle.filter(m => !m.ist_demo && m.status === 'vorrat').length;
   /* Der Einrichtungsstand kommt aus einem eigenen Endpunkt, weil er
      Verbindungen zu fremden Datenbanken aufbaut -- das darf die Liste
      nicht bei jedem Aufruf mitschleppen. Schlaegt er fehl, bleibt die
@@ -3676,13 +3792,11 @@ async function ladeMandanten() {
     /* "Nur Demo-Plaetze" ist etwas anderes als "gar nichts eingetragen"
        (Hausregel). Wer den zweiten Text liest, obwohl zehn Instanzen
        laufen, sucht den Fehler an der falschen Stelle. */
-    inhalt.innerHTML = demoZeilen
-      ? leerBlock('◇', 'Nur Demo-Plätze eingetragen',
-          'Der Mandantenstamm enthält bisher ' + demoZeilen + ' Demo-'
-          + (demoZeilen === 1 ? 'Platz' : 'Plätze') + ' und sonst nichts. '
-          + 'Sie stehen im Reiter Demo.')
+    inhalt.innerHTML = (demoZeilen || vorratZeilen)
+      ? leerBlock('◇', 'Noch kein Kunde eingetragen', ausserhalbText(demoZeilen, vorratZeilen))
       : leerBlock('◇', 'Noch kein Mandant eingetragen',
           'Sobald ein Betrieb angelegt ist, erscheint er hier.');
+    ladeVorrat();
     return;
   }
 
@@ -3706,11 +3820,9 @@ async function ladeMandanten() {
     /* Keine Zahl ohne Bezug, sobald ein Filter greift (Hausregel): Eine
        Liste mit einem Eintrag saehe sonst aus, als laufe auf dieser Anlage
        genau eine Instanz. */
-    + (demoZeilen
-        ? '<div class="hinweis" style="margin-top:10px">' + text(demoZeilen
-            + ' Demo-' + (demoZeilen === 1 ? 'Platz steht' : 'Plätze stehen')
-            + ' im Reiter Demo und ' + (demoZeilen === 1 ? 'ist' : 'sind')
-            + ' hier nicht mitgezählt.') + '</div>'
+    + ((demoZeilen || vorratZeilen)
+        ? '<div class="hinweis" style="margin-top:10px">'
+            + text(ausserhalbText(demoZeilen, vorratZeilen)) + '</div>'
         : '');
 
   aufVerdrahten(inhalt);
@@ -3728,6 +3840,20 @@ async function ladeMandanten() {
      Neuzeichnen der Tabelle nicht auf "wird abgefragt" zurückfallen. */
   if (freigabeLagen) { freigabeZeichnen(); }
   ladeFreigabeLagen();
+  /* Der Vorrat braucht die Datenbankangaben aus derselben Liste. Still
+     nachgeladen: Er faerbt den Punkt am Reiter, auch wenn niemand ihn
+     oeffnet (ENT-705). */
+  ladeVorrat();
+}
+
+/* Was ausser den Kunden noch im Mandantenstamm steht -- je Art ein Satz,
+   weil Demo und Vorrat zwei Aussagen sind (Hausregel: keine Zahl ohne
+   Bezug). */
+function ausserhalbText(demo, vorrat) {
+  const teile = [];
+  if (demo) { teile.push(demo + ' Demo-' + (demo === 1 ? 'Platz steht' : 'Plätze stehen') + ' im Reiter Demo'); }
+  if (vorrat) { teile.push(vorrat + ' Vorrats' + (vorrat === 1 ? 'platz steht' : 'plätze stehen') + ' im Reiter Vorrat'); }
+  return teile.join(', ') + '. Sie sind hier nicht mitgezählt.';
 }
 
 /* Unbekannt darf nie wie "keine" aussehen: Kommt der Stand nicht, sagt die
@@ -4828,13 +4954,33 @@ function kdUnterschriftKarte(k) {
   let inhalt;
   if (k.unterschrift_da === null || k.unterschrift_da === undefined) {
     inhalt = `<div class="sec">Auf diesem Server noch nicht eingerichtet. Ein Einrichtungslauf legt die Stelle an.</div>`;
+  } else if (k.ich && kdUsigVorschau) {
+    /* Ein hochgeladenes Bild (ENT-706), aufbereitet, noch nicht gespeichert. */
+    inhalt = `<div class="kd-usig-blatt"><img id="kdUsigVorschauBild" src="${esc(kdUsigVorschau)}" alt="Vorschau deiner Unterschrift"></div>
+      <div class="sec" style="margin:18px 0 12px">So steht sie auf der Offerte. Hintergrund entfernt und zugeschnitten — noch nicht gespeichert.</div>
+      <div style="display:flex;gap:8px">
+        <button type="button" class="btn btn-primary btn-sm" id="kdUsigUebernehmen" onclick="kdUnterschriftUebernehmen()">Übernehmen</button>
+        <button type="button" class="btn btn-plain btn-sm" id="kdUsigVerwerfen" onclick="kdUnterschriftVerwerfen()">Verwerfen</button>
+      </div>`;
   } else if (k.ich) {
+    /* Zeichnen oder ein Bild hochladen, etwa ein Bildschirmfoto der
+       Unterschrift aus Apple Vorschau (ENT-706). */
+    const hochladen = `<button type="button" class="btn btn-plain btn-sm" id="kdUsigHochladen"
+        onclick="document.getElementById('kdUsigDatei').click()">Bild hochladen</button>
+      <input type="file" id="kdUsigDatei" accept="image/png,image/jpeg" hidden onchange="kdUnterschriftDatei(this)">`;
     inhalt = (k.unterschrift
       ? `<div class="kd-usig-blatt"><img id="kdUsigBild" src="${esc(k.unterschrift)}" alt="Deine Unterschrift"></div>
-         <div class="sec" style="margin:10px 0 12px">Steht auf jeder Offerte und jedem Vertrag, die du freigibst. Eine neue Unterschrift ändert bereits versendete Fassungen nicht.</div>
-         <button type="button" class="btn btn-plain btn-sm" id="kdUsigKnopf" onclick="kdUnterschriftZeichnen()">Neu zeichnen</button>`
+         <div class="sec" style="margin:18px 0 12px">Steht auf jeder Offerte und jedem Vertrag, die du freigibst. Eine neue Unterschrift ändert bereits versendete Fassungen nicht.</div>
+         <div style="display:flex;gap:8px">
+           <button type="button" class="btn btn-plain btn-sm" id="kdUsigKnopf" onclick="kdUnterschriftZeichnen()">Neu zeichnen</button>
+           ${hochladen}
+         </div>`
       : `<div class="sec" style="margin-bottom:12px">Noch keine Unterschrift hinterlegt. Ohne sie kannst du keine Offerte und keinen Vertrag freigeben.</div>
-         <button type="button" class="btn btn-primary btn-sm" id="kdUsigKnopf" onclick="kdUnterschriftZeichnen()">Unterschrift zeichnen</button>`);
+         <div style="display:flex;gap:8px">
+           <button type="button" class="btn btn-primary btn-sm" id="kdUsigKnopf" onclick="kdUnterschriftZeichnen()">Unterschrift zeichnen</button>
+           ${hochladen}
+         </div>
+         <div class="sec" style="margin-top:10px">Bild: PNG oder JPG, dunkle Schrift auf hellem Grund — etwa ein Bildschirmfoto deiner Unterschrift aus Apple Vorschau oder ein Foto auf Papier.</div>`);
   } else {
     inhalt = k.unterschrift_da
       ? `<div class="sec">Hinterlegt.</div>`
@@ -4851,14 +4997,66 @@ function kdUnterschriftZeichnen() {
   Unterschrift.zeichnen({
     kraeftig: true,
     kontext: () => ({ zeilen: ['Deine Unterschrift für Offerten und Verträge'], name: k.name || '' }),
-    fertig: async bild => {
-      const a = await ruf('betreiber_unterschrift_speichern.php', { zeichnung: bild });
-      if (a.status !== 'ok') { kurzmeldung(a.message || 'Die Unterschrift liess sich nicht speichern.'); return; }
-      kurzmeldung('Unterschrift gespeichert.');
-      ofEigeneUnterschrift = true;
-      await ladeKonten();
-    },
+    fertig: bild => { kdUnterschriftSpeichern(bild); },
   });
+}
+
+async function kdUnterschriftSpeichern(bild) {
+  const a = await ruf('betreiber_unterschrift_speichern.php', { zeichnung: bild });
+  if (a.status !== 'ok') { kurzmeldung(a.message || 'Die Unterschrift liess sich nicht speichern.'); return false; }
+  kurzmeldung('Unterschrift gespeichert.');
+  ofEigeneUnterschrift = true;
+  await ladeKonten();
+  return true;
+}
+
+/* Hochladen (ENT-706). Der Browser verkleinert zuerst auf hoechstens
+   1600 px Breite -- ein Handyfoto waere sonst zu gross fuer eine Anfrage.
+   Hintergrund entfernen und zuschneiden macht der Server; gespeichert wird
+   erst nach "Uebernehmen". */
+let kdUsigVorschau = null;
+
+function kdBildVerkleinern(datei) {
+  return new Promise((gut, schlecht) => {
+    const url = URL.createObjectURL(datei);
+    const img = new Image();
+    img.onload = () => {
+      const f = Math.min(1, 1600 / img.naturalWidth);
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.naturalWidth * f));
+      c.height = Math.max(1, Math.round(img.naturalHeight * f));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      gut(datei.type === 'image/png' ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.92));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); schlecht(new Error('Das Bild liess sich nicht lesen.')); };
+    img.src = url;
+  });
+}
+
+async function kdUnterschriftDatei(eingabe) {
+  const datei = eingabe.files && eingabe.files[0];
+  eingabe.value = '';
+  if (!datei) { return; }
+  if (!['image/png', 'image/jpeg'].includes(datei.type)) { kurzmeldung('Bitte ein PNG- oder JPG-Bild wählen.'); return; }
+  let bild;
+  try { bild = await kdBildVerkleinern(datei); } catch (e) { kurzmeldung(e.message); return; }
+  const a = await ruf('betreiber_unterschrift_bild.php', { bild });
+  if (a.status !== 'ok' || !a.bild) { kurzmeldung(a.message || 'Das Bild liess sich nicht verarbeiten.'); return; }
+  kdUsigVorschau = a.bild;
+  kdZeichnen();
+}
+
+async function kdUnterschriftUebernehmen() {
+  if (!kdUsigVorschau) { return; }
+  const bild = kdUsigVorschau;
+  kdUsigVorschau = null;
+  if (!await kdUnterschriftSpeichern(bild)) { kdUsigVorschau = bild; kdZeichnen(); }
+}
+
+function kdUnterschriftVerwerfen() {
+  kdUsigVorschau = null;
+  kdZeichnen();
 }
 
 /* Aus dem Versanddialog: direkt zum eigenen Konto. */
@@ -4980,6 +5178,239 @@ async function zEinladen() {
   } finally {
     knopf.disabled = false;
   }
+}
+
+/* ── Vorrat (ENT-705) ──────────────────────────────────────────────
+   Der Stand je Platz kommt aus betreiber_vorrat_pruefen.php (GET) --
+   derselben Pruefung wie die taegliche Meldung. Die Oberflaeche rechnet
+   nichts nach; sie benennt, was der Server sagt.
+
+   FUENF LAGEN, FUENF TEXTE (Hausregel "unbekannt ist nicht keine"): Angaben
+   fehlen, Secret fehlt, nicht erreichbar und Schema unvollstaendig
+   verlangen je einen anderen Handgriff an einem anderen Ort. */
+const VORRAT_TEXT = {
+  bereit:                ['m-pos',  'bereit'],
+  nicht_eingetragen:     ['m-warn', 'Angaben fehlen'],
+  secret_fehlt:          ['m-warn', 'Secret fehlt'],
+  nicht_erreichbar:      ['m-neg',  'nicht erreichbar'],
+  schema_unvollstaendig: ['m-warn', 'Schema unvollständig'],
+};
+let vorratPlaetze = [];
+
+function vorratPunktSetzen(an) {
+  $('vorratPunkt').hidden = !an;
+  $('mtab-vorrat').title = an ? 'Zu wenige Vorratsplätze bereit' : '';
+  unterreiterZeichnen();
+}
+
+async function ladeVorrat() {
+  const inhalt = $('vorrat-inhalt');
+  const zahlen = $('vorrat-zahlen');
+  let a;
+  try { a = await ruf('betreiber_vorrat_pruefen.php'); }
+  catch (e) { a = { status: 'error', message: 'Der Stand ist nicht abrufbar.' }; }
+
+  if (a.status !== 'ok') {
+    /* Nicht eingerichtet und nicht abrufbar sind zwei Aussagen -- und
+       keine davon heisst "Vorrat leer". Der Punkt bleibt aus: Ob zu wenig
+       bereit ist, wissen wir dann nicht. */
+    vorratPunktSetzen(false);
+    zahlen.innerHTML = '';
+    $('knopf-vorrat-neu').disabled = a.code === 503;
+    inhalt.innerHTML = a.code === 503
+      ? leerBlock('⚙', 'Noch nicht eingerichtet', a.message || 'Der Vorrat ist auf diesem Server noch nicht nachgetragen.')
+      : leerBlock('⚠', 'Stand nicht abrufbar', a.message || 'Unbekannter Fehler.');
+    return;
+  }
+  $('knopf-vorrat-neu').disabled = false;
+  vorratPlaetze = a.plaetze || [];
+  vorratPunktSetzen(!!a.zu_wenig);
+
+  /* Zwei Zahlen, zwei Einheiten: "Bereit" zaehlt uebergabefaehige Plaetze,
+     "Soll" die angestrebte Groesse. Die Schwelle steht als Bezug -- sie
+     ist der Grund fuer den Punkt am Reiter. */
+  zahlen.innerHTML =
+      zahlBlock('Bereit', a.bereit, a.eingetragen
+        ? a.bereit + ' von ' + a.eingetragen + ' eingetragenen'
+        : 'nichts eingetragen')
+    + zahlBlock('Soll', a.soll, 'Meldung unter ' + a.schwelle + ' bereiten');
+
+  if (!vorratPlaetze.length) {
+    inhalt.innerHTML = leerBlock('◇', 'Noch kein Vorratsplatz eingetragen',
+      'Mit „Vorratsplatz anlegen" kommt der erste dazu. Bis ' + a.schwelle
+      + ' bereit sind, geht jeden Morgen eine Meldung an die Betreiber-Konten.');
+    return;
+  }
+
+  const zeile = p => mandantenAlle.find(m => m.id === p.id) || {};
+  inhalt.innerHTML = '<div class="tab-huelle"><table><thead><tr>'
+    + '<th>Platz</th><th>Datenbank</th><th>Stand</th><th></th>'
+    + '</tr></thead><tbody>'
+    + vorratPlaetze.map(p => {
+        const m = zeile(p);
+        return aufZeile(
+          '<td><strong>' + text(p.name) + '</strong></td>'
+          + '<td>' + datenbankZelle(m) + '</td>'
+          + '<td>' + merker(VORRAT_TEXT, p.lage)
+            + (p.bereit ? '' : '<div class="zweit">' + text(p.text) + '</div>') + '</td>',
+          3, vorratBereiche(p, m), p.name);
+      }).join('')
+    + '</tbody></table></div>';
+
+  aufVerdrahten(inhalt);
+  inhalt.querySelectorAll('[data-vorrat-aendern]').forEach(b =>
+    b.onclick = () => vDlgOeffnen(mandantenAlle.find(m => m.id === +b.dataset.vorratAendern)));
+  inhalt.querySelectorAll('[data-vorrat-zuteilen]').forEach(b =>
+    b.onclick = () => tDlgOeffnen(vorratPlaetze.find(p => p.id === +b.dataset.vorratZuteilen)));
+  inhalt.querySelectorAll('[data-vorrat-entfernen]').forEach(b =>
+    b.onclick = () => vEntfernen(vorratPlaetze.find(p => p.id === +b.dataset.vorratEntfernen)));
+}
+
+/* Unbekannt ist nicht leer: Fehlt die Zeile in der Mandantenliste (andere
+   Anfrage, anderer Stand), steht das da -- nicht ein leeres Feld. */
+function datenbankZelle(m) {
+  if (m.db_name === undefined) { return '<span class="zweit">Angaben nicht geladen</span>'; }
+  if (!m.db_name && !m.db_host) { return '<span class="zweit">keine Angaben</span>'; }
+  return text((m.db_name || '–') + ' @ ' + (m.db_host || '–'))
+    + '<div class="zweit">' + text(m.secret_name ? 'Secret ' + m.secret_name : 'kein Secret-Name') + '</div>';
+}
+
+/* Die Bereiche einer aufgeklappten Vorratszeile: Datenbank, Zuteilen und
+   zuletzt Entfernen (Gefahr, wie "Beenden" bei den Demo-Zugaengen). Der
+   Zuteilen-Knopf ist bei einem nicht bereiten Platz ausgegraut und nennt
+   den Grund -- die Sperre selbst sitzt im Server. */
+function vorratBereiche(p, m) {
+  return [
+    aufBereich('Datenbank', datenbankZelle(m),
+      m.id ? '<button class="klein" data-vorrat-aendern="' + p.id + '">Ändern</button>' : ''),
+    aufBereich('Zuteilen',
+      /* Kurz: der volle Grund steht schon in der Spalte Stand und am Knopf.
+         Hier in der schmalen Spalte brach er mitten im Wort um (gemessen). */
+      p.bereit ? 'übergabefähig' : text('nicht möglich — ' + (VORRAT_TEXT[p.lage] || ['', p.lage])[1]),
+      p.bereit
+        ? '<button class="klein" data-vorrat-zuteilen="' + p.id + '">Einem Kunden zuteilen</button>'
+        : '<button class="klein" disabled title="' + text('Nicht übergabefähig: ' + p.text) + '">Einem Kunden zuteilen</button>'),
+    aufBereich('Entfernen', 'nur der Eintrag hier — Datenbank und Secret bleiben',
+      '<button class="klein gefahr" data-vorrat-entfernen="' + p.id + '">Entfernen</button>', true),
+  ];
+}
+
+/* ── Anlegen und Aendern ── */
+let vMandant = null;
+
+function vDlgOeffnen(m) {
+  vMandant = m || null;
+  stumm($('vErr'));
+  $('vDlgTitel').textContent = m ? 'Vorratsplatz ändern' : 'Vorratsplatz anlegen';
+  /* Den Namen vergibt der Server. Hier steht nur, wie er heisst oder dass
+     er vergeben wird -- keine Nummer, die der Server anders sehen koennte. */
+  $('vDlgUnter').textContent = m
+    ? m.name + ' — nur die Datenbankangaben.'
+    : 'Der Name wird vergeben („Vorrat 1", „Vorrat 2" …) und beim Zuteilen durch den Kundennamen ersetzt.';
+  $('v_host').value   = m ? (m.db_host || '') : '';
+  $('v_db').value     = m ? (m.db_name || '') : '';
+  $('v_user').value   = m ? (m.db_user || '') : '';
+  $('v_secret').value = m ? (m.secret_name || '') : '';
+  $('vSaveBtn').textContent = m ? 'Speichern' : 'Anlegen';
+  dlgAuf('dlgVorrat');
+  setTimeout(() => $('v_host').focus(), 30);
+}
+
+async function vSpeichern() {
+  stumm($('vErr'));
+  const daten = {
+    db_host:     $('v_host').value.trim(),
+    db_name:     $('v_db').value.trim(),
+    db_user:     $('v_user').value.trim(),
+    secret_name: $('v_secret').value.trim(),
+  };
+  if (!daten.db_host || !daten.db_name || !daten.db_user || !daten.secret_name) {
+    melde($('vErr'), 'fehler', 'Alle vier Angaben werden gebraucht.');
+    return;
+  }
+  if (vMandant) { daten.id = vMandant.id; daten.name = vMandant.name; }
+  else { daten.vorrat = true; }
+  const knopf = $('vSaveBtn');
+  knopf.disabled = true;
+  try {
+    const a = await ruf('betreiber_mandant_save.php', daten);
+    if (a.status !== 'ok') {
+      melde($('vErr'), 'fehler', a.message || 'Der Platz konnte nicht gespeichert werden.');
+      return;
+    }
+    dlgZu('dlgVorrat');
+    kurzmeldung(vMandant ? 'Gespeichert.' : 'Vorratsplatz angelegt.');
+    await ladeMandanten();
+  } finally {
+    knopf.disabled = false;
+  }
+}
+
+/* ── Zuteilen ── */
+let tPlatz = null;
+
+function tDlgOeffnen(p) {
+  if (!p) { return; }
+  tPlatz = p;
+  stumm($('tErr'));
+  $('tDlgUnter').textContent = p.name + ' wird zur Anlage dieses Kunden.';
+  ['t_name', 't_kanton', 't_subdomain', 't_beginn', 't_mindest', 't_frist', 't_verlaengerung']
+    .forEach(id => { $(id).value = ''; });
+  dlgAuf('dlgZuteilen');
+  setTimeout(() => $('t_name').focus(), 30);
+}
+
+async function tZuteilen() {
+  stumm($('tErr'));
+  if (!tPlatz) { return; }
+  const daten = {
+    id:        tPlatz.id,
+    name:      $('t_name').value.trim(),
+    kanton:    $('t_kanton').value.trim(),
+    subdomain: $('t_subdomain').value.trim().toLowerCase(),
+    vertrag_beginn:          $('t_beginn').value,
+    mindestlaufzeit_monate:  $('t_mindest').value,
+    kuendigungsfrist_monate: $('t_frist').value,
+    verlaengerung_monate:    $('t_verlaengerung').value,
+  };
+  if (!daten.name)      { melde($('tErr'), 'fehler', 'Der Name des Kunden wird gebraucht.'); return; }
+  if (!daten.kanton)    { melde($('tErr'), 'fehler', 'Der Kanton wird gebraucht.'); return; }
+  if (!daten.subdomain) { melde($('tErr'), 'fehler', 'Die Subdomain wird gebraucht.'); return; }
+  const knopf = $('tSaveBtn');
+  knopf.disabled = true;
+  try {
+    const a = await ruf('betreiber_vorrat_zuteilen.php', daten);
+    if (a.status !== 'ok') {
+      melde($('tErr'), 'fehler', a.message || 'Die Zuteilung ist nicht gelungen.');
+      return;
+    }
+    dlgZu('dlgZuteilen');
+    /* Weiter zu den Mandanten: Dort steht der Kunde jetzt, und dort wird
+       sein erster Zugang uebergeben. */
+    await ladeMandanten();
+    mandGo('mandanten');
+    kurzmeldung(daten.name + ' ist zugeteilt. Den ersten Zugang gibt es unter Mandanten per Einladung.');
+  } finally {
+    knopf.disabled = false;
+  }
+}
+
+/* ── Entfernen ── */
+function vEntfernen(p) {
+  if (!p) { return; }
+  frageStellen(p.name + ' entfernen?',
+    'Entfernt wird nur der Eintrag im Mandantenstamm. Die Datenbank beim Hoster '
+    + 'und der Eintrag in MANDANT_SECRETS bleiben bestehen und müssen dort von Hand '
+    + 'entfernt werden, falls sie nicht mehr gebraucht werden.',
+    'Entfernen', async () => {
+      const a = await ruf('betreiber_vorrat_entfernen.php', { id: p.id });
+      if (a.status !== 'ok') {
+        melde($('haus-meldung'), 'fehler', a.message || 'Der Platz konnte nicht entfernt werden.');
+        return;
+      }
+      kurzmeldung(p.name + ' ist entfernt.');
+      await ladeMandanten();
+    });
 }
 
 /* ── Eigenes Passwort ──────────────────────────────────────────── */

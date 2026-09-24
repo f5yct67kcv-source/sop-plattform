@@ -173,6 +173,67 @@ $pruef('und der Lauf meldet: zu wenig', $lage['zu_wenig'] === true);
 $pruef('ohne Auskunft der Datenbank gilt der Vorrat als nicht nachgetragen, statt zu brechen',
     mandant_vorrat_status_da($db) === false);
 
+// ── ENT-705: Anlegen, Zuteilen ────────────────────────────────────────
+
+// Der Name eines neuen Platzes: die naechste Nummer nach der hoechsten.
+$pruef('der erste Vorratsplatz heisst "Vorrat 1"',
+    mandant_vorrat_naechster_name([]) === 'Vorrat 1');
+$pruef('KRITISCH: nach der hoechsten Nummer, nicht nach der Anzahl -- kein doppelter Name',
+    mandant_vorrat_naechster_name(['Vorrat 1', 'Vorrat 3', 'Beispielwache AG']) === 'Vorrat 4');
+$pruef('nur genau "Vorrat <Zahl>" zaehlt, nicht ein Kundenname, der so anfaengt',
+    mandant_vorrat_naechster_name(['Vorrat 7 Sicherheit GmbH']) === 'Vorrat 1');
+$pruef('mit den Namen aus dem Stamm gerechnet (Vorrat A, B zaehlen nicht als Nummer)',
+    mandant_vorrat_naechster_name($db->query('SELECT name FROM mandant')->fetchAll(PDO::FETCH_COLUMN)) === 'Vorrat 1');
+
+// Die Subdomain beim Zuteilen: ein gueltiges Wort vor .guardops.ch.
+foreach (['musterag', 'muster-ag', 'a', 'ab1', str_repeat('a', 63)] as $gut) {
+    $pruef("Subdomain '$gut' ist gueltig", mandant_subdomain_gueltig($gut));
+}
+foreach (['', '-muster', 'muster-', 'Muster', 'muster.ag', 'muster ag', 'müster', str_repeat('a', 64)] as $schlecht) {
+    $pruef("KRITISCH: Subdomain '$schlecht' wird abgewiesen", !mandant_subdomain_gueltig($schlecht));
+}
+
+// Die Pruefung EINES Platzes -- dieselbe fuer Meldung und Zuteilen.
+// KRITISCH ist, dass sie NICHT verbindet, solange die Angaben nicht
+// vollstaendig sind: Sonst liefe ein Verbindungsversuch mit leeren oder
+// halben Angaben -- im schlimmsten Fall auf die Standardverbindung, also die
+// Datenbank eines laufenden Betriebs.
+$verbunden = 0;
+$bauplan = static function (array $m) use (&$verbunden): array { $verbunden++; return []; };
+$ohne = mandant_vorrat_platz_pruefen(['id' => 5, 'name' => 'Vorrat 5'], $bauplan);
+$pruef('KRITISCH: ohne Datenbankangaben wird nicht verbunden, und der Platz ist nicht bereit',
+    $verbunden === 0 && $ohne['bereit'] === false && $ohne['lage'] === 'nicht_eingetragen'
+    && $ohne['id'] === 5 && $ohne['name'] === 'Vorrat 5');
+$ohneSecret = mandant_vorrat_platz_pruefen(['id' => 6, 'name' => 'Vorrat 6', 'db_host' => 'db.beispiel.invalid',
+    'db_name' => 'vorrat6', 'db_user' => 'vorrat6', 'secret_name' => 'GIBT_ES_NICHT'], $bauplan);
+$pruef('KRITISCH: ohne Secret im Deploy wird nicht verbunden -- "Secret fehlt", nicht "bereit"',
+    $verbunden === 0 && $ohneSecret['bereit'] === false && $ohneSecret['lage'] === 'secret_fehlt');
+
+// Die Vertragsangaben: gemeinsam fuer Speichern und Zuteilen.
+$pruef('fehlen die Vertragsspalten noch, wird nichts davon geschrieben -- statt zu brechen',
+    be_mandant_vertrag_werte($db, ['vertrag_beginn' => '2031-01-01', 'mindestlaufzeit_monate' => '12']) === []);
+foreach (['vertrag_beginn TEXT', 'mindestlaufzeit_monate INTEGER', 'kuendigungsfrist_monate INTEGER',
+          'verlaengerung_monate INTEGER', 'gekuendigt_per TEXT'] as $sp) {
+    $db->exec('ALTER TABLE mandant ADD COLUMN ' . $sp);
+}
+$v = be_mandant_vertrag_werte($db, ['vertrag_beginn' => '', 'mindestlaufzeit_monate' => '',
+    'kuendigungsfrist_monate' => '3']);
+$pruef('KRITISCH: leer wird NULL, nicht 0 -- "nicht erfasst" ist nicht "null Monate"',
+    array_key_exists('vertrag_beginn', $v) && $v['vertrag_beginn'] === null
+    && array_key_exists('mindestlaufzeit_monate', $v) && $v['mindestlaufzeit_monate'] === null
+    && $v['kuendigungsfrist_monate'] === 3);
+$pruef('nur mitgeschickte Felder -- ein Formular ohne Vertragsfelder leert nichts',
+    !array_key_exists('verlaengerung_monate', $v) && !array_key_exists('gekuendigt_per', $v)
+    && be_mandant_vertrag_werte($db, ['name' => 'x']) === []);
+$pruef('ein ungueltiges Datum wird NULL, nicht ein erfundener Tag',
+    be_mandant_vertrag_werte($db, ['vertrag_beginn' => '2031-02-30'])['vertrag_beginn'] === null);
+$pruef('mehr als 600 Monate sind ein Vertipper und werden gekappt',
+    be_mandant_vertrag_werte($db, ['mindestlaufzeit_monate' => '9999'])['mindestlaufzeit_monate'] === 600);
+$pruef('KRITISCH: ein Kuendigungsdatum vor dem Beginn wird abgewiesen',
+    be_mandant_vertrag_fehler(['vertrag_beginn' => '2031-05-01', 'gekuendigt_per' => '2031-04-30']) !== null
+    && be_mandant_vertrag_fehler(['vertrag_beginn' => '2031-05-01', 'gekuendigt_per' => '2031-05-01']) === null
+    && be_mandant_vertrag_fehler(['gekuendigt_per' => '2031-04-30']) === null);
+
 echo count($bad) === 0
     ? "$ok bestanden\n\nAlle Pruefungen bestanden.\n"
     : "$ok bestanden, " . count($bad) . " nicht bestanden\n\n  ✗ "

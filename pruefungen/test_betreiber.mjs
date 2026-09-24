@@ -648,6 +648,12 @@ const DARF_VERBINDEN = {
   // Anlagen gehoeren noch keinem Kunden. Nachgewiesen in
   // test_mandant_vorrat.mjs.
   'betreiber_vorrat_pruefen.php':     'prueft Erreichbarkeit und Bauplan jeder Vorratsanlage (ENT-686)',
+  // ENT-705: Das Zuteilen sperrt eine Anlage, die nicht uebergabefaehig
+  // ist -- mit derselben Pruefung wie die taegliche Meldung
+  // (mandant_vorrat_platz_pruefen), verbunden in eigener Zeile. Gelesen wird
+  // nur der Bauplan; die Anlage gehoert in diesem Moment noch keinem Kunden.
+  // Nachgewiesen in test_mandant_vorrat.mjs.
+  'betreiber_vorrat_zuteilen.php':    'prueft vor dem Zuteilen den Bauplan der Vorratsanlage (ENT-705)',
 };
 const heimlich = nutztMandantDb.filter(f => !DARF_VERBINDEN[f]);
 check('KRITISCH: nur namentlich genannte Endpunkte verbinden zu einer Mandantendatenbank',
@@ -1026,19 +1032,32 @@ check('KRITISCH: das Zahnrad faerbt sich, sobald etwas nachzutragen ist -- still
   // Jedes der fuenf Felder geht durch einen Wandler, der bei leerer Eingabe
   // null liefert -- nicht 0 und nicht ''. Eine 0 wuerde "null Monate
   // vereinbart" behaupten, und die Lage waere dann nicht mehr "unbekannt".
+  //
+  // SEIT ENT-705 AN EINER STELLE: be_mandant_vertrag_werte() in
+  // betreiber.php, gemeinsam fuer Speichern und Zuteilen aus dem Vorrat.
+  // Geprueft wird darum die Stelle UND dass beide Wege sie benutzen -- ein
+  // Weg mit eigener Abschrift fiele sonst aus der Pruefung.
+  const vertragKern = (nurCode(modul).match(/function be_mandant_vertrag_werte[\s\S]*?\n}/) || [''])[0]
+                    + (nurCode(modul).match(/function be_mandant_vertrag_fehler[\s\S]*?\n}/) || [''])[0];
+  const zuteilen = nurCode(lies('backend/api/betreiber_vorrat_zuteilen.php'));
+  check('die gemeinsame Vertragsstelle ist auffindbar', vertragKern.length > 400);
+  check('KRITISCH: Speichern und Zuteilen lesen die Vertragsfelder ueber dieselbe Stelle',
+    [save, zuteilen].every(q => /be_mandant_vertrag_werte\(\$pdo, \$daten\)/.test(q)
+      && /be_mandant_vertrag_fehler\(\$werte\)[\s\S]{0,200}400\)/.test(q))
+    && ![save, zuteilen].some(q => /OderNull\s*=\s*static function/.test(q)));
   check('KRITISCH: ein leeres Feld wird NULL, nicht 0',
-    /\$monateOderNull = static function[\s\S]{0,200}return null;/.test(save)
-    && /\$datumOderNull = static function[\s\S]{0,200}return null;/.test(save)
+    /\$monateOderNull = static function[\s\S]{0,200}return null;/.test(vertragKern)
+    && /\$datumOderNull = static function[\s\S]{0,200}return null;/.test(vertragKern)
     && ['mindestlaufzeit_monate', 'kuendigungsfrist_monate', 'verlaengerung_monate']
-         .every(f => new RegExp("'" + f + "'\\s*=> \\$monateOderNull").test(save))
+         .every(f => new RegExp("'" + f + "'\\s*=> \\$monateOderNull").test(vertragKern))
     && ['vertrag_beginn', 'gekuendigt_per']
-         .every(f => new RegExp("'" + f + "'\\s*=> \\$datumOderNull").test(save)));
+         .every(f => new RegExp("'" + f + "'\\s*=> \\$datumOderNull").test(vertragKern)));
   check('KRITISCH: ein Enddatum vor dem Beginn wird abgewiesen',
-    /gekuendigt_per'\][\s\S]{0,120}vertrag_beginn'\]/.test(save) && /400/.test(save));
+    /gekuendigt_per'\][\s\S]{0,120}vertrag_beginn'\]/.test(vertragKern));
   check('nur mitgeschickte Vertragsfelder werden geschrieben — ein altes Formular leert nichts',
-    /array_key_exists\(\$feld, \$daten\)/.test(save));
+    /array_key_exists\(\$feld, \$daten\)/.test(vertragKern));
   check('fehlen die Spalten noch, bricht weder Lesen noch Schreiben ab',
-    /hat_spalte\(\$pdo, 'mandant'/.test(save) && /hat_spalte\(\$pdo, 'mandant'/.test(list));
+    /hat_spalte\(\$pdo, 'mandant'/.test(vertragKern) && /hat_spalte\(\$pdo, 'mandant'/.test(list));
 
   check('KRITISCH: die Uebersicht zaehlt den Stichtag der Kuendigung, nicht das Vertragsende',
     /faellig_90/.test(list) && /be_vertrag_faellig\(/.test(list));

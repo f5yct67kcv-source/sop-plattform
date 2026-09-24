@@ -265,19 +265,29 @@ for (const [breite, hoehe, art] of [[390, 844, 'Handy'], [1280, 900, 'Desktop']]
     check(`${art}: kein Knopf in der aufgeklappten Zeile bricht um`,
       Math.max(...lage.knopfHoehe) - Math.min(...lage.knopfHoehe) < 2);
 
+    // Seit ENT-705 steht eine Vorratsanlage nicht mehr unter den Kunden,
+    // sondern im eigenen Reiter (dort geprueft: test_vorrat_ansicht.mjs).
+    check(`${art}: KRITISCH: die Vorratsanlage steht nicht in der Mandantentabelle (ENT-705)`,
+      await page.evaluate(() => ![...document.querySelectorAll('#m-inhalt tr.auf-kopf strong')]
+        .some(s => s.textContent === 'Vorrat A')));
     // Immer nur eine offen: die zweite aufklappen, die erste schliesst sich.
-    await aufklappen(page, 'Vorrat A');
+    await aufklappen(page, 'Musterdienst GmbH');
     const offen = await page.evaluate(() =>
       [...document.querySelectorAll('#m-inhalt .auf-knopf[aria-expanded="true"]')]
         .map(k => k.closest('tr').querySelector('strong').textContent));
     check(`${art}: KRITISCH: es ist immer nur eine Zeile offen`,
-      offen.length === 1 && offen[0] === 'Vorrat A');
-    const vorratZugang = await page.evaluate(() =>
-      document.querySelector('#m-inhalt tr.auf-kopf.offen').nextElementSibling.innerText);
+      offen.length === 1 && offen[0] === 'Musterdienst GmbH');
+    // Der Zugang einer Vorratsanlage, falls sie doch einmal hier gezeichnet
+    // wird: kein Knopf, sondern der Hinweis auf die Zuteilung.
+    const vorratZugang = await page.evaluate(() => {
+      const d = document.createElement('div');
+      d.innerHTML = zugangBereich({ id: 2, name: 'Vorrat A', status: 'vorrat', uebergabe: { lage: 'keine' } });
+      return { text: d.innerText, knoepfe: d.querySelectorAll('button').length };
+    });
     check(`${art}: eine Vorratsanlage sagt beim Zugang, dass erst zugeteilt wird`,
-      /erst nach der Zuteilung/.test(vorratZugang));
+      /erst nach der Zuteilung/.test(vorratZugang.text) && vorratZugang.knoepfe === 0);
     // Nochmals klicken schliesst.
-    await aufklappen(page, 'Vorrat A');
+    await aufklappen(page, 'Musterdienst GmbH');
     check(`${art}: ein zweiter Klick schliesst die Zeile wieder`,
       await page.evaluate(() => !document.querySelector('#m-inhalt .auf-knopf[aria-expanded="true"]')));
 
@@ -383,8 +393,10 @@ for (const [breite, hoehe, art] of [[1280, 900, 'Desktop']]) {
     zeilen['Ueberfaellig AG'].warn.some(w => /überfällig/.test(w))
     && Object.entries(zeilen).filter(([n]) => n !== 'Ueberfaellig AG')
          .every(([, z]) => !z.warn.some(w => /Einladung|eingel|überfällig|Übergabe/.test(w))));
-  check(`${art}: KRITISCH: bei einer Vorratsanlage steht kein "keine Einladung erfasst"`,
-    !/Einladung/.test(zeilen['Vorrat A'].text));
+  // Seit ENT-705 steht die Vorratsanlage gar nicht mehr hier -- also auch
+  // kein "keine Einladung erfasst" bei ihr.
+  check(`${art}: KRITISCH: eine Vorratsanlage steht nicht unter den Kunden, also ohne Einladungszeile`,
+    !('Vorrat A' in zeilen));
   check(`${art}: ein vorhandener Vermerk bleibt auch nach der Kuendigung sichtbar`,
     /eingelöst am 05\.04\.2029/.test(zeilen['Gekuendigt AG'].text));
   check(`${art}: KRITISCH: "nicht eingerichtet" sieht anders aus als "keine Einladung erfasst"`,
