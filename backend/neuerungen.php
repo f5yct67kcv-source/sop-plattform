@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 9,
+            'datum' => '2026-09-24',
+            'art'   => 'fehlerbehebung',
+            'fuer'  => ['betreiber'],
+            'titel' => 'Updates erscheinen sofort und vollständig',
+            'text'  => 'Das Update-Fenster kommt jetzt gleich beim Öffnen, auch wenn die Prüfung aller Mandanten noch läuft. Es zeigt jede Neuerung, auch die fürs Cockpit oder die App, mit dem Vermerk, wo sie gilt.',
+        ],
+        [
             'nr'    => 8,
             'datum' => '2026-09-23',
             'art'   => 'neu',
@@ -101,6 +109,22 @@ function neuerungen_neueste(): int
     $hoechste = 0;
     foreach (neuerungen_katalog() as $n) { $hoechste = max($hoechste, (int)$n['nr']); }
     return $hoechste;
+}
+
+// Alles Ungelesene, gleich fuer welche Oberflaeche -- fuer den Betreiber
+// (2026-09-24, Anordnung des Projektinhabers): Als Betreiberin der
+// Plattform muss die pzu jedes ausgerollte Update sehen, auch eines, das
+// nur im Cockpit oder in der App gilt. 'fuer' bleibt am Eintrag, damit das
+// Fenster sagen kann, wo es gilt.
+function neuerungen_alle(int $gesehenBis): array
+{
+    $aus = [];
+    foreach (neuerungen_katalog() as $n) {
+        if ((int)$n['nr'] <= $gesehenBis) { continue; }
+        $aus[] = $n + ['art_titel' => NEUERUNG_ARTEN[$n['art']] ?? $n['art']];
+    }
+    usort($aus, static fn($a, $b) => (int)$b['nr'] <=> (int)$a['nr']);
+    return $aus;
 }
 
 // Was diese Person noch nicht gesehen hat, fuer diese Oberflaeche, das

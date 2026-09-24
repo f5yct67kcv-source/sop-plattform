@@ -27,6 +27,10 @@ async function seite(stand) {
     ruf = async (pfad, daten, methode) => {
       const m = methode || (daten ? 'POST' : 'GET');
       window.__rufe.push({ pfad, daten, m });
+      if (stand.werfen && pfad === stand.werfen) { throw new Error('Liste kaputt'); }
+      if (pfad === 'betreiber_schema_pruefen.php' && m === 'GET' && stand.schemaBremse) {
+        await new Promise(r => setTimeout(r, stand.schemaBremse));
+      }
       if (stand.bremse) { await new Promise(r => setTimeout(r, stand.bremse)); }
       if (pfad === 'betreiber_neuerungen.php') {
         if (m === 'POST') { return { status: 'ok', gesehen_bis: daten.bis }; }
@@ -45,8 +49,13 @@ async function seite(stand) {
       return { status: 'ok' };
     };
   }, stand);
-  await page.evaluate(() => pruefeEinrichtungUpdate());
-  await page.waitForTimeout(stand.bremse ? 300 : 150);
+  // Wie beim echten Oeffnen der Seite: ueber ladeAlles(), nicht direkt.
+  if (stand.ueberLadeAlles) {
+    page.evaluate(() => ladeAlles().catch(() => {}));
+  } else {
+    await page.evaluate(() => pruefeEinrichtungUpdate());
+    await page.waitForTimeout(stand.bremse ? 300 : 150);
+  }
   return page;
 }
 const offen = p => p.evaluate(() => $('dlgEinrichtung').classList.contains('on'));
@@ -119,6 +128,35 @@ await page.waitForTimeout(200);
 check('„Verstanden“ schliesst und spielt nichts ein',
   !(await offen(page))
   && !(await page.evaluate(() => __rufe.some(r => r.pfad === 'betreiber_schema_pruefen.php' && r.m === 'POST'))));
+await page.close();
+
+// ══ Befund vom 2026-09-24: ausgerollte Updates erschienen beim Oeffnen nicht
+// (a) Eine Neuerung NUR fuers Cockpit erscheint trotzdem -- mit Vermerk.
+const NUR_COCKPIT = [{ nr: 6, datum: '2028-06-10', art: 'fehlerbehebung', fuer: ['cockpit'],
+  titel: 'Nur im Cockpit', text: 'Etwas im Cockpit.' }];
+page = await seite({ neu: NUR_COCKPIT, offen: [], fehlerBei: null, bremse: 0 });
+check('KRITISCH: der Betreiber sieht auch eine Neuerung, die nur im Cockpit gilt', await offen(page)
+  && (await page.textContent('#be-upd-neu')).includes('Nur im Cockpit'));
+check('und sieht, wo sie gilt', (await page.textContent('#be-upd-neu')).includes('Gilt für: Cockpit'));
+await page.close();
+
+// (b) Das Fenster wartet nicht auf die langsame Schema-Pruefung.
+page = await seite({ neu: NEU, offen: ['Mandant „Betrieb A“: Spalte x fehlt noch'], fehlerBei: null,
+  bremse: 0, schemaBremse: 2500, ueberLadeAlles: true });
+await page.waitForTimeout(600);
+check('KRITISCH: die Neuerungen erscheinen, bevor die Schema-Pruefung fertig ist', await offen(page)
+  && (await page.textContent('#be-upd-titel')).includes('Neu in GuardOpS'));
+await page.waitForTimeout(2600);
+check('KRITISCH: steht danach ein Update aus, heisst das Fenster „Update erforderlich“',
+  (await page.textContent('#be-upd-titel')).includes('Update erforderlich')
+  && (await page.textContent('#knopf-einrichtung-lauf')).trim() === 'Jetzt einspielen');
+await page.close();
+
+// (c) Scheitert beim Laden eine Liste, kommt das Fenster trotzdem.
+page = await seite({ neu: NEU, offen: [], fehlerBei: null, bremse: 0,
+  werfen: 'betreiber_mandant_list.php', ueberLadeAlles: true });
+await page.waitForTimeout(800);
+check('KRITISCH: scheitert eine Liste beim Laden, erscheint das Fenster trotzdem', await offen(page));
 await page.close();
 
 await browser.close();
