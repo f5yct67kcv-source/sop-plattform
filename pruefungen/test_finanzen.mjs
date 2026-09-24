@@ -21,7 +21,10 @@
 //    Pfad: Zwischen einem Nullmonat und einem hohen Monat darf sie nicht
 //    unter die Nulllinie tauchen und nicht über den höchsten Wert hinaus.
 //
-// 6. RECHNUNGEN SIND UMGEZOGEN. Kein Punkt mehr unter Kunden, ein alter
+// 6. EIN ENTWURF IST NICHT VERRECHNET (Entscheid 24.09.2026). Er zählt in
+//    keiner Zahl der Übersicht mit, wird aber genannt.
+//
+// 7. RECHNUNGEN SIND UMGEZOGEN. Kein Punkt mehr unter Kunden, ein alter
 //    Einstieg (kuGoTab('rechnungen')) landet unter Finanzen, und "Zurück"
 //    aus einer Rechnung auch.
 import { WURZEL, browserPfad } from './pfade.mjs';
@@ -52,6 +55,10 @@ const RECHNUNGEN = { status: 'ok', naechste_nummer: 'RE-0999', belege: [
   re(4, tagIm(-1, 9), 30000),
   // Archiviert -- darf nirgends mitzählen.
   re(5, tagIm(-1, 9), 999999, { aktiv: 0 }),
+  // Entwurf (Entscheid 24.09.2026): nicht verrechnet, nicht offen, nicht
+  // überfällig -- obwohl die Frist vorbei ist. Der Betrag ist gross genug,
+  // dass jedes Mitzählen sofort auffiele.
+  re(6, tagIm(-1, 10), 700000, { status: 'entwurf', faellig_bis: tagIm(-1, 12), kunde_name: 'Entwurf Kunde AG' }),
 ]};
 
 const KOSTEN = { status: 'ok',
@@ -150,6 +157,8 @@ try {
   check('KRITISCH: überfällig nur B (CHF 540.50) -- D ohne Fälligkeit zählt NICHT',
     /540\.50/.test(k[1].v));
   check('GEGENPROBE: überfällig ist nicht B+D', !/864\.80/.test(k[1].v));
+  check('KRITISCH: der Entwurf zählt nicht im offenen Betrag und wird genannt',
+    !/8['’]4\d\d\.\d\d/.test(k[0].v) && /1 Entwurf nicht mitgezählt/.test(k[0].f));
   check('KRITISCH: Lohnkosten zeigen den letzten Monat MIT Lauf (Vorvormonat), CHF 5\'000.00',
     /5['’]000\.00/.test(k[3].v));
   check('KRITISCH: Lohnkosten sagen "ohne Arbeitgeberbeiträge"', /ohne Arbeitgeberbeiträge/.test(k[3].f));
@@ -174,12 +183,15 @@ try {
   check('Der Umschalter steht auf 12 M',
     await page.evaluate(() => document.querySelector('#finZeitraum button.on').dataset.zr === '12'));
   check('Die Grafik sagt "exkl. MWST"', /exkl\. MWST/.test(await page.textContent('#finChartUnter')));
+  check('KRITISCH: die Grafik nennt den nicht mitgezählten Entwurf',
+    /1 Entwurf nicht mitgezählt/.test(await page.textContent('#finChartUnter')));
 
   const vm = await tip(page, 10); // Vormonat
   // verrechnet C+D netto = 2'300.00; bezahlt A+C = 3'000.00; offen D = 300.00
   check('KRITISCH: verrechnet im Vormonat CHF 2\'300.00 -- netto, ohne MWST',
     /verrechnet\s*CHF 2['’]300\.00/.test(vm));
   check('GEGENPROBE: nicht das Total mit MWST (2\'486.30)', !/2['’]486\.30/.test(vm));
+  check('KRITISCH: der Entwurf zählt nicht als verrechnet (sonst 9\'300.00)', !/9['’]300\.00/.test(vm));
   check('KRITISCH: bezahlt nach Zahldatum CHF 3\'000.00 (A aus dem Vorvormonat zählt hier)',
     /bezahlt\s*CHF 3['’]000\.00/.test(vm));
   check('KRITISCH: "davon heute noch offen" CHF 300.00 -- die Rechnungen DIESES Monats',
@@ -248,6 +260,12 @@ try {
     status.includes('Offen, ohne Fälligkeit'));
   const kunden = await page.$$eval('#finKunden .fin-zeile .fin-name', z => z.map(x => x.textContent.trim()));
   check('Einnahmen nach Kunden: grösster zuerst', kunden[0] === 'Muster Logistik AG');
+  check('KRITISCH: der Entwurf fehlt bei den Kunden', !kunden.includes('Entwurf Kunde AG'));
+  const anzahl = await page.$$eval('#finStatus .fin-zeile b', z => z.map(x => Number(x.textContent)));
+  check('KRITISCH: Rechnungsstatus zählt vier Rechnungen -- ohne Entwurf und Archiv',
+    anzahl.reduce((a, b) => a + b, 0) === 4);
+  check('KRITISCH: der Entwurf steht nicht in der Mahnliste, obwohl seine Frist vorbei ist',
+    !/RE-06/.test(await page.textContent('#finMahn')));
   check('Altersbänder stehen unter Finanzen', await page.$$eval('#finAlter .bar', b => b.length) === 5);
   check('Die Mahnliste führt B', /RE-02/.test(await page.textContent('#finMahn')));
   check('Letzte Lohnläufe: ein Lauf mit Status', /Freigegeben/.test(await page.textContent('#finLaeufe')));
@@ -285,6 +303,18 @@ try {
     }));
 } catch (e) { bad.push('Umzug: ' + String(e).split('\n')[0].slice(0, 160)); }
 await page.close();
+
+// ══════════════════════════════════════════ 5b. NUR ENTWÜRFE
+try {
+  const pE = await seite(browser);
+  await pE.evaluate(() => { go('finanzen'); });
+  await pE.waitForTimeout(500);
+  await pE.evaluate(() => { rechnungen = rechnungen.filter(b => b.status === 'entwurf'); finZeichnen(); });
+  check('KRITISCH: nur Entwürfe heisst "Noch keine verrechnete Rechnung", nicht "Noch keine Rechnungen"',
+    /Noch keine verrechnete Rechnung/.test(await pE.textContent('#finAlter'))
+    && !/Noch keine Rechnungen/.test(await pE.textContent('#finAlter')));
+  await pE.close();
+} catch (e) { bad.push('Nur Entwürfe: ' + String(e).split('\n')[0].slice(0, 160)); }
 
 // ══════════════════════════════════════════ 6. RECHTE
 try {
