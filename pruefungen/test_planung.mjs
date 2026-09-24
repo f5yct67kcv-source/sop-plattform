@@ -336,6 +336,25 @@ check('Sie nennt die andere Schicht', (await page.textContent('#enEMa .clash')).
 check('Sie sagt "bereits eingeteilt", nicht "nicht verfügbar"',
   (await page.textContent('#enEMa .clash')).includes('Bereits eingeteilt'));
 check('Freie Person bleibt waehlbar', !(await page.isDisabled('#enEMa input[value="3"]')));
+// Wie die Sperre im Server (doppelbelegungen, ENT-350): Wer die andere
+// Schicht abgelehnt hat oder entfallen ist, belegt sie nicht mehr. Vorher
+// meldete die Liste "bereits eingeteilt", der Server speicherte trotzdem.
+for (const zusage of ['abgelehnt', 'entfallen']) {
+  await page.evaluate(z => { einsaetze.find(e => Number(e.id) === 11).mitarbeiter.find(m => Number(m.id) === 1).zusage = z; }, zusage);
+  await page.dispatchEvent('#enEBis', 'change');
+  await page.waitForTimeout(200);
+  check(`KRITISCH: hat die Person die andere Schicht ${zusage === 'abgelehnt' ? 'abgelehnt' : 'als entfallen'}, meldet die Liste keinen Konflikt`,
+    await page.evaluate(() => {
+      const l = document.querySelector('#enEMa input[value="1"]').closest('label');
+      return l.classList.contains('frei') && !l.querySelector('.clash');
+    }));
+}
+// Zurueck auf den Ausgangsstand: ohne Zusage, also "offen" -- das belegt.
+await page.evaluate(() => { delete einsaetze.find(e => Number(e.id) === 11).mitarbeiter.find(m => Number(m.id) === 1).zusage; });
+await page.dispatchEvent('#enEBis', 'change');
+await page.waitForTimeout(200);
+check('Ohne Absage (offen) ist der Konflikt wieder da', await page.evaluate(() =>
+  !!document.querySelector('#enEMa input[value="1"]').closest('label').querySelector('.clash')));
 check('KRITISCH: eine freie Person ist als verfuegbar markiert',
   await page.evaluate(() => {
     const el = document.querySelector('#enEMa input[value="3"]');

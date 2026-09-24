@@ -1345,9 +1345,10 @@ tr.rapp-gruppe-offen td:not(.rapp-klammer) { border-bottom: none; }
 @media (max-width: 900px) { .of-abschluss { grid-template-columns: 1fr; } }
 
 /* ── Verlauf am Beleg (ENT-697) ──────────────────────────────────────
-   Gleiche Regeln in dashboard.html und betreiber.html. Unter 700 px wird
-   jede Zeile ein Block: Zeit und Wer oben, Was darunter (Entscheid des
-   Projektinhabers) -- keine waagrechte Scrollleiste. */
+   Gleiche Regeln in dashboard.html und betreiber.html -- bis auf die
+   Handy-Regeln: Unter 700 px wird jede Zeile ein Block, Zeit und Wer oben,
+   Was darunter. Die gibt es nur hier; der Betreiber-Bereich bekommt keine
+   mobile Fassung (ENT-701). */
 .of-verlauf { margin-top: 14px; }
 .of-verlauf-titel { font-size: 11px; font-weight: 650; letter-spacing: .4px; text-transform: uppercase;
   color: var(--ink-2); margin-bottom: 12px; }
@@ -19468,6 +19469,10 @@ function spanne(datum, von, bis) {
 // Das ist eine reine Zeitüberschneidung — KEINE Prüfung von Ruhezeiten oder
 // Höchstarbeitszeiten nach GAV. Diese Auslegung ist offen (OP-20) und wird
 // hier bewusst nicht vorweggenommen.
+// Eingeteilt heisst wie in der Sperre des Servers (doppelbelegungen() in
+// planung.php, ENT-350): Wer abgelehnt hat oder entfallen ist, belegt die
+// andere Schicht nicht mehr. Vorher meldete die Oberflaeche dort einen
+// Konflikt, den der Server beim Speichern nicht hatte.
 function konflikte(datum, von, bis, ausserId) {
   const sp = spanne(datum, von, bis);
   const map = {};
@@ -19476,7 +19481,10 @@ function konflikte(datum, von, bis, ausserId) {
     if (Number(e.id) === Number(ausserId) || e.status === 'abgesagt') return;
     const o = spanne(e.datum, e.von, e.bis);
     if (!o || o[0] >= sp[1] || sp[0] >= o[1]) return;
-    (e.mitarbeiter || []).forEach(m => { (map[m.id] = map[m.id] || []).push(e); });
+    (e.mitarbeiter || []).forEach(m => {
+      if (!zaehltAlsBesetzt(zusageVon(m))) return;
+      (map[m.id] = map[m.id] || []).push(e);
+    });
   });
   return map;
 }
