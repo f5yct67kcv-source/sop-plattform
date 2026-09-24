@@ -1519,7 +1519,10 @@ jobs:
           # Der Zeitgeber-Schluessel fuer den Ablauf der Demo-Zugaenge
           # (api/betreiber_demo_ablauf.php). Derselbe Wert wie beim
           # naechtlichen Demo-Reset -- es ist derselbe Cron-Dienst.
-          sed -i "s|__DEMO_ABLAUF_TOKEN__|$EFF_DEMO_ABLAUF_TOKEN|g" dist-betreiber/api/betreiber_demo_ablauf.php
+          # Gesucht wird die ZERLEGTE Form, wie sie in der Quelle steht; nur
+          # hier wird sie ersetzt, in den anderen Buendeln bleibt der
+          # Zeitgeber "nicht eingerichtet". Die ganze Form gibt es nirgends.
+          sed -i "s|'__DEMO_ABLAUF' \\. '_TOKEN__'|'$EFF_DEMO_ABLAUF_TOKEN'|g" dist-betreiber/api/betreiber_demo_ablauf.php
           # Die taegliche Pruefung des Mandanten-Vorrats (ENT-686,
           # api/betreiber_vorrat_pruefen.php). Derselbe Schluessel wie beim
           # Demo-Ablauf darueber -- es ist derselbe Cron-Dienst beim Hoster,
@@ -1527,7 +1530,7 @@ jobs:
           # gleich gehalten werden muss. Der Endpunkt liest nur den Stand
           # und schreibt Post an die Betreiber-Konten; mehr oeffnet der
           # Schluessel dort nicht.
-          sed -i "s|__VORRAT_ZEITGEBER_TOKEN__|$EFF_DEMO_ABLAUF_TOKEN|g" dist-betreiber/api/betreiber_vorrat_pruefen.php
+          sed -i "s|'__VORRAT_ZEITGEBER' \\. '_TOKEN__'|'$EFF_DEMO_ABLAUF_TOKEN'|g" dist-betreiber/api/betreiber_vorrat_pruefen.php
           # Die Deploy-Geheimnisse der einzelnen Mandanten-Datenbanken
           # (OP-526, mandant_secret() in backend/betreiber.php) -- als
           # base64(JSON), nicht als rohes JSON, siehe Begruendung bei

@@ -26,13 +26,21 @@ require_once __DIR__ . '/../supportvorgang.php';          // sv_empfaenger()
 
 // DERSELBE SCHLUESSEL WIE BEIM DEMO-ABLAUF: Es ist derselbe Cron-Dienst beim
 // Hoster, und dieselbe Ueberlegung steht schon am Demo-Ablauf selbst. Der
-// Deploy setzt ihn hier ein. Der Platzhalter wird zusammengesetzt und steht
-// NICHT am Stueck im Quelltext -- sonst ersetzte ihn der Deploy auch in
-// einem Kommentar, und die Pruefung auf unersetzte Platzhalter liefe ins
-// Leere.
+// Deploy setzt ihn per sed ein, NUR im Betreiber-Buendel -- darum steht
+// der Platzhalter zerlegt da, und das sed sucht genau diese zerlegte Form
+// (Begruendung und Vorgeschichte: betreiber_demo_ablauf.php).
+$schluessel = (string)($_GET['schluessel'] ?? '');
 $erwartet = '__VORRAT_ZEITGEBER' . '_TOKEN__';
-$lage = mandant_vorrat_zeitgeber_lage($erwartet, (string)($_GET['schluessel'] ?? ''));
+$lage = mandant_vorrat_zeitgeber_lage($erwartet, $schluessel);
 $perZeitgeber = $lage === 'ok';
+
+// Schluessel mitgegeben, aber hier keiner eingerichtet: genau das sagen,
+// statt "kein Token" aus der Sitzungspruefung.
+if ($lage === 'nicht_eingerichtet' && $schluessel !== '') {
+    json_response(['status' => 'error',
+        'message' => 'Der Zeitgeber-Schlüssel ist auf diesem Server nicht eingerichtet. '
+                   . 'Secret DEMO_ABLAUF_TOKEN setzen und neu deployen.'], 503);
+}
 
 if (!$perZeitgeber) {
     // Ein FALSCHER Schluessel ist etwas anderes als gar keiner und wird

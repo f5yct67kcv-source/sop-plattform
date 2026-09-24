@@ -165,13 +165,29 @@ check('ohne gueltigen Schluessel verlangt der Endpunkt die volle Betreiber-Wache
 
 // ── 8. Der Schluessel kommt aus dem Deploy ────────────────────────────
 //
-// Der Platzhalter steht NICHT am Stueck im Quelltext -- sonst ersetzte der
-// Deploy ihn auch dort, wo er nur erwaehnt wird --, und der Deploy setzt ihn
-// im Betreiber-Buendel ein.
-check('KRITISCH: der Platzhalter steht nicht am Stueck in der Quelle',
-  !lies(API + 'betreiber_vorrat_pruefen.php').includes('__VORRAT_ZEITGEBER_TOKEN__'));
-check('KRITISCH: der Deploy setzt den Schluessel im Betreiber-Buendel ein',
-  /sed -i "s\|__VORRAT_ZEITGEBER_TOKEN__\|\$EFF_\w+\|g" dist-betreiber\/api\/betreiber_vorrat_pruefen\.php/.test(deploy));
+// Der Platzhalter steht ZERLEGT in der Quelle -- die Datei geht per
+// "cp backend/api/*.php" auch in Buendel, in denen der Zeitgeber nicht
+// eingerichtet sein soll --, und das sed im Betreiber-Buendel sucht GENAU
+// diese zerlegte Form. Die erste Fassung suchte die ganze, die es nirgends
+// gab: Der Schluessel kam nie auf den Server, jeder Cron-Aufruf lief als
+// "kein Token" ins Leere. Geprueft wird, dass der Suchtext des Deploys in
+// der Quelle steht; die allgemeine Wache ueber alle Ersetzungen steht in
+// test_deploy.mjs.
+{
+  const m = deploy.match(/sed -i "s\|([^|"]+)\|'\$EFF_\w+'\|g" dist-betreiber\/api\/betreiber_vorrat_pruefen\.php/);
+  const such = m ? m[1].replace(/\\+\./g, '.') : null;
+  check('KRITISCH: der Deploy setzt den Schluessel im Betreiber-Buendel ein, und sein Suchtext steht in der Quelle',
+    such !== null && lies(API + 'betreiber_vorrat_pruefen.php').includes(`$erwartet = ${such};`));
+  check('KRITISCH: der Platzhalter steht nicht am Stueck in der Quelle (sonst bricht dist-cupi24)',
+    !lies(API + 'betreiber_vorrat_pruefen.php').includes('__VORRAT_ZEITGEBER_TOKEN__'));
+}
+// Schluessel mitgegeben, aber keiner eingerichtet: eigene Antwort, bevor die
+// Sitzungspruefung "kein Token" sagt -- das sah nach falschem Aufruf aus.
+{
+  const i = pruefen.search(/'nicht_eingerichtet'\s*&&\s*\$schluessel\s*!==\s*''\s*\)\s*\{\s*json_response\([^;]*503\)/);
+  check('KRITISCH: ein Schluessel ohne eingerichteten Gegenwert bekommt eine eigene Antwort (503), nicht "kein Token"',
+    i > 0 && i < pruefen.search(/require_betreiber_voll\s*\(\s*\)/));
+}
 
 // ── 9. Einladen einer Vorratsanlage: eigener Text ─────────────────────
 //

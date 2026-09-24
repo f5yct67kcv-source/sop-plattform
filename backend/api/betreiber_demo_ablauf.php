@@ -24,12 +24,26 @@ require_once __DIR__ . '/../demo_instanz.php';
 require_once __DIR__ . '/../mailer.php';
 
 $schluessel = (string)($_GET['schluessel'] ?? '');
-// Der Platzhalter wird hier zusammengesetzt und steht NICHT am Stueck im
-// Quelltext -- sonst ersetzte ihn der Deploy auch in diesem Kommentar und
-// die Pruefung auf unersetzte Platzhalter liefe ins Leere.
+// Der Platzhalter steht ZERLEGT da, und das mit Absicht: Diese Datei geht
+// ueber "cp backend/api/*.php" auch in dist/, dist-cupi24/ und die
+// Demo-Plaetze. Dort soll der Zeitgeber nicht eingerichtet sein, und ein
+// Platzhalter am Stueck braeche deren Pruefung auf Uebriggebliebenes.
+// NUR das Betreiber-Buendel ersetzt ihn -- und zwar genau in dieser
+// zerlegten Form. Anfangs suchte das sed dort die ganze Form, fand sie
+// nie, und jeder Cron-Aufruf fiel als "nicht eingerichtet" in die
+// Sitzungspruefung ("kein Token"). Die Wache dagegen: test_deploy.mjs.
 $erwartet   = '__DEMO_ABLAUF' . '_TOKEN__';
 $lage = demo_ablauf_zeitgeber_lage($erwartet, $schluessel);
 $perZeitgeber = $lage === 'ok';
+
+// Kommt ein Schluessel an, ist hier aber keiner eingerichtet, sagt der
+// Endpunkt genau das -- statt "kein Token" aus der Sitzungspruefung, das nach
+// einem falschen Aufruf aussieht. Unbekannt ist nicht dasselbe wie falsch.
+if ($lage === 'nicht_eingerichtet' && $schluessel !== '') {
+    json_response(['status' => 'error',
+        'message' => 'Der Zeitgeber-Schlüssel ist auf diesem Server nicht eingerichtet. '
+                   . 'Secret DEMO_ABLAUF_TOKEN setzen und neu deployen.'], 503);
+}
 
 if (!$perZeitgeber) {
     // Keine gültige Zeitgeber-Kennung: Dann muss eine Betreiber-Sitzung
