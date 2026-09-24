@@ -1583,6 +1583,20 @@ if (syntaxFehler.length) { console.log('   Syntax: ' + syntaxFehler.join(', '));
     /INSERT INTO einsatz_zuteilung \(einsatz_id, mitarbeiter_id, position_id\)/.test(zuteilenBlock));
 }
 
+// Der Service Worker der App hoert auf push und notificationclick -- und
+// NICHT auf fetch. Ein fetch-Handler, auch ein leerer, weckt ihn vor jeder
+// Anfrage der App, jeder API-Abruf eingeschlossen. Geprueft am Verhalten:
+// sw.js wird mit einem nachgebauten "self" ausgefuehrt, und gezaehlt wird,
+// was sich tatsaechlich anmeldet -- nicht, was im Quelltext steht.
+{
+  const angemeldet = [];
+  const selbst = { addEventListener: t => angemeldet.push(t), registration: {}, clients: {} };
+  new Function('self', readFileSync(`${WURZEL}/sw.js`, 'utf8'))(selbst);
+  check('Der Service Worker hoert auf push (ENT-424)', angemeldet.includes('push'));
+  check('KRITISCH: der Service Worker meldet keinen fetch-Handler an -- er bremste jede Anfrage der App',
+    !angemeldet.includes('fetch'));
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');
