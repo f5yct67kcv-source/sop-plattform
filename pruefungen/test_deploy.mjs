@@ -2367,6 +2367,48 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
   }
 }
 
+// ── Jede Ersetzung im Deploy trifft etwas ─────────────────────────────
+//
+// Ein sed, das seinen Platzhalter nicht findet, laeuft lautlos durch. Und
+// die Pruefung auf unersetzte Platzhalter im Buendel bleibt dann ebenfalls
+// gruen, weil nichts am Stueck dasteht, das sie finden koennte. So lief der
+// Zeitgeber-Schluessel des Demo-Ablaufs und des Vorrats nie auf den Server:
+// Die Quelle schrieb den Platzhalter zerlegt ('__X' . '_TOKEN__'), der
+// Endpunkt hielt sich fuer "nicht eingerichtet" und verlangte eine
+// Anmeldung -- jeder Cron-Aufruf wurde mit "kein Token" abgewiesen.
+//
+// Geprueft wird deshalb die Aussage, nicht eine Liste: Fuer jede
+// sed-Ersetzung mit festem Zielpfad muss die Quelldatei den Suchtext
+// enthalten -- so, wie sed ihn sucht, auch in zerlegter Form.
+{
+  const SED = /sed -i "s\|([^|"]*__[^|"]*)\|[^|"]*\|g" (dist[\w-]*)\/([\w./-]+)/g;
+  // Wie bash und sed den Suchtext lesen: "\\." wird in Anfuehrungszeichen
+  // zu "\.", und das ist fuer sed ein woertlicher Punkt.
+  const woertlich = such => such.replace(/\\+\./g, '.');
+  // Die Quelle zuerst aus der cp-Zeile, die die Datei ins Buendel legt --
+  // dist-portal/index.html ist portal.html, nicht die Homepage index.html.
+  const kopiert = new Map();
+  for (const [, von, nach] of workflow.matchAll(/^\s*cp\s+([\w./-]+)\s+(dist[\w-]*\/[\w./-]+\.\w+)\s*$/gm)) {
+    kopiert.set(nach, von);
+  }
+  const quelle = (ziel, rest) => [kopiert.get(`${ziel}/${rest}`), `backend/${rest}`, rest]
+    .find(p => p && existsSync(`${WURZEL}/${p}`));
+  const leer = [];
+  let gesehen = 0;
+  for (const [, such, ziel, rest] of workflow.matchAll(SED)) {
+    const platzhalter = woertlich(such);
+    const datei = quelle(ziel, rest);
+    if (!datei) { continue; } // erst im Deploy erzeugt, keine Quelle im Repository
+    gesehen++;
+    if (!readFileSync(`${WURZEL}/${datei}`, 'utf8').includes(platzhalter)) {
+      leer.push(`${platzhalter} in ${datei}`);
+    }
+  }
+  check(`Die Ersetzungen im Deploy werden gefunden (${gesehen})`, gesehen > 50);
+  check('KRITISCH: jede Ersetzung im Deploy findet ihren Suchtext in der Quelle'
+    + (leer.length ? ` — ins Leere: ${[...new Set(leer)].join(', ')}` : ''), leer.length === 0);
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

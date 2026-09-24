@@ -1001,7 +1001,7 @@ function beleg_fassung_anlegen(PDO $pdo, int $belegId, array $abbild, string $an
     $json = beleg_abbild_json($abbild);
     $summe = beleg_pruefsumme($json);
     $letzte = beleg_letzte_fassung($pdo, $belegId, $tabPraefix);
-    if ($letzte && hash_equals((string)$letzte['pruefsumme'], $summe)) {
+    if ($letzte && beleg_fassung_gleich($letzte, $abbild)) {
         return ['nummer' => (int)$letzte['nummer'], 'neu' => false];
     }
     $nummer = $letzte ? (int)$letzte['nummer'] + 1 : 1;
@@ -1031,14 +1031,44 @@ function beleg_fassung_freigabe_da(PDO $pdo, string $tabPraefix = ''): bool
     }
 }
 
+// Unsere Unterschrift im Abbild (ENT-704). Beim Freigeben kopiert
+// betreiber_beleg_versenden.php die Unterschrift dessen, der freigibt, unter
+// diesem Schluessel ins Abbild -- NEBEN 'beleg', damit sie unter der
+// Pruefsumme der Fassung steht, aber nicht zum Inhalt zaehlt.
+const BELEG_FREIGABE_UNTERSCHRIFT = 'freigabe_unterschrift';
+
+// Zeigt eine neue Fassung dasselbe wie die letzte? Verglichen wird das
+// Abbild OHNE unsere Unterschrift: Sie kommt erst beim Freigeben dazu, das
+// frisch gelesene Abbild traegt sie nie. Mit ihr im Vergleich waere jede
+// Erinnerung eine neue Fassung (ENT-704). Ein altes Abbild ohne Schluessel
+// vergleicht sich wie bisher.
+function beleg_fassung_gleich(array $letzte, array $abbild): bool
+{
+    $ohne = static function (array $a): string {
+        unset($a[BELEG_FREIGABE_UNTERSCHRIFT]);
+        return beleg_pruefsumme(beleg_abbild_json($a));
+    };
+    return hash_equals($ohne((array)($letzte['abbild'] ?? [])), $ohne($abbild));
+}
+
+// Die Unterschrift aus der Freigabe, gepruefte PNG-Zeichnung oder null.
+// Ein Abbild aus der Zeit davor hat keine -- dann gilt wie bisher der Name.
+function beleg_freigabe_unterschrift(array $abbild): ?array
+{
+    $f = $abbild[BELEG_FREIGABE_UNTERSCHRIFT] ?? null;
+    if (!is_array($f)) { return null; }
+    $bild = beleg_zeichnung_pruefen((string)($f['bild'] ?? ''));
+    if ($bild === null || $bild === '') { return null; }
+    return ['name' => (string)($f['name'] ?? ''), 'bild' => $bild];
+}
+
 // Braucht der Versand eine neue Fassung? Dieselbe Frage wie in
 // beleg_fassung_anlegen(), aber ohne zu schreiben -- die Mail muss vor dem
 // Eintrag wissen, ob sie "neu" oder "angepasst" sagt.
 function beleg_fassung_naechste(PDO $pdo, int $belegId, array $abbild, string $tabPraefix = ''): array
 {
-    $summe = beleg_pruefsumme(beleg_abbild_json($abbild));
     $letzte = beleg_letzte_fassung($pdo, $belegId, $tabPraefix);
-    if ($letzte && hash_equals((string)$letzte['pruefsumme'], $summe)) {
+    if ($letzte && beleg_fassung_gleich($letzte, $abbild)) {
         return ['nummer' => (int)$letzte['nummer'], 'neu' => false];
     }
     return ['nummer' => $letzte ? (int)$letzte['nummer'] + 1 : 1, 'neu' => true];
@@ -1631,7 +1661,7 @@ function beleg_unterschrift_dialog_html(array $info): string
         . 'if(n===2){$("uzCode").focus();}};'
         . 'var eingerichtet=false;'
         . 'window.uzAnnehmen=function(){$("uzHuelle").classList.add("an");uzSchritt(1);'
-        . 'if(!eingerichtet&&window.Unterschrift){eingerichtet=true;Unterschrift.einrichten({ziel:"uzZeichnung",'
+        . 'if(!eingerichtet&&window.Unterschrift){eingerichtet=true;Unterschrift.einrichten({ziel:"uzZeichnung",kraeftig:true,'
         . 'kontext:function(){return{zeilen:[C.was,$("uzFirma").value],name:$("uzName").value};}});}'
         . 'setTimeout(function(){$("uzName").focus();},30);};'
         . 'window.uzZu=function(){$("uzHuelle").classList.remove("an");};'
@@ -1680,15 +1710,21 @@ function beleg_unterschrift_css(): string
 // Protokoll (ENT-688, Punkt 5).
 function beleg_unterschrift_linien(?array $u, ?array $fassung, bool $angenommen): array
 {
-    $leer = ['kunde' => '', 'absender' => '', 'ort' => ''];
+    // Unsere gezeichnete Unterschrift aus der Freigabe (ENT-704) steht schon
+    // VOR der Annahme da: freigegeben ist, was der Link zeigt.
+    $fu = ($fassung && !empty($fassung['freigegeben'])) ? beleg_freigabe_unterschrift((array)($fassung['abbild'] ?? [])) : null;
+    $bildAbsender = $fu ? '<img src="' . beleg_h($fu['bild']) . '" alt="Unterschrift ' . beleg_h($fu['name'])
+        . '" style="max-height:64px;max-width:100%">' : '';
+    $leer = ['kunde' => '', 'absender' => $bildAbsender, 'ort' => ''];
     if (!$angenommen || !$u || $u['art'] !== 'annahme') { return $leer; }
     $schrift = 'font-family:\'Segoe Script\',\'Brush Script MT\',\'Snell Roundhand\',cursive;font-size:21px;line-height:1.1;padding-bottom:4px';
     $kunde = !empty($u['zeichnung'])
-        ? '<img src="' . beleg_h((string)$u['zeichnung']) . '" alt="Unterschrift" style="max-height:44px;max-width:100%">'
+        ? '<img src="' . beleg_h((string)$u['zeichnung']) . '" alt="Unterschrift" style="max-height:64px;max-width:100%">'
         : '<span style="' . $schrift . '">' . beleg_h((string)$u['name']) . '</span>';
-    $absender = ($fassung && !empty($fassung['freigegeben']) && trim((string)$fassung['versendet_von']) !== '')
-        ? '<span style="' . $schrift . '">' . beleg_h((string)$fassung['versendet_von']) . '</span>'
-        : '';
+    $absender = $bildAbsender !== '' ? $bildAbsender
+        : (($fassung && !empty($fassung['freigegeben']) && trim((string)$fassung['versendet_von']) !== '')
+            ? '<span style="' . $schrift . '">' . beleg_h((string)$fassung['versendet_von']) . '</span>'
+            : '');
     $t = strtotime((string)$u['bestaetigt_am']);
     return ['kunde' => $kunde, 'absender' => $absender,
             'ort' => 'Elektronisch angenommen am ' . ($t ? date('d.m.Y', $t) : '–')];
