@@ -1089,7 +1089,7 @@ function ki_assistent_werkzeuge(): array
             'titel' => 'Ein vorbereitetes Formular ergänzen',
             'description' => 'Aendert das Formular, das formular_vorbereiten gerade geoeffnet hat: bei Offerte oder '
                 . 'Rechnung Empfaenger, Titel, Bemerkung und Positionen (hinzufuegen, Menge aendern, entfernen), '
-                . 'beim Einsatz Datum, Zeiten, Anzahl, Ort, Strasse, Bezeichnung und Bemerkung. Nie Preise. Nur '
+                . 'beim Einsatz Kunde, Datum, Zeiten, Anzahl, Ort, Strasse, Bezeichnung und Bemerkung. Nie Preise. Nur '
                 . 'nennen, was sich aendern soll.',
             'input_schema' => ['type' => 'object', 'properties' => [
                 'kunde_name' => ['type' => 'string'], 'titel' => ['type' => 'string'], 'bemerkung' => ['type' => 'string'],
@@ -1137,9 +1137,13 @@ function ki_assistent_system(string $heute): string
         . "- Offene Plaetze und Einsaetze sind verschiedene Einheiten: nenne beide getrennt, nie das eine als das andere.\n"
         . "- Ruhezeit-Hinweise gibst du so weiter, wie sie im Ergebnis stehen. Du legst den GAV nicht aus.\n"
         . "- Soll etwas angelegt oder eine Person geaendert werden, rufe formular_vorbereiten sofort mit dem ganzen "
-        . "Auftrag auf, auch wenn Angaben fehlen. Frag nicht vorher nach; die offenen Felder zeigt das Formular. "
-        . "Danach sagst du in einem Satz, dass es vorbereitet ist, und fragst hoechstens nach der einen wichtigsten "
-        . "fehlenden Angabe. Weitere Angaben dazu gehen mit formular_ergaenzen ins offene Formular.\n"
+        . "Auftrag auf, auch wenn Angaben fehlen. Frag nicht vorher nach.\n"
+        . "- Das Ergebnis von formular_vorbereiten und formular_ergaenzen enthaelt nachfragen: die wichtigen Angaben, "
+        . "die noch fehlen, in ihrer Reihenfolge. Ist die Liste nicht leer, frag in einem kurzen Satz nach dem ersten "
+        . "Punkt, nur nach diesem einen (Von und Bis gelten als ein Punkt). Die Antwort traegst du mit "
+        . "formular_ergaenzen ein und fragst dann nach dem naechsten. Ist nachfragen leer, sag, dass das Formular "
+        . "bereit ist zum Pruefen und Speichern, und frag nach nichts weiterem. Nach Feldern ausserhalb von "
+        . "nachfragen fragst du nie. Will die Person nicht antworten oder spaeter ergaenzen, hoer auf zu fragen.\n"
         . "- Du selbst speicherst, versendest und loeschst nie etwas, und du setzt nie Preise. Wirst du darum gebeten, "
         . "sag das.\n"
         . "- Rechne relative Angaben (morgen, Samstag, diese Woche) selbst in Daten um.\n"

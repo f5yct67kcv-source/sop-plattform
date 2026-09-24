@@ -381,12 +381,38 @@ check('KRITISCH: gespeichert wurde nichts', !rufe.some(x => /beleg_speichern|ein
 routerAntwort = routerAus('einsatz_neu', { kunde_name: 'Beispiel AG', datum: tag(5), von: '07:00', bis: '16:00', bedarf: 2 });
 r = await fragen('Neuer Einsatz für die Beispiel AG', { name: 'formular_vorbereiten', input: { auftrag: 'Neuer Einsatz für die Beispiel AG' }, antwort: 'Vorbereitet.' });
 check('Einsatz: das Formular geht auf', r.geoeffnet === true && await page.isVisible('#view-einsatzneu.on'));
+check('Einsatz: nachgefragt wird nur, was von den wichtigen Angaben fehlt (hier der Arbeitsort)',
+  JSON.stringify(r.nachfragen) === JSON.stringify(['Arbeitsort']));
 r = await fragen('bis 18 Uhr und drei Leute', { name: 'formular_ergaenzen', input: { bis: '18:00', bedarf: 3 }, antwort: 'Angepasst.' });
 check('Einsatz ergänzen: Bis und Anzahl stehen im Formular und sind blau markiert',
   (await page.inputValue('#enNBis')) === '18:00' && (await page.inputValue('#enNBedarf')) === '3'
   && await page.evaluate(() => document.getElementById('enNBis').classList.contains('ki')));
 check('... und die sichtbare Zeitauswahl zeigt es auch', await page.evaluate(() => {
   const el = document.getElementById('enNBis'); return !el.__zw || (el.__zw.std.value === '18' && el.__zw.min.value === '00'); }));
+await page.evaluate(() => enNeuAbbrechen());
+
+// Nachfragen (Projektinhaber 2026-09-24): Kunde, Datum, Von/Bis, Arbeitsort,
+// Anzahl -- in dieser Reihenfolge. Vorgaben des Formulars zaehlen nicht.
+routerAntwort = routerAus('einsatz_neu', { kunde_name: 'Beispiel AG' });
+r = await fragen('Lege einen Einsatz für die Beispiel AG an', { name: 'formular_vorbereiten', input: { auftrag: 'Einsatz für die Beispiel AG' }, antwort: 'Vorbereitet.' });
+check('KRITISCH: Datum (heute) und Anzahl (1) als blosse Vorgabe gelten als offen, nicht als Angabe',
+  JSON.stringify(r.nachfragen) === JSON.stringify(['Datum', 'Von und Bis', 'Arbeitsort', 'Anzahl Mitarbeitende'])
+  && /Vorgabe, nicht gesagt/.test(r.felder.datum) && /Vorgabe, nicht gesagt/.test(r.felder.bedarf));
+r = await fragen('am Samstag', { name: 'formular_ergaenzen', input: { datum: tag(3) }, antwort: 'Von wann bis wann?' });
+check('Nach jeder Antwort rückt die nächste Frage nach (Von und Bis als ein Punkt)',
+  JSON.stringify(r.nachfragen) === JSON.stringify(['Von und Bis', 'Arbeitsort', 'Anzahl Mitarbeitende']) && !/Vorgabe/.test(r.felder.datum));
+r = await fragen('7 bis 16 Uhr in Musterdorf, eine Person', { name: 'formular_ergaenzen', input: { von: '07:00', bis: '16:00', ort: 'Musterdorf', bedarf: 1 }, antwort: 'Bereit zum Prüfen.' });
+check('Eine gesagte „eine Person“ zählt, obwohl sie der Vorgabe gleicht; danach ist nichts mehr nachzufragen',
+  Array.isArray(r.nachfragen) && r.nachfragen.length === 0);
+r = await fragen('Der Kunde ist Neufirma AG', { name: 'formular_ergaenzen', input: { kunde_name: 'Neufirma AG' }, antwort: 'Eingetragen.' });
+check('Einsatz: der Kunde lässt sich im Gespräch nachtragen; ausserhalb der Kundenliste orange, ohne neue Nachfrage',
+  (await page.inputValue('#enNKunde_name')) === 'Neufirma AG' && r.geaendert.includes('Kunde')
+  && await page.evaluate(() => document.getElementById('enNKunde_name').classList.contains('ki-offen'))
+  && r.kunde_in_kundenliste === false && r.nachfragen.length === 0);
+r = await fragen('Doch die muster gmbh', { name: 'formular_ergaenzen', input: { kunde_name: 'muster gmbh' }, antwort: 'Eingetragen.' });
+check('Ein Kunde aus der Liste wird in seiner Schreibweise übernommen und blau markiert',
+  (await page.inputValue('#enNKunde_name')) === 'Muster GmbH' && r.kunde_in_kundenliste === true
+  && await page.evaluate(() => { const c = document.getElementById('enNKunde_name').classList; return c.contains('ki') && !c.contains('ki-offen'); }));
 await page.evaluate(() => enNeuAbbrechen());
 
 routerAntwort = [403, { status: 'error', grund: 'kein_recht', recht: 'offerten_schreiben', message: 'Für „Offerten“ fehlt dir die Berechtigung.' }];

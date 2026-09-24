@@ -13147,6 +13147,11 @@ function asFormularStand() {
         ...(ofPos.some(z => z.produkt_name) ? [] : ['Positionen']),
         ...ofPos.filter(z => z.produkt_name && !z.einzelpreis_rappen).map(z => `Preis für „${z.produkt_name}“`),
       ],
+      // Nachgefragt wird nur, was der Assistent eintragen darf -- nie Preise.
+      nachfragen: [
+        ...($('of_kunde').value.trim() ? [] : ['Empfänger']),
+        ...(ofPos.some(z => z.produkt_name) ? [] : ['Positionen']),
+      ],
       katalog: produkte.filter(p => Number(p.aktiv ?? 1) === 1).map(p => p.name).slice(0, 60),
       gespeichert: false,
     };
@@ -13155,8 +13160,31 @@ function asFormularStand() {
     const w = f => { const el = $(enId('enN', f)); return el ? String(el.value || '').trim() : ''; };
     const stand = {};
     EN_FELDER.forEach(f => { if (w(f)) { stand[f] = w(f); } });
+    // Datum (heute) und Anzahl (1) stehen beim Oeffnen als Vorgabe im
+    // Formular. Solange sie weder gesagt (blau) noch von Hand geaendert sind,
+    // gelten sie als offen -- eine Vorgabe ist keine Angabe.
+    const vorgabe = { datum: isoTag(), bedarf: '1' };
+    const gesetzt = f => {
+      const el = $(enId('enN', f));
+      return !!w(f) && (el.classList.contains('ki') || vorgabe[f] === undefined || w(f) !== vorgabe[f]);
+    };
+    const kundeBekannt = !!w('kunde_name') && kunden.some(k => String(k.name).toLowerCase() === w('kunde_name').toLowerCase());
+    Object.keys(vorgabe).forEach(f => { if (stand[f] && !gesetzt(f)) { stand[f] += ' (Vorgabe, nicht gesagt)'; } });
+    // Die Punkte zum Nachfragen, in dieser Reihenfolge (Projektinhaber
+    // 2026-09-24): Pflichtfelder und die Anzahl, sonst nichts.
+    const nachfragen = [
+      ...(!gesetzt('kunde_name') ? ['Kunde'] : []),
+      ...(!gesetzt('datum') ? ['Datum'] : []),
+      ...(!gesetzt('von') || !gesetzt('bis') ? ['Von und Bis'] : []),
+      ...(!gesetzt('ort') ? ['Arbeitsort'] : []),
+      ...(!gesetzt('bedarf') ? ['Anzahl Mitarbeitende'] : []),
+    ];
+    // Ein Kunde ausserhalb der Kundenliste ist erlaubt (freie Eingabe) -- ein
+    // Hinweis, keine Nachfrage, sonst kaeme sie in jeder Runde wieder.
     return { formular: 'Einsatz', felder: stand,
-      noch_offen: ['kunde_name', 'ort', 'von', 'bis'].filter(f => !w(f)).map(f => EN_LABEL[f]), gespeichert: false };
+      kunde_in_kundenliste: w('kunde_name') ? kundeBekannt : null,
+      noch_offen: ['kunde_name', 'ort', 'von', 'bis'].filter(f => !w(f)).map(f => EN_LABEL[f]),
+      nachfragen, gespeichert: false };
   }
   if (b === 'kunde') { return { formular: 'Kunde', name: $('ku_name').value.trim() || null, gespeichert: false }; }
   if (b === 'mitarbeiter') { return { formular: asFormular.aktion === 'aendern' ? 'Mitarbeitende ändern' : 'Mitarbeitende anlegen', gespeichert: false }; }
@@ -13224,6 +13252,19 @@ async function asWzErgaenzen(e) {
     ofPos = zeilen.length ? zeilen : [ofLeereZeile()];
     ofZeilenZeichnen();
   } else if (asFormular.bereich === 'einsatz') {
+    if (e.kunde_name) {
+      // Wie bei der Offerte: aus der Kundenliste blau, sonst orange zum Pruefen.
+      const name = String(e.kunde_name).trim();
+      const k = kunden.find(x => String(x.name).toLowerCase() === name.toLowerCase());
+      const el = $('enNKunde_name');
+      el.value = k ? k.name : name;
+      el.classList.toggle('ki', !!k);
+      el.classList.toggle('ki-offen', !k);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      geaendert.push('Kunde');
+      if (!k) { hinweise.push(`„${name}“ steht nicht in der Kundenliste`); }
+    }
     const felder = { datum: asDatum(e.datum), von: asZeit(e.von), bis: asZeit(e.bis),
       bedarf: Number.isInteger(e.bedarf) && e.bedarf > 0 ? String(Math.min(99, e.bedarf)) : null,
       ort: e.ort, strasse: e.strasse, titel: e.titel, bemerkung: e.bemerkung };
@@ -13237,7 +13278,6 @@ async function asWzErgaenzen(e) {
       el.dispatchEvent(new Event('change', { bubbles: true }));
       geaendert.push(EN_LABEL[f] || f);
     });
-    if (e.kunde_name) { hinweise.push('Den Kunden eines Einsatzes bitte im Formular wählen.'); }
     if (e.positionen_hinzu || e.positionen_menge || e.positionen_entfernen) { hinweise.push('Ein Einsatz hat keine Positionen.'); }
   } else {
     return { modell: { fehler: 'Kunden- und Mitarbeitendenformulare ergänzt der Assistent nicht. Bitte im Formular weiter, oder den ganzen Auftrag neu sagen.' } };
@@ -19934,6 +19974,7 @@ function openEinsatzNeu(felder, maNamen) {
     const hat = felder[f] !== undefined && felder[f] !== '';
     el.value = hat ? felder[f] : (vorgabe[f] !== undefined ? vorgabe[f] : '');
     el.classList.toggle('ki', ausDiktat && hat);
+    el.classList.remove('ki-offen');
   });
   $('enNStatus').value = 'geplant';
   // Beim zweiten Oeffnen duerfen keine Reste des vorigen Einsatzes stehen.
