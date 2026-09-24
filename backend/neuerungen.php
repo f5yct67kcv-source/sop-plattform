@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 14,
+            'datum' => '2026-09-24',
+            'art'   => 'fehlerbehebung',
+            'fuer'  => ['betreiber'],
+            'titel' => 'Einrichtung auf neuen, leeren Anlagen',
+            'text'  => 'Auf einer frischen Datenbank, etwa einem neuen Vorratsplatz, brach die Einrichtung bei den Ereignismeldungen ab. Sie läuft jetzt vollständig durch. Ein Klick auf „Erneut versuchen“ holt nach, was fehlte.',
+        ],
+        [
             'nr'    => 13,
             'datum' => '2026-09-24',
             'art'   => 'fehlerbehebung',
