@@ -131,8 +131,14 @@ function beleg_pdf_absender(array $a): array
 }
 
 // Das PDF als Zeichenkette. $fassung und $u wie in
-// beleg_pruefprotokoll_zeilen(); $u darf null sein (dann ohne Protokoll).
-function beleg_pdf(array $abbild, array $fassung, ?array $u, bool $komprimiert = true): string
+// beleg_pruefprotokoll_zeilen(); $u darf null sein (dann ohne Annahme).
+//
+// $mitProtokoll (ENT-710): Der Kunde bekommt nach der Annahme nur die
+// Quittung (beleg_annahme_quittung()), das volle Pruefprotokoll nur die
+// interne Fassung. Ohne Angabe die Kundenfassung -- was nicht ausdruecklich
+// intern ist, verlaesst den Server ohne IP-Adresse und Browser.
+function beleg_pdf(array $abbild, array $fassung, ?array $u, bool $komprimiert = true,
+                   bool $mitProtokoll = false): string
 {
     $b      = (array)($abbild['beleg'] ?? []);
     $art    = (string)($b['art'] ?? 'offerte');
@@ -386,7 +392,7 @@ function beleg_pdf(array $abbild, array $fassung, ?array $u, bool $komprimiert =
     }
 
     // ── Pruefprotokoll (ENT-688, Punkt 8) ──────────────────────────────
-    if ($angenommen) {
+    if ($angenommen && $mitProtokoll) {
         // Das Protokoll bleibt beisammen. Seine Hoehe wird GERECHNET, nicht
         // geschaetzt: Eine geschaetzte Hoehe liess den letzten Satz allein
         // auf die naechste Seite rutschen (gemessen am gerenderten PDF).
@@ -395,8 +401,7 @@ function beleg_pdf(array $abbild, array $fassung, ?array $u, bool $komprimiert =
         $hoehe = 8 + 3 + 5 + 2 + 2 * 3.8 + 2;
         foreach ($zeilenP as [, $w]) { $hoehe += 4.4 * $pdf->zeilen(130, $T($w)); }
         $pdf->SetFont('Helvetica', '', 7.5);
-        $hoehe += 3.8 * max(0, $pdf->zeilen(170, $T('Einfache elektronische Signatur mit Bestätigungscode per E-Mail. '
-            . 'Die Prüfsumme weist nach, dass das angenommene Dokument seit der Annahme unverändert ist.')) - 2);
+        $hoehe += 3.8 * max(0, $pdf->zeilen(170, $T(beleg_pruefprotokoll_fussnote($u))) - 2);
         $pdf->platz($hoehe);
         $pdf->Ln(8);
         $pdf->SetDrawColor(229, 232, 236);
@@ -418,8 +423,31 @@ function beleg_pdf(array $abbild, array $fassung, ?array $u, bool $komprimiert =
         $pdf->Ln(2);
         $pdf->SetFont('Helvetica', '', 7.5);
         $pdf->SetTextColor(107, 114, 128);
-        $pdf->MultiCell(0, 3.8, $T('Einfache elektronische Signatur mit Bestätigungscode per E-Mail. Die Prüfsumme '
-            . 'weist nach, dass das angenommene Dokument seit der Annahme unverändert ist.'), 0, 'L');
+        $pdf->MultiCell(0, 3.8, $T(beleg_pruefprotokoll_fussnote($u)), 0, 'L');
+    }
+
+    // ── Quittung fuer den Kunden (ENT-710) ────────────────────────────
+    // Dezent am Ende der letzten Seite, ueber der Seitenfusszeile. Reicht
+    // der Platz dort nicht, folgt sie dem Inhalt (und notfalls auf die
+    // naechste Seite) -- nie ueber etwas drueber.
+    if ($angenommen && !$mitProtokoll) {
+        $satz = $T(beleg_annahme_quittung($u, $abs['firma']));
+        $pdf->SetFont('Helvetica', '', 7.5);
+        $hoehe = 3 + 3.8 * $pdf->zeilen(170, $satz);
+        // Unter 20 mm vom Rand bricht FPDF selbst um (SetAutoPageBreak).
+        $unten = $pdf->GetPageHeight() - 20.5 - $hoehe;
+        if ($pdf->GetY() + 6 <= $unten) {
+            $pdf->SetY($unten);
+        } else {
+            $pdf->platz($hoehe + 6);
+            $pdf->Ln(6);
+        }
+        $pdf->SetDrawColor(229, 232, 236);
+        $pdf->Line(20, $pdf->GetY(), 190, $pdf->GetY());
+        $pdf->Ln(3);
+        $pdf->SetTextColor(107, 114, 128);
+        $pdf->MultiCell(0, 3.8, $satz, 0, 'L');
+        $pdf->SetTextColor(20, 22, 26);
     }
 
     $raus = $pdf->Output('S');
@@ -481,14 +509,14 @@ function beleg_bestaetigung_mail(array $beleg, array $u, int $fassung, string $f
     $betreff = "Bestätigung: $titel $nummer angenommen";
     $text = "$anrede\n\n"
         . "vielen Dank. Sie haben die $titel $nummer (Fassung $fassung) am $am angenommen.\n\n"
-        . "Das unterschriebene Dokument mit Prüfprotokoll liegt dieser E-Mail bei. Bitte bewahren Sie es auf.\n\n"
+        . "Das unterschriebene Dokument liegt dieser E-Mail bei. Bitte bewahren Sie es auf.\n\n"
         . "Mit freundlichen Grüssen\n" . implode("\n", $gruss);
     $logo = $mitLogo ? mail_logo() : null;
     $logoHell = $mitLogo ? mail_logo_hell() : null;
     $inhalt = mail_absatz(mail_e($anrede))
         . mail_absatz('vielen Dank. Sie haben die <b>' . mail_e("$titel $nummer") . '</b> (Fassung ' . $fassung
             . ') am ' . mail_e($am) . ' angenommen.')
-        . mail_absatz('Das unterschriebene Dokument mit Prüfprotokoll liegt dieser E-Mail bei. Bitte bewahren Sie es auf.')
+        . mail_absatz('Das unterschriebene Dokument liegt dieser E-Mail bei. Bitte bewahren Sie es auf.')
         . mail_signatur($gruss, $logo === null ? '' : (string)$logo['cid'], $logoHell === null ? '' : (string)$logoHell['cid']);
     return ['betreff' => $betreff, 'text' => $text, 'html' => mail_rahmen($inhalt),
             'bilder' => array_values(array_filter([$logo, $logoHell]))];
@@ -530,6 +558,8 @@ function beleg_annahme_abschliessen(PDO $pdo, string $tabPraefix, int $belegId, 
 
     $pdf = null;
     try {
+        // Gespeichert wird die KUNDENFASSUNG mit der Quittung (ENT-710): Sie
+        // ist das Dokument, das der Kunde bekommt und am Link wieder abruft.
         $pdf = beleg_pdf($f['abbild'], $f, $u);
         // EINMAL: Steht schon ein PDF da, bleibt es. Ein zweiter Aufruf
         // erzeugt keines, das vom ersten abweicht.
@@ -545,10 +575,17 @@ function beleg_annahme_abschliessen(PDO $pdo, string $tabPraefix, int $belegId, 
     }
 
     $titel = (string)(BELEG_ARTEN[(string)$beleg['art']]['titel'] ?? 'Beleg');
-    $anhang = $pdf !== null
-        ? [['name' => preg_replace('/[^A-Za-z0-9._-]/', '-', "$titel-{$beleg['nummer']}-angenommen") . '.pdf',
-            'mime' => 'application/pdf', 'inhalt' => $pdf]]
-        : [];
+    $dateiname = preg_replace('/[^A-Za-z0-9._-]/', '-', "$titel-{$beleg['nummer']}-angenommen") . '.pdf';
+    $anhang = $pdf !== null ? [['name' => $dateiname, 'mime' => 'application/pdf', 'inhalt' => $pdf]] : [];
+    // Die eigene Seite bekommt die interne Fassung mit dem vollen
+    // Pruefprotokoll (ENT-710). Scheitert sie, geht die Kundenfassung mit.
+    $anhangIntern = $anhang;
+    try {
+        $anhangIntern = [['name' => $dateiname, 'mime' => 'application/pdf',
+                          'inhalt' => beleg_pdf($f['abbild'], $f, $u, true, true)]];
+    } catch (Throwable $e) {
+        // siehe oben
+    }
     try {
         $m = beleg_bestaetigung_mail($beleg, $u, (int)$f['nummer'], $firma, false, $signaturZeilen,
                                      $tabPraefix === 'be_');
@@ -560,13 +597,31 @@ function beleg_annahme_abschliessen(PDO $pdo, string $tabPraefix, int $belegId, 
     foreach (beleg_bestaetigung_empfaenger($pdo, $tabPraefix, $f) as $e) {
         try {
             $m = beleg_bestaetigung_mail($beleg, $u, (int)$f['nummer'], $firma, true);
-            smtp_senden((string)$e['email'], (string)($e['name'] ?? ''), $m['betreff'], $m['html'], $m['text'], $anhang, []);
+            smtp_senden((string)$e['email'], (string)($e['name'] ?? ''), $m['betreff'], $m['html'], $m['text'], $anhangIntern, []);
             $raus['intern']++;
         } catch (Throwable $x) {
             // Eine unzustellbare Adresse haelt die uebrigen nicht auf.
         }
     }
     return $raus;
+}
+
+// Die INTERNE Fassung mit dem vollen Pruefprotokoll (ENT-710) -- oder
+// null. Nur hinter einer Anmeldung (beleg_pdf_intern.php,
+// betreiber_beleg_pdf_intern.php), nie am Link des Kunden.
+//
+// Erzeugt, nicht gespeichert: Gespeichert ist das Dokument, das der Kunde
+// bekommen hat. Das Protokoll sind die Daten der Annahme, und die stehen
+// unveraendert in der Unterschrift und der Fassung, deren Pruefsumme hier
+// stimmen muss ('echt').
+function beleg_pdf_intern(PDO $pdo, string $tabPraefix, int $belegId): ?string
+{
+    $u = beleg_unterschrift_letzte($pdo, $tabPraefix, $belegId);
+    $f = beleg_letzte_fassung($pdo, $belegId, $tabPraefix);
+    if (!$u || $u['art'] !== 'annahme' || !$f || !$f['echt'] || (int)$f['nummer'] !== (int)$u['fassung']) {
+        return null;
+    }
+    return beleg_pdf($f['abbild'], $f, $u, true, true);
 }
 
 // Das gespeicherte PDF einer Annahme -- oder null.

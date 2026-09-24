@@ -1751,27 +1751,42 @@ function beleg_pruefprotokoll_zeilen(array $beleg, array $fassung, array $u): ar
     ];
 }
 
-// Das Protokoll als Abschnitt am Ende des Dokuments. Es steht IM Dokument
-// (und damit auf dem Ausdruck), nicht in der Seitenspalte: Es gehoert zu
-// dem, was angenommen wurde.
-function beleg_pruefprotokoll_html(array $zeilen): string
+// Die Quittung fuer den Kunden (ENT-710). Das Pruefprotokoll mit
+// Pruefsumme, IP-Adresse und Browser verwirrt den Kunden eher, als dass es
+// ihm etwas nachweist -- er sieht darum nur diesen einen Satz, dezent am
+// Ende des Dokuments. Das volle Protokoll bleibt intern (beleg_pdf() mit
+// $mitProtokoll, die internen PDF-Endpunkte und die interne Mail).
+//
+// $firma ist die Absenderin: Sie bewahrt den Nachweis auf, und der Satz
+// sagt das, damit "kein Protokoll" nicht wie "kein Nachweis" aussieht.
+function beleg_annahme_quittung(array $u, string $firma): string
 {
-    $html = '';
-    foreach ($zeilen as [$l, $w]) {
-        $mono = $l === 'Prüfsumme (SHA-256)';
-        $html .= '<tr><td style="padding:3px 18px 3px 0;color:#6B7280;vertical-align:top;white-space:nowrap">'
-            . beleg_h($l) . '</td><td style="padding:3px 0;word-break:break-all'
-            . ($mono ? ';font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px' : '')
-            . '">' . beleg_h($w) . '</td></tr>';
-    }
-    return '<div id="pruefprotokoll" style="margin-top:30px;padding-top:14px;border-top:1px solid #E5E8EC;'
-        . 'page-break-inside:avoid;break-inside:avoid">'
-        . '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;'
-        . 'color:#6B7280;margin-bottom:8px">Prüfprotokoll der elektronischen Annahme</div>'
-        . '<table style="width:100%;font-size:11.5px;line-height:1.45">' . $html . '</table>'
-        . '<div style="font-size:10.5px;color:#6B7280;margin-top:8px;line-height:1.5">Einfache elektronische '
-        . 'Signatur mit Bestätigungscode per E-Mail. Die Prüfsumme weist nach, dass dieses Dokument seit der '
-        . 'Annahme unverändert ist.</div></div>';
+    $t = strtotime((string)($u['bestaetigt_am'] ?? ''));
+    $am = $t ? date('d.m.Y', $t) . ' um ' . date('H:i', $t) . ' Uhr' : '';
+    $wer = implode(', ', array_filter([(string)($u['name'] ?? ''), (string)($u['funktion'] ?? ''),
+        (string)($u['firma'] ?? '')], static fn($x) => trim($x) !== ''));
+    $satz = 'Elektronisch angenommen' . ($am !== '' ? ' am ' . $am : '') . ($wer !== '' ? ' von ' . $wer : '') . '.';
+    return $satz . (trim($firma) !== ''
+        ? ' Den vollständigen Nachweis der Annahme bewahrt ' . trim($firma) . ' auf.'
+        : ' Der vollständige Nachweis der Annahme wird aufbewahrt.');
+}
+
+function beleg_annahme_quittung_html(array $u, string $firma): string
+{
+    return '<div id="annahmequittung" style="margin-top:14px;padding-top:10px;border-top:1px solid #E5E8EC;'
+        . 'font-size:10.5px;line-height:1.5;color:#6B7280;page-break-inside:avoid;break-inside:avoid">'
+        . beleg_h(beleg_annahme_quittung($u, $firma)) . '</div>';
+}
+
+// Der Satz unter dem internen Protokoll. Ohne Code (ENT-708) war der Weg
+// der Link an die Empfaengeradresse -- dann darf dort nicht "mit
+// Bestaetigungscode" stehen.
+function beleg_pruefprotokoll_fussnote(array $u): string
+{
+    return (!empty($u['ohne_code'])
+            ? 'Einfache elektronische Signatur über den persönlichen Link in der E-Mail an die Empfängeradresse. '
+            : 'Einfache elektronische Signatur mit Bestätigungscode per E-Mail. ')
+        . 'Die Prüfsumme weist nach, dass das angenommene Dokument seit der Annahme unverändert ist.';
 }
 
 // Der Unterschriftsdialog (ENT-688: Dialog ueber der Seite, zwei Schritte)

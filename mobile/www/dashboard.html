@@ -17260,7 +17260,7 @@ function ofSummenZeichnen() {
 // ── Laden und Speichern ───────────────────────────────────────────────────
 /* Wo das unterschriebene PDF liegt (ENT-688, Schritt 3) -- je Seite ein
    eigener Endpunkt, darum ausserhalb des gemeinsamen Blocks darunter. */
-const OF_PDF_ENDPUNKT = 'beleg_pdf.php';
+const OF_PDF_ENDPUNKT = 'beleg_pdf_intern.php';
 
 /* ── Fassungen und Sperre (ENT-688) ─────────────────────────────────────
    Der Chip im Kopf sagt, welche Fassung der Empfaenger am Link sieht, und
@@ -17331,14 +17331,15 @@ function ofSperreSetzen(gesperrt) {
       + (u.grund ? ' Grund: ' + u.grund : ' Ohne Grund.');
   }
   leiste.textContent = text;
-  /* Das unterschriebene PDF (ENT-688, Schritt 3) -- das gespeicherte aus
-     dem Moment der Annahme, ueber denselben Link, den der Kunde hat. */
-  if (gesperrt && u && u.pdf_da && ofFormToken) {
+  /* Das unterschriebene PDF MIT dem vollen Pruefprotokoll (ENT-710) --
+     nur hier, hinter der Anmeldung. Der Kunde hat am Link die Fassung mit
+     der Quittung. */
+  if (gesperrt && u && u.pdf_da && ofFormId) {
     const a = document.createElement('a');
-    a.href = API + OF_PDF_ENDPUNKT + '?token=' + encodeURIComponent(ofFormToken);
+    a.href = API + OF_PDF_ENDPUNKT + '?id=' + encodeURIComponent(ofFormId);
     a.target = '_blank';
     a.rel = 'noopener';
-    a.textContent = 'Unterschriebenes PDF öffnen';
+    a.textContent = 'PDF mit Prüfprotokoll öffnen';
     a.style.cssText = 'margin-left:8px;font-weight:650;color:inherit;text-decoration:underline';
     leiste.appendChild(a);
   }

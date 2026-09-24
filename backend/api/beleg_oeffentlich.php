@@ -403,10 +403,11 @@ try {
             . '</div>';
     }
 
-    // Das Pruefprotokoll (ENT-688, Punkt 8) -- nur nach einer Annahme mit Code.
-    $protokoll = ($unterschrift && $unterschrift['art'] === 'annahme' && $fassung
-                  && $b['status'] === 'bestaetigt' && $entschieden)
-        ? beleg_pruefprotokoll_html(beleg_pruefprotokoll_zeilen($b, $fassung, $unterschrift))
+    // Nach der Annahme eine schlichte Quittung, dezent am Ende des Dokuments
+    // (ENT-710). Das technische Pruefprotokoll bleibt intern.
+    $quittung = ($unterschrift && $unterschrift['art'] === 'annahme' && $fassung
+                 && $b['status'] === 'bestaetigt' && $entschieden)
+        ? beleg_annahme_quittung_html($unterschrift, $firma)
         : '';
 
     $dokument = '<div class="keindruck" style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:24px">'
@@ -450,7 +451,6 @@ try {
         . $abschnitt('Notizen', $b['oeffentliche_notizen'])
         . $abschnitt('Bedingungen', $b['bedingungen'])
         . $unterschriftsseite
-        . $protokoll
         // margin-top:auto auf dem LETZTEN Flex-Kind schiebt es an den
         // unteren Rand der Seite, egal wie wenig Inhalt darueber steht --
         // auch wenn die Beleg-Fusszeile selbst leer ist, bleibt so die
@@ -458,6 +458,7 @@ try {
         . '<div style="margin-top:auto;padding-top:14px">'
         . ($b['fusszeile_text'] ? '<div style="border-top:1px solid #E5E8EC;padding-top:14px;white-space:pre-line;line-height:1.5;font-size:12px">' . nl2br(portal_esc($b['fusszeile_text'])) . '</div>' : '')
         . $betriebFusszeile
+        . $quittung
         . '</div>'
         . '</div>'
         . '</div>';
