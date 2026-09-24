@@ -328,7 +328,9 @@ function beleg_pdf(array $abbild, array $fassung, ?array $u, bool $komprimiert =
             $bilder[] = $bild['datei'];
             $h = 18; $w = $h * $bild['b'] / $bild['h'];
             if ($w > $breite) { $w = $breite; $h = $w * $bild['h'] / $bild['b']; }
-            $pdf->Image($bild['datei'], $x, $y - $h - 0.5, $w, $h, $bild['typ']);
+            // Ein Fuenftel ueber die Linie hinaus (ENT-706): Der untere Rand
+            // des Bildes ist Luft und Unterlaenge, nicht die Grundlinie.
+            $pdf->Image($bild['datei'], $x, $y - $h * 0.8, $w, $h, $bild['typ']);
         };
         // Unsere Unterschrift aus der Freigabe (ENT-704), fest in der Fassung.
         $fu = !empty($fassung['freigegeben']) ? beleg_freigabe_unterschrift($abbild) : null;
@@ -352,7 +354,8 @@ function beleg_pdf(array $abbild, array $fassung, ?array $u, bool $komprimiert =
         $pdf->SetDrawColor(20, 22, 26);
         $pdf->Line($links, $y, $links + $breite, $y);
         $pdf->Line($rechts, $y, $rechts + $breite, $y);
-        $pdf->SetXY($links, $y + 1.5);
+        // Tiefer als die Unterlaenge der Unterschrift (ENT-706).
+        $pdf->SetXY($links, $y + 4.5);
         $pdf->SetFont('Helvetica', '', 7.5);
         $pdf->SetTextColor(107, 114, 128);
         $auftraggeber = trim((string)($kunde['name'] ?? '')) ?: 'Auftraggeber';
