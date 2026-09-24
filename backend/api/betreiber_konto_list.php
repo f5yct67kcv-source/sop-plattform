@@ -8,6 +8,7 @@
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../betreiber.php';
+require_once __DIR__ . '/../belege.php';
 
 $ich = require_betreiber_voll();
 $pdo = betreiber_db();
@@ -67,6 +68,8 @@ $liste = array_map(static function (array $k) use ($ich, $pdo, $geteilt, $hatArc
     $bild = be_unterschrift_von($pdo, $k['id']);
     $k['unterschrift_da'] = $bild === null ? null : $bild !== '';
     $k['unterschrift'] = ($k['ich'] && $bild !== null && $bild !== '') ? $bild : null;
+    // Wo die Schrift auf der Linie steht (ENT-706), fuer die Karte.
+    $k['unterschrift_grundlinie'] = $k['unterschrift'] !== null ? beleg_unterschrift_grundlinie($k['unterschrift']) : null;
     return $k;
 }, $zeilen);
 
