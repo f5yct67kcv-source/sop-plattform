@@ -59,14 +59,15 @@
 
       <p class="hb-kicker">Cockpit</p>
       <h1>Kunden</h1>
-      <p class="hb-lead">Kundenstamm, Objekte, Rapporte, Offerten und Rechnungen — fünf
-      Reiter in derselben Ansicht. Adressen und Objekte sind dabei zwei getrennte Listen:
+      <p class="hb-lead">Kundenstamm, Objekte, Rapporte und Offerten — vier Reiter in
+      derselben Ansicht, dazu eine Übersicht über die offenen Offerten. Die Rechnungen
+      stehen unter <b>Finanzen → Rechnungen</b>. Adressen und Objekte sind dabei zwei getrennte Listen:
       Objekte erscheinen <b>nicht</b> auf der Kunden-Detailseite, sondern nur in der
       eigenen Objektliste.</p>
 
       <div class="hb-kasten hb-achtung">
-        <p class="hb-kasten-titel">Ein Reiter, fünf verschiedene Rechte</p>
-        <p>Die fünf Reiter liegen zwar sichtbar nebeneinander, gehören aber
+        <p class="hb-kasten-titel">Ein Bereich, verschiedene Rechte</p>
+        <p>Die Reiter liegen zwar sichtbar nebeneinander, gehören aber
         <b>unterschiedlichen</b> Rechte-Bereichen an: „Adressen" gehört zu „Kunden",
         „Objekte" gehört zu „Planung", „Rapporte" gehört zu „Abgleich", „Offerten" und
         „Rechnungen" gehören gemeinsam zu „Offerten &amp; Rechnungen". Jemand kann also
@@ -174,7 +175,8 @@
       </div>
 
       <h2 id="offerten-rechnungen">Offerten &amp; Rechnungen</h2>
-      <p>Gemeinsames Formular, getrennte Listen. Status einer Offerte: Entwurf →
+      <p>Gemeinsames Formular, getrennte Listen: die Offerten hier unter Kunden, die
+      Rechnungen unter Finanzen → Rechnungen. Status einer Offerte: Entwurf →
       Versendet → Angeschaut → Bestätigt/Abgelehnt. Eine Rechnung zeigt zusätzlich
       „Fällig" und „Offener Betrag"; abgelaufene Fristen erscheinen automatisch als
       „Überfällig", bezahlte als „Bezahlt" — unabhängig vom ursprünglichen Status.</p>

@@ -261,15 +261,16 @@ const sichtbar = id => page.evaluate(i => {
 await anmelden();
 
 // ── 1. Der Reiter haengt am eigenen Recht ────────────────────────────────
-check('Mit dem Recht "Lohn" steht die Rubrik in der Navigation', await sichtbar('navg-lohn'));
+// Seit ENT-712 lebt der Lohn unter Finanzen -> Lohn (Kachelleiste).
+check('Mit dem Recht "Lohn" steht die Rubrik Finanzen in der Navigation', await sichtbar('navg-finanzen'));
 // Die Unterpunkte liegen in der eingeklappten Rubrik -- gemessen wird
 // darum nicht, ob sie GERADE zu sehen sind, sondern ob rechteAnwenden()
 // sie freigegeben hat. Ein per style ausgeblendeter Knopf bliebe auch nach
 // dem Aufklappen fort.
 const freigegeben = id => page.evaluate(i =>
   !!document.getElementById(i) && document.getElementById(i).style.display !== 'none', id);
-check('Mit dem Recht "Lohn" sind beide Unterpunkte freigegeben',
-  await freigegeben('nav-lohn-lohnarten') && await freigegeben('nav-lohn-saetze'));
+check('Mit dem Recht "Lohn" ist der Unterpunkt "Lohn" freigegeben',
+  await freigegeben('nav-finanzen-lohn'));
 
 // ── 2. Lohnarten: die sechs Kennzeichen ──────────────────────────────────
 await page.evaluate(() => go('lohnarten'));
@@ -623,11 +624,11 @@ check('KRITISCH: mit Schreibrecht ist der Knopf wieder da -- die Prüfung oben m
 rechte = ['personal_lesen'];
 lohnAntwort = LOHN_VOLL;
 await anmelden();
-check('KRITISCH: ohne das Recht "Lohn" fehlt die Rubrik in der Navigation',
-  !(await sichtbar('navg-lohn')));
-check('KRITISCH: auch der Lohnlauf-Eintrag ist ohne das Recht fort',
-  await page.evaluate(() => !document.getElementById('nav-lohn-laeufe')
-    || document.getElementById('nav-lohn-laeufe').style.display === 'none'));
+check('KRITISCH: ohne das Recht "Lohn" (und ohne weitere Finanzrechte) fehlt die Rubrik in der Navigation',
+  !(await sichtbar('navg-finanzen')));
+check('KRITISCH: auch der Lohn-Eintrag ist ohne das Recht fort',
+  await page.evaluate(() => !document.getElementById('nav-finanzen-lohn')
+    || document.getElementById('nav-finanzen-lohn').style.display === 'none'));
 await page.evaluate(() => { go('mitarbeiter'); openMaDetail('muster.person'); });
 await page.waitForTimeout(400);
 check('KRITISCH: ohne das Recht "Lohn" fehlt auch der Reiter in der Personalakte',
