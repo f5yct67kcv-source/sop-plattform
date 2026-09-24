@@ -43,12 +43,13 @@ const EI = [
   { id: 13, datum: tag(3), von: '07:00:00', bis: '16:00:00', bedarf: 3, status: 'abgesagt', kunde_name: 'Beispiel AG', titel: 'Abgesagt', mitarbeiter: [] },
   { id: 14, datum: tag(40), von: '07:00:00', bis: '16:00:00', bedarf: 5, status: 'geplant', kunde_name: 'Beispiel AG', titel: 'Spaeter', mitarbeiter: [] },
   { id: 15, datum: tag(4), von: '20:00:00', bis: '06:00:00', bedarf: 3, status: 'geplant', kunde_name: 'Muster GmbH', titel: 'Nachtwache', mitarbeiter: [] },
-  // Vergangen (offene Enden, ENT-709): 16 noch nicht abgeglichen, 17 abgeglichen,
-  // 18 abgelehnt (zaehlt nicht).
+  // Vergangen (offene Enden, ENT-709): 16 noch nicht abgeglichen -- das alte
+  // abgeglichen_am stammt von einem aufgehobenen Abgleich, massgeblich ist
+  // der Ist-Status wie im Server; 17 abgeglichen; 18 abgelehnt (zaehlt nicht).
   { id: 16, datum: tag(-2), von: '07:00:00', bis: '12:00:00', bedarf: 1, status: 'geplant', kunde_name: 'Beispiel AG', titel: 'Frueh',
-    mitarbeiter: [{ id: 3, name: 'ptest', zusage: 'zugesagt', abgeglichen_am: null }] },
+    mitarbeiter: [{ id: 3, name: 'ptest', zusage: 'zugesagt', ist_status: 'offen', abgeglichen_am: tag(-1) + ' 09:00:00' }] },
   { id: 17, datum: tag(-3), von: '07:00:00', bis: '12:00:00', bedarf: 1, status: 'geplant', kunde_name: 'Beispiel AG', titel: 'Erledigt',
-    mitarbeiter: [{ id: 4, name: 'lprobe', zusage: 'zugesagt', abgeglichen_am: tag(-1) + ' 08:00:00' }] },
+    mitarbeiter: [{ id: 4, name: 'lprobe', zusage: 'zugesagt', ist_status: 'anwesend', abgeglichen_am: tag(-1) + ' 08:00:00' }] },
   { id: 18, datum: tag(-3), von: '13:00:00', bis: '17:00:00', bedarf: 1, status: 'geplant', kunde_name: 'Muster GmbH', titel: 'Abgelehnt',
     mitarbeiter: [{ id: 2, name: 'abeispiel', zusage: 'abgelehnt', abgeglichen_am: null }] },
 ];

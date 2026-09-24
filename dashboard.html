@@ -13132,10 +13132,12 @@ async function asWzOffeneEnden(e) {
     const antraege = sAw ? [] : ((aw.data.abwesenheiten || []).filter(a => a.status === 'beantragt')
       .sort((a, b) => String(a.von).localeCompare(String(b.von))));
     const sEin = stand(ein);
-    // Wie die Abgleich-Ansicht: vergangene Schichten mit Person, nicht
-    // abgesagt, Zusage nicht abgelehnt/entfallen, noch ohne Abgleich.
+    // Wie der Server (einsatz_abgleich(), planung.php): abgeglichen ist, was
+    // einen Ist-Status hat -- nicht, wer ein abgeglichen_am traegt; das bleibt
+    // nach einem aufgehobenen Abgleich stehen. Vergangene Schichten mit
+    // Person, nicht abgesagt, Zusage nicht abgelehnt/entfallen.
     const nichtAbgeglichen = sEin ? [] : agZeilenBauen()
-      .filter(z => z.mitarbeiter_id && String(z.datum).slice(0, 10) < heute && zaehltAlsBesetzt(z.zusage) && leeresDatum(z.abgeglichen_am));
+      .filter(z => z.mitarbeiter_id && String(z.datum).slice(0, 10) < heute && zaehltAlsBesetzt(z.zusage) && (z.ist_status || 'offen') === 'offen');
     modell.personal = {
       abwesenheitsantraege: sAw || { offen: antraege.length },
       abgleich: sEin || { schichten_nicht_abgeglichen: nichtAbgeglichen.length,
