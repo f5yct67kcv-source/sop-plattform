@@ -60,6 +60,10 @@ function pdf_text(string $pdf): string
     return $t;
 }
 $w = static fn(string $s): string => (string)iconv('UTF-8', 'Windows-1252', $s);
+// Der Fliesstext ohne die Zeilenumbrueche einer MultiCell: aufeinander
+// folgende Textzeilen zu einem Satz, damit ein Satz ueber zwei Zeilen als
+// ganzer gefunden wird.
+$fliess = static fn(string $t): string => (string)preg_replace('/\) Tj ET Q\s*q [^(]*\(/', ' ', $t);
 
 $pdo->exec("CREATE TABLE betrieb (id INTEGER PRIMARY KEY, firma TEXT, fusszeile TEXT, fusszeile2 TEXT,
   logo_mime TEXT, logo BLOB, qr_iban TEXT, qr_strasse TEXT, qr_hausnummer TEXT, qr_plz TEXT, qr_ort TEXT)");
@@ -119,9 +123,24 @@ $pruef('KRITISCH: das PDF zeigt Nummer, Titel, Position und Total des Angenommen
     && str_contains($text, $w(beleg_pdf_chf((int)$f['abbild']['summen']['total_rappen']) . ' CHF'))
     && (int)$f['abbild']['summen']['total_rappen'] === 281060);
 $pruef('KRITISCH: das PDF traegt den Empfaenger aus der Fassung', str_contains($text, 'Muster Handel AG') && str_contains($text, 'Musterweg 1'));
-$pruef('KRITISCH: das PDF traegt das Pruefprotokoll mit der Pruefsumme der Fassung',
-    str_contains($text, $w('PRÜFPROTOKOLL')) && str_contains($text, (string)$f['pruefsumme'])
-    && str_contains($text, $w('Erika Beispiel, Geschäftsführerin, Muster Handel AG')));
+// ENT-710: Gespeichert und beim Kunden ist die Fassung mit der Quittung.
+$pruef('KRITISCH: das gespeicherte PDF traegt die Quittung mit Name und Zeitpunkt',
+    (bool)preg_match('/Elektronisch angenommen am \d\d\.\d\d\.\d{4} um \d\d:\d\d Uhr von Erika Beispiel, '
+        . preg_quote($w('Geschäftsführerin'), '/') . ', Muster Handel AG\. Den ' . preg_quote($w('vollständigen'), '/')
+        . ' Nachweis der Annahme bewahrt Beispiel Sicherheit GmbH auf\./', $fliess($text)));
+$pruef('KRITISCH: … und KEIN Pruefprotokoll: weder Pruefsumme noch IP-Adresse noch Browser',
+    !str_contains($text, $w('PRÜFPROTOKOLL')) && !str_contains($text, (string)$f['pruefsumme'])
+    && !str_contains($text, 'IP-Adresse') && !str_contains($text, 'Browser'));
+$intern = beleg_pdf_intern($pdo, '', 1);
+$textI = pdf_text((string)$intern);
+$pruef('KRITISCH: die interne Fassung traegt das volle Pruefprotokoll mit der Pruefsumme',
+    str_contains($textI, $w('PRÜFPROTOKOLL')) && str_contains($textI, (string)$f['pruefsumme'])
+    && str_contains($textI, 'IP-Adresse') && str_contains($textI, 'Browser')
+    && str_contains($textI, $w('Erika Beispiel, Geschäftsführerin, Muster Handel AG'))
+    && str_contains($fliess($textI), $w('mit Bestätigungscode per E-Mail')));
+$pruef('GEGENPROBE: die interne Fassung traegt keine Quittung',
+    !str_contains($textI, $w('Den vollständigen Nachweis der Annahme bewahrt')));
+$pruef('KRITISCH: ohne Annahme gibt es keine interne Fassung', beleg_pdf_intern($pdo, '', 99) === null);
 $pruef('das PDF traegt die elektronische Annahme auf der Linie', str_contains($text, 'Elektronisch angenommen am'));
 $pruef('die Seitenfusszeile nennt Nummer und Fassung', str_contains($text, $w('OF-0815 · Fassung 1')));
 
@@ -131,9 +150,12 @@ $anIntern = array_values(array_filter($GLOBALS['mails'], fn($x) => $x['an'] === 
 $pruef('KRITISCH: der Unterzeichnende bekommt die Bestaetigung mit dem PDF',
     count($anKunde) === 1 && ($anKunde[0]['anhaenge'][0]['inhalt'] ?? '') === $pdf
     && str_ends_with((string)($anKunde[0]['anhaenge'][0]['name'] ?? ''), '.pdf'));
-$pruef('KRITISCH: im Cockpit bekommt die Person, die versendet hat, die interne Bestaetigung mit PDF',
-    count($anIntern) === 1 && ($anIntern[0]['anhaenge'][0]['inhalt'] ?? '') === $pdf
-    && str_contains($anIntern[0]['betreff'], 'Angenommen'));
+$pruef('KRITISCH: im Cockpit bekommt die Person, die versendet hat, die interne Bestaetigung mit Pruefprotokoll',
+    count($anIntern) === 1 && str_contains($anIntern[0]['betreff'], 'Angenommen')
+    && str_contains(pdf_text((string)($anIntern[0]['anhaenge'][0]['inhalt'] ?? '')), $w('PRÜFPROTOKOLL')));
+$pruef('KRITISCH: die Mail an den Kunden spricht nicht von einem Pruefprotokoll',
+    !str_contains($anKunde[0]['text'] ?? 'Prüfprotokoll', 'Prüfprotokoll')
+    && !str_contains($anKunde[0]['html'] ?? 'Prüfprotokoll', 'Prüfprotokoll'));
 $pruef('KRITISCH: im Cockpit traegt die Kundenmail kein GuardOpS-Logo (OP-675)',
     ($anKunde[0]['bilder'] ?? ['x']) === [] && !str_contains($anKunde[0]['html'] ?? 'cid:', 'cid:'));
 $pruef('die interne Mail nennt die abweichende Codeadresse', str_contains($anIntern[0]['text'] ?? '', 'nicht an die Empfängeradresse'));
@@ -168,6 +190,9 @@ $pruef('KRITISCH: scheitert die Bestaetigungsmail, bleibt der Beleg angenommen',
 $pruef('… und das PDF ist trotzdem gespeichert', beleg_pdf_gespeichert($pdo, '', 2) !== null);
 $pruef('GEGENPROBE: dieselbe Adresse wie beim Versand gilt nicht als abweichend',
     beleg_unterschrift_letzte($pdo, '', 2)['abweichend'] === false);
+$textQ = pdf_text((string)beleg_pdf_intern($pdo, '', 2));
+$pruef('KRITISCH: ohne Code sagt das interne Protokoll "persönlicher Link", nicht "Bestätigungscode"',
+    str_contains($fliess($textQ), $w('über den persönlichen Link')) && !str_contains($fliess($textQ), $w('mit Bestätigungscode')));
 
 // ── Die Mail der Betreiberin traegt ihr Logo, sofern es eines gibt ───
 $mailBe = beleg_bestaetigung_mail(['art' => 'offerte', 'nummer' => 'OF-1'], beleg_unterschrift_letzte($pdo, '', 2),

@@ -15,7 +15,8 @@
 //   4. DER DIALOG IST BEDIENBAR: am Handy ohne seitliches Rollen, Knoepfe
 //      mindestens 44 px, Felder mindestens 16 px (Hausregel), und er fuehrt
 //      in zwei Schritten zum Code.
-//   5. NACH DER ANNAHME steht das Pruefprotokoll im Dokument.
+//   5. NACH DER ANNAHME steht die Quittung im Dokument, das Pruefprotokoll
+//      bleibt intern (ENT-710).
 //
 // Der Ablauf selbst (Code, Abdruck, Bremse, Ablauf, Fassungswechsel) laeuft
 // in pruef_beleg_unterschrift.php wirklich.
@@ -96,17 +97,20 @@ const an = rendern('angenommen');
 const ab = rendern('abgelehnt');
 check('KRITISCH: offen — Annehmen oeffnet den Dialog, es gibt keinen Annehmen-Knopf im Formular mehr',
   offen.includes('uzAnnehmen()') && !offen.includes('value="annehmen"'));
-check('KRITISCH: angenommen — das Pruefprotokoll steht IM Dokument, mit der Pruefsumme',
-  /<div id="dokumentGanz">[\s\S]*id="pruefprotokoll"/.test(an) && /[0-9a-f]{64}/.test(an));
-check('KRITISCH: angenommen — die abweichende Codeadresse steht im Protokoll',
-  an.includes('weicht von der Empfängeradresse des Belegs ab'));
+// ENT-710: Der Kunde sieht eine Quittung, das technische Protokoll bleibt intern.
+check('KRITISCH: angenommen — die Quittung steht IM Dokument, mit Name und Zeitpunkt',
+  /<div id="dokumentGanz">[\s\S]*id="annahmequittung"[^>]*>Elektronisch angenommen am \d\d\.\d\d\.\d{4} um \d\d:\d\d Uhr von Erika Beispiel, Geschäftsführerin/.test(an)
+  && an.includes('Den vollständigen Nachweis der Annahme bewahrt'));
+check('KRITISCH: angenommen — kein Pruefprotokoll beim Kunden: keine Pruefsumme, keine IP-Adresse, kein Browser',
+  !an.includes('id="pruefprotokoll"') && !/[0-9a-f]{64}/.test(an) && !an.includes('IP-Adresse')
+  && !an.includes('weicht von der Empfängeradresse des Belegs ab'));
 check('angenommen — die Seitenspalte nennt, wer angenommen hat',
   an.includes('Angenommen am') && an.includes('von Erika Beispiel, Geschäftsführerin'));
 check('angenommen — die Linie traegt den Namen, "Ort, Datum" die elektronische Annahme',
   an.includes('Elektronisch angenommen am') && />Erika Beispiel</.test(an));
 check('KRITISCH: angenommen — kein Dialog und kein Knopf mehr', !an.includes('uzAnnehmen()'));
 check('abgelehnt — die Seitenspalte nennt, wer abgelehnt hat',
-  ab.includes('Abgelehnt am') && ab.includes('von Rolf Muster') && !ab.includes('id="pruefprotokoll"'));
+  ab.includes('Abgelehnt am') && ab.includes('von Rolf Muster') && !ab.includes('id="annahmequittung"'));
 
 // ── 4. Der Dialog im Browser, gemessen ───────────────────────────────
 const server = http.createServer((req, res) => {

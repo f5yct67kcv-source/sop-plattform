@@ -299,8 +299,11 @@ for (const e of ergebnisse) {
   check(`KRITISCH: ${e.name} — angenommen: die Leiste nennt, wer angenommen hat, und warnt bei abweichender Codeadresse`,
     e.zu.leisteText.includes('von Erika Beispiel, Geschäftsführerin, Musterbetrieb AG')
     && e.zu.leisteText.includes('Achtung: Der Bestätigungscode ging an leitung@musterbetrieb.example'));
-  check(`KRITISCH: ${e.name} — angenommen: die Leiste verlinkt das unterschriebene PDF des eigenen Endpunkts`,
-    e.zu.pdfLink === 'api/' + (e.name === 'Betreiber' ? 'betreiber_beleg_pdf.php' : 'beleg_pdf.php') + '?token=tokPruef');
+  // ENT-710: intern das PDF MIT Pruefprotokoll, ueber die Anmeldung und
+  // die id -- nicht den Link des Kunden.
+  check(`KRITISCH: ${e.name} — angenommen: die Leiste verlinkt das PDF mit Pruefprotokoll des eigenen Endpunkts`,
+    new RegExp('^api/' + (e.name === 'Betreiber' ? 'betreiber_beleg_pdf_intern' : 'beleg_pdf_intern')
+      + '\\.php\\?id=\\d+$').test(e.zu.pdfLink));
   check(`${e.name} — ohne Annahme kein PDF-Link`, e.auf.pdfLink === '');
   check(`${e.name} — angenommen: der Chip nennt die angenommene Fassung`,
     e.zu.chipSicht && e.zu.chipText === 'Fassung 2 · versendet 01.03.2031' && /chip-a/.test(e.zu.chipKlasse));
