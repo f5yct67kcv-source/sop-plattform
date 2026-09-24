@@ -25,11 +25,13 @@ const check = (n, c) => (c ? ok : bad).push(n);
 const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 const tag = n => iso(new Date(Date.now() + n * 864e5));
 
+// Kategorie und Revierdienst-Berechtigung fuer die Disposition (ENT-711):
+// Hans ohne Kategorie, Anna C ohne Revier-Berechtigung, Peter B, Lea A.
 const MA = [
-  { id: 1, name: 'hmuster', vorname: 'Hans', nachname: 'Muster', aktiv: 1, ist_admin: 1 },
-  { id: 2, name: 'abeispiel', vorname: 'Anna', nachname: 'Beispiel', aktiv: 1 },
-  { id: 3, name: 'ptest', vorname: 'Peter', nachname: 'Test', aktiv: 1 },
-  { id: 4, name: 'lprobe', vorname: 'Lea', nachname: 'Probe', aktiv: 1 },
+  { id: 1, name: 'hmuster', vorname: 'Hans', nachname: 'Muster', aktiv: 1, ist_admin: 1, anstellungskategorie: '', revierdienst_berechtigt: 1 },
+  { id: 2, name: 'abeispiel', vorname: 'Anna', nachname: 'Beispiel', aktiv: 1, anstellungskategorie: 'C', revierdienst_berechtigt: 0 },
+  { id: 3, name: 'ptest', vorname: 'Peter', nachname: 'Test', aktiv: 1, anstellungskategorie: 'B', revierdienst_berechtigt: 1 },
+  { id: 4, name: 'lprobe', vorname: 'Lea', nachname: 'Probe', aktiv: 1, anstellungskategorie: 'A', revierdienst_berechtigt: 1 },
   { id: 5, name: 'amuster', vorname: 'Alt', nachname: 'Muster', aktiv: 0 },
 ];
 // Einsatz 11: Bedarf 2, eine Zusage, eine Absage -> 1 Platz offen.
@@ -52,6 +54,10 @@ const EI = [
     mitarbeiter: [{ id: 4, name: 'lprobe', zusage: 'zugesagt', ist_status: 'anwesend', abgeglichen_am: tag(-1) + ' 08:00:00' }] },
   { id: 18, datum: tag(-3), von: '13:00:00', bis: '17:00:00', bedarf: 1, status: 'geplant', kunde_name: 'Muster GmbH', titel: 'Abgelehnt',
     mitarbeiter: [{ id: 2, name: 'abeispiel', zusage: 'abgelehnt', abgeglichen_am: null }] },
+  // Disposition (ENT-711): Revierdienst ausserhalb der 14 Tage, damit die
+  // Zaehlungen oben unberuehrt bleiben.
+  { id: 20, datum: tag(20), von: '08:00:00', bis: '12:00:00', bedarf: 1, status: 'geplant', kunde_name: 'Muster GmbH', titel: 'Runde',
+    einsatzart: 'Revierdienst', mitarbeiter: [] },
 ];
 const OFFERTEN = [
   { id: 21, art: 'offerte', nummer: 'OF-1', kunde_name: 'Beispiel AG', titel: 'Umzug', status: 'bestaetigt', total_rappen: 150000, aktiv: 1,
@@ -91,6 +97,10 @@ let modellServer = { staende: [{ phase: 'fertig' }], datei: [200, MODELL], posts
 // Server mit leerer Ablage (ablageLeeren).
 const ablageLeeren = () => page.evaluate(() => caches.delete('guardops-weckwort'));
 const modellNeu = (staende, datei, stoer) => { modellServer = { staende, datei: datei || [200, MODELL], posts: 0, teile: [], stoer: stoer || null }; };
+// Der Server-Weg fuer "Zuteilen" (ENT-711): jede Anfrage wird gemerkt; die
+// Antwort bestimmt zuteilenAntwort(body) -> [status, json].
+const zuteilungen = [];
+let zuteilenAntwort = () => [200, { status: 'ok' }];
 let drehbuch = null, belegeGesperrt = false, abwesenheitGesperrt = true, assistentAntwort = null, routerAntwort = null;
 const rufe = [];
 // Katalog und Kunden fuer die Formular-Werkzeuge (ENT-700). Die Antwort der
@@ -201,6 +211,12 @@ async function neueSeite() {
       const [code, body] = modellServer.datei;
       const roh = Buffer.from(body);
       return route.fulfill({ status: code, contentType: 'application/octet-stream', body: roh.subarray(n * TEIL, (n + 1) * TEIL) });
+    }
+    if (p.startsWith('einsatz_person_zuteilen')) {
+      const body = JSON.parse(req.postData() || '{}');
+      zuteilungen.push(body);
+      const [code, json] = zuteilenAntwort(body);
+      return send(json, code);
     }
     if (p.startsWith('ki_router_parse')) return routerAntwort ? send(routerAntwort[1], routerAntwort[0]) : send({ status: 'error', message: 'kein Mock' }, 502);
     if (p.startsWith('produkt_list')) return send({ status: 'ok', produkte: PR });
@@ -469,6 +485,71 @@ belegeGesperrt = false;
 r = await fragen('Was ist in der Planung offen?', { name: 'offene_enden', input: { bereich: 'planung' }, antwort: 'Vier Plätze.' });
 check('Mit bereich nur dieser Bereich', Object.keys(r).filter(k => k !== 'hinweis').join() === 'planung');
 abwesenheitGesperrt = false;
+
+// ══════════ DISPOSITION MIT VORSCHLAG (ENT-711)
+r = await fragen('Besetz mir die offenen Plätze', { name: 'disposition_vorschlaege', input: {}, antwort: 'Für die Nachtwache passt Lea Probe.' });
+const e15 = r.posten.find(p => p.titel === 'Nachtwache'), e11 = r.posten.find(p => p.titel === 'Verkehrsdienst');
+check('Vorschläge nur für Einsätze mit offenen Plätzen in den nächsten 14 Tagen', r.posten.length === 2 && !!e15 && !!e11);
+check('KRITISCH: wer schon auf dem Einsatz steht (auch mit Absage) oder bewilligt abwesend ist, wird nicht vorgeschlagen',
+  !e11.vorschlaege.some(v => /Hans|Anna|Peter/.test(v.name)) && !e15.vorschlaege.some(v => /Peter/.test(v.name)));
+check('Reihenfolge: Kategorie A vor C, ohne Kategorie zuletzt (nicht nach Namen)',
+  e15.vorschlaege.map(v => v.name).join() === 'Lea Probe,Anna Beispiel,Hans Muster');
+check('Eine Einschränkung steht beim Vorschlag (selbst gesperrter Tag)',
+  e11.vorschlaege.length === 1 && /gesperrt/.test(e11.vorschlaege[0].einschraenkungen.join()));
+check('Das Modell erfährt, dass Qualifikationen nicht geprüft sind', /Qualifikationen sind nicht geprueft/.test(r.hinweis));
+check('Geplante Stunden der Woche zählen nur besetzende Zuteilungen', await page.evaluate(t => asPlanStunden(1, t) === 5 && asPlanStunden(2, t) === 0, tag(2)));
+check('KRITISCH: das Modell teilt nie selbst zu -- ohne Klick keine Anfrage an den Server', zuteilungen.length === 0);
+check('Je Einsatz eine Kopfzeile, darunter seine Vorschläge; nichts unter „weitere“ versteckt', await page.evaluate(() => {
+  const m = [...document.querySelectorAll('#asVerlauf .as-msg.er')].pop();
+  const zeilen = [...m.querySelectorAll('.as-treffer > *')].map(z => z.classList.contains('as-t-zeile') ? 'P' : 'K').join('');
+  return zeilen === 'KPKPPP' && !m.querySelector('.as-t-mehr'); }));
+// Die Grenze von acht Zeilen gilt fuer andere Antworten weiter; die
+// Disposition hebt sie an, weil ein Einsatz mit fuenf Vorschlaegen allein
+// schon sechs Zeilen hat.
+check('Die Disposition darf mehr als acht Zeilen zeigen, andere Antworten nicht', await page.evaluate(() => {
+  const t = Array.from({ length: 12 }, (_, i) => ({ text: 'Z' + i }));
+  const a = asNachricht('er', 'x', t), b = asNachricht('er', 'y', t, 40);
+  const r = [a.querySelectorAll('.as-treffer > button').length, b.querySelectorAll('.as-treffer > button').length];
+  a.remove(); b.remove(); return r.join() === '8,12'; }));
+const knopf = await page.evaluate(() => {
+  const z = [...document.querySelectorAll('#asVerlauf .as-t-zeile')].find(x => x.textContent.includes('Lea Probe · Kat. A') && x.textContent.includes('h geplant'));
+  if (!z) { return null; }
+  const a = z.getBoundingClientRect(), k = z.querySelector('.as-t-aktion').getBoundingClientRect(), b = z.firstChild.getBoundingClientRect();
+  return { rechts: Math.abs(a.right - k.right) < 2, nebeneinander: k.left >= b.right - 1 && k.top < b.bottom && k.bottom > b.top, text: z.querySelector('.as-t-aktion').textContent };
+});
+check('Gemessen: der Knopf „Zuteilen“ steht rechts in der Zeile, neben dem Vorschlag, nicht darunter',
+  !!knopf && knopf.rechts && knopf.nebeneinander && knopf.text === 'Zuteilen');
+await page.evaluate(() => [...document.querySelectorAll('#asVerlauf .as-t-zeile')].find(x => x.textContent.includes('Lea Probe · Kat. A') && x.textContent.includes('h geplant')).querySelector('.as-t-aktion').click());
+await page.waitForTimeout(200);
+check('Ein Klick teilt genau diese Person diesem Einsatz zu und zeigt „✓ zugeteilt“',
+  zuteilungen.length === 1 && zuteilungen[0].einsatz_id === 15 && zuteilungen[0].mitarbeiter_id === 4 && !zuteilungen[0].trotz_fehlender_berechtigung
+  && await page.evaluate(() => [...document.querySelectorAll('#asVerlauf .as-t-erledigt')].some(x => x.textContent === '✓ zugeteilt')));
+
+// Revierdienst: der Server warnt, der Knopf fragt einmal nach.
+zuteilenAntwort = b => (b.trotz_fehlender_berechtigung ? [200, { status: 'ok' }]
+  : [409, { status: 'error', unberechtigt: true, message: 'Ohne Revierdienst-Berechtigung: Anna Beispiel' }]);
+r = await fragen('Wer kann die Runde übernehmen?', { name: 'disposition_vorschlaege', input: { von: tag(20), bis: tag(20) }, antwort: 'Lea Probe.' });
+check('Revierdienst ohne Berechtigung ist eine Einschränkung und steht hinten',
+  r.posten[0].vorschlaege[0].name === 'Lea Probe' && r.posten[0].vorschlaege.at(-1).name === 'Anna Beispiel'
+  && /Revierdienst-Berechtigung/.test(r.posten[0].vorschlaege.at(-1).einschraenkungen.join()));
+await page.evaluate(() => [...[...document.querySelectorAll('#asVerlauf .as-msg.er')].pop().querySelectorAll('.as-t-zeile')].find(x => x.textContent.includes('Anna Beispiel')).querySelector('.as-t-aktion').click());
+await page.waitForTimeout(200);
+const nachfrage = await page.evaluate(() => { const z = [...[...document.querySelectorAll('#asVerlauf .as-msg.er')].pop().querySelectorAll('.as-t-zeile')].find(x => x.textContent.includes('Anna Beispiel'));
+  return { knopf: z.querySelector('.as-t-aktion') && z.querySelector('.as-t-aktion').textContent, text: z.textContent }; });
+check('Warnt der Server (Revierdienst), bleibt der Knopf als „Trotzdem zuteilen“ und nennt den Grund',
+  nachfrage.knopf === 'Trotzdem zuteilen' && /Ohne Revierdienst-Berechtigung/.test(nachfrage.text) && zuteilungen.length === 2);
+await page.evaluate(() => [...[...document.querySelectorAll('#asVerlauf .as-msg.er')].pop().querySelectorAll('.as-t-zeile')].find(x => x.textContent.includes('Anna Beispiel')).querySelector('.as-t-aktion').click());
+await page.waitForTimeout(200);
+check('Erst der zweite Klick sendet „trotzdem“', zuteilungen.length === 3 && zuteilungen[2].trotz_fehlender_berechtigung === true);
+
+// Voll oder gesperrt: der Grund steht da, der Knopf verschwindet.
+zuteilenAntwort = () => [409, { status: 'error', voll: true, message: 'Der Einsatz ist bereits voll besetzt.' }];
+await page.evaluate(() => [...[...document.querySelectorAll('#asVerlauf .as-msg.er')].pop().querySelectorAll('.as-t-zeile')].find(x => x.textContent.includes('Lea Probe')).querySelector('.as-t-aktion').click());
+await page.waitForTimeout(200);
+check('Lehnt der Server ab, steht sein Grund in der Zeile und der Knopf ist weg', await page.evaluate(() => {
+  const z = [...[...document.querySelectorAll('#asVerlauf .as-msg.er')].pop().querySelectorAll('.as-t-zeile')].find(x => x.textContent.includes('Lea Probe'));
+  return /voll besetzt/.test(z.textContent) && !z.querySelector('.as-t-aktion') && !z.querySelector('.as-t-erledigt'); }));
+zuteilenAntwort = () => [200, { status: 'ok' }];
 
 // ══════════ KEIN RECHT, FALSCHE EINGABE
 belegeGesperrt = true;

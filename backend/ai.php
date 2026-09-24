@@ -1068,6 +1068,19 @@ function ki_assistent_werkzeuge(): array
             'input_schema' => ['type' => 'object', 'properties' => ['datum' => $datum, 'von' => $zeit, 'bis' => $zeit],
                 'required' => ['datum', 'von', 'bis']],
         ],
+        // Disposition mit Vorschlag (ENT-711): liest nur. Zuteilen tut ein
+        // Klick der Person auf den Knopf neben dem Vorschlag, ueber
+        // einsatz_person_zuteilen.php -- nie das Modell.
+        'disposition_vorschlaege' => [
+            'recht' => 'einsaetze_lesen',
+            'titel' => 'Vorschläge für offene Plätze',
+            'description' => 'Schlaegt fuer Einsaetze mit offenen Plaetzen je bis zu fuenf Personen vor: ohne '
+                . 'Ueberschneidung und ohne bewilligte Abwesenheit; zuerst ohne Einschraenkung, darin Kategorie A '
+                . 'und B vor C, darin wenig geplante Stunden in der Woche. Einschraenkungen (Ruhezeit-Hinweis, '
+                . 'gesperrter Tag, beantragte Abwesenheit, Revierdienst-Berechtigung) stehen dabei. Die Person teilt '
+                . 'per Knopf selbst zu. Ohne von/bis: heute und die naechsten 13 Tage.',
+            'input_schema' => ['type' => 'object', 'properties' => ['von' => $datum, 'bis' => $datum]],
+        ],
         // Offene Enden (ENT-709): vier Bereiche, jeder mit seinem eigenen
         // Leserecht. Der Browser laedt sie ueber die bestehenden Endpunkte;
         // fehlt ein Recht, meldet der Bereich kein_recht statt "nichts offen".
@@ -1161,6 +1174,9 @@ function ki_assistent_system(string $heute): string
         . "formular_ergaenzen ein und fragst dann nach dem naechsten. Ist nachfragen leer, sag, dass das Formular "
         . "bereit ist zum Pruefen und Speichern, und frag nach nichts weiterem. Nach Feldern ausserhalb von "
         . "nachfragen fragst du nie. Will die Person nicht antworten oder spaeter ergaenzen, hoer auf zu fragen.\n"
+        . "- Bei disposition_vorschlaege nennst du je Einsatz kurz den ersten Vorschlag und sagst, dass die Person mit "
+        . "dem Knopf Zuteilen selbst zuteilt. Du teilst nie selbst zu. Eine Einschraenkung eines Vorschlags nennst du, "
+        . "wenn du ihn nennst.\n"
         . "- Du selbst speicherst, versendest und loeschst nie etwas, und du setzt nie Preise. Wirst du darum gebeten, "
         . "sag das.\n"
         . "- Rechne relative Angaben (morgen, Samstag, diese Woche) selbst in Daten um.\n"

@@ -2120,6 +2120,14 @@ html:not(.hat-reinigung) [data-sparte-feld] { display: none !important; }
 .as-treffer button { text-align: left; font: inherit; font-size: 12.5px; padding: 6px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: inherit; cursor: pointer; }
 .as-treffer button:hover { border-color: var(--accent); }
 .as-treffer .as-t-sub { display: block; color: var(--ink-3); font-size: 11.5px; }
+.as-treffer .as-t-zeile { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px; }
+.as-treffer .as-t-zeile > button:first-child { min-width: 0; }
+.as-treffer .as-t-aktion { font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--accent); cursor: pointer; white-space: nowrap; }
+.as-treffer .as-t-aktion:hover { border-color: var(--accent); }
+.as-treffer .as-t-aktion:disabled { opacity: .6; cursor: default; }
+.as-treffer .as-t-aktion.warn { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+.as-treffer .as-t-erledigt { font-size: 12px; font-weight: 600; color: var(--pos); white-space: nowrap; padding: 0 4px; }
+.as-treffer .as-t-sub.warn { color: var(--warn); }
 .as-treffer .as-t-mehr { color: var(--ink-3); font-size: 11.5px; padding: 2px 2px 0; }
 .as-fuss { border-top: 1px solid var(--line); padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 8px; }
 .as-fuss .as-reihe { display: flex; gap: 8px; align-items: center; }
@@ -12684,6 +12692,7 @@ const AS_RUNDEN = 5;          // Werkzeugrunden je Frage, danach Abbruch mit Mel
 const AS_TREFFER_MAX = 8;     // Treffer je Antwort sichtbar, Rest als "und n weitere"
 let asNachrichten = [];       // Gespraech im Format der Modell-Schnittstelle
 let asTreffer = [];           // Treffer der laufenden Frage
+let asTrefferMax = 8;         // sichtbare Zeilen dieser Antwort (Disposition zeigt mehr)
 let asAktiv = false, asLaeuft = false;
 
 function asUmgebungErlaubt() {
@@ -12858,24 +12867,32 @@ function asMikKlick() {
 }
 
 // ── Verlauf
-function asNachricht(wer, text, treffer) {
+function asNachricht(wer, text, treffer, max) {
   const d = document.createElement('div');
   d.className = 'as-msg ' + wer;
   d.textContent = text;
+  max = max || AS_TREFFER_MAX;
   if (treffer && treffer.length) {
     const box = document.createElement('div');
     box.className = 'as-treffer';
-    treffer.slice(0, AS_TREFFER_MAX).forEach(t => {
+    treffer.slice(0, max).forEach(t => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.innerHTML = `${esc(t.text)}${t.sub ? `<span class="as-t-sub">${esc(t.sub)}</span>` : ''}`;
+      b.innerHTML = `${esc(t.text)}${t.sub ? `<span class="as-t-sub${t.warn ? ' warn' : ''}">${esc(t.sub)}</span>` : ''}`;
       if (t.oeffnen) { b.onclick = t.oeffnen; } else { b.disabled = true; b.style.cursor = 'default'; }
-      box.appendChild(b);
+      if (!t.aktion) { box.appendChild(b); return; }
+      // Vorschlag mit Knopf rechts (ENT-711): Die Zeile bleibt, wie sie
+      // ist; der Knopf sitzt daneben, nicht darin (kein Knopf im Knopf).
+      const z = document.createElement('div');
+      z.className = 'as-t-zeile';
+      z.appendChild(b);
+      z.appendChild(asAktionKnopf(t.aktion, b));
+      box.appendChild(z);
     });
-    if (treffer.length > AS_TREFFER_MAX) {
+    if (treffer.length > max) {
       const m = document.createElement('div');
       m.className = 'as-t-mehr';
-      m.textContent = `und ${treffer.length - AS_TREFFER_MAX} weitere`;
+      m.textContent = `und ${treffer.length - max} weitere`;
       box.appendChild(m);
     }
     d.appendChild(box);
@@ -12905,6 +12922,7 @@ async function asSenden() {
   asKuerzen();
   asNachrichten.push({ role: 'user', content: text });
   asTreffer = [];
+  asTrefferMax = AS_TREFFER_MAX;
   asFormularNeu = false;
   asLaeuft = true;
   $('asBtn').disabled = true;
@@ -12927,7 +12945,7 @@ async function asSenden() {
       if (!aufrufe.length) {
         const antwort = inhalt.filter(b => b.type === 'text').map(b => b.text).join(' ').trim()
           || 'Dazu habe ich keine Antwort.';
-        asNachricht('er', antwort, asTreffer);
+        asNachricht('er', antwort, asTreffer, asTrefferMax);
         asSprechen(antwort);
         // Ein Formular ist aufgegangen (ENT-700): Fenster zu, damit es frei
         // ist; die Figur bleibt und zeigt die Antwort kurz als Sprechblase.
@@ -12941,6 +12959,7 @@ async function asSenden() {
         catch (e) { r = { fehler: 'Das Werkzeug ist mit einem Fehler abgebrochen.' }; }
         ergebnisse.push({ type: 'tool_result', tool_use_id: a.id, content: JSON.stringify(r.modell || r) });
         if (r.treffer) { asTreffer = asTreffer.concat(r.treffer); }
+        if (r.trefferMax) { asTrefferMax = Math.max(asTrefferMax, r.trefferMax); }
       }
       asNachrichten.push({ role: 'user', content: ergebnisse });
     }
@@ -12974,6 +12993,7 @@ async function asWerkzeug(name, e) {
   if (name === 'verfuegbare_mitarbeitende') { return asWzVerfuegbar(e); }
   if (name === 'offene_rechnungen') { return asWzRechnungen(e); }
   if (name === 'offene_enden') { return asWzOffeneEnden(e); }
+  if (name === 'disposition_vorschlaege') { return asWzDisposition(e); }
   if (name === 'formular_vorbereiten') { return asWzVorbereiten(e); }
   if (name === 'formular_ergaenzen') { return asWzErgaenzen(e); }
   return { modell: { fehler: 'unbekanntes Werkzeug' } };
@@ -13161,6 +13181,143 @@ async function asWzOffeneEnden(e) {
   }
   const treffer = gruppen.flatMap((g, i) => g.slice(0, anteil[i])).concat(gruppen.flatMap((g, i) => g.slice(anteil[i])));
   return { modell, treffer };
+}
+
+// ── Disposition mit Vorschlag (ENT-711). Der Assistent schlaegt vor; zuteilen
+// tut nur ein Klick der Person, ueber einsatz_person_zuteilen.php mit allen
+// Sperren im Server. Reihenfolge (Projektinhaber 2026-09-24): ohne
+// Einschraenkung vor mit Einschraenkung; darin Kategorie A und B (Monatslohn,
+// Pensum, Art. 8 GAV) vor C, ohne erfasste Kategorie zuletzt; darin wer in
+// der Woche am wenigsten geplante Stunden hat.
+const AS_VORSCHLAEGE = 5;        // Vorschlaege je Einsatz
+const AS_DISPO_EINSAETZE = 8;    // Einsaetze je Antwort
+function asKatRang(k) { k = String(k || '').toUpperCase(); return k === 'A' || k === 'B' ? 0 : k === 'C' ? 1 : 2; }
+function asWocheVon(datum) {     // Montag der Woche (ISO), fuer die Stundensumme
+  const d = new Date(String(datum).slice(0, 10) + 'T12:00:00');
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return isoTag(d);
+}
+function asPlanStunden(maId, datum) {
+  const mo = asWocheVon(datum), so = plusTage(mo, 6);
+  let min = 0;
+  einsaetze.forEach(x => {
+    const d = String(x.datum).slice(0, 10);
+    if (d < mo || d > so || x.status === 'abgesagt') { return; }
+    if (!(x.mitarbeiter || []).some(m => Number(m.id) === Number(maId) && zaehltAlsBesetzt(m.zusage))) { return; }
+    const sp = spanne(x.datum, x.von, x.bis);
+    if (sp) { min += (sp[1] - sp[0]) / 6e4; }
+  });
+  return Math.round(min / 6) / 10;   // Stunden, eine Nachkommastelle
+}
+
+async function asWzDisposition(e) {
+  const heute = isoTag();
+  const von = asDatum(e.von) || heute, bis = asDatum(e.bis) || plusTage(heute, AS_PLANUNG_TAGE - 1);
+  if (bis < von) { return { modell: { fehler: 'bis liegt vor von' } }; }
+  const r = await asEinsaetzeFrisch();
+  if (r.kein_recht) { return { modell: { kein_recht: true } }; }
+  if (r.fehler) { return { modell: { fehler: r.fehler } }; }
+  if (!mitarbeiter.length) { try { await loadMitarbeiter(); } catch (x) { /* unten gemeldet */ } }
+  const personen = mitarbeiter.filter(m => Number(m.aktiv ?? 1) === 1);
+  if (!personen.length) { return { modell: { fehler: 'Personalliste nicht verfuegbar' } }; }
+  const hinweise = [];
+  const aw = await asLaden(`abwesenheit_list.php?von=${von}&bis=${bis}`);
+  if (aw.kein_recht) { hinweise.push('Abwesenheiten (Ferien usw.) sind nicht beruecksichtigt: keine Berechtigung, sie zu sehen.'); }
+  else if (aw.fehler) { hinweise.push('Abwesenheiten (Ferien usw.) sind nicht beruecksichtigt: sie liessen sich nicht laden.'); }
+  const abw = (aw.data && aw.data.abwesenheiten) || [];
+  hinweise.push('Qualifikationen sind nicht geprueft.');
+
+  const offen = einsaetze
+    .filter(x => { const d = String(x.datum).slice(0, 10); return d >= von && d <= bis && d >= heute && x.status !== 'abgesagt'; })
+    .map(x => ({ x, fehlt: Math.max(0, (Number(x.bedarf) || 0) - (x.mitarbeiter || []).filter(m => zaehltAlsBesetzt(m.zusage)).length) }))
+    .filter(o => o.fehlt > 0)
+    .sort((a, b) => (String(a.x.datum) + hm(a.x.von)).localeCompare(String(b.x.datum) + hm(b.x.von)));
+  if (offen.length > AS_DISPO_EINSAETZE) { hinweise.push(`Gezeigt sind die ersten ${AS_DISPO_EINSAETZE} von ${offen.length} Einsaetzen mit offenen Plaetzen.`); }
+
+  const posten = [], treffer = [];
+  offen.slice(0, AS_DISPO_EINSAETZE).forEach(({ x, fehlt }) => {
+    const datum = String(x.datum).slice(0, 10);
+    // Ueberschneidung wie im Server (doppelbelegungen, ENT-350): nur wer dort
+    // wirklich eingeteilt ist, nicht wer abgelehnt hat oder entfallen ist.
+    const k = konflikte(datum, x.von, x.bis, x.id);
+    const ru = ruheLuecken(datum, x.von, x.bis, x.id);
+    const schonDa = new Set((x.mitarbeiter || []).map(m => Number(m.id)));
+    const kandidaten = personen.filter(m => !schonDa.has(Number(m.id))).map(m => {
+      const ueber = (k[m.id] || []).filter(y => (y.mitarbeiter || []).some(z => Number(z.id) === Number(m.id) && zaehltAlsBesetzt(z.zusage)));
+      if (ueber.length) { return null; }
+      const eigene = abw.filter(a => Number(a.mitarbeiter_id) === Number(m.id) && String(a.von).slice(0, 10) <= datum && String(a.bis).slice(0, 10) >= datum);
+      if (eigene.some(a => a.status === 'genehmigt')) { return null; }
+      const einschr = [];
+      const ruhe = ru[m.id] || [];
+      if (ruhe.length) { einschr.push(`Ruhezeit-Hinweis: nur ${gavStd(ruhe[0].minuten)} h zu „${ruhe[0].gegen.titel || ruhe[0].gegen.kunde_name}“`); }
+      const sp = gesperrtAm(m.id, datum);
+      if (sp !== null) { einschr.push(sp ? `Tag selbst gesperrt: ${sp}` : 'Tag selbst gesperrt'); }
+      eigene.filter(a => a.status === 'beantragt').forEach(a => einschr.push(`${a.typ || 'Abwesenheit'} beantragt`));
+      if (x.einsatzart === 'Revierdienst' && !Number(m.revierdienst_berechtigt ?? 0)) { einschr.push('ohne Revierdienst-Berechtigung'); }
+      const kat = String(m.anstellungskategorie || '').toUpperCase();
+      return { m, name: fullName(m) || m.name, kat, rang: asKatRang(kat), stunden: asPlanStunden(m.id, datum), einschr };
+    }).filter(Boolean)
+      .sort((a, b) => (a.einschr.length > 0) - (b.einschr.length > 0) || a.rang - b.rang || a.stunden - b.stunden
+        || a.name.localeCompare(b.name, 'de'))
+      .slice(0, AS_VORSCHLAEGE);
+
+    const titel = `${asTag(datum)} ${hm(x.von)}–${hm(x.bis)} · ${x.kunde_name || x.titel || 'Einsatz'}`;
+    posten.push({ datum, von: hm(x.von), bis: hm(x.bis), kunde: x.kunde_name || '', titel: x.titel || x.einsatzart || '',
+      offene_plaetze: fehlt, vorschlaege: kandidaten.map(c => ({ name: c.name, kategorie: c.kat || null,
+        stunden_geplant_in_der_woche: c.stunden, einschraenkungen: c.einschr })) });
+    treffer.push({ text: titel, sub: `${fehlt} ${fehlt === 1 ? 'Platz' : 'Plätze'} offen${kandidaten.length ? '' : ' · niemand frei'}`, oeffnen: () => epAuf(x.id) });
+    kandidaten.forEach(c => treffer.push({
+      text: `${c.name} · ${c.kat ? 'Kat. ' + c.kat : 'Kategorie fehlt'}`,
+      sub: c.einschr.length ? '⚠ ' + c.einschr.join(' · ') : `${String(c.stunden).replace('.', ',')} h geplant diese Woche`,
+      warn: c.einschr.length > 0,
+      aktion: { einsatz_id: Number(x.id), mitarbeiter_id: Number(c.m.id), name: c.name },
+    }));
+  });
+  return {
+    modell: { vollstaendig: true, zeitraum: { von, bis }, einsaetze_mit_offenen_plaetzen: offen.length,
+      offene_plaetze: offen.reduce((t, o) => t + o.fehlt, 0), posten, hinweis: hinweise.join(' ') },
+    treffer, trefferMax: 40,
+  };
+}
+
+// Der Knopf "Zuteilen" (ENT-711). Nur ein Klick der Person loest ihn aus;
+// die Sperren stehen im Server. Die Revierdienst-Berechtigung ist dort eine
+// Warnung (ENT-284): Der Knopf fragt dann einmal nach.
+function asAktionKnopf(a, zeile) {
+  const k = document.createElement('button');
+  k.type = 'button';
+  k.className = 'as-t-aktion';
+  k.textContent = 'Zuteilen';
+  let trotz = false;
+  const sub = () => { let el = zeile.querySelector('.as-t-sub'); if (!el) { el = document.createElement('span'); el.className = 'as-t-sub'; zeile.appendChild(el); } return el; };
+  k.onclick = async () => {
+    k.disabled = true;
+    k.textContent = '…';
+    const body = { einsatz_id: a.einsatz_id, mitarbeiter_id: a.mitarbeiter_id };
+    if (trotz) { body.trotz_fehlender_berechtigung = true; }
+    const { ok, status, data } = await api('einsatz_person_zuteilen.php', { method: 'POST', body });
+    if (status === 401) { doLogout(); return; }
+    if (ok && data.status === 'ok') {
+      const f = document.createElement('span');
+      f.className = 'as-t-erledigt';
+      f.textContent = '✓ zugeteilt';
+      k.replaceWith(f);
+      asEinsaetzeFrisch();
+      return;
+    }
+    const s = sub();
+    s.textContent = (data && data.message) || 'Zuteilen ist fehlgeschlagen.';
+    s.classList.add('warn');
+    if (data && data.unberechtigt && !trotz) {
+      trotz = true;
+      k.disabled = false;
+      k.textContent = 'Trotzdem zuteilen';
+      k.classList.add('warn');
+      return;
+    }
+    k.remove();
+  };
+  return k;
 }
 
 async function asWzVerfuegbar(e) {
