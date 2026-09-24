@@ -20163,6 +20163,26 @@ let finLaedt = 0;
 // gehoert zum Total mit MWST und bleibt darum aussen vor.
 const finNetto = b => (Number(b.zwischensumme_rappen) || 0) - (Number(b.rabatt_rappen) || 0);
 
+// Was als verrechnet gilt (Entscheid des Projektinhabers, 24.09.2026): jede
+// aktive Rechnung AUSSER einem Entwurf. Ein Entwurf ist nicht beim Kunden --
+// er zaehlt weder als verrechnet noch als offen. Wer eine Rechnung auf Papier
+// verschickt, setzt ihren Status von Hand. Die Rechnungsliste zeigt Entwuerfe
+// weiterhin; nur die Uebersicht laesst sie aus und NENNT ihre Anzahl, damit
+// "nicht mitgezaehlt" nicht wie "gibt es nicht" aussieht.
+const finVerrechnet = b => kuLageAktiv(b) && b.status !== 'entwurf';
+const finEntwuerfe = () => rechnungen.filter(b => kuLageAktiv(b) && b.status === 'entwurf').length;
+const finEntwurfHinweis = () => {
+  const n = finEntwuerfe();
+  return n ? ` · ${nf(n)} ${n === 1 ? 'Entwurf' : 'Entwürfe'} nicht mitgezählt` : '';
+};
+// "Noch keine Rechnungen" stimmt nur, wenn es auch keinen Entwurf gibt.
+function finNochKeine() {
+  const n = finEntwuerfe();
+  return n
+    ? EMPTY('Noch keine verrechnete Rechnung', `${nf(n)} ${n === 1 ? 'Entwurf zählt erst, wenn er versendet' : 'Entwürfe zählen erst, wenn sie versendet'} oder ihr Status von Hand gesetzt ist.`)
+    : EMPTY('Noch keine Rechnungen', 'Sobald eine Rechnung erfasst ist, erscheint sie hier.');
+}
+
 // Monat 'YYYY-MM' eines Datums relativ zu heute.
 function finMonat(versatz, basis) {
   const h = basis || new Date();
@@ -20257,7 +20277,7 @@ const FIN_UNBEKANNT_RE = () => EMPTY('Rechnungen nicht geladen', 'Die Rechnungsl
 
 // Die Monatszeilen der Grafik -- eine Stelle, die alles je Monat rechnet.
 function finMonatsDaten(monate) {
-  const aktiv = rechnungen.filter(kuLageAktiv);
+  const aktiv = rechnungen.filter(finVerrechnet);
   const lohn = finKosten && finKosten.lohn;
   const ausl = finKosten && finKosten.auslagen;
   return monate.map(m => {
@@ -20284,7 +20304,7 @@ function finZeichnen() {
   const monate = finMonate(finZr);
   const daten = finMonatsDaten(monate);
   const zr = finZeitraumText(monate);
-  $('finChartUnter').textContent = `exkl. MWST · ${zr}`;
+  $('finChartUnter').textContent = `exkl. MWST · ${zr}${finRechnungenZugriff() === 'ok' ? finEntwurfHinweis() : ''}`;
   $('finKundenUnter').textContent = `verrechnet, exkl. MWST · ${zr}`;
   $('finStatusUnter').textContent = `Anzahl Rechnungen nach Rechnungsdatum · ${zr}`;
   finKpiZeichnen();
@@ -20344,7 +20364,7 @@ function finKpiZeichnen() {
     karten.push(ohne(ic.geld, 'Offener Betrag', text), ohne(ic.uhr, 'Davon überfällig', text),
                 ohne(ic.haken, 'Bezahlt im Monat', text));
   } else {
-    const aktiv = rechnungen.filter(kuLageAktiv);
+    const aktiv = rechnungen.filter(finVerrechnet);
     const heute = isoTag();
     const jetzt = new Date();
     const endeVor = isoTag(new Date(jetzt.getFullYear(), jetzt.getMonth(), 0));
@@ -20361,7 +20381,7 @@ function finKpiZeichnen() {
     karten.push(karte({
       i: ic.geld, l: 'Offener Betrag', v: finChfHtml(kuLageSumme(offen)),
       f: `${finDelta(kuLageSumme(offen), kuLageSumme(offenVor), 'tief_gut')} <span>inkl. MWST · ${offen.length
-        ? 'aus ' + anz(offen.length, 'Rechnung', 'Rechnungen') : 'keine offene Rechnung'}${hinweis}</span>`,
+        ? 'aus ' + anz(offen.length, 'Rechnung', 'Rechnungen') : 'keine offene Rechnung'}${hinweis}${finEntwurfHinweis()}</span>`,
     }));
     karten.push(karte({
       i: ic.uhr, l: 'Davon überfällig', v: finChfHtml(kuLageSumme(ueber)),
@@ -20466,8 +20486,8 @@ function finChartZeichnen(daten) {
   // Ohne eine einzige Rechnung und ohne Lohnlinie waere die Grafik eine
   // Nulllinie -- sie saehe aus wie zwoelf Monate ohne Umsatz. "Noch nichts
   // erfasst" ist eine andere Aussage.
-  if (re === 'ok' && !lohnDa && !rechnungen.filter(kuLageAktiv).length) {
-    box.innerHTML = EMPTY('Noch keine Rechnungen', 'Sobald eine Rechnung erfasst ist, entsteht hier die Einnahmenkurve.');
+  if (re === 'ok' && !lohnDa && !rechnungen.filter(finVerrechnet).length) {
+    box.innerHTML = finNochKeine();
     $('finLegende').innerHTML = '';
     return;
   }
@@ -20664,14 +20684,14 @@ function finKundenZeichnen(monate) {
   const re = finRechnungenZugriff();
   if (re !== 'ok') { el.innerHTML = re === 'kein_zugriff' ? FIN_KEIN_ZUGRIFF_RE() : FIN_UNBEKANNT_RE(); return; }
   const von = monate[0], bis = monate[monate.length - 1];
-  const imZr = rechnungen.filter(kuLageAktiv).filter(b => {
+  const imZr = rechnungen.filter(finVerrechnet).filter(b => {
     const m = String(b.datum || '').slice(0, 7);
     return m >= von && m <= bis;
   });
   if (!imZr.length) {
-    el.innerHTML = rechnungen.filter(kuLageAktiv).length
+    el.innerHTML = rechnungen.filter(finVerrechnet).length
       ? EMPTY('Keine Rechnung im Zeitraum', 'In diesem Zeitraum wurde nichts verrechnet.')
-      : EMPTY('Noch keine Rechnungen', 'Sobald eine Rechnung erfasst ist, erscheint sie hier.');
+      : finNochKeine();
     return;
   }
   const je = new Map();
@@ -20705,14 +20725,14 @@ function finStatusZeichnen(monate) {
   if (re !== 'ok') { el.innerHTML = re === 'kein_zugriff' ? FIN_KEIN_ZUGRIFF_RE() : FIN_UNBEKANNT_RE(); return; }
   const von = monate[0], bis = monate[monate.length - 1];
   const heute = isoTag();
-  const imZr = rechnungen.filter(kuLageAktiv).filter(b => {
+  const imZr = rechnungen.filter(finVerrechnet).filter(b => {
     const m = String(b.datum || '').slice(0, 7);
     return m >= von && m <= bis;
   });
   if (!imZr.length) {
-    el.innerHTML = rechnungen.filter(kuLageAktiv).length
+    el.innerHTML = rechnungen.filter(finVerrechnet).length
       ? EMPTY('Keine Rechnung im Zeitraum', 'In diesem Zeitraum wurde nichts verrechnet.')
-      : EMPTY('Noch keine Rechnungen', 'Sobald eine Rechnung erfasst ist, erscheint sie hier.');
+      : finNochKeine();
     return;
   }
   const gruppen = [
@@ -20744,18 +20764,18 @@ function finAlterZeichnen() {
     $('finMahn').innerHTML = '';
     return;
   }
-  const rAktiv = rechnungen.filter(kuLageAktiv);
+  const rAktiv = rechnungen.filter(finVerrechnet);
   const offen = rAktiv.filter(b => !Number(b.bezahlt));
   const mitTagen = offen.map(b => ({ b, t: kuLageUeberTage(b) }));
   const ueber = mitTagen.filter(x => x.t !== null && x.t >= 1).sort((a, b) => b.t - a.t);
-  $('finAlterUnter').textContent = offen.length
+  $('finAlterUnter').textContent = (offen.length
     ? `inkl. MWST · Stand heute · ${nf(offen.length)} offene ${offen.length === 1 ? 'Rechnung' : 'Rechnungen'}`
-    : 'inkl. MWST · Stand heute';
+    : 'inkl. MWST · Stand heute') + finEntwurfHinweis();
 
   if (!offen.length) {
     $('finAlter').innerHTML = rAktiv.length
       ? EMPTY('Alles bezahlt', 'Zurzeit ist keine Rechnung offen.')
-      : EMPTY('Noch keine Rechnungen', 'Sobald eine Rechnung erfasst ist, erscheint sie hier.');
+      : finNochKeine();
     $('finMahn').innerHTML = '';
     return;
   }
