@@ -577,8 +577,10 @@ try {
   check('KRITISCH: kompakt erscheinen die Unterkategorien oben', ts.display === 'flex');
   // Seit ENT-181 waren es fuenf (Offerten, dann Rechnungen); seit ENT-555
   // steht "Uebersicht" als Startseite des Bereichs davor.
+  // Seit ENT-712 stehen die Rechnungen unter Finanzen -- bei den Kunden
+  // bleiben fuenf.
   check('KRITISCH: mit den richtigen Namen',
-    JSON.stringify(namen) === JSON.stringify(['Übersicht', 'Adressen', 'Objekte', 'Rapporte', 'Offerten', 'Rechnungen']));
+    JSON.stringify(namen) === JSON.stringify(['Übersicht', 'Adressen', 'Objekte', 'Rapporte', 'Offerten']));
   const markiert = await p.evaluate(() => {
     const b = document.querySelector('#topSub button.on'); return b ? b.textContent : null; });
   check('Die aktuelle ist hervorgehoben', markiert === 'Adressen');
@@ -641,10 +643,10 @@ try {
   // ergaenzt, hier vorbeizukommen und nachzusehen, ob die Mitte noch
   // stimmt -- genau das ist der Zweck dieser Suite.
   const mPlanung = await mitteVon(() => go('planung'));
-  check('Bei den Kunden stehen sechs Unterkategorien (ENT-181, "Übersicht" seit ENT-555)', mKunden.anzahl === 6);
+  check('Bei den Kunden stehen fuenf Unterkategorien (ENT-181, "Übersicht" seit ENT-555, Rechnungen seit ENT-712 unter Finanzen)', mKunden.anzahl === 5);
   check('Bei der Administration sechs (ENT-181/ENT-421/ENT-441/ENT-682)', mAdmin.anzahl === 6);
   check('Bei der Planung ebenfalls vier', mPlanung.anzahl === 4);
-  check('KRITISCH: sechs Unterkategorien stehen in der Fenstermitte',
+  check('KRITISCH: fuenf Unterkategorien der Kunden stehen in der Fenstermitte',
     Math.abs(mKunden.mitte - 800) <= 4);
   check('KRITISCH: sechs der Administration ebenfalls -- die Zahl aendert die Mitte nicht',
     Math.abs(mAdmin.mitte - 800) <= 4);

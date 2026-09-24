@@ -127,18 +127,19 @@ await page.fill('#gName', 'adrian'); await page.fill('#gPass', 'x'); await page.
 await page.waitForSelector('#shell.on');
 await page.waitForTimeout(400);
 
-await page.click('#nav-kunden');
+// Seit ENT-712 unter Finanzen, nicht mehr unter Kunden.
+await page.click('#nav-finanzen');
 await page.waitForTimeout(150);
 
 try {
-  check('Der Reiter "Rechnungen" steht neben "Offerten" in der Kunden-Gruppe',
-    await page.isVisible('#nav-kunden-rechnungen'));
+  check('Der Reiter "Rechnungen" steht in der Finanzen-Gruppe (ENT-712)',
+    await page.isVisible('#nav-finanzen-rechnungen'));
 
-  await page.click('#nav-kunden-rechnungen');
+  await page.click('#nav-finanzen-rechnungen');
   await page.waitForTimeout(300);
   check('KRITISCH: der Klick oeffnet die Rechnungen-Ansicht',
-    (await page.getAttribute('#kv-rechnungen', 'class') || '').includes('on'));
-  check('Der Reiter ist als aktiv markiert', (await page.getAttribute('#nav-kunden-rechnungen', 'class') || '').includes('on'));
+    (await page.getAttribute('#view-rechnungen', 'class') || '').includes('on'));
+  check('Der Reiter ist als aktiv markiert', (await page.getAttribute('#nav-finanzen-rechnungen', 'class') || '').includes('on'));
   check('Die Kopfzeile nennt "Rechnungen"', (await page.textContent('#pgCrumb')) === 'Rechnungen an Kunden');
   check('KRITISCH: die Liste ruft wirklich art=rechnung ab, nicht art=offerte',
     belegListArten.includes('rechnung'));
@@ -214,8 +215,8 @@ try {
     /RE0940/.test(nachOffen[0]));
 
   // ── "Rechnung erstellen" oeffnet die geteilte Erfassungsmaske ─────────────
-  check('KRITISCH: der Knopf "Rechnung erstellen" ist da', await page.isVisible('#kv-rechnungen button:has-text("Rechnung erstellen")'));
-  await page.click('#kv-rechnungen button:has-text("Rechnung erstellen")'); await page.waitForTimeout(300);
+  check('KRITISCH: der Knopf "Rechnung erstellen" ist da', await page.isVisible('#view-rechnungen button:has-text("Rechnung erstellen")'));
+  await page.click('#view-rechnungen button:has-text("Rechnung erstellen")'); await page.waitForTimeout(300);
   check('KRITISCH: das Formular zeigt "Rechnungsdatum", nicht "Offertendatum"',
     (await page.textContent('#ofLblDatum')).includes('Rechnungsdatum'));
   check('KRITISCH: das zweite Datumsfeld heisst "Fällig am", nicht "Gültig bis"',
@@ -238,7 +239,7 @@ try {
   // Zurueck fuehrt wirklich in die Rechnungsliste, nicht in die Offertenliste.
   await page.click('#ofBtnZurueck'); await page.waitForTimeout(200);
   check('KRITISCH: "Zurück" fuehrt zur Rechnungsliste',
-    (await page.getAttribute('#kv-rechnungen', 'class') || '').includes('on'));
+    (await page.getAttribute('#view-rechnungen', 'class') || '').includes('on'));
 
   // ── Als bezahlt markieren ueber das Zeilenmenue ───────────────────────────
   // Gezielt die Zeile von RE0950 (unbezahlt) statt nth=0: die vorherige
@@ -295,7 +296,7 @@ try {
   // Zurueck in die Kunden-Ansicht, bevor der naechste Abschnitt Kunden-Reiter
   // anklickt -- die Nav-Knoepfe dort sind nur sichtbar, waehrend man auf der
   // Kunden-Seite steht, nicht mitten im offenen Beleg-Formular.
-  await page.evaluate(() => { go('kunden'); kuGoTab('rechnungen'); });
+  await page.evaluate(() => { go('kunden'); kuGoTab('offerten'); });
   await page.waitForTimeout(200);
 
   // ── Offerten- und Rechnungen-Liste ueberschreiben sich nicht ──────────────
@@ -336,8 +337,8 @@ try {
   await p2.goto(URL);
   await p2.fill('#gName', 'adrian'); await p2.fill('#gPass', 'x'); await p2.click('#gBtn');
   await p2.waitForSelector('#shell.on'); await p2.waitForTimeout(400);
-  await p2.click('#nav-kunden'); await p2.waitForTimeout(150);
-  await p2.click('#nav-kunden-rechnungen'); await p2.waitForTimeout(300);
+  await p2.click('#nav-finanzen'); await p2.waitForTimeout(150);
+  await p2.click('#nav-finanzen-rechnungen'); await p2.waitForTimeout(300);
   check('KRITISCH: eine leere Rechnungsliste sagt "Noch keine Rechnungen", nicht "Keine Treffer"',
     /Noch keine Rechnungen/.test(await p2.textContent('#reTable')));
   await p2.close();
@@ -374,8 +375,8 @@ try {
   await p3.goto(URL);
   await p3.fill('#gName', 'adrian'); await p3.fill('#gPass', 'x'); await p3.click('#gBtn');
   await p3.waitForSelector('#shell.on'); await p3.waitForTimeout(400);
-  await p3.click('#nav-kunden'); await p3.waitForTimeout(150);
-  await p3.click('#nav-kunden-rechnungen'); await p3.waitForTimeout(400);
+  await p3.click('#nav-finanzen'); await p3.waitForTimeout(150);
+  await p3.click('#nav-finanzen-rechnungen'); await p3.waitForTimeout(400);
 
   const zeile = (await p3.$$eval('#reTable tbody tr', ts => ts.map(t => t.innerText.replace(/\s+/g, ' ').trim())))[0] || '';
   check('KRITISCH: ein Nulldatum liest sich NICHT als "Überfällig" (OP-559)',

@@ -75,11 +75,13 @@
       <div class="hb-tabelle-wrap"><table>
         <tr><th>Ort</th><th>Zeigt</th></tr>
         <tr><td>Reiter <b>„Lohn"</b> im Personaldossier</td><td>Lohnstammdaten <b>einer</b> Person: Ansatz, Abzüge, Zahlungsweg — erscheint erst mit dem Recht „Lohn: lesen".</td></tr>
-        <tr><td>Seitenleisten-Rubrik <b>„Lohn"</b> (Desktop)</td><td>Betriebsweite Vorgänge: Lohnläufe, Lohnarten, Sätze und Regelwerk.</td></tr>
+        <tr><td><b>Finanzen → Lohn</b> in der Seitenleiste (Desktop)</td><td>Betriebsweite Vorgänge: Lohnläufe, Lohnarten, Sätze und Regelwerk, dazu der Auslagenersatz als Monatssumme je Person.</td></tr>
       </table></div>
-      <p>Der Klick auf die Rubrik „Lohn" führt direkt zu den <b>Lohnläufen</b>, nicht zum
+      <p>Der Klick auf „Lohn" unter Finanzen führt direkt zu den <b>Lohnläufen</b>, nicht zum
       Katalog dahinter — Lohnläufe sind der eigentliche Vorgang, Lohnarten und Sätze nur
-      dessen Einrichtung.</p>
+      dessen Einrichtung. Oben steht eine Kachelleiste, über die du zwischen Lohnläufen,
+      Lohnarten, Sätzen und dem Auslagenersatz wechselst. Die Lohnkosten des Betriebs
+      (Bruttolohn, ohne Arbeitgeberbeiträge) zeigt die Übersicht unter Finanzen.</p>
 
       <h2 id="lohnansatz-abzuege-auszahlung">Lohnansatz, Abzüge, Auszahlung</h2>
       <p>Im Personaldossier, Reiter „Lohn". Eine Kachel „Aus dem GAV abgeleitet" zeigt
@@ -201,7 +203,7 @@
       </div>
 
       <p class="hb-fussnote">Quelle: <code>dashboard.html</code> (Reiter „Lohn" im
-      Personaldossier, Rubrik „Lohn"), <code>backend/lohn.php</code>,
+      Personaldossier, Finanzen → Lohn), <code>backend/lohn.php</code>,
       <code>backend/lohnlauf.php</code>, <code>backend/api/lohn*.php</code>,
       <code>backend/rechte.php</code>, Stand 11.09.2026. Nicht am laufenden Cockpit
       nachgeprüft — siehe Hinweis auf der <a href="index.php">Übersicht</a>.</p>
