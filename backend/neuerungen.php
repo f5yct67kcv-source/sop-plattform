@@ -38,6 +38,14 @@ function neuerungen_katalog(): array
             'text'  => 'Die Buchstaben einer Unterschrift stehen jetzt auf der Linie, auch wenn eine Schlaufe weit nach unten reicht. Die Beschriftung darunter rückt entsprechend.',
         ],
         [
+            'nr'    => 12,
+            'datum' => '2026-09-24',
+            'art'   => 'neu',
+            'fuer'  => ['betreiber'],
+            'titel' => 'Eigener Reiter für den Vorrat',
+            'text'  => 'Unter Mandanten → Vorrat legst du vorbereitete Anlagen an, siehst je Platz, ob er bereit ist, und teilst ihn in einem Schritt einem neuen Kunden zu. Ein oranger Punkt am Reiter zeigt, wenn weniger als zwei Plätze bereit sind. Vorratsplätze stehen nicht mehr in der Mandantenliste.',
+        ],
+        [
             'nr'    => 11,
             'datum' => '2026-09-24',
             'art'   => 'verbesserung',
