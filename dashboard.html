@@ -13354,6 +13354,23 @@ function loadRapporte() {
   });
 }
 
+// Die Unterschrift kommt nicht mehr mit der Liste, nur "hat_unterschrift"
+// (siehe rapport_list.php): Die Bilder machten die Liste mit jedem Rapport
+// schwerer, und die Liste laedt bei jedem Start. Geholt wird sie erst, wenn
+// EIN Rapport geoeffnet, gedruckt oder geteilt wird, und am Rapport gemerkt.
+// Drei Ergebnisse, weil es drei Aussagen sind: das Bild, '' fuer "keine
+// erfasst" und null fuer "liess sich nicht laden" -- ein gescheiterter
+// Abruf darf nie wie ein Rapport ohne Unterschrift aussehen.
+function rapportUnterschrift(r) {
+  if (r.unterschrift) return Promise.resolve(r.unterschrift);
+  if (!Number(r.hat_unterschrift)) return Promise.resolve('');
+  return api('rapport_list.php?id=' + Number(r.id)).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok' || !data.rapport) return null;
+    r.unterschrift = data.rapport.unterschrift || '';
+    return r.unterschrift;
+  }).catch(() => null);
+}
+
 function loadMitarbeiter() {
   return api('mitarbeiter_list.php').then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') return;
@@ -14204,7 +14221,7 @@ function rKarte(r, gruppenGroesse) {
     ['Pause', nf(r.pause_min) + ' Min.'],
     ['Nettostunden', '<strong>' + nf(r.netto_h, 2) + ' h</strong>'],
     ['Unterzeichner', dash(r.unterzeichner)],
-    ['Unterschrift', r.unterschrift ? 'erfasst' : '<span style="color:var(--ink-3)">keine erfasst</span>'],
+    ['Unterschrift', (r.unterschrift || Number(r.hat_unterschrift)) ? 'erfasst' : '<span style="color:var(--ink-3)">keine erfasst</span>'],
     ['Bemerkung', dash(r.bemerkung)],
     ['Erfasst am', r.erfasst_am ? dmy(r.erfasst_am) + ', ' + String(r.erfasst_am).slice(11, 16) : '–'],
   ];
@@ -30276,22 +30293,29 @@ function ladeFeiertagMap() {
 // Dauerhaft ueber "Einrichtung" in der Seitenleiste erreichbar -- nicht nur
 // als Nothilfe, wenn ein Laden bereits fehlgeschlagen ist. Sonst findet ihn
 // niemand, dessen erster Blick auf ein funktionierendes Dashboard faellt.
-// Stiller Hintergrund-Check, ob die Einrichtung etwas nachzutragen hat --
-// derselbe Endpunkt wie planungEinrichten(), nur als GET ohne Ausfuehrung.
+// Stiller Hintergrund-Check, ob die Einrichtung etwas nachzutragen hat.
 // Kein Toast bei Fehlern: das ist ein Hinweis-Punkt, kein Vorgang.
+//
+// EIN Abruf, nicht zwei: Frueher fragte der Start zusaetzlich
+// planung_einrichten.php (GET) -- und neuerungen_stand.php zaehlte dieselben
+// fehlenden Tabellen/Spalten gleich noch einmal ('einrichtung_ausstehend',
+// dieselbe Zaehlung wie 'ausstehend'). Beide gehen ueber information_schema
+// und kosten bei jedem Start Zeit. Die Etappenliste holt die Einrichtung
+// selbst, wenn sie laeuft (planungEinrichten).
+// Den Punkt sieht wie bisher nur, wer einspielen darf (betrieb_schreiben):
+// planung_einrichten.php antwortete allen anderen mit 403.
 function pruefeUpdate() {
-  api('planung_einrichten.php').then(({ ok, data }) => {
-    const hat = ok && Number(data.ausstehend) > 0;
+  updLaden().then(d => {
+    const hat = !!(d && d.darf_einspielen && Number(d.einrichtung_ausstehend) > 0);
     $('nav-einrichtung').classList.toggle('hat-update', hat);
     $('nav-einrichtung').title = hat ? 'Update verfügbar: neue Einrichtung steht aus' : 'Einrichtung';
     $('navEinrichtungLbl').textContent = hat ? 'Update' : 'Einrichtung';
-    if (ok && data && data.etappen) { updEtappen = data.etappen; }
-  }).catch(() => {});
-  // Der Punkt am Konto-Logo faellt nicht auf, solange niemand dort
-  // hinschaut (ENT-698). Darum oeffnet sich beim Anmelden das Fenster
-  // selbst -- fuer alle im Cockpit, nicht nur fuer die, die einspielen
-  // duerfen: Neuerungen betreffen jeden.
-  updVonSelbst();
+    // Der Punkt am Konto-Logo faellt nicht auf, solange niemand dort
+    // hinschaut (ENT-698). Darum oeffnet sich beim Anmelden das Fenster
+    // selbst -- fuer alle im Cockpit, nicht nur fuer die, die einspielen
+    // duerfen: Neuerungen betreffen jeden.
+    updVonSelbst(d);
+  });
 }
 
 // ══════════════════════════════════════════ UPDATE-FENSTER (ENT-698)
@@ -30305,7 +30329,7 @@ function pruefeUpdate() {
 //   unbekannt   der Stand liess sich nicht abrufen
 //   fertig      soeben eingespielt
 let updStand = null;
-let updEtappen = null;       // aus planung_einrichten.php (GET), Reihenfolge = Laufreihenfolge
+let updEtappen = null;       // aus planung_einrichten.php (GET, erst beim Einspielen geholt), Reihenfolge = Laufreihenfolge
 let updModus = 'aktuell';
 let updLaeuft = false;
 let updVonSelbstGezeigt = false;
@@ -30319,9 +30343,11 @@ function updLaden() {
 
 // Einmal je Anmeldung. "Spaeter" schliesst nur; solange eine Einrichtung
 // aussteht, kommt das Fenster beim naechsten Anmelden wieder (Punkt 4).
-function updVonSelbst() {
+// vorab: der Stand, den pruefeUpdate() schon geholt hat -- dann kein
+// zweiter Abruf. undefined heisst: selbst holen.
+function updVonSelbst(vorab) {
   if (updVonSelbstGezeigt) { return; }
-  updLaden().then(d => {
+  (vorab !== undefined ? Promise.resolve(vorab) : updLaden()).then(d => {
     if (!d || updVonSelbstGezeigt) { return; }
     const neu = (d.neuerungen || []).length > 0;
     const offen = Number(d.einrichtung_ausstehend) > 0;
@@ -32029,9 +32055,9 @@ function openDrawer(id) {
   ];
   $('drBody').innerHTML =
     '<dl class="dl">' + rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('') + '</dl>' +
-    (r.unterschrift
-      ? `<div class="sig-box"><div class="lb">Unterschrift Kunde</div><img src="${esc(r.unterschrift)}" alt="Unterschrift"></div>`
-      : `<div class="sig-box"><div class="lb">Unterschrift Kunde</div><p style="font-size:12.5px;color:var(--ink-3)">Keine Unterschrift erfasst.</p></div>`) +
+    `<div class="sig-box" id="drSig">${drUnterschriftHtml(r.unterschrift
+      ? r.unterschrift
+      : (Number(r.hat_unterschrift) ? undefined : ''))}</div>` +
     `<p class="zone-note" style="margin-top:20px">Direkt als PDF: „Herunterladen“ oder „Teilen“ unten. Für den Ausdruck selbst „Kundenbericht drucken“, im Druckdialog lässt sich dort auch „Als PDF sichern“ wählen.</p>`;
   // Herunterladen/Teilen (ENT-399): direkter Weg zum PDF, ohne den Umweg
   // ueber den System-Druckdialog -- Anruf-Szenario, der Kunde am Telefon
@@ -32052,6 +32078,24 @@ function openDrawer(id) {
      <div style="flex:1"></div>
      <button class="btn btn-plain" id="drDeleteBtn" onclick="askDeleteRapport(${Number(id)})">Löschen</button>`;
   showDrawer();
+  // Das Bild erst jetzt holen (rapportUnterschrift). Nur einsetzen, wenn
+  // noch derselbe Rapport offen ist -- wer schnell weiterklickt, soll nicht
+  // die Unterschrift des vorherigen Rapports sehen.
+  if (!r.unterschrift && Number(r.hat_unterschrift)) {
+    rapportUnterschrift(r).then(u => {
+      if (drawerId !== Number(id) || !$('drSig')) return;
+      $('drSig').innerHTML = drUnterschriftHtml(u);
+    });
+  }
+}
+
+// undefined = wird geladen, null = liess sich nicht laden, '' = keine erfasst.
+function drUnterschriftHtml(u) {
+  const hinweis = t => `<div class="lb">Unterschrift Kunde</div><p style="font-size:12.5px;color:var(--ink-3)">${t}</p>`;
+  if (u === undefined) return hinweis('Unterschrift wird geladen …');
+  if (u === null) return hinweis('Die Unterschrift liess sich nicht laden. Bitte den Rapport erneut öffnen.');
+  if (!u) return hinweis('Keine Unterschrift erfasst.');
+  return `<div class="lb">Unterschrift Kunde</div><img src="${esc(u)}" alt="Unterschrift">`;
 }
 
 function showDrawer() {
@@ -34622,8 +34666,14 @@ function kdBerichtBlatt(r) {
 function printReport() {
   const r = rapporte.find(x => Number(x.id) === drawerId);
   if (!r) return;
-  $('printArea').innerHTML = kdBerichtBlatt(r);
-  window.print();
+  // Ohne geladene Unterschrift stuende auf dem Blatt die leere Linie fuer
+  // "keine erfasst" -- beim Kunden sieht das aus wie ein unsignierter
+  // Rapport. Dann lieber gar nicht drucken und es sagen.
+  rapportUnterschrift(r).then(u => {
+    if (u === null) { toast('Die Unterschrift liess sich nicht laden — bitte erneut versuchen.'); return; }
+    $('printArea').innerHTML = kdBerichtBlatt(r);
+    window.print();
+  });
 }
 
 function kdRapportDateiname(r) {
@@ -34639,13 +34689,25 @@ function kdRapportDateiname(r) {
 // nichts, und eine Verzweigung dort haette nur eine neue Stelle geschaffen,
 // an der beide Formen auseinanderlaufen koennen.
 function kdRapportPdfBauen(r) {
-  return html2pdfLaden().then(() => {
+  // Gleiche Regel wie bei printReport(): kein Blatt ohne geladene Unterschrift.
+  return rapportUnterschrift(r).then(u => {
+    if (u === null) throw new Error('unterschrift');
+    return html2pdfLaden();
+  }).then(() => {
     $('rapportBlatt').innerHTML = kdBerichtBlatt(r);
     // Seit ENT-425 dieselbe Erzeugung wie bei der Offerte: moeglichst eine
     // Seite. Der Rapport hatte dasselbe Problem -- Unterschriftenblock und
     // Fusszeile kippten bei laengeren Bemerkungen auf Seite 2.
     return blattPdfBlob($('rapportBlatt'));
   });
+}
+
+// Scheiterte schon das Nachladen der Unterschrift, sagt die Meldung das --
+// sonst sucht man den Fehler beim PDF.
+function kdRapportFehler(err, sonst) {
+  return (err && err.message === 'unterschrift')
+    ? 'Die Unterschrift liess sich nicht laden — bitte erneut versuchen.'
+    : sonst;
 }
 
 // Herunterladen und Teilen (ENT-399): Anruf-Szenario -- der Planer ist
@@ -34672,9 +34734,9 @@ function kdRapportHerunterladen(id, knopf) {
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
     if (btn) { btn.disabled = false; }
-  }).catch(() => {
+  }).catch(err => {
     if (btn) { btn.disabled = false; }
-    toast('Der Rapport liess sich nicht erzeugen.');
+    toast(kdRapportFehler(err, 'Der Rapport liess sich nicht erzeugen.'));
   });
 }
 
@@ -34702,7 +34764,7 @@ function kdRapportTeilen(id, knopf) {
   }).catch(err => {
     if (btn) { btn.disabled = false; }
     if (err && err.name === 'AbortError') { return; }
-    toast('Der Rapport liess sich nicht teilen.');
+    toast(kdRapportFehler(err, 'Der Rapport liess sich nicht teilen.'));
   });
 }
 

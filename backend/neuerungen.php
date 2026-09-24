@@ -38,6 +38,14 @@ function neuerungen_katalog(): array
             'text'  => 'Hat jemand eine Schicht abgelehnt oder ist sie für die Person entfallen, zeigt die Planung sie zur selben Zeit nicht mehr als „bereits eingeteilt“. Speichern ging schon vorher, jetzt stimmt auch die Anzeige.',
         ],
         [
+            'nr'    => 17,
+            'datum' => '2026-09-24',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Cockpit startet schneller',
+            'text'  => 'Seiten und Daten kommen jetzt komprimiert, und was sich nicht geändert hat, lädt dein Browser nicht noch einmal. Die Unterschriften der Rapporte kommen erst, wenn du einen Rapport öffnest, druckst oder teilst.',
+        ],
+        [
             'nr'    => 16,
             'datum' => '2026-09-24',
             'art'   => 'verbesserung',

@@ -607,6 +607,7 @@ for (const [datei, titel] of [
   ['pruef_push.php', 'KRITISCH: die VAPID-Signatur haelt der Gegenpruefung stand und ein toter Endpunkt wird abgemeldet (ENT-424)'],
   ['pruef_mitteilung_loeschen.php', 'KRITISCH: eine laufende Mitteilung laesst sich auch am Browser vorbei nicht loeschen (ENT-433)'],
   ['pruef_mitteilung_antwort.php', 'KRITISCH: auf einen fremden oder nicht sichtbaren Termin laesst sich nicht zusagen (ENT-436)'],
+  ['pruef_rapport_liste.php', 'KRITISCH: die Rapportliste traegt keine Unterschriftsbilder, sagt aber, ob eine da ist -- und ?id= haelt dieselbe Grenze'],
   ['pruef_mitteilung_liste.php', 'KRITISCH: die Antwortliste eines Termins nennt ALLE Empfaenger, auch die ohne Antwort (ENT-436)'],
   ['pruef_kundenportal.php', 'KRITISCH: Sitzungsablauf, Einmal-Code und E-Mail-Abgleich des Kundenportals stimmen (ENT-441)'],
   ['pruef_wachbuch.php', 'KRITISCH: das Wachbuch fuehrt vier Quellen richtig zusammen, sortiert und kappt sie (ENT-480)'],
@@ -1580,6 +1581,20 @@ if (syntaxFehler.length) { console.log('   Syntax: ' + syntaxFehler.join(', '));
   // pro Person gezaehlt wuerde.
   check('Der zusammengesetzte Primärschlüssel (einsatz_id, mitarbeiter_id) bleibt dabei unverändert',
     /INSERT INTO einsatz_zuteilung \(einsatz_id, mitarbeiter_id, position_id\)/.test(zuteilenBlock));
+}
+
+// Der Service Worker der App hoert auf push und notificationclick -- und
+// NICHT auf fetch. Ein fetch-Handler, auch ein leerer, weckt ihn vor jeder
+// Anfrage der App, jeder API-Abruf eingeschlossen. Geprueft am Verhalten:
+// sw.js wird mit einem nachgebauten "self" ausgefuehrt, und gezaehlt wird,
+// was sich tatsaechlich anmeldet -- nicht, was im Quelltext steht.
+{
+  const angemeldet = [];
+  const selbst = { addEventListener: t => angemeldet.push(t), registration: {}, clients: {} };
+  new Function('self', readFileSync(`${WURZEL}/sw.js`, 'utf8'))(selbst);
+  check('Der Service Worker hoert auf push (ENT-424)', angemeldet.includes('push'));
+  check('KRITISCH: der Service Worker meldet keinen fetch-Handler an -- er bremste jede Anfrage der App',
+    !angemeldet.includes('fetch'));
 }
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
