@@ -5211,7 +5211,9 @@ function vorratBereiche(p, m) {
     aufBereich('Datenbank', datenbankZelle(m),
       m.id ? '<button class="klein" data-vorrat-aendern="' + p.id + '">Ändern</button>' : ''),
     aufBereich('Zuteilen',
-      p.bereit ? 'übergabefähig' : text('nicht möglich: ' + p.text),
+      /* Kurz: der volle Grund steht schon in der Spalte Stand und am Knopf.
+         Hier in der schmalen Spalte brach er mitten im Wort um (gemessen). */
+      p.bereit ? 'übergabefähig' : text('nicht möglich — ' + (VORRAT_TEXT[p.lage] || ['', p.lage])[1]),
       p.bereit
         ? '<button class="klein" data-vorrat-zuteilen="' + p.id + '">Einem Kunden zuteilen</button>'
         : '<button class="klein" disabled title="' + text('Nicht übergabefähig: ' + p.text) + '">Einem Kunden zuteilen</button>'),

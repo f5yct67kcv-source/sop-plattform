@@ -146,13 +146,21 @@ const browser = await chromium.launch({ executablePath: browserPfad() });
     const leib = [...document.querySelectorAll('#vorrat-inhalt tr.auf-leib')].find(l => !l.classList.contains('versteckt'));
     const bereiche = [...leib.querySelectorAll('.auf-bereich')];
     const zut = [...leib.querySelectorAll('button')].find(b => /zuteilen/.test(b.textContent));
+    const stand = bereiche[1].querySelector('.auf-stand');
+    const zeile = parseFloat(getComputedStyle(stand).lineHeight) || 20;
     return { titel: bereiche.map(b => b.querySelector('.auf-titel').textContent),
+             zuteilenText: stand.textContent, zuteilenZeilen: Math.round(stand.getBoundingClientRect().height / zeile),
              gefahr: bereiche.map(b => b.classList.contains('gefahr')),
              zuteilenAus: zut ? zut.disabled : null, grund: zut ? zut.title : '' };
   });
   check('aufgeklappt: Datenbank, Zuteilen, Entfernen', b2.titel.join('|') === 'Datenbank|Zuteilen|Entfernen');
   check('KRITISCH: Entfernen steht zuletzt und als einziger abgesetzt',
     b2.gefahr.join('|') === 'false|false|true');
+  // GEMESSEN (2026-09-24): Die erste Fassung schrieb den vollen Grund auch
+  // hierher; in der schmalen Spalte brach er ueber sechs Zeilen und mitten
+  // im Wort um. Hier steht das Stichwort, der volle Grund in Stand und Knopf.
+  check('gemessen: der Stand unter "Zuteilen" bleibt kurz (hoechstens zwei Zeilen) und nennt das Stichwort',
+    b2.zuteilenZeilen <= 2 && /Secret fehlt/.test(b2.zuteilenText));
   check('KRITISCH: nicht bereit -> der Zuteilen-Knopf ist ausgegraut und nennt den Grund',
     b2.zuteilenAus === true && /Secret|MANDANT_SECRETS/.test(b2.grund));
 
