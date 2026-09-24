@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 19,
+            'datum' => '2026-09-24',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Persönliche Zulagen und Abzüge',
+            'text'  => 'Im Reiter „Lohn“ der Personalakte gibt es die neue Karte „Zulagen und Abzüge“. Dort erfasst du pro Person Beträge aus deinen eigenen Lohnarten: pro Stunde, pro Monat oder einmalig, jeweils ab einem Monat und auf Wunsch bis zu einem Monat. Der Lohnlauf rechnet sie mit. Änderst du einen Betrag, endet die alte Position und eine neue beginnt, so bleibt jeder Monat nachvollziehbar.',
+        ],
+        [
             'nr'    => 18,
             'datum' => '2026-09-24',
             'art'   => 'fehlerbehebung',

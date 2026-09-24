@@ -70,6 +70,31 @@ const LOHN_VOLL = {
   zahlungen: [{ id: 9, mitarbeiter_id: 42, reihenfolge: 1, art: 'rest', betrag_rappen: null,
     iban: 'CH9300762011623852957', empfaenger: null, bank: null, aktiv: 1 }],
   warnung: null,
+  // Persoenliche Zulagen und Abzuege (ENT-713). Vier Zustaende auf einmal:
+  // laeuft und ist schon abgerechnet, beendet, einmalig beendet, kuenftig.
+  abgeschlossen_bis: '2027-02-28',
+  positionen: [
+    { id: 21, lohnart_id: 101, bezeichnung: 'Funktionszulage', art: 'fixbetrag',
+      betrag_rappen: 15000, gueltig_ab: '2027-01-01', gueltig_bis: null,
+      ferien_pflichtig: 0, ml13_pflichtig: 0, system: 0, verwendet: true },
+    { id: 22, lohnart_id: 102, bezeichnung: 'Hundeführerzulage', art: 'stundensatz',
+      betrag_rappen: 150, gueltig_ab: '2026-01-01', gueltig_bis: '2026-12-31',
+      ferien_pflichtig: 1, ml13_pflichtig: 1, system: 0, verwendet: true },
+    { id: 23, lohnart_id: 103, bezeichnung: 'Abzug Uniform', art: 'abzug',
+      betrag_rappen: 2000, gueltig_ab: '2027-03-01', gueltig_bis: '2027-03-31',
+      ferien_pflichtig: 0, ml13_pflichtig: 0, system: 0, verwendet: false },
+    { id: 24, lohnart_id: 104, bezeichnung: 'Pauschalspesen', art: 'netto',
+      betrag_rappen: 500, gueltig_ab: '2027-08-01', gueltig_bis: null,
+      ferien_pflichtig: 0, ml13_pflichtig: 0, system: 0, verwendet: false },
+  ],
+  positionen_lohnarten: [
+    { id: 101, schluessel: 'funktionszulage', bezeichnung: 'Funktionszulage', art: 'fixbetrag',
+      ferien_pflichtig: 0, ml13_pflichtig: 0, ahv_pflichtig: 1 },
+    { id: 102, schluessel: 'hundefuehrer', bezeichnung: 'Hundeführerzulage', art: 'stundensatz',
+      ferien_pflichtig: 1, ml13_pflichtig: 1, ahv_pflichtig: 1 },
+    { id: 103, schluessel: 'uniform', bezeichnung: 'Abzug Uniform', art: 'abzug',
+      ferien_pflichtig: 0, ml13_pflichtig: 0, ahv_pflichtig: 0 },
+  ],
 };
 
 // Dieselbe Person, aber ohne Kategorie und ohne Eintritt: Der Mindestlohn
@@ -214,6 +239,10 @@ const LAUF_VORSCHAU = {
 let lohnAntwort = LOHN_VOLL;
 let rechte = ['personal_lesen', 'lohn_lesen', 'lohn_schreiben'];
 
+// Was der Browser an lohn_person.php schickt -- geprueft wird die Anfrage,
+// nicht nur, dass ein Dialog zuging.
+const gesendet = [];
+
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 1600, height: 1100 } });
 page.setDefaultTimeout(5000);
@@ -225,7 +254,10 @@ await page.route('**/api/**', async r => {
   const send = x => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(x) });
   if (u.includes('login')) return send({ status: 'ok', token: 't', name: 'a', rechte });
   if (u.includes('me.php')) return send({ status: 'ok', name: 'a', rechte });
-  if (u.includes('lohn_person')) return send(lohnAntwort);
+  if (u.includes('lohn_person')) {
+    if (r.request().method() === 'POST') { gesendet.push(JSON.parse(r.request().postData() || '{}')); }
+    return send(lohnAntwort);
+  }
   if (u.includes('lohnlaeufe')) {
     // Ohne Zeitraum die Liste, mit Zeitraum die Vorschau.
     return u.includes('von=') ? send(LAUF_VORSCHAU) : send({ status: 'ok', laeufe: [] });
@@ -418,6 +450,117 @@ check('Ein Zuschlag nach Art. 19 erscheint mit Betrag und Einheit',
 check('Die IBAN des Zahlungsempfaengers erscheint',
   /CH9300762011623852957/.test(akte));
 
+// ── 4b. Persoenliche Zulagen und Abzuege (ENT-713) ───────────────────────
+// Gemessen am gerenderten Zustand: Reihenfolge der Karten, Filter mit
+// Bezugszahl, Vorzeichen, und was der Dialog einer schon abgerechneten
+// Position NICHT mehr anbietet.
+const karten = await page.$$eval('#mdBereich_lohn .card-hd h3', hs => hs.map(h => h.textContent.trim()));
+check('Die Karte "Zulagen und Abzüge" steht direkt unter "Lohnansatz"',
+  karten.indexOf('Zulagen und Abzüge') === karten.indexOf('Lohnansatz') + 1);
+const posKarte = page.locator('#mdBereich_lohn .card', { hasText: 'Zulagen und Abzüge' });
+const breiten = await page.$$eval('#mdBereich_lohn .ma-lohn > .card', cs => cs.map(c => Math.round(c.getBoundingClientRect().width)));
+check('Die neue Karte ist so breit wie die übrigen Lohnkarten', new Set(breiten).size === 1);
+let posText = (await posKarte.textContent()).replace(/\s+/g, ' ');
+check('Beendete Positionen sind ausgeblendet, laufende und künftige stehen da',
+  /Funktionszulage/.test(posText) && /Pauschalspesen/.test(posText)
+  && !/Hundeführerzulage/.test(posText) && !/Abzug Uniform/.test(posText));
+check('KRITISCH: die gefilterte Liste sagt "2 von 4" -- sie sieht nicht aus wie die ganze',
+  /2 von 4/.test(posText));
+check('Eine künftige Position ist als künftig markiert, eine laufende als "gilt heute"',
+  /ab 08.2027 künftig/.test(posText) && /gilt heute/.test(posText)
+  && (posText.match(/08.2027/g) || []).length === 1);
+check('Die GAV-Zuschläge verweisen auf den Lohnansatz statt zu fehlen',
+  /Art. 19/.test(posText) && /beim Lohnansatz/.test(posText));
+await page.check('#lpoAlle');
+await page.waitForTimeout(200);
+posText = (await posKarte.textContent()).replace(/\s+/g, ' ');
+check('Mit "auch beendete zeigen" erscheinen alle vier, als beendet markiert',
+  /Hundeführerzulage/.test(posText) && /Abzug Uniform/.test(posText) && /beendet/.test(posText)
+  && !/2 von 4/.test(posText));
+check('Ein Abzug steht mit Minus da, eine Zulage ohne',
+  /−20.00/.test(posText) && /150.00/.test(posText) && !/−150.00/.test(posText));
+check('Einmalig und pro Stunde sind benannt',
+  /einmalig/.test(posText) && /03.2027/.test(posText) && /pro Stunde/.test(posText));
+check('Eine Zulage mit Ferien- und 13.-Kennzeichen sagt das in der Liste',
+  /mit Ferienentschädigung/.test(posText) && /mit 13. ML/.test(posText));
+
+// Der Dialog einer schon abgerechneten Position.
+await page.evaluate(() => lohnPositionOeffnen(21));
+await page.waitForTimeout(300);
+const wege = await page.$$eval('#lpoWeg option', os => os.map(o => o.value));
+check('KRITISCH: eine abgerechnete Position bietet kein Korrigieren an',
+  wege.includes('ab') && wege.includes('beenden') && !wege.includes('korrigieren'));
+check('KRITISCH: und keinen Löschknopf', !(await sichtbar('lpoLoeschKnopf')));
+check('Der Grund steht im Dialog',
+  (await sichtbar('lpoSperrHinweis')) && /02.2027/.test(await page.textContent('#lpoSperrHinweis')));
+check('Beim "Ändern ab" sind nur Betrag und Monat gefragt, nicht die ganze Position',
+  (await sichtbar('lpoGrpAb')) && !(await sichtbar('lpoGrpVoll')));
+await page.fill('#lpoNeuBetrag', '200.00');
+await page.fill('#lpoNeuAb', '2027-06');
+gesendet.length = 0;
+await page.evaluate(() => lohnPositionSpeichern());
+await page.waitForTimeout(300);
+check('Gesendet wird der Weg "ab" mit Betrag und Monat -- kein Überschreiben',
+  gesendet.length === 1 && gesendet[0].was === 'position' && gesendet[0].aktion === 'ab'
+  && gesendet[0].eintrag_id === 21 && gesendet[0].betrag === '200.00' && gesendet[0].ab === '2027-06');
+
+// Eine noch nicht abgerechnete Position darf korrigiert und geloescht werden.
+await page.evaluate(() => lohnPositionOeffnen(24));
+await page.waitForTimeout(300);
+check('Eine noch nicht abgerechnete Position lässt sich korrigieren und löschen',
+  (await page.$$eval('#lpoWeg option', os => os.map(o => o.value))).includes('korrigieren')
+  && (await sichtbar('lpoLoeschKnopf')));
+await page.evaluate(() => closeDlg('dlgLohnPosition'));
+
+// Der Dialog fuer eine neue Position: Einheit folgt der Lohnart.
+await page.evaluate(() => lohnPositionOeffnen(null));
+await page.waitForTimeout(300);
+check('Beim Erfassen gibt es keine Wegwahl, nur die Felder',
+  !(await sichtbar('lpoWegFeld')) && (await sichtbar('lpoGrpVoll')));
+await page.selectOption('#lpoLohnart', '102');
+await page.evaluate(() => lohnPositionEinheit());
+check('Die Einheit am Betrag folgt der Lohnart: pro Stunde',
+  /pro Stunde/.test(await page.textContent('#lpoBetragLabel')));
+check('Und der Dialog sagt, dass Ferien und 13. ML darauf gerechnet werden',
+  /Ferienentschädigung/.test(await page.textContent('#lpoLohnartHinweis')));
+await page.selectOption('#lpoLohnart', '103');
+await page.evaluate(() => lohnPositionEinheit());
+check('Bei einem Abzug sagt die Einheit, dass abgezogen wird',
+  /abgezogen/.test(await page.textContent('#lpoBetragLabel')));
+await page.fill('#lpoBetrag', '20');
+await page.fill('#lpoAb', '2027-09');
+await page.check('#lpoEinmalig');
+check('Einmalig blendet das Bis-Feld aus', !(await sichtbar('lpoBisFeld')));
+gesendet.length = 0;
+await page.evaluate(() => lohnPositionSpeichern());
+await page.waitForTimeout(300);
+check('Einmalig wird als ein einziger Monat gesendet (Ab = Bis)',
+  gesendet.length === 1 && gesendet[0].aktion === 'neu' && gesendet[0].lohnart_id === 103
+  && gesendet[0].ab === '2027-09' && gesendet[0].bis === '2027-09');
+
+// Die Leerzustaende: nicht eingerichtet, nichts erfasst ohne Lohnart, und
+// kein Treffer sind drei verschiedene Aussagen.
+const posLeer = async (aenderung) => {
+  lohnAntwort = Object.assign({}, LOHN_VOLL, aenderung);
+  await page.evaluate(() => { lohnAkte = null; lohnAkteFuer = null; lohnPosAlle = false; mdGoTab('lohn'); });
+  await page.waitForTimeout(400);
+  return (await posKarte.textContent()).replace(/\s+/g, ' ');
+};
+const tNicht = await posLeer({ positionen: null, positionen_lohnarten: [] });
+const tOhneArt = await posLeer({ positionen: [], positionen_lohnarten: [] });
+const tAllesBeendet = await posLeer({ positionen: [LOHN_VOLL.positionen[1]] });
+check('KRITISCH: "nicht eingerichtet" sagt, dass die Einrichtung fehlt',
+  /noch nicht eingerichtet/.test(tNicht) && /Einrichtung/.test(tNicht));
+check('KRITISCH: ohne eigene Lohnart steht, was zuerst zu tun ist -- und kein Erfassen-Knopf',
+  /Lohnarten/.test(tOhneArt) && /anlegen/.test(tOhneArt) && !/Erfassen/.test(tOhneArt));
+check('KRITISCH: sind alle beendet, steht "kein Treffer" statt "nichts erfasst"',
+  /Kein Treffer/.test(tAllesBeendet) && !/Noch nichts erfasst/.test(tAllesBeendet));
+check('Die drei Leerzustände sehen verschieden aus',
+  new Set([tNicht, tOhneArt, tAllesBeendet]).size === 3);
+lohnAntwort = LOHN_VOLL;
+await page.evaluate(() => { lohnAkte = null; lohnAkteFuer = null; lohnPosAlle = false; mdGoTab('lohn'); });
+await page.waitForTimeout(400);
+
 // ── 5. Der eigentliche Kern: Unbekanntes sieht nicht aus wie Nichts ──────
 lohnAntwort = LOHN_LUECKIG;
 await page.evaluate(() => { lohnAkte = null; lohnAkteFuer = null; mdGoTab('lohn'); });
@@ -609,6 +752,10 @@ check('KRITISCH: in der Personalakte fehlen die Erfassen-Knöpfe',
   !/Ansatz erfassen/.test(nurLesen) && !/Empfänger erfassen/.test(nurLesen));
 check('Die erfassten Werte sind aber weiterhin zu sehen',
   /25.00/.test(nurLesen) && /Aus dem GAV abgeleitet/.test(nurLesen));
+const nurLesenPos = (await page.locator('#mdBereich_lohn .card', { hasText: 'Zulagen und Abzüge' })
+  .textContent()).replace(/\s+/g, ' ');
+check('KRITISCH: auch bei Zulagen und Abzügen fehlen "Erfassen" und "Ändern"',
+  /Funktionszulage/.test(nurLesenPos) && !/Erfassen/.test(nurLesenPos) && !/Ändern/.test(nurLesenPos));
 
 // Und mit Schreibrecht sind sie wieder da -- sonst prüfte der Block oben
 // nur, dass irgendetwas fehlt.
