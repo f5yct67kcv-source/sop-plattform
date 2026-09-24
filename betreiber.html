@@ -482,6 +482,7 @@ button.klein { min-height: 36px; padding: 0 12px; font-size: 13px; }
 .upd-gruppe[data-art="verbesserung"] li::before { background: var(--warn); }
 .upd-gruppe b { display: block; font-size: 13.5px; font-weight: 620; color: var(--ink); }
 .upd-gruppe span { display: block; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; margin-top: 2px; }
+.upd-gruppe .upd-wo { display: block; font-style: normal; font-size: 11.5px; color: var(--ink-3); margin-top: 3px; }
 .upd-lauf { margin-top: 20px; }
 .upd-lauf-zeile { display: grid; grid-template-columns: 1fr auto; gap: 12px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 8px; }
 .upd-lauf-zeile span:last-child { color: var(--ink-3); font-variant-numeric: tabular-nums; }
@@ -9169,18 +9170,31 @@ window.addEventListener('resize', () => {
    ein stiller GET-Check faerbt das Zahnrad, wenn etwas ansteht, und ERST
    der Klick darauf oeffnet den Dialog und traegt tatsaechlich nach (POST). */
 async function pruefeEinrichtungUpdate() {
-  let a;
+  // Die Neuerungen ZUERST und ohne auf die Schema-Pruefung zu warten
+  // (2026-09-24): Die Pruefung geht ueber jede Mandanten- und
+  // Demo-Datenbank und kann dauern. Solange blieb das Fenster aus, und wer
+  // die Seite oeffnete, sah von einem ausgerollten Update nichts.
+  const neu = beUpdVonSelbst();
+  let a = null;
   try { a = await ruf('betreiber_schema_pruefen.php', undefined, 'GET'); }
-  catch (e) { return; }
-  const hat = !!(a && (((a.offen || []).length) || ((a.fehler || []).length)));
+  catch (e) { a = null; }
+  const gueltig = !!(a && (a.getan !== undefined || a.offen !== undefined));
+  const hat = gueltig && !!(((a.offen || []).length) || ((a.fehler || []).length));
   const knopf = $('knopf-einrichtung');
   knopf.classList.toggle('hat-update', hat);
   knopf.title = hat ? 'Update verfügbar: Einrichtung steht aus' : 'Einrichtung';
-  beUpdSchema = a || null;
-  // Der Punkt am Zahnrad faellt nicht auf (ENT-698): Beim Anmelden oeffnet
-  // sich das Fenster von selbst, wenn ein Update aussteht oder es
-  // ungelesene Neuerungen gibt.
-  beUpdVonSelbst();
+  beUpdSchema = gueltig ? a : null;
+  await neu;
+  // Steht ein Update aus, heisst das Fenster jetzt "Update erforderlich" --
+  // ob es schon wegen der Neuerungen offen ist oder erst jetzt aufgeht.
+  if (hat && !beUpdLaeuft) {
+    if ($('dlgEinrichtung').classList.contains('on')) {
+      // Nur umstellen, solange es noch "Neu" oder "wird geprueft" zeigt --
+      // ein soeben gemeldetes Ergebnis eines Laufs bleibt stehen.
+      if (beUpdModus === 'neu' || beUpdModus === 'laden' || beUpdModus === 'unbekannt') { beUpdZeigen(); }
+    }
+    else if (!beUpdGezeigt) { beUpdGezeigt = true; beUpdZeigen(); }
+  }
 }
 
 /* ── Update-Fenster (ENT-698) ──────────────────────────────────────
@@ -9199,19 +9213,22 @@ async function beUpdNeuLaden() {
   } catch (e) { return null; }
 }
 
+// Holt die Neuerungen und zeigt sie, sobald es welche gibt. Ob zusaetzlich
+// ein Update aussteht, stellt pruefeEinrichtungUpdate() danach um.
 async function beUpdVonSelbst() {
   if (beUpdGezeigt) { return; }
   const n = await beUpdNeuLaden();
   if (beUpdGezeigt) { return; }
   beUpdNeu = n;
-  const offen = !!(beUpdSchema && ((beUpdSchema.offen || []).length || (beUpdSchema.fehler || []).length));
-  if (!offen && !(n && (n.neuerungen || []).length)) { return; }
+  if (!(n && (n.neuerungen || []).length)) { return; }
   beUpdGezeigt = true;
   beUpdZeigen();
 }
 
 function beUpdModusBestimmen() {
-  if (!beUpdSchema) { return 'unbekannt'; }
+  // Stand der Einrichtung noch unbekannt, aber Neuerungen da: Das Fenster
+  // spricht von den Neuerungen und behauptet nichts ueber die Einrichtung.
+  if (!beUpdSchema) { return beUpdNeu && (beUpdNeu.neuerungen || []).length ? 'neu' : 'unbekannt'; }
   if ((beUpdSchema.offen || []).length || (beUpdSchema.fehler || []).length) { return 'einspielen'; }
   if (beUpdNeu && (beUpdNeu.neuerungen || []).length) { return 'neu'; }
   return 'aktuell';
@@ -9244,7 +9261,8 @@ function beUpdZeigen(modus) {
   $('be-upd-neu').innerHTML = arten.map(([art, t]) => {
     const teil = liste.filter(x => x.art === art);
     return !teil.length ? '' : '<div class="upd-gruppe" data-art="' + art + '"><div class="upd-art">' + text(t) + '</div><ul>'
-      + teil.map(x => '<li><b>' + text(x.titel) + '</b><span>' + text(x.text) + '</span></li>').join('') + '</ul></div>';
+      + teil.map(x => '<li><b>' + text(x.titel) + '</b><span>' + text(x.text) + '</span>'
+        + beUpdWo(x.fuer) + '</li>').join('') + '</ul></div>';
   }).join('');
   const [zu, haupt] = K[beUpdModus] || K.aktuell;
   const zuK = $('knopf-einrichtung-zu'), hK = $('knopf-einrichtung-lauf');
@@ -9253,6 +9271,14 @@ function beUpdZeigen(modus) {
   hK.textContent = haupt;
   hK.disabled = beUpdLaeuft; zuK.disabled = beUpdLaeuft;
   $('dlgEinrichtung').classList.add('on');
+}
+
+// Wo eine Neuerung gilt (2026-09-24): Der Betreiber sieht jede, auch die
+// nur fuers Cockpit oder die App -- ohne diesen Vermerk suchte man sie hier.
+function beUpdWo(fuer) {
+  const namen = { cockpit: 'Cockpit', app: 'Mitarbeiter-App', betreiber: 'Betreiberbereich' };
+  const liste = (fuer || []).map(f => namen[f] || f);
+  return liste.length ? '<em class="upd-wo">Gilt für: ' + text(liste.join(', ')) + '</em>' : '';
 }
 
 function beUpdBalken(anteil, zustand) {
@@ -9377,6 +9403,10 @@ async function ladeAlles() {
   const hinweis = $('u-sitzung');
   if (hinweis) { hinweis.textContent = 'Die Sitzung endet nach 30 Minuten ohne Nutzung.'; }
 
+  // Update-Fenster zuerst anstossen, nicht zuletzt (2026-09-24): Es wartete
+  // hinter dreizehn Listen, und scheiterte eine davon, kam es nie dran.
+  // Nicht abgewartet -- es laeuft neben dem Laden her.
+  const updatePruefung = pruefeEinrichtungUpdate().catch(() => {});
   await ladeMandanten();
   await ladeDemo();
   await ladeKonten();
@@ -9391,7 +9421,7 @@ async function ladeAlles() {
   /* Zuletzt, aber auf jeder Seite sichtbar: Das Abzeichen am Reiter steht
      auch dann im Blick, wenn gerade ein anderer Bereich offen ist. */
   await ladeSupport();
-  await pruefeEinrichtungUpdate();
+  await updatePruefung;
 }
 
 async function abmelden() {

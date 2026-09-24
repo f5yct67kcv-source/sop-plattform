@@ -985,7 +985,7 @@ check('KRITISCH: das Zahnrad oeffnet den Einrichtungs-Dialog, statt eine Karte i
 check('KRITISCH: der Dialog-Lauf ruft betreiber_schema_pruefen.php tatsaechlich per POST auf',
   /function einrichtungLauf\(\)[\s\S]{0,2500}betreiber_schema_pruefen\.php[\s\S]{0,40}'POST'/.test(betreiberHtml));
 check('KRITISCH: das Zahnrad faerbt sich, sobald etwas nachzutragen ist -- stiller GET-Check, kein Toast',
-  /function pruefeEinrichtungUpdate\(\)[\s\S]{0,300}betreiber_schema_pruefen\.php[\s\S]{0,200}hat-update/.test(betreiberHtml)
+  /function pruefeEinrichtungUpdate\(\)[\s\S]{0,1200}betreiber_schema_pruefen\.php[\s\S]{0,400}hat-update/.test(betreiberHtml)
   // Ohne Klassennamen davor: Das Zahnrad sitzt seit ENT-611 im Kontomenue
   // und traegt die Klasse der Menueeintraege. Geprueft ist die Aussage --
   // "hat-update" faerbt warn --, nicht wo der Knopf gerade haengt.
