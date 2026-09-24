@@ -667,11 +667,16 @@ fest im Deploy-Bündel (ENT-501). Sie entsteht erst bei der Zuteilung.
 1. Datenbank beim Hoster anlegen.
 2. Ihren Zugang in `MANDANT_SECRETS` eintragen (Aufbau: Abschnitt zu
    OP-526) und einmal nach `main` pushen.
-3. Im Betreiber-Bereich als Mandant erfassen, **als Vorrat**
-   (`api/betreiber_mandant_save.php` mit `"vorrat": true`). Als Name genügt
-   etwas Neutrales; er wird bei der Zuteilung überschrieben.
-4. Die Einrichtung laufen lassen (`api/betreiber_schema_pruefen.php`). Sie
-   nimmt Vorratsanlagen mit — darüber bleibt ihr Schema auch später aktuell.
+3. Im Betreiber-Bereich unter **Mandanten → Vorrat → „Vorratsplatz
+   anlegen"** die vier Datenbankangaben eintragen (ENT-705). Den Namen
+   („Vorrat 1", „Vorrat 2" …) vergibt der Server; er wird bei der
+   Zuteilung durch den Kundennamen ersetzt.
+4. Die Einrichtung laufen lassen (Zahnrad im Kontomenü). Sie nimmt
+   Vorratsanlagen mit — darüber bleibt ihr Schema auch später aktuell.
+
+Der Reiter zeigt danach je Platz, ob er bereit ist, und wenn nicht, warum.
+Ein falsch erfasster Platz lässt sich dort wieder entfernen; entfernt wird
+nur der Eintrag, Datenbank und Secret bleiben.
 
 ### Täglich prüfen lassen
 
@@ -697,20 +702,13 @@ jederzeit per GET auf denselben Endpunkt, aber gemeldet wird nichts.
 
 ### Zuteilen
 
-Status von `vorrat` auf `aktiv` (`api/betreiber_mandant_status.php`), nachdem
-Name, Kanton und Subdomain des Kunden gesetzt sind. Danach lässt sich das
-Erstkonto einladen.
-
-**Was sich nicht vorbereiten lässt:** die eigene Adresse des Kunden. Sie
-braucht heute noch einen Deploy-Block wie bei cupi24 — Verzeichnis,
-FTP-Zugang, Subdomain beim Hoster, eine Änderung an
-`deploy-hostpoint.yml`. Das ist der Teil der Übergabe, der Handarbeit
-bleibt, bis der Deploy die Mandanten aus einer Liste baut statt aus
-einzelnen Blöcken.
-
-**Zurück in den Vorrat geht nichts von Hand** — ein
-laufender Mandant sähe sonst aus wie eine freie Anlage, mit den
-Personaldaten eines Kunden darin.
+Im Reiter Vorrat die Zeile aufklappen und **„Einem Kunden zuteilen"**:
+Name, Subdomain, Kanton und Vertragsangaben (ENT-705). Der Server trägt
+alles ein und aktiviert in einem Schritt
+(`api/betreiber_vorrat_zuteilen.php`). Er lehnt ab, wenn der Platz nicht
+übergabefähig ist — dieselbe Prüfung wie die tägliche Meldung — oder
+Name, Subdomain oder Kanton fehlen. Danach steht der Kunde unter
+Mandanten, und dort wird sein erster Zugang per Einladung übergeben.
 
 ## Betreiber-Bereich in Betrieb nehmen (ENT-519 bis ENT-526)
 

@@ -324,6 +324,57 @@ function mandant_vorrat_befund(string $verbindung, ?array $luecken): array
     return ['lage' => 'bereit', 'bereit' => true, 'text' => 'übergabefähig'];
 }
 
+// Prueft EINE Vorratsanlage -- dieselbe Pruefung fuer die taegliche Meldung
+// und fuer das Zuteilen (ENT-705), damit "bereit" an beiden Stellen dasselbe
+// heisst. Der Server sperrt das Zuteilen einer Anlage, die hier nicht bereit
+// ist; zwei eigene Pruefungen liefen irgendwann auseinander.
+//
+// $bauplan VERBINDET und liefert kern_schema_fehlend(). Er wird im Endpunkt
+// gebaut, nicht hier: Dort steht mandant_db() in eigener Zeile, und nur dort
+// sieht ihn die Verbindungswache (test_betreiber.mjs). Wirft er, ist die
+// Anlage nicht erreichbar -- nicht "bereit".
+function mandant_vorrat_platz_pruefen(array $m, callable $bauplan): array
+{
+    $verbindung = mandant_verbindung_bereit($m);
+    $luecken = null;
+    if ($verbindung === 'bereit') {
+        try {
+            $luecken = $bauplan($m);
+        } catch (Throwable $e) {
+            $verbindung = 'fehlgeschlagen';
+        }
+    }
+    return ['id' => (int)$m['id'], 'name' => (string)$m['name']]
+         + mandant_vorrat_befund($verbindung, $luecken);
+}
+
+// Der Name eines neuen Vorratsplatzes (ENT-705): "Vorrat 1", "Vorrat 2" ...,
+// die naechste Nummer nach der hoechsten vergebenen. Er wird beim Zuteilen
+// durch den Kundennamen ersetzt; bis dahin soll er nur unterscheidbar sein.
+// Gezaehlt ueber ALLE Namen im Stamm, nicht nur ueber den Vorrat: Ein Kunde
+// hiesse zwar kaum "Vorrat 3", aber ein doppelter Name waere im Logbuch
+// nicht mehr auseinanderzuhalten. Rein, damit es sich ohne Datenbank
+// pruefen laesst.
+function mandant_vorrat_naechster_name(array $namen): string
+{
+    $hoechste = 0;
+    foreach ($namen as $n) {
+        if (preg_match('/^Vorrat (\d+)$/u', trim((string)$n), $t)) {
+            $hoechste = max($hoechste, (int)$t[1]);
+        }
+    }
+    return 'Vorrat ' . ($hoechste + 1);
+}
+
+// Die Subdomain eines Kunden: ein Wort vor ".guardops.ch", wie es ein
+// Namensserver annimmt -- Kleinbuchstaben, Ziffern, Bindestrich, nicht am
+// Rand, hoechstens 63 Zeichen. Beim Zuteilen verlangt (ENT-705); was sie
+// verfehlt, ergaebe eine Adresse, die es nicht geben kann.
+function mandant_subdomain_gueltig(string $sub): bool
+{
+    return (bool)preg_match('/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/', $sub);
+}
+
 // Zaehlt aus den Einzelbefunden zusammen. Rein, aus demselben Grund wie
 // mandant_vorrat_befund().
 //
@@ -377,7 +428,7 @@ function mandant_vorrat_meldung(array $lage): ?array
           . "Solange das so bleibt, kommt diese Nachricht jeden Tag. Sie hört von selbst auf, "
           . "sobald wieder genug Anlagen übergabefähig sind.\n\n"
           . "Nachfüllen: Datenbank beim Hoster anlegen, Zugang in MANDANT_SECRETS eintragen, "
-          . "Anlage im Betreiber-Bereich mit Status „Vorrat\" erfassen und die Einrichtung laufen lassen.";
+          . "im Betreiber-Bereich unter Mandanten → Vorrat einen Platz anlegen und die Einrichtung laufen lassen.";
 
     return ['betreff' => $betreff, 'text' => $text];
 }
@@ -801,6 +852,57 @@ function mandant_einladung_freigeben(PDO $pdo, int $mandantId): void
 // soll (angelegt_am) oder die eine eigene Bestaetigung brauchen
 // (gav_bestaetigt_am/-von, siehe be_gav_bestaetigen()).
 const BE_MANDANT_FELDER = ['name', 'subdomain', 'kanton', 'db_host', 'db_name', 'db_user', 'secret_name'];
+
+// Die Vertragsangaben eines Mandanten aus einer Anfrage (ENT-617). Gemeinsam
+// fuer Speichern und Zuteilen (ENT-705): Zwei Abschriften derselben Regeln
+// liefen beim naechsten Feld auseinander.
+//
+// LEER BLEIBT NULL, nicht 0. Ein Vertrag ohne eingetragene Laufzeit hat
+// keine Laufzeit von null Monaten -- er ist unbekannt, und die Oberflaeche
+// muss die beiden auseinanderhalten koennen (Hausregel).
+//
+// NUR WAS MITGESCHICKT WURDE, und nur Spalten, die es schon gibt: Ein
+// Formular, das die Vertragsfelder nicht kennt, soll sie nicht still leeren,
+// und zwischen Deploy und Einrichtungslauf fehlen die Spalten noch.
+function be_mandant_vertrag_werte(PDO $pdo, array $daten): array
+{
+    $datumOderNull = static function ($roh): ?string {
+        $t = trim((string)$roh);
+        if ($t === '' || $t === '0000-00-00') { return null; }
+        $d = DateTimeImmutable::createFromFormat('!Y-m-d', substr($t, 0, 10));
+        return $d && $d->format('Y-m-d') === substr($t, 0, 10) ? $d->format('Y-m-d') : null;
+    };
+    $monateOderNull = static function ($roh): ?int {
+        if ($roh === null || trim((string)$roh) === '') { return null; }
+        // 600 Monate sind fuenfzig Jahre. Was darueber liegt, ist ein Vertipper.
+        return max(0, min(600, (int)$roh));
+    };
+    $vertrag = [
+        'vertrag_beginn'          => $datumOderNull($daten['vertrag_beginn'] ?? null),
+        'mindestlaufzeit_monate'  => $monateOderNull($daten['mindestlaufzeit_monate'] ?? null),
+        'kuendigungsfrist_monate' => $monateOderNull($daten['kuendigungsfrist_monate'] ?? null),
+        'verlaengerung_monate'    => $monateOderNull($daten['verlaengerung_monate'] ?? null),
+        'gekuendigt_per'          => $datumOderNull($daten['gekuendigt_per'] ?? null),
+    ];
+    $werte = [];
+    foreach ($vertrag as $feld => $wert) {
+        if (array_key_exists($feld, $daten) && hat_spalte($pdo, 'mandant', $feld)) {
+            $werte[$feld] = $wert;
+        }
+    }
+    return $werte;
+}
+
+// Ein Enddatum vor dem Beginn ist kein Vertrag, sondern ein Vertipper -- und
+// es ergaebe die Lage "gekuendigt, beendet", die niemand erklaeren kann.
+function be_mandant_vertrag_fehler(array $werte): ?string
+{
+    if (!empty($werte['gekuendigt_per']) && !empty($werte['vertrag_beginn'])
+        && $werte['gekuendigt_per'] < $werte['vertrag_beginn']) {
+        return 'Das Kündigungsdatum liegt vor dem Vertragsbeginn.';
+    }
+    return null;
+}
 
 // Der Kanton steuert den Feiertagskalender. Zwei Buchstaben, gross --
 // mehr wird hier nicht geprueft: Eine Liste der 26 Kantone waere eine
