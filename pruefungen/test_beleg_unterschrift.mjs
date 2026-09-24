@@ -168,6 +168,10 @@ for (const [name, breite, hoehe] of [['Desktop', 1280, 900], ['Handy', 390, 844]
   await seite.click('button:has-text("Annehmen")');
   await seite.waitForTimeout(150);
   const auf = await seite.evaluate(MESSEN);
+  // Ohne Code (ENT-708): die Empfaengeradresse steht vorbelegt, der Knopf
+  // nimmt direkt an; wer eine andere Adresse eintraegt, fordert den Code an.
+  const vorbelegt = await seite.evaluate(() => ({ email: document.getElementById('uzEmail').value,
+    knopf: document.getElementById('uzAnfordern').textContent }));
 
   // Ohne Haken: der Server wird trotzdem gefragt und sagt nein -- hier
   // steht das Nein des nachgebildeten Servers nicht zur Pruefung, sondern
@@ -175,6 +179,7 @@ for (const [name, breite, hoehe] of [['Desktop', 1280, 900], ['Handy', 390, 844]
   await seite.fill('#uzName', 'Erika Beispiel');
   await seite.fill('#uzFunktion', 'Geschäftsführerin');
   await seite.fill('#uzEmail', 'leitung@muster.invalid');
+  const knopfFremd = await seite.evaluate(() => document.getElementById('uzAnfordern').textContent);
   await seite.check('#uzBerechtigt');
   await seite.click('#uzAnfordern');
   await seite.waitForTimeout(200);
@@ -198,6 +203,9 @@ for (const [name, breite, hoehe] of [['Desktop', 1280, 900], ['Handy', 390, 844]
     zu.breite <= breite && auf.breite <= breite);
   check(`${name} — der Dialog passt in die Breite (${auf.karteBreite.toFixed(0)} px)`,
     auf.karteBreite > 0 && auf.karteBreite <= breite - 16);
+  check(`KRITISCH: ${name} — die Empfaengeradresse ist vorbelegt, der Knopf heisst "Verbindlich annehmen"`,
+    vorbelegt.email === 'einkauf@muster.invalid' && vorbelegt.knopf === 'Verbindlich annehmen');
+  check(`KRITISCH: ${name} — mit einer anderen Adresse heisst er "Code anfordern"`, knopfFremd === 'Code anfordern');
   const anf = anfragen.find(a => a.was === 'anfordern') || {};
   check(`KRITISCH: ${name} — die Anforderung traegt Token, Angaben und die Erklaerung`,
     anf.token === 'tok456' && anf.name === 'Erika Beispiel' && anf.funktion === 'Geschäftsführerin'
@@ -209,6 +217,32 @@ for (const [name, breite, hoehe] of [['Desktop', 1280, 900], ['Handy', 390, 844]
   check(`${name} — das Bestaetigen schickt Zeile und Code`, best.id === 7 && best.code === '123456');
   check(`KRITISCH: ${name} — ein falscher Code steht als Fehler da, statt still zu scheitern`,
     nachFalsch.includes('stimmt nicht'));
+}
+
+// Ohne Code bis zum Ende: Antwortet der Server "angenommen", laedt die Seite
+// neu (und zeigt den angenommenen Beleg) -- kein Schritt 2.
+{
+  const seite = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const anfragen = [];
+  await seite.route('**/betreiber_beleg_unterschrift.php', route => {
+    const k = JSON.parse(route.request().postData() || '{}');
+    anfragen.push(k);
+    route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ status: 'ok', lage: 'angenommen', abschluss: { pdf: true } }) });
+  });
+  await seite.goto(url, { waitUntil: 'load' });
+  let geladen = 0;
+  seite.on('load', () => { geladen++; });
+  await seite.click('button:has-text("Annehmen")');
+  await seite.fill('#uzName', 'Erika Beispiel');
+  await seite.fill('#uzFunktion', 'Geschäftsführerin');
+  await seite.check('#uzBerechtigt');
+  await seite.click('#uzAnfordern');
+  await seite.waitForTimeout(500);
+  check('KRITISCH: ueber die Empfaengeradresse: eine Anfrage mit dieser Adresse, dann laedt die Seite neu -- ohne Code-Schritt',
+    anfragen.length === 1 && anfragen[0].was === 'anfordern' && anfragen[0].email === 'einkauf@muster.invalid'
+    && geladen >= 1);
+  await seite.close();
 }
 
 await browser.close();

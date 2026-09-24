@@ -46,7 +46,7 @@ $pdo->exec("CREATE TABLE be_belege (id INTEGER PRIMARY KEY, versand_token TEXT, 
   faellig_bis TEXT, rabatt_bp INTEGER, status TEXT, bezahlt INTEGER, bezahlt_am TEXT, entscheidung_am TEXT,
   oeffentliche_notizen TEXT, bedingungen TEXT, fusszeile_text TEXT, unterschriftsseite INTEGER)");
 $pdo->exec("CREATE TABLE be_kunden (id INTEGER PRIMARY KEY, name TEXT, zusatzfeld TEXT, strasse TEXT,
-  hausnummer TEXT, adresszusatz TEXT, plz TEXT, ort TEXT)");
+  hausnummer TEXT, adresszusatz TEXT, plz TEXT, ort TEXT, email TEXT DEFAULT '')");
 $pdo->exec("CREATE TABLE be_kunden_person (id INTEGER PRIMARY KEY, anrede TEXT, vorname TEXT, nachname TEXT)");
 $pdo->exec("CREATE TABLE be_beleg_positionen (id INTEGER PRIMARY KEY, beleg_id INTEGER, sortierung INTEGER,
   produkt_id INTEGER, produkt_name TEXT, beschreibung TEXT, menge REAL, einheit TEXT,
@@ -55,7 +55,8 @@ $pdo->exec("CREATE TABLE be_beleg_positionen (id INTEGER PRIMARY KEY, beleg_id I
 // Nur erfundene Angaben (Vertraulichkeitsregel in CLAUDE.md).
 $pdo->exec("INSERT INTO be_briefkopf (id, firma, absender, email) VALUES
   (1, 'Beispiel Software GmbH', 'Beispielgasse 1\n9999 Musterhausen', 'post@beispiel.invalid')");
-$pdo->exec("INSERT INTO be_kunden VALUES (1, 'Muster Sicherheit AG', NULL, 'Musterweg', '12', NULL, '3000', 'Musterstadt')");
+// Die Empfaengeradresse: ueber sie geht die Offerte ohne Code (ENT-708).
+$pdo->exec("INSERT INTO be_kunden VALUES (1, 'Muster Sicherheit AG', NULL, 'Musterweg', '12', NULL, '3000', 'Musterstadt', 'einkauf@muster.invalid')");
 $pdo->exec("INSERT INTO be_kunden_person VALUES (1, 'Frau', 'Erika', 'Beispiel')");
 $pdo->exec("INSERT INTO be_belege VALUES (1, 'tok456', 'offerte', 'OF-0815', 1, 1, 'Lizenz 12 Monate', '',
   '2031-03-01', '2031-04-01', NULL, 0, 'versendet', 0, NULL, NULL, NULL, 'Zahlbar in 30 Tagen', NULL, 1)");

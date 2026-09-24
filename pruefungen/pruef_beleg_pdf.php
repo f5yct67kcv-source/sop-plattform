@@ -156,12 +156,11 @@ $pdo->exec("INSERT INTO belege (id, art, nummer, kunde_id, datum, gueltig_bis, s
 $pdo->exec("INSERT INTO beleg_positionen (beleg_id, produkt_name, beschreibung, menge, einheit, einzelpreis_rappen)
             VALUES (2, 'Objektschutz', '', 1, 'Std.', 6500)");
 beleg_fassung_anlegen($pdo, 2, beleg_abbild_lesen($pdo, 2, '', beleg_absender_betrieb($pdo)), 'versand', 'A. Muster', '', true, 7);
+// Ueber die Empfaengeradresse: seit ENT-708 ohne Code, sofort angenommen.
 $GLOBALS['mails'] = [];
-[, $d] = $rufe('anfordern', ['token' => 'tokQ', 'name' => 'Rolf Muster', 'funktion' => 'Leitung',
-    'firma' => '', 'email' => 'einkauf@muster.invalid', 'zeichnungsberechtigt' => 1]);
-preg_match('/\b(\d{6})\b/', $GLOBALS['mails'][0]['text'] ?? '', $m);
 $GLOBALS['mail_kaputt'] = true;
-[$c, $d] = $rufe('bestaetigen', ['token' => 'tokQ', 'id' => (int)$d['id'], 'code' => $m[1] ?? '']);
+[$c, $d] = $rufe('anfordern', ['token' => 'tokQ', 'name' => 'Rolf Muster', 'funktion' => 'Leitung',
+    'firma' => '', 'email' => 'einkauf@muster.invalid', 'zeichnungsberechtigt' => 1]);
 $GLOBALS['mail_kaputt'] = false;
 $pruef('KRITISCH: scheitert die Bestaetigungsmail, bleibt der Beleg angenommen',
     $c === 200 && ($d['abschluss']['kunde'] ?? true) === false

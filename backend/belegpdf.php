@@ -456,7 +456,9 @@ function beleg_bestaetigung_mail(array $beleg, array $u, int $fassung, string $f
     if ($intern) {
         $betreff = "Angenommen: $titel $nummer";
         $felder = [['Angenommen von', $wer], ['Am', $am], ['Fassung', (string)$fassung],
-                   ['Bestätigungscode an', (string)$u['email']]];
+                   !empty($u['ohne_code'])
+                       ? ['Angenommen über', 'Link an ' . (string)$u['email'] . ' (ohne Code)']
+                       : ['Bestätigungscode an', (string)$u['email']]];
         $hinweis = !empty($u['abweichend'])
             ? 'Achtung: Der Code ging nicht an die Empfängeradresse des Belegs ('
               . ((string)$u['empfaenger_email'] !== '' ? $u['empfaenger_email'] : 'keine hinterlegt') . ').'
