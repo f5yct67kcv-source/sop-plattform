@@ -84,6 +84,7 @@ await seite.route('**/api/**', route => {
     return send({ status: 'ok', konten: globalThis.__konten || [], aktive: 1, archivierte: 0 });
   }
   if (url.includes('betreiber_unterschrift_speichern.php')) { return send({ status: 'ok' }); }
+  if (url.includes('betreiber_unterschrift_bild.php')) { return send({ status: 'ok', bild: globalThis.__aufbereitet }); }
   return send({ status: 'ok', eingerichtet: true, belege: [], kunden: [], produkte: [] });
 });
 await seite.goto(`file://${WURZEL}/betreiber.html`);
@@ -185,6 +186,47 @@ const duenn = await deckung(false);
 const kraeftig = await deckung(true);
 check(`KRITISCH: kraeftig deckt eine hohe Unterschrift deutlich staerker (${(duenn * 100).toFixed(1)} % → ${(kraeftig * 100).toFixed(1)} %)`,
   duenn > 0 && kraeftig > duenn * 1.5);
+
+// Hochladen (ENT-706): Bild waehlen -> Server bereitet auf -> Vorschau ->
+// erst "Uebernehmen" speichert.
+globalThis.__aufbereitet = PNG;
+const pngDatei = Buffer.from(PNG.split(',')[1], 'base64');
+await karte({ ...KONTO, ich: true, unterschrift_da: false, unterschrift: null });
+check('KRITISCH: neben "Unterschrift zeichnen" steht "Bild hochladen"',
+  await seite.evaluate(() => (document.getElementById('kdUsigHochladen') || {}).textContent === 'Bild hochladen'
+    && document.getElementById('kdUsigDatei').accept === 'image/png,image/jpeg'));
+rufe.length = 0;
+await seite.setInputFiles('#kdUsigDatei', { name: 'unterschrift.png', mimeType: 'image/png', buffer: pngDatei });
+await seite.waitForTimeout(400);
+const auf = rufe.find(r => r.url.includes('betreiber_unterschrift_bild.php'));
+let aufBody = {};
+try { aufBody = JSON.parse(auf ? auf.body : '{}'); } catch (e) { /* leer */ }
+check('KRITISCH: das Bild geht zur Aufbereitung an den Server, als PNG', !!auf && /^data:image\/png;base64,/.test(aufBody.bild || ''));
+const vorschau = await seite.evaluate(() => ({
+  bild: !!document.getElementById('kdUsigVorschauBild'),
+  ueber: !!document.getElementById('kdUsigUebernehmen'), weg: !!document.getElementById('kdUsigVerwerfen'),
+  text: document.getElementById('kdUsigKarte').textContent }));
+check('KRITISCH: danach eine Vorschau mit "Übernehmen" und "Verwerfen"', vorschau.bild && vorschau.ueber && vorschau.weg
+  && /noch nicht gespeichert/.test(vorschau.text));
+check('KRITISCH: … und noch nichts gespeichert', !rufe.some(r => r.url.includes('betreiber_unterschrift_speichern.php')));
+if (vorschau.ueber) { await seite.click('#kdUsigUebernehmen'); }
+await seite.waitForTimeout(300);
+const ueber = rufe.find(r => r.url.includes('betreiber_unterschrift_speichern.php'));
+check('KRITISCH: "Übernehmen" speichert genau das aufbereitete Bild, ueber den gewohnten Weg',
+  !!ueber && JSON.parse(ueber.body).zeichnung === PNG);
+await karte({ ...KONTO, ich: true, unterschrift_da: false, unterschrift: null });
+rufe.length = 0;
+await seite.setInputFiles('#kdUsigDatei', { name: 'unterschrift.png', mimeType: 'image/png', buffer: pngDatei });
+await seite.waitForTimeout(400);
+if (await seite.$('#kdUsigVerwerfen')) { await seite.click('#kdUsigVerwerfen'); }
+await seite.waitForTimeout(150);
+check('GEGENPROBE: "Verwerfen" speichert nichts und nimmt die Vorschau weg',
+  !rufe.some(r => r.url.includes('betreiber_unterschrift_speichern.php'))
+  && await seite.evaluate(() => !document.getElementById('kdUsigVorschauBild') && !!document.getElementById('kdUsigHochladen')));
+rufe.length = 0;
+await seite.setInputFiles('#kdUsigDatei', { name: 'bild.gif', mimeType: 'image/gif', buffer: Buffer.from('R0lGODlhAQABAAAAACw=', 'base64') });
+await seite.waitForTimeout(200);
+check('ein anderes Format geht gar nicht erst hinaus', !rufe.some(r => r.url.includes('betreiber_unterschrift_bild.php')));
 
 // Der Versanddialog
 async function versandDialog(eigene) {

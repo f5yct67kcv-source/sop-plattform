@@ -1192,6 +1192,116 @@ function beleg_zeichnung_pruefen(string $roh): ?string
     return $roh;
 }
 
+// Eine hochgeladene Unterschrift aufbereiten (ENT-706): ein Bildschirmfoto
+// aus Apple Vorschau oder ein Foto der Unterschrift auf Papier. Heraus kommt
+// dasselbe wie aus dem Zeichenfeld -- eine PNG-Zeichnung mit durchsichtigem
+// Grund, auf die Unterschrift zugeschnitten --, damit alles Weitere
+// (Fassung, Pruefsumme, PDF) nichts von der Herkunft wissen muss.
+//
+// DER HINTERGRUND richtet sich nach dem Bild, nicht nach reinem Weiss: Papier
+// auf einem Foto ist grau. Als Hintergrund gilt die Helligkeit, die 90 % der
+// Bildpunkte erreichen; was deutlich dunkler ist, ist Tinte. Dazwischen ein
+// weicher Uebergang, sonst franst der Strich aus.
+//
+// Gibt ['bild' => data-URL] oder ['fehler' => Text fuer den Menschen].
+const BELEG_UPLOAD_MAX = 8000000;       // Zeichen der data-URL, rund 6 MB Bild
+const BELEG_UPLOAD_BREITE = 900;        // Pixel, so breit wird hoechstens gespeichert
+
+function beleg_unterschrift_aus_bild(string $roh): array
+{
+    if (!function_exists('imagecreatefromstring')) {
+        return ['fehler' => 'Bilder lassen sich auf diesem Server nicht verarbeiten.'];
+    }
+    $roh = trim($roh);
+    if ($roh === '' || strlen($roh) > BELEG_UPLOAD_MAX) {
+        return ['fehler' => 'Das Bild ist zu gross. Bitte ein kleineres Bild oder einen engeren Ausschnitt wählen.'];
+    }
+    if (!preg_match('~^data:image/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$~', $roh, $m)) {
+        return ['fehler' => 'Bitte ein PNG- oder JPG-Bild wählen.'];
+    }
+    $bin = base64_decode($m[2], true);
+    $png = $bin !== false && strncmp($bin, "\x89PNG\r\n\x1a\n", 8) === 0;
+    $jpg = $bin !== false && strncmp($bin, "\xFF\xD8\xFF", 3) === 0;
+    if (!$png && !$jpg) {
+        return ['fehler' => 'Bitte ein PNG- oder JPG-Bild wählen.'];
+    }
+    $quelle = @imagecreatefromstring($bin);
+    if (!$quelle) {
+        return ['fehler' => 'Das Bild liess sich nicht lesen.'];
+    }
+    // Erst verkleinern: Ein Handyfoto hat zwoelf Millionen Punkte, und die
+    // Schleife unten laeuft ueber jeden.
+    $b0 = imagesx($quelle); $h0 = imagesy($quelle);
+    $f = min(1.0, 1400 / max(1, $b0));
+    $b = max(1, (int)round($b0 * $f)); $h = max(1, (int)round($h0 * $f));
+    $bild = imagecreatetruecolor($b, $h);
+    imagealphablending($bild, false);
+    imagesavealpha($bild, true);
+    imagefill($bild, 0, 0, imagecolorallocatealpha($bild, 255, 255, 255, 127));
+    imagealphablending($bild, true);
+    imagecopyresampled($bild, $quelle, 0, 0, 0, 0, $b, $h, $b0, $h0);
+    imagedestroy($quelle);
+    imagealphablending($bild, false);
+
+    // Helligkeit je Punkt; ein durchsichtiger Punkt zaehlt als Hintergrund.
+    $hell = [];
+    for ($y = 0; $y < $h; $y++) {
+        for ($x = 0; $x < $b; $x++) {
+            $c = imagecolorat($bild, $x, $y);
+            $a = ($c >> 24) & 0x7F;
+            $l = 0.299 * (($c >> 16) & 0xFF) + 0.587 * (($c >> 8) & 0xFF) + 0.114 * ($c & 0xFF);
+            $hell[] = $a >= 120 ? 255.0 : $l + (255 - $l) * $a / 127;
+        }
+    }
+    $sortiert = $hell; sort($sortiert);
+    $grund = $sortiert[(int)floor(0.9 * (count($sortiert) - 1))];
+    $oben = $grund - 25; $unten = max(0.0, $grund - 110);
+    if ($oben <= $unten + 5) {
+        return ['fehler' => 'Auf dem Bild ist keine Unterschrift zu erkennen. Bitte ein Bild mit dunkler Schrift auf hellem Grund wählen.'];
+    }
+    $x0 = $b; $y0 = $h; $x1 = -1; $y1 = -1;
+    $i = 0;
+    for ($y = 0; $y < $h; $y++) {
+        for ($x = 0; $x < $b; $x++, $i++) {
+            $l = $hell[$i];
+            $deckung = $l >= $oben ? 0.0 : ($l <= $unten ? 1.0 : ($oben - $l) / ($oben - $unten));
+            $c = imagecolorat($bild, $x, $y);
+            // Die Farbe der Tinte bleibt (blauer Kugelschreiber bleibt blau),
+            // abgedunkelt, damit sie auf dem Dokument traegt.
+            $r = (int)((($c >> 16) & 0xFF) * 0.6); $g = (int)((($c >> 8) & 0xFF) * 0.6); $bl = (int)(($c & 0xFF) * 0.6);
+            imagesetpixel($bild, $x, $y, imagecolorallocatealpha($bild, $r, $g, $bl, (int)round(127 * (1 - $deckung))));
+            if ($deckung > 0.35) {
+                if ($x < $x0) { $x0 = $x; } if ($x > $x1) { $x1 = $x; }
+                if ($y < $y0) { $y0 = $y; } if ($y > $y1) { $y1 = $y; }
+            }
+        }
+    }
+    if ($x1 < 0 || ($x1 - $x0) < 10 || ($y1 - $y0) < 5) {
+        imagedestroy($bild);
+        return ['fehler' => 'Auf dem Bild ist keine Unterschrift zu erkennen. Bitte ein Bild mit dunkler Schrift auf hellem Grund wählen.'];
+    }
+    // Zuschneiden mit wenig Luft, dann auf hoechstens BELEG_UPLOAD_BREITE.
+    $rand = 4;
+    $x0 = max(0, $x0 - $rand); $y0 = max(0, $y0 - $rand);
+    $x1 = min($b - 1, $x1 + $rand); $y1 = min($h - 1, $y1 + $rand);
+    $bw = $x1 - $x0 + 1; $bh = $y1 - $y0 + 1;
+    $g = min(1.0, BELEG_UPLOAD_BREITE / $bw, 300 / $bh);
+    $zb = max(1, (int)round($bw * $g)); $zh = max(1, (int)round($bh * $g));
+    $ziel = imagecreatetruecolor($zb, $zh);
+    imagealphablending($ziel, false);
+    imagesavealpha($ziel, true);
+    imagefill($ziel, 0, 0, imagecolorallocatealpha($ziel, 0, 0, 0, 127));
+    imagecopyresampled($ziel, $bild, 0, 0, $x0, $y0, $zb, $zh, $bw, $bh);
+    imagedestroy($bild);
+    ob_start(); imagepng($ziel, null, 9); $aus = (string)ob_get_clean();
+    imagedestroy($ziel);
+    $url = 'data:image/png;base64,' . base64_encode($aus);
+    if (beleg_zeichnung_pruefen($url) === null) {
+        return ['fehler' => 'Das Bild ist nach dem Zuschneiden noch zu gross. Bitte einen engeren Ausschnitt wählen.'];
+    }
+    return ['bild' => $url];
+}
+
 // Die Angaben aus dem Unterschriftsdialog, geprueft. Gibt
 // ['fehler' => '…'] oder ['werte' => [...]] zurueck.
 function beleg_unterschrift_angaben(array $in): array
@@ -1713,13 +1823,17 @@ function beleg_unterschrift_linien(?array $u, ?array $fassung, bool $angenommen)
     // Unsere gezeichnete Unterschrift aus der Freigabe (ENT-704) steht schon
     // VOR der Annahme da: freigegeben ist, was der Link zeigt.
     $fu = ($fassung && !empty($fassung['freigegeben'])) ? beleg_freigabe_unterschrift((array)($fassung['abbild'] ?? [])) : null;
+    // AUF DER LINIE (ENT-706): Das Bild ragt um ein Fuenftel ueber die Linie
+    // hinaus. Sein unterer Rand ist Luft und Unterlaenge, nicht die
+    // Grundlinie der Schrift -- ohne das schwebt die Unterschrift darueber.
+    $aufLinie = 'max-height:64px;max-width:100%;margin-bottom:-12px;position:relative';
     $bildAbsender = $fu ? '<img src="' . beleg_h($fu['bild']) . '" alt="Unterschrift ' . beleg_h($fu['name'])
-        . '" style="max-height:64px;max-width:100%">' : '';
+        . '" style="' . $aufLinie . '">' : '';
     $leer = ['kunde' => '', 'absender' => $bildAbsender, 'ort' => ''];
     if (!$angenommen || !$u || $u['art'] !== 'annahme') { return $leer; }
     $schrift = 'font-family:\'Segoe Script\',\'Brush Script MT\',\'Snell Roundhand\',cursive;font-size:21px;line-height:1.1;padding-bottom:4px';
     $kunde = !empty($u['zeichnung'])
-        ? '<img src="' . beleg_h((string)$u['zeichnung']) . '" alt="Unterschrift" style="max-height:64px;max-width:100%">'
+        ? '<img src="' . beleg_h((string)$u['zeichnung']) . '" alt="Unterschrift" style="' . $aufLinie . '">'
         : '<span style="' . $schrift . '">' . beleg_h((string)$u['name']) . '</span>';
     $absender = $bildAbsender !== '' ? $bildAbsender
         : (($fassung && !empty($fassung['freigegeben']) && trim((string)$fassung['versendet_von']) !== '')

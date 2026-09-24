@@ -180,6 +180,65 @@ $pruef('GEGENPROBE: ohne unsere Unterschrift nur das Bild des Kunden, unser Name
     count(pdf_bilder($pdf2)) === 1 && str_contains($pdf2 . implode('', array_map(fn($s) => (string)@gzuncompress($s),
         (preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf2, $mm2) ? $mm2[1] : []))), '(A. Muster)'));
 
+// 5. Auf der Linie (ENT-706): Das Bild ragt unter die Linie, die
+// Beschriftung steht tiefer als diese Unterlaenge.
+$pruef('KRITISCH: auf der Kundenseite ragen beide Unterschriften ueber die Linie hinaus',
+    substr_count($l2['kunde'] . $l2['absender'], 'margin-bottom:-12px') === 2);
+$linieY = null;
+preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf1, $st);
+$inh = '';
+foreach ($st[1] as $roh) { $e = @gzuncompress($roh); $inh .= ($e === false ? $roh : $e) . "\n"; }
+// FPDF: Linie "x1 y1 m x2 y2 l S" in Punkten, y von unten; Bild "q w 0 0 h x y cm".
+preg_match_all('/([\d.]+) ([\d.]+) m ([\d.]+) ([\d.]+) l S/', $inh, $li, PREG_SET_ORDER);
+preg_match_all('/q [\d.]+ 0 0 ([\d.]+) [\d.]+ ([\d.]+) cm \/I\d+ Do Q/', $inh, $bi, PREG_SET_ORDER);
+// Die Unterschriftslinien sind 80 mm lang, waagrecht; Trennstriche gehen ueber die ganze Breite.
+$linien = array_values(array_filter($li, fn($x) => abs((float)$x[2] - (float)$x[4]) < 0.01 && abs((float)$x[3] - (float)$x[1] - 80 * 72 / 25.4) < 1));
+$linieY = $linien ? (float)$linien[count($linien) - 1][2] : null;
+$unten = array_map(fn($x) => (float)$x[2], $bi);
+$pruef('KRITISCH: im PDF beginnt jede Unterschrift unter der Linie (ein Fuenftel der Hoehe)',
+    $linieY !== null && count($unten) === 2
+    && count(array_filter($unten, fn($u) => $u < $linieY - 2 && $u > $linieY - 18)) === 2);
+
+// 6. Hochladen (ENT-706): ein Bild wird zur Zeichnung
+function bild_url(int $grund, bool $leer = false, string $typ = 'jpeg'): string
+{
+    $im = imagecreatetruecolor(1200, 500);
+    imagefill($im, 0, 0, imagecolorallocate($im, $grund, $grund, max(0, $grund - 5)));
+    if (!$leer) {
+        imagesetthickness($im, 6);
+        $c = imagecolorallocate($im, 20, 20, 60);
+        imageline($im, 300, 350, 700, 150, $c); imageline($im, 700, 150, 800, 380, $c);
+    }
+    ob_start(); $typ === 'jpeg' ? imagejpeg($im, null, 85) : imagepng($im);
+    return 'data:image/' . $typ . ';base64,' . base64_encode((string)ob_get_clean());
+}
+function alpha_an(string $url, int $x, int $y): int
+{
+    $im = imagecreatefromstring(base64_decode(substr($url, strpos($url, ',') + 1)));
+    return (imagecolorat($im, $x, $y) >> 24) & 0x7F;
+}
+foreach (['weisses Papier (JPG)' => bild_url(250), 'graues Papier, Foto' => bild_url(170), 'Bildschirmfoto (PNG)' => bild_url(255, false, 'png')] as $n => $url) {
+    $r = beleg_unterschrift_aus_bild($url);
+    $ok1 = isset($r['bild']) && beleg_zeichnung_pruefen($r['bild']) !== null;
+    $pruef("KRITISCH: $n wird eine gepruefte PNG-Zeichnung", $ok1);
+    if ($ok1) {
+        [$b, $h] = getimagesizefromstring(base64_decode(substr($r['bild'], 22)));
+        $pruef("$n: Hintergrund durchsichtig, auf die Unterschrift zugeschnitten",
+            alpha_an($r['bild'], 0, 0) === 127 && $b < 1200 && $h < 500 && $b <= BELEG_UPLOAD_BREITE);
+        $mitte = alpha_an($r['bild'], (int)($b * 0.5), (int)($h * 0.5));
+        $pruef("$n: die Schrift bleibt deckend", (function () use ($r, $b, $h) {
+            $im = imagecreatefromstring(base64_decode(substr($r['bild'], 22)));
+            for ($y = 0; $y < $h; $y++) { for ($x = 0; $x < $b; $x++) { if ((((imagecolorat($im, $x, $y) >> 24) & 0x7F)) < 20) { return true; } } }
+            return false;
+        })());
+    }
+}
+$pruef('KRITISCH: ein leeres Blatt wird abgewiesen, mit Grund', str_contains((string)(beleg_unterschrift_aus_bild(bild_url(250, true))['fehler'] ?? ''), 'keine Unterschrift'));
+$pruef('KRITISCH: nur PNG und JPG', isset(beleg_unterschrift_aus_bild('data:image/gif;base64,R0lGODlhAQABAAAAACw=')['fehler'])
+    && isset(beleg_unterschrift_aus_bild('data:image/jpeg;base64,' . base64_encode('<svg/>'))['fehler']));
+$pruef('KRITISCH: zu gross wird abgewiesen, bevor etwas gelesen wird',
+    str_contains((string)(beleg_unterschrift_aus_bild('data:image/png;base64,' . str_repeat('A', BELEG_UPLOAD_MAX))['fehler'] ?? ''), 'zu gross'));
+
 echo "$ok bestanden, " . count($bad) . " nicht bestanden\n";
 foreach ($bad as $b) { echo "  ✗ $b\n"; }
 exit($bad ? 1 : 0);

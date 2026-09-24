@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 11,
+            'datum' => '2026-09-24',
+            'art'   => 'verbesserung',
+            'fuer'  => ['betreiber'],
+            'titel' => 'Unterschrift als Bild hochladen',
+            'text'  => 'Statt zu zeichnen kannst du in deinem Konto auch ein Bild deiner Unterschrift hochladen, etwa ein Bildschirmfoto aus Apple Vorschau. Der Hintergrund wird entfernt. Unterschriften stehen jetzt sauber auf der Linie.',
+        ],
+        [
             'nr'    => 10,
             'datum' => '2026-09-24',
             'art'   => 'neu',
