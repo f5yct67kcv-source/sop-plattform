@@ -92,6 +92,14 @@ pruef('KRITISCH: wer nur eigene sieht, bekommt einen fremden Rapport auch ueber 
     $fremd->status === 404 && !isset($fremd->daten['rapport']));
 $liste = nachId(ausfuehren()->daten['rapporte'] ?? []);
 pruef('Die Liste mit nur eigenen enthaelt den fremden Rapport nicht', !isset($liste[4]));
+pruef('KRITISCH: wer nur eigene sieht, bekommt keine Kundenstammdaten -- weder in der Liste noch ueber ?id=',
+    !array_key_exists('k_name', $liste[1]) && !array_key_exists('re_ort', $liste[1])
+    && !array_key_exists('k_name', ausfuehren(['id' => '1'])->daten['rapport']));
+$GLOBALS['alle'] = true;
+$liste = nachId(ausfuehren()->daten['rapporte'] ?? []);
+pruef('Wer alle sieht, bekommt die Kundenstammdaten in Liste und ?id=',
+    array_key_exists('k_name', $liste[1]) && array_key_exists('k_name', ausfuehren(['id' => '1'])->daten['rapport']));
+$GLOBALS['alle'] = false;
 
 $GLOBALS['alle'] = true;
 $fremd = ausfuehren(['id' => '4']);
