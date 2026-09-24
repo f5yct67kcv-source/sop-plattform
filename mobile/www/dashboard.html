@@ -13665,12 +13665,13 @@ function asWeckStop() {
 // im Feld, bevor er gestellt wird.
 let asFrageStille = 8000;      // ohne ein Wort so lange: zurueck zum Weckwort
 let asFrageMax = 30000;        // laengstens so lange zuhoeren
+let asFragePause = 2500;       // Luft nach einem Satz, bevor die Frage gestellt wird
 function asFrageStart() {
   const w = asWeck;
   if (!w || w.frage) { return; }
   asStimmeAus();
   const rec = new w.model.KaldiRecognizer(w.ctx.sampleRate);   // ohne Wortliste: freie Saetze
-  const f = { rec, fest: '', uhrStille: null, uhrMax: null };
+  const f = { rec, fest: '', uhrStille: null, uhrMax: null, uhrPause: null };
   w.frage = f;
   $('asText').value = '';
   $('asWidget').classList.add('hoert');
@@ -13678,16 +13679,20 @@ function asFrageStart() {
   const zeigen = teil => { $('asText').value = (f.fest + ' ' + (teil || '')).trim(); };
   rec.on('partialresult', m => {
     const t = m && m.result && m.result.partial;
-    if (t) { clearTimeout(f.uhrStille); }
+    // Spricht die Person weiter, wartet die Frage weiter.
+    if (t) { clearTimeout(f.uhrStille); clearTimeout(f.uhrPause); }
     zeigen(t);
   });
-  // "result" kommt nach einer Sprechpause: Das ist das Ende der Frage.
+  // "result" kommt schon nach einer kurzen Sprechpause (unter einer Sekunde)
+  // -- zu frueh fuer das Ende einer Frage. Darum noch asFragePause Luft;
+  // spricht die Person darin weiter, wird angehaengt und neu gewartet.
   rec.on('result', m => {
     const t = String((m && m.result && m.result.text) || '').trim();
     if (!t) { return; }
     f.fest = (f.fest + ' ' + t).trim();
     zeigen('');
-    asFrageEnde(w, true);
+    clearTimeout(f.uhrPause);
+    f.uhrPause = setTimeout(() => asFrageEnde(w, true), asFragePause);
   });
   f.uhrStille = setTimeout(() => asFrageEnde(w, false, 'Nichts gehört. Ich höre wieder auf „Hallo Wächter“.'), asFrageStille);
   f.uhrMax = setTimeout(() => asFrageEnde(w, !!f.fest), asFrageMax);
@@ -13699,6 +13704,7 @@ function asFrageEnde(w, stellen, hinweis) {
   w.frage = null;
   clearTimeout(f.uhrStille);
   clearTimeout(f.uhrMax);
+  clearTimeout(f.uhrPause);
   try { f.rec.remove(); } catch (e) { /* schon weg */ }
   $('asWidget').classList.remove('hoert');
   $('asSprachHint').textContent = hinweis || '';

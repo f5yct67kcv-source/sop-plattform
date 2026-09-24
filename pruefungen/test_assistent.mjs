@@ -504,8 +504,21 @@ await page.evaluate(() => window.__voskSagt('hallo wächter'));
 check('Ein Echo des Weckworts startet keine zweite Frage', await page.evaluate(() => window.__vosk.erkenner.filter(x => !x.weg && x.gram === null).length === 1));
 await page.evaluate(() => window.__voskSagt('wo fehlen', 'frage', 'partialresult'));
 check('Was schon verstanden ist, steht sofort im Feld', (await page.inputValue('#asText')) === 'wo fehlen');
-await page.evaluate(() => window.__voskSagt('wo fehlen diese woche noch leute', 'frage', 'result'));
-await page.waitForFunction(() => !document.getElementById('asBtn').disabled, null, { timeout: 5000 });
+// Eine kurze Pause mitten in der Frage: Vosk schliesst den ersten Teil ab,
+// gestellt wird aber erst nach der Luft -- und der zweite Teil gehoert dazu.
+await page.evaluate(() => { asFragePause = 600; });
+await page.evaluate(() => window.__voskSagt('wo fehlen', 'frage', 'result'));
+await page.waitForTimeout(300);
+check('KRITISCH: nach einer kurzen Sprechpause wird die Frage noch nicht gestellt',
+  zurueck.length === vorFrage && await page.evaluate(() => window.__frageOffen()));
+await page.evaluate(() => window.__voskSagt('diese woche', 'frage', 'partialresult'));
+await page.waitForTimeout(450);
+check('Spricht die Person weiter, wartet die Frage weiter (auch über die Luft hinaus)',
+  zurueck.length === vorFrage && await page.evaluate(() => window.__frageOffen()));
+await page.evaluate(() => window.__voskSagt('diese woche noch leute', 'frage', 'result'));
+await page.waitForTimeout(300);
+check('Auch der zweite Teil stellt die Frage nicht sofort', zurueck.length === vorFrage);
+await page.waitForFunction(() => !document.getElementById('asBtn').disabled && !window.__frageOffen(), null, { timeout: 5000 });
 await page.waitForTimeout(150);
 check('KRITISCH: nach der Sprechpause wird die Frage gestellt und beantwortet',
   zurueck.length === vorFrage + 1 && (await letzteAntwort()) === 'Zwei Einsätze haben noch Lücken.'
