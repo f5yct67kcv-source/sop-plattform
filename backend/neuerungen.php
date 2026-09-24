@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 18,
+            'datum' => '2026-09-24',
+            'art'   => 'fehlerbehebung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Kein falscher Konflikt nach einer Absage',
+            'text'  => 'Hat jemand eine Schicht abgelehnt oder ist sie für die Person entfallen, zeigt die Planung sie zur selben Zeit nicht mehr als „bereits eingeteilt“. Speichern ging schon vorher, jetzt stimmt auch die Anzeige.',
+        ],
+        [
             'nr'    => 16,
             'datum' => '2026-09-24',
             'art'   => 'verbesserung',
