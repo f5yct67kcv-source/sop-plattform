@@ -1153,7 +1153,8 @@ tr.auf-leib > td { background: var(--surface-2); padding-top: 4px; }
 .kd-usig { grid-column: 1 / -1; }
 .kd-usig-blatt { border-bottom: 1px solid var(--ink); padding: 6px 0 4px; max-width: 360px; min-height: 60px;
   display: flex; align-items: flex-end; }
-.kd-usig-blatt img { max-height: 72px; max-width: 100%; }
+/* Auf der Linie wie auf dem Dokument (ENT-706). */
+.kd-usig-blatt img { max-height: 72px; max-width: 100%; margin-bottom: -14px; position: relative; }
 /* Dunkle Tinte auf dunkler Flaeche waere unsichtbar. */
 html[data-thema="dunkel"] .kd-usig-blatt img { filter: invert(1); }
 .kd-raster { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
@@ -4953,13 +4954,33 @@ function kdUnterschriftKarte(k) {
   let inhalt;
   if (k.unterschrift_da === null || k.unterschrift_da === undefined) {
     inhalt = `<div class="sec">Auf diesem Server noch nicht eingerichtet. Ein Einrichtungslauf legt die Stelle an.</div>`;
+  } else if (k.ich && kdUsigVorschau) {
+    /* Ein hochgeladenes Bild (ENT-706), aufbereitet, noch nicht gespeichert. */
+    inhalt = `<div class="kd-usig-blatt"><img id="kdUsigVorschauBild" src="${esc(kdUsigVorschau)}" alt="Vorschau deiner Unterschrift"></div>
+      <div class="sec" style="margin:18px 0 12px">So steht sie auf der Offerte. Hintergrund entfernt und zugeschnitten — noch nicht gespeichert.</div>
+      <div style="display:flex;gap:8px">
+        <button type="button" class="btn btn-primary btn-sm" id="kdUsigUebernehmen" onclick="kdUnterschriftUebernehmen()">Übernehmen</button>
+        <button type="button" class="btn btn-plain btn-sm" id="kdUsigVerwerfen" onclick="kdUnterschriftVerwerfen()">Verwerfen</button>
+      </div>`;
   } else if (k.ich) {
+    /* Zeichnen oder ein Bild hochladen, etwa ein Bildschirmfoto der
+       Unterschrift aus Apple Vorschau (ENT-706). */
+    const hochladen = `<button type="button" class="btn btn-plain btn-sm" id="kdUsigHochladen"
+        onclick="document.getElementById('kdUsigDatei').click()">Bild hochladen</button>
+      <input type="file" id="kdUsigDatei" accept="image/png,image/jpeg" hidden onchange="kdUnterschriftDatei(this)">`;
     inhalt = (k.unterschrift
       ? `<div class="kd-usig-blatt"><img id="kdUsigBild" src="${esc(k.unterschrift)}" alt="Deine Unterschrift"></div>
-         <div class="sec" style="margin:10px 0 12px">Steht auf jeder Offerte und jedem Vertrag, die du freigibst. Eine neue Unterschrift ändert bereits versendete Fassungen nicht.</div>
-         <button type="button" class="btn btn-plain btn-sm" id="kdUsigKnopf" onclick="kdUnterschriftZeichnen()">Neu zeichnen</button>`
+         <div class="sec" style="margin:18px 0 12px">Steht auf jeder Offerte und jedem Vertrag, die du freigibst. Eine neue Unterschrift ändert bereits versendete Fassungen nicht.</div>
+         <div style="display:flex;gap:8px">
+           <button type="button" class="btn btn-plain btn-sm" id="kdUsigKnopf" onclick="kdUnterschriftZeichnen()">Neu zeichnen</button>
+           ${hochladen}
+         </div>`
       : `<div class="sec" style="margin-bottom:12px">Noch keine Unterschrift hinterlegt. Ohne sie kannst du keine Offerte und keinen Vertrag freigeben.</div>
-         <button type="button" class="btn btn-primary btn-sm" id="kdUsigKnopf" onclick="kdUnterschriftZeichnen()">Unterschrift zeichnen</button>`);
+         <div style="display:flex;gap:8px">
+           <button type="button" class="btn btn-primary btn-sm" id="kdUsigKnopf" onclick="kdUnterschriftZeichnen()">Unterschrift zeichnen</button>
+           ${hochladen}
+         </div>
+         <div class="sec" style="margin-top:10px">Bild: PNG oder JPG, dunkle Schrift auf hellem Grund — etwa ein Bildschirmfoto deiner Unterschrift aus Apple Vorschau oder ein Foto auf Papier.</div>`);
   } else {
     inhalt = k.unterschrift_da
       ? `<div class="sec">Hinterlegt.</div>`
@@ -4976,14 +4997,66 @@ function kdUnterschriftZeichnen() {
   Unterschrift.zeichnen({
     kraeftig: true,
     kontext: () => ({ zeilen: ['Deine Unterschrift für Offerten und Verträge'], name: k.name || '' }),
-    fertig: async bild => {
-      const a = await ruf('betreiber_unterschrift_speichern.php', { zeichnung: bild });
-      if (a.status !== 'ok') { kurzmeldung(a.message || 'Die Unterschrift liess sich nicht speichern.'); return; }
-      kurzmeldung('Unterschrift gespeichert.');
-      ofEigeneUnterschrift = true;
-      await ladeKonten();
-    },
+    fertig: bild => { kdUnterschriftSpeichern(bild); },
   });
+}
+
+async function kdUnterschriftSpeichern(bild) {
+  const a = await ruf('betreiber_unterschrift_speichern.php', { zeichnung: bild });
+  if (a.status !== 'ok') { kurzmeldung(a.message || 'Die Unterschrift liess sich nicht speichern.'); return false; }
+  kurzmeldung('Unterschrift gespeichert.');
+  ofEigeneUnterschrift = true;
+  await ladeKonten();
+  return true;
+}
+
+/* Hochladen (ENT-706). Der Browser verkleinert zuerst auf hoechstens
+   1600 px Breite -- ein Handyfoto waere sonst zu gross fuer eine Anfrage.
+   Hintergrund entfernen und zuschneiden macht der Server; gespeichert wird
+   erst nach "Uebernehmen". */
+let kdUsigVorschau = null;
+
+function kdBildVerkleinern(datei) {
+  return new Promise((gut, schlecht) => {
+    const url = URL.createObjectURL(datei);
+    const img = new Image();
+    img.onload = () => {
+      const f = Math.min(1, 1600 / img.naturalWidth);
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.naturalWidth * f));
+      c.height = Math.max(1, Math.round(img.naturalHeight * f));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      gut(datei.type === 'image/png' ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.92));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); schlecht(new Error('Das Bild liess sich nicht lesen.')); };
+    img.src = url;
+  });
+}
+
+async function kdUnterschriftDatei(eingabe) {
+  const datei = eingabe.files && eingabe.files[0];
+  eingabe.value = '';
+  if (!datei) { return; }
+  if (!['image/png', 'image/jpeg'].includes(datei.type)) { kurzmeldung('Bitte ein PNG- oder JPG-Bild wählen.'); return; }
+  let bild;
+  try { bild = await kdBildVerkleinern(datei); } catch (e) { kurzmeldung(e.message); return; }
+  const a = await ruf('betreiber_unterschrift_bild.php', { bild });
+  if (a.status !== 'ok' || !a.bild) { kurzmeldung(a.message || 'Das Bild liess sich nicht verarbeiten.'); return; }
+  kdUsigVorschau = a.bild;
+  kdZeichnen();
+}
+
+async function kdUnterschriftUebernehmen() {
+  if (!kdUsigVorschau) { return; }
+  const bild = kdUsigVorschau;
+  kdUsigVorschau = null;
+  if (!await kdUnterschriftSpeichern(bild)) { kdUsigVorschau = bild; kdZeichnen(); }
+}
+
+function kdUnterschriftVerwerfen() {
+  kdUsigVorschau = null;
+  kdZeichnen();
 }
 
 /* Aus dem Versanddialog: direkt zum eigenen Konto. */
