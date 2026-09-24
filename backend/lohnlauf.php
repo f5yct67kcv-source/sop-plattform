@@ -26,6 +26,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/gavzeit.php';
 require_once __DIR__ . '/lohn.php';
 require_once __DIR__ . '/planung.php';
+require_once __DIR__ . '/rechte.php';   // darf() fuer die Finanz-Kostenseite (ENT-712)
 
 // Sperrgruende, ausdruecklich benannt statt als freier Text. Wer einen
 // ergaenzt, entscheidet ihn bewusst -- und die Oberflaeche kann jeden
@@ -876,4 +877,248 @@ function lohnlauf_person(PDO $pdo, array $ma, string $von, string $bis): array
                     . number_format($mindest['wert'] / 100, 2, '.', "'") . ' CHF pro Stunde.'];
     }
     return $kopf;
+}
+
+// ══ Finanzen (ENT-712): die Kostenseite der Finanz-Uebersicht ════════════
+//
+// WARUM HIER UND NICHT IN EINER EIGENEN DATEI: Jede Hilfsdatei im
+// Web-Verzeichnis muss in der FilesMatch-Sperre der .htaccess stehen
+// (test_php.mjs). Die Staging-.htaccess wird von Hand gepflegt, und der
+// Staging-Deploy bricht bei jeder Abweichung ab (Drift-Guard, ENT-384/387).
+// Eine neue Datei haette die Testseite blockiert, bis jemand bei Hostpoint
+// nachtraegt. Die Kostenseite liest ohnehin Lohnlaeufe und Auslagenersatz --
+// sie gehoert fachlich neben den Lohnlauf.
+//
+// WAS HIER STEHT UND WAS NICHT. Die Einnahmenseite (verrechnet, bezahlt,
+// offen, ueberfaellig) rechnet die Oberflaeche aus derselben Rechnungsliste,
+// die auch die Liste unter Finanzen -> Rechnungen zeigt (beleg_list.php,
+// Recht offerten_lesen). Eine zweite Summenbildung hier waere eine zweite
+// Wahrheit ueber dieselben Belege. Die KOSTEN dagegen stehen in keiner Liste,
+// die der Browser ohnehin laedt -- Lohnlaeufe und Auslagenersatz werden nur
+// hier zu Monaten zusammengezaehlt.
+//
+// JEDER BLOCK AN SEINEM RECHT (ENT-712, Punkt 13). Wer Rechnungen sehen darf,
+// sieht damit nicht die Lohnsumme des Betriebs. Ein fehlendes Recht liefert
+// null und den Vermerk "kein Zugriff" -- nie eine 0, die wie "keine Kosten"
+// aussieht.
+//
+// "OHNE ARBEITGEBERBEITRAEGE". Die Plattform rechnet keine Arbeitgeberanteile
+// (AHV/IV/EO/ALV-Anteil AG, BVG, UVG, FAK, PaKo). Die Bruttolohnsumme ist
+// darum die beste verfuegbare Naeherung an die Personalkosten und liegt
+// systematisch darunter. Deshalb bildet hier auch niemand eine Differenz
+// oder Marge (ENT-712, Punkt 15).
+
+
+// Welche Laeufe als Kosten zaehlen: freigegeben oder ausbezahlt (ENT-712,
+// Punkt 10). Ein Entwurf kann sich noch aendern, ein stornierter gilt nicht.
+const FIN_LAUF_ZAEHLT = ['freigegeben', 'ausbezahlt'];
+
+// Ein Monat als 'YYYY-MM'. Alles andere wird abgewiesen, bevor es in eine
+// Abfrage gelangt.
+function fin_monat_gueltig(string $m): bool
+{
+    return (bool)preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $m);
+}
+
+// Erster und letzter Tag eines Monatsbereichs.
+function fin_bereich(string $vonMonat, string $bisMonat): array
+{
+    $von = $vonMonat . '-01';
+    $bis = date('Y-m-t', strtotime($bisMonat . '-01'));
+    return [$von, $bis];
+}
+
+// Bruttolohn je Monat der Lohnperiode (periode_von). Ein Monat ohne
+// zaehlenden Lauf fehlt im Ergebnis -- er steht NICHT mit 0 da. Die
+// Oberflaeche schreibt dort "noch kein Lohnlauf".
+//
+// Mehrere zaehlende Laeufe im selben Monat (ein Nachtrag nach der
+// Auszahlung, ENT-451) werden zusammengezaehlt: Beide sind Lohn dieses
+// Monats.
+function fin_lohn_monate(PDO $pdo, string $von, string $bis): array
+{
+    $platz = implode(',', array_fill(0, count(FIN_LAUF_ZAEHLT), '?'));
+    $st = $pdo->prepare(
+        "SELECT l.id, l.periode_von,
+                COALESCE(SUM(p.brutto_rappen), 0) AS brutto,
+                COUNT(p.id) AS personen
+         FROM lohnlauf l
+         LEFT JOIN lohnlauf_person p ON p.lauf_id = l.id
+         WHERE l.status IN ($platz) AND l.periode_von BETWEEN ? AND ?
+         GROUP BY l.id, l.periode_von"
+    );
+    $st->execute(array_merge(FIN_LAUF_ZAEHLT, [$von, $bis]));
+    $monate = [];
+    foreach ($st->fetchAll() as $r) {
+        $m = substr((string)$r['periode_von'], 0, 7);
+        if (!isset($monate[$m])) { $monate[$m] = ['brutto_rappen' => 0, 'laeufe' => 0]; }
+        $monate[$m]['brutto_rappen'] += (int)$r['brutto'];
+        $monate[$m]['laeufe']++;
+    }
+    ksort($monate);
+    return $monate;
+}
+
+// Die letzten Laeufe fuer den Block "Letzte Lohnlaeufe". Stornierte bleiben
+// draussen: Sie sind ersetzt, und ihr Nachfolger steht ohnehin in der Liste.
+function fin_letzte_laeufe(PDO $pdo, int $anzahl = 3): array
+{
+    $st = $pdo->prepare(
+        "SELECT l.id, l.periode_von, l.periode_bis, l.status,
+                l.freigegeben_am, l.ausbezahlt_am,
+                COALESCE(SUM(p.brutto_rappen), 0) AS brutto,
+                COUNT(p.id) AS personen
+         FROM lohnlauf l
+         LEFT JOIN lohnlauf_person p ON p.lauf_id = l.id
+         WHERE l.status <> 'storniert'
+         GROUP BY l.id, l.periode_von, l.periode_bis, l.status, l.freigegeben_am, l.ausbezahlt_am
+         ORDER BY l.periode_von DESC, l.id DESC
+         LIMIT " . max(1, $anzahl)
+    );
+    $st->execute();
+    return array_map(fn($r) => [
+        'id'             => (int)$r['id'],
+        'periode_von'    => $r['periode_von'],
+        'periode_bis'    => $r['periode_bis'],
+        'status'         => $r['status'],
+        'freigegeben_am' => $r['freigegeben_am'],
+        'ausbezahlt_am'  => $r['ausbezahlt_am'],
+        'brutto_rappen'  => (int)$r['brutto'],
+        'personen'       => (int)$r['personen'],
+    ], $st->fetchAll());
+}
+
+// Auslagenersatz je Monat der Schicht (ENT-712, Punkt 10). Eine Zeile in
+// einsatz_auslagen entsteht erst im Abgleich -- was hier steht, ist damit
+// abgeglichen. Gesperrte Zeilen (etwa unbekanntes Verkehrsmittel) haben
+// keinen Betrag und werden GEZAEHLT, nicht als 0 mitsummiert.
+function fin_auslagen_monate(PDO $pdo, string $von, string $bis): array
+{
+    $st = $pdo->prepare(
+        "SELECT e.datum, a.fahrzeitersatz_rappen, a.fahrkostenersatz_rappen, a.gesperrt_grund
+         FROM einsatz_auslagen a
+         JOIN einsaetze e ON e.id = a.einsatz_id
+         WHERE e.datum BETWEEN ? AND ?"
+    );
+    $st->execute([$von, $bis]);
+    $monate = [];
+    foreach ($st->fetchAll() as $r) {
+        $m = substr((string)$r['datum'], 0, 7);
+        if (!isset($monate[$m])) { $monate[$m] = ['rappen' => 0, 'zeilen' => 0, 'gesperrt' => 0]; }
+        if ($r['gesperrt_grund'] !== null && $r['gesperrt_grund'] !== '') {
+            $monate[$m]['gesperrt']++;
+            continue;
+        }
+        $monate[$m]['rappen'] += (int)($r['fahrzeitersatz_rappen'] ?? 0) + (int)($r['fahrkostenersatz_rappen'] ?? 0);
+        $monate[$m]['zeilen']++;
+    }
+    ksort($monate);
+    return $monate;
+}
+
+// Wie viele zugeteilte Schichten je Monat noch NICHT abgeglichen sind --
+// nur bis heute, eine kuenftige Schicht kann noch gar nicht abgeglichen
+// sein. Dieselbe Definition wie im Lohnlauf (ist_status = 'offen', abgesagte
+// zaehlen nicht). Sie stehen als Hinweis neben dem Auslagenersatz, damit
+// "fehlt noch" nicht wie "gibt es nicht" aussieht.
+function fin_offene_schichten(PDO $pdo, string $von, string $bis, string $heute): array
+{
+    $bisEff = min($bis, $heute);
+    if ($bisEff < $von) { return []; }
+    $st = $pdo->prepare(
+        "SELECT e.datum FROM einsatz_zuteilung z
+         JOIN einsaetze e ON e.id = z.einsatz_id
+         WHERE e.datum BETWEEN ? AND ? AND e.status <> 'abgesagt'
+           AND COALESCE(z.ist_status, 'offen') = 'offen'"
+    );
+    $st->execute([$von, $bisEff]);
+    $monate = [];
+    foreach ($st->fetchAll() as $r) {
+        $m = substr((string)$r['datum'], 0, 7);
+        $monate[$m] = ($monate[$m] ?? 0) + 1;
+    }
+    ksort($monate);
+    return $monate;
+}
+
+// Die ganze Kostenseite fuer einen Benutzer. $tabellen sagt, welche
+// Tabellen es gibt -- ohne Einrichtung fehlen sie, und das ist eine eigene
+// Aussage ("nicht eingerichtet"), weder "kein Zugriff" noch "keine Kosten".
+function fin_kosten(PDO $pdo, array $user, string $vonMonat, string $bisMonat,
+                    array $tabellen, string $heute): array
+{
+    [$von, $bis] = fin_bereich($vonMonat, $bisMonat);
+    $antwort = ['status' => 'ok', 'von' => $vonMonat, 'bis' => $bisMonat];
+
+    if (!darf($user, 'lohn_lesen')) {
+        $antwort['lohn'] = ['zugriff' => false];
+    } elseif (empty($tabellen['lohnlauf'])) {
+        $antwort['lohn'] = ['zugriff' => true, 'eingerichtet' => false];
+    } else {
+        $antwort['lohn'] = [
+            'zugriff'      => true,
+            'eingerichtet' => true,
+            'monate'       => (object)fin_lohn_monate($pdo, $von, $bis),
+            'letzte'       => fin_letzte_laeufe($pdo),
+        ];
+    }
+
+    if (!darf($user, 'auslagen_lesen')) {
+        $antwort['auslagen'] = ['zugriff' => false];
+    } elseif (empty($tabellen['einsatz_auslagen'])) {
+        $antwort['auslagen'] = ['zugriff' => true, 'eingerichtet' => false];
+    } else {
+        $antwort['auslagen'] = [
+            'zugriff'           => true,
+            'eingerichtet'      => true,
+            'monate'            => (object)fin_auslagen_monate($pdo, $von, $bis),
+            'offene_schichten'  => (object)fin_offene_schichten($pdo, $von, $bis, $heute),
+        ];
+    }
+    return $antwort;
+}
+
+// Auslagenersatz je Person und Monat fuer die Geldsicht unter Finanzen ->
+// Lohn -> Auslagenersatz (ENT-712, Punkt 11). Dieselben Zeilen wie die
+// Kontrolle unter Auswertung, nur anders gebuendelt -- keine zweite Tabelle.
+function fin_auslagen_personen(PDO $pdo, string $vonMonat, string $bisMonat): array
+{
+    [$von, $bis] = fin_bereich($vonMonat, $bisMonat);
+    $st = $pdo->prepare(
+        "SELECT a.mitarbeiter_id, m.name, m.vorname, m.nachname, e.datum,
+                a.fahrzeitersatz_rappen, a.fahrkostenersatz_rappen, a.gesperrt_grund
+         FROM einsatz_auslagen a
+         JOIN einsaetze e ON e.id = a.einsatz_id
+         JOIN mitarbeiter m ON m.id = a.mitarbeiter_id
+         WHERE e.datum BETWEEN ? AND ?
+         ORDER BY m.nachname, m.vorname, m.name"
+    );
+    $st->execute([$von, $bis]);
+    $personen = [];
+    foreach ($st->fetchAll() as $r) {
+        $id = (int)$r['mitarbeiter_id'];
+        if (!isset($personen[$id])) {
+            $personen[$id] = [
+                'mitarbeiter_id' => $id,
+                'name'   => trim(($r['vorname'] ?? '') . ' ' . ($r['nachname'] ?? '')) ?: (string)$r['name'],
+                'monate' => [],
+            ];
+        }
+        $m = substr((string)$r['datum'], 0, 7);
+        $zelle = &$personen[$id]['monate'][$m];
+        if ($zelle === null) {
+            $zelle = ['fahrzeit_rappen' => 0, 'fahrkosten_rappen' => 0, 'schichten' => 0, 'gesperrt' => 0];
+        }
+        if ($r['gesperrt_grund'] !== null && $r['gesperrt_grund'] !== '') {
+            $zelle['gesperrt']++;
+        } else {
+            $zelle['fahrzeit_rappen']   += (int)($r['fahrzeitersatz_rappen'] ?? 0);
+            $zelle['fahrkosten_rappen'] += (int)($r['fahrkostenersatz_rappen'] ?? 0);
+            $zelle['schichten']++;
+        }
+        unset($zelle);
+    }
+    foreach ($personen as &$p) { ksort($p['monate']); $p['monate'] = (object)$p['monate']; }
+    unset($p);
+    return array_values($personen);
 }

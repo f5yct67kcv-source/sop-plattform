@@ -593,6 +593,7 @@ for (const [datei, titel] of [
   ['pruef_neuerungen.php', 'KRITISCH: Neuerungsliste und Etappen der Einrichtung stimmen (ENT-698)'],
   ['pruef_lohn.php', 'KRITISCH: Lohnform, Mindestlohn, Ferienentschaedigung und PaKo-Beitrag stimmen mit dem GAV ueberein (ENT-451)'],
   ['pruef_lohnlauf.php', 'KRITISCH: der Lohnlauf zaehlt nur abgeglichene Schichten, sperrt Reinigung und rechnet nichts auf fehlender Grundlage (ENT-451)'],
+  ['pruef_finanzen.php', 'KRITISCH: die Finanz-Kostenseite zaehlt nur freigegebene Laeufe, laesst fehlende Monate fehlen statt 0 und gibt Lohn- und Auslagenbetraege nur mit ihrem Recht heraus (ENT-712)'],
   ['pruef_logbuch.php', 'KRITISCH: das Logbuch haelt fest, wer was geaendert hat'],
   ['pruef_einsatz_abgeschlossen.php', 'KRITISCH: "abgeschlossen" verlangt ALLE zugesagten Rapporte (ENT-128)'],
   ['pruef_rundgang.php', 'KRITISCH: Geofence-Pruefung und Restliste der Kontrollpunkte stimmen (ENT-132/ENT-145/ENT-180)'],
