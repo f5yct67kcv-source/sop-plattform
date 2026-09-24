@@ -5,6 +5,9 @@
 //                               die daraus abgeleiteten GAV-Groessen
 // POST -> {id, was: 'ansatz'|'abzug'|'zahlung', ...} anlegen/aendern,
 //         mit {loeschen:true} entfernen
+// POST -> {id, was: 'position', aktion: 'neu'|'korrigieren'|'ab'|'beenden'|
+//         'loeschen', ...} persoenliche Zulagen und Abzuege (ENT-713). Die
+//         Regeln stehen in lohn_position_schreiben() in backend/lohnlauf.php.
 //
 // HISTORISIERT: 'ansatz' und 'abzug' werden nie ueberschrieben, sondern je
 // Gueltigkeitsdatum als neue Zeile gefuehrt. Eine Ansatzerhoehung darf
@@ -145,9 +148,39 @@ function lohn_person_lesen(int $id, string $stichtag): array
         $nbuGerechnet = lohn_nbu_unterstellung($fenster, $uvgRw);
     }
 
+    // Persoenliche Zulagen und Abzuege (ENT-713). NULL heisst "noch nicht
+    // eingerichtet" und ist etwas anderes als eine leere Liste -- die
+    // Oberflaeche sagt es auch anders.
+    $positionen = null;
+    $waehlbar = [];
+    $abgeschlossen = null;
+    if (hat_tabelle($pdo, 'lohn_position')) {
+        $abgeschlossen = lohn_position_abgeschlossen_bis($pdo, $id);
+        $pst = $pdo->prepare(
+            'SELECT p.*, l.bezeichnung, l.art, l.schluessel, l.system,
+                    l.ferien_pflichtig, l.ml13_pflichtig
+             FROM lohn_position p JOIN lohnart l ON l.id = p.lohnart_id
+             WHERE p.mitarbeiter_id = ?
+             ORDER BY l.sortierung, l.bezeichnung, p.gueltig_ab DESC'
+        );
+        $pst->execute([$id]);
+        $positionen = array_map(function ($r) use ($abgeschlossen) {
+            foreach (['id', 'lohnart_id', 'betrag_rappen', 'system',
+                      'ferien_pflichtig', 'ml13_pflichtig'] as $f) { $r[$f] = (int)$r[$f]; }
+            // Schon in einem abgeschlossenen Lauf verwendet? Dann nur noch
+            // "aendern ab" und "beenden", kein Korrigieren und Loeschen.
+            $r['verwendet'] = $abgeschlossen !== null && $r['gueltig_ab'] <= $abgeschlossen;
+            return $r;
+        }, $pst->fetchAll());
+        $waehlbar = lohn_position_lohnarten($pdo);
+    }
+
     return [
         'status' => 'ok',
         'nbu' => $nbuGerechnet,
+        'positionen' => $positionen,
+        'positionen_lohnarten' => $waehlbar,
+        'abgeschlossen_bis' => $abgeschlossen,
         'person' => [
             'id' => (int)$ma['id'],
             'name' => trim(($ma['vorname'] ?? '') . ' ' . ($ma['nachname'] ?? '')) ?: $ma['name'],
@@ -200,10 +233,26 @@ $input = json_decode(file_get_contents('php://input'), true) ?? [];
 $id  = (int)($input['id'] ?? 0);
 $was = (string)($input['was'] ?? '');
 if ($id <= 0)  { json_response(['status' => 'error', 'message' => 'id fehlt'], 400); }
-if (!in_array($was, ['ansatz', 'abzug', 'zahlung'], true)) {
-    json_response(['status' => 'error', 'message' => 'was: ansatz, abzug oder zahlung'], 400);
+if (!in_array($was, ['ansatz', 'abzug', 'zahlung', 'position'], true)) {
+    json_response(['status' => 'error', 'message' => 'was: ansatz, abzug, zahlung oder position'], 400);
 }
 $pdo = db();
+
+// Persoenliche Zulagen und Abzuege (ENT-713). Eigener Weg vor dem
+// allgemeinen Loeschen unten: Hier darf nicht geloescht werden, was ein
+// abgeschlossener Lohnlauf schon verwendet hat.
+if ($was === 'position') {
+    if (!hat_tabelle($pdo, 'lohn_position')) {
+        json_response(['status' => 'error',
+            'message' => 'Die Tabelle für persönliche Zulagen fehlt noch — zuerst „Einrichtung" ausführen.'], 503);
+    }
+    $da = $pdo->prepare('SELECT 1 FROM mitarbeiter WHERE id = ?');
+    $da->execute([$id]);
+    if (!$da->fetchColumn()) { json_response(['status' => 'error', 'message' => 'Person nicht gefunden'], 404); }
+    $fehler = lohn_position_schreiben($pdo, $id, $input, (int)$user['id']);
+    if ($fehler !== null) { json_response(['status' => 'error', 'message' => $fehler], 400); }
+    json_response(lohn_person_lesen($id, $stichtag));
+}
 
 // Rappen aus einer Eingabe. Erlaubt sind "25.00", "25", "25,00" -- was ein
 // Mensch tippt. Leer und null bleiben null; 0 ist ein Wert, keine Leere.

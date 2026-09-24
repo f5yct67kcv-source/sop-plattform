@@ -718,7 +718,7 @@ if (!empty($mSchema[1]) && !empty($mIns[1])) {
     if ($fehler === null) {
         $n = (int)$p->query('SELECT COUNT(*) FROM lohnart')->fetchColumn();
         pruef('Alle Lohnarten des Startbestands landen in der Tabelle',
-            $n === count($zeilen) && $n === 21);
+            $n === count($zeilen) && $n === 23);
 
         // Die Anzahl allein genuegt nicht: Bei vertauschter Reihenfolge
         // passte sie weiterhin, und der Katalog waere still falsch. Darum
@@ -730,8 +730,26 @@ if (!empty($mSchema[1]) && !empty($mIns[1])) {
             && (int)$g['system'] === 1 && $g['art'] === 'stundensatz');
         $b = (int)$p->query('SELECT COUNT(*) FROM lohnart WHERE bemessung = 1')->fetchColumn();
         pruef('Die Bemessungszeilen kommen als solche an -- sonst rechnete der Lauf doppelt',
-            $b === count(array_filter($zeilen, fn ($z) => (int)$z[13] === 1)) && $b === 6);
+            $b === count(array_filter($zeilen, fn ($z) => (int)$z[13] === 1)) && $b === 8);
     }
+
+    // Seit ENT-713 gibt es einen ZWEITEN INSERT: Er traegt nachtraeglich
+    // hinzugekommene Systemlohnarten in einen schon bestehenden Katalog
+    // nach. Dieselbe Absprache ueber die Feldzahl, dieselbe Pruefung --
+    // jeder INSERT in lohnart im Einrichtungslauf wird ausgefuehrt.
+    preg_match_all('/(INSERT IGNORE INTO lohnart.*?VALUES \([^)]*\))/s', $einr, $alleIns);
+    $fehler2 = null;
+    try {
+        $p2 = new PDO('sqlite::memory:');
+        $p2->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $p2->exec($ddl);
+        foreach ($alleIns[1] as $ins) {
+            $st2 = $p2->prepare(str_replace('INSERT IGNORE INTO', 'INSERT OR IGNORE INTO', $ins));
+            foreach ($zeilen as $z) { $st2->execute($z); }
+        }
+    } catch (Throwable $e) { $fehler2 = $e->getMessage(); }
+    pruef('KRITISCH: auch der Nachtrag-INSERT fuer spaetere Systemlohnarten laesst sich ausfuehren',
+        count($alleIns[1]) >= 2 && $fehler2 === null);
 }
 
 echo $ok . " Pruefungen bestanden\n";

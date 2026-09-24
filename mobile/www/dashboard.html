@@ -10265,6 +10265,60 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   </div>
 </div>
 
+<!-- ══════════════════ PERSÖNLICHE ZULAGEN UND ABZÜGE (ENT-713) ═════════════
+     Neu erfassen und Korrigieren teilen sich die vollen Felder. Eine
+     bestehende Position bietet dagegen die Wege an, die ihre Geschichte
+     erhalten: „Betrag ändern ab" und „Beenden". Korrigieren und Löschen
+     gibt es nur, solange kein abgeschlossener Lohnlauf sie verwendet hat —
+     das entscheidet der Server, der Dialog bietet es nur nicht erst an. -->
+<div class="dlg-scrim" id="dlgLohnPosition">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2 id="lpoTitel">Zulage oder Abzug erfassen</h2>
+      <p id="lpoUnter">Gilt je ganzen Monat. Wie gerechnet wird, sagt die Lohnart.</p>
+    </div>
+    <div class="dlg-bd">
+      <input type="hidden" id="lpoId">
+      <div class="feld" id="lpoWegFeld"><label for="lpoWeg">Was soll geschehen?</label>
+        <select class="inp" id="lpoWeg" onchange="lohnPositionWegUmschalten()"></select></div>
+      <div id="lpoGrpVoll">
+        <div class="feld"><label for="lpoLohnart">Lohnart</label>
+          <select class="inp" id="lpoLohnart" onchange="lohnPositionEinheit()"></select>
+          <div class="zone-note" id="lpoLohnartHinweis"></div></div>
+        <div class="feld"><label for="lpoBetrag" id="lpoBetragLabel">Betrag in CHF</label>
+          <input class="inp" id="lpoBetrag" inputmode="decimal" placeholder="z. B. 150.00"></div>
+        <div class="feld"><label class="check" style="min-height:24px"><input type="checkbox" id="lpoEinmalig" onchange="lohnPositionEinmalig()"> einmalig, nur in einem Monat</label></div>
+        <div class="feld"><label for="lpoAb" id="lpoAbLabel">Ab Monat</label>
+          <input class="inp" type="month" id="lpoAb"></div>
+        <div class="feld" id="lpoBisFeld"><label for="lpoBis">Bis Monat</label>
+          <input class="inp" type="month" id="lpoBis">
+          <div class="zone-note">Leer lassen, wenn die Position bis auf Weiteres gilt.</div></div>
+        <div class="feld"><label for="lpoBemerkung">Bemerkung</label>
+          <input class="inp" id="lpoBemerkung"></div>
+      </div>
+      <div id="lpoGrpAb">
+        <div class="feld"><label for="lpoNeuBetrag" id="lpoNeuBetragLabel">Neuer Betrag in CHF</label>
+          <input class="inp" id="lpoNeuBetrag" inputmode="decimal"></div>
+        <div class="feld"><label for="lpoNeuAb">Gilt ab Monat</label>
+          <input class="inp" type="month" id="lpoNeuAb">
+          <div class="zone-note">Die bisherige Position endet im Monat davor und bleibt stehen.</div></div>
+      </div>
+      <div id="lpoGrpEnde">
+        <div class="feld"><label for="lpoEnde">Letzter Monat</label>
+          <input class="inp" type="month" id="lpoEnde">
+          <div class="zone-note">Leer heisst: gilt wieder bis auf Weiteres.</div></div>
+      </div>
+      <p class="zone-note" id="lpoSperrHinweis" style="display:none"></p>
+      <p class="err" id="lpoFehler" style="display:none"></p>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgLohnPosition')">Abbrechen</button>
+      <button class="btn btn-quiet" id="lpoLoeschKnopf" onclick="lohnPositionLoeschen()">Löschen</button>
+      <button class="btn btn-primary" onclick="lohnPositionSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════ LOHNLAUF ANSEHEN (ENT-451) ══════════════════════
      Die Knöpfe folgen dem Status: Was nicht geht, steht gar nicht erst da.
      Die Grenze ist die Auszahlung — davor stornieren, danach nachtragen. -->
@@ -22429,7 +22483,215 @@ function lohnAkteZeichnen() {
     </div></div>`;
 
   ziel.innerHTML = `<div class="ma-lohn" style="display:grid;gap:16px">
-    ${abgeleitet}${ansatzKarte}${abzugKarte}${zahlKarte}</div>`;
+    ${abgeleitet}${ansatzKarte}${lohnPositionKarte(heute)}${abzugKarte}${zahlKarte}</div>`;
+}
+
+// ── Persönliche Zulagen und Abzüge (ENT-713) ─────────────────────────────
+// Eine eigene Karte, gebaut wie „Lohnansatz" und „Auszahlung". Beendete
+// Positionen sind ausgeblendet; die Zahl daneben sagt dann „2 von 3", damit
+// eine gefilterte Liste nicht wie die ganze aussieht.
+let lohnPosAlle = false;
+
+// "2027-03-01" -> "03.2027". Positionen gelten je ganzen Monat -- ein Tag
+// in der Anzeige behauptete eine Genauigkeit, die es nicht gibt.
+const lohnMonat = d => d ? String(d).slice(5, 7) + '.' + String(d).slice(0, 4) : '';
+
+// Was eine Lohnart mit dem Betrag tut. Steht an EINER Stelle, weil Karte
+// und Dialog dieselben Worte brauchen.
+function lohnPositionRechnung(art) {
+  return { stundensatz: 'pro Stunde', fixbetrag: 'pro Monat',
+           abzug: 'Abzug pro Monat', netto: 'Nettobetrag pro Monat' }[art]
+    || 'Rechenart unbekannt';
+}
+
+function lohnPositionKarte(heute) {
+  const liste = lohnAkte.positionen;
+  const waehlbar = lohnAkte.positionen_lohnarten || [];
+  const knopf = lohnSchreiben() && liste !== null && liste !== undefined && waehlbar.length
+    ? `<button class="btn btn-primary btn-sm" onclick="lohnPositionOeffnen(null)">Erfassen</button>` : '';
+  const kopf = `<div class="card-hd"><h3>Zulagen und Abzüge</h3>${knopf}</div>`;
+  const gavHinweis = `<p class="zone-note" style="margin:10px 0 0">Die GAV-Zuschläge nach Art. 19
+    (Fachausweis, Diensthund, Schusswaffe) stehen beim Lohnansatz.</p>`;
+
+  // Vier verschiedene Aussagen, vier verschiedene Texte: nicht
+  // eingerichtet, nichts erfasst, keine Lohnart vorhanden, kein Treffer.
+  // Nur DIESE Tabelle fehlt, nicht der Lohnbereich -- der Text von
+  // lohnLeer('nicht_eingerichtet') behauptete zu viel.
+  if (liste === null || liste === undefined) {
+    return `<div class="card">${kopf}<div class="card-bd"><div class="leer-zustand" style="padding:28px 4px;text-align:center">
+      <div style="font-weight:600;margin-bottom:6px">Zulagen und Abzüge sind auf dem Server noch nicht eingerichtet.</div>
+      <div class="zone-note" style="margin:0">Einmalig unter „Einrichtung“ ausführen — dabei entsteht die Tabelle dafür.</div>
+    </div></div></div>`;
+  }
+  const beendet = p => p.gueltig_bis && p.gueltig_bis < heute;
+  const sichtbar = lohnPosAlle ? liste : liste.filter(p => !beendet(p));
+  const zahl = liste.length && sichtbar.length !== liste.length
+    ? `<span class="zone-note" style="margin:0">${sichtbar.length} von ${liste.length}</span>` : '';
+  const schalter = liste.some(beendet)
+    ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 10px">
+        <label class="check" style="min-height:24px"><input type="checkbox" id="lpoAlle"
+          ${lohnPosAlle ? 'checked' : ''} onchange="lohnPosAlle = this.checked; lohnAkteZeichnen()">
+          auch beendete zeigen</label>${zahl}</div>` : '';
+
+  if (!liste.length) {
+    const zusatz = waehlbar.length
+      ? 'Persönliche Zulagen und Abzüge dieser Person, etwa eine Funktionszulage oder ein Abzug für die Uniform.'
+      : 'Es gibt noch keine eigene Lohnart, die sich einer Person zuordnen lässt. '
+        + 'Zuerst unter Lohn → Lohnarten eine anlegen (pro Stunde, fester Betrag, Abzug oder Netto).';
+    return `<div class="card">${kopf}<div class="card-bd">${lohnLeer('leer', zusatz)}${gavHinweis}</div></div>`;
+  }
+  if (!sichtbar.length) {
+    return `<div class="card">${kopf}<div class="card-bd">${schalter}
+      ${lohnLeer('kein_treffer', 'Alle Positionen sind beendet. „Auch beendete zeigen" blendet sie ein.')}
+      ${gavHinweis}</div></div>`;
+  }
+
+  const zeilen = sichtbar.map(p => {
+    const kuenftig = p.gueltig_ab > heute;
+    const vorbei = beendet(p);
+    const einmalig = p.gueltig_bis && p.gueltig_bis.slice(0, 7) === p.gueltig_ab.slice(0, 7);
+    const zeitraum = einmalig ? lohnMonat(p.gueltig_ab)
+      : (p.gueltig_bis ? lohnMonat(p.gueltig_ab) + ' – ' + lohnMonat(p.gueltig_bis)
+                       : 'ab ' + lohnMonat(p.gueltig_ab));
+    const marke = vorbei ? ' <span class="chip">beendet</span>'
+      : (kuenftig ? ' <span class="chip">künftig</span>'
+                  : ' <span class="chip chip-ok">gilt heute</span>');
+    const traegt = [];
+    if (p.ferien_pflichtig) { traegt.push('mit Ferienentschädigung'); }
+    if (p.ml13_pflichtig) { traegt.push('mit 13. ML'); }
+    const vz = p.art === 'abzug' ? '−' : '';
+    return `<tr${vorbei || kuenftig ? ' style="opacity:.7"' : ''}>
+      <td>${esc(p.bezeichnung)}${traegt.length ? `<div class="zone-note" style="margin:0">${esc(traegt.join(' · '))}</div>` : ''}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums"><b>${vz}${lohnFr(p.betrag_rappen)}</b></td>
+      <td>${einmalig && p.art !== 'stundensatz' ? 'einmalig' : esc(lohnPositionRechnung(p.art))}</td>
+      <td>${zeitraum}${marke}</td>
+      <td style="text-align:right">${lohnSchreiben()
+        ? `<button class="btn btn-quiet btn-sm" onclick="lohnPositionOeffnen(${p.id})">Ändern</button>` : ''}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="card">${kopf}<div class="card-bd">${schalter}
+    <div style="overflow-x:auto"><table class="tbl"><thead><tr>
+      <th>Lohnart</th><th style="text-align:right">CHF</th><th>Rechnung</th><th>Zeitraum</th><th></th>
+    </tr></thead><tbody>${zeilen}</tbody></table></div>
+    <p class="zone-note">Eine Änderung beendet die bisherige Position und beginnt eine neue —
+      so bleibt nachvollziehbar, was in welchem Monat galt.</p>${gavHinweis}</div></div>`;
+}
+
+// ── Dialog: persönliche Position ─────────────────────────────────────────
+function lohnPositionOeffnen(id) {
+  const p = id ? (lohnAkte.positionen || []).find(x => x.id === id) : null;
+  const waehlbar = lohnAkte.positionen_lohnarten || [];
+  $('lpoId').value = p ? p.id : '';
+  // Eine bestehende Position darf eine inzwischen deaktivierte Lohnart
+  // tragen -- sie steht dann trotzdem in der Auswahl, sonst sprang die
+  // Auswahl beim Korrigieren stillschweigend auf eine andere.
+  const optionen = waehlbar.slice();
+  if (p && !optionen.some(l => l.id === p.lohnart_id)) {
+    optionen.push({ id: p.lohnart_id, bezeichnung: p.bezeichnung, art: p.art,
+      ferien_pflichtig: p.ferien_pflichtig, ml13_pflichtig: p.ml13_pflichtig });
+  }
+  $('lpoLohnart').innerHTML = optionen.map(l =>
+    `<option value="${l.id}">${esc(l.bezeichnung)} — ${esc(lohnPositionRechnung(l.art))}</option>`).join('');
+  $('lpoLohnart').value = p ? String(p.lohnart_id) : (optionen[0] ? String(optionen[0].id) : '');
+  $('lpoBetrag').value = p ? (p.betrag_rappen / 100).toFixed(2) : '';
+  $('lpoAb').value = p ? p.gueltig_ab.slice(0, 7) : '';
+  $('lpoBis').value = p && p.gueltig_bis ? p.gueltig_bis.slice(0, 7) : '';
+  $('lpoEinmalig').checked = !!(p && p.gueltig_bis && p.gueltig_bis.slice(0, 7) === p.gueltig_ab.slice(0, 7));
+  $('lpoBemerkung').value = p ? (p.bemerkung || '') : '';
+  $('lpoNeuBetrag').value = '';
+  $('lpoNeuAb').value = '';
+  $('lpoEnde').value = p && p.gueltig_bis ? p.gueltig_bis.slice(0, 7) : '';
+
+  // Die Wege einer bestehenden Position. Korrigieren und Löschen nur,
+  // solange kein abgeschlossener Lauf sie verwendet hat.
+  const wege = p ? [['ab', 'Betrag ändern ab einem Monat'], ['beenden', 'Beenden oder wieder öffnen']]
+    .concat(p.verwendet ? [] : [['korrigieren', 'Korrigieren (Tippfehler)']]) : [];
+  $('lpoWeg').innerHTML = wege.map(([w, t]) => `<option value="${w}">${t}</option>`).join('');
+  $('lpoWegFeld').style.display = p ? '' : 'none';
+  $('lpoTitel').textContent = p ? p.bezeichnung + ' ändern' : 'Zulage oder Abzug erfassen';
+  $('lpoUnter').textContent = p
+    ? `${lohnFr(p.betrag_rappen)} CHF ${lohnPositionRechnung(p.art)}, `
+      + (p.gueltig_bis ? `${lohnMonat(p.gueltig_ab)} – ${lohnMonat(p.gueltig_bis)}` : `ab ${lohnMonat(p.gueltig_ab)}`)
+    : 'Gilt je ganzen Monat. Wie gerechnet wird, sagt die Lohnart.';
+  const schluss = lohnAkte.abgeschlossen_bis;
+  $('lpoSperrHinweis').style.display = p && p.verwendet ? '' : 'none';
+  $('lpoSperrHinweis').textContent = p && p.verwendet
+    ? `Die Abrechnungen sind bis ${lohnMonat(schluss)} abgeschlossen. Diese Position ist darin verwendet `
+      + 'worden und lässt sich darum nicht mehr korrigieren oder löschen.' : '';
+  $('lpoLoeschKnopf').style.display = p && !p.verwendet ? '' : 'none';
+  $('lpoFehler').style.display = 'none';
+  lohnPositionWegUmschalten();
+  lohnPositionEinheit();
+  lohnPositionEinmalig();
+  openDlg('dlgLohnPosition');
+}
+
+function lohnPositionWeg() {
+  return $('lpoId').value ? $('lpoWeg').value : 'neu';
+}
+
+function lohnPositionWegUmschalten() {
+  const w = lohnPositionWeg();
+  $('lpoGrpVoll').style.display = w === 'neu' || w === 'korrigieren' ? '' : 'none';
+  $('lpoGrpAb').style.display = w === 'ab' ? '' : 'none';
+  $('lpoGrpEnde').style.display = w === 'beenden' ? '' : 'none';
+}
+
+// Die Einheit steht am Betrag, damit klar ist, worauf er sich bezieht --
+// 1.50 heisst pro Stunde etwas ganz anderes als pro Monat.
+function lohnPositionEinheit() {
+  const id = Number($('lpoLohnart').value);
+  const p = $('lpoId').value ? (lohnAkte.positionen || []).find(x => x.id === Number($('lpoId').value)) : null;
+  const l = (lohnAkte.positionen_lohnarten || []).find(x => x.id === id)
+    || (p && p.lohnart_id === id ? p : null);
+  const einheit = !l ? 'CHF'
+    : { stundensatz: 'CHF pro Stunde', fixbetrag: 'CHF pro Monat',
+        abzug: 'CHF pro Monat, wird abgezogen', netto: 'CHF pro Monat, netto ausbezahlt' }[l.art] || 'CHF';
+  $('lpoBetragLabel').textContent = 'Betrag in ' + einheit;
+  $('lpoNeuBetragLabel').textContent = 'Neuer Betrag in ' + einheit;
+  const traegt = [];
+  if (l && l.ferien_pflichtig) { traegt.push('Ferienentschädigung'); }
+  if (l && l.ml13_pflichtig) { traegt.push('13. Monatslohn'); }
+  $('lpoLohnartHinweis').textContent = !l ? ''
+    : (l.art === 'abzug' ? 'Wird nach dem Nettolohn abgezogen und ändert keinen Sozialversicherungsbeitrag.'
+      : l.art === 'netto' ? 'Kein Lohn: wird nach dem Nettolohn ausbezahlt, ohne Sozialversicherungsbeiträge.'
+      : traegt.length ? 'Der Lohnlauf rechnet darauf ' + traegt.join(' und ') + ' als eigene Zeile.'
+      : 'Trägt weder Ferienentschädigung noch 13. Monatslohn.');
+}
+
+function lohnPositionEinmalig() {
+  const einmalig = $('lpoEinmalig').checked;
+  $('lpoBisFeld').style.display = einmalig ? 'none' : '';
+  $('lpoAbLabel').textContent = einmalig ? 'Monat' : 'Ab Monat';
+}
+
+function lohnPositionSpeichern() {
+  const w = lohnPositionWeg();
+  const body = { id: lohnAkte.person.id, was: 'position', aktion: w,
+    eintrag_id: $('lpoId').value ? Number($('lpoId').value) : 0 };
+  if (w === 'neu' || w === 'korrigieren') {
+    Object.assign(body, {
+      lohnart_id: Number($('lpoLohnart').value),
+      betrag: $('lpoBetrag').value.trim(),
+      ab: $('lpoAb').value,
+      bis: $('lpoEinmalig').checked ? $('lpoAb').value : $('lpoBis').value,
+      bemerkung: $('lpoBemerkung').value.trim(),
+    });
+  } else if (w === 'ab') {
+    Object.assign(body, { betrag: $('lpoNeuBetrag').value.trim(), ab: $('lpoNeuAb').value });
+  } else {
+    body.bis = $('lpoEnde').value;
+  }
+  lohnAkteSchreiben(body, 'dlgLohnPosition', 'lpoFehler',
+    w === 'neu' ? 'Position erfasst.' : 'Position geändert.');
+}
+
+function lohnPositionLoeschen() {
+  const id = Number($('lpoId').value);
+  if (!id) { return; }
+  lohnAkteSchreiben({ id: lohnAkte.person.id, was: 'position', aktion: 'loeschen', eintrag_id: id },
+    'dlgLohnPosition', 'lpoFehler', 'Position gelöscht.');
 }
 
 // ── Dialog: Lohnansatz ───────────────────────────────────────────────────

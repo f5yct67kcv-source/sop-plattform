@@ -43,6 +43,8 @@ function lohnlauf_sperrgruende(): array
         'ausgefallen'        => 'Die Schicht ist laut Abgleich ausgefallen und hat nicht stattgefunden. Kein Lohnanspruch.',
         'monatslohn_offen'   => 'Für den Monatslohn (Kategorie A und B) ist der Rechenweg noch nicht gebaut — Etappe 3 deckt den Stundenlohn ab.',
         'anordnung_fehlt'    => 'Der Zuschlag ist als Stundenentschädigung vereinbart. Nach Art. 19 entsteht er aus dem angeordneten Einsatz — die Anordnung je Schicht führt das Datenmodell noch nicht.',
+        'periode_kein_monat' => 'Persönliche Zulagen und Abzüge gelten je ganzen Kalendermonat. Der Zeitraum dieses Laufs ist kein ganzer Monat — welcher Anteil gilt, ist nicht festgelegt, darum entsteht kein Betrag.',
+        'position_art_ungueltig' => 'Die Lohnart dieser persönlichen Position rechnet weder pro Stunde noch als fester Betrag noch als Abzug. Sie ist im Katalog geändert worden, nachdem die Position erfasst war.',
         'ausgleich_offen'    => 'Art. 14 Ziff. 3 lässt für die Mehrstunden über 210 die Auszahlung ODER den Ausgleich als Freizeit innerhalb von drei Monaten zu. Welches von beidem gilt, ist nicht festgelegt — bis dahin entsteht kein Betrag.',
         // ── Abzugsseite (Etappe 4) ──────────────────────────────────────
         'kein_sv_regelwerk'  => 'Für dieses Beitragsjahr sind die Sätze für AHV, IV und EO nicht erfasst. Es wird nicht mit den Sätzen eines anderen Jahres gerechnet.',
@@ -374,14 +376,20 @@ function lohnlauf_katalog(?PDO $pdo = null): array
     if ($pdo === null) { return $k; }
     try {
         $st = $pdo->query("SELECT schluessel, ahv_pflichtig, ferien_pflichtig, ml13_pflichtig,
-                                  bvg_pflichtig, uvg_pflichtig, qst_pflichtig, bemessung
+                                  bvg_pflichtig, uvg_pflichtig, qst_pflichtig, bemessung, system
                              FROM lohnart");
         foreach ($st->fetchAll() as $r) {
             $k[(string)$r['schluessel']] = [
                 'ahv' => (int)$r['ahv_pflichtig'], 'ferien' => (int)$r['ferien_pflichtig'],
                 'ml13' => (int)$r['ml13_pflichtig'], 'bvg' => (int)$r['bvg_pflichtig'],
                 'uvg' => (int)$r['uvg_pflichtig'], 'qst' => (int)$r['qst_pflichtig'],
-                'bemessung' => (int)$r['bemessung']];
+                // Eine SELBST ANGELEGTE Lohnart traegt immer einen Betrag der
+                // Periode (ENT-713). Bestandteile eines Stundensatzes gibt es
+                // nur unter den Systemlohnarten. Die Spalte selbst bietet die
+                // Oberflaeche nicht an; sie stuende bei jeder betrieblichen
+                // Zulage auf der Voreinstellung 0 -- und die Zulage fehlte
+                // dann stillschweigend im AHV-pflichtigen Lohn.
+                'bemessung' => (int)$r['system'] ? (int)$r['bemessung'] : 1];
         }
     } catch (Throwable $e) { /* vor der Einrichtung gibt es die Tabelle nicht */ }
     $merker = $k;
@@ -616,6 +624,23 @@ function lohnlauf_abzuege(PDO $pdo, array $kopf, string $bis, ?array $nbu = null
             $pako['text'] ?? 'Art. 6 Ziff. 2 GAV');
     }
 
+    // 6b. Persoenliche Abzuege und Nettobetraege (ENT-713), NACH dem
+    //     Nettolohn: Ein Abzug fuer die Uniform oder ein Pauschalersatz
+    //     aendert keinen Sozialversicherungsbeitrag. Das Vorzeichen folgt
+    //     aus der Lohnart, der erfasste Betrag ist immer positiv.
+    foreach ($kopf['positionen_netto'] ?? [] as $p) {
+        $abzug = $p['art'] === 'abzug';
+        $sort = $abzug ? 63 : 64;
+        if (empty($p['ganzer_monat'])) {
+            $zeile((string)$p['schluessel'], (string)$p['bezeichnung'], (int)$p['betrag_rappen'],
+                null, null, $sort, 'periode_kein_monat', 'Persönliche Position aus der Personalakte');
+            continue;
+        }
+        $zeile((string)$p['schluessel'], (string)$p['bezeichnung'], null, null,
+            $abzug ? -(int)$p['betrag_rappen'] : (int)$p['betrag_rappen'], $sort, null,
+            $abzug ? 'Persönlicher Abzug pro Monat' : 'Persönlicher Nettobetrag pro Monat — kein Lohn');
+    }
+
     // 7. Quellensteuer -- Etappe 5. AUSDRUECKLICH GESPERRT und nicht still
     //    abzugsfrei: Ein nicht nachgefuehrter kantonaler Tarif produziert
     //    weiter plausible Zahlen (ENT-451, Risiken).
@@ -701,6 +726,299 @@ function lohnlauf_ansatz(PDO $pdo, int $maId, string $stichtag): ?array
     $st->execute([$maId, $stichtag]);
     $a = $st->fetch();
     return $a ?: null;
+}
+
+// ── Persoenliche Zulagen und Abzuege (ENT-713) ───────────────────────────
+// Welche Arten eine persoenliche Position haben darf. Die Rechenweise folgt
+// aus der Lohnart, nicht aus der Position:
+//   stundensatz -> Betrag x bewertete Stunden, Bruttoseite
+//   fixbetrag   -> Betrag je Monat, Bruttoseite
+//   abzug       -> Betrag je Monat, nach dem Nettolohn abgezogen
+//   netto       -> Betrag je Monat, nach dem Nettolohn ausbezahlt (kein Lohn)
+const LOHN_POSITION_ARTEN = ['stundensatz', 'fixbetrag', 'abzug', 'netto'];
+
+// Ist der Zeitraum genau ein Kalendermonat? Persoenliche Positionen gelten
+// nur je ganzen Monat -- eine Rechnung fuer einen Teilzeitraum waere eine
+// Pro-rata-Regel, die niemand festgelegt hat.
+function lohn_ganzer_monat(string $von, string $bis): bool
+{
+    return substr($von, 8, 2) === '01' && substr($von, 0, 7) === substr($bis, 0, 7)
+        && $bis === date('Y-m-t', strtotime($von));
+}
+
+// Die Positionen einer Person, die den Zeitraum beruehren -- samt der
+// Angaben ihrer Lohnart. Fehlt die Tabelle (vor der Einrichtung), kann
+// auch nichts erfasst sein: Dann ist "keine" die zutreffende Aussage.
+function lohnlauf_positionen(PDO $pdo, int $maId, string $von, string $bis): array
+{
+    try {
+        $st = $pdo->prepare(
+            'SELECT p.id, p.betrag_rappen, p.gueltig_ab, p.gueltig_bis,
+                    l.schluessel, l.bezeichnung, l.art, l.system,
+                    l.ferien_pflichtig, l.ml13_pflichtig
+             FROM lohn_position p JOIN lohnart l ON l.id = p.lohnart_id
+             WHERE p.mitarbeiter_id = ? AND p.gueltig_ab <= ?
+               AND (p.gueltig_bis IS NULL OR p.gueltig_bis >= ?)
+             ORDER BY l.sortierung, l.bezeichnung, p.gueltig_ab'
+        );
+        $st->execute([$maId, $bis, $von]);
+        return $st->fetchAll();
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+// ── Erfassen und Aendern der Positionen (ENT-713) ────────────────────────
+// Steht hier und nicht im Endpunkt, damit pruef_lohnlauf.php es gegen eine
+// wirkliche Datenbank ausfuehren kann. Die Regeln haben Geldfolge -- eine
+// Pruefung, die sie nur nachbaut, haette nie bemerkt, wenn sie kippen.
+
+// "2027-03" oder "2027-03-15" -> "2027-03-01". Alles andere -> null.
+function lohn_monat_anfang($roh): ?string
+{
+    $t = trim((string)$roh);
+    if (!preg_match('/^(\d{4})-(\d{2})(-\d{2})?$/', $t, $m)) { return null; }
+    if ((int)$m[2] < 1 || (int)$m[2] > 12) { return null; }
+    return $m[1] . '-' . $m[2] . '-01';
+}
+
+function lohn_monat_ende(string $anfang): string
+{
+    return date('Y-m-t', strtotime($anfang));
+}
+
+function lohn_monat_davor_ende(string $anfang): string
+{
+    return date('Y-m-d', strtotime($anfang . ' -1 day'));
+}
+
+// Bis zu welchem Tag die Abrechnungen dieser Person abgeschlossen sind:
+// das Ende des juengsten FREIGEGEBENEN oder AUSBEZAHLTEN Laufs, in dem sie
+// vorkommt. Ein Entwurf zaehlt nicht -- er wird ohnehin neu gerechnet.
+// null heisst "noch nichts abgeschlossen", alles ist aenderbar.
+function lohn_position_abgeschlossen_bis(PDO $pdo, int $maId): ?string
+{
+    try {
+        $st = $pdo->prepare(
+            "SELECT MAX(l.periode_bis) FROM lohnlauf l
+             JOIN lohnlauf_person p ON p.lauf_id = l.id
+             WHERE p.mitarbeiter_id = ? AND l.status IN ('freigegeben', 'ausbezahlt')"
+        );
+        $st->execute([$maId]);
+        $w = $st->fetchColumn();
+        return $w ? substr((string)$w, 0, 10) : null;
+    } catch (Throwable $e) {
+        return null; // ohne Lohnlauf-Tabellen gibt es keinen Abschluss
+    }
+}
+
+// Waehlbar ist nur, was der Betrieb selbst angelegt hat. Eine Systemlohnart
+// (Grundlohn, AHV, die GAV-Zuschlaege) wird vom Lauf selbst erzeugt -- von
+// Hand erfasst stuende derselbe Betrag zweimal in der Abrechnung.
+function lohn_position_lohnarten(PDO $pdo): array
+{
+    $platz = implode(',', array_fill(0, count(LOHN_POSITION_ARTEN), '?'));
+    $st = $pdo->prepare(
+        "SELECT id, schluessel, bezeichnung, art, ferien_pflichtig, ml13_pflichtig, ahv_pflichtig
+         FROM lohnart WHERE system = 0 AND aktiv = 1 AND art IN ($platz)
+         ORDER BY sortierung, bezeichnung"
+    );
+    $st->execute(LOHN_POSITION_ARTEN);
+    return array_map(function ($r) {
+        foreach (['id', 'ferien_pflichtig', 'ml13_pflichtig', 'ahv_pflichtig'] as $f) { $r[$f] = (int)$r[$f]; }
+        return $r;
+    }, $st->fetchAll());
+}
+
+// Aendern, Beenden, Korrigieren, Loeschen -- vier Wege, und jeder sagt,
+// was er tut. Ein einziges "Speichern", das je nach Eingabe mal
+// ueberschreibt und mal aufteilt, liesse offen, was geschehen ist.
+//
+// Die EINE Regel dahinter: Was ein abgeschlossener Lohnlauf verwendet hat,
+// aendert sich nicht mehr. Kein Monat bis einschliesslich
+// lohn_position_abgeschlossen_bis() bekommt nachtraeglich eine andere
+// Position. Korrekturen fuer einen abgeschlossenen Monat gehoeren als
+// Nachtrag in den naechsten Lauf, nicht in die Akte von damals.
+//
+// Rueckgabe: null bei Erfolg, sonst der Text fuer den Menschen.
+function lohn_position_schreiben(PDO $pdo, int $maId, array $in, int $userId): ?string
+{
+    $aktion = (string)($in['aktion'] ?? 'neu');
+    $schluss = lohn_position_abgeschlossen_bis($pdo, $maId);
+    $offen = fn(?string $tag) => $schluss === null || ($tag !== null && $tag > $schluss);
+    $schlussText = $schluss ? date('m.Y', strtotime($schluss)) : '';
+    $zuFrueh = 'Die Abrechnungen sind bis ' . $schlussText . ' abgeschlossen. '
+             . 'Ein abgeschlossener Monat wird nicht nachträglich geändert — '
+             . 'eine Korrektur gehört als Nachtrag in den nächsten Lohnlauf.';
+
+    $bestehend = null;
+    if ($aktion !== 'neu') {
+        $st = $pdo->prepare('SELECT * FROM lohn_position WHERE id = ? AND mitarbeiter_id = ?');
+        $st->execute([(int)($in['eintrag_id'] ?? 0), $maId]);
+        $bestehend = $st->fetch() ?: null;
+        if (!$bestehend) { return 'Position nicht gefunden'; }
+    }
+
+    $betrag = null;
+    if (array_key_exists('betrag', $in)) {
+        $t = str_replace(["'", ' ', ','], ['', '', '.'], (string)$in['betrag']);
+        if (is_numeric($t)) { $betrag = lohn_rappen((float)$t * 100); }
+    }
+
+    // Gibt es fuer dieselbe Lohnart schon eine Position, die den Zeitraum
+    // beruehrt? Zwei gleichzeitig gueltige Zeilen zahlten doppelt aus.
+    $ueberlappt = function (int $lohnartId, string $ab, ?string $bis, array $ausser) use ($pdo, $maId) {
+        $st = $pdo->prepare(
+            'SELECT id, gueltig_ab, gueltig_bis FROM lohn_position
+             WHERE mitarbeiter_id = ? AND lohnart_id = ?'
+        );
+        $st->execute([$maId, $lohnartId]);
+        foreach ($st->fetchAll() as $r) {
+            if (in_array((int)$r['id'], $ausser, true)) { continue; }
+            $rBis = $r['gueltig_bis'] ? substr((string)$r['gueltig_bis'], 0, 10) : null;
+            if (($bis === null || substr((string)$r['gueltig_ab'], 0, 10) <= $bis)
+                && ($rBis === null || $rBis >= $ab)) { return true; }
+        }
+        return false;
+    };
+    $doppelt = 'Für diese Lohnart ist in diesem Zeitraum schon eine Position erfasst. '
+             . 'Die bestehende zuerst ändern oder beenden.';
+
+    // Die Lohnart pruefen -- beim Erfassen und beim Korrigieren.
+    $lohnartPruefen = function ($roh) use ($pdo): ?array {
+        $st = $pdo->prepare('SELECT id, art, system, aktiv FROM lohnart WHERE id = ?');
+        $st->execute([(int)$roh]);
+        $l = $st->fetch();
+        if (!$l || (int)$l['system'] || !(int)$l['aktiv']
+            || !in_array((string)$l['art'], LOHN_POSITION_ARTEN, true)) { return null; }
+        return $l;
+    };
+
+    if ($aktion === 'neu' || $aktion === 'korrigieren') {
+        $l = $lohnartPruefen($in['lohnart_id'] ?? 0);
+        if (!$l) {
+            return 'Lohnart: nur selbst angelegte, aktive Lohnarten pro Stunde, pro Monat, '
+                 . 'als Abzug oder als Nettobetrag';
+        }
+        if ($betrag === null || $betrag <= 0) {
+            return 'Betrag: eine Zahl über null. Ob abgezogen wird, sagt die Lohnart.';
+        }
+        $ab = lohn_monat_anfang($in['ab'] ?? '');
+        if ($ab === null) { return 'Ab: Monat erforderlich'; }
+        $bisRoh = trim((string)($in['bis'] ?? ''));
+        $bis = null;
+        if ($bisRoh !== '') {
+            $bisAnfang = lohn_monat_anfang($bisRoh);
+            if ($bisAnfang === null) { return 'Bis: Monat oder leer'; }
+            if ($bisAnfang < $ab) { return 'Bis liegt vor Ab'; }
+            $bis = lohn_monat_ende($bisAnfang);
+        }
+        if (!$offen($ab)) { return $zuFrueh; }
+        if ($aktion === 'korrigieren' && !$offen(substr((string)$bestehend['gueltig_ab'], 0, 10))) {
+            return 'Diese Position ist schon in einem abgeschlossenen Lohnlauf verwendet worden '
+                 . 'und lässt sich nicht mehr korrigieren. „Ändern ab" oder „Beenden" verwenden.';
+        }
+        $ausser = $bestehend ? [(int)$bestehend['id']] : [];
+        if ($ueberlappt((int)$l['id'], $ab, $bis, $ausser)) { return $doppelt; }
+        $bem = trim((string)($in['bemerkung'] ?? '')) ?: null;
+        if ($aktion === 'neu') {
+            $pdo->prepare(
+                'INSERT INTO lohn_position
+                   (mitarbeiter_id, lohnart_id, betrag_rappen, gueltig_ab, gueltig_bis, bemerkung, erfasst_von)
+                 VALUES (?,?,?,?,?,?,?)'
+            )->execute([$maId, (int)$l['id'], $betrag, $ab, $bis, $bem, $userId]);
+        } else {
+            $pdo->prepare(
+                'UPDATE lohn_position SET lohnart_id = ?, betrag_rappen = ?, gueltig_ab = ?,
+                     gueltig_bis = ?, bemerkung = ?, geaendert_von = ?, geaendert_am = CURRENT_TIMESTAMP
+                 WHERE id = ?'
+            )->execute([(int)$l['id'], $betrag, $ab, $bis, $bem, $userId, (int)$bestehend['id']]);
+        }
+        return null;
+    }
+
+    $altAb  = substr((string)$bestehend['gueltig_ab'], 0, 10);
+    $altBis = $bestehend['gueltig_bis'] ? substr((string)$bestehend['gueltig_bis'], 0, 10) : null;
+
+    if ($aktion === 'ab') {
+        // Neuer Betrag ab einem Monat: Die alte Zeile endet am Vortag, die
+        // neue uebernimmt ihr bisheriges Ende.
+        $ab = lohn_monat_anfang($in['ab'] ?? '');
+        if ($ab === null) { return 'Ab: Monat erforderlich'; }
+        if ($betrag === null || $betrag <= 0) { return 'Betrag: eine Zahl über null'; }
+        if ($ab <= $altAb) {
+            return 'Der neue Betrag muss nach dem Beginn der Position gelten. '
+                 . 'Soll der Betrag von Anfang an anders sein, „Korrigieren" verwenden.';
+        }
+        if ($altBis !== null && $ab > $altBis) { return 'Die Position endet vorher.'; }
+        if ($betrag === (int)$bestehend['betrag_rappen']) { return 'Der Betrag ist unverändert.'; }
+        if (!$offen($ab)) { return $zuFrueh; }
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare(
+                'UPDATE lohn_position SET gueltig_bis = ?, geaendert_von = ?,
+                     geaendert_am = CURRENT_TIMESTAMP WHERE id = ?'
+            )->execute([lohn_monat_davor_ende($ab), $userId, (int)$bestehend['id']]);
+            $pdo->prepare(
+                'INSERT INTO lohn_position
+                   (mitarbeiter_id, lohnart_id, betrag_rappen, gueltig_ab, gueltig_bis, bemerkung, erfasst_von)
+                 VALUES (?,?,?,?,?,?,?)'
+            )->execute([$maId, (int)$bestehend['lohnart_id'], $betrag, $ab, $altBis,
+                trim((string)($in['bemerkung'] ?? '')) ?: $bestehend['bemerkung'], $userId]);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+        return null;
+    }
+
+    if ($aktion === 'beenden') {
+        // Leer heisst "wieder offen" -- auch das ist ein Beenden, das man
+        // rueckgaengig machen koennen muss.
+        $bisRoh = trim((string)($in['bis'] ?? ''));
+        $bis = null;
+        if ($bisRoh !== '') {
+            $bisAnfang = lohn_monat_anfang($bisRoh);
+            if ($bisAnfang === null) { return 'Bis: Monat oder leer'; }
+            if ($bisAnfang < $altAb) { return 'Bis liegt vor dem Beginn der Position'; }
+            $bis = lohn_monat_ende($bisAnfang);
+        }
+        // Betroffen sind die Monate zwischen altem und neuem Ende. Der
+        // frueheste davon beginnt nach dem kleineren der beiden.
+        $kleiner = $altBis === null ? $bis : ($bis === null ? $altBis : min($altBis, $bis));
+        if ($schluss !== null && $kleiner !== null && $kleiner < $schluss) { return $zuFrueh; }
+        if ($ueberlappt((int)$bestehend['lohnart_id'], $altAb, $bis, [(int)$bestehend['id']])) {
+            return $doppelt;
+        }
+        $pdo->prepare(
+            'UPDATE lohn_position SET gueltig_bis = ?, geaendert_von = ?,
+                 geaendert_am = CURRENT_TIMESTAMP WHERE id = ?'
+        )->execute([$bis, $userId, (int)$bestehend['id']]);
+        return null;
+    }
+
+    if ($aktion === 'loeschen') {
+        if (!$offen($altAb)) {
+            return 'Diese Position ist schon in einem abgeschlossenen Lohnlauf verwendet worden '
+                 . 'und lässt sich nicht löschen. „Beenden" verwenden.';
+        }
+        $pdo->prepare('DELETE FROM lohn_position WHERE id = ?')->execute([(int)$bestehend['id']]);
+        return null;
+    }
+
+    return 'aktion: neu, korrigieren, ab, beenden oder loeschen';
+}
+
+// Die Zeile einer Position, die nicht gerechnet werden kann -- mit Grund
+// und ohne Betrag. Nie eine Null.
+function lohnlauf_position_gesperrt(array $p, int $sort, string $grund): array
+{
+    return ['schluessel' => (string)$p['schluessel'], 'bezeichnung' => (string)$p['bezeichnung'],
+        'basis_rappen' => (int)$p['betrag_rappen'], 'satz_bp' => null, 'menge' => null,
+        'betrag_rappen' => null, 'sortierung' => $sort, 'annahme' => 0,
+        'gesperrt_grund' => $grund,
+        'hinweis' => 'Persönliche Position aus der Personalakte'];
 }
 
 // ── Die Lohnzeilen einer Person ──────────────────────────────────────────
@@ -848,6 +1166,68 @@ function lohnlauf_person(PDO $pdo, array $ma, string $von, string $bis): array
                 . '210 Stunden. Der Zuschlag von 25 % kann ausbezahlt ODER innerhalb von drei '
                 . 'Monaten als Freizeit ausgeglichen werden — welches von beidem gilt, ist nicht '
                 . 'festgelegt. Bis dahin entsteht kein Betrag.'];
+    }
+
+    // 8. Persoenliche Zulagen (ENT-713) -- betriebliche Vereinbarungen aus
+    //    der Personalakte. Abzuege und Nettobetraege derselben Tabelle
+    //    gehoeren hinter den Nettolohn und werden fuer lohnlauf_abzuege()
+    //    im Kopf abgelegt, nicht hier gerechnet.
+    //
+    //    Ferienentschaedigung und 13.-Anteil auf einer Zulage entstehen als
+    //    EIGENE Zeile, wenn die Lohnart das Kennzeichen traegt -- mit
+    //    demselben Satz wie beim Grundlohn. So steht jeder Betrag einzeln
+    //    da, statt in der Zulage zu verschwinden (Art. 12 Ziff. 5).
+    $ganzerMonat = lohn_ganzer_monat($von, $bis);
+    $kopf['positionen_netto'] = [];
+    foreach (lohnlauf_positionen($pdo, $maId, $von, $bis) as $p) {
+        $art = (string)$p['art'];
+        if ((int)$p['system'] || !in_array($art, LOHN_POSITION_ARTEN, true)) {
+            $zeilen[] = lohnlauf_position_gesperrt($p, 36, 'position_art_ungueltig');
+            continue;
+        }
+        if ($art === 'abzug' || $art === 'netto') {
+            $kopf['positionen_netto'][] = $p + ['ganzer_monat' => $ganzerMonat];
+            continue;
+        }
+        if (!$ganzerMonat) {
+            $zeilen[] = lohnlauf_position_gesperrt($p, 36, 'periode_kein_monat');
+            continue;
+        }
+        $satz = (int)$p['betrag_rappen'];
+        if ($art === 'stundensatz') {
+            $betrag = lohn_rappen($satz * $stunden);
+            $zeilen[] = ['schluessel' => (string)$p['schluessel'],
+                'bezeichnung' => (string)$p['bezeichnung'],
+                'basis_rappen' => $satz, 'satz_bp' => null, 'menge' => round($stunden, 4),
+                'betrag_rappen' => $betrag, 'sortierung' => 36,
+                // Dieselbe Stundenzahl wie der Grundlohn -- und damit
+                // dieselbe offene Auslegung, sobald ein Zeitbonus drinsteckt.
+                'annahme' => $kopf['bonus_min'] > 0 ? 1 : 0,
+                'hinweis' => 'Persönliche Zulage pro Stunde, auf die bewertete Zeit wie der Grundlohn'];
+        } else {
+            $betrag = $satz;
+            $zeilen[] = ['schluessel' => (string)$p['schluessel'],
+                'bezeichnung' => (string)$p['bezeichnung'],
+                'basis_rappen' => null, 'satz_bp' => null, 'menge' => null,
+                'betrag_rappen' => $betrag, 'sortierung' => 36, 'annahme' => 0,
+                'hinweis' => 'Persönliche Zulage pro Monat'];
+        }
+        if ((int)$p['ferien_pflichtig']) {
+            $zeilen[] = ['schluessel' => 'ferien_auf_zulage',
+                'bezeichnung' => 'Ferienentschädigung auf ' . $p['bezeichnung'],
+                'basis_rappen' => $betrag, 'satz_bp' => $fe['bp'], 'menge' => null,
+                'betrag_rappen' => lohn_anteil($betrag, $fe['bp']), 'sortierung' => 37,
+                'annahme' => $fe['annahme'] ? 1 : 0, 'hinweis' => $fe['text']];
+        }
+        // Kein 13. Monatslohn vereinbart -> keine Zeile, nicht "0 %".
+        if ((int)$p['ml13_pflichtig'] && $ansatz['ml13_bp'] !== null) {
+            $zeilen[] = ['schluessel' => 'anteil_13ml_auf_zulage',
+                'bezeichnung' => 'Anteil 13. Monatslohn auf ' . $p['bezeichnung'],
+                'basis_rappen' => $betrag, 'satz_bp' => (int)$ansatz['ml13_bp'], 'menge' => null,
+                'betrag_rappen' => lohn_anteil($betrag, (int)$ansatz['ml13_bp']),
+                'sortierung' => 38, 'annahme' => 0,
+                'hinweis' => 'Betrieblich vereinbart, Satz aus dem Lohnansatz'];
+        }
     }
 
     $kopf['zeilen'] = $zeilen;
