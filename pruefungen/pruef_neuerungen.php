@@ -39,6 +39,11 @@ foreach (NEUERUNG_ZIELE as $ziel) {
     for ($i = 1; $i < count($alle); $i++) { if ($alle[$i - 1]['nr'] < $alle[$i]['nr']) { $sortiert = false; } }
     pruef("Fuer $ziel absteigend nach Nummer", $sortiert);
 }
+pruef('KRITISCH: der Betreiber bekommt JEDE Neuerung, auch die nur fuer Cockpit oder App',
+    count(neuerungen_alle(0)) === count($k)
+    && array_filter(neuerungen_alle(0), fn($n) => empty($n['fuer'])) === []);
+pruef('Auch fuer den Betreiber verschwindet Gelesenes',
+    neuerungen_alle(neuerungen_neueste()) === []);
 pruef('KRITISCH: wer bis zur neuesten gelesen hat, sieht nichts mehr',
     neuerungen_fuer('cockpit', neuerungen_neueste()) === []
     && neuerungen_fuer('app', neuerungen_neueste()) === []
