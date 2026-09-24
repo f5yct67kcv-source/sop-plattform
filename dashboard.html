@@ -30285,22 +30285,29 @@ function ladeFeiertagMap() {
 // Dauerhaft ueber "Einrichtung" in der Seitenleiste erreichbar -- nicht nur
 // als Nothilfe, wenn ein Laden bereits fehlgeschlagen ist. Sonst findet ihn
 // niemand, dessen erster Blick auf ein funktionierendes Dashboard faellt.
-// Stiller Hintergrund-Check, ob die Einrichtung etwas nachzutragen hat --
-// derselbe Endpunkt wie planungEinrichten(), nur als GET ohne Ausfuehrung.
+// Stiller Hintergrund-Check, ob die Einrichtung etwas nachzutragen hat.
 // Kein Toast bei Fehlern: das ist ein Hinweis-Punkt, kein Vorgang.
+//
+// EIN Abruf, nicht zwei: Frueher fragte der Start zusaetzlich
+// planung_einrichten.php (GET) -- und neuerungen_stand.php zaehlte dieselben
+// fehlenden Tabellen/Spalten gleich noch einmal ('einrichtung_ausstehend',
+// dieselbe Zaehlung wie 'ausstehend'). Beide gehen ueber information_schema
+// und kosten bei jedem Start Zeit. Die Etappenliste holt die Einrichtung
+// selbst, wenn sie laeuft (planungEinrichten).
+// Den Punkt sieht wie bisher nur, wer einspielen darf (betrieb_schreiben):
+// planung_einrichten.php antwortete allen anderen mit 403.
 function pruefeUpdate() {
-  api('planung_einrichten.php').then(({ ok, data }) => {
-    const hat = ok && Number(data.ausstehend) > 0;
+  updLaden().then(d => {
+    const hat = !!(d && d.darf_einspielen && Number(d.einrichtung_ausstehend) > 0);
     $('nav-einrichtung').classList.toggle('hat-update', hat);
     $('nav-einrichtung').title = hat ? 'Update verfügbar: neue Einrichtung steht aus' : 'Einrichtung';
     $('navEinrichtungLbl').textContent = hat ? 'Update' : 'Einrichtung';
-    if (ok && data && data.etappen) { updEtappen = data.etappen; }
-  }).catch(() => {});
-  // Der Punkt am Konto-Logo faellt nicht auf, solange niemand dort
-  // hinschaut (ENT-698). Darum oeffnet sich beim Anmelden das Fenster
-  // selbst -- fuer alle im Cockpit, nicht nur fuer die, die einspielen
-  // duerfen: Neuerungen betreffen jeden.
-  updVonSelbst();
+    // Der Punkt am Konto-Logo faellt nicht auf, solange niemand dort
+    // hinschaut (ENT-698). Darum oeffnet sich beim Anmelden das Fenster
+    // selbst -- fuer alle im Cockpit, nicht nur fuer die, die einspielen
+    // duerfen: Neuerungen betreffen jeden.
+    updVonSelbst(d);
+  });
 }
 
 // ══════════════════════════════════════════ UPDATE-FENSTER (ENT-698)
@@ -30314,7 +30321,7 @@ function pruefeUpdate() {
 //   unbekannt   der Stand liess sich nicht abrufen
 //   fertig      soeben eingespielt
 let updStand = null;
-let updEtappen = null;       // aus planung_einrichten.php (GET), Reihenfolge = Laufreihenfolge
+let updEtappen = null;       // aus planung_einrichten.php (GET, erst beim Einspielen geholt), Reihenfolge = Laufreihenfolge
 let updModus = 'aktuell';
 let updLaeuft = false;
 let updVonSelbstGezeigt = false;
@@ -30328,9 +30335,11 @@ function updLaden() {
 
 // Einmal je Anmeldung. "Spaeter" schliesst nur; solange eine Einrichtung
 // aussteht, kommt das Fenster beim naechsten Anmelden wieder (Punkt 4).
-function updVonSelbst() {
+// vorab: der Stand, den pruefeUpdate() schon geholt hat -- dann kein
+// zweiter Abruf. undefined heisst: selbst holen.
+function updVonSelbst(vorab) {
   if (updVonSelbstGezeigt) { return; }
-  updLaden().then(d => {
+  (vorab !== undefined ? Promise.resolve(vorab) : updLaden()).then(d => {
     if (!d || updVonSelbstGezeigt) { return; }
     const neu = (d.neuerungen || []).length > 0;
     const offen = Number(d.einrichtung_ausstehend) > 0;

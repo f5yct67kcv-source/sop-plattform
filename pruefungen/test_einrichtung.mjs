@@ -17,6 +17,11 @@ let ANTWORT = { status: 'ok', message: 'Einrichtung abgeschlossen.',
   unveraendert: ['Tabelle objekte war bereits vorhanden', 'Tabelle einsaetze war bereits vorhanden'],
   ausstehend: 1 };
 let PRUEFUNG = { status: 'ok', message: 'Alles ist eingerichtet.', getan: [], unveraendert: [], ausstehend: 0 };
+// Der Update-Punkt kommt seit der Zusammenlegung aus neuerungen_stand.php
+// ('einrichtung_ausstehend', nur mit 'darf_einspielen'), nicht mehr aus einem
+// eigenen GET an planung_einrichten.php -- der kostete bei jedem Start eine
+// zweite Pruefung ueber information_schema.
+let STAND = { einrichtung_ausstehend: 0, darf_einspielen: true };
 // Gesetzt = der Endpunkt antwortet mit etwas, das KEIN JSON ist (schwerer
 // PHP-Abbruch). Wie ANTWORT/PRUEFUNG umschaltbar, statt die Route zu tauschen.
 let ROH = null;
@@ -29,6 +34,8 @@ await page.route('**/api/**', route => {
   rufe.push({ p, methode: req.method() });
   const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
   if (p.includes('login')) return send({ status: 'ok', token: 't', name: 'a', ist_admin: true });
+  if (p.includes('neuerungen_stand')) return send({ status: 'ok', ziel: 'cockpit', neueste: 0,
+    gesehen_bis: 0, neuerungen: [], ...STAND });
   // Alles laedt normal durch -- genau der Fall, in dem der Knopf bisher fehlte.
   if (p.includes('planung_einrichten')) {
     if (ROH && req.method() !== 'GET') {
@@ -57,7 +64,20 @@ await page.waitForTimeout(200);
 // ══════════ UPDATE-PUNKT (ENT-033) -- derselbe Knopf, nur die Optik ändert sich
 check('Zu Beginn kein Update-Punkt, wenn alles eingerichtet ist',
   !(await page.evaluate(() => document.getElementById('nav-einrichtung').classList.contains('hat-update'))));
+check('KRITISCH: beim Start geht KEIN Pruef-GET an planung_einrichten.php -- der Punkt kommt aus neuerungen_stand.php',
+  !rufe.some(r => r.p.includes('planung_einrichten'))
+  && rufe.filter(r => r.p.includes('neuerungen_stand')).length === 1);
 PRUEFUNG = { status: 'ok', message: '2 Punkt(e) stehen noch aus.', getan: ['x', 'y'], unveraendert: [], ausstehend: 2 };
+// Wer nicht einspielen darf, sieht keinen Punkt -- wie frueher, als
+// planung_einrichten.php ihm mit 403 antwortete.
+STAND = { einrichtung_ausstehend: 2, darf_einspielen: false };
+// Das Fenster, das sich beim Anmelden von selbst oeffnet, ist hier nicht
+// Gegenstand (test_updatefenster.mjs) -- es wuerde die Schritte unten verdecken.
+await page.evaluate(() => { updVonSelbstGezeigt = true; pruefeUpdate(); });
+await page.waitForTimeout(300);
+check('KRITISCH: ohne Recht zum Einspielen kein Update-Punkt, auch wenn etwas aussteht',
+  !(await page.evaluate(() => document.getElementById('nav-einrichtung').classList.contains('hat-update'))));
+STAND = { einrichtung_ausstehend: 2, darf_einspielen: true };
 await page.evaluate(() => pruefeUpdate());
 await page.waitForTimeout(300);
 check('Der Knopf hebt sich farblich ab, wenn etwas aussteht',
@@ -77,6 +97,8 @@ check('Kein zusaetzlicher Toast neben dem Fenster',
     && (await page.textContent('#toast')).includes('unter „Einrichtung“')));
 
 // ══════════ DIALOG
+// Der Dialog-Abschnitt gilt dem Fall "nichts steht aus".
+STAND = { einrichtung_ausstehend: 0, darf_einspielen: true };
 await page.click('#nav-einrichtung');
 await page.waitForTimeout(300);
 check('Der Dialog geht auf', await page.evaluate(() => document.getElementById('dlgEinrichtung').classList.contains('on')));
@@ -96,6 +118,7 @@ const lauf = async () => {
 
 // ══════════ EINRICHTEN
 PRUEFUNG = { status: 'ok', message: 'Alles ist eingerichtet.', getan: [], unveraendert: [], ausstehend: 0 };
+STAND = { einrichtung_ausstehend: 0, darf_einspielen: true };
 await page.click('#eiBtn');
 await page.waitForTimeout(500);
 check('Der Aufruf geht an den richtigen Endpunkt', rufe.some(r => r.p.includes('planung_einrichten') && r.methode === 'POST'));
