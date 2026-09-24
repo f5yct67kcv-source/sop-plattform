@@ -984,6 +984,39 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   FOREIGN KEY (kontrollpunkt_id) REFERENCES kontrollpunkt(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// STEHT VOR ereignis_meldung: Die Meldung verweist per Fremdschluessel auf
+// objekt_aufgabe (aufgabe_id, ENT-621). Eine frische Datenbank legt die
+// Tabellen in dieser Reihenfolge an; stand die Aufgabe dahinter, scheiterte
+// ereignis_meldung mit errno 150 (gefunden beim ersten Vorrat, ENT-705).
+// Bestehende Anlagen merkten es nie -- dort gab es beide Tabellen schon.
+// ── Aufgaben am Kontrollpunkt (ENT-302) ───────────────────────────────
+//
+// Zwei Tabellen statt einer: Der KATALOG haelt den Text ein einziges Mal
+// ("Tuere verschliessen"), die VERKNUEPFUNG haengt ihn an beliebig viele
+// Kontrollpunkte. Der Grund ist Wiederholung -- dieselbe Aufgabe steht in
+// der Praxis an einem Dutzend Punkten, und eine geaenderte Formulierung
+// soll eine Aenderung sein und nicht zwoelf.
+//
+// Katalog je OBJEKT, nicht betriebsweit: Was an einem Objekt zu tun ist,
+// ergibt sich aus diesem Objekt. Ein betriebsweiter Katalog waere schnell
+// eine Liste, in der man sucht statt findet.
+//
+// GELOESCHT WIRD NICHT HART, sondern ueber aktiv = 0. Sobald die Erledigung
+// einer Aufgabe protokolliert wird (eigener Schritt), haengt an einer
+// Aufgabe ein Nachweis; ein DELETE risse ihn mit. Gleiches Prinzip wie bei
+// kontrollpunkt.aktiv.
+'objekt_aufgabe' => "CREATE TABLE objekt_aufgabe (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  objekt_id INT NOT NULL,
+  bezeichnung VARCHAR(200) NOT NULL,
+  -- Freitext wie im Referenzsystem 'Informationen': was genau zu tun ist.
+  information TEXT NULL,
+  aktiv TINYINT(1) NOT NULL DEFAULT 1,
+  erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_objekt (objekt_id, aktiv),
+  FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 // Die Meldung selbst. Drei Zeitangaben, die bewusst getrennt bleiben
 // (gleiches Prinzip wie Rohzeit/bewertete Zeit im GAV-Teil und wie
 // erfasst_am/uebermittelt_am bei rundgang_scan):
@@ -1079,34 +1112,6 @@ CREATE TABLE IF NOT EXISTS kunden_kontaktweg (
   KEY idx_vorlage (vorlage_id, reihenfolge),
   FOREIGN KEY (vorlage_id) REFERENCES rundgang_vorlage(id) ON DELETE CASCADE,
   FOREIGN KEY (kontrollpunkt_id) REFERENCES kontrollpunkt(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
-
-// ── Aufgaben am Kontrollpunkt (ENT-302) ───────────────────────────────
-//
-// Zwei Tabellen statt einer: Der KATALOG haelt den Text ein einziges Mal
-// ("Tuere verschliessen"), die VERKNUEPFUNG haengt ihn an beliebig viele
-// Kontrollpunkte. Der Grund ist Wiederholung -- dieselbe Aufgabe steht in
-// der Praxis an einem Dutzend Punkten, und eine geaenderte Formulierung
-// soll eine Aenderung sein und nicht zwoelf.
-//
-// Katalog je OBJEKT, nicht betriebsweit: Was an einem Objekt zu tun ist,
-// ergibt sich aus diesem Objekt. Ein betriebsweiter Katalog waere schnell
-// eine Liste, in der man sucht statt findet.
-//
-// GELOESCHT WIRD NICHT HART, sondern ueber aktiv = 0. Sobald die Erledigung
-// einer Aufgabe protokolliert wird (eigener Schritt), haengt an einer
-// Aufgabe ein Nachweis; ein DELETE risse ihn mit. Gleiches Prinzip wie bei
-// kontrollpunkt.aktiv.
-'objekt_aufgabe' => "CREATE TABLE objekt_aufgabe (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  objekt_id INT NOT NULL,
-  bezeichnung VARCHAR(200) NOT NULL,
-  -- Freitext wie im Referenzsystem 'Informationen': was genau zu tun ist.
-  information TEXT NULL,
-  aktiv TINYINT(1) NOT NULL DEFAULT 1,
-  erstellt_am DATETIME DEFAULT CURRENT_TIMESTAMP,
-  KEY idx_objekt (objekt_id, aktiv),
-  FOREIGN KEY (objekt_id) REFERENCES objekte(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
 // Reine Zuordnung, gleiche Bauart wie rundgang_vorlage_punkt: dieselbe
