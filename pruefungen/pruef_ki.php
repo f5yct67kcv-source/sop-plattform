@@ -403,6 +403,26 @@ if (class_exists('ZipArchive') && class_exists('PharData')) {
     pruef('Umpacken: ein echtes Modell wird tar.gz mit dem Ordner "model/", den vosk-browser erwartet',
         $g === '' && in_array('model/am/final.mdl', $namen, true) && in_array('model/graph/HCLr.fst', $namen, true)
         && !array_filter($namen, fn($n) => str_contains($n, 'vosk-model-small-de')));
+    // Die Kopfzeilen des tar in ihrer Reihenfolge lesen: Name und Typ ('5' = Ordner).
+    $kopf = [];
+    $roh = $g === '' ? (string)gzdecode((string)file_get_contents("$tmp/gut.tar.gz")) : '';
+    for ($o = 0; $o + 512 <= strlen($roh); ) {
+        $name = rtrim(substr($roh, $o, 100), "\0");
+        if ($name === '') { break; }
+        $groesse = octdec(trim(substr($roh, $o + 124, 12), "\0 "));
+        $kopf[] = [rtrim($name, '/'), substr($roh, $o + 156, 1)];
+        $o += 512 + (int)(ceil($groesse / 512) * 512);
+    }
+    $gesehen = []; $ordnerVorher = $kopf !== [];
+    foreach ($kopf as [$name, $typ]) {
+        if ($typ === '5') { $gesehen[$name] = true; continue; }
+        for ($d = dirname($name); $d !== '.' && $d !== ''; $d = dirname($d)) {
+            $ordnerVorher = $ordnerVorher && isset($gesehen[$d]);
+        }
+    }
+    pruef('KRITISCH: Jeder Ordner steht als eigener Eintrag vor seinen Dateien (sonst scheitert die Ablage im Browser)', $ordnerVorher);
+    pruef('Ordnerliste: Eltern vor Kindern, jeder Ordner einmal',
+        weckwort_ordner(['model/graph/phones/w.int', 'model/am/f.mdl', 'model/graph/g.fst']) === ['model', 'model/am', 'model/graph', 'model/graph/phones']);
     $bauen("$tmp/fremd.zip", ['ordner/liesmich.txt' => 'hallo']);
     $f = weckwort_umpacken("$tmp/fremd.zip", "$tmp/fremd.tar.gz");
     pruef('KRITISCH: ein fremdes Archiv wird nicht ausgeliefert', $f !== '' && !is_file("$tmp/fremd.tar.gz"));

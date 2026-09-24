@@ -1280,7 +1280,9 @@ function weckwort_verzeichnis(): string
 
 function weckwort_modell_datei(): string
 {
-    return weckwort_verzeichnis() . '/model-de-0.15.tar.gz';
+    // v2: Das erste Archiv hatte keine Ordnereintraege und liess sich im
+    // Browser nicht ablegen; der neue Name erzwingt ein neues Packen.
+    return weckwort_verzeichnis() . '/model-de-0.15-v2.tar.gz';
 }
 
 // Stand der Vorbereitung (ENT-703, Nachtrag): Der Browser fragt ihn ab,
@@ -1335,6 +1337,24 @@ function weckwort_pfad_sicher(string $pfad): bool
 }
 
 // Zip -> tar.gz mit Ordner "model/". Gibt '' zurueck oder den Grund.
+// Alle Ordner, in denen die Dateien liegen, Eltern vor Kindern. Rein.
+function weckwort_ordner(array $dateien): array
+{
+    $ordner = [];
+    foreach ($dateien as $d) {
+        $teile = explode('/', (string)$d);
+        array_pop($teile);
+        $pfad = '';
+        foreach ($teile as $t) {
+            $pfad = $pfad === '' ? $t : $pfad . '/' . $t;
+            $ordner[$pfad] = true;
+        }
+    }
+    $liste = array_keys($ordner);
+    usort($liste, fn($a, $b) => substr_count($a, '/') <=> substr_count($b, '/') ?: strcmp($a, $b));
+    return $liste;
+}
+
 function weckwort_umpacken(string $zipDatei, string $zielTarGz): string
 {
     if (!class_exists('ZipArchive') || !class_exists('PharData')) {
@@ -1378,7 +1398,24 @@ function weckwort_umpacken(string $zipDatei, string $zielTarGz): string
     try {
         $tar = $arbeit . '/model.tar';
         $phar = new PharData($tar);
-        $phar->buildFromDirectory($arbeit, '#^' . preg_quote($arbeit . '/model/', '#') . '#');
+        // Jeder Ordner bekommt einen eigenen Eintrag, und zwar vor seinen
+        // Dateien. Ohne ihn legt der Entpacker von vosk-browser die Ordner so
+        // an, dass die Ablage im Browser (IDBFS) scheitert ("Failed to sync
+        // file system") -- und createModel wartet dann still bis zur Frist.
+        // buildFromDirectory schreibt keine Ordnereintraege.
+        $dateien = [];
+        foreach ($pfade as $p) {
+            $teile = explode('/', str_replace('\\', '/', $p), 2);
+            if (count($teile) === 2 && $teile[1] !== '' && substr($p, -1) !== '/') {
+                $dateien[] = 'model/' . $teile[1];
+            }
+        }
+        foreach (weckwort_ordner($dateien) as $ordner) {
+            $phar->addEmptyDir($ordner);
+        }
+        foreach ($dateien as $d) {
+            $phar->addFile($arbeit . '/' . $d, $d);
+        }
         $phar->compress(Phar::GZ);
         unset($phar);
         if (!rename($tar . '.gz', $zielTarGz)) {
@@ -1418,6 +1455,7 @@ function weckwort_bereitstellen(): string
     if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
         return 'Kein Ablageort für das Modell auf dem Server.';
     }
+    @unlink($dir . '/model-de-0.15.tar.gz');   // erste Fassung ohne Ordnereintraege
     $sperre = fopen($dir . '/.sperre', 'c');
     if (!$sperre || !flock($sperre, LOCK_EX)) {
         return 'Das Modell wird gerade von einer anderen Anfrage bereitgestellt.';

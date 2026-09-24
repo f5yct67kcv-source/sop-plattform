@@ -105,15 +105,32 @@ async function neueSeite() {
     // Jeder Erkenner wird gemerkt: der fuer das Weckwort (mit Wortliste) und
     // der fuer die Frage (ohne, ENT-703).
     window.__vosk = { modelle: 0, grammatik: null, erkenner: [], mikro: 0, gestoppt: 0, modellAdresse: null };
-    window.Vosk = { createModel: async adresse => {
+    // Wie vosk-browser: new Model(adresse) meldet 'load' oder 'error' als
+    // Ereignis. __voskModus: 'ok', 'haengt' oder 'fehler'. Beim Laden legt die
+    // Attrappe wie Vosk einen Eintrag unter /vosk/<Adresse> in IndexedDB ab.
+    window.__voskModus = 'ok';
+    window.Vosk = { Model: function (adresse) {
       window.__vosk.modelle++; window.__vosk.modellAdresse = adresse;
-      return { terminate() {}, KaldiRecognizer: function (rate, gram) {
+      const hoerer = {};
+      this.on = (ev, fn) => { hoerer[ev] = fn; };
+      this.terminate = () => { window.__vosk.beendet = (window.__vosk.beendet || 0) + 1; };
+      const modus = window.__voskModus;
+      if (modus === 'fehler') { setTimeout(() => hoerer.error && hoerer.error({ event: 'error', error: 'Failed to sync file system' }), 20); }
+      else if (modus === 'ok') {
+        const pfad = '/vosk/' + adresse.replace(/[\W]/g, '_');
+        const r = indexedDB.open('/vosk', 21);
+        r.onupgradeneeded = () => { r.result.createObjectStore('FILE_DATA'); };
+        r.onsuccess = () => { const db = r.result; const tx = db.transaction('FILE_DATA', 'readwrite');
+          tx.objectStore('FILE_DATA').put({}, pfad); tx.objectStore('FILE_DATA').put({}, pfad + '/am');
+          tx.oncomplete = () => { db.close(); hoerer.load && hoerer.load({ event: 'load', result: true }); }; };
+      }
+      this.KaldiRecognizer = function (rate, gram) {
         const e = { gram: gram === undefined ? null : gram, hoerer: {}, weg: false };
         window.__vosk.erkenner.push(e);
         if (window.__vosk.grammatik === null && gram !== undefined) { window.__vosk.grammatik = gram; }
         this.on = (ev, fn) => { e.hoerer[ev] = fn; };
         this.acceptWaveform = () => {}; this.remove = () => { e.weg = true; };
-      } };
+      };
     } };
     // art: 'wort' (Erkenner mit Wortliste) oder 'frage' (ohne); typ: 'result' oder 'partialresult'.
     window.__voskSagt = (text, art = 'wort', typ = 'result') => {
@@ -568,13 +585,39 @@ check('Liefert der Server etwas anderes als ein Modell, sagt die Seite das', /ke
 
 // Vosk startet nicht (haengt still): nach der Frist ein eigener Grund, kein endloses Blinken.
 modellNeu([{ phase: 'fertig' }]);
-await page.evaluate(() => { window.__createModelEcht = window.Vosk.createModel; window.Vosk.createModel = () => new Promise(() => {}); asFristModell = 300; });
+await page.evaluate(() => { window.__voskModus = 'haengt'; asFristModell = 300; });
 await page.click('#asHorch');
 await page.waitForTimeout(800);
 check('KRITISCH: hängt Vosk im Browser, nennt die Seite nach der Frist Schritt 3 und blinkt nicht endlos',
   /Schritt 3\/4/.test(await page.textContent('#asVerlauf'))
   && await page.evaluate(() => !document.getElementById('asHorch').classList.contains('laedt')));
-await page.evaluate(() => { window.Vosk.createModel = window.__createModelEcht; asFristModell = 120000; });
+await page.evaluate(() => { window.__voskModus = 'ok'; asFristModell = 120000; });
+
+// Vosk meldet einen Fehler: sofort, mit seinem Text, nicht erst nach der Frist.
+await page.evaluate(() => { window.__voskModus = 'fehler'; });
+await page.click('#asHorch');
+await page.waitForTimeout(400);
+check('KRITISCH: meldet Vosk einen Fehler, steht er sofort da (nicht erst nach zwei Minuten)',
+  /Vosk meldet einen Fehler.*Failed to sync file system/.test(await page.textContent('#asVerlauf'))
+  && await page.evaluate(() => !document.getElementById('asHorch').classList.contains('laedt')));
+await page.evaluate(() => { window.__voskModus = 'ok'; });
+
+// Alte Kopien in der Ablage von Vosk werden entfernt, die benutzte bleibt.
+await page.evaluate(() => new Promise(ok => { const r = indexedDB.open('/vosk', 21);
+  r.onupgradeneeded = () => { r.result.createObjectStore('FILE_DATA'); };
+  r.onsuccess = () => { const db = r.result; const tx = db.transaction('FILE_DATA', 'readwrite');
+    tx.objectStore('FILE_DATA').put({}, '/vosk'); tx.objectStore('FILE_DATA').put({}, '/vosk/blob_alt'); tx.objectStore('FILE_DATA').put({}, '/vosk/blob_alt/am');
+    tx.oncomplete = () => { db.close(); ok(); }; }; }));
+await page.click('#asHorch');
+await page.waitForFunction(() => document.getElementById('asHorch').classList.contains('an'), null, { timeout: 5000 });
+await page.waitForTimeout(300);
+const vorrat = await page.evaluate(() => new Promise(ok => { const r = indexedDB.open('/vosk');
+  r.onsuccess = () => { const db = r.result; const k = db.transaction('FILE_DATA').objectStore('FILE_DATA').getAllKeys();
+    k.onsuccess = () => { db.close(); ok(k.result.map(String)); }; }; }));
+const benutzt = await page.evaluate(() => '/vosk/' + window.__vosk.modellAdresse.replace(/[\W]/g, '_'));
+check('Alte Kopien des Modells in der Browser-Datenbank werden entfernt, die benutzte bleibt',
+  !vorrat.some(k => k.startsWith('/vosk/blob_alt')) && vorrat.includes(benutzt) && vorrat.includes(benutzt + '/am') && vorrat.includes('/vosk'));
+await page.click('#asHorch'); await page.waitForTimeout(100);
 
 // Die Bibliothek laedt nicht: Schritt 1.
 await page.evaluate(() => { window.__VoskEcht = window.Vosk; delete window.Vosk; asFristSkript = 300; });

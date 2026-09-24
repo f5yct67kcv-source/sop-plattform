@@ -13449,7 +13449,7 @@ async function asModellStand() {
 
 async function asModellAdresse(schritt) {
   let blob = null;
-  try { const c = await caches.open('guardops-weckwort'); const r = await c.match(AS_ABLAGE + 'modell-de-0.15'); if (r) { blob = await r.blob(); } }
+  try { const c = await caches.open('guardops-weckwort'); c.delete(AS_ABLAGE + 'modell-de-0.15').catch(() => {}); const r = await c.match(AS_ABLAGE + 'modell-de-0.15-v2'); if (r) { blob = await r.blob(); } }
   catch (e) { blob = null; }
   if (blob && blob.size > 1000000) {
     schritt('2/4 Sprachmodell aus dem Zwischenspeicher des Browsers …');
@@ -13486,7 +13486,7 @@ async function asModellAdresse(schritt) {
     throw new Error('Der Server nennt keine brauchbare Grösse des Sprachmodells.');
   }
   const anzahl = Math.ceil(gesamt / teilB);
-  const schluessel = i => `${AS_ABLAGE}modell-de-0.15-${gesamt}-teil-${i}`;
+  const schluessel = i => `${AS_ABLAGE}modell-de-0.15-v2-${gesamt}-teil-${i}`;
   let ablage = null;
   try { ablage = await caches.open('guardops-weckwort'); } catch (e) { ablage = null; }
   const stuecke = [];
@@ -13535,8 +13535,53 @@ async function asModellAdresse(schritt) {
     throw new Error('Der Server hat kein Sprachmodell geliefert, sondern etwas anderes (' + blob.size + ' Bytes).');
   }
   try { if (ablage) { for (let i = 0; i < anzahl; i++) { await ablage.delete(schluessel(i)); } } } catch (e) { /* weiter */ }
-  try { const c = await caches.open('guardops-weckwort'); await c.put(AS_ABLAGE + 'modell-de-0.15', new Response(blob)); } catch (e) { /* ohne Zwischenspeicher weiter */ }
+  try { const c = await caches.open('guardops-weckwort'); await c.put(AS_ABLAGE + 'modell-de-0.15-v2', new Response(blob)); } catch (e) { /* ohne Zwischenspeicher weiter */ }
   return URL.createObjectURL(blob);
+}
+
+// Vosk.createModel meldet sich nur bei Erfolg; einen Fehler im Worker
+// verschluckt es, und die Seite wartete bis zur Frist. Darum hier selbst,
+// mit dem Fehler von Vosk als Text.
+function asVoskModell(adresse) {
+  return new Promise((ok, nein) => {
+    let m, fertig = false;
+    try { m = new window.Vosk.Model(adresse); } catch (e) { nein(new Error('Schritt 3/4: Vosk startet nicht (' + (e && e.message || e) + ').')); return; }
+    m.on('load', x => {
+      if (fertig) { return; }
+      fertig = true;
+      if (x && x.result) { ok(m); } else { nein(new Error('Schritt 3/4: Vosk konnte das Sprachmodell nicht laden.')); }
+    });
+    m.on('error', x => {
+      if (fertig) { return; }
+      fertig = true;
+      try { m.terminate(); } catch (e) { /* weiter */ }
+      nein(new Error('Schritt 3/4: Vosk meldet einen Fehler beim Laden des Sprachmodells' + (x && x.error ? ' (' + x.error + ')' : '') + '.'));
+    });
+  });
+}
+
+// vosk-browser legt das entpackte Modell (rund 60 MB) in der Browser-Datenbank
+// "/vosk" ab, unter einem Pfad aus der Adresse. Die Blob-Adresse ist bei jedem
+// Laden neu -- ohne Aufraeumen kaeme jedes Mal eine Kopie dazu. Behalten wird
+// nur der Pfad, den Vosk gerade benutzt.
+function asVoskAblageAufraeumen(behalten) {
+  try {
+    const r = indexedDB.open('/vosk');
+    r.onsuccess = () => {
+      const db = r.result;
+      if (!db.objectStoreNames.contains('FILE_DATA')) { db.close(); return; }
+      const tx = db.transaction('FILE_DATA', 'readwrite');
+      const st = tx.objectStore('FILE_DATA');
+      const k = st.getAllKeys();
+      k.onsuccess = () => {
+        k.result.forEach(pfad => {
+          const s = String(pfad);
+          if (s !== '/vosk' && s !== behalten && !s.startsWith(behalten + '/')) { st.delete(pfad); }
+        });
+      };
+      tx.oncomplete = tx.onerror = tx.onabort = () => db.close();
+    };
+  } catch (e) { /* ohne Aufraeumen weiter */ }
 }
 
 function asWeckFehler(text) {
@@ -13562,8 +13607,9 @@ async function asWeckStart() {
       'Schritt 1/4: Die Erkennungsbibliothek (Vosk, von jsDelivr) liess sich nicht innert einer Minute laden.');
     const adresse = await asModellAdresse(schritt);
     schritt('3/4 Starte die Erkennung im Browser …');
-    const model = await asMitFrist(window.Vosk.createModel(adresse), asFristModell,
+    const model = await asMitFrist(asVoskModell(adresse), asFristModell,
       'Schritt 3/4: Die Erkennung startet in diesem Browser nicht (Vosk antwortet nicht innert zwei Minuten).');
+    asVoskAblageAufraeumen('/vosk/' + adresse.replace(/[\W]/g, '_'));
     schritt('4/4 Öffne das Mikrofon …');
     const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
