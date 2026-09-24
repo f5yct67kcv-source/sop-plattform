@@ -392,11 +392,11 @@ try {
             . '<div style="display:flex;gap:60px">'
             . '<div style="flex:1">'
             . '<div style="border-bottom:1px solid #14161A;height:70px;display:flex;align-items:flex-end">' . $linien['kunde'] . '</div>'
-            . '<div style="margin-top:16px;font-size:11px;color:#6B7280">Unterschrift ' . portal_esc($auftraggeber) . '</div>'
+            . '<div style="margin-top:' . (int)($linien['abstand'] ?? 16) . 'px;font-size:11px;color:#6B7280">Unterschrift ' . portal_esc($auftraggeber) . '</div>'
             . '</div>'
             . '<div style="flex:1">'
             . '<div style="border-bottom:1px solid #14161A;height:70px;display:flex;align-items:flex-end">' . $linien['absender'] . '</div>'
-            . '<div style="margin-top:16px;font-size:11px;color:#6B7280">Unterschrift ' . portal_esc($auftragnehmer) . '</div>'
+            . '<div style="margin-top:' . (int)($linien['abstand'] ?? 16) . 'px;font-size:11px;color:#6B7280">Unterschrift ' . portal_esc($auftragnehmer) . '</div>'
             . '</div>'
             . '</div>'
             . '</div>';

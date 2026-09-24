@@ -180,10 +180,46 @@ $pruef('GEGENPROBE: ohne unsere Unterschrift nur das Bild des Kunden, unser Name
     count(pdf_bilder($pdf2)) === 1 && str_contains($pdf2 . implode('', array_map(fn($s) => (string)@gzuncompress($s),
         (preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf2, $mm2) ? $mm2[1] : []))), '(A. Muster)'));
 
-// 5. Auf der Linie (ENT-706): Das Bild ragt unter die Linie, die
-// Beschriftung steht tiefer als diese Unterlaenge.
-$pruef('KRITISCH: auf der Kundenseite ragen beide Unterschriften ueber die Linie hinaus',
-    substr_count($l2['kunde'] . $l2['absender'], 'margin-bottom:-12px') === 2);
+// 5. Auf der Linie (ENT-706): Die GRUNDLINIE der Schrift steht auf der
+// Linie, erkannt im Bild -- nicht der tiefste Punkt, nicht ein fester Anteil.
+//
+// Eine Unterschrift wie die aus dem ersten echten Versuch: ein Band aus
+// Buchstaben ueber die ganze Breite, unten eine tiefe Schlaufe in wenigen
+// Spalten.
+function mit_schlaufe(): string
+{
+    $im = imagecreatetruecolor(400, 200);
+    imagesavealpha($im, true); imagealphablending($im, false);
+    imagefill($im, 0, 0, imagecolorallocatealpha($im, 0, 0, 0, 127));
+    $t = imagecolorallocatealpha($im, 20, 20, 30, 0);
+    imagesetthickness($im, 3);
+    for ($x = 10; $x < 390; $x += 12) { imageline($im, $x, 40, $x + 6, 100, $t); }   // Buchstaben, Grundlinie y = 100
+    imageellipse($im, 300, 150, 60, 90, $t);                                         // Schlaufe bis y = 195
+    ob_start(); imagepng($im); return 'data:image/png;base64,' . base64_encode((string)ob_get_clean());
+}
+function flach(): string
+{
+    $im = imagecreatetruecolor(400, 60);
+    imagesavealpha($im, true); imagealphablending($im, false);
+    imagefill($im, 0, 0, imagecolorallocatealpha($im, 0, 0, 0, 127));
+    imagesetthickness($im, 3);
+    imageline($im, 5, 50, 395, 50, imagecolorallocatealpha($im, 20, 20, 30, 0));
+    ob_start(); imagepng($im); return 'data:image/png;base64,' . base64_encode((string)ob_get_clean());
+}
+$gs = beleg_unterschrift_grundlinie(mit_schlaufe());
+$pruef(sprintf('KRITISCH: mit Schlaufe: die Grundlinie liegt bei den Buchstaben, nicht am Ende der Schlaufe (%.2f, erwartet um 0.49)', $gs),
+    abs($gs - (199 - 101) / 200) < 0.04);
+$gf = beleg_unterschrift_grundlinie(flach());
+$pruef(sprintf('flach: kaum etwas liegt unter der Grundlinie (%.2f)', $gf), $gf < 0.2);
+$pruef('GEGENPROBE: ohne lesbares Bild der bisherige Wert', beleg_unterschrift_grundlinie('data:image/png;base64,AAAA') === 0.2);
+
+$pruef('KRITISCH: auf der Kundenseite rutscht jede Unterschrift um ihren Anteil unter der Grundlinie nach unten',
+    str_contains($l2['kunde'], 'transform:translateY(' . round(beleg_unterschrift_grundlinie($KUNDE) * 100, 1) . '%)')
+    && str_contains($l2['absender'], 'transform:translateY(' . round(beleg_unterschrift_grundlinie($UNSERE) * 100, 1) . '%)'));
+$uS = $u; $uS['zeichnung'] = mit_schlaufe();
+$l3 = beleg_unterschrift_linien($uS, $f1, true);
+$pruef('KRITISCH: die Beschriftung rueckt unter die tiefste Unterlaenge',
+    $l3['abstand'] >= (int)round(64 * $gs) && $l3['abstand'] > $l2['abstand'] - 1 && $l2['abstand'] >= 16);
 $linieY = null;
 preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf1, $st);
 $inh = '';
@@ -194,10 +230,12 @@ preg_match_all('/q [\d.]+ 0 0 ([\d.]+) [\d.]+ ([\d.]+) cm \/I\d+ Do Q/', $inh, $
 // Die Unterschriftslinien sind 80 mm lang, waagrecht; Trennstriche gehen ueber die ganze Breite.
 $linien = array_values(array_filter($li, fn($x) => abs((float)$x[2] - (float)$x[4]) < 0.01 && abs((float)$x[3] - (float)$x[1] - 80 * 72 / 25.4) < 1));
 $linieY = $linien ? (float)$linien[count($linien) - 1][2] : null;
-$unten = array_map(fn($x) => (float)$x[2], $bi);
-$pruef('KRITISCH: im PDF beginnt jede Unterschrift unter der Linie (ein Fuenftel der Hoehe)',
+$unten = array_map(fn($x) => ['unten' => (float)$x[2], 'h' => (float)$x[1]], $bi);
+// Beide Testzeichnungen haben dieselbe Grundlinie-Lage (gleiche Form).
+$soll = beleg_unterschrift_grundlinie($UNSERE);
+$pruef('KRITISCH: im PDF steht die Grundlinie auf der Linie: das Bild beginnt um seinen Anteil darunter',
     $linieY !== null && count($unten) === 2
-    && count(array_filter($unten, fn($u) => $u < $linieY - 2 && $u > $linieY - 18)) === 2);
+    && count(array_filter($unten, fn($b) => abs(($linieY - $b['unten']) - $b['h'] * $soll) < 1.0)) === 2);
 
 // 6. Hochladen (ENT-706): ein Bild wird zur Zeichnung
 function bild_url(int $grund, bool $leer = false, string $typ = 'jpeg'): string
