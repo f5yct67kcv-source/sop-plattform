@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 15,
+            'datum' => '2026-09-24',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit', 'betreiber'],
+            'titel' => 'Offerten ohne Code annehmen',
+            'text'  => 'Nimmt der Kunde eine Offerte über die Adresse an, an die du sie geschickt hast, gilt die Annahme sofort, ohne Code per E-Mail. Den Code braucht es nur noch bei einer anderen Adresse und bei Verträgen.',
+        ],
+        [
             'nr'    => 13,
             'datum' => '2026-09-24',
             'art'   => 'fehlerbehebung',

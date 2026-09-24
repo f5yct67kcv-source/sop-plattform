@@ -283,6 +283,7 @@ try {
                 'firma' => (string)($kunde['name'] ?? ''),
                 'endpunkt' => 'beleg_unterschrift.php',
                 'entscheid' => 'beleg_entscheidung.php', 'token' => $token,
+                'empfaenger' => beleg_empfaenger_email($pdo, '', $b['kunde_id'] ?? null),
             ])
             . (($_GET['lage'] ?? '') === 'name_fehlt'
                 ? '<div class="hinweis hinweis-ab" style="margin:20px 0 0">Bitte geben Sie Ihren Namen an, um abzulehnen.</div>'
