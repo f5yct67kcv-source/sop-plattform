@@ -181,7 +181,8 @@ if ($u !== null) {
 // ── 4. Fehler, Ablauf, neue Fassung, Bremse (Beleg 3) ────────────────
 $GLOBALS['mails'] = []; $GLOBALS['versuche'] = [];
 beleg_fassung_anlegen($pdo, 3, beleg_abbild_lesen($pdo, 3, '', beleg_absender_betrieb($pdo)), 'versand', 'A. Muster', '', true);
-$b3 = ['token' => 'tokB', 'email' => 'einkauf@muster.invalid'] + $angaben;
+// Eine fremde Adresse: der Weg mit Code (ohne Code gilt nur die Empfaengeradresse, ENT-708).
+$b3 = ['token' => 'tokB', 'email' => 'leitung2@muster.invalid'] + $angaben;
 [, $d] = $rufe('anfordern', $b3);
 $z3 = (int)$d['id'];
 $u3 = beleg_unterschrift_letzte($pdo, '', 3);
@@ -231,6 +232,52 @@ $u3 = beleg_unterschrift_letzte($pdo, '', 3);
 $pruef('KRITISCH: eine Ablehnung haelt Name und Grund fest, ohne Code',
     $u3 !== null && $u3['art'] === 'ablehnung' && $u3['name'] === 'Rolf Muster' && $u3['grund'] === 'zu teuer'
     && $u3['abweichend'] === false);
+
+// ── 6. Ohne Code (ENT-708) ────────────────────────────────────────────
+// Eine OFFERTE ueber die Empfaengeradresse: sofort angenommen, kein Code.
+// Ein VERTRAG und eine FREMDE Adresse: weiter mit Code.
+$pdo->exec("INSERT INTO belege (id, art, nummer, kunde_id, datum, gueltig_bis, status, versand_token)
+            VALUES (4, 'offerte', 'OF-0817', 1, '2031-03-01', '2099-12-31', 'versendet', 'tokO'),
+                   (5, 'vertrag', 'VE-0001', 1, '2031-03-01', '2099-12-31', 'versendet', 'tokV'),
+                   (6, 'offerte', 'OF-0818', 1, '2031-03-01', '2099-12-31', 'versendet', 'tokF')");
+$pdo->exec("INSERT INTO beleg_positionen (beleg_id, produkt_name, beschreibung, menge, einheit, einzelpreis_rappen)
+            VALUES (4, 'Bewachung', '', 5, 'Std.', 6500), (5, 'Bewachung', '', 5, 'Std.', 6500), (6, 'Bewachung', '', 5, 'Std.', 6500)");
+foreach ([4, 5, 6] as $bid) {
+    beleg_fassung_anlegen($pdo, $bid, beleg_abbild_lesen($pdo, $bid, '', beleg_absender_betrieb($pdo)), 'versand', 'A. Muster', '', true);
+}
+$GLOBALS['versuche'] = [];
+$codeMails = fn() => count(array_filter($GLOBALS['mails'], fn($x) => str_contains($x['betreff'], 'Bestätigungscode')));
+
+$GLOBALS['mails'] = [];
+[$c, $d] = $rufe('anfordern', ['token' => 'tokO', 'email' => 'Einkauf@Muster.invalid'] + $angaben);
+$u4 = beleg_unterschrift_letzte($pdo, '', 4);
+$pruef('KRITISCH: Offerte ueber die Empfaengeradresse (Gross/klein egal): sofort angenommen',
+    $c === 200 && ($d['lage'] ?? '') === 'angenommen'
+    && $pdo->query('SELECT status FROM belege WHERE id = 4')->fetchColumn() === 'bestaetigt');
+$pruef('KRITISCH: … ohne dass ein Code verschickt wurde', $codeMails() === 0);
+$pruef('KRITISCH: … und die Unterschrift ist als "ohne Code" erkennbar, nicht abweichend',
+    $u4 !== null && $u4['ohne_code'] === true && $u4['abweichend'] === false && $u4['bestaetigt_am'] !== null);
+$zeilen = $u4 === null ? [] : array_column(beleg_pruefprotokoll_zeilen(['art' => 'offerte', 'nummer' => 'OF-0817'],
+    beleg_letzte_fassung($pdo, 4, ''), $u4), 1, 0);
+$pruef('KRITISCH: das Pruefprotokoll sagt, worueber bestaetigt wurde -- nicht "Code angefordert"',
+    str_contains($zeilen['Bestätigt über'] ?? '', 'ohne Code') && !isset($zeilen['Code angefordert'])
+    && !isset($zeilen['Bestätigungscode an']));
+
+$GLOBALS['mails'] = [];
+[$c, $d] = $rufe('anfordern', ['token' => 'tokV', 'email' => 'einkauf@muster.invalid'] + $angaben);
+$pruef('KRITISCH: ein Vertrag braucht den Code auch ueber die Empfaengeradresse',
+    $c === 200 && ($d['lage'] ?? '') !== 'angenommen' && $codeMails() === 1
+    && $pdo->query('SELECT status FROM belege WHERE id = 5')->fetchColumn() === 'versendet');
+
+$GLOBALS['mails'] = [];
+[$c, $d] = $rufe('anfordern', ['token' => 'tokF', 'email' => 'chef@anderswo.invalid'] + $angaben);
+$pruef('KRITISCH: eine Offerte ueber eine fremde Adresse braucht den Code',
+    $c === 200 && ($d['lage'] ?? '') !== 'angenommen' && $codeMails() === 1
+    && $pdo->query('SELECT status FROM belege WHERE id = 6')->fetchColumn() === 'versendet');
+$pruef('GEGENPROBE: beleg_annahme_ohne_code nur fuer die Offerte und nur mit Adresse',
+    beleg_annahme_ohne_code('offerte', 'a@b.invalid', 'A@B.invalid')
+    && !beleg_annahme_ohne_code('vertrag', 'a@b.invalid', 'a@b.invalid')
+    && !beleg_annahme_ohne_code('offerte', '', '') && !beleg_annahme_ohne_code('offerte', 'x@b.invalid', 'a@b.invalid'));
 
 echo count($bad) === 0
     ? "$ok bestanden, 0 nicht bestanden\n"

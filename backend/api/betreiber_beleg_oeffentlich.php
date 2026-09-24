@@ -400,6 +400,7 @@ try {
                     'firma' => (string)($kunde['name'] ?? ''),
                     'endpunkt' => 'betreiber_beleg_unterschrift.php',
                     'entscheid' => 'betreiber_beleg_entscheidung.php', 'token' => $token,
+                'empfaenger' => beleg_empfaenger_email($pdo, 'be_', $b['kunde_id'] ?? null),
                 ]);
         } else {
             $knoepfe = '<form method="post" action="betreiber_beleg_entscheidung.php" class="keindruck" style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">'
