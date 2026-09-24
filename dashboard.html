@@ -13423,9 +13423,14 @@ function asSkriptLaden(url, sri) {
 // ihren eigenen Grund.
 let asFristSkript = 60000;          // Bibliothek von jsDelivr
 let asFristVorbereiten = 900000;    // Server holt und packt das Modell (einmalig)
-let asFristStille = 120000;         // Herunterladen: so lange ohne neue Daten
+let asFristTeil = 60000;            // ein Teil des Modells (4 MB)
+let asTeilVersuche = 3;             // Versuche je Teil
+let asTeilPause = 2000;             // Pause vor dem naechsten Versuch (wachsend)
 let asFristModell = 120000;         // Vosk startet das Modell im Browser
 let asTakt = 4000;                  // Abfrage des Stands auf dem Server
+// Schluessel im Zwischenspeicher als volle Adresse: Cache.put verlangt http(s),
+// eine relative Angabe scheitert unter file:// (Pruefungen, Buendel) still.
+const AS_ABLAGE = 'https://weckwort.guardops.invalid/';
 const asMb = b => (b / 1048576).toFixed(1).replace('.', ',');
 
 function asMitFrist(versprechen, ms, grund) {
@@ -13444,7 +13449,7 @@ async function asModellStand() {
 
 async function asModellAdresse(schritt) {
   let blob = null;
-  try { const c = await caches.open('guardops-weckwort'); const r = await c.match('modell-de-0.15'); if (r) { blob = await r.blob(); } }
+  try { const c = await caches.open('guardops-weckwort'); const r = await c.match(AS_ABLAGE + 'modell-de-0.15'); if (r) { blob = await r.blob(); } }
   catch (e) { blob = null; }
   if (blob && blob.size > 1000000) {
     schritt('2/4 Sprachmodell aus dem Zwischenspeicher des Browsers …');
@@ -13472,51 +13477,65 @@ async function asModellAdresse(schritt) {
     }
   }
 
-  // b) Herunterladen, mit Fortschritt und Frist bei Stillstand.
-  const steuer = new AbortController();
-  let still = setTimeout(() => steuer.abort(), asFristStille);
-  let res;
-  try {
-    res = await fetch(API + 'assistent_weckwort_modell.php', { headers: asModellKopf(), signal: steuer.signal });
-  } catch (e) {
-    clearTimeout(still);
-    throw new Error('Das Sprachmodell liess sich nicht vom Server laden (keine Antwort).');
+  // b) Herunterladen in Teilen (ENT-703, Nachtrag): Eine einzige lange
+  // Antwort brach auf Hostpoint bei rund 9 MB ab. Jeder Teil ist eine kurze
+  // Anfrage mit eigener Frist und bis zu drei Versuchen; fertige Teile
+  // bleiben im Zwischenspeicher, ein neuer Anlauf setzt dort fort.
+  const gesamt = Number(stand.groesse) || 0, teilB = Number(stand.teil) || 0;
+  if (gesamt < 1000000 || teilB <= 0) {
+    throw new Error('Der Server nennt keine brauchbare Grösse des Sprachmodells.');
   }
-  if (!res.ok) {
-    clearTimeout(still);
-    let m = '';
-    try { m = (await res.json()).message || ''; } catch (e) { m = ''; }
-    throw new Error(m || `Das Sprachmodell ist nicht verfügbar (HTTP ${res.status}).`);
-  }
-  const gesamt = Number(res.headers.get('Content-Length')) || 0;
-  const teile = [];
+  const anzahl = Math.ceil(gesamt / teilB);
+  const schluessel = i => `${AS_ABLAGE}modell-de-0.15-${gesamt}-teil-${i}`;
+  let ablage = null;
+  try { ablage = await caches.open('guardops-weckwort'); } catch (e) { ablage = null; }
+  const stuecke = [];
   let geladen = 0;
-  try {
-    if (res.body && res.body.getReader) {
-      const leser = res.body.getReader();
-      for (;;) {
-        const { done, value } = await leser.read();
-        if (done) { break; }
-        teile.push(value);
-        geladen += value.length;
-        clearTimeout(still);
-        still = setTimeout(() => steuer.abort(), asFristStille);
-        schritt(`2/4 Sprachmodell: ${asMb(geladen)}${gesamt ? ' von ' + asMb(gesamt) : ''} MB …`);
+  for (let i = 0; i < anzahl; i++) {
+    const soll = Math.min(teilB, gesamt - i * teilB);
+    let stueck = null;
+    try { const r = ablage && await ablage.match(schluessel(i)); if (r) { stueck = await r.blob(); } } catch (e) { stueck = null; }
+    if (stueck && stueck.size !== soll) { stueck = null; }
+    let grund = '';
+    for (let versuch = 1; !stueck && versuch <= asTeilVersuche; versuch++) {
+      schritt(`2/4 Sprachmodell: ${asMb(geladen)} von ${asMb(gesamt)} MB (Teil ${i + 1} von ${anzahl}${versuch > 1 ? ', Versuch ' + versuch : ''}) …`);
+      const steuer = new AbortController();
+      const uhr = setTimeout(() => steuer.abort(), asFristTeil);
+      try {
+        const res = await fetch(API + 'assistent_weckwort_modell.php?teil=' + i, { headers: asModellKopf(), signal: steuer.signal });
+        if (!res.ok) {
+          let m = '';
+          try { m = (await res.json()).message || ''; } catch (e) { m = ''; }
+          grund = m || `HTTP ${res.status}`;
+        } else {
+          const b = await res.blob();
+          if (b.size === soll) { stueck = b; }
+          else { grund = `${b.size} statt ${soll} Bytes erhalten`; }
+        }
+      } catch (e) {
+        grund = steuer.signal.aborted ? `keine vollständige Antwort innert ${Math.round(asFristTeil / 1000)} s` : 'keine Antwort';
+      } finally {
+        clearTimeout(uhr);
       }
-      blob = new Blob(teile, { type: 'application/gzip' });
-    } else {
-      blob = await res.blob();
+      if (!stueck && versuch < asTeilVersuche) { await new Promise(ok => setTimeout(ok, asTeilPause * versuch)); }
     }
-  } catch (e) {
-    throw new Error(`Das Herunterladen des Sprachmodells ist bei ${asMb(geladen)} MB stehengeblieben.`);
-  } finally {
-    clearTimeout(still);
+    if (!stueck) {
+      throw new Error(`Das Herunterladen des Sprachmodells ist bei ${asMb(geladen)} von ${asMb(gesamt)} MB stehengeblieben: Teil ${i + 1} von ${anzahl} kam nach ${asTeilVersuche} Versuchen nicht an (${grund}). Beim nächsten Einschalten geht es bei diesem Teil weiter.`);
+    }
+    try { if (ablage) { await ablage.put(schluessel(i), new Response(stueck)); } } catch (e) { /* ohne Zwischenspeicher weiter */ }
+    stuecke.push(stueck);
+    geladen += stueck.size;
   }
-  // Eine Fehlerseite des Servers mit Status 200 waere kein Modell.
-  if (blob.size < 1000000) {
+  blob = new Blob(stuecke, { type: 'application/gzip' });
+  // Ein gzip beginnt mit 1f 8b -- eine Fehlerseite des Servers mit Status 200
+  // waere kein Modell.
+  const kopf = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
+  if (blob.size !== gesamt || kopf[0] !== 0x1f || kopf[1] !== 0x8b) {
+    for (let i = 0; i < anzahl; i++) { try { if (ablage) { await ablage.delete(schluessel(i)); } } catch (e) { /* weiter */ } }
     throw new Error('Der Server hat kein Sprachmodell geliefert, sondern etwas anderes (' + blob.size + ' Bytes).');
   }
-  try { const c = await caches.open('guardops-weckwort'); await c.put('modell-de-0.15', new Response(blob)); } catch (e) { /* ohne Zwischenspeicher weiter */ }
+  try { if (ablage) { for (let i = 0; i < anzahl; i++) { await ablage.delete(schluessel(i)); } } } catch (e) { /* weiter */ }
+  try { const c = await caches.open('guardops-weckwort'); await c.put(AS_ABLAGE + 'modell-de-0.15', new Response(blob)); } catch (e) { /* ohne Zwischenspeicher weiter */ }
   return URL.createObjectURL(blob);
 }
 

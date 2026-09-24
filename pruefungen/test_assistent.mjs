@@ -63,9 +63,15 @@ const RECHNUNGEN = [
 // Ergebnis antwortet es mit `antwort`. Was es zurueckbekam, wird gemerkt.
 // Der Server fuer das Sprachmodell (ENT-703): erst der Stand, dann die Datei.
 // staende: Folge der Antworten auf ?stand=1 (die letzte bleibt stehen).
-const MODELL = Buffer.alloc(1200000, 7);
-let modellServer = { staende: [{ phase: 'fertig' }], datei: [200, MODELL], posts: 0 };
-const modellNeu = (staende, datei) => { modellServer = { staende, datei: datei || [200, MODELL], posts: 0 }; };
+// Seit dem Nachtrag zu ENT-703 in Teilen (?teil=N); `stoer(n)` darf einen
+// Teil scheitern lassen: [status, body] oder 'haengt'.
+const MODELL = Buffer.alloc(1200000, 7); MODELL[0] = 0x1f; MODELL[1] = 0x8b;
+const TEIL = 300000;
+let modellServer = { staende: [{ phase: 'fertig' }], datei: [200, MODELL], posts: 0, teile: [], stoer: null };
+// Seit der Zwischenspeicher auch unter file:// greift, beginnt jeder Fall zum
+// Server mit leerer Ablage (ablageLeeren).
+const ablageLeeren = () => page.evaluate(() => caches.delete('guardops-weckwort'));
+const modellNeu = (staende, datei, stoer) => { modellServer = { staende, datei: datei || [200, MODELL], posts: 0, teile: [], stoer: stoer || null }; };
 let drehbuch = null, belegeGesperrt = false, abwesenheitGesperrt = true, assistentAntwort = null, routerAntwort = null;
 const rufe = [];
 // Katalog und Kunden fuer die Formular-Werkzeuge (ENT-700). Die Antwort der
@@ -148,10 +154,17 @@ async function neueSeite() {
       if (req.method() === 'POST') { modellServer.posts++; return send({ status: 'ok' }); }
       if (p.includes('stand=1')) {
         const st = modellServer.staende.length > 1 ? modellServer.staende.shift() : modellServer.staende[0];
-        return send({ status: 'ok', grund: '', ...st });
+        const gr = st.phase === 'fertig' ? { groesse: Buffer.byteLength(modellServer.datei[1]), teil: TEIL } : {};
+        return send({ status: 'ok', grund: '', ...gr, ...st });
       }
+      const n = Number((p.match(/teil=(\d+)/) || [])[1] ?? -1);
+      modellServer.teile.push(n);
+      const st = modellServer.stoer && modellServer.stoer(n);
+      if (st === 'haengt') return new Promise(() => {});
+      if (st) return route.fulfill({ status: st[0], contentType: 'application/json', body: st[1] });
       const [code, body] = modellServer.datei;
-      return route.fulfill({ status: code, contentType: code === 200 ? 'application/gzip' : 'application/json', body });
+      const roh = Buffer.from(body);
+      return route.fulfill({ status: code, contentType: 'application/octet-stream', body: roh.subarray(n * TEIL, (n + 1) * TEIL) });
     }
     if (p.startsWith('ki_router_parse')) return routerAntwort ? send(routerAntwort[1], routerAntwort[0]) : send({ status: 'error', message: 'kein Mock' }, 502);
     if (p.startsWith('produkt_list')) return send({ status: 'ok', produkte: PR });
@@ -503,6 +516,7 @@ check('Ausgeschaltet: Mikrofon zu, Anzeige weg', await page.evaluate(() => windo
 check('Die Einstellung bleibt gemerkt (aus)', await page.evaluate(() => localStorage.getItem('as_horchen') === '0'));
 
 // Der Server scheitert beim Vorbereiten: sein Grund steht da.
+await ablageLeeren();
 modellNeu([{ phase: 'fehler', grund: 'Das Modell liess sich nicht herunterladen (Zeitlimit)' }]);
 await page.evaluate(() => { asTakt = 30; });
 await page.click('#asHorch');
@@ -512,14 +526,42 @@ check('Scheitert der Server, steht sein Grund da, und das Zuhören schaltet sich
   && await page.evaluate(() => !document.getElementById('asHorch').classList.contains('an') && localStorage.getItem('as_horchen') === '0'));
 
 // Noch nicht vorbereitet: einmal anstossen, Stand abfragen, dann laden.
+await ablageLeeren();
 modellNeu([{ phase: '' }, { phase: 'laedt' }, { phase: 'packt' }, { phase: 'fertig' }, { phase: 'fertig' }]);
 await page.click('#asHorch');
 await page.waitForFunction(() => document.getElementById('asHorch').classList.contains('an'), null, { timeout: 5000 });
 check('Nicht vorbereitet: die Seite stösst die Vorbereitung genau einmal an und wartet auf den Stand', modellServer.posts === 1);
 await page.click('#asHorch'); await page.waitForTimeout(100);
 
+// In Teilen (Nachtrag ENT-703): ein Teil scheitert zweimal, der dritte Versuch kommt an.
+await page.evaluate(() => { asTeilPause = 10; }); await ablageLeeren();
+let fehlversuche = 0;
+modellNeu([{ phase: 'fertig' }], null, n => (n === 2 && fehlversuche++ < 2 ? [503, '{"message":"Zeitlimit"}'] : null));
+await page.click('#asHorch');
+await page.waitForFunction(() => document.getElementById('asHorch').classList.contains('an'), null, { timeout: 5000 });
+check('Das Modell kommt in Teilen, ein gescheiterter Teil wird wiederholt', JSON.stringify(modellServer.teile) === JSON.stringify([0, 1, 2, 2, 2, 3]));
+await page.click('#asHorch'); await page.waitForTimeout(100);
+
+// Ein Teil haengt: nach drei Versuchen eine Meldung mit dem Teil, dann beim naechsten Mal dort weiter.
+await page.evaluate(() => { asFristTeil = 150; }); await ablageLeeren();
+modellNeu([{ phase: 'fertig' }], null, n => (n === 1 ? 'haengt' : null));
+await page.click('#asHorch');
+await page.waitForTimeout(1500);
+check('KRITISCH: Hängt ein Teil, nennt die Seite ihn nach drei Versuchen, statt still zu warten',
+  /Teil 2 von 4 kam nach 3 Versuchen nicht an/.test(await page.textContent('#asVerlauf'))
+  && JSON.stringify(modellServer.teile) === JSON.stringify([0, 1, 1, 1])
+  && await page.evaluate(() => !document.getElementById('asHorch').classList.contains('laedt')));
+modellNeu([{ phase: 'fertig' }]);
+await page.evaluate(() => { asFristTeil = 60000; });
+await page.click('#asHorch');
+await page.waitForFunction(() => document.getElementById('asHorch').classList.contains('an'), null, { timeout: 5000 });
+check('Beim nächsten Einschalten geht es beim fehlenden Teil weiter, fertige Teile kommen aus dem Zwischenspeicher',
+  JSON.stringify(modellServer.teile) === JSON.stringify([1, 2, 3]));
+await page.click('#asHorch'); await page.waitForTimeout(100);
+
 // Eine Fehlerseite mit Status 200 ist kein Modell.
-modellNeu([{ phase: 'fertig' }], [200, '<html>Fehler</html>']);
+await ablageLeeren();
+modellNeu([{ phase: 'fertig' }], [200, Buffer.alloc(1200000, 0x3c)]);
 await page.click('#asHorch');
 await page.waitForTimeout(400);
 check('Liefert der Server etwas anderes als ein Modell, sagt die Seite das', /kein Sprachmodell geliefert/.test(await page.textContent('#asVerlauf')));

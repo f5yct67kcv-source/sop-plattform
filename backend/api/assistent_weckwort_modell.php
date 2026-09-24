@@ -3,7 +3,9 @@
 //   GET  ?stand=1  -> Stand der Vorbereitung (schnell)
 //   POST           -> Vorbereitung anstossen (holt das Modell einmal; laeuft
 //                     weiter, auch wenn die Anfrage abbricht)
-//   GET            -> das fertige Modell (tar.gz), sonst 409 mit Stand
+//   GET  ?teil=N   -> Teil N des fertigen Modells (tar.gz), sonst 409 mit Stand.
+//                     Nur in Teilen: Eine einzige lange Antwort brach auf
+//                     Hostpoint bei rund 9 MB ab.
 // Nur ausserhalb von Produktion und Demo, wie der Assistent selbst.
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
@@ -29,7 +31,27 @@ if ($stand['phase'] !== 'fertig') {
     json_response(['status' => 'error', 'grund' => 'nicht_bereit', 'message' => 'Das Sprachmodell ist noch nicht bereit.'] + $stand, 409);
 }
 $datei = weckwort_modell_datei();
-header('Content-Type: application/gzip');
-header('Content-Length: ' . filesize($datei));
-header('Cache-Control: private, max-age=2592000');
-readfile($datei);
+$bereich = weckwort_teil_bereich((int)filesize($datei), (int)($_GET['teil'] ?? -1));
+if ($bereich === null) {
+    json_response(['status' => 'error', 'grund' => 'teil', 'message' => 'Diesen Teil des Sprachmodells gibt es nicht.'] + $stand, 400);
+}
+[$anfang, $laenge] = $bereich;
+@set_time_limit(120);
+@ini_set('zlib.output_compression', '0');
+while (ob_get_level() > 0) { ob_end_clean(); }
+$fh = @fopen($datei, 'rb');
+if (!$fh || fseek($fh, $anfang) !== 0) {
+    json_response(['status' => 'error', 'message' => 'Das Sprachmodell liess sich auf dem Server nicht lesen.'], 500);
+}
+header('Content-Type: application/octet-stream');
+header('Content-Length: ' . $laenge);
+header('Cache-Control: private, no-transform, max-age=2592000');
+$rest = $laenge;
+while ($rest > 0 && !feof($fh)) {
+    $block = fread($fh, min(262144, $rest));
+    if ($block === false || $block === '') { break; }
+    echo $block;
+    flush();
+    $rest -= strlen($block);
+}
+fclose($fh);

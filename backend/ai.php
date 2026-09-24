@@ -1258,6 +1258,21 @@ const WECKWORT_MODELL_MAX_BYTES = 120 * 1024 * 1024;   // Obergrenze beim Herunt
 // nichts ausgeliefert, statt etwas Fremdes an den Browser zu geben.
 const WECKWORT_PFLICHT = ['am/final.mdl', 'conf/mfcc.conf', 'conf/model.conf', 'graph/phones/word_boundary.int'];
 
+// Ausgeliefert wird in Teilen dieser Groesse (ENT-703, Nachtrag): Eine
+// einzige 45-MB-Antwort brach auf Hostpoint bei rund 9 MB ab. Ein Teil ist
+// eine kurze Anfrage, die bei einem Abbruch einzeln wiederholt wird.
+const WECKWORT_TEIL_BYTES = 4 * 1024 * 1024;
+
+// Bereich [Anfang, Laenge] von Teil $n einer Datei mit $groesse Bytes, null
+// ausserhalb. Rein, ohne Dateizugriff.
+function weckwort_teil_bereich(int $groesse, int $n, int $teil = WECKWORT_TEIL_BYTES): ?array
+{
+    if ($groesse <= 0 || $teil <= 0 || $n < 0) { return null; }
+    $anfang = $n * $teil;
+    if ($anfang >= $groesse) { return null; }
+    return [$anfang, min($teil, $groesse - $anfang)];
+}
+
 function weckwort_verzeichnis(): string
 {
     return sys_get_temp_dir() . '/guardops-weckwort';
@@ -1282,7 +1297,7 @@ function weckwort_stand(): array
 {
     $datei = weckwort_modell_datei();
     if (is_file($datei) && filesize($datei) > 1000000) {
-        return ['phase' => 'fertig', 'grund' => '', 'groesse' => filesize($datei)];
+        return ['phase' => 'fertig', 'grund' => '', 'groesse' => filesize($datei), 'teil' => WECKWORT_TEIL_BYTES];
     }
     $roh = @file_get_contents(weckwort_verzeichnis() . '/stand.json');
     $s = $roh ? (json_decode($roh, true) ?: []) : [];

@@ -356,6 +356,17 @@ pruef('Die Quelle ist fest und verschluesselt (https), keine Adresse aus der Anf
     str_starts_with(WECKWORT_MODELL_QUELLE, 'https://'));
 
 // Stand der Vorbereitung (ENT-703): nur pruefen, wenn hier kein echtes Modell liegt.
+// Teile (Nachtrag ENT-703): lueckenlos, ohne Ueberlappung, letzter Teil kuerzer.
+$gr = 10 * 1024 * 1024 + 5;
+$summe = 0; $n = 0; $lueckenlos = true;
+while (($b = weckwort_teil_bereich($gr, $n)) !== null) { $lueckenlos = $lueckenlos && $b[0] === $summe; $summe += $b[1]; $n++; }
+pruef('Die Teile decken das Modell lueckenlos und ohne Ueberlappung ab', $lueckenlos && $summe === $gr && $n === 3);
+pruef('Der letzte Teil ist der Rest', weckwort_teil_bereich($gr, 2) === [2 * WECKWORT_TEIL_BYTES, 10 * 1024 * 1024 + 5 - 2 * WECKWORT_TEIL_BYTES]);
+pruef('Kein Teil ausserhalb, bei negativer Nummer oder leerer Datei',
+    weckwort_teil_bereich($gr, 3) === null && weckwort_teil_bereich($gr, -1) === null && weckwort_teil_bereich(0, 0) === null);
+$ep = file_get_contents(__DIR__ . '/../backend/api/assistent_weckwort_modell.php');
+pruef('Der Endpunkt liefert das Modell nie am Stueck, nur in Teilen', !str_contains($ep, 'readfile(') && str_contains($ep, 'weckwort_teil_bereich('));
+
 if (!is_file(weckwort_modell_datei())) {
     $standDatei = weckwort_verzeichnis() . '/stand.json';
     $vorher = is_file($standDatei) ? file_get_contents($standDatei) : null;
