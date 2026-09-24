@@ -81,20 +81,14 @@ if (!mandant_vorrat_status_da($stamm)) {
 // Keine Verwaltungstabelle. Ob in einer Vorratsanlage schon jemand steht,
 // prueft diese Schleife bewusst NICHT: Das duerfte sie von der
 // Betreiber-Ebene aus gar nicht, und die Sperre dagegen sitzt im Einloeseweg.
+//
+// Die Pruefung EINER Anlage steht in mandant_vorrat_platz_pruefen() --
+// dieselbe, die das Zuteilen sperrt (ENT-705). Verbunden wird hier, in
+// eigener Zeile, damit die Verbindungswache es sieht.
+$bauplan = static fn(array $m): array => kern_schema_fehlend(mandant_db($m));
 $plaetze = [];
 foreach (mandant_vorrat_zeilen($stamm) as $m) {
-    $verbindung = mandant_verbindung_bereit($m);
-    $luecken = null;
-    if ($verbindung === 'bereit') {
-        try {
-            $anlage = mandant_db($m);
-            $luecken = kern_schema_fehlend($anlage);
-        } catch (Throwable $e) {
-            $verbindung = 'fehlgeschlagen';
-        }
-    }
-    $plaetze[] = ['id' => (int)$m['id'], 'name' => (string)$m['name']]
-               + mandant_vorrat_befund($verbindung, $luecken);
+    $plaetze[] = mandant_vorrat_platz_pruefen($m, $bauplan);
 }
 $vorrat = mandant_vorrat_zusammenfassen($plaetze);
 
