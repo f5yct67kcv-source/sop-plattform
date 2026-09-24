@@ -1302,6 +1302,51 @@ function beleg_unterschrift_aus_bild(string $roh): array
     return ['bild' => $url];
 }
 
+// Wie weit reicht die Unterschrift UNTER ihre Grundlinie? (ENT-706)
+//
+// Als Anteil der Bildhoehe, von unten gemessen. Die Grundlinie ist die
+// Linie, auf der die Buchstaben stehen -- nicht der tiefste Punkt des
+// Bildes: Eine Schlaufe nach unten (ein "b", ein Schwung) reicht weit
+// darunter, ebenso die Luft am Rand. Ein fester Anteil passt deshalb nie fuer
+// alle Unterschriften.
+//
+// ERKANNT, NICHT GERATEN: Je Spalte der tiefste Punkt der Tinte; der Median
+// davon ist die Grundlinie. Eine Schlaufe betrifft nur wenige Spalten und
+// verschiebt den Median kaum, die Buchstaben bestimmen ihn.
+//
+// Ohne GD oder bei einem unlesbaren Bild ein Fuenftel -- der Wert von vorher.
+function beleg_unterschrift_grundlinie(string $url): float
+{
+    static $gemerkt = [];
+    $schluessel = md5($url);
+    if (isset($gemerkt[$schluessel])) { return $gemerkt[$schluessel]; }
+    $ersatz = 0.2;
+    if (!function_exists('imagecreatefromstring') || !preg_match('~^data:image/png;base64,(.+)$~s', $url, $m)) {
+        return $gemerkt[$schluessel] = $ersatz;
+    }
+    $im = @imagecreatefromstring((string)base64_decode($m[1], true));
+    if (!$im) { return $gemerkt[$schluessel] = $ersatz; }
+    $b = imagesx($im); $h = imagesy($im);
+    $boeden = [];
+    for ($x = 0; $x < $b; $x++) {
+        $tinte = 0;
+        for ($y = $h - 1; $y >= 0; $y--) {
+            if (((imagecolorat($im, $x, $y) >> 24) & 0x7F) < 64) {
+                if ($tinte === 0) { $boden = $y; }
+                if (++$tinte >= 2) { $boeden[] = $boden; break; }
+            }
+        }
+    }
+    imagedestroy($im);
+    if (count($boeden) < 3 || $h < 4) { return $gemerkt[$schluessel] = $ersatz; }
+    sort($boeden);
+    $grund = $boeden[(int)floor(count($boeden) / 2)];
+    $anteil = ($h - 1 - $grund) / $h;
+    // Hoechstens 45 %: Eine stark steigende Unterschrift hat keine klare
+    // Grundlinie; sie soll die Linie kreuzen, nicht darunter verschwinden.
+    return $gemerkt[$schluessel] = max(0.02, min(0.45, $anteil));
+}
+
 // Die Angaben aus dem Unterschriftsdialog, geprueft. Gibt
 // ['fehler' => '…'] oder ['werte' => [...]] zurueck.
 function beleg_unterschrift_angaben(array $in): array
@@ -1826,14 +1871,22 @@ function beleg_unterschrift_linien(?array $u, ?array $fassung, bool $angenommen)
     // AUF DER LINIE (ENT-706): Das Bild ragt um ein Fuenftel ueber die Linie
     // hinaus. Sein unterer Rand ist Luft und Unterlaenge, nicht die
     // Grundlinie der Schrift -- ohne das schwebt die Unterschrift darueber.
-    $aufLinie = 'max-height:64px;max-width:100%;margin-bottom:-12px;position:relative';
+    // Um den Anteil unter der Grundlinie nach unten geschoben (translateY in
+    // Prozent bezieht sich auf die Hoehe des Bildes selbst).
+    $aufLinie = static fn(string $url): string => 'max-height:64px;max-width:100%;position:relative;transform:translateY('
+        . round(beleg_unterschrift_grundlinie($url) * 100, 1) . '%)';
     $bildAbsender = $fu ? '<img src="' . beleg_h($fu['bild']) . '" alt="Unterschrift ' . beleg_h($fu['name'])
-        . '" style="' . $aufLinie . '">' : '';
-    $leer = ['kunde' => '', 'absender' => $bildAbsender, 'ort' => ''];
+        . '" style="' . $aufLinie($fu['bild']) . '">' : '';
+    // Die Beschriftung unter der Linie rueckt so weit nach unten, wie eine
+    // Unterschrift darunter reicht (hoechstens 64 px Bild).
+    $abstand = static fn(array $urls): int => max(16, (int)round(64 * max(array_merge([0.0],
+        array_map('beleg_unterschrift_grundlinie', array_filter($urls))))) + 8);
+    $leer = ['kunde' => '', 'absender' => $bildAbsender, 'ort' => '',
+             'abstand' => $abstand([$fu['bild'] ?? ''])];
     if (!$angenommen || !$u || $u['art'] !== 'annahme') { return $leer; }
     $schrift = 'font-family:\'Segoe Script\',\'Brush Script MT\',\'Snell Roundhand\',cursive;font-size:21px;line-height:1.1;padding-bottom:4px';
     $kunde = !empty($u['zeichnung'])
-        ? '<img src="' . beleg_h((string)$u['zeichnung']) . '" alt="Unterschrift" style="' . $aufLinie . '">'
+        ? '<img src="' . beleg_h((string)$u['zeichnung']) . '" alt="Unterschrift" style="' . $aufLinie((string)$u['zeichnung']) . '">'
         : '<span style="' . $schrift . '">' . beleg_h((string)$u['name']) . '</span>';
     $absender = $bildAbsender !== '' ? $bildAbsender
         : (($fassung && !empty($fassung['freigegeben']) && trim((string)$fassung['versendet_von']) !== '')
@@ -1841,7 +1894,8 @@ function beleg_unterschrift_linien(?array $u, ?array $fassung, bool $angenommen)
             : '');
     $t = strtotime((string)$u['bestaetigt_am']);
     return ['kunde' => $kunde, 'absender' => $absender,
-            'ort' => 'Elektronisch angenommen am ' . ($t ? date('d.m.Y', $t) : '–')];
+            'ort' => 'Elektronisch angenommen am ' . ($t ? date('d.m.Y', $t) : '–'),
+            'abstand' => $abstand([$fu['bild'] ?? '', (string)($u['zeichnung'] ?? '')])];
 }
 
 // Die Unterschrift fuer das Formular: alles ausser Zeichnung, IP und Browser.

@@ -309,7 +309,7 @@ function beleg_pdf(array $abbild, array $fassung, ?array $u, bool $komprimiert =
     // ── Unterschriften ─────────────────────────────────────────────────
     $angenommen = $u !== null && ($u['art'] ?? '') === 'annahme';
     if (!empty($b['unterschriftsseite']) || $angenommen) {
-        $pdf->platz(60);
+        $pdf->platz(68);
         $pdf->Ln(8);
         $pdf->SetFont('Helvetica', 'B', 7.5);
         $pdf->SetTextColor(107, 114, 128);
@@ -324,22 +324,25 @@ function beleg_pdf(array $abbild, array $fassung, ?array $u, bool $komprimiert =
         $pdf->Ln(20);
         $y = $pdf->GetY();
         $links = 20; $rechts = 110; $breite = 80;
-        $unterschriftSetzen = function (array $bild, float $x) use ($pdf, $y, $breite, &$bilder): void {
+        $unten = 0.0;   // wie weit eine Unterschrift unter die Linie reicht, in mm
+        $unterschriftSetzen = function (array $bild, float $x, string $url) use ($pdf, $y, $breite, &$bilder, &$unten): void {
             $bilder[] = $bild['datei'];
             $h = 18; $w = $h * $bild['b'] / $bild['h'];
             if ($w > $breite) { $w = $breite; $h = $w * $bild['h'] / $bild['b']; }
-            // Ein Fuenftel ueber die Linie hinaus (ENT-706): Der untere Rand
-            // des Bildes ist Luft und Unterlaenge, nicht die Grundlinie.
-            $pdf->Image($bild['datei'], $x, $y - $h * 0.8, $w, $h, $bild['typ']);
+            // Die Grundlinie der Schrift auf die Linie (ENT-706), erkannt im
+            // Bild: Luft und Unterlaengen reichen darunter.
+            $anteil = beleg_unterschrift_grundlinie($url);
+            $pdf->Image($bild['datei'], $x, $y - $h * (1 - $anteil), $w, $h, $bild['typ']);
+            $unten = max($unten, $h * $anteil);
         };
         // Unsere Unterschrift aus der Freigabe (ENT-704), fest in der Fassung.
         $fu = !empty($fassung['freigegeben']) ? beleg_freigabe_unterschrift($abbild) : null;
         $fuBild = $fu ? beleg_pdf_bild($fu['bild']) : null;
-        if ($fuBild) { $unterschriftSetzen($fuBild, $rechts); }
+        if ($fuBild) { $unterschriftSetzen($fuBild, $rechts, $fu['bild']); }
         if ($angenommen) {
             $zeichnung = !empty($u['zeichnung']) ? beleg_pdf_bild((string)$u['zeichnung']) : null;
             if ($zeichnung) {
-                $unterschriftSetzen($zeichnung, $links);
+                $unterschriftSetzen($zeichnung, $links, (string)$u['zeichnung']);
             } else {
                 $pdf->SetFont('Helvetica', 'I', 14);
                 $pdf->SetXY($links, $y - 8);
@@ -354,8 +357,8 @@ function beleg_pdf(array $abbild, array $fassung, ?array $u, bool $komprimiert =
         $pdf->SetDrawColor(20, 22, 26);
         $pdf->Line($links, $y, $links + $breite, $y);
         $pdf->Line($rechts, $y, $rechts + $breite, $y);
-        // Tiefer als die Unterlaenge der Unterschrift (ENT-706).
-        $pdf->SetXY($links, $y + 4.5);
+        // Unter die tiefste Unterlaenge der Unterschriften (ENT-706).
+        $pdf->SetXY($links, $y + max(1.5, $unten + 1.5));
         $pdf->SetFont('Helvetica', '', 7.5);
         $pdf->SetTextColor(107, 114, 128);
         $auftraggeber = trim((string)($kunde['name'] ?? '')) ?: 'Auftraggeber';

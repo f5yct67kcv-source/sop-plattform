@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 13,
+            'datum' => '2026-09-24',
+            'art'   => 'fehlerbehebung',
+            'fuer'  => ['cockpit', 'betreiber'],
+            'titel' => 'Unterschriften stehen auf ihrer Grundlinie',
+            'text'  => 'Die Buchstaben einer Unterschrift stehen jetzt auf der Linie, auch wenn eine Schlaufe weit nach unten reicht. Die Beschriftung darunter rückt entsprechend.',
+        ],
+        [
             'nr'    => 11,
             'datum' => '2026-09-24',
             'art'   => 'verbesserung',

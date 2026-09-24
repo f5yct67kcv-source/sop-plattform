@@ -25,4 +25,5 @@ $ergebnis = beleg_unterschrift_aus_bild((string)($in['bild'] ?? ''));
 if (isset($ergebnis['fehler'])) {
     json_response(['status' => 'error', 'message' => $ergebnis['fehler']], 400);
 }
-json_response(['status' => 'ok', 'bild' => $ergebnis['bild']]);
+json_response(['status' => 'ok', 'bild' => $ergebnis['bild'],
+    'grundlinie' => beleg_unterschrift_grundlinie($ergebnis['bild'])]);
