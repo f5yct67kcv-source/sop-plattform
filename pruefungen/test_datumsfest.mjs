@@ -31,6 +31,13 @@ for (const f of dateien) {
     // Kommentare zaehlen nicht -- dort steht die Erklaerung, warum es kein
     // festes Datum mehr gibt.
     if (/^\s*(\/\/|\*)/.test(zeile)) { return; }
+    // Ein fester Kalendertag, den das Produkt nie mit heute vergleicht
+    // (Zeitumstellung, Jahresende, Grenze eines Regelwerks), kippt nicht
+    // beim Datumswechsel. Er wird auf seiner Zeile als "kalenderfest:" mit
+    // Grund gekennzeichnet -- ohne Grund zaehlt die Kennzeichnung nicht.
+    // Nur fuer einzelne Zeilen, nie fuer ganze Suiten: Die gehoeren in den
+    // Grundstand unten, und der darf nicht wachsen.
+    if (/\/\/\s*kalenderfest:\s*\S{3,}/.test(zeile)) { return; }
     for (const m of zeile.matchAll(/(20\d\d-[01]\d-[0-3]\d)/g)) {
       if (nah(m[1])) { (funde[f] = funde[f] || []).push(`${i + 1}: ${m[1]}`); }
     }
