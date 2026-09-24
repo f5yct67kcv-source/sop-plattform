@@ -939,9 +939,9 @@ tbody tr.aus td { opacity: .55; }
 .of-abschluss { display: grid; grid-template-columns: 1fr 380px; gap: 14px; align-items: start; }
 
 /* ── Verlauf am Beleg (ENT-697) ──────────────────────────────────────
-   Gleiche Regeln in dashboard.html und betreiber.html. Unter 700 px wird
-   jede Zeile ein Block: Zeit und Wer oben, Was darunter (Entscheid des
-   Projektinhabers) -- keine waagrechte Scrollleiste. */
+   Gleiche Regeln in dashboard.html und betreiber.html -- bis auf die
+   Handy-Regeln: Der Betreiber-Bereich bekommt keine mobile Fassung
+   (ENT-701), das Stapeln unter 700 px gibt es nur im Cockpit. */
 .of-verlauf { margin-top: 14px; }
 .of-verlauf-titel { font-size: 11px; font-weight: 650; letter-spacing: .4px; text-transform: uppercase;
   color: var(--ink-2); margin-bottom: 12px; }
@@ -969,17 +969,6 @@ tbody tr.aus td { opacity: .55; }
 .vl-hinweis { font-size: 12.5px; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line);
   border-radius: 6px; padding: 8px 11px; margin-bottom: 12px; line-height: 1.5; }
 .vl-leer { color: var(--ink-3); font-size: 13px; }
-@media (max-width: 700px) {
-  .of-vl thead { display: none; }
-  .of-vl, .of-vl tbody, .of-vl tr, .of-vl td { display: block; width: auto; }
-  .of-vl tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
-  .of-vl tr:last-child { border-bottom: 0; }
-  .of-vl td { border: 0; padding: 0; }
-  .of-vl .vl-zeit, .of-vl .vl-wer { display: inline; font-size: 12.5px; color: var(--ink-2); }
-  .of-vl .vl-wer::before { content: ' · '; }
-  .of-vl .vl-was { margin-top: 3px; }
-  .vl-auf { min-height: 44px; display: inline-flex; align-items: center; }
-}
 .of-kopf-zwei { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 14px; }
 .of-lbl-zeile { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
 .of-lbl-zeile label { margin-bottom: 0; }
