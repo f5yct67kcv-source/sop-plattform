@@ -52,10 +52,10 @@ const DATEN = [
   '2026-03-08', // Sonntag
   '2026-03-28', // Samstag vor der Zeitumstellung
   '2026-03-29', // Sonntag, Beginn der Sommerzeit
-  '2026-10-24', // Samstag vor dem Ende der Sommerzeit
-  '2026-10-25', // Sonntag, Ende der Sommerzeit
-  '2026-12-31', // Jahresende, letzter Tag im Regelwerk
-  '2027-01-01', // ausserhalb des Regelwerks -- muss null ergeben
+  '2026-10-24', // kalenderfest: Samstag vor dem Ende der Sommerzeit
+  '2026-10-25', // kalenderfest: Sonntag, Ende der Sommerzeit
+  '2026-12-31', // kalenderfest: Jahresende, letzter Tag im Regelwerk
+  '2027-01-01', // kalenderfest: ausserhalb des Regelwerks -- muss null ergeben
 ];
 const ZEITEN = [];
 for (let h = 0; h < 24; h++) {
@@ -149,8 +149,8 @@ if (phpErgebnis) {
   check('Darunter sind Faelle ohne Bonus und Faelle mit Bonus',
     phpErgebnis.some(r => r.bonus === 0) && phpErgebnis.some(r => r.bonus > 0));
   check('KRITISCH: ausserhalb des Regelwerk-Zeitraums liefern BEIDE Fassungen null, statt zu rechnen',
-    phpErgebnis.some((r, i) => faelle[i].datum === '2027-01-01' && r.bonus === null)
-    && jsErgebnis.some((r, i) => faelle[i].datum === '2027-01-01' && r.bonus === null));
+    phpErgebnis.some((r, i) => faelle[i].datum === '2027-01-01' && r.bonus === null) // kalenderfest: ausserhalb des Regelwerks
+    && jsErgebnis.some((r, i) => faelle[i].datum === '2027-01-01' && r.bonus === null)); // kalenderfest: ausserhalb des Regelwerks
   check('KRITISCH: eine Pause laenger als die Schicht ergibt in beiden Fassungen keine Zeit, keine negative',
     phpErgebnis.some((r, i) => faelle[i].pause === 2000 && r.netto === ''));
   check('KRITISCH: die Sparte Reinigung schaltet in beiden Fassungen ab, andere Werte nicht',
