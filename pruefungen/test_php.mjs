@@ -607,6 +607,7 @@ for (const [datei, titel] of [
   ['pruef_push.php', 'KRITISCH: die VAPID-Signatur haelt der Gegenpruefung stand und ein toter Endpunkt wird abgemeldet (ENT-424)'],
   ['pruef_mitteilung_loeschen.php', 'KRITISCH: eine laufende Mitteilung laesst sich auch am Browser vorbei nicht loeschen (ENT-433)'],
   ['pruef_mitteilung_antwort.php', 'KRITISCH: auf einen fremden oder nicht sichtbaren Termin laesst sich nicht zusagen (ENT-436)'],
+  ['pruef_rapport_liste.php', 'KRITISCH: die Rapportliste traegt keine Unterschriftsbilder, sagt aber, ob eine da ist -- und ?id= haelt dieselbe Grenze'],
   ['pruef_mitteilung_liste.php', 'KRITISCH: die Antwortliste eines Termins nennt ALLE Empfaenger, auch die ohne Antwort (ENT-436)'],
   ['pruef_kundenportal.php', 'KRITISCH: Sitzungsablauf, Einmal-Code und E-Mail-Abgleich des Kundenportals stimmen (ENT-441)'],
   ['pruef_wachbuch.php', 'KRITISCH: das Wachbuch fuehrt vier Quellen richtig zusammen, sortiert und kappt sie (ENT-480)'],

@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 17,
+            'datum' => '2026-09-24',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Cockpit startet schneller',
+            'text'  => 'Beim Start lädt das Cockpit die Unterschriften der Rapporte nicht mehr mit. Eine Unterschrift kommt erst, wenn du einen Rapport öffnest, druckst oder teilst. Je mehr Rapporte erfasst sind, desto mehr Zeit spart das.',
+        ],
+        [
             'nr'    => 16,
             'datum' => '2026-09-24',
             'art'   => 'verbesserung',
