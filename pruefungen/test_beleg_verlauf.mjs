@@ -11,7 +11,7 @@
 //   4. BEIDE OBERFLAECHEN zeichnen mit demselben Code, gemessen im Browser:
 //      volle Breite, Tabelle, Empfaenger-Etikett, nur Endpunkte gefaerbt,
 //      aufklappbar auch im gesperrten Beleg, vier Texte fuer vier Lagen, am
-//      Handy gestapelt ohne waagrechtes Scrollen.
+//      Handy gestapelt ohne waagrechtes Scrollen -- nur im Cockpit (ENT-701).
 import { WURZEL, HIER, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
 import { readFileSync } from 'fs';
@@ -76,10 +76,17 @@ for (const [datei, pf] of [['beleg_lesen.php', "''"], ['betreiber_beleg_lesen.ph
 
 // ── 5. Beide Oberflaechen: derselbe Code ─────────────────────────────
 const block = q => (q.match(/\/\* ── Verlauf am Beleg \(ENT-697\) ─+\s*\n\s*Zeichnet, was beleg_verlauf\(\)[\s\S]*?\nfunction ofVerlaufZeichnen\([\s\S]*?\n\}/) || [''])[0];
-const cssBlock = q => (q.match(/\/\* ── Verlauf am Beleg \(ENT-697\) ─+\s*\n\s*Gleiche Regeln[\s\S]*?\.vl-auf \{ min-height: 44px;[^}]*\}\n\}/) || [''])[0];
+// Die Regeln ohne Kommentar und ohne Handy-Teil: Die Handy-Regeln gibt es
+// nur im Cockpit (ENT-701), alles andere ist gleich.
+const cssBlock = q => {
+  const m = q.match(/\/\* ── Verlauf am Beleg \(ENT-697\) ─+[\s\S]*?\*\/\n([\s\S]*?\.vl-leer \{[^}]*\}\n)/);
+  return m ? m[1] : '';
+};
+const handyRegeln = q => /@media \(max-width: 700px\) \{\s*\.of-vl thead \{ display: none; \}/.test(q);
 const BS = lies('betreiber.html'), CS = lies('dashboard.html');
 check('KRITISCH: der Verlauf ist in beiden Oberflaechen derselbe Code', block(BS) !== '' && block(BS) === block(CS));
-check('KRITISCH: und dieselben Regeln', cssBlock(BS) !== '' && cssBlock(BS) === cssBlock(CS));
+check('KRITISCH: und dieselben Regeln', cssBlock(BS).length > 500 && cssBlock(BS) === cssBlock(CS));
+check('KRITISCH: das Stapeln am Handy gibt es nur im Cockpit (ENT-701)', handyRegeln(CS) && !handyRegeln(BS));
 check('GEGENPROBE: der Vergleich faengt eine Abweichung', block(BS) !== block(CS.replace('Noch nichts erfasst.', 'Nichts.')));
 check('GEGENPROBE: kein innerHTML im Verlauf -- Namen und Wortlaut kommen vom Empfaenger',
   block(BS).length > 500 && !/innerHTML/.test(block(BS)));
@@ -223,7 +230,8 @@ async function durchgang(name, oeffnen, breite) {
 
 const laeufe = [];
 for (const [name, f] of [['Betreiber', betreiber], ['Cockpit', cockpit]]) {
-  for (const breite of [1280, 390]) { laeufe.push(await durchgang(name, f, breite)); }
+  // Der Betreiber-Bereich hat keine mobile Fassung (ENT-701): nur am Desktop.
+  for (const breite of name === 'Betreiber' ? [1280] : [1280, 390]) { laeufe.push(await durchgang(name, f, breite)); }
 }
 await browser.close();
 
@@ -268,7 +276,7 @@ for (const e of laeufe) {
     check(`KRITISCH: ${n} — Handy: das Aufklappen ist mindestens 44 px hoch`, e.voll.knopfHoehe >= 44);
   }
 }
-const [bD, , cD] = laeufe;
+const [bD, cD] = laeufe;
 check('KRITISCH: beide Seiten zeigen dieselben Zeilen', JSON.stringify(bD.voll.texte) === JSON.stringify(cD.voll.texte));
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
