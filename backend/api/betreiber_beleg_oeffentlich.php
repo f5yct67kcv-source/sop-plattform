@@ -553,11 +553,11 @@ try {
             . '</div>';
     }
 
-    // Das Pruefprotokoll (ENT-688, Punkt 8) -- nur nach einer Annahme mit
-    // Code, und nur wenn die Fassung dazu passt.
-    $protokoll = ($unterschrift && $unterschrift['art'] === 'annahme' && $fassung
-                  && $b['status'] === 'bestaetigt' && $entschieden)
-        ? beleg_pruefprotokoll_html(beleg_pruefprotokoll_zeilen($b, $fassung, $unterschrift))
+    // Nach der Annahme eine schlichte Quittung, dezent am Ende des Dokuments
+    // (ENT-710). Das technische Pruefprotokoll bleibt intern.
+    $quittung = ($unterschrift && $unterschrift['art'] === 'annahme' && $fassung
+                 && $b['status'] === 'bestaetigt' && $entschieden)
+        ? beleg_annahme_quittung_html($unterschrift, $firma)
         : '';
 
     $spalte = 'padding:2px 24px 2px 0;color:#6B7280;font-size:12px';
@@ -651,10 +651,10 @@ try {
         . $abschnitt('Notizen', $b['oeffentliche_notizen'])
         . $abschnitt('Bedingungen', $b['bedingungen'])
         . $unterschriftsseite
-        . $protokoll
         . '<div style="margin-top:auto;padding-top:14px">'
         . ($b['fusszeile_text'] ? '<div style="border-top:1px solid #E5E8EC;padding-top:14px;white-space:pre-line;line-height:1.5;font-size:12px">' . nl2br(portal_esc($b['fusszeile_text'])) . '</div>' : '')
         . $betriebFusszeile
+        . $quittung
         . '</div>'
         . '</div>'
         . '</div>';

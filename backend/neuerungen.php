@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 16,
+            'datum' => '2026-09-24',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit', 'betreiber'],
+            'titel' => 'Quittung statt Prüfprotokoll beim Kunden',
+            'text'  => 'Nach der Annahme sieht dein Kunde am Ende des Dokuments nur noch einen kurzen Satz: wer wann angenommen hat. Prüfsumme, IP-Adresse und Browser stehen nur noch in deiner Fassung. Du öffnest sie bei der Offerte über „PDF mit Prüfprotokoll öffnen“, und sie liegt deiner Bestätigungsmail bei.',
+        ],
+        [
             'nr'    => 15,
             'datum' => '2026-09-24',
             'art'   => 'verbesserung',

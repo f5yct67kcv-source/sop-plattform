@@ -96,11 +96,22 @@ const offen = execFileSync('php', [`${HIER}/pruef_betreiber_beleg_rendern.php`, 
 check('GEGENPROBE: vor der Annahme bleibt "Herunterladen" die Kopie aus dem Browser',
   /id="btnHerunterladen" onclick="portalHerunterladen\(\)"/.test(offen));
 
-for (const [name, datei, ep] of [['Betreiber', 'betreiber.html', 'betreiber_beleg_pdf.php'], ['Cockpit', 'dashboard.html', 'beleg_pdf.php']]) {
+// ENT-710: Die interne Fassung mit dem vollen Pruefprotokoll gibt es nur
+// hinter der Anmeldung. Der Link des Kunden liefert die Kundenfassung.
+for (const [name, datei, anmeldung] of [
+  ['Betreiber', 'betreiber_beleg_pdf_intern.php', /\brequire_betreiber_voll\(\)/],
+  ['Cockpit', 'beleg_pdf_intern.php', /\$user = require_session\(\);\s*require_recht\(\$user, 'offerten_lesen'\)/]]) {
+  const ep = nurCode(lies('backend/api/' + datei));
+  check(`KRITISCH: ${name} — das PDF mit Pruefprotokoll verlangt die Anmeldung`,
+    anmeldung.test(ep) && ep.indexOf('beleg_pdf_intern(') > ep.search(anmeldung));
+  check(`KRITISCH: ${name} — der Link des Kunden liefert nie die interne Fassung`,
+    !/beleg_pdf_intern\(/.test(nurCode(lies('backend/api/' + datei.replace('_intern', '')))));
+}
+for (const [name, datei, ep] of [['Betreiber', 'betreiber.html', 'betreiber_beleg_pdf_intern.php'], ['Cockpit', 'dashboard.html', 'beleg_pdf_intern.php']]) {
   const q = lies(datei);
-  check(`KRITISCH: ${name} — die Sperrleiste verlinkt das unterschriebene PDF des eigenen Endpunkts`,
+  check(`KRITISCH: ${name} — die Sperrleiste verlinkt das PDF mit Pruefprotokoll des eigenen Endpunkts`,
     new RegExp(`const OF_PDF_ENDPUNKT = '${ep.replace('.', '\\.')}';`).test(q)
-    && /a\.href = API \+ OF_PDF_ENDPUNKT \+ '\?token=' \+ encodeURIComponent\(ofFormToken\)/.test(q));
+    && /a\.href = API \+ OF_PDF_ENDPUNKT \+ '\?id=' \+ encodeURIComponent\(ofFormId\)/.test(q));
 }
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
