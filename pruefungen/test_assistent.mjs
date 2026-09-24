@@ -346,11 +346,11 @@ check('Ein Klick auf einen Treffer öffnet den Einsatz', await page.evaluate(() 
 r = await fragen('Wer kann übermorgen von 18 bis 23 Uhr?', { name: 'verfuegbare_mitarbeitende', input: { datum: tag(2), von: '18:00', bis: '23:00' }, antwort: 'Einer ist frei.' });
 const inGruppe = (g, n) => (r[g] || []).some(x => x.name.includes(n));
 check('KRITISCH: wer zur selben Zeit eingeteilt ist, ist nicht verfügbar (konflikte())', inGruppe('nicht_verfuegbar', 'Muster') && inGruppe('nicht_verfuegbar', 'Hans'));
-// Anna hat den Einsatz zur selben Zeit abgelehnt. konflikte() im Cockpit
-// zaehlt auch eine abgelehnte Zuteilung als "bereits eingeteilt" -- der
-// Assistent sagt dasselbe wie der Zuteil-Dialog, nicht etwas anderes. Ob
-// das so bleiben soll, ist eine eigene Frage (als Befund gemeldet).
-check('Dieselbe Regel wie der Zuteil-Dialog: auch eine abgelehnte Zuteilung zählt als eingeteilt (Anna)', inGruppe('nicht_verfuegbar', 'Anna'));
+// Anna hat den Einsatz zur selben Zeit abgelehnt. Seit PR #359 gilt im
+// Cockpit dieselbe Regel wie in der Sperre des Servers (ENT-350): Eine
+// Absage belegt nicht. Der Assistent sagt dasselbe wie der Zuteil-Dialog.
+check('Dieselbe Regel wie Server und Zuteil-Dialog: eine abgelehnte Zuteilung belegt nicht (Anna ist verfügbar)',
+  inGruppe('verfuegbar', 'Anna') && !inGruppe('nicht_verfuegbar', 'Anna'));
 check('Ein selbst gesperrter Tag ist eine Einschränkung, keine Absage (Lea)', inGruppe('mit_einschraenkung', 'Lea'));
 check('Inaktive Mitarbeitende zählen nicht', !JSON.stringify(r).includes('Alt Muster'));
 check('KRITISCH: ohne Recht auf Abwesenheiten steht im Ergebnis, dass sie fehlen -- nicht stillschweigend „verfügbar"',
