@@ -404,9 +404,9 @@ check('Nach jeder Antwort rückt die nächste Frage nach (Von und Bis als ein Pu
 r = await fragen('7 bis 16 Uhr in Musterdorf, eine Person', { name: 'formular_ergaenzen', input: { von: '07:00', bis: '16:00', ort: 'Musterdorf', bedarf: 1 }, antwort: 'Bereit zum Prüfen.' });
 check('Eine gesagte „eine Person“ zählt, obwohl sie der Vorgabe gleicht; danach ist nichts mehr nachzufragen',
   Array.isArray(r.nachfragen) && r.nachfragen.length === 0);
-r = await fragen('Der Kunde ist Neufirma AG', { name: 'formular_ergaenzen', input: { kunde_name: 'Neufirma AG' }, antwort: 'Eingetragen.' });
+r = await fragen('Der Kunde ist Neukunde AG', { name: 'formular_ergaenzen', input: { kunde_name: 'Neukunde AG' }, antwort: 'Eingetragen.' });
 check('Einsatz: der Kunde lässt sich im Gespräch nachtragen; ausserhalb der Kundenliste orange, ohne neue Nachfrage',
-  (await page.inputValue('#enNKunde_name')) === 'Neufirma AG' && r.geaendert.includes('Kunde')
+  (await page.inputValue('#enNKunde_name')) === 'Neukunde AG' && r.geaendert.includes('Kunde')
   && await page.evaluate(() => document.getElementById('enNKunde_name').classList.contains('ki-offen'))
   && r.kunde_in_kundenliste === false && r.nachfragen.length === 0);
 r = await fragen('Doch die muster gmbh', { name: 'formular_ergaenzen', input: { kunde_name: 'muster gmbh' }, antwort: 'Eingetragen.' });
