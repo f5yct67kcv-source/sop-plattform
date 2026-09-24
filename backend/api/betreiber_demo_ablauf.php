@@ -25,7 +25,7 @@ require_once __DIR__ . '/../mailer.php';
 
 $schluessel = (string)($_GET['schluessel'] ?? '');
 // Der Platzhalter steht ZERLEGT da, und das mit Absicht: Diese Datei geht
-// ueber "cp backend/api/*.php" auch in dist/, dist-cupi24/ und die
+// mit der pauschalen Kopie aller Endpunkte auch in dist/, dist-cupi24/ und die
 // Demo-Plaetze. Dort soll der Zeitgeber nicht eingerichtet sein, und ein
 // Platzhalter am Stueck braeche deren Pruefung auf Uebriggebliebenes.
 // NUR das Betreiber-Buendel ersetzt ihn -- und zwar genau in dieser
