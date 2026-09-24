@@ -61,7 +61,11 @@ const RECHNUNGEN = [
 
 // Drehbuch des Modells: Auf eine Frage ruft es `aufruf` auf, auf das
 // Ergebnis antwortet es mit `antwort`. Was es zurueckbekam, wird gemerkt.
-let modellAntwort = null;
+// Der Server fuer das Sprachmodell (ENT-703): erst der Stand, dann die Datei.
+// staende: Folge der Antworten auf ?stand=1 (die letzte bleibt stehen).
+const MODELL = Buffer.alloc(1200000, 7);
+let modellServer = { staende: [{ phase: 'fertig' }], datei: [200, MODELL], posts: 0 };
+const modellNeu = (staende, datei) => { modellServer = { staende, datei: datei || [200, MODELL], posts: 0 }; };
 let drehbuch = null, belegeGesperrt = false, abwesenheitGesperrt = true, assistentAntwort = null, routerAntwort = null;
 const rufe = [];
 // Katalog und Kunden fuer die Formular-Werkzeuge (ENT-700). Die Antwort der
@@ -140,9 +144,15 @@ async function neueSeite() {
       zurueck.push(JSON.parse(r.content));
       return send({ status: 'ok', stop_reason: 'end_turn', content: [{ type: 'text', text: drehbuch.antwort }] });
     }
-    if (p.startsWith('assistent_weckwort_modell')) return modellAntwort
-      ? route.fulfill({ status: modellAntwort[0], contentType: modellAntwort[0] === 200 ? 'application/gzip' : 'application/json', body: modellAntwort[1] })
-      : route.fulfill({ status: 200, contentType: 'application/gzip', body: 'MODELL' });
+    if (p.startsWith('assistent_weckwort_modell')) {
+      if (req.method() === 'POST') { modellServer.posts++; return send({ status: 'ok' }); }
+      if (p.includes('stand=1')) {
+        const st = modellServer.staende.length > 1 ? modellServer.staende.shift() : modellServer.staende[0];
+        return send({ status: 'ok', grund: '', ...st });
+      }
+      const [code, body] = modellServer.datei;
+      return route.fulfill({ status: code, contentType: code === 200 ? 'application/gzip' : 'application/json', body });
+    }
     if (p.startsWith('ki_router_parse')) return routerAntwort ? send(routerAntwort[1], routerAntwort[0]) : send({ status: 'error', message: 'kein Mock' }, 502);
     if (p.startsWith('produkt_list')) return send({ status: 'ok', produkte: PR });
     if (p.startsWith('kunden_list')) return send({ status: 'ok', kunden: KU });
@@ -492,14 +502,46 @@ await page.waitForTimeout(100);
 check('Ausgeschaltet: Mikrofon zu, Anzeige weg', await page.evaluate(() => window.__vosk.gestoppt >= 1 && !document.getElementById('asWidget').classList.contains('horcht')));
 check('Die Einstellung bleibt gemerkt (aus)', await page.evaluate(() => localStorage.getItem('as_horchen') === '0'));
 
-modellAntwort = [503, JSON.stringify({ status: 'error', grund: 'modell_fehlt', message: 'Das Modell liess sich nicht herunterladen.' })];
-await page.evaluate(() => caches && caches.delete && caches.delete('guardops-weckwort')).catch(() => {});
+// Der Server scheitert beim Vorbereiten: sein Grund steht da.
+modellNeu([{ phase: 'fehler', grund: 'Das Modell liess sich nicht herunterladen (Zeitlimit)' }]);
+await page.evaluate(() => { asTakt = 30; });
 await page.click('#asHorch');
 await page.waitForTimeout(400);
-check('Fehlt das Modell, steht der Grund des Servers da, und das Zuhören schaltet sich aus',
-  /liess sich nicht herunterladen/.test(await page.textContent('#asVerlauf'))
+check('Scheitert der Server, steht sein Grund da, und das Zuhören schaltet sich aus',
+  /liess sich nicht herunterladen \(Zeitlimit\)/.test(await page.textContent('#asVerlauf'))
   && await page.evaluate(() => !document.getElementById('asHorch').classList.contains('an') && localStorage.getItem('as_horchen') === '0'));
-modellAntwort = null;
+
+// Noch nicht vorbereitet: einmal anstossen, Stand abfragen, dann laden.
+modellNeu([{ phase: '' }, { phase: 'laedt' }, { phase: 'packt' }, { phase: 'fertig' }, { phase: 'fertig' }]);
+await page.click('#asHorch');
+await page.waitForFunction(() => document.getElementById('asHorch').classList.contains('an'), null, { timeout: 5000 });
+check('Nicht vorbereitet: die Seite stösst die Vorbereitung genau einmal an und wartet auf den Stand', modellServer.posts === 1);
+await page.click('#asHorch'); await page.waitForTimeout(100);
+
+// Eine Fehlerseite mit Status 200 ist kein Modell.
+modellNeu([{ phase: 'fertig' }], [200, '<html>Fehler</html>']);
+await page.click('#asHorch');
+await page.waitForTimeout(400);
+check('Liefert der Server etwas anderes als ein Modell, sagt die Seite das', /kein Sprachmodell geliefert/.test(await page.textContent('#asVerlauf')));
+
+// Vosk startet nicht (haengt still): nach der Frist ein eigener Grund, kein endloses Blinken.
+modellNeu([{ phase: 'fertig' }]);
+await page.evaluate(() => { window.__createModelEcht = window.Vosk.createModel; window.Vosk.createModel = () => new Promise(() => {}); asFristModell = 300; });
+await page.click('#asHorch');
+await page.waitForTimeout(800);
+check('KRITISCH: hängt Vosk im Browser, nennt die Seite nach der Frist Schritt 3 und blinkt nicht endlos',
+  /Schritt 3\/4/.test(await page.textContent('#asVerlauf'))
+  && await page.evaluate(() => !document.getElementById('asHorch').classList.contains('laedt')));
+await page.evaluate(() => { window.Vosk.createModel = window.__createModelEcht; asFristModell = 120000; });
+
+// Die Bibliothek laedt nicht: Schritt 1.
+await page.evaluate(() => { window.__VoskEcht = window.Vosk; delete window.Vosk; asFristSkript = 300; });
+await page.route('**/vosk.js', r => new Promise(() => {}));
+await page.click('#asHorch');
+await page.waitForTimeout(800);
+check('Lädt die Bibliothek nicht, nennt die Seite Schritt 1', /Schritt 1\/4/.test(await page.textContent('#asVerlauf')));
+await page.evaluate(() => { window.Vosk = window.__VoskEcht; asFristSkript = 60000; });
+modellNeu([{ phase: 'fertig' }]);
 
 // Am Handy nicht (mobiler Zuschnitt nicht entschieden).
 await page.reload(); await page.waitForSelector('#shell.on'); await page.waitForTimeout(400);

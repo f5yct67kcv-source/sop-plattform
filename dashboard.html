@@ -13413,24 +13413,110 @@ function asSkriptLaden(url, sri) {
   });
 }
 
-// Das Modell kommt vom eigenen Server (assistent_weckwort_modell.php) und bleibt im
-// Browser zwischengespeichert. Der Worker von Vosk kann keinen Anmeldekopf
-// mitschicken -- darum laedt es diese Seite selbst und reicht eine lokale
-// Adresse weiter.
-async function asModellAdresse() {
+// Das Modell kommt vom eigenen Server (assistent_weckwort_modell.php) und
+// bleibt im Browser zwischengespeichert. Der Worker von Vosk kann keinen
+// Anmeldekopf mitschicken -- darum laedt diese Seite es selbst und reicht
+// eine lokale Adresse weiter.
+//
+// Seit ENT-703 in Schritten mit Frist und Anzeige: Vorher blinkte der Knopf
+// endlos, wenn ein Schritt hing, und niemand sah, welcher. Jede Frist nennt
+// ihren eigenen Grund.
+let asFristSkript = 60000;          // Bibliothek von jsDelivr
+let asFristVorbereiten = 900000;    // Server holt und packt das Modell (einmalig)
+let asFristStille = 120000;         // Herunterladen: so lange ohne neue Daten
+let asFristModell = 120000;         // Vosk startet das Modell im Browser
+let asTakt = 4000;                  // Abfrage des Stands auf dem Server
+const asMb = b => (b / 1048576).toFixed(1).replace('.', ',');
+
+function asMitFrist(versprechen, ms, grund) {
+  let uhr;
+  return Promise.race([versprechen, new Promise((_, nein) => { uhr = setTimeout(() => nein(new Error(grund)), ms); })])
+    .finally(() => clearTimeout(uhr));
+}
+const asModellKopf = () => (token ? { 'X-Auth-Token': token } : {});
+async function asModellStand() {
+  const r = await fetch(API + 'assistent_weckwort_modell.php?stand=1', { headers: asModellKopf() });
+  let d = {};
+  try { d = await r.json(); } catch (e) { d = {}; }
+  if (!r.ok) { throw new Error(d.message || `Der Server antwortet nicht wie erwartet (HTTP ${r.status}).`); }
+  return d;
+}
+
+async function asModellAdresse(schritt) {
   let blob = null;
   try { const c = await caches.open('guardops-weckwort'); const r = await c.match('modell-de-0.15'); if (r) { blob = await r.blob(); } }
   catch (e) { blob = null; }
-  if (!blob) {
-    const res = await fetch(API + 'assistent_weckwort_modell.php', { headers: token ? { 'X-Auth-Token': token } : {} });
-    if (!res.ok) {
-      let m = '';
-      try { m = (await res.json()).message || ''; } catch (e) { m = ''; }
-      throw new Error(m || 'Das Sprachmodell für das Weckwort ist nicht verfügbar.');
-    }
-    blob = await res.blob();
-    try { const c = await caches.open('guardops-weckwort'); await c.put('modell-de-0.15', new Response(blob)); } catch (e) { /* ohne Zwischenspeicher weiter */ }
+  if (blob && blob.size > 1000000) {
+    schritt('2/4 Sprachmodell aus dem Zwischenspeicher des Browsers …');
+    return URL.createObjectURL(blob);
   }
+
+  // a) Bereitet der Server es vor? Wenn nicht: anstossen und den Stand abfragen.
+  schritt('2/4 Frage den Server nach dem Sprachmodell …');
+  let stand = await asModellStand();
+  if (stand.phase !== 'fertig') {
+    if (stand.phase !== 'laedt' && stand.phase !== 'packt') {
+      // Die Antwort dieser Anfrage wird nicht abgewartet: Hostpoint bricht
+      // lange Anfragen womoeglich ab, die Vorbereitung laeuft trotzdem weiter.
+      fetch(API + 'assistent_weckwort_modell.php', { method: 'POST', headers: asModellKopf() }).catch(() => {});
+    }
+    const bis = Date.now() + asFristVorbereiten;
+    for (;;) {
+      if (stand.phase === 'fehler') { throw new Error('Der Server konnte das Sprachmodell nicht bereitstellen: ' + (stand.grund || 'ohne Angabe') + '.'); }
+      if (stand.phase === 'fertig') { break; }
+      if (Date.now() > bis) { throw new Error('Der Server hat das Sprachmodell nicht innert 15 Minuten bereitgestellt.'); }
+      const was = stand.phase === 'packt' ? 'packt es um' : 'lädt es herunter (einmalig, rund 45 MB)';
+      schritt(`2/4 Der Server ${was} …`);
+      await new Promise(ok => setTimeout(ok, asTakt));
+      stand = await asModellStand();
+    }
+  }
+
+  // b) Herunterladen, mit Fortschritt und Frist bei Stillstand.
+  const steuer = new AbortController();
+  let still = setTimeout(() => steuer.abort(), asFristStille);
+  let res;
+  try {
+    res = await fetch(API + 'assistent_weckwort_modell.php', { headers: asModellKopf(), signal: steuer.signal });
+  } catch (e) {
+    clearTimeout(still);
+    throw new Error('Das Sprachmodell liess sich nicht vom Server laden (keine Antwort).');
+  }
+  if (!res.ok) {
+    clearTimeout(still);
+    let m = '';
+    try { m = (await res.json()).message || ''; } catch (e) { m = ''; }
+    throw new Error(m || `Das Sprachmodell ist nicht verfügbar (HTTP ${res.status}).`);
+  }
+  const gesamt = Number(res.headers.get('Content-Length')) || 0;
+  const teile = [];
+  let geladen = 0;
+  try {
+    if (res.body && res.body.getReader) {
+      const leser = res.body.getReader();
+      for (;;) {
+        const { done, value } = await leser.read();
+        if (done) { break; }
+        teile.push(value);
+        geladen += value.length;
+        clearTimeout(still);
+        still = setTimeout(() => steuer.abort(), asFristStille);
+        schritt(`2/4 Sprachmodell: ${asMb(geladen)}${gesamt ? ' von ' + asMb(gesamt) : ''} MB …`);
+      }
+      blob = new Blob(teile, { type: 'application/gzip' });
+    } else {
+      blob = await res.blob();
+    }
+  } catch (e) {
+    throw new Error(`Das Herunterladen des Sprachmodells ist bei ${asMb(geladen)} MB stehengeblieben.`);
+  } finally {
+    clearTimeout(still);
+  }
+  // Eine Fehlerseite des Servers mit Status 200 waere kein Modell.
+  if (blob.size < 1000000) {
+    throw new Error('Der Server hat kein Sprachmodell geliefert, sondern etwas anderes (' + blob.size + ' Bytes).');
+  }
+  try { const c = await caches.open('guardops-weckwort'); await c.put('modell-de-0.15', new Response(blob)); } catch (e) { /* ohne Zwischenspeicher weiter */ }
   return URL.createObjectURL(blob);
 }
 
@@ -13450,11 +13536,16 @@ async function asWeckStart() {
   }
   asWeckZustand = 'laedt';
   asHorchZeichnen();
-  const hinweis = asNachricht('leise', 'Lade die Erkennung für „Hallo Wächter“ (beim ersten Mal rund 45 MB) …');
+  const hinweis = asNachricht('leise', '1/4 Lade die Erkennungsbibliothek …');
+  const schritt = t => { hinweis.textContent = t; };
   try {
-    await asSkriptLaden(AS_VOSK_URL, AS_VOSK_SRI);
-    const adresse = await asModellAdresse();
-    const model = await window.Vosk.createModel(adresse);
+    await asMitFrist(asSkriptLaden(AS_VOSK_URL, AS_VOSK_SRI), asFristSkript,
+      'Schritt 1/4: Die Erkennungsbibliothek (Vosk, von jsDelivr) liess sich nicht innert einer Minute laden.');
+    const adresse = await asModellAdresse(schritt);
+    schritt('3/4 Starte die Erkennung im Browser …');
+    const model = await asMitFrist(window.Vosk.createModel(adresse), asFristModell,
+      'Schritt 3/4: Die Erkennung startet in diesem Browser nicht (Vosk antwortet nicht innert zwei Minuten).');
+    schritt('4/4 Öffne das Mikrofon …');
     const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     // Nur das Weckwort und "unbekannt": Mehr soll diese Erkennung gar nicht

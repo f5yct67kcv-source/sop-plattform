@@ -1268,6 +1268,33 @@ function weckwort_modell_datei(): string
     return weckwort_verzeichnis() . '/model-de-0.15.tar.gz';
 }
 
+// Stand der Vorbereitung (ENT-703, Nachtrag): Der Browser fragt ihn ab,
+// statt minutenlang an einer einzigen Anfrage zu haengen, die Hostpoint
+// womoeglich abbricht. phase: '' (nie begonnen), laedt, packt, fertig, fehler.
+function weckwort_stand_setzen(string $phase, string $grund = ''): void
+{
+    $dir = weckwort_verzeichnis();
+    if (!is_dir($dir)) { @mkdir($dir, 0700, true); }
+    @file_put_contents($dir . '/stand.json', json_encode(['phase' => $phase, 'grund' => $grund, 'zeit' => time()]));
+}
+
+function weckwort_stand(): array
+{
+    $datei = weckwort_modell_datei();
+    if (is_file($datei) && filesize($datei) > 1000000) {
+        return ['phase' => 'fertig', 'grund' => '', 'groesse' => filesize($datei)];
+    }
+    $roh = @file_get_contents(weckwort_verzeichnis() . '/stand.json');
+    $s = $roh ? (json_decode($roh, true) ?: []) : [];
+    $phase = (string)($s['phase'] ?? '');
+    // Ein Stand "laedt/packt", der seit ueber 15 Minuten nicht weiterkam, ist
+    // ein abgebrochener Lauf -- dann darf ein neuer beginnen.
+    if (in_array($phase, ['laedt', 'packt'], true) && time() - (int)($s['zeit'] ?? 0) > 900) {
+        return ['phase' => 'fehler', 'grund' => 'Die Vorbereitung auf dem Server wurde abgebrochen (vermutlich Zeitlimit).', 'groesse' => 0];
+    }
+    return ['phase' => $phase === 'fertig' ? '' : $phase, 'grund' => (string)($s['grund'] ?? ''), 'groesse' => 0];
+}
+
 // Welche Pflichtdateien fehlen in einer Liste von Pfaden im Archiv? Die Pfade
 // liegen unter einem Ordner beliebigen Namens (im Original
 // "vosk-model-small-de-0.15/"). Rein, ohne Dateizugriff.
@@ -1384,7 +1411,9 @@ function weckwort_bereitstellen(): string
         if (is_file($ziel) && filesize($ziel) > 1000000) {
             return '';
         }
-        @set_time_limit(600);
+        @set_time_limit(900);
+        @ignore_user_abort(true);   // bricht die Anfrage ab, laeuft die Vorbereitung weiter
+        weckwort_stand_setzen('laedt');
         $zip = $dir . '/download.zip';
         $f = fopen($zip, 'w');
         $ch = curl_init(WECKWORT_MODELL_QUELLE);
@@ -1401,10 +1430,14 @@ function weckwort_bereitstellen(): string
         fclose($f);
         if (!$ok) {
             @unlink($zip);
-            return 'Das Modell liess sich nicht herunterladen' . ($fehler !== '' ? " ({$fehler})" : '') . '.';
+            $grund = 'Das Modell liess sich nicht herunterladen' . ($fehler !== '' ? " ({$fehler})" : '') . '.';
+            weckwort_stand_setzen('fehler', $grund);
+            return $grund;
         }
+        weckwort_stand_setzen('packt');
         $grund = weckwort_umpacken($zip, $ziel);
         @unlink($zip);
+        weckwort_stand_setzen($grund === '' ? 'fertig' : 'fehler', $grund);
         return $grund;
     } finally {
         flock($sperre, LOCK_UN);

@@ -355,6 +355,20 @@ pruef('KRITISCH: Pfade, die aus dem Zielordner hinauszeigen, gelten als unsicher
 pruef('Die Quelle ist fest und verschluesselt (https), keine Adresse aus der Anfrage',
     str_starts_with(WECKWORT_MODELL_QUELLE, 'https://'));
 
+// Stand der Vorbereitung (ENT-703): nur pruefen, wenn hier kein echtes Modell liegt.
+if (!is_file(weckwort_modell_datei())) {
+    $standDatei = weckwort_verzeichnis() . '/stand.json';
+    $vorher = is_file($standDatei) ? file_get_contents($standDatei) : null;
+    weckwort_stand_setzen('laedt');
+    pruef('Ein frischer Stand "laedt" wird so gemeldet', weckwort_stand()['phase'] === 'laedt');
+    file_put_contents($standDatei, json_encode(['phase' => 'laedt', 'grund' => '', 'zeit' => time() - 1000]));
+    pruef('KRITISCH: ein seit ueber 15 Minuten haengender Lauf gilt als abgebrochen -- sonst wartete der Browser ewig',
+        weckwort_stand()['phase'] === 'fehler' && weckwort_stand()['grund'] !== '');
+    weckwort_stand_setzen('fehler', 'Beispielgrund');
+    pruef('Ein Fehler kommt mit seinem Grund zurueck', weckwort_stand() === ['phase' => 'fehler', 'grund' => 'Beispielgrund', 'groesse' => 0]);
+    if ($vorher === null) { @unlink($standDatei); } else { file_put_contents($standDatei, $vorher); }
+}
+
 if (class_exists('ZipArchive') && class_exists('PharData')) {
     $tmp = sys_get_temp_dir() . '/pruef-weckwort-' . bin2hex(random_bytes(3));
     @mkdir($tmp, 0700, true);
