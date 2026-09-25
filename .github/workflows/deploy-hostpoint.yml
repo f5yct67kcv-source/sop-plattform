@@ -557,6 +557,35 @@ jobs:
             echo "STAGING_EXCLUDE_ENDE"
           } >> "$GITHUB_ENV"
 
+      # Software-Stand (ENT-696). Setzt Datum und Kurzkennung des
+      # ausgelieferten Commits in die QUELLDATEIEN dashboard.html (Cockpit)
+      # und app.html (Waechter-App im Browser) ein -- einmal, VOR jedem
+      # Buendel. Alle Buendel (dist/, cupi24, Demo-Plaetze ...) kopieren die
+      # beiden danach und erben den Stand, ohne dass jede
+      # Kopierstelle eine eigene Ersetzung braucht. Die Platzhalterform ist
+      # bewusst NICHT __X__: Die Waechter der Buendel verlangen fuer jeden
+      # __X__-Platzhalter eine Ersetzung je Buendel -- genau die fuenf
+      # Stellen, die dieser Schritt vermeidet.
+      #
+      # Commit-Datum statt Deploy-Datum: Derselbe Code traegt so immer
+      # dieselbe Kennung, auch wenn er ein zweites Mal ausgeliefert wird.
+      # Zuercher Zeit, weil ein Commit kurz nach Mitternacht sonst den
+      # Vortag truege.
+      #
+      # Kein Abbruch, wenn das Einsetzen versagt: Cockpit und App sagen dann
+      # selbst "nicht bekannt". Ein fehlender Stand ist kein Grund, eine
+      # Fehlerbehebung nicht auszuliefern -- die Warnung steht im Lauf.
+      - name: Software-Stand in dashboard.html und app.html einsetzen
+        run: |
+          STAND_DATUM=$(TZ=Europe/Zurich git log -1 --date=format-local:%Y-%m-%d --format=%cd)
+          STAND_KURZ=$(git rev-parse --short=7 HEAD)
+          sed -i "s|%%APP_STAND%%|$STAND_DATUM · $STAND_KURZ|g" dashboard.html app.html
+          if grep -q '%%APP_STAND%%' dashboard.html app.html; then
+            echo "::warning::Software-Stand nicht eingesetzt -- Cockpit und App zeigen 'nicht bekannt'."
+          else
+            echo "Software-Stand: $STAND_DATUM · $STAND_KURZ"
+          fi
+
       - name: Platzhalter durch echte Werte ersetzen
         run: |
           mkdir -p dist/api dist/icons dist/fonts dist/img dist/handbuch

@@ -958,6 +958,15 @@ html[data-desktop="an"] .desktop-zurueck { display: inline-flex; }
 
 #view-arbeitsergebnisse #aeInhalt { max-width: 980px; }
 #view-arbeitsergebnisse .rdkr-reiter { justify-content: flex-start; gap: 6px; }
+/* Software-Stand in der Supportansicht (ENT-696): eine Zeile, keine Karte.
+   Beschriftung in der feinen Versalform der Kartenkoepfe, Wert daneben in
+   Ziffern gleicher Breite -- die Kennung wird abgelesen und weitergegeben,
+   nicht ueberflogen. */
+.sp-stand { margin: -6px 0 16px; font-size: 12.5px; color: var(--ink-3);
+            display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.sp-stand-lbl { font-size: 10.5px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+.sp-stand-wert { font-variant-numeric: tabular-nums; user-select: all; }
+.sp-stand-wert.unbekannt { font-style: italic; }
 #view-arbeitsergebnisse .rdkr-tab { padding: 7px 10px; }
 /* Noch nicht verdrahtet: gedämpft statt mit einem "folgt"-Chip daneben
    (ENT-326). Der Chip war ehrlich, aber teuer -- fünfmal 41 px in einer
@@ -9023,6 +9032,21 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           </button>
         </div>
 
+        <!-- Software-Stand (ENT-696). Welcher Code gerade in DIESEM Browser
+             laeuft: Datum und Kurzkennung des Commits, eingesetzt vom
+             Deploy (Schritt "Software-Stand ... einsetzen").
+             Hier und nicht unter "Betrieb", weil man ihn braucht, wenn man
+             dem Betreiber etwas meldet -- "Betrieb" sind Angaben zum
+             eigenen Betrieb, nicht zur Software. Eine dezente Zeile statt
+             einer Karte (Vorgabe des Projektinhabers, 2026-09-23).
+             Nur am Desktop: Die Supportansicht ist zwar auch am Handy
+             erreichbar, ob die Zeile dort erscheint, ist aber eine eigene
+             Entscheidung (ENT-235) und noch nicht getroffen. -->
+        <p class="sp-stand nur-desktop" id="spStand">
+          <span class="sp-stand-lbl">Software-Stand</span>
+          <span class="sp-stand-wert" id="spStandWert"></span>
+        </p>
+
         <!-- Supportanfrage (ENT-538). Der Weg vom Betrieb zum Betreiber:
              ein Anliegen schildern, das nicht dringend genug fuer einen
              Anruf ist, und den Verlauf dazu nachlesen.
@@ -12886,6 +12910,7 @@ function go(view) {
   if (view === 'support') {
     $('nav-admin-support').classList.add('on');
     saLaden();
+    spStandSetzen();
     if (spFreigabeSetzen()) { sfLaden(); }
     // Immer auf "Meine Anfragen" beginnen, nicht im zuletzt besuchten
     // Reiter stehenbleiben -- gleiches Muster wie bkUebersichtZeigen() bei
@@ -25064,7 +25089,13 @@ function saUmgebung() {
              : /Firefox\//.test(ua) ? 'Firefox'
              : /Safari\//.test(ua)  ? 'Safari'
              : 'Browser unbekannt';
-  return name + ' · ' + window.innerWidth + '×' + window.innerHeight;
+  // Der Software-Stand gehoert dazu (ENT-696): Er sagt dem Betreiber, ob der
+  // Browser noch alten Code hatte. Angehaengt statt eigenes Feld -- keine
+  // Aenderung an der Betreiber-Datenbank, die Ansicht dort zeigt ihn mit.
+  // Unbekannt wird als solches gemeldet, nicht weggelassen.
+  const stand = appStand();
+  return name + ' · ' + window.innerWidth + '×' + window.innerHeight
+    + ' · ' + (stand ? 'Stand ' + stand : 'Stand nicht bekannt');
 }
 
 
@@ -25236,6 +25267,26 @@ function spFreigabeSetzen() {
 // Bereich stehen, gewechselt wird nur der Inhalt darunter, und der offene
 // Reiter wird markiert -- sonst sieht man der Seite nicht an, wo man ist.
 let spReiter = 'anfragen';
+// Software-Stand (ENT-696). Der Deploy ersetzt den Platzhalter in der
+// Konstante durch "JJJJ-MM-TT · abc1234" (Commit-Datum in Zuercher Zeit und
+// Kurzkennung des Commits; aus aufs-handy.sh ggf. mit "+ lokal geaendert").
+// Geprueft wird die FORM des Wertes, nicht, ob er noch dem Platzhalter
+// gleicht: Der Vergleichstext wuerde vom Deploy mitersetzt und die Pruefung
+// damit immer "eingesetzt" sagen.
+const APP_STAND = '%%APP_STAND%%';
+function appStand() {
+  return /^\d{4}-\d{2}-\d{2} · [0-9a-f]{7,40}( \+ lokal geändert)?$/.test(APP_STAND) ? APP_STAND : null;
+}
+// "Nicht bekannt" ist etwas anderes als ein leerer Stand: Die Seite kam dann
+// nicht ueber den Deploy (lokal geoeffnet) oder der Schritt hat versagt.
+function spStandSetzen() {
+  const el = $('spStandWert');
+  if (!el) { return; }
+  const stand = appStand();
+  el.textContent = stand || 'nicht bekannt – diese Seite kam nicht über den Deploy';
+  el.classList.toggle('unbekannt', !stand);
+}
+
 function spReiterZeigen(id) {
   // Ein Reiter, den es fuer diese Rolle nicht gibt, faellt auf den ersten
   // zurueck. Sonst stuende jemand ohne das Recht vor einer leeren Seite,
