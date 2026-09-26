@@ -9921,20 +9921,29 @@ async function ladeAlles() {
   // hinter dreizehn Listen, und scheiterte eine davon, kam es nie dran.
   // Nicht abgewartet -- es laeuft neben dem Laden her.
   const updatePruefung = pruefeEinrichtungUpdate().catch(() => {});
-  await ladeMandanten();
-  await ladeDemo();
-  await ladeKonten();
-  /* Der Offertenteil (ENT-605). ladeAdressen() entscheidet dabei auch, ob
-     der Teil ueberhaupt eingerichtet ist -- steht die Tabelle nicht, sagen
-     die Listen das und bieten das Einrichten an, statt leer dazustehen. */
-  await ladeAdressen();
-  await ladeProdukte();
-  await ladeBelege();
-  await ladeRechnungen();
-  await ladeBriefkopf();
-  /* Zuletzt, aber auf jeder Seite sichtbar: Das Abzeichen am Reiter steht
-     auch dann im Blick, wenn gerade ein anderer Bereich offen ist. */
-  await ladeSupport();
+  /* Die Listen laufen GLEICHZEITIG, nicht eine nach der anderen
+     (2026-09-26): Nacheinander wartete jede auf alle davor, der Start
+     dauerte so lange wie alle Abrufe zusammen. Keine haengt an einer
+     anderen -- mit einer Ausnahme, siehe unten.
+     allSettled statt all: Scheitert eine Liste, laden die anderen trotzdem
+     fertig. Vorher brach eine Ausnahme die Kette ab, und alles dahinter
+     blieb leer, ohne dass es hiess, warum. */
+  await Promise.allSettled([
+    ladeMandanten(),
+    ladeDemo(),
+    ladeKonten(),
+    /* Der Offertenteil (ENT-605). ladeAdressen() entscheidet dabei auch, ob
+       der Teil ueberhaupt eingerichtet ist (offertenBereit) -- steht die
+       Tabelle nicht, sagen die Listen das und bieten das Einrichten an,
+       statt leer dazustehen. Leistungen, Offerten und Rechnungen lesen
+       diesen Stand beim Zeichnen, darum erst danach, untereinander
+       gleichzeitig. */
+    ladeAdressen().then(() => Promise.allSettled([ladeProdukte(), ladeBelege(), ladeRechnungen()])),
+    ladeBriefkopf(),
+    /* Das Abzeichen am Reiter steht auch dann im Blick, wenn gerade ein
+       anderer Bereich offen ist. */
+    ladeSupport(),
+  ]);
   await updatePruefung;
 }
 
