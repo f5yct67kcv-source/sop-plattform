@@ -55,8 +55,12 @@ check('KRITISCH: Speichern verlangt eine Betreiber-Anmeldung mit zweitem Faktor'
 check('KRITISCH: Speichern nimmt nur eine gepruefte PNG-Zeichnung', /beleg_zeichnung_pruefen\(/.test(speichern));
 check('das Logbuch haelt das Neuzeichnen fest, ohne das Bild', /be_log\(\$pdo, \$ich, 'konto', \(int\)\$ich\['id'\], 'unterschrift', null, null, true\)/.test(speichern));
 const liste = nurCode(lies('backend/api/betreiber_konto_list.php'));
+// Seit 2026-09-26 holt die Liste fremde Bilder gar nicht erst aus der
+// Datenbank (be_unterschrift_da). Geprueft wird: Das Bild wird nur im Zweig
+// fuer das eigene Konto gelesen, und fremde Konten bekommen null.
 check('KRITISCH: das Bild verlaesst den Server nur fuer das eigene Konto',
-  /\$k\['unterschrift'\] = \(\$k\['ich'\] && /.test(liste));
+  /if \(\$k\['ich'\]\) \{[^}]*be_unterschrift_von\([^}]*\} else \{[^}]*\$k\['unterschrift'\] = null;[^}]*\}/.test(liste)
+  && (liste.match(/be_unterschrift_von\(/g) || []).length === 1);
 
 // ── 4. Nur Betreiber ─────────────────────────────────────────────────
 check('KRITISCH: das Cockpit kopiert keine Unterschrift in die Fassung (ENT-704, Punkt 5)',

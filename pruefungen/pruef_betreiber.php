@@ -502,6 +502,25 @@ $pruef('KRITISCH: auch beim unbekannten Code geht nichts aus der Anlage mit',
     && !str_contains($unbekannt, 'db_benutzer') && !str_contains($unbekannt, '10.0.0.7')
     && !str_contains($unbekannt, 'geheime_db') && !str_contains($unbekannt, 'Access denied'));
 
+// ── Unterschrift in der Kontenliste: "ob" ohne das Bild (2026-09-26) ──
+// be_unterschrift_da() muss dieselben drei Aussagen treffen wie
+// be_unterschrift_von(): null = Spalte fehlt, sonst gezeichnet ja/nein.
+// Leerer Text und reine Leerzeichen gelten wie dort als "nicht gezeichnet".
+$ud = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+$ud->exec('CREATE TABLE betreiber (id INTEGER PRIMARY KEY)');
+$pruef('KRITISCH: ohne Spalte heisst es "nicht eingerichtet" (null), nicht "nicht gezeichnet"',
+    be_unterschrift_da($ud, 1) === null && be_unterschrift_von($ud, 1) === null);
+$ud->exec('ALTER TABLE betreiber ADD COLUMN unterschrift TEXT');
+$ud->exec("INSERT INTO betreiber (id, unterschrift) VALUES (1, 'data:image/png;base64,QUJD'), (2, NULL), (3, ''), (4, '   ')");
+foreach ([1, 2, 3, 4] as $id) {
+    $bild = be_unterschrift_von($ud, $id);
+    $pruef("KRITISCH: Konto $id -- \"ob\" ohne Bild sagt dasselbe wie mit Bild",
+        be_unterschrift_da($ud, $id) === ($bild !== ''));
+}
+$pruef('Konto 1 ist gezeichnet, Konto 2 bis 4 nicht',
+    be_unterschrift_da($ud, 1) === true && be_unterschrift_da($ud, 2) === false
+    && be_unterschrift_da($ud, 3) === false && be_unterschrift_da($ud, 4) === false);
+
 echo count($bad) === 0
     ? "$ok bestanden, 0 nicht bestanden\n"
     : "$ok bestanden, " . count($bad) . " nicht bestanden\n";
