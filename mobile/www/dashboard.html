@@ -12771,6 +12771,8 @@ function asMerk(k, v) {
 function asStart() {
   if (asAktiv || !asUmgebungErlaubt() || !$('asWidget')) { return; }
   asAktiv = true;
+  // Safari und Chrome laden die Stimmenliste erst auf Nachfrage; ohne
+  // diesen Anstoss waere sie bei der ersten Antwort noch leer.
   // Zu Beginn schlaeft er in der Kopfzeile (ENT-702); die grosse Figur
   // erscheint erst nach Klicken oder Herausziehen.
   $('asWidget').hidden = true;
@@ -12793,6 +12795,16 @@ function asStart() {
   if (!$('asVerlauf').children.length) {
     asNachricht('er', 'Hallo. Frag mich nach Offerten, offenen Plätzen, Verfügbarkeit oder Rechnungen. Formulare bereite ich vor. Speichern tust du selbst.');
   }
+  // Der Hinweis auf eine bessere Stimme kommt gleich unter die Begruessung,
+  // sobald die Liste da ist -- nicht mitten ins Gespraech.
+  try {
+    if (window.speechSynthesis) {
+      const pruefen = () => { const l = window.speechSynthesis.getVoices() || []; if (l.length && !asStumm()) { asStimmeHinweis(asBesteStimme(l)); } return l.length > 0; };
+      if (!pruefen() && 'onvoiceschanged' in window.speechSynthesis) {
+        window.speechSynthesis.addEventListener('voiceschanged', function einmal() { if (pruefen()) { window.speechSynthesis.removeEventListener('voiceschanged', einmal); } });
+      }
+    }
+  } catch (e) { /* ohne Stimme weiter */ }
 }
 
 function asPanelUm() { $('asPanel').hidden ? asPanelAuf() : asPanelZu(); }
@@ -12887,13 +12899,47 @@ function asStimmeAus() {
 }
 // Die Stimme des Browsers (Entscheid ENT-699): gratis, bleibt auf dem Geraet.
 // Gibt es sie nicht, bleibt es beim Text -- kein Fehler.
+// Die beste deutsche Stimme auf dem Geraet (Nachtrag ENT-699): Vorher nahm
+// die Seite die erste, die der Browser nannte -- am Mac meist eine einfache
+// Kompakt-Stimme, darum klang es blechern. Bewertet wird die Qualitaet
+// (Apple Premium/Erweitert, Edge "Natural"/Online, Google in Chrome) vor der
+// Region; die absichtlich kuenstlichen Stimmen (Eloquence, Spassstimmen)
+// kommen zuletzt. Schweiz vor Deutschland nur bei gleicher Qualitaet.
+const AS_STIMME_KUENSTLICH = /eloquence|\b(eddy|flo|grandma|grandpa|oma|opa|reed|rocko|sandy|shelley|bad news|bahh|bells|boing|bubbles|cellos|jester|organ|superstar|trinoids|whisper|wobble|zarvox|albert|fred|junior|kathy|ralph)\b/i;
+function asStimmePunkte(s) {
+  const n = `${s.name || ''} ${s.voiceURI || ''}`;
+  let p = 0;
+  if (/premium/i.test(n)) { p += 40; }
+  else if (/enhanced|erweitert|verbessert/i.test(n)) { p += 30; }
+  else if (/natural|online/i.test(n)) { p += 35; }
+  else if (/google/i.test(n)) { p += 20; }
+  if (/compact|kompakt/i.test(n)) { p -= 5; }
+  if (AS_STIMME_KUENSTLICH.test(n)) { p -= 60; }
+  p += /^de-CH/i.test(s.lang) ? 3 : /^de-DE/i.test(s.lang) ? 2 : 1;
+  return p;
+}
+function asBesteStimme(stimmen) {
+  // Deutsch entscheidet die Sprache, nicht die Punktzahl: Auch eine einfache
+  // Stimme ist besser als eine fremdsprachige.
+  return (stimmen || []).filter(s => /^de/i.test(s.lang || ''))
+    .sort((a, b) => asStimmePunkte(b) - asStimmePunkte(a))[0] || null;
+}
+// Nur einfache Stimmen da: einmal pro Geraet sagen, wo es eine bessere gibt.
+function asStimmeHinweis(v) {
+  if (!v || asStimmePunkte(v) >= 20) { return; }
+  try { if (localStorage.getItem('as_stimme_hinweis') === '1') { return; } localStorage.setItem('as_stimme_hinweis', '1'); } catch (e) { return; }
+  const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+  asNachricht('leise', mac
+    ? 'Klingt die Stimme blechern? Am Mac: Systemeinstellungen → Bedienungshilfen → Gesprochene Inhalte → Systemstimme → Stimmen verwalten, dort eine deutsche Stimme mit „Premium“ laden. Danach die Seite neu laden.'
+    : 'Klingt die Stimme blechern? In den Spracheinstellungen des Systems lässt sich eine hochwertigere deutsche Stimme installieren; danach die Seite neu laden.');
+}
+
 function asSprechen(text) {
   if (asStumm() || !text || !window.speechSynthesis || typeof SpeechSynthesisUtterance !== 'function') { return; }
   try {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    const stimmen = window.speechSynthesis.getVoices() || [];
-    const v = stimmen.find(s => /^de-CH/i.test(s.lang)) || stimmen.find(s => /^de/i.test(s.lang));
+    const v = asBesteStimme(window.speechSynthesis.getVoices());
     if (v) { u.voice = v; }
     u.lang = v ? v.lang : 'de-CH';
     u.onstart = () => $('asWidget').classList.add('spricht');
