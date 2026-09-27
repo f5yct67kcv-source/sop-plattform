@@ -708,6 +708,10 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
     // festgeschriebene Schicht darf angesehen werden -- der Vermerk beruehrt
     // weder den Plan noch die Ist-Zeiten, auf denen die Feststellung beruht.
     'meine_gesehen.php': 'haelt nur fest, dass die eigene Schicht angesehen wurde',
+    // Testdaten der Testseite (ENT-714): leert zuerst alle Schichten und
+    // legt danach nur NEUE an -- eine neue Schicht kann nicht abgeglichen
+    // sein, gleicher Grund wie schichten_erzeugen.php. Nur auf Staging.
+    'testdaten.php': 'leert zuerst und legt nur neue Schichten an (ENT-714, nur Staging)',
   };
   const luecken = apiDateien.filter(f => {
     const q = ohneKommentar(f);

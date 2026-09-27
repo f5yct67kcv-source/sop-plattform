@@ -32,7 +32,7 @@ function hat_spalte(PDO $pdo, string $tabelle, string $spalte): bool {
 // definiert, wenn es sie noch nicht gibt; die SQLite-Fassungen oben gehen vor.
 require_once __DIR__ . '/../backend/planung_einrichten_kern.php';
 require_once __DIR__ . '/../backend/rechte.php';
-require_once __DIR__ . '/../backend/demo_daten.php';
+require_once __DIR__ . '/../backend/api/testdaten.php';
 require_once __DIR__ . '/../backend/planung_einrichten_kern.php';
 
 // ── Das echte Schema nach SQLite ─────────────────────────────────────
@@ -93,7 +93,11 @@ demo_reset_systemrollen_saeen($pdo);
 // Bestand vor dem Leeren: zwei Cockpit-Konten, eine Person ohne Cockpit,
 // ein Kunde, ein Beleg -- und eine Tabelle, die ein spaeteres Feature
 // anlegen koennte.
-$pdo->exec("INSERT INTO mitarbeiter (id, name, password_hash, ist_admin) VALUES (1, 'staging-admin', 'x', 1), (2, 'qa-admin', 'x', 0), (3, 'alt.person', 'x', 0)");
+// Seit ENT-684 traegt jedes Konto eine Personalnummer -- auch die, die
+// stehen bleiben. Sie duerfen nicht in die Planung rutschen.
+$pdo->exec("INSERT INTO mitarbeiter (id, name, password_hash, ist_admin, personalnummer, vorname, nachname) VALUES
+            (1, 'staging-admin', 'x', 1, '001', 'Staging', 'Admin'), (2, 'qa-admin', 'x', 0, '002', 'QA', 'Admin'),
+            (3, 'alt.person', 'x', 0, '003', 'Alt', 'Person')");
 $pdo->exec("INSERT INTO mitarbeiter_rollen (mitarbeiter_id, rolle) VALUES (1, 'administrator'), (2, 'verwaltung'), (3, 'mitarbeitend')");
 $pdo->exec("INSERT INTO kunden (name) VALUES ('Alter Kunde')");
 $pdo->exec("INSERT INTO sessions (token, mitarbeiter_id) VALUES ('abdruck1', 1)");
@@ -160,6 +164,10 @@ $pdo->beginTransaction(); $ab = td_abschluss($pdo, $HEUTE); $pdo->commit();
 
 $n = fn(string $sql, array $p = []) => (function () use ($pdo, $sql, $p) { $s = $pdo->prepare($sql); $s->execute($p); return $s->fetchColumn(); })();
 
+pruef('KRITISCH: die stehengebliebenen Konten sind nirgends eingeteilt',
+    (int)$n('SELECT COUNT(*) FROM einsatz_zuteilung WHERE mitarbeiter_id IN (1, 2)') === 0);
+pruef('KRITISCH: und in keinem Lohnlauf', (int)$n('SELECT COUNT(*) FROM lohnlauf_person WHERE mitarbeiter_id IN (1, 2)') === 0);
+pruef('Die Zusammenfassung zaehlt nur die erfundenen Personen', td_zusammenfassung($pdo)['mitarbeitende'] === 30);
 // Niemand an zwei Orten gleichzeitig.
 $doppelt = (int)$n('SELECT COUNT(*) FROM (SELECT z.mitarbeiter_id, e.datum FROM einsatz_zuteilung z JOIN einsaetze e ON e.id = z.einsatz_id
                     GROUP BY z.mitarbeiter_id, e.datum HAVING COUNT(*) > 1)');
