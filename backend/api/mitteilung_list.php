@@ -171,14 +171,16 @@ json_response(['status' => 'ok', 'eingerichtet' => true, 'mitteilungen' => $list
     // eingerichtet" zeigen kann (ENT-424). Seit ENT-604: EINGERICHTET,
     // sobald mindestens EIN Kanal es ist -- eine Mitteilung geht dann an
     // alle Geraete hinaus, die ihr Kanal erreichen kann.
-    'push_eingerichtet' => hat_tabelle($pdo, 'push_abo') && (push_konfiguriert() || push_apns_konfiguriert()),
+    'push_eingerichtet' => hat_tabelle($pdo, 'push_abo') && (push_konfiguriert() || push_apns_konfiguriert()
+                                                           || push_fcm_konfiguriert()),
     // WARUM nicht eingerichtet -- damit die Oberflaeche den noetigen
     // Handgriff nennen kann statt nur "fehlt" (ENT-424). Nennt nie den
     // Schluessel selbst. Bleibt Web Push, weil die weitaus meisten
     // Geraete (Browser, installierte PWA) darueber laufen; der
-    // APNs-Zustand steht zusaetzlich und einzeln zur Verfuegung.
+    // APNs- und der FCM-Zustand stehen zusaetzlich und einzeln zur Verfuegung.
     'push_grund' => hat_tabelle($pdo, 'push_abo') ? push_grund() : 'keine_tabelle',
     'push_apns_grund' => hat_tabelle($pdo, 'push_abo') ? push_apns_grund() : 'keine_tabelle',
+    'push_fcm_grund' => hat_tabelle($pdo, 'push_abo') ? push_fcm_grund() : 'keine_tabelle',
     'push_geraete' => hat_tabelle($pdo, 'push_abo')
         ? (int)$pdo->query('SELECT COUNT(*) FROM push_abo WHERE abgemeldet_am IS NULL')->fetchColumn()
         : -1,

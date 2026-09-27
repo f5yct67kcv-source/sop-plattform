@@ -50,6 +50,20 @@ openssl_pkey_export($pk, $pem);
 $apk = openssl_pkey_new(['curve_name' => 'prime256v1', 'private_key_type' => OPENSSL_KEYTYPE_EC]);
 openssl_pkey_export($apk, $apem);
 
+// Ein DRITTER fuer FCM (ENT-604, Android): Google verlangt RSA, und der
+// Schluessel steckt in einer Dienstkonto-Datei samt Projekt und Konto. Das
+// "token_uri" darin zeigt absichtlich woanders hin -- der Server darf ihm
+// nicht folgen (siehe FCM_TOKEN_ADRESSE).
+$fk = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+openssl_pkey_export($fk, $fpem);
+$fcmKonto = [
+    'type' => 'service_account', 'project_id' => 'pruef-projekt-42',
+    'private_key_id' => 'x', 'private_key' => $fpem,
+    'client_email' => 'versand@pruef-projekt-42.iam.gserviceaccount.com',
+    'token_uri' => 'https://boese.example.invalid/token',
+];
+$fcmB64 = base64_encode((string)json_encode($fcmKonto));
+
 $quelle = (string)file_get_contents(__DIR__ . '/../backend/push.php');
 pruef('KRITISCH: im Quelltext steht ein Platzhalter und kein echter Schluessel',
     str_contains($quelle, "'__VAPID_PRIVATE_PEM_B64__'"));
@@ -57,12 +71,13 @@ pruef('Dasselbe fuer die Kontaktadresse', str_contains($quelle, "'__VAPID_KONTAK
 pruef('Dasselbe fuer den APNs-Schluessel', str_contains($quelle, "'__APNS_KEY_P8_B64__'"));
 pruef('Dasselbe fuer die APNs-Key-ID', str_contains($quelle, "'__APNS_KEY_ID__'"));
 pruef('Dasselbe fuer die APNs-Team-ID', str_contains($quelle, "'__APNS_TEAM_ID__'"));
+pruef('Dasselbe fuer das FCM-Dienstkonto', str_contains($quelle, "'__FCM_DIENSTKONTO_B64__'"));
 
 $ersetzt = str_replace(
     ['__VAPID_PRIVATE_PEM_B64__', '__VAPID_KONTAKT__',
-     '__APNS_KEY_P8_B64__', '__APNS_KEY_ID__', '__APNS_TEAM_ID__'],
+     '__APNS_KEY_P8_B64__', '__APNS_KEY_ID__', '__APNS_TEAM_ID__', '__FCM_DIENSTKONTO_B64__'],
     [base64_encode($pem), 'mailto:pruefung@example.invalid',
-     base64_encode($apem), 'PRUEFKEYID01', 'PRUEFTEAMID9'],
+     base64_encode($apem), 'PRUEFKEYID01', 'PRUEFTEAMID9', $fcmB64],
     $quelle
 );
 $tmp = tempnam(sys_get_temp_dir(), 'push') . '.php';
@@ -251,12 +266,10 @@ pruef('KRITISCH: 401 ist eine Stoerung und entfernt kein Abo -- '
 pruef('Auch 403 entfernt nichts', push_antwort_deuten(403) === 'fehler');
 
 // ── KANAELE
-pruef('KRITISCH: Web Push und APNs sind gueltige Kanaele, FCM noch nicht '
-    . '(ENT-604, zweiter Bauabschnitt)',
-    PUSH_KANAELE === ['webpush', 'apns']);
+pruef('KRITISCH: Web Push, APNs und FCM sind die gueltigen Kanaele (ENT-604)',
+    PUSH_KANAELE === ['webpush', 'apns', 'fcm']);
 pruef('Ein erfundener Kanal gilt nicht', !push_kanal_gueltig('brieftaube'));
-pruef('KRITISCH: "fcm" gilt noch nicht -- ein Kanal, den niemand zustellen kann, '
-    . 'waere ein Versprechen ohne Deckung', !push_kanal_gueltig('fcm'));
+pruef('KRITISCH: "fcm" gilt -- die Android-App meldet sich damit an', push_kanal_gueltig('fcm'));
 
 // ── APNs: EINRICHTUNG
 pruef('Mit Schluessel, Key-ID und Team-ID gilt APNs als eingerichtet', push_apns_konfiguriert());
@@ -589,6 +602,146 @@ pruef('KRITISCH: push_zustellen() kennt keine Stufe mehr -- sie kann die Zustell
 $rw = new ReflectionFunction('push_webpush_senden');
 pruef('KRITISCH: auch der Web-Push-Weg kennt sie nicht mehr',
     $rw->getNumberOfParameters() === 1);
+
+// ── FCM (ENT-604, zweiter Bauabschnitt: Android) ─────────────────────────
+pruef('KRITISCH: mit einer gueltigen Dienstkonto-Datei gilt FCM als eingerichtet', push_fcm_konfiguriert());
+pruef('Und der Grund lautet "ok"', push_fcm_grund() === 'ok');
+pruef('Ein unbekannter Kanal gilt nie als eingerichtet', !push_kanal_konfiguriert('brieftaube'));
+pruef('KRITISCH: die Anmeldung fragt fuer "fcm" das Dienstkonto, nicht VAPID oder APNs',
+    push_kanal_konfiguriert('fcm') === push_fcm_konfiguriert());
+
+// Die Gruende einzeln -- dieselbe Bauart wie pruef_apns_grund_mit().
+function pruef_fcm_grund_mit(string $wert): string
+{
+    static $nr = 0; $nr++;
+    $quelle = (string)file_get_contents(__DIR__ . '/../backend/push.php');
+    $anfang = strpos($quelle, 'function push_fcm_grund(): string');
+    $ende = strpos($quelle, "\n}\n", $anfang);
+    $rumpf = substr($quelle, $anfang, $ende - $anfang + 2);
+    $rumpf = str_replace('function push_fcm_grund(): string', "function pruef_fcm_grund_$nr(): string", $rumpf);
+    $rumpf = str_replace('FCM_DIENSTKONTO_B64', "PRUEF_FCM_KONTO_$nr", $rumpf);
+    define("PRUEF_FCM_KONTO_$nr", $wert);
+    eval($rumpf);
+    return ('pruef_fcm_grund_' . $nr)();
+}
+$ec = openssl_pkey_new(['curve_name' => 'prime256v1', 'private_key_type' => OPENSSL_KEYTYPE_EC]);
+openssl_pkey_export($ec, $ecPem);
+$mit = fn(array $aenderung) => base64_encode((string)json_encode(array_merge($fcmKonto, $aenderung)));
+$fcmGruende = [
+    'kein Deploy gelaufen'   => pruef_fcm_grund_mit('__FCM_DIENSTKONTO_B64__'),
+    'Secret leer'            => pruef_fcm_grund_mit(''),
+    'unlesbar'               => pruef_fcm_grund_mit($fcmB64 . '%'),
+    // Die naheliegende Verwechslung: google-services.json gehoert in die
+    // App und hat keinen Schluessel.
+    'google-services.json'   => pruef_fcm_grund_mit(base64_encode((string)json_encode(
+        ['project_info' => ['project_id' => 'pruef-projekt-42'], 'client' => []]))),
+    'Projekt fehlt'          => pruef_fcm_grund_mit($mit(['project_id' => ''])),
+    'Konto fehlt'            => pruef_fcm_grund_mit($mit(['client_email' => ''])),
+    'Schluessel kaputt'      => pruef_fcm_grund_mit($mit(['private_key' => 'kein Schluessel'])),
+    'EC statt RSA'           => pruef_fcm_grund_mit($mit(['private_key' => $ecPem])),
+    'alles gut'              => pruef_fcm_grund_mit($fcmB64),
+];
+pruef('KRITISCH: ohne Deploy "kein_schluessel"', $fcmGruende['kein Deploy gelaufen'] === 'kein_schluessel');
+pruef('Leeres Secret ebenso', $fcmGruende['Secret leer'] === 'kein_schluessel');
+pruef('Unlesbar ist etwas anderes', $fcmGruende['unlesbar'] === 'schluessel_unlesbar');
+pruef('KRITISCH: google-services.json statt Dienstkonto wird als Verwechslung erkannt',
+    $fcmGruende['google-services.json'] === 'kein_dienstkonto');
+pruef('Fehlende Projekt-Kennung', $fcmGruende['Projekt fehlt'] === 'keine_projekt_id');
+pruef('Fehlende Kontoadresse', $fcmGruende['Konto fehlt'] === 'keine_kontoadresse');
+pruef('Kaputter Schluessel', $fcmGruende['Schluessel kaputt'] === 'schluessel_ungueltig');
+pruef('KRITISCH: ein EC-Schluessel ist fuer Google falsch -- RS256 verlangt RSA',
+    $fcmGruende['EC statt RSA'] === 'schluessel_ungueltig');
+pruef('Mit allem gilt es als eingerichtet', $fcmGruende['alles gut'] === 'ok');
+pruef('KRITISCH: die Handgriffe sind unterscheidbar -- "unbekannt" sieht nie aus wie "keine"',
+    count(array_unique($fcmGruende)) === 7);
+
+// Das JWT fuer das Zugangstoken -- signiert und mit dem oeffentlichen
+// Schluessel nachgeprueft, so wie Google es tut.
+$fJetzt = 1893495600;
+$fJwt = push_fcm_jwt($fJetzt);
+$fTeile = explode('.', (string)$fJwt);
+pruef('KRITISCH: das FCM-JWT hat drei Teile', count($fTeile) === 3);
+$fKopf = json_decode(push_b64url_zurueck($fTeile[0] ?? ''), true);
+$fRumpf = json_decode(push_b64url_zurueck($fTeile[1] ?? ''), true);
+pruef('KRITISCH: der Kopf nennt RS256', ($fKopf['alg'] ?? '') === 'RS256');
+pruef('KRITISCH: Aussteller ist das Dienstkonto', ($fRumpf['iss'] ?? '') === $fcmKonto['client_email']);
+pruef('KRITISCH: der Bereich ist Firebase Messaging und nichts Breiteres',
+    ($fRumpf['scope'] ?? '') === 'https://www.googleapis.com/auth/firebase.messaging');
+pruef('KRITISCH: Empfaenger ist Googles Token-Adresse -- NICHT das "token_uri" aus der Datei (ENT-501)',
+    ($fRumpf['aud'] ?? '') === 'https://oauth2.googleapis.com/token'
+    && FCM_TOKEN_ADRESSE === 'https://oauth2.googleapis.com/token');
+pruef('KRITISCH: eine Stunde gueltig, nicht laenger -- mehr nimmt Google nicht an',
+    ($fRumpf['iat'] ?? 0) === $fJetzt && ($fRumpf['exp'] ?? 0) === $fJetzt + 3600);
+$fPub = openssl_pkey_get_details($fk)['key'];
+pruef('KRITISCH: die Signatur haelt der Pruefung mit dem oeffentlichen Schluessel stand',
+    openssl_verify(($fTeile[0] ?? '') . '.' . ($fTeile[1] ?? ''),
+        push_b64url_zurueck($fTeile[2] ?? ''), $fPub, OPENSSL_ALGO_SHA256) === 1);
+$fFalsch = ($fTeile[0] ?? '') . '.' . push_b64url((string)json_encode(array_merge($fRumpf ?? [], ['iss' => 'boese@x.invalid'])));
+pruef('KRITISCH: ein verfaelschter Rumpf faellt durch -- sonst pruefte die Zeile oben nichts',
+    openssl_verify($fFalsch, push_b64url_zurueck($fTeile[2] ?? ''), $fPub, OPENSSL_ALGO_SHA256) !== 1);
+
+// Das Geraete-Token
+$fTok = 'd' . str_repeat('Xy9_-', 4) . ':APA91b' . str_repeat('Q7w-_zK3', 17);
+pruef('KRITISCH: ein Token in der Form von FCM gilt', push_fcm_token_gueltig($fTok));
+pruef('KRITISCH: eine URL gilt NICHT als FCM-Token -- sonst waere ein Web-Push-Abo als Android verbucht',
+    !push_fcm_token_gueltig('https://fcm.googleapis.com/fcm/send/' . str_repeat('a', 80)));
+pruef('Ein zu kurzer Wert gilt nicht', !push_fcm_token_gueltig('abc:def'));
+pruef('KRITISCH: Leerzeichen und Anfuehrungszeichen fallen durch',
+    !push_fcm_token_gueltig($fTok . ' x') && !push_fcm_token_gueltig($fTok . '"'));
+pruef('KRITISCH: die Anmeldung prueft je Kanal -- ein FCM-Token ist kein Web-Push-Endpunkt',
+    push_endpunkt_gueltig('fcm', $fTok) && !push_endpunkt_gueltig('webpush', $fTok));
+pruef('KRITISCH: und eine Web-Push-Adresse kein FCM-Token',
+    !push_endpunkt_gueltig('fcm', 'https://fcm.googleapis.com/fcm/send/abc'));
+pruef('Unbekannter Kanal: nie ein gueltiger Endpunkt', !push_endpunkt_gueltig('brieftaube', $fTok));
+
+// Die Projekt-Kennung steht in der Versandadresse
+pruef('Die Versandadresse ist die v1-Schnittstelle des Projekts',
+    push_fcm_adresse('pruef-projekt-42') === 'https://fcm.googleapis.com/v1/projects/pruef-projekt-42/messages:send');
+pruef('KRITISCH: eine Kennung mit Pfad oder Punkt gilt nicht',
+    !push_fcm_projekt_gueltig('a/../b') && !push_fcm_projekt_gueltig('boese.example')
+    && push_fcm_projekt_gueltig('pruef-projekt-42'));
+
+// Die Nachricht
+$fN = push_fcm_nachricht($fTok);
+pruef('KRITISCH: die Nachricht geht an genau dieses Geraet', ($fN['message']['token'] ?? '') === $fTok);
+pruef('KRITISCH: sofortige Zustellung wie bei Apple -- sonst haelt Android sie im Ruhemodus zurueck',
+    ($fN['message']['android']['priority'] ?? '') === 'HIGH');
+pruef('KRITISCH: ein angezeigter Alarm, keine stille Datennachricht',
+    isset($fN['message']['notification']['title'], $fN['message']['notification']['body']));
+$apnsAlarm = push_apns_nutzlast()['aps']['alert'] ?? [];
+pruef('KRITISCH: iOS und Android zeigen denselben festen Text (ENT-604, Risiken)',
+    ($fN['message']['notification'] ?? null) === $apnsAlarm);
+$rn = new ReflectionFunction('push_fcm_nachricht');
+pruef('KRITISCH: die Nachricht kennt nur das Token -- kein Mitteilungsinhalt kann zu Google (Festlegung 2)',
+    $rn->getNumberOfParameters() === 1);
+
+// Die Antworten von FCM
+$fehlerRumpf = fn(string $status, string $code) => (string)json_encode(['error' => [
+    'status' => $status,
+    'details' => [['@type' => 'type.googleapis.com/google.firebase.fcm.v1.FcmError', 'errorCode' => $code]]]]);
+pruef('KRITISCH: 200 ist zugestellt', push_fcm_antwort_deuten(200, '{"name":"x"}')['ausgang'] === 'ok');
+pruef('KRITISCH: UNREGISTERED entfernt das Abo',
+    push_fcm_antwort_deuten(404, $fehlerRumpf('NOT_FOUND', 'UNREGISTERED'))['ausgang'] === 'entfernen');
+pruef('KRITISCH: ein Token eines fremden Projekts ebenso',
+    push_fcm_antwort_deuten(403, $fehlerRumpf('PERMISSION_DENIED', 'SENDER_ID_MISMATCH'))['ausgang'] === 'entfernen');
+pruef('KRITISCH: INVALID_ARGUMENT entfernt NICHTS -- ein Fehler in der Nachricht loeschte sonst jedes Android-Abo',
+    push_fcm_antwort_deuten(400, $fehlerRumpf('INVALID_ARGUMENT', 'INVALID_ARGUMENT'))['ausgang'] === 'fehler');
+pruef('KRITISCH: 401 (Zugang abgelehnt) ist eine Stoerung, kein totes Geraet',
+    push_fcm_antwort_deuten(401, $fehlerRumpf('UNAUTHENTICATED', 'THIRD_PARTY_AUTH_ERROR'))['ausgang'] === 'fehler');
+pruef('Kontingent erschoepft ist eine Stoerung',
+    push_fcm_antwort_deuten(429, $fehlerRumpf('RESOURCE_EXHAUSTED', 'QUOTA_EXCEEDED'))['ausgang'] === 'fehler');
+pruef('Ein unlesbarer Rumpf ist eine Stoerung und nennt den Code',
+    push_fcm_antwort_deuten(503, '<html>')['meldung'] === 'HTTP 503');
+pruef('Der Grund steht in der Meldung',
+    push_fcm_antwort_deuten(404, $fehlerRumpf('NOT_FOUND', 'UNREGISTERED'))['meldung'] === 'UNREGISTERED');
+
+// Der Versand verzweigt: Ein Android-Abo geht an FCM und nicht, wie vor
+// diesem Bauabschnitt, auf den Web-Push-Weg. Ohne Netz pruefbar ueber ein
+// ungueltiges Token -- jeder Weg meldet es mit seinen eigenen Worten.
+$fZu = push_zustellen(['kanal' => 'fcm', 'endpunkt' => 'kaputt']);
+pruef('KRITISCH: ein FCM-Abo nimmt den FCM-Weg, nicht den Web-Push-Weg',
+    $fZu['meldung'] === 'Kein gueltiges Geraete-Token'
+    && push_zustellen(['kanal' => 'webpush', 'endpunkt' => 'kaputt'])['meldung'] !== $fZu['meldung']);
 
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

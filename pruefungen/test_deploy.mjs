@@ -120,7 +120,7 @@ for (const seite of [...seiten, ...phpDateien]) {
    eine Zeile, die nichts tut. */
 for (const [datei, platzhalter] of [
   ['backend/push.php', ['__VAPID_PRIVATE_PEM_B64__', '__VAPID_KONTAKT__',
-    '__APNS_KEY_P8_B64__', '__APNS_KEY_ID__', '__APNS_TEAM_ID__']],
+    '__APNS_KEY_P8_B64__', '__APNS_KEY_ID__', '__APNS_TEAM_ID__', '__FCM_DIENSTKONTO_B64__']],
   ['backend/api/push_versand.php', ['__PUSH_CRON_SCHLUESSEL__']],
 ]) {
   const inhalt = readFileSync(`${WURZEL}/${datei}`, 'utf8');
@@ -138,7 +138,8 @@ for (const [datei, platzhalter] of [
    Zeilen entfernt, genau diese Aussage wurde rot -- die generische blieb
    gruen. */
 for (const ziel of ['dist/push.php', 'dist-cupi24/push.php']) {
-  for (const ph of ['__APNS_KEY_P8_B64__', '__APNS_KEY_ID__', '__APNS_TEAM_ID__']) {
+  for (const ph of ['__APNS_KEY_P8_B64__', '__APNS_KEY_ID__', '__APNS_TEAM_ID__',
+                    '__FCM_DIENSTKONTO_B64__']) {
     check(`KRITISCH: ${ph} wird auch in ${ziel} ersetzt (nicht nur im jeweils anderen Buendel)`,
       new RegExp(`sed -i "s\\|${ph}\\|\\$EFF_${ph.slice(2, -2)}\\|g" ${ziel.replace('.', '\\.')}`)
         .test(workflow));

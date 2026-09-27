@@ -259,6 +259,10 @@ jobs:
           P_APNS_KEY_P8_B64: ${{ secrets.APNS_KEY_P8_B64 }}
           P_APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
           P_APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+          # FCM (ENT-604, Android). Dieselbe Begruendung wie bei APNs: NUR
+          # Production, die Store-App spricht immer mit der echten Anlage.
+          # Wert: base64 -w0 der Dienstkonto-JSON aus der Firebase-Konsole.
+          P_FCM_DIENSTKONTO_B64: ${{ secrets.FCM_DIENSTKONTO_B64 }}
         run: |
           set -euo pipefail
 
@@ -289,6 +293,7 @@ jobs:
             EFF_APNS_KEY_P8_B64="$P_APNS_KEY_P8_B64"
             EFF_APNS_KEY_ID="$P_APNS_KEY_ID"
             EFF_APNS_TEAM_ID="$P_APNS_TEAM_ID"
+            EFF_FCM_DIENSTKONTO_B64="$P_FCM_DIENSTKONTO_B64"
             EFF_DEMO_EMPFAENGER="$P_DEMO_EMPFAENGER"
             EFF_GUARDOPS_FTP_HOST="$P_GUARDOPS_FTP_HOST"
             EFF_GUARDOPS_FTP_USER="$P_GUARDOPS_FTP_USER"
@@ -363,6 +368,7 @@ jobs:
             EFF_APNS_KEY_P8_B64=""
             EFF_APNS_KEY_ID=""
             EFF_APNS_TEAM_ID=""
+            EFF_FCM_DIENSTKONTO_B64=""
             EFF_DEMO_EMPFAENGER="$S_DEMO_EMPFAENGER"
             # guardops.ch ist die ECHTE Verkaufsdomain. Ein Staging-Lauf hat
             # dort nichts verloren -- darum hier leer und KEIN Rueckfall auf
@@ -517,6 +523,7 @@ jobs:
             echo "EFF_APNS_KEY_P8_B64=$EFF_APNS_KEY_P8_B64"
             echo "EFF_APNS_KEY_ID=$EFF_APNS_KEY_ID"
             echo "EFF_APNS_TEAM_ID=$EFF_APNS_TEAM_ID"
+            echo "EFF_FCM_DIENSTKONTO_B64=$EFF_FCM_DIENSTKONTO_B64"
             echo "EFF_APP_BASIS_URL=$EFF_APP_BASIS_URL"
             echo "EFF_DEMO_EMPFAENGER=$EFF_DEMO_EMPFAENGER"
             echo "EFF_GUARDOPS_FTP_HOST=$EFF_GUARDOPS_FTP_HOST"
@@ -908,19 +915,16 @@ jobs:
           # Karte bleibt leer; test_deploy.mjs prueft das darum je Datei.
           sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist/dashboard.html
           sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist/portal.html
-          # Push-Benachrichtigungen (ENT-424). Wie bei SMTP bewusst NICHT
-          # erforderlich: Bleiben die Secrets ungesetzt, steht weiterhin
-          # woertlich "__VAPID_PRIVATE_PEM_B64__" in dist/push.php --
-          # push_konfiguriert() erkennt das und meldet "nicht eingerichtet",
-          # statt mit einem Platzhalter als Schluessel zu signieren.
-          # VAPID_PRIVATE_PEM_B64 ist base64 der PEM-Datei des privaten
-          # P-256-Schluessels, EINZEILIG (base64 -w0) -- sed vertraegt
-          # keine Zeilenumbrueche im Ersatzwert.
+          # Push (ENT-424; APNs/FCM seit ENT-604). Nicht erforderlich: Ungesetzt
+          # bleibt der Platzhalter stehen, und push_*grund() meldet "nicht
+          # eingerichtet", statt damit zu signieren. Alle Werte EINZEILIG
+          # (base64 -w0) -- sed vertraegt keine Zeilenumbrueche.
           sed -i "s|__VAPID_PRIVATE_PEM_B64__|$EFF_VAPID_PRIVATE_PEM_B64|g" dist/push.php
           sed -i "s|__VAPID_KONTAKT__|$EFF_VAPID_KONTAKT|g" dist/push.php
           sed -i "s|__APNS_KEY_P8_B64__|$EFF_APNS_KEY_P8_B64|g" dist/push.php
           sed -i "s|__APNS_KEY_ID__|$EFF_APNS_KEY_ID|g" dist/push.php
           sed -i "s|__APNS_TEAM_ID__|$EFF_APNS_TEAM_ID|g" dist/push.php
+          sed -i "s|__FCM_DIENSTKONTO_B64__|$EFF_FCM_DIENSTKONTO_B64|g" dist/push.php
           # Der Schluessel fuer den Zeitgeber-Aufruf (Hostpoint-Cronjob).
           # Ohne ihn bleibt dieser Weg zu; der Versand laeuft dann nur beim
           # Veroeffentlichen und beilaeufig beim Oeffnen der
@@ -1977,6 +1981,7 @@ jobs:
           sed -i "s|__APNS_KEY_P8_B64__|$EFF_APNS_KEY_P8_B64|g" dist-cupi24/push.php
           sed -i "s|__APNS_KEY_ID__|$EFF_APNS_KEY_ID|g" dist-cupi24/push.php
           sed -i "s|__APNS_TEAM_ID__|$EFF_APNS_TEAM_ID|g" dist-cupi24/push.php
+          sed -i "s|__FCM_DIENSTKONTO_B64__|$EFF_FCM_DIENSTKONTO_B64|g" dist-cupi24/push.php
           sed -i "s|__PUSH_CRON_SCHLUESSEL__|$EFF_PUSH_CRON_SCHLUESSEL|g" dist-cupi24/api/push_versand.php
 
           # CUPI-24-eigenes Branding (ENT-589, mandantenseitig -- schliesst
@@ -2409,11 +2414,11 @@ jobs:
             ersetze __VAPID_PRIVATE_PEM_B64__ "$G_VAPID_PEM" "dist-demo/$PLATZ/push.php"
             ersetze __VAPID_KONTAKT__ "$G_VAPID_KONTAKT" "dist-demo/$PLATZ/push.php"
             ersetze __PUSH_CRON_SCHLUESSEL__ "$G_PUSH_CRON" "dist-demo/$PLATZ/api/push_versand.php"
-            # Natives Push (ENT-604) bleibt leer: Die App im Store spricht
-            # mit der Anlage der Mandantin, nicht mit einer Demo-Instanz.
+            # Natives Push (ENT-604) leer: Die Store-App spricht nie mit einem Platz.
             ersetze __APNS_KEY_P8_B64__ "" "dist-demo/$PLATZ/push.php"
             ersetze __APNS_KEY_ID__ "" "dist-demo/$PLATZ/push.php"
             ersetze __APNS_TEAM_ID__ "" "dist-demo/$PLATZ/push.php"
+            ersetze __FCM_DIENSTKONTO_B64__ "" "dist-demo/$PLATZ/push.php"
 
             # ── Werte, die hier absichtlich LEER bleiben ─────────────────
             #

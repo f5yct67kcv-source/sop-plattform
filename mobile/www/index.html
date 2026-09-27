@@ -3221,7 +3221,7 @@ function nativeAppHuelle() {
 
 // ── Zustand
 // In der Huelle (Variante A, ENT-588) ist der API-Pfad NICHT relativ: Die
-// Herkunft dort ist capacitor://localhost (iOS) bzw. http://localhost
+// Herkunft dort ist capacitor://localhost (iOS) bzw. https://localhost
 // (Android), eine relative Adresse zeigte ins Buendel statt auf den
 // Server. Im Browser bleibt der bisherige, relative Pfad -- gleiche
 // Herkunft wie das Backend, kein CORS noetig.
@@ -5356,9 +5356,7 @@ function pushMoeglichNativ() {
 }
 
 // 'apns' auf iOS, 'fcm' auf Android -- dieselben Kanalnamen wie in
-// backend/push.php (PUSH_KANAELE). FCM ist dort noch nicht zustellfaehig
-// (ENT-604, zweiter Bauabschnitt); die Registrierung darf trotzdem schon
-// laufen, sie wird serverseitig nur noch nicht angeschrieben.
+// backend/push.php (PUSH_KANAELE).
 function nativePlattform() {
   const p = (window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || '';
   return p === 'ios' ? 'apns' : (p === 'android' ? 'fcm' : '');

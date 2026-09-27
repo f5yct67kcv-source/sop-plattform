@@ -13,8 +13,8 @@ declare(strict_types=1);
 //         ein Abo?
 // POST -- Abo anlegen ("an": endpunkt, keys) oder abmelden ("aus": endpunkt).
 //
-// SEIT ENT-604 auch fuer natives Push (APNs): `endpunkt` traegt dann das
-// Geraete-Token statt einer URL, `kanal` steht auf 'apns'. Dieselbe
+// SEIT ENT-604 auch fuer natives Push (APNs, FCM): `endpunkt` traegt dann
+// das Geraete-Token statt einer URL, `kanal` steht auf 'apns' bzw. 'fcm'. Dieselbe
 // Tabelle, derselbe Endpunkt -- nur die Gueltigkeitspruefung und die
 // "eingerichtet"-Frage verzweigen nach Kanal (push.php, Festlegung 1).
 require __DIR__ . '/../db.php';
@@ -65,6 +65,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         // bleibt.
         'apns_eingerichtet' => $tabelleDa && push_apns_konfiguriert(),
         'apns_grund'        => $tabelleDa ? push_apns_grund() : 'keine_tabelle',
+        'fcm_eingerichtet'  => $tabelleDa && push_fcm_konfiguriert(),
+        'fcm_grund'         => $tabelleDa ? push_fcm_grund() : 'keine_tabelle',
     ]);
 }
 
@@ -80,16 +82,17 @@ if (!$tabelleDa) {
 $in = json_decode(file_get_contents('php://input'), true) ?? [];
 $endpunkt = trim((string)($in['endpunkt'] ?? ''));
 // Der Kanal entscheidet, WAS "endpunkt" ueberhaupt ist -- bei Web Push
-// eine URL, bei APNs ein Geraete-Token. Vor der Anmelden-Pruefung
+// eine URL, bei APNs und FCM ein Geraete-Token. Vor der Anmelden-Pruefung
 // gebraucht (siehe unten), darum schon hier gelesen; beim Abmelden bleibt
 // der bisherige, kanal-unabhaengige Weg (der Wert kollidiert praktisch
 // nie zwischen den Formen).
 $kanalEingabe = trim((string)($in['kanal'] ?? 'webpush'));
-$istApns = $kanalEingabe === 'apns';
+$istNativ = in_array($kanalEingabe, ['apns', 'fcm'], true);
 
-if ($endpunkt === '' || (!$istApns && push_ursprung($endpunkt) === null)
-                     || ($istApns && !push_apns_token_gueltig($endpunkt))) {
-    json_response(['status' => 'error', 'message' => $istApns
+// Ein unbekannter Kanal faellt hier mit "kein gueltiger Endpunkt" durch --
+// push_endpunkt_gueltig() kennt nur die Kanaele aus PUSH_KANAELE.
+if (!push_endpunkt_gueltig($kanalEingabe, $endpunkt)) {
+    json_response(['status' => 'error', 'message' => $istNativ
         ? 'Kein gültiges Geräte-Token' : 'Kein gültiger Endpunkt (https erwartet)'], 400);
 }
 
@@ -113,10 +116,11 @@ if (!push_kanal_gueltig($kanal)) {
     json_response(['status' => 'error', 'message' => 'Unbekannter Kanal'], 400);
 }
 // Welcher Schluessel zaehlt, haengt vom Kanal ab -- ein Geraet ohne
-// Gegenstueck (VAPID fuer Web Push, APNs-Schluessel fuer 'apns') waere
+// Gegenstueck (VAPID fuer Web Push, APNs-Schluessel fuer 'apns',
+// Dienstkonto fuer 'fcm') waere
 // ein Abo, an das nie etwas zugestellt werden kann, und die App zeigte
 // trotzdem "eingeschaltet".
-if ($istApns ? !push_apns_konfiguriert() : !push_konfiguriert()) {
+if (!push_kanal_konfiguriert($kanal)) {
     json_response(['status' => 'error',
         'message' => 'Auf dem Server fehlt der Push-Schlüssel — bitte in der Einrichtung hinterlegen.'], 400);
 }
@@ -125,10 +129,10 @@ if ($istApns ? !push_apns_konfiguriert() : !push_konfiguriert()) {
 // heute NICHT gebraucht (es wird ohne Nutzlast verschickt, siehe
 // push.php), aber mitgespeichert: Sie stammen aus genau diesem Abo, und
 // ohne sie muesste spaeter jede Person ihr Abo neu erteilen, falls doch
-// einmal ein Titel mitgeschickt werden soll. Bei 'apns' gibt es beides
+// einmal ein Titel mitgeschickt werden soll. Bei 'apns'/'fcm' gibt es beides
 // nicht -- ein Geraete-Token ist kein Web-Push-Abo.
-$p256dh = $istApns ? null : trim((string)($in['p256dh'] ?? ''));
-$auth   = $istApns ? null : trim((string)($in['auth'] ?? ''));
+$p256dh = $istNativ ? null : trim((string)($in['p256dh'] ?? ''));
+$auth   = $istNativ ? null : trim((string)($in['auth'] ?? ''));
 // Geraetebezeichnung: freiwillig und kurz, damit in der Verwaltung nicht
 // nur eine Nummer steht. KEIN vollstaendiger User-Agent -- der ist ein
 // Wiedererkennungsmerkmal und wird hier nicht gebraucht.

@@ -9,7 +9,7 @@
 //  1. EIN ABO, MEHRERE KANAELE. Web Push kam zuerst, weil er ohne Apple-/
 //     Google-Freigabe funktioniert (ENT-424: "jetzt bauen, Aufruf an die
 //     Belegschaft spaeter"). Seit ENT-604 kommt natives Push dazu (APNs
-//     fuer iOS, FCM fuer Android folgt), weil die Store-App-Huelle Web
+//     fuer iOS, FCM fuer Android), weil die Store-App-Huelle Web
 //     Push technisch nicht empfangen kann (kein Service Worker in der
 //     Capacitor-WKWebView). Genau dafuer war die Spalte `kanal` von Anfang
 //     an vorgesehen: 'webpush' traegt eine URL in `endpunkt`, 'apns'/'fcm'
@@ -91,15 +91,71 @@ const APNS_TEAM_ID = '__APNS_TEAM_ID__';
 // sie im "apns-topic"-Kopf jeder Zustellung.
 const APNS_BUNDLE_ID = 'ch.guardops.mitarbeiter';
 
+// ── Das dritte Geheimnis: FCM (ENT-604, zweiter Bauabschnitt) ────────
+// Android bekommt seine Benachrichtigungen ueber Firebase Cloud Messaging,
+// HTTP-v1-Schnittstelle. Die alte Schnittstelle mit einem festen
+// "Server-Schluessel" hat Google abgeschaltet; v1 verlangt ein
+// Dienstkonto, mit dem sich der Server je Versand ein kurzlebiges
+// Zugangstoken holt (push_fcm_zugang).
+//
+// EIN Wert, nicht drei: Die Dienstkonto-Datei traegt Projekt-Kennung,
+// Konto-Adresse und privaten Schluessel beisammen. Getrennt hinterlegt
+// koennten sie aus zwei verschiedenen Projekten stammen -- und das faellt
+// erst auf, wenn nichts ankommt (dieselbe Ueberlegung wie Festlegung 3).
+//
+// Erzeugen: Firebase-Konsole -> Projekteinstellungen -> Dienstkonten ->
+// "Neuen privaten Schluessel generieren". Die heruntergeladene JSON-Datei
+// EINZEILIG kodiert hinterlegen (derselbe Grund wie bei VAPID_PRIVAT_B64):
+//     base64 -w0 dienstkonto.json
+const FCM_DIENSTKONTO_B64 = '__FCM_DIENSTKONTO_B64__';
+
+// Wohin das Zugangstoken beantragt wird. FEST und nicht aus der Datei
+// gelesen, obwohl sie ein "token_uri" mitbringt: Der Server schickt dorthin
+// ein signiertes JWT und wuerde jede Adresse aufrufen, die in dem Wert
+// steht (ENT-501, dieselbe Haltung wie PUSH_DIENSTE).
+const FCM_TOKEN_ADRESSE = 'https://oauth2.googleapis.com/token';
+const FCM_BEREICH = 'https://www.googleapis.com/auth/firebase.messaging';
+
+// Was auf dem Sperrbildschirm steht -- fuer BEIDE nativen Wege derselbe
+// feste Text (Festlegung 2). Eine Stelle, damit iOS und Android nicht
+// auseinanderlaufen (ENT-604, Risiken: "Text/Titel nur auf einem Weg
+// angepasst").
+const PUSH_NATIV_TITEL = 'GuardOpS';
+const PUSH_NATIV_TEXT  = 'Neue Mitteilung — zum Lesen öffnen';
+
 // Die Kanaele. EINE Liste -- Speichern und Versand befragen sie.
-// 'fcm' (Android) steht noch nicht drin: Ein Kanal, den niemand zustellen
-// kann, waere ein Versprechen ohne Deckung. Kommt dazu, wenn der
-// FCM-Versand gebaut wird (ENT-604, zweiter Bauabschnitt).
-const PUSH_KANAELE = ['webpush', 'apns'];
+const PUSH_KANAELE = ['webpush', 'apns', 'fcm'];
 
 function push_kanal_gueltig(string $wert): bool
 {
     return in_array($wert, PUSH_KANAELE, true);
+}
+
+/**
+ * Ist dieser Wert fuer diesen Kanal ueberhaupt ein Endpunkt? Bei Web Push
+ * eine URL eines bekannten Dienstes, bei APNs und FCM ein Geraete-Token.
+ * Unbekannter Kanal: nein.
+ */
+function push_endpunkt_gueltig(string $kanal, string $endpunkt): bool
+{
+    if ($endpunkt === '') { return false; }
+    if ($kanal === 'apns') { return push_apns_token_gueltig($endpunkt); }
+    if ($kanal === 'fcm')  { return push_fcm_token_gueltig($endpunkt); }
+    if ($kanal === 'webpush') { return push_ursprung($endpunkt) !== null; }
+    return false;
+}
+
+/**
+ * Kann an diesen Kanal zugestellt werden? Ein Abo ohne Gegenstueck auf
+ * dem Server waere eines, an das nie etwas ankommt -- und die App zeigte
+ * trotzdem "eingeschaltet".
+ */
+function push_kanal_konfiguriert(string $kanal): bool
+{
+    if ($kanal === 'apns') { return push_apns_konfiguriert(); }
+    if ($kanal === 'fcm')  { return push_fcm_konfiguriert(); }
+    if ($kanal === 'webpush') { return push_konfiguriert(); }
+    return false;
 }
 
 // ── Kodierung ─────────────────────────────────────────────────────────
@@ -495,15 +551,24 @@ function push_apns_kopfzeilen(string $jwt): array
     ];
 }
 
+/**
+ * Was Apple zugestellt bekommt. Eigene Funktion, damit sich pruefen laesst,
+ * dass iOS und Android denselben festen Text zeigen (push_fcm_nachricht).
+ */
+function push_apns_nutzlast(): array
+{
+    return ['aps' => [
+        'alert' => ['title' => PUSH_NATIV_TITEL, 'body' => PUSH_NATIV_TEXT],
+        'sound' => 'default',
+    ]];
+}
+
 function push_apns_versuch(string $token, string $jwt, bool $sandkasten): array
 {
     $ch = curl_init(push_apns_adresse($token, $sandkasten));
     curl_setopt_array($ch, [
         CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => (string)json_encode(['aps' => [
-            'alert' => ['title' => 'GuardOpS', 'body' => 'Neue Mitteilung — zum Lesen öffnen'],
-            'sound' => 'default',
-        ]]),
+        CURLOPT_POSTFIELDS     => (string)json_encode(push_apns_nutzlast()),
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 10,
         CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_2_0,
@@ -527,6 +592,235 @@ function push_apns_versuch(string $token, string $jwt, bool $sandkasten): array
         return ['code' => $code, 'ausgang' => 'entfernen', 'meldung' => $grund];
     }
     return ['code' => $code, 'ausgang' => 'fehler', 'meldung' => $grund ?: ('HTTP ' . $code)];
+}
+
+// ── FCM (ENT-604, zweiter Bauabschnitt) ──────────────────────────────
+// Andere Kryptografie als VAPID und APNs: Google verlangt RS256 (RSA),
+// nicht ES256. push_der_zu_roh() wird hier darum NICHT gebraucht -- eine
+// RSA-Signatur hat keine DER-Huelle.
+
+/**
+ * Die Dienstkonto-Datei, gelesen und geprueft -- oder null.
+ * Statisch gemerkt wie push_apns_privatschluessel(), derselbe Grund.
+ *
+ * Rueckgabe: ['projekt' => ..., 'konto' => ..., 'schluessel' => OpenSSL-Schluessel]
+ */
+function push_fcm_dienstkonto(): ?array
+{
+    static $konto = false;
+    if ($konto !== false) { return $konto; }
+    $konto = null;
+    if (push_fcm_grund() !== 'ok') { return null; }
+    $d = json_decode((string)base64_decode(FCM_DIENSTKONTO_B64, true), true);
+    $k = openssl_pkey_get_private((string)$d['private_key']);
+    if ($k === false) { return null; }
+    $konto = ['projekt' => (string)$d['project_id'], 'konto' => (string)$d['client_email'], 'schluessel' => $k];
+    return $konto;
+}
+
+/**
+ * Die Projekt-Kennung steht in der Adresse des Versands. Darum eng
+ * geprueft: Firebase vergibt Kleinbuchstaben, Ziffern und Bindestriche,
+ * 6 bis 30 Zeichen. Was anderes enthaelt, ist keine Kennung.
+ */
+function push_fcm_projekt_gueltig(string $p): bool
+{
+    return (bool)preg_match('/^[a-z][a-z0-9-]{4,29}$/', $p);
+}
+
+/**
+ * WARUM ist FCM nicht eingerichtet? Dieselbe Idee wie push_apns_grund():
+ * jeder Handgriff seine eigene Antwort, nie der Schluessel selbst.
+ */
+function push_fcm_grund(): string
+{
+    if (FCM_DIENSTKONTO_B64 === '' || str_starts_with(FCM_DIENSTKONTO_B64, '__FCM')) { return 'kein_schluessel'; }
+    $roh = base64_decode(FCM_DIENSTKONTO_B64, true);
+    if ($roh === false || $roh === '') { return 'schluessel_unlesbar'; }
+    $d = json_decode($roh, true);
+    // Eine andere JSON-Datei aus der Firebase-Konsole -- typischerweise
+    // google-services.json, die in die APP gehoert und keinen Schluessel
+    // enthaelt. Eigene Antwort, weil die Verwechslung naheliegt.
+    if (!is_array($d) || ($d['type'] ?? '') !== 'service_account') { return 'kein_dienstkonto'; }
+    if (!push_fcm_projekt_gueltig((string)($d['project_id'] ?? ''))) { return 'keine_projekt_id'; }
+    if (!filter_var((string)($d['client_email'] ?? ''), FILTER_VALIDATE_EMAIL)) { return 'keine_kontoadresse'; }
+    $k = openssl_pkey_get_private((string)($d['private_key'] ?? ''));
+    if ($k === false) { return 'schluessel_ungueltig'; }
+    $det = openssl_pkey_get_details($k);
+    if (($det['type'] ?? -1) !== OPENSSL_KEYTYPE_RSA) { return 'schluessel_ungueltig'; }
+    return 'ok';
+}
+
+function push_fcm_konfiguriert(): bool
+{
+    return push_fcm_grund() === 'ok';
+}
+
+/**
+ * Ein FCM-Registrierungstoken: Buchstaben, Ziffern, "-", "_" und ":",
+ * in der Praxis 140 bis 200 Zeichen. Es steht im RUMPF des Versands, nicht
+ * in der Adresse -- die Pruefung haelt trotzdem alles fern, was sich in
+ * JSON oder einem Protokolleintrag anders verhalten koennte.
+ */
+function push_fcm_token_gueltig(string $t): bool
+{
+    return (bool)preg_match('/^[A-Za-z0-9_:\-]{64,4096}$/', $t);
+}
+
+/**
+ * Das JWT, mit dem der Server bei Google ein Zugangstoken beantragt
+ * ("Service account"-Ablauf, RFC 7523). Eine Stunde gueltig -- laenger
+ * nimmt Google nicht an.
+ */
+function push_fcm_jwt(?int $jetzt = null): ?string
+{
+    $konto = push_fcm_dienstkonto();
+    if ($konto === null) { return null; }
+    $jetzt = $jetzt ?? time();
+    $kopf  = push_b64url((string)json_encode(['alg' => 'RS256', 'typ' => 'JWT']));
+    $rumpf = push_b64url((string)json_encode([
+        'iss'   => $konto['konto'],
+        'scope' => FCM_BEREICH,
+        'aud'   => FCM_TOKEN_ADRESSE,
+        'iat'   => $jetzt,
+        'exp'   => $jetzt + 3600,
+    ], JSON_UNESCAPED_SLASHES));
+    $sig = '';
+    if (!openssl_sign($kopf . '.' . $rumpf, $sig, $konto['schluessel'], OPENSSL_ALGO_SHA256)) { return null; }
+    return $kopf . '.' . $rumpf . '.' . push_b64url($sig);
+}
+
+/**
+ * Das Zugangstoken fuer den Versand. EINMAL je Aufruf geholt und gemerkt:
+ * Eine Mitteilung an 30 Geraete braucht ein Token, nicht dreissig.
+ * Gibt ['token' => ..] oder ['fehler' => ..] zurueck.
+ */
+function push_fcm_zugang(): array
+{
+    static $zugang = null;
+    if ($zugang !== null) { return $zugang; }
+    $jwt = push_fcm_jwt();
+    if ($jwt === null) { return ['fehler' => 'FCM ist nicht eingerichtet']; }
+    $ch = curl_init(FCM_TOKEN_ADRESSE);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => http_build_query([
+            'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            'assertion'  => $jwt,
+        ]),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 10,
+        CURLOPT_HTTPHEADER     => ['content-type: application/x-www-form-urlencoded'],
+    ]);
+    $antwort = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    $netzfehler = curl_error($ch);
+    curl_close($ch);
+    $d = json_decode((string)$antwort, true);
+    if ($code === 200 && is_array($d) && !empty($d['access_token'])) {
+        $zugang = ['token' => (string)$d['access_token']];
+        return $zugang;
+    }
+    // Ein Fehlschlag wird NICHT gemerkt: Beim naechsten Geraet derselben
+    // Mitteilung wird es erneut versucht -- eine kurze Stoerung bei Google
+    // soll nicht die ganze Mitteilung kosten.
+    if ($antwort === false && $code === 0) { return ['fehler' => $netzfehler ?: 'keine Verbindung']; }
+    return ['fehler' => 'Zugangstoken abgelehnt: ' . (is_array($d) ? (string)($d['error'] ?? ('HTTP ' . $code)) : ('HTTP ' . $code))];
+}
+
+function push_fcm_adresse(string $projekt): string
+{
+    return 'https://fcm.googleapis.com/v1/projects/' . $projekt . '/messages:send';
+}
+
+/**
+ * Die Nachricht an ein Geraet. Eigene Funktion, damit sich Inhalt und
+ * Dringlichkeit ohne Netz pruefen lassen.
+ *
+ * "priority: HIGH" fuer JEDE Mitteilung -- derselbe Grund wie
+ * "apns-priority: 10" (push_apns_kopfzeilen): Normale Prioritaet darf
+ * Android im Ruhemodus ("Doze") zurueckhalten, bis das Geraet ohnehin
+ * aufwacht. Beide Kanaele verhalten sich hier gleich.
+ *
+ * Ein "notification"-Block und nicht nur "data": Nur so zeigt Android die
+ * Meldung selbst an, wenn die App nicht laeuft. Der Text ist der feste
+ * aus PUSH_NATIV_TEXT, nie Titel oder Inhalt der Mitteilung.
+ */
+function push_fcm_nachricht(string $token): array
+{
+    return ['message' => [
+        'token'        => $token,
+        'notification' => ['title' => PUSH_NATIV_TITEL, 'body' => PUSH_NATIV_TEXT],
+        'android'      => [
+            'priority'     => 'HIGH',
+            'notification' => ['sound' => 'default'],
+        ],
+    ]];
+}
+
+/**
+ * Was die Antwort von FCM fuer das Abo heisst.
+ *
+ * Entfernt wird NUR, wenn Google ausdruecklich sagt, dass es das Geraet
+ * nicht (mehr) gibt: UNREGISTERED (App entfernt, Token abgelaufen) oder
+ * SENDER_ID_MISMATCH (Token eines anderen Firebase-Projekts -- kann hier
+ * nie zugestellt werden).
+ *
+ * NICHT entfernt wird bei INVALID_ARGUMENT, obwohl Google damit auch ein
+ * kaputtes Token meldet: Derselbe Code steht fuer eine fehlerhafte
+ * Nachricht. Waere ein Fehler in push_fcm_nachricht() der Grund, loeschte
+ * der erste Versand JEDES Android-Abo -- still, und die Telefone
+ * blieben stumm. Ein wirklich kaputtes Token faengt ohnehin schon
+ * push_fcm_token_gueltig() ab.
+ */
+function push_fcm_antwort_deuten(int $code, string $rumpf): array
+{
+    if ($code >= 200 && $code < 300) { return ['code' => $code, 'ausgang' => 'ok', 'meldung' => '']; }
+    $d = json_decode($rumpf, true);
+    $grund = '';
+    foreach ((array)($d['error']['details'] ?? []) as $det) {
+        if (is_array($det) && !empty($det['errorCode'])) { $grund = (string)$det['errorCode']; break; }
+    }
+    if ($grund === '') { $grund = (string)($d['error']['status'] ?? ''); }
+    if (in_array($grund, ['UNREGISTERED', 'SENDER_ID_MISMATCH'], true)) {
+        return ['code' => $code, 'ausgang' => 'entfernen', 'meldung' => $grund];
+    }
+    return ['code' => $code, 'ausgang' => 'fehler', 'meldung' => $grund ?: ('HTTP ' . $code)];
+}
+
+function push_fcm_senden(array $abo): array
+{
+    $token = (string)($abo['endpunkt'] ?? '');
+    if (!push_fcm_token_gueltig($token)) {
+        return ['code' => 0, 'ausgang' => 'entfernen', 'meldung' => 'Kein gueltiges Geraete-Token'];
+    }
+    $konto = push_fcm_dienstkonto();
+    if ($konto === null) {
+        return ['code' => 0, 'ausgang' => 'fehler', 'meldung' => 'FCM ist nicht eingerichtet'];
+    }
+    $zugang = push_fcm_zugang();
+    if (!isset($zugang['token'])) {
+        return ['code' => 0, 'ausgang' => 'fehler', 'meldung' => (string)$zugang['fehler']];
+    }
+    $ch = curl_init(push_fcm_adresse($konto['projekt']));
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => (string)json_encode(push_fcm_nachricht($token), JSON_UNESCAPED_UNICODE),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 10,
+        CURLOPT_HTTPHEADER     => [
+            'authorization: Bearer ' . $zugang['token'],
+            'content-type: application/json; charset=utf-8',
+        ],
+    ]);
+    $antwort = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    $netzfehler = curl_error($ch);
+    curl_close($ch);
+    if ($antwort === false && $code === 0) {
+        return ['code' => 0, 'ausgang' => 'fehler', 'meldung' => $netzfehler ?: 'keine Verbindung'];
+    }
+    return push_fcm_antwort_deuten($code, (string)$antwort);
 }
 
 /**
@@ -631,9 +925,9 @@ function push_antwort_deuten(int $code): string
  */
 function push_zustellen(array $abo): array
 {
-    if ((string)($abo['kanal'] ?? 'webpush') === 'apns') {
-        return push_apns_senden($abo);
-    }
+    $kanal = (string)($abo['kanal'] ?? 'webpush');
+    if ($kanal === 'apns') { return push_apns_senden($abo); }
+    if ($kanal === 'fcm')  { return push_fcm_senden($abo); }
     return push_webpush_senden($abo);
 }
 
