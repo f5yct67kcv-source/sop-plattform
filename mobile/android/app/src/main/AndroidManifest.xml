@@ -35,7 +35,42 @@
         </provider>
     </application>
 
-    <!-- Permissions -->
+    <!-- Berechtigungen. Jede hier fehlende laesst die zugehoerige Funktion
+         STILL ausfallen: Der WebView fragt nur nach, was hier steht
+         (BridgeWebChromeClient in @capacitor/android), und meldet sonst
+         einfach "abgelehnt" - ohne Dialog und ohne Fehlermeldung. Das
+         Gegenstueck auf iOS sind die *UsageDescription-Texte in Info.plist. -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Kontrollpunkt bestaetigen, Weg der Runde, Ereignis verorten.
+         FINE ist die GPS-Genauigkeit; ohne sie liefert Android nur eine
+         Position auf einige hundert Meter, und kein Kontrollpunkt liesse
+         sich bestaetigen. COARSE muss daneben stehen: Seit Android 12 darf
+         die Person "ungefaehr" waehlen, und ohne COARSE im Manifest
+         bekaeme sie dann gar nichts. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- GPS nicht als Pflicht erklaeren: Sonst blendet Google Play die App
+         auf Geraeten ohne GPS-Empfaenger (manche Tablets) ganz aus. -->
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+
+    <!-- KEINE Kamera-Berechtigung, und das ist Absicht. Der Fotobeleg
+         (Ereignis, Fahrzeuguebernahme, Ersatzscan: input type=file capture)
+         oeffnet die Kamera-App des Systems. Die braucht keine Erlaubnis -
+         AUSSER die App fuehrt CAMERA im Manifest. Dann fragt Capacitor
+         nach, und lehnt die Person ab, gibt es gar kein Foto, auch keine
+         Auswahl aus den Bildern (BridgeWebChromeClient.onShowFileChooser).
+         Eine Zeile mehr haette hier also nur einen Weg zum Scheitern
+         hinzugefuegt. -->
+
+    <!-- Benachrichtigungen (ENT-604). Seit Android 13 eine eigene
+         Laufzeit-Erlaubnis; das Push-Plugin bringt sie NICHT selbst mit.
+         Fehlt sie, bekommt das Geraet zwar ein Token und meldet sich beim
+         Server an - angezeigt wird aber nie etwas. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Vibration beim Erfassen eines Kontrollpunkts (navigator.vibrate).
+         Keine Laufzeit-Erlaubnis, aber ohne diese Zeile vibriert nichts. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 </manifest>

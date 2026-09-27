@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptives Symbol (ab Android 8): Verlauf und Marke als getrennte Ebenen,
+     erzeugt von android-symbole-erzeugen.mjs (ENT-658, dasselbe Zeichen wie
+     auf iOS). "monochrome" ist die Marke allein - Android 13 faerbt sie ein,
+     wenn jemand "Designte Symbole" eingeschaltet hat; ohne diese Zeile
+     stuende GuardOpS dort als einziges Symbol ungefaerbt. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background"/>
+    <background android:drawable="@mipmap/ic_launcher_background"/>
     <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+    <monochrome android:drawable="@mipmap/ic_launcher_foreground"/>
 </adaptive-icon>

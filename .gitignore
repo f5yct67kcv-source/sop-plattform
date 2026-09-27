@@ -59,6 +59,14 @@ mobile/.maps-ios-key
 # mitliegt.
 mobile/www/karte-nativ.js
 
+# Firebase-Konfiguration der Android-App (ENT-604, FCM). Gehoert zu einem
+# Firebase-Projekt der Betreiberin, nicht zum Code -- dieselbe Ueberlegung
+# wie beim Maps-Schluessel. aufs-android.sh verlangt sie und prueft, dass
+# ihr Paketname zur App passt. Nicht verwechseln mit dem DIENSTKONTO fuer
+# den Server: Das ist ein privater Schluessel und liegt als GitHub Secret
+# FCM_DIENSTKONTO_B64, nie in einer Datei hier.
+mobile/android/app/google-services.json
+
 # Persoenliche Signier-Einstellungen fuer Xcode, vor allem
 # DEVELOPMENT_TEAM. Die Kennung gehoert zum Apple-Entwicklerkonto einer
 # Person, nicht zum Projekt -- dieselbe Ueberlegung wie bei APNS_TEAM_ID,

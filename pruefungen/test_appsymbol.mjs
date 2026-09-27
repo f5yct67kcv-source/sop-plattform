@@ -24,6 +24,9 @@ import { readFileSync, existsSync } from 'fs';
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
 
+const ANDROID_RES = 'mobile/android/app/src/main/res';
+const ANDROID_DICHTEN = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
+
 // Die Dateien, die wirklich ausgeliefert werden -- der iOS-Satz und der
 // Web-Satz. Die Groessen stehen hier, weil sie Teil der Aussage sind:
 // Ein 180er, der in Wahrheit 32 px hat, ist auf dem Startbildschirm Matsch.
@@ -34,6 +37,11 @@ const SYMBOLE = [
   ['icons/guardops-180.png', 180],
   ['icons/guardops-32.png', 32],
   ['icons/guardops-16.png', 16],
+  // Android (seit dem ersten Android-Bau): das ganzflaechige Symbol fuer
+  // Android 7, das noch keine adaptiven Symbole kennt. Gleiche Aussagen
+  // wie oben -- es ist dasselbe Zeichen.
+  ...Object.entries(ANDROID_DICHTEN).map(([d, f]) =>
+    [`${ANDROID_RES}/mipmap-${d}/ic_launcher.png`, 48 * f]),
 ];
 
 const browser = await chromium.launch({ executablePath: browserPfad() });
@@ -116,6 +124,100 @@ check('Der iOS-Satz ist lesbares JSON', js !== null);
 check('KRITISCH: er fuehrt genau die Datei, die hier geprueft wurde',
   !!js && (js.images || []).some(b => b.filename === 'AppIcon-512@2x.png'
     && String(b.size || '').startsWith('1024')));
+
+/* ── Android: das adaptive Symbol (ab Android 8) ─────────────────────────
+   Zwei Ebenen von 108 dp, sichtbar ist nur die Mitte von 72 dp, und jeder
+   Hersteller schneidet sie anders zu. Sicher bleibt nur, was im Kreis von
+   66 dp um die Mitte liegt. Darum hier andere Aussagen als oben:
+   - Die VORDERE Ebene ist Durchsicht mit einer hellen Marke darauf, und
+     die Marke liegt ganz im sicheren Kreis. Eine Marke, die darueber
+     hinausragt, wird auf einem runden Startbildschirm angeschnitten --
+     auf dem Telefon, mit dem es gebaut wurde, sieht man das womoeglich nie.
+   - Die HINTERE Ebene ist der Verlauf, deckend, dunkel unten links. */
+const lies = async pfad => {
+  const b64 = readFileSync(`${WURZEL}/${pfad}`).toString('base64');
+  return page.evaluate(async d => {
+    const im = new Image(); im.src = 'data:image/png;base64,' + d;
+    try { await im.decode(); } catch (e) { return null; }
+    const N = im.naturalWidth;
+    const c = document.createElement('canvas'); c.width = N; c.height = im.naturalHeight;
+    const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+    const px = x.getImageData(0, 0, N, c.height).data;
+    const L = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const at = (xx, yy) => { const i = (yy * N + xx) * 4; return [px[i], px[i+1], px[i+2], px[i+3]]; };
+    let deckend = 0, hell = 0, weiteste = 0;
+    for (let yy = 0; yy < N; yy++) for (let xx = 0; xx < N; xx++) {
+      const [r, g, b, a] = at(xx, yy);
+      if (a > 20) {
+        deckend++;
+        if (L(r, g, b) > 170) { hell++; }
+        weiteste = Math.max(weiteste, Math.hypot(xx + 0.5 - N / 2, yy + 0.5 - N / 2));
+      }
+    }
+    // Die Ecken des SICHTBAREN Feldes (72 von 108 dp), nicht der Ebene.
+    const r0 = Math.round(N * 18 / 108) + 1, r1 = Math.round(N * 90 / 108) - 2;
+    const lum = (xx, yy) => { const [r, g, b] = at(xx, yy); return L(r, g, b); };
+    return { breite: N, hoehe: c.height, deckung: 100 * deckend / (N * N),
+      hellAnteil: deckend ? 100 * hell / deckend : 0, weiteste,
+      untenLinks: lum(r0, r1), obenRechts: lum(r1, r0), obenLinks: lum(r0, r0), untenRechts: lum(r1, r1) };
+  }, b64);
+};
+
+for (const [d, f] of Object.entries(ANDROID_DICHTEN)) {
+  const soll = 108 * f;
+  const vorn = `${ANDROID_RES}/mipmap-${d}/ic_launcher_foreground.png`;
+  const hinten = `${ANDROID_RES}/mipmap-${d}/ic_launcher_background.png`;
+  const rund = `${ANDROID_RES}/mipmap-${d}/ic_launcher_round.png`;
+  for (const p of [vorn, hinten, rund]) { check(`${p}: vorhanden`, existsSync(`${WURZEL}/${p}`)); }
+  if (![vorn, hinten, rund].every(p => existsSync(`${WURZEL}/${p}`))) { continue; }
+
+  const v = await lies(vorn);
+  check(`${vorn}: ${soll} px`, !!v && v.breite === soll && v.hoehe === soll);
+  check(`${vorn}: die vordere Ebene ist Durchsicht -- kein eigener Grund, der den Verlauf verdeckt`,
+    !!v && v.deckung > 1 && v.deckung < 25);
+  check(`${vorn}: was darauf steht, ist die helle Marke`, !!v && v.hellAnteil > 90);
+  check(`KRITISCH: ${vorn}: die Marke liegt ganz im sicheren Kreis von 66 dp (weiteste Stelle ${v ? (v.weiteste / f).toFixed(1) : '?'} dp vom Mittelpunkt)`,
+    !!v && v.weiteste <= 33 * f);
+  // Nicht zu klein: Auf dem iPhone misst die Marke 44,6 % der Kante. Im
+  // sichtbaren Feld von 72 dp reicht sie damit bis gut 22 dp vom
+  // Mittelpunkt (gemessen: 22,2 bis 22,6 dp je nach Dichte). Eine Marke,
+  // die deutlich weniger weit reicht, waere ein anderes Symbol als auf iOS.
+  check(`${vorn}: die Marke fuellt das Feld wie auf dem iPhone und schrumpft nicht zum Punkt`,
+    !!v && v.weiteste >= 20 * f);
+
+  const h = await lies(hinten);
+  check(`${hinten}: ${soll} px`, !!h && h.breite === soll && h.hoehe === soll);
+  check(`${hinten}: deckend`, !!h && h.deckung > 99);
+  check(`${hinten}: dunkel, und hell nur oben rechts -- derselbe Verlauf wie auf iOS`,
+    !!h && h.untenLinks < 60 && h.obenRechts < 110 && h.obenRechts > h.untenLinks + 8);
+  check(`${hinten}: entlang der Diagonale und nicht quer dazu`,
+    !!h && Math.abs(h.obenLinks - h.untenRechts) <= 6);
+  check(`${hinten}: keine Marke auf der hinteren Ebene -- sonst stuende sie doppelt`,
+    !!h && h.hellAnteil < 0.5);
+
+  const r = await lies(rund);
+  check(`${rund}: ${48 * f} px und rund -- die Ecken sind Durchsicht`,
+    !!r && r.breite === 48 * f && r.deckung < 82 && r.deckung > 70);
+}
+
+/* Die beiden XML-Dateien des adaptiven Symbols muessen auf genau diese
+   Ebenen zeigen. Stand dort weiter das Capacitor-Standardzeichen (blaues
+   Kreuz, weisser Grund), zeigte jedes Android ab Version 8 dieses --
+   gleichgueltig, was in den PNG-Dateien steht. Genau der Fehler aus
+   ENT-658, nur eine Datei weiter. */
+for (const x of ['ic_launcher.xml', 'ic_launcher_round.xml']) {
+  const t = readFileSync(`${WURZEL}/${ANDROID_RES}/mipmap-anydpi-v26/${x}`, 'utf8');
+  const ziel = teil => (t.match(new RegExp(`<${teil}[^>]*android:drawable="@([a-z]+)/([a-z_]+)"`)) || []).slice(1);
+  const [ht, hn] = ziel('background'), [vt, vn] = ziel('foreground');
+  const gibtEs = (typ, name) => !!typ && Object.keys(ANDROID_DICHTEN).every(d =>
+    existsSync(`${WURZEL}/${ANDROID_RES}/${typ}-${d}/${name}.png`));
+  check(`KRITISCH: ${x}: die hintere Ebene ist der gepruefte Verlauf`,
+    ht === 'mipmap' && hn === 'ic_launcher_background' && gibtEs(ht, hn));
+  check(`KRITISCH: ${x}: die vordere Ebene ist die gepruefte Marke`,
+    vt === 'mipmap' && vn === 'ic_launcher_foreground' && gibtEs(vt, vn));
+  check(`${x}: fuer "Designte Symbole" (Android 13) ist eine einfarbige Fassung da`,
+    /<monochrome[^>]*@mipmap\/ic_launcher_foreground/.test(t));
+}
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
