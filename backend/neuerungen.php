@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 20,
+            'datum' => '2026-09-26',
+            'art'   => 'verbesserung',
+            'fuer'  => ['betreiber'],
+            'titel' => 'Betreiberbereich startet schneller',
+            'text'  => 'Mandanten, Konten, Offerten, Rechnungen und die übrigen Listen laden beim Öffnen jetzt gleichzeitig statt nacheinander. Klemmt eine davon, erscheinen die anderen trotzdem.',
+        ],
+        [
             'nr'    => 19,
             'datum' => '2026-09-24',
             'art'   => 'neu',
