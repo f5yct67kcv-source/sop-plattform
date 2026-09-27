@@ -65,9 +65,16 @@ $liste = array_map(static function (array $k) use ($ich, $pdo, $geteilt, $hatArc
     // Die Unterschrift (ENT-704): null = nicht eingerichtet, sonst ob
     // gezeichnet. Das Bild selbst nur am eigenen Konto -- es ist die
     // Unterschrift einer Person, keine Angabe fuer die ganze Liste.
-    $bild = be_unterschrift_von($pdo, $k['id']);
-    $k['unterschrift_da'] = $bild === null ? null : $bild !== '';
-    $k['unterschrift'] = ($k['ich'] && $bild !== null && $bild !== '') ? $bild : null;
+    // Fremde Konten: nur ob, nicht das Bild (be_unterschrift_da) -- es
+    // wuerde hier ohnehin weggeworfen.
+    if ($k['ich']) {
+        $bild = be_unterschrift_von($pdo, $k['id']);
+        $k['unterschrift_da'] = $bild === null ? null : $bild !== '';
+        $k['unterschrift'] = ($bild !== null && $bild !== '') ? $bild : null;
+    } else {
+        $k['unterschrift_da'] = be_unterschrift_da($pdo, $k['id']);
+        $k['unterschrift'] = null;
+    }
     // Wo die Schrift auf der Linie steht (ENT-706), fuer die Karte.
     $k['unterschrift_grundlinie'] = $k['unterschrift'] !== null ? beleg_unterschrift_grundlinie($k['unterschrift']) : null;
     return $k;

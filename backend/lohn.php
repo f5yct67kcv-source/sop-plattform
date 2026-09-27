@@ -1116,6 +1116,18 @@ function lohnart_startbestand(): array
          1,1,1,1,1,1, 'Art. 19 Ziff. 3 GAV', 33, 1],
         ['zeitzuschlag', 'Zeitzuschlag über 210 Stunden', 'prozent', 'grundlohn', 2500,
          1,1,1,1,1,1, 'Art. 14 Ziff. 3 GAV', 35, 1],
+        // Ferienentschaedigung und 13.-Anteil AUF EINER PERSOENLICHEN
+        // ZULAGE (ENT-713). Anders als 'ferienentschaedigung' und
+        // 'anteil_13ml' oben sind das KEINE Bestandteile eines Stundensatzes,
+        // sondern Periodenbetraege: Die Zulage ist schon mit den Stunden
+        // multipliziert, der Zuschlag darauf auch. Darum bemessung = 1 --
+        // mit 0 fehlten sie in jeder Bemessungsgrundlage. Selbst weder
+        // ferien- noch 13.-pflichtig, sonst rechnete sich ein Zuschlag auf
+        // einen Zuschlag.
+        ['ferien_auf_zulage', 'Ferienentschädigung auf Zulage', 'prozent', 'zulage', null,
+         1,0,0,1,1,1, 'Art. 20 Ziff. 2 GAV', 37, 1],
+        ['anteil_13ml_auf_zulage', 'Anteil 13. Monatslohn auf Zulage', 'prozent', 'zulage', null,
+         1,0,0,1,1,1, null, 38, 1],
         // Auslagenersatz ist KEIN Lohn: nicht AHV-pflichtig, in keiner
         // Bemessungsgrundlage. Nach GAV-AUS-009 gehoert er in eine
         // getrennte Spesenabrechnung nach Art. 18 Ziff. 10 -- nicht in die

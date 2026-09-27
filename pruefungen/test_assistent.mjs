@@ -337,6 +337,19 @@ check('KRITISCH: Einsätze und offene Plätze sind getrennte Zahlen (2 Einsätze
   r.einsaetze_mit_offenen_plaetzen === 2 && r.offene_plaetze_gesamt === 4 && r.einsaetze_im_zeitraum === 3);
 const treffer = await page.$$eval('#asVerlauf .as-msg.er:last-child .as-treffer button', b => b.map(x => x.textContent));
 check('Die Treffer darunter nennen dieselben Einsätze', treffer.length === 2 && treffer.every(t => /(Platz|Plätze) offen/.test(t)));
+// Stimme (Nachtrag ENT-699): die beste auf dem Geraet, nicht die erste.
+check('Die Stimme: Premium vor Kompakt, auch wenn die Kompakt-Stimme schweizerisch ist und zuerst kommt', await page.evaluate(() =>
+  asBesteStimme([{ lang: 'de-CH', name: 'Petra (Kompakt)', voiceURI: 'com.apple.voice.compact.de-CH.Petra' },
+    { lang: 'de-DE', name: 'Eddy (Deutsch (Deutschland))', voiceURI: 'com.apple.eloquence.de-DE.Eddy' },
+    { lang: 'de-DE', name: 'Anna (Premium)', voiceURI: 'com.apple.voice.premium.de-DE.Anna' },
+    { lang: 'en-US', name: 'Samantha (Premium)', voiceURI: 'com.apple.voice.premium.en-US.Samantha' }]).name === 'Anna (Premium)'));
+check('Bei gleicher Qualität die Schweizer Stimme; künstliche Stimmen (Eloquence) zuletzt, fremde Sprachen nie', await page.evaluate(() =>
+  asBesteStimme([{ lang: 'de-DE', name: 'Anna (Erweitert)' }, { lang: 'de-CH', name: 'Petra (Erweitert)' }]).name === 'Petra (Erweitert)'
+  && asBesteStimme([{ lang: 'de-DE', name: 'Eddy', voiceURI: 'com.apple.eloquence.de-DE.Eddy' }, { lang: 'de-DE', name: 'Anna', voiceURI: 'com.apple.voice.compact.de-DE.Anna' }]).name === 'Anna'
+  && asBesteStimme([{ lang: 'en-US', name: 'Samantha' }]) === null
+  && asBesteStimme([{ lang: 'de-DE', name: 'Microsoft Katja Online (Natural) - German (Germany)' }, { lang: 'de-DE', name: 'Google Deutsch' }]).name.startsWith('Microsoft Katja')));
+check('Nur eine einfache Stimme da: einmal der Hinweis, wo es eine bessere gibt', await page.evaluate(() =>
+  (document.getElementById('asVerlauf').textContent.match(/Klingt die Stimme blechern/g) || []).length === 1));
 check('Die Antwort wird vorgelesen', (await page.evaluate(() => window.__gesprochen)).includes('Zwei Einsätze haben noch vier offene Plätze.'));
 await page.evaluate(() => { window.__epAuf = null; window.epAuf = id => { window.__epAuf = id; }; });
 await page.click('#asVerlauf .as-msg.er:last-child .as-treffer button');

@@ -704,8 +704,22 @@ function mapRapport(r) {
     id: r.id, datum: r.datum, ma: r.mitarbeiter, kunde: r.kunde, strasse: r.strasse, ort: r.ort,
     auftragNr: r.auftrag_nr, einsatzart: r.einsatzart, von: r.von.slice(0, 5), bis: r.bis.slice(0, 5),
     pause: r.pause_min, netH: parseFloat(r.netto_h), bemerkung: r.bemerkung, sigName: r.unterzeichner,
-    sig: r.unterschrift, ts: r.erfasst_am
+    sig: r.unterschrift || '', hatSig: !!(r.unterschrift || Number(r.hat_unterschrift)), ts: r.erfasst_am
   };
+}
+
+// Die Unterschrift kommt nicht mehr mit der Liste (siehe rapport_list.php),
+// nur ob eine da ist. Geholt wird sie erst fuer EINEN Rapport, beim Ansehen
+// oder Drucken. '' = keine erfasst, null = liess sich nicht laden -- zwei
+// verschiedene Aussagen, die nie gleich aussehen duerfen.
+function sigHolen(r) {
+  if (r.sig) return Promise.resolve(r.sig);
+  if (!r.hatSig) return Promise.resolve('');
+  return apiCall('rapport_list.php?id=' + Number(r.id)).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok' || !data.rapport) return null;
+    r.sig = data.rapport.unterschrift || '';
+    return r.sig;
+  }).catch(() => null);
 }
 
 // Kein Treffer, nichts vorhanden und "Abruf gescheitert" sind drei
@@ -786,6 +800,8 @@ const T = {
     'stat-r':'Rapporte','stat-h':'Stunden','stat-ma':'Mitarbeiter',
     'min':'Min.','tDel':'Rapport gelöscht.',
     'tCsv':'✓ CSV exportiert.','tNoData':'Keine Daten.','tConfirm':'Bitte Bestätigung anhaken.',
+    'sigLaedt':'Unterschrift wird geladen …',
+    'sigFehler':'Die Unterschrift liess sich nicht laden — bitte erneut versuchen.',
 };
 const t = k => T[k] || k;
 
@@ -1018,17 +1034,39 @@ function showDetail(id) {
   ];
   document.getElementById('detailBody').innerHTML =
     rows.map(([k,v]) => `<div class="detail-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('') +
-    (r.sig ? `<div style="margin-top:10px"><div style="color:var(--sub);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Unterschrift</div><img class="detail-sig-img" src="${r.sig}"></div>` : '');
+    (r.hatSig ? `<div style="margin-top:10px"><div style="color:var(--sub);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Unterschrift</div><div id="detailSig">${detailSigHtml(r.sig || undefined)}</div></div>` : '');
   const isAdmin = !!(currentUser && currentUser.ist_admin);
   document.getElementById('btn-print-report').style.display = isAdmin ? '' : 'none';
   document.getElementById('print-hint').style.display = isAdmin ? '' : 'none';
   document.getElementById('detailModal').classList.add('show');
+  if (r.hatSig && !r.sig) {
+    sigHolen(r).then(u => {
+      const ziel = document.getElementById('detailSig');
+      if (detailTargetId !== id || !ziel) return;
+      ziel.innerHTML = detailSigHtml(u);
+    });
+  }
+}
+// undefined = wird geladen, null = liess sich nicht laden.
+function detailSigHtml(u) {
+  if (u === undefined || u === null) {
+    return `<div style="font-size:13px;color:var(--sub)">${t(u === null ? 'sigFehler' : 'sigLaedt')}</div>`;
+  }
+  return `<img class="detail-sig-img" src="${u}">`;
 }
 function closeDetailModal(){document.getElementById('detailModal').classList.remove('show');detailTargetId=null;}
 
 function printReport(id) {
   const r = rapports.find(x => x.id === id);
   if (!r) return;
+  // Ohne geladene Unterschrift stuende die leere Linie auf dem Blatt, als
+  // haette niemand unterschrieben. Dann nicht drucken und es sagen.
+  sigHolen(r).then(u => {
+    if (u === null) { showToast(t('sigFehler')); return; }
+    printReportBlatt(r);
+  });
+}
+function printReportBlatt(r) {
   const rowsHtml = [
     ['Datum', fmtDate(r.datum)],
     ['Mitarbeiter', r.ma],

@@ -10532,6 +10532,60 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   </div>
 </div>
 
+<!-- ══════════════════ PERSÖNLICHE ZULAGEN UND ABZÜGE (ENT-713) ═════════════
+     Neu erfassen und Korrigieren teilen sich die vollen Felder. Eine
+     bestehende Position bietet dagegen die Wege an, die ihre Geschichte
+     erhalten: „Betrag ändern ab" und „Beenden". Korrigieren und Löschen
+     gibt es nur, solange kein abgeschlossener Lohnlauf sie verwendet hat —
+     das entscheidet der Server, der Dialog bietet es nur nicht erst an. -->
+<div class="dlg-scrim" id="dlgLohnPosition">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <h2 id="lpoTitel">Zulage oder Abzug erfassen</h2>
+      <p id="lpoUnter">Gilt je ganzen Monat. Wie gerechnet wird, sagt die Lohnart.</p>
+    </div>
+    <div class="dlg-bd">
+      <input type="hidden" id="lpoId">
+      <div class="feld" id="lpoWegFeld"><label for="lpoWeg">Was soll geschehen?</label>
+        <select class="inp" id="lpoWeg" onchange="lohnPositionWegUmschalten()"></select></div>
+      <div id="lpoGrpVoll">
+        <div class="feld"><label for="lpoLohnart">Lohnart</label>
+          <select class="inp" id="lpoLohnart" onchange="lohnPositionEinheit()"></select>
+          <div class="zone-note" id="lpoLohnartHinweis"></div></div>
+        <div class="feld"><label for="lpoBetrag" id="lpoBetragLabel">Betrag in CHF</label>
+          <input class="inp" id="lpoBetrag" inputmode="decimal" placeholder="z. B. 150.00"></div>
+        <div class="feld"><label class="check" style="min-height:24px"><input type="checkbox" id="lpoEinmalig" onchange="lohnPositionEinmalig()"> einmalig, nur in einem Monat</label></div>
+        <div class="feld"><label for="lpoAb" id="lpoAbLabel">Ab Monat</label>
+          <input class="inp" type="month" id="lpoAb"></div>
+        <div class="feld" id="lpoBisFeld"><label for="lpoBis">Bis Monat</label>
+          <input class="inp" type="month" id="lpoBis">
+          <div class="zone-note">Leer lassen, wenn die Position bis auf Weiteres gilt.</div></div>
+        <div class="feld"><label for="lpoBemerkung">Bemerkung</label>
+          <input class="inp" id="lpoBemerkung"></div>
+      </div>
+      <div id="lpoGrpAb">
+        <div class="feld"><label for="lpoNeuBetrag" id="lpoNeuBetragLabel">Neuer Betrag in CHF</label>
+          <input class="inp" id="lpoNeuBetrag" inputmode="decimal"></div>
+        <div class="feld"><label for="lpoNeuAb">Gilt ab Monat</label>
+          <input class="inp" type="month" id="lpoNeuAb">
+          <div class="zone-note">Die bisherige Position endet im Monat davor und bleibt stehen.</div></div>
+      </div>
+      <div id="lpoGrpEnde">
+        <div class="feld"><label for="lpoEnde">Letzter Monat</label>
+          <input class="inp" type="month" id="lpoEnde">
+          <div class="zone-note">Leer heisst: gilt wieder bis auf Weiteres.</div></div>
+      </div>
+      <p class="zone-note" id="lpoSperrHinweis" style="display:none"></p>
+      <p class="err" id="lpoFehler" style="display:none"></p>
+    </div>
+    <div class="dlg-ft">
+      <button class="btn btn-plain" onclick="closeDlg('dlgLohnPosition')">Abbrechen</button>
+      <button class="btn btn-quiet" id="lpoLoeschKnopf" onclick="lohnPositionLoeschen()">Löschen</button>
+      <button class="btn btn-primary" onclick="lohnPositionSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════ LOHNLAUF ANSEHEN (ENT-451) ══════════════════════
      Die Knöpfe folgen dem Status: Was nicht geht, steht gar nicht erst da.
      Die Grenze ist die Auszahlung — davor stornieren, danach nachtragen. -->
@@ -12876,6 +12930,8 @@ function asMerk(k, v) {
 function asStart() {
   if (asAktiv || !asUmgebungErlaubt() || !$('asWidget')) { return; }
   asAktiv = true;
+  // Safari und Chrome laden die Stimmenliste erst auf Nachfrage; ohne
+  // diesen Anstoss waere sie bei der ersten Antwort noch leer.
   // Zu Beginn schlaeft er in der Kopfzeile (ENT-702); die grosse Figur
   // erscheint erst nach Klicken oder Herausziehen.
   $('asWidget').hidden = true;
@@ -12898,6 +12954,16 @@ function asStart() {
   if (!$('asVerlauf').children.length) {
     asNachricht('er', 'Hallo. Frag mich nach Offerten, offenen Plätzen, Verfügbarkeit oder Rechnungen. Formulare bereite ich vor. Speichern tust du selbst.');
   }
+  // Der Hinweis auf eine bessere Stimme kommt gleich unter die Begruessung,
+  // sobald die Liste da ist -- nicht mitten ins Gespraech.
+  try {
+    if (window.speechSynthesis) {
+      const pruefen = () => { const l = window.speechSynthesis.getVoices() || []; if (l.length && !asStumm()) { asStimmeHinweis(asBesteStimme(l)); } return l.length > 0; };
+      if (!pruefen() && 'onvoiceschanged' in window.speechSynthesis) {
+        window.speechSynthesis.addEventListener('voiceschanged', function einmal() { if (pruefen()) { window.speechSynthesis.removeEventListener('voiceschanged', einmal); } });
+      }
+    }
+  } catch (e) { /* ohne Stimme weiter */ }
 }
 
 function asPanelUm() { $('asPanel').hidden ? asPanelAuf() : asPanelZu(); }
@@ -12992,13 +13058,47 @@ function asStimmeAus() {
 }
 // Die Stimme des Browsers (Entscheid ENT-699): gratis, bleibt auf dem Geraet.
 // Gibt es sie nicht, bleibt es beim Text -- kein Fehler.
+// Die beste deutsche Stimme auf dem Geraet (Nachtrag ENT-699): Vorher nahm
+// die Seite die erste, die der Browser nannte -- am Mac meist eine einfache
+// Kompakt-Stimme, darum klang es blechern. Bewertet wird die Qualitaet
+// (Apple Premium/Erweitert, Edge "Natural"/Online, Google in Chrome) vor der
+// Region; die absichtlich kuenstlichen Stimmen (Eloquence, Spassstimmen)
+// kommen zuletzt. Schweiz vor Deutschland nur bei gleicher Qualitaet.
+const AS_STIMME_KUENSTLICH = /eloquence|\b(eddy|flo|grandma|grandpa|oma|opa|reed|rocko|sandy|shelley|bad news|bahh|bells|boing|bubbles|cellos|jester|organ|superstar|trinoids|whisper|wobble|zarvox|albert|fred|junior|kathy|ralph)\b/i;
+function asStimmePunkte(s) {
+  const n = `${s.name || ''} ${s.voiceURI || ''}`;
+  let p = 0;
+  if (/premium/i.test(n)) { p += 40; }
+  else if (/enhanced|erweitert|verbessert/i.test(n)) { p += 30; }
+  else if (/natural|online/i.test(n)) { p += 35; }
+  else if (/google/i.test(n)) { p += 20; }
+  if (/compact|kompakt/i.test(n)) { p -= 5; }
+  if (AS_STIMME_KUENSTLICH.test(n)) { p -= 60; }
+  p += /^de-CH/i.test(s.lang) ? 3 : /^de-DE/i.test(s.lang) ? 2 : 1;
+  return p;
+}
+function asBesteStimme(stimmen) {
+  // Deutsch entscheidet die Sprache, nicht die Punktzahl: Auch eine einfache
+  // Stimme ist besser als eine fremdsprachige.
+  return (stimmen || []).filter(s => /^de/i.test(s.lang || ''))
+    .sort((a, b) => asStimmePunkte(b) - asStimmePunkte(a))[0] || null;
+}
+// Nur einfache Stimmen da: einmal pro Geraet sagen, wo es eine bessere gibt.
+function asStimmeHinweis(v) {
+  if (!v || asStimmePunkte(v) >= 20) { return; }
+  try { if (localStorage.getItem('as_stimme_hinweis') === '1') { return; } localStorage.setItem('as_stimme_hinweis', '1'); } catch (e) { return; }
+  const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+  asNachricht('leise', mac
+    ? 'Klingt die Stimme blechern? Am Mac: Systemeinstellungen → Bedienungshilfen → Gesprochene Inhalte → Systemstimme → Stimmen verwalten, dort eine deutsche Stimme mit „Premium“ laden. Danach die Seite neu laden.'
+    : 'Klingt die Stimme blechern? In den Spracheinstellungen des Systems lässt sich eine hochwertigere deutsche Stimme installieren; danach die Seite neu laden.');
+}
+
 function asSprechen(text) {
   if (asStumm() || !text || !window.speechSynthesis || typeof SpeechSynthesisUtterance !== 'function') { return; }
   try {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    const stimmen = window.speechSynthesis.getVoices() || [];
-    const v = stimmen.find(s => /^de-CH/i.test(s.lang)) || stimmen.find(s => /^de/i.test(s.lang));
+    const v = asBesteStimme(window.speechSynthesis.getVoices());
     if (v) { u.voice = v; }
     u.lang = v ? v.lang : 'de-CH';
     u.onstart = () => $('asWidget').classList.add('spricht');
@@ -15026,6 +15126,23 @@ function loadRapporte() {
   });
 }
 
+// Die Unterschrift kommt nicht mehr mit der Liste, nur "hat_unterschrift"
+// (siehe rapport_list.php): Die Bilder machten die Liste mit jedem Rapport
+// schwerer, und die Liste laedt bei jedem Start. Geholt wird sie erst, wenn
+// EIN Rapport geoeffnet, gedruckt oder geteilt wird, und am Rapport gemerkt.
+// Drei Ergebnisse, weil es drei Aussagen sind: das Bild, '' fuer "keine
+// erfasst" und null fuer "liess sich nicht laden" -- ein gescheiterter
+// Abruf darf nie wie ein Rapport ohne Unterschrift aussehen.
+function rapportUnterschrift(r) {
+  if (r.unterschrift) return Promise.resolve(r.unterschrift);
+  if (!Number(r.hat_unterschrift)) return Promise.resolve('');
+  return api('rapport_list.php?id=' + Number(r.id)).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok' || !data.rapport) return null;
+    r.unterschrift = data.rapport.unterschrift || '';
+    return r.unterschrift;
+  }).catch(() => null);
+}
+
 function loadMitarbeiter() {
   return api('mitarbeiter_list.php').then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') return;
@@ -15876,7 +15993,7 @@ function rKarte(r, gruppenGroesse) {
     ['Pause', nf(r.pause_min) + ' Min.'],
     ['Nettostunden', '<strong>' + nf(r.netto_h, 2) + ' h</strong>'],
     ['Unterzeichner', dash(r.unterzeichner)],
-    ['Unterschrift', r.unterschrift ? 'erfasst' : '<span style="color:var(--ink-3)">keine erfasst</span>'],
+    ['Unterschrift', (r.unterschrift || Number(r.hat_unterschrift)) ? 'erfasst' : '<span style="color:var(--ink-3)">keine erfasst</span>'],
     ['Bemerkung', dash(r.bemerkung)],
     ['Erfasst am', r.erfasst_am ? dmy(r.erfasst_am) + ', ' + String(r.erfasst_am).slice(11, 16) : '–'],
   ];
@@ -24784,7 +24901,215 @@ function lohnAkteZeichnen() {
     </div></div>`;
 
   ziel.innerHTML = `<div class="ma-lohn" style="display:grid;gap:16px">
-    ${abgeleitet}${ansatzKarte}${abzugKarte}${zahlKarte}</div>`;
+    ${abgeleitet}${ansatzKarte}${lohnPositionKarte(heute)}${abzugKarte}${zahlKarte}</div>`;
+}
+
+// ── Persönliche Zulagen und Abzüge (ENT-713) ─────────────────────────────
+// Eine eigene Karte, gebaut wie „Lohnansatz" und „Auszahlung". Beendete
+// Positionen sind ausgeblendet; die Zahl daneben sagt dann „2 von 3", damit
+// eine gefilterte Liste nicht wie die ganze aussieht.
+let lohnPosAlle = false;
+
+// "2027-03-01" -> "03.2027". Positionen gelten je ganzen Monat -- ein Tag
+// in der Anzeige behauptete eine Genauigkeit, die es nicht gibt.
+const lohnMonat = d => d ? String(d).slice(5, 7) + '.' + String(d).slice(0, 4) : '';
+
+// Was eine Lohnart mit dem Betrag tut. Steht an EINER Stelle, weil Karte
+// und Dialog dieselben Worte brauchen.
+function lohnPositionRechnung(art) {
+  return { stundensatz: 'pro Stunde', fixbetrag: 'pro Monat',
+           abzug: 'Abzug pro Monat', netto: 'Nettobetrag pro Monat' }[art]
+    || 'Rechenart unbekannt';
+}
+
+function lohnPositionKarte(heute) {
+  const liste = lohnAkte.positionen;
+  const waehlbar = lohnAkte.positionen_lohnarten || [];
+  const knopf = lohnSchreiben() && liste !== null && liste !== undefined && waehlbar.length
+    ? `<button class="btn btn-primary btn-sm" onclick="lohnPositionOeffnen(null)">Erfassen</button>` : '';
+  const kopf = `<div class="card-hd"><h3>Zulagen und Abzüge</h3>${knopf}</div>`;
+  const gavHinweis = `<p class="zone-note" style="margin:10px 0 0">Die GAV-Zuschläge nach Art. 19
+    (Fachausweis, Diensthund, Schusswaffe) stehen beim Lohnansatz.</p>`;
+
+  // Vier verschiedene Aussagen, vier verschiedene Texte: nicht
+  // eingerichtet, nichts erfasst, keine Lohnart vorhanden, kein Treffer.
+  // Nur DIESE Tabelle fehlt, nicht der Lohnbereich -- der Text von
+  // lohnLeer('nicht_eingerichtet') behauptete zu viel.
+  if (liste === null || liste === undefined) {
+    return `<div class="card">${kopf}<div class="card-bd"><div class="leer-zustand" style="padding:28px 4px;text-align:center">
+      <div style="font-weight:600;margin-bottom:6px">Zulagen und Abzüge sind auf dem Server noch nicht eingerichtet.</div>
+      <div class="zone-note" style="margin:0">Einmalig unter „Einrichtung“ ausführen — dabei entsteht die Tabelle dafür.</div>
+    </div></div></div>`;
+  }
+  const beendet = p => p.gueltig_bis && p.gueltig_bis < heute;
+  const sichtbar = lohnPosAlle ? liste : liste.filter(p => !beendet(p));
+  const zahl = liste.length && sichtbar.length !== liste.length
+    ? `<span class="zone-note" style="margin:0">${sichtbar.length} von ${liste.length}</span>` : '';
+  const schalter = liste.some(beendet)
+    ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 10px">
+        <label class="check" style="min-height:24px"><input type="checkbox" id="lpoAlle"
+          ${lohnPosAlle ? 'checked' : ''} onchange="lohnPosAlle = this.checked; lohnAkteZeichnen()">
+          auch beendete zeigen</label>${zahl}</div>` : '';
+
+  if (!liste.length) {
+    const zusatz = waehlbar.length
+      ? 'Persönliche Zulagen und Abzüge dieser Person, etwa eine Funktionszulage oder ein Abzug für die Uniform.'
+      : 'Es gibt noch keine eigene Lohnart, die sich einer Person zuordnen lässt. '
+        + 'Zuerst unter Lohn → Lohnarten eine anlegen (pro Stunde, fester Betrag, Abzug oder Netto).';
+    return `<div class="card">${kopf}<div class="card-bd">${lohnLeer('leer', zusatz)}${gavHinweis}</div></div>`;
+  }
+  if (!sichtbar.length) {
+    return `<div class="card">${kopf}<div class="card-bd">${schalter}
+      ${lohnLeer('kein_treffer', 'Alle Positionen sind beendet. „Auch beendete zeigen" blendet sie ein.')}
+      ${gavHinweis}</div></div>`;
+  }
+
+  const zeilen = sichtbar.map(p => {
+    const kuenftig = p.gueltig_ab > heute;
+    const vorbei = beendet(p);
+    const einmalig = p.gueltig_bis && p.gueltig_bis.slice(0, 7) === p.gueltig_ab.slice(0, 7);
+    const zeitraum = einmalig ? lohnMonat(p.gueltig_ab)
+      : (p.gueltig_bis ? lohnMonat(p.gueltig_ab) + ' – ' + lohnMonat(p.gueltig_bis)
+                       : 'ab ' + lohnMonat(p.gueltig_ab));
+    const marke = vorbei ? ' <span class="chip">beendet</span>'
+      : (kuenftig ? ' <span class="chip">künftig</span>'
+                  : ' <span class="chip chip-ok">gilt heute</span>');
+    const traegt = [];
+    if (p.ferien_pflichtig) { traegt.push('mit Ferienentschädigung'); }
+    if (p.ml13_pflichtig) { traegt.push('mit 13. ML'); }
+    const vz = p.art === 'abzug' ? '−' : '';
+    return `<tr${vorbei || kuenftig ? ' style="opacity:.7"' : ''}>
+      <td>${esc(p.bezeichnung)}${traegt.length ? `<div class="zone-note" style="margin:0">${esc(traegt.join(' · '))}</div>` : ''}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums"><b>${vz}${lohnFr(p.betrag_rappen)}</b></td>
+      <td>${einmalig && p.art !== 'stundensatz' ? 'einmalig' : esc(lohnPositionRechnung(p.art))}</td>
+      <td>${zeitraum}${marke}</td>
+      <td style="text-align:right">${lohnSchreiben()
+        ? `<button class="btn btn-quiet btn-sm" onclick="lohnPositionOeffnen(${p.id})">Ändern</button>` : ''}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="card">${kopf}<div class="card-bd">${schalter}
+    <div style="overflow-x:auto"><table class="tbl"><thead><tr>
+      <th>Lohnart</th><th style="text-align:right">CHF</th><th>Rechnung</th><th>Zeitraum</th><th></th>
+    </tr></thead><tbody>${zeilen}</tbody></table></div>
+    <p class="zone-note">Eine Änderung beendet die bisherige Position und beginnt eine neue —
+      so bleibt nachvollziehbar, was in welchem Monat galt.</p>${gavHinweis}</div></div>`;
+}
+
+// ── Dialog: persönliche Position ─────────────────────────────────────────
+function lohnPositionOeffnen(id) {
+  const p = id ? (lohnAkte.positionen || []).find(x => x.id === id) : null;
+  const waehlbar = lohnAkte.positionen_lohnarten || [];
+  $('lpoId').value = p ? p.id : '';
+  // Eine bestehende Position darf eine inzwischen deaktivierte Lohnart
+  // tragen -- sie steht dann trotzdem in der Auswahl, sonst sprang die
+  // Auswahl beim Korrigieren stillschweigend auf eine andere.
+  const optionen = waehlbar.slice();
+  if (p && !optionen.some(l => l.id === p.lohnart_id)) {
+    optionen.push({ id: p.lohnart_id, bezeichnung: p.bezeichnung, art: p.art,
+      ferien_pflichtig: p.ferien_pflichtig, ml13_pflichtig: p.ml13_pflichtig });
+  }
+  $('lpoLohnart').innerHTML = optionen.map(l =>
+    `<option value="${l.id}">${esc(l.bezeichnung)} — ${esc(lohnPositionRechnung(l.art))}</option>`).join('');
+  $('lpoLohnart').value = p ? String(p.lohnart_id) : (optionen[0] ? String(optionen[0].id) : '');
+  $('lpoBetrag').value = p ? (p.betrag_rappen / 100).toFixed(2) : '';
+  $('lpoAb').value = p ? p.gueltig_ab.slice(0, 7) : '';
+  $('lpoBis').value = p && p.gueltig_bis ? p.gueltig_bis.slice(0, 7) : '';
+  $('lpoEinmalig').checked = !!(p && p.gueltig_bis && p.gueltig_bis.slice(0, 7) === p.gueltig_ab.slice(0, 7));
+  $('lpoBemerkung').value = p ? (p.bemerkung || '') : '';
+  $('lpoNeuBetrag').value = '';
+  $('lpoNeuAb').value = '';
+  $('lpoEnde').value = p && p.gueltig_bis ? p.gueltig_bis.slice(0, 7) : '';
+
+  // Die Wege einer bestehenden Position. Korrigieren und Löschen nur,
+  // solange kein abgeschlossener Lauf sie verwendet hat.
+  const wege = p ? [['ab', 'Betrag ändern ab einem Monat'], ['beenden', 'Beenden oder wieder öffnen']]
+    .concat(p.verwendet ? [] : [['korrigieren', 'Korrigieren (Tippfehler)']]) : [];
+  $('lpoWeg').innerHTML = wege.map(([w, t]) => `<option value="${w}">${t}</option>`).join('');
+  $('lpoWegFeld').style.display = p ? '' : 'none';
+  $('lpoTitel').textContent = p ? p.bezeichnung + ' ändern' : 'Zulage oder Abzug erfassen';
+  $('lpoUnter').textContent = p
+    ? `${lohnFr(p.betrag_rappen)} CHF ${lohnPositionRechnung(p.art)}, `
+      + (p.gueltig_bis ? `${lohnMonat(p.gueltig_ab)} – ${lohnMonat(p.gueltig_bis)}` : `ab ${lohnMonat(p.gueltig_ab)}`)
+    : 'Gilt je ganzen Monat. Wie gerechnet wird, sagt die Lohnart.';
+  const schluss = lohnAkte.abgeschlossen_bis;
+  $('lpoSperrHinweis').style.display = p && p.verwendet ? '' : 'none';
+  $('lpoSperrHinweis').textContent = p && p.verwendet
+    ? `Die Abrechnungen sind bis ${lohnMonat(schluss)} abgeschlossen. Diese Position ist darin verwendet `
+      + 'worden und lässt sich darum nicht mehr korrigieren oder löschen.' : '';
+  $('lpoLoeschKnopf').style.display = p && !p.verwendet ? '' : 'none';
+  $('lpoFehler').style.display = 'none';
+  lohnPositionWegUmschalten();
+  lohnPositionEinheit();
+  lohnPositionEinmalig();
+  openDlg('dlgLohnPosition');
+}
+
+function lohnPositionWeg() {
+  return $('lpoId').value ? $('lpoWeg').value : 'neu';
+}
+
+function lohnPositionWegUmschalten() {
+  const w = lohnPositionWeg();
+  $('lpoGrpVoll').style.display = w === 'neu' || w === 'korrigieren' ? '' : 'none';
+  $('lpoGrpAb').style.display = w === 'ab' ? '' : 'none';
+  $('lpoGrpEnde').style.display = w === 'beenden' ? '' : 'none';
+}
+
+// Die Einheit steht am Betrag, damit klar ist, worauf er sich bezieht --
+// 1.50 heisst pro Stunde etwas ganz anderes als pro Monat.
+function lohnPositionEinheit() {
+  const id = Number($('lpoLohnart').value);
+  const p = $('lpoId').value ? (lohnAkte.positionen || []).find(x => x.id === Number($('lpoId').value)) : null;
+  const l = (lohnAkte.positionen_lohnarten || []).find(x => x.id === id)
+    || (p && p.lohnart_id === id ? p : null);
+  const einheit = !l ? 'CHF'
+    : { stundensatz: 'CHF pro Stunde', fixbetrag: 'CHF pro Monat',
+        abzug: 'CHF pro Monat, wird abgezogen', netto: 'CHF pro Monat, netto ausbezahlt' }[l.art] || 'CHF';
+  $('lpoBetragLabel').textContent = 'Betrag in ' + einheit;
+  $('lpoNeuBetragLabel').textContent = 'Neuer Betrag in ' + einheit;
+  const traegt = [];
+  if (l && l.ferien_pflichtig) { traegt.push('Ferienentschädigung'); }
+  if (l && l.ml13_pflichtig) { traegt.push('13. Monatslohn'); }
+  $('lpoLohnartHinweis').textContent = !l ? ''
+    : (l.art === 'abzug' ? 'Wird nach dem Nettolohn abgezogen und ändert keinen Sozialversicherungsbeitrag.'
+      : l.art === 'netto' ? 'Kein Lohn: wird nach dem Nettolohn ausbezahlt, ohne Sozialversicherungsbeiträge.'
+      : traegt.length ? 'Der Lohnlauf rechnet darauf ' + traegt.join(' und ') + ' als eigene Zeile.'
+      : 'Trägt weder Ferienentschädigung noch 13. Monatslohn.');
+}
+
+function lohnPositionEinmalig() {
+  const einmalig = $('lpoEinmalig').checked;
+  $('lpoBisFeld').style.display = einmalig ? 'none' : '';
+  $('lpoAbLabel').textContent = einmalig ? 'Monat' : 'Ab Monat';
+}
+
+function lohnPositionSpeichern() {
+  const w = lohnPositionWeg();
+  const body = { id: lohnAkte.person.id, was: 'position', aktion: w,
+    eintrag_id: $('lpoId').value ? Number($('lpoId').value) : 0 };
+  if (w === 'neu' || w === 'korrigieren') {
+    Object.assign(body, {
+      lohnart_id: Number($('lpoLohnart').value),
+      betrag: $('lpoBetrag').value.trim(),
+      ab: $('lpoAb').value,
+      bis: $('lpoEinmalig').checked ? $('lpoAb').value : $('lpoBis').value,
+      bemerkung: $('lpoBemerkung').value.trim(),
+    });
+  } else if (w === 'ab') {
+    Object.assign(body, { betrag: $('lpoNeuBetrag').value.trim(), ab: $('lpoNeuAb').value });
+  } else {
+    body.bis = $('lpoEnde').value;
+  }
+  lohnAkteSchreiben(body, 'dlgLohnPosition', 'lpoFehler',
+    w === 'neu' ? 'Position erfasst.' : 'Position geändert.');
+}
+
+function lohnPositionLoeschen() {
+  const id = Number($('lpoId').value);
+  if (!id) { return; }
+  lohnAkteSchreiben({ id: lohnAkte.person.id, was: 'position', aktion: 'loeschen', eintrag_id: id },
+    'dlgLohnPosition', 'lpoFehler', 'Position gelöscht.');
 }
 
 // ── Dialog: Lohnansatz ───────────────────────────────────────────────────
@@ -32648,22 +32973,29 @@ function ladeFeiertagMap() {
 // Dauerhaft ueber "Einrichtung" in der Seitenleiste erreichbar -- nicht nur
 // als Nothilfe, wenn ein Laden bereits fehlgeschlagen ist. Sonst findet ihn
 // niemand, dessen erster Blick auf ein funktionierendes Dashboard faellt.
-// Stiller Hintergrund-Check, ob die Einrichtung etwas nachzutragen hat --
-// derselbe Endpunkt wie planungEinrichten(), nur als GET ohne Ausfuehrung.
+// Stiller Hintergrund-Check, ob die Einrichtung etwas nachzutragen hat.
 // Kein Toast bei Fehlern: das ist ein Hinweis-Punkt, kein Vorgang.
+//
+// EIN Abruf, nicht zwei: Frueher fragte der Start zusaetzlich
+// planung_einrichten.php (GET) -- und neuerungen_stand.php zaehlte dieselben
+// fehlenden Tabellen/Spalten gleich noch einmal ('einrichtung_ausstehend',
+// dieselbe Zaehlung wie 'ausstehend'). Beide gehen ueber information_schema
+// und kosten bei jedem Start Zeit. Die Etappenliste holt die Einrichtung
+// selbst, wenn sie laeuft (planungEinrichten).
+// Den Punkt sieht wie bisher nur, wer einspielen darf (betrieb_schreiben):
+// planung_einrichten.php antwortete allen anderen mit 403.
 function pruefeUpdate() {
-  api('planung_einrichten.php').then(({ ok, data }) => {
-    const hat = ok && Number(data.ausstehend) > 0;
+  updLaden().then(d => {
+    const hat = !!(d && d.darf_einspielen && Number(d.einrichtung_ausstehend) > 0);
     $('nav-einrichtung').classList.toggle('hat-update', hat);
     $('nav-einrichtung').title = hat ? 'Update verfügbar: neue Einrichtung steht aus' : 'Einrichtung';
     $('navEinrichtungLbl').textContent = hat ? 'Update' : 'Einrichtung';
-    if (ok && data && data.etappen) { updEtappen = data.etappen; }
-  }).catch(() => {});
-  // Der Punkt am Konto-Logo faellt nicht auf, solange niemand dort
-  // hinschaut (ENT-698). Darum oeffnet sich beim Anmelden das Fenster
-  // selbst -- fuer alle im Cockpit, nicht nur fuer die, die einspielen
-  // duerfen: Neuerungen betreffen jeden.
-  updVonSelbst();
+    // Der Punkt am Konto-Logo faellt nicht auf, solange niemand dort
+    // hinschaut (ENT-698). Darum oeffnet sich beim Anmelden das Fenster
+    // selbst -- fuer alle im Cockpit, nicht nur fuer die, die einspielen
+    // duerfen: Neuerungen betreffen jeden.
+    updVonSelbst(d);
+  });
 }
 
 // ══════════════════════════════════════════ UPDATE-FENSTER (ENT-698)
@@ -32677,7 +33009,7 @@ function pruefeUpdate() {
 //   unbekannt   der Stand liess sich nicht abrufen
 //   fertig      soeben eingespielt
 let updStand = null;
-let updEtappen = null;       // aus planung_einrichten.php (GET), Reihenfolge = Laufreihenfolge
+let updEtappen = null;       // aus planung_einrichten.php (GET, erst beim Einspielen geholt), Reihenfolge = Laufreihenfolge
 let updModus = 'aktuell';
 let updLaeuft = false;
 let updVonSelbstGezeigt = false;
@@ -32691,9 +33023,11 @@ function updLaden() {
 
 // Einmal je Anmeldung. "Spaeter" schliesst nur; solange eine Einrichtung
 // aussteht, kommt das Fenster beim naechsten Anmelden wieder (Punkt 4).
-function updVonSelbst() {
+// vorab: der Stand, den pruefeUpdate() schon geholt hat -- dann kein
+// zweiter Abruf. undefined heisst: selbst holen.
+function updVonSelbst(vorab) {
   if (updVonSelbstGezeigt) { return; }
-  updLaden().then(d => {
+  (vorab !== undefined ? Promise.resolve(vorab) : updLaden()).then(d => {
     if (!d || updVonSelbstGezeigt) { return; }
     const neu = (d.neuerungen || []).length > 0;
     const offen = Number(d.einrichtung_ausstehend) > 0;
@@ -34401,9 +34735,9 @@ function openDrawer(id) {
   ];
   $('drBody').innerHTML =
     '<dl class="dl">' + rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('') + '</dl>' +
-    (r.unterschrift
-      ? `<div class="sig-box"><div class="lb">Unterschrift Kunde</div><img src="${esc(r.unterschrift)}" alt="Unterschrift"></div>`
-      : `<div class="sig-box"><div class="lb">Unterschrift Kunde</div><p style="font-size:12.5px;color:var(--ink-3)">Keine Unterschrift erfasst.</p></div>`) +
+    `<div class="sig-box" id="drSig">${drUnterschriftHtml(r.unterschrift
+      ? r.unterschrift
+      : (Number(r.hat_unterschrift) ? undefined : ''))}</div>` +
     `<p class="zone-note" style="margin-top:20px">Direkt als PDF: „Herunterladen“ oder „Teilen“ unten. Für den Ausdruck selbst „Kundenbericht drucken“, im Druckdialog lässt sich dort auch „Als PDF sichern“ wählen.</p>`;
   // Herunterladen/Teilen (ENT-399): direkter Weg zum PDF, ohne den Umweg
   // ueber den System-Druckdialog -- Anruf-Szenario, der Kunde am Telefon
@@ -34424,6 +34758,24 @@ function openDrawer(id) {
      <div style="flex:1"></div>
      <button class="btn btn-plain" id="drDeleteBtn" onclick="askDeleteRapport(${Number(id)})">Löschen</button>`;
   showDrawer();
+  // Das Bild erst jetzt holen (rapportUnterschrift). Nur einsetzen, wenn
+  // noch derselbe Rapport offen ist -- wer schnell weiterklickt, soll nicht
+  // die Unterschrift des vorherigen Rapports sehen.
+  if (!r.unterschrift && Number(r.hat_unterschrift)) {
+    rapportUnterschrift(r).then(u => {
+      if (drawerId !== Number(id) || !$('drSig')) return;
+      $('drSig').innerHTML = drUnterschriftHtml(u);
+    });
+  }
+}
+
+// undefined = wird geladen, null = liess sich nicht laden, '' = keine erfasst.
+function drUnterschriftHtml(u) {
+  const hinweis = t => `<div class="lb">Unterschrift Kunde</div><p style="font-size:12.5px;color:var(--ink-3)">${t}</p>`;
+  if (u === undefined) return hinweis('Unterschrift wird geladen …');
+  if (u === null) return hinweis('Die Unterschrift liess sich nicht laden. Bitte den Rapport erneut öffnen.');
+  if (!u) return hinweis('Keine Unterschrift erfasst.');
+  return `<div class="lb">Unterschrift Kunde</div><img src="${esc(u)}" alt="Unterschrift">`;
 }
 
 function showDrawer() {
@@ -36994,8 +37346,14 @@ function kdBerichtBlatt(r) {
 function printReport() {
   const r = rapporte.find(x => Number(x.id) === drawerId);
   if (!r) return;
-  $('printArea').innerHTML = kdBerichtBlatt(r);
-  window.print();
+  // Ohne geladene Unterschrift stuende auf dem Blatt die leere Linie fuer
+  // "keine erfasst" -- beim Kunden sieht das aus wie ein unsignierter
+  // Rapport. Dann lieber gar nicht drucken und es sagen.
+  rapportUnterschrift(r).then(u => {
+    if (u === null) { toast('Die Unterschrift liess sich nicht laden — bitte erneut versuchen.'); return; }
+    $('printArea').innerHTML = kdBerichtBlatt(r);
+    window.print();
+  });
 }
 
 function kdRapportDateiname(r) {
@@ -37011,13 +37369,25 @@ function kdRapportDateiname(r) {
 // nichts, und eine Verzweigung dort haette nur eine neue Stelle geschaffen,
 // an der beide Formen auseinanderlaufen koennen.
 function kdRapportPdfBauen(r) {
-  return html2pdfLaden().then(() => {
+  // Gleiche Regel wie bei printReport(): kein Blatt ohne geladene Unterschrift.
+  return rapportUnterschrift(r).then(u => {
+    if (u === null) throw new Error('unterschrift');
+    return html2pdfLaden();
+  }).then(() => {
     $('rapportBlatt').innerHTML = kdBerichtBlatt(r);
     // Seit ENT-425 dieselbe Erzeugung wie bei der Offerte: moeglichst eine
     // Seite. Der Rapport hatte dasselbe Problem -- Unterschriftenblock und
     // Fusszeile kippten bei laengeren Bemerkungen auf Seite 2.
     return blattPdfBlob($('rapportBlatt'));
   });
+}
+
+// Scheiterte schon das Nachladen der Unterschrift, sagt die Meldung das --
+// sonst sucht man den Fehler beim PDF.
+function kdRapportFehler(err, sonst) {
+  return (err && err.message === 'unterschrift')
+    ? 'Die Unterschrift liess sich nicht laden — bitte erneut versuchen.'
+    : sonst;
 }
 
 // Herunterladen und Teilen (ENT-399): Anruf-Szenario -- der Planer ist
@@ -37044,9 +37414,9 @@ function kdRapportHerunterladen(id, knopf) {
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
     if (btn) { btn.disabled = false; }
-  }).catch(() => {
+  }).catch(err => {
     if (btn) { btn.disabled = false; }
-    toast('Der Rapport liess sich nicht erzeugen.');
+    toast(kdRapportFehler(err, 'Der Rapport liess sich nicht erzeugen.'));
   });
 }
 
@@ -37074,7 +37444,7 @@ function kdRapportTeilen(id, knopf) {
   }).catch(err => {
     if (btn) { btn.disabled = false; }
     if (err && err.name === 'AbortError') { return; }
-    toast('Der Rapport liess sich nicht teilen.');
+    toast(kdRapportFehler(err, 'Der Rapport liess sich nicht teilen.'));
   });
 }
 
