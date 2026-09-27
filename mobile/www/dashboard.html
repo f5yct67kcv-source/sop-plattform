@@ -2201,6 +2201,11 @@ html:not(.hat-reinigung) [data-sparte-feld] { display: none !important; }
 .as-treffer button { text-align: left; font: inherit; font-size: 12.5px; padding: 6px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: inherit; cursor: pointer; }
 .as-treffer button:hover { border-color: var(--accent); }
 .as-treffer .as-t-sub { display: block; color: var(--ink-3); font-size: 11.5px; }
+.as-bezug { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-3); margin: 0 0 6px; min-width: 0; }
+.as-bezug[hidden] { display: none; }
+.as-bezug span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.as-bezug button { border: 0; background: none; color: var(--ink-3); font-size: 15px; line-height: 1; padding: 2px 4px; cursor: pointer; border-radius: 6px; }
+.as-bezug button:hover { color: inherit; background: var(--surface); }
 .as-treffer .as-t-zeile { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px; }
 .as-treffer .as-t-zeile > button:first-child { min-width: 0; }
 .as-treffer .as-t-aktion { font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--accent); cursor: pointer; white-space: nowrap; }
@@ -10121,6 +10126,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
     </div>
     <div class="as-verlauf" id="asVerlauf"></div>
     <div class="as-fuss">
+      <div class="as-bezug" id="asBezug" hidden><span id="asBezugText"></span><button type="button" id="asBezugWeg" aria-label="Bezug für die nächste Frage weglassen" title="Für die nächste Frage weglassen" onclick="asBezugWeglassen()">×</button></div>
       <textarea class="inp" id="asText" rows="2" placeholder="Frag mich, z. B. „Wo fehlen diese Woche noch Leute?“"
                 onkeydown="if (event.key === 'Enter' &amp;&amp; !event.shiftKey) { event.preventDefault(); asSenden(); }"></textarea>
       <div class="as-reihe">
@@ -12970,6 +12976,7 @@ function asPanelUm() { $('asPanel').hidden ? asPanelAuf() : asPanelZu(); }
 function asPanelAuf() {
   $('asBlase').hidden = true;
   $('asPanel').hidden = false;
+  asBezugZeigen();
   asInSicht();
   setTimeout(() => $('asText').focus(), 30);
 }
@@ -13171,6 +13178,52 @@ function asKuerzen() {
   if (ab > 0) { asNachrichten = asNachrichten.slice(ab); }
 }
 
+// ── Die offene Seite (ENT-716). Der Assistent bekommt Art, Nummer und eine
+// kurze Beschriftung; die Einzelheiten holen die Werkzeuge mit den Rechten
+// der Person. Eine feine Zeile ueber dem Eingabefeld zeigt den Bezug, ein x
+// laesst ihn fuer die naechste Frage weg.
+let asBezugWegGelassen = false;
+function asAn(id) { const el = $(id); return !!el && el.classList.contains('on'); }
+function asBezugErmitteln() {
+  try {
+    if (asAn('drawer') && enTarget) {
+      const e = einsaetze.find(x => Number(x.id) === Number(enTarget));
+      if (e) { return { art: 'einsatz', id: Number(e.id), text: `Einsatz ${asTag(e.datum)} ${hm(e.von)}–${hm(e.bis)} · ${e.kunde_name || e.titel || ''}` }; }
+    }
+    if (asAn('view-einsatzplan') && epId && epEinsatz) {
+      const e = epEinsatz;
+      return { art: 'einsatz', id: Number(epId), text: `Einsatz ${asTag(e.datum)} ${hm(e.von)}–${hm(e.bis)} · ${e.kunde_name || e.titel || ''}` };
+    }
+    if (asAn('view-offerte') && ofFormId) {
+      const art = ofArt === 'rechnung' ? 'rechnung' : 'offerte';
+      const nr = ($('ofFormNummer') && $('ofFormNummer').textContent.trim()) || '';
+      const bearbeitbar = !(typeof ofFormFassung !== 'undefined' && ofFormFassung && ofFormFassung.gesperrt);
+      return { art, id: Number(ofFormId), bearbeitbar,
+        text: `${art === 'rechnung' ? 'Rechnung' : 'Offerte'} ${nr} · ${$('of_kunde').value.trim()}${bearbeitbar ? '' : ' (gesperrt)'}` };
+    }
+    if (asAn('view-kunden') && asAn('kv-detail') && kdId) {
+      const k = kunden.find(x => Number(x.id) === Number(kdId));
+      if (k) { return { art: 'kunde', id: Number(k.id), text: `Kunde ${k.name}` }; }
+    }
+    if (asAn('view-mitarbeiter') && (asAn('mv-detail') || asAn('mv-bearbeiten')) && mdName) {
+      const m = mitarbeiter.find(x => x.name === mdName);
+      if (m) { return { art: 'mitarbeiter', id: Number(m.id), text: `Person ${fullName(m) || m.name}` }; }
+    }
+  } catch (e) { /* ohne Bezug weiter */ }
+  return null;
+}
+function asBezugZeigen() {
+  const b = asBezugWegGelassen ? null : asBezugErmitteln();
+  const el = $('asBezug');
+  if (!el) { return; }
+  el.hidden = !b;
+  if (b) { $('asBezugText').textContent = 'Bezug: ' + b.text; }
+}
+function asBezugWeglassen() { asBezugWegGelassen = true; asBezugZeigen(); }
+// Die Seite wechselt ohne eigenes Ereignis; solange das Fenster offen ist,
+// wird der Bezug darum im Takt nachgefuehrt.
+setInterval(() => { if ($('asPanel') && !$('asPanel').hidden) { asBezugZeigen(); } }, 1500);
+
 async function asSenden() {
   const text = $('asText').value.trim();
   if (!text || asLaeuft) { return; }
@@ -13181,6 +13234,13 @@ async function asSenden() {
   asNachricht('du', text);
   asKuerzen();
   asNachrichten.push({ role: 'user', content: text });
+  // Die offene Seite (ENT-716) gilt fuer diese Frage; ein x gilt nur fuer sie.
+  const bezug = asBezugWegGelassen ? null : asBezugErmitteln();
+  asBezugWegGelassen = false;
+  asBezugZeigen();
+  // Ein offener Entwurf laesst sich ergaenzen wie ein vorbereitetes Formular;
+  // ein gesperrter (versendet, entschieden) nicht -- die Sperre sagt der Server.
+  if (bezug && bezug.bearbeitbar) { asFormular = { bereich: 'beleg', aktion: 'offen' }; }
   asTreffer = [];
   asTrefferMax = AS_TREFFER_MAX;
   asFormularNeu = false;
@@ -13190,7 +13250,9 @@ async function asSenden() {
   const warten = asNachricht('leise', 'Ich sehe nach …');
   try {
     for (let runde = 0; runde < AS_RUNDEN; runde++) {
-      const { ok, status, data } = await api('ki_assistent.php', { method: 'POST', body: { messages: asNachrichten, heute: isoTag() } });
+      const body = { messages: asNachrichten, heute: isoTag() };
+      if (bezug) { body.bezug = { art: bezug.art, id: bezug.id, text: bezug.text }; }
+      const { ok, status, data } = await api('ki_assistent.php', { method: 'POST', body });
       if (status === 401) { doLogout(); return; }
       if (!ok || data.status !== 'ok') {
         // Die Frage bleibt nicht als unbeantwortete Nachricht im Gespraech
@@ -13254,6 +13316,10 @@ async function asWerkzeug(name, e) {
   if (name === 'offene_rechnungen') { return asWzRechnungen(e); }
   if (name === 'offene_enden') { return asWzOffeneEnden(e); }
   if (name === 'disposition_vorschlaege') { return asWzDisposition(e); }
+  if (name === 'beleg_auskunft') { return asWzBeleg(e); }
+  if (name === 'tagesplan') { return asWzTagesplan(e); }
+  if (name === 'kunde_auskunft') { return asWzKunde(e); }
+  if (name === 'person_auskunft') { return asWzPerson(e); }
   if (name === 'formular_vorbereiten') { return asWzVorbereiten(e); }
   if (name === 'formular_ergaenzen') { return asWzErgaenzen(e); }
   return { modell: { fehler: 'unbekanntes Werkzeug' } };
@@ -13487,8 +13553,11 @@ async function asWzDisposition(e) {
   const abw = (aw.data && aw.data.abwesenheiten) || [];
   hinweise.push('Qualifikationen sind nicht geprueft.');
 
+  const nurId = Number.isInteger(e.einsatz_id) && e.einsatz_id > 0 ? e.einsatz_id : null;
+  if (nurId && !einsaetze.some(x => Number(x.id) === nurId)) { return { modell: { fehler: 'Diesen Einsatz gibt es nicht (oder er ist nicht sichtbar).' } }; }
   const offen = einsaetze
-    .filter(x => { const d = String(x.datum).slice(0, 10); return d >= von && d <= bis && d >= heute && x.status !== 'abgesagt'; })
+    .filter(x => { const d = String(x.datum).slice(0, 10);
+      return nurId ? Number(x.id) === nurId && d >= heute && x.status !== 'abgesagt' : d >= von && d <= bis && d >= heute && x.status !== 'abgesagt'; })
     .map(x => ({ x, fehlt: Math.max(0, (Number(x.bedarf) || 0) - (x.mitarbeiter || []).filter(m => zaehltAlsBesetzt(m.zusage)).length) }))
     .filter(o => o.fehlt > 0)
     .sort((a, b) => (String(a.x.datum) + hm(a.x.von)).localeCompare(String(b.x.datum) + hm(b.x.von)));
@@ -13538,6 +13607,116 @@ async function asWzDisposition(e) {
       offene_plaetze: offen.reduce((t, o) => t + o.fehlt, 0), posten, hinweis: hinweise.join(' ') },
     treffer, trefferMax: 40,
   };
+}
+
+// ── Auskuenfte (ENT-716): ein Beleg, ein Tag, ein Kunde, eine Person. Jede
+// ueber den bestehenden Endpunkt mit dessen Recht; fehlt es, sagt der Teil
+// kein_recht statt "nichts". Keine vertraulichen Personalfelder.
+async function asWzBeleg(e) {
+  const id = Number(e.beleg_id);
+  if (!Number.isInteger(id) || id <= 0) { return { modell: { fehler: 'beleg_id fehlt' } }; }
+  const r = await asLaden('beleg_lesen.php?id=' + id);
+  if (r.kein_recht) { return { modell: { kein_recht: true } }; }
+  if (r.fehler) { return { modell: { fehler: r.fehler } }; }
+  const b = r.data.beleg || {}, f = r.data.fassung || null;
+  const re = b.art === 'rechnung';
+  return {
+    modell: { vollstaendig: true, art: re ? 'Rechnung' : 'Offerte', nummer: b.nummer, kunde: (r.data.kunde && r.data.kunde.name) || '',
+      status: b.status, bearbeitbar: !(f && f.gesperrt), total_chf: chf(Number((b.summen && b.summen.total_rappen) || b.total_rappen) || 0),
+      ...(re ? { faellig_bis: leeresDatum(b.faellig_bis) ? null : String(b.faellig_bis).slice(0, 10), bezahlt: !!Number(b.bezahlt) }
+             : { gueltig_bis: leeresDatum(b.gueltig_bis) ? null : String(b.gueltig_bis).slice(0, 10),
+                 entscheid: leeresDatum(b.entscheidung_am) ? null : (b.status === 'abgelehnt' ? 'abgelehnt' : 'angenommen'),
+                 entscheid_am: leeresDatum(b.entscheidung_am) ? null : String(b.entscheidung_am).slice(0, 16),
+                 entscheid_angesehen: leeresDatum(b.entscheidung_am) ? null : !leeresDatum(b.entscheidung_gesehen_am) }),
+      positionen: (b.positionen || []).filter(p => p.produkt_name).slice(0, 20).map(p => ({ leistung: p.produkt_name, menge: Number(p.menge), einheit: p.einheit || '' })) },
+    treffer: [{ text: `${b.nummer || ''} · ${(r.data.kunde && r.data.kunde.name) || '(ohne Kunde)'}`, sub: `${re ? 'Rechnung' : 'Offerte'} · ${b.status}`, oeffnen: () => ofOeffnen(id) }],
+  };
+}
+
+const asBesetztVon = x => (x.mitarbeiter || []).filter(m => zaehltAlsBesetzt(m.zusage));
+async function asWzTagesplan(e) {
+  const von = asDatum(e.von), bis = asDatum(e.bis) || von;
+  if (!von || bis < von) { return { modell: { fehler: 'von (JJJJ-MM-TT) noetig, bis nicht davor' } }; }
+  if (bis > plusTage(von, 6)) { return { modell: { fehler: 'hoechstens 7 Tage auf einmal' } }; }
+  const r = await asEinsaetzeFrisch();
+  if (r.kein_recht) { return { modell: { kein_recht: true } }; }
+  if (r.fehler) { return { modell: { fehler: r.fehler } }; }
+  const im = einsaetze.filter(x => { const d = String(x.datum).slice(0, 10); return d >= von && d <= bis; });
+  const laufend = im.filter(x => x.status !== 'abgesagt')
+    .sort((a, b) => (String(a.datum) + hm(a.von)).localeCompare(String(b.datum) + hm(b.von)));
+  const wer = m => { const p = mitarbeiter.find(y => Number(y.id) === Number(m.id)); return p ? (fullName(p) || p.name) : (m.name || 'Person'); };
+  return {
+    modell: { vollstaendig: true, zeitraum: { von, bis }, einsaetze: laufend.length, abgesagt: im.length - laufend.length,
+      offene_plaetze: laufend.reduce((t, x) => t + Math.max(0, (Number(x.bedarf) || 0) - asBesetztVon(x).length), 0),
+      posten: laufend.slice(0, 30).map(x => ({ datum: String(x.datum).slice(0, 10), von: hm(x.von), bis: hm(x.bis), kunde: x.kunde_name || '',
+        titel: x.titel || x.einsatzart || '', bedarf: Number(x.bedarf) || 0, besetzt: asBesetztVon(x).length,
+        eingeteilt: asBesetztVon(x).map(m => `${wer(m)} (${m.zusage || 'offen'})`) })) },
+    treffer: laufend.map(x => ({ text: `${asTag(x.datum)} ${hm(x.von)}–${hm(x.bis)} · ${x.kunde_name || x.titel || 'Einsatz'}`,
+      sub: `${asBesetztVon(x).length} von ${Number(x.bedarf) || 0} besetzt`, oeffnen: () => epAuf(x.id) })),
+  };
+}
+
+async function asWzKunde(e) {
+  if (!kunden.length) { try { await loadKunden(); } catch (x) { /* unten gemeldet */ } }
+  const name = String(e.name || '').trim().toLowerCase();
+  const k = Number.isInteger(e.kunde_id) ? kunden.find(x => Number(x.id) === e.kunde_id)
+    : kunden.find(x => String(x.name).toLowerCase() === name) || (name ? kunden.filter(x => String(x.name).toLowerCase().includes(name)) : []).at(0);
+  if (!k) { return { modell: { fehler: name || e.kunde_id ? 'Kunde nicht gefunden' : 'kunde_id oder name noetig' } }; }
+  const heute = isoTag(), treffer = [], modell = { vollstaendig: true, kunde: k.name };
+  const mitKunde = b => (Number(b.kunde_id) === Number(k.id) || String(b.kunde_name || '').toLowerCase() === String(k.name).toLowerCase())
+    && Number(b.aktiv ?? 1) === 1 && !Number(b.ist_vorlage);
+  const of = await asLaden('beleg_list.php?art=offerte');
+  if (of.kein_recht || of.fehler) { modell.offerten = of.kein_recht ? { kein_recht: true } : { fehler: of.fehler }; } else {
+    const l = (of.data.belege || []).filter(mitKunde);
+    const offen = l.filter(b => b.status === 'entwurf' || (['versendet', 'angeschaut'].includes(b.status) && leeresDatum(b.entscheidung_am)));
+    modell.offerten = { offen: offen.length, entwuerfe: offen.filter(b => b.status === 'entwurf').length, liste: offen.slice(0, 5).map(b => ({ nummer: b.nummer, status: b.status })) };
+    offen.slice(0, 5).forEach(b => treffer.push({ text: `Offerte · ${b.nummer}`, sub: b.status === 'entwurf' ? 'Entwurf' : 'versendet, kein Entscheid', oeffnen: () => ofOeffnen(b.id) }));
+  }
+  const re = await asLaden('beleg_list.php?art=rechnung');
+  if (re.kein_recht || re.fehler) { modell.rechnungen = re.kein_recht ? { kein_recht: true } : { fehler: re.fehler }; } else {
+    const offen = (re.data.belege || []).filter(mitKunde).filter(b => b.status !== 'entwurf' && !Number(b.bezahlt));
+    const ueber = offen.filter(b => { const t = reFaelligTage(b); return t !== null && t < 0; });
+    modell.rechnungen = { offen: offen.length, ueberfaellig: ueber.length, summe_offen_chf: chf(offen.reduce((t, b) => t + (Number(b.total_rappen) || 0), 0)) };
+    ueber.slice(0, 5).forEach(b => treffer.push({ text: `Rechnung · ${b.nummer}`, sub: `${-reFaelligTage(b)} Tage überfällig`, oeffnen: () => ofOeffnen(b.id) }));
+  }
+  const ein = await asEinsaetzeFrisch();
+  if (ein.kein_recht || ein.fehler) { modell.einsaetze = ein.kein_recht ? { kein_recht: true } : { fehler: ein.fehler }; } else {
+    const seine = einsaetze.filter(x => (Number(x.kunde_id) === Number(k.id) || String(x.kunde_name || '').toLowerCase() === String(k.name).toLowerCase()) && x.status !== 'abgesagt');
+    const bald = seine.filter(x => { const d = String(x.datum).slice(0, 10); return d >= heute && d <= plusTage(heute, 13); })
+      .sort((a, b) => (String(a.datum) + hm(a.von)).localeCompare(String(b.datum) + hm(b.von)));
+    const letzter = seine.filter(x => String(x.datum).slice(0, 10) < heute).sort((a, b) => String(b.datum).localeCompare(String(a.datum)))[0];
+    modell.einsaetze = { naechste_14_tage: bald.length, offene_plaetze: bald.reduce((t, x) => t + Math.max(0, (Number(x.bedarf) || 0) - asBesetztVon(x).length), 0),
+      letzter_vergangener: letzter ? String(letzter.datum).slice(0, 10) : null };
+    bald.slice(0, 5).forEach(x => treffer.push({ text: `Einsatz · ${asTag(x.datum)} ${hm(x.von)}–${hm(x.bis)}`, sub: `${asBesetztVon(x).length} von ${Number(x.bedarf) || 0} besetzt`, oeffnen: () => epAuf(x.id) }));
+  }
+  return { modell, treffer };
+}
+
+async function asWzPerson(e) {
+  if (!mitarbeiter.length) { try { await loadMitarbeiter(); } catch (x) { /* unten gemeldet */ } }
+  const name = String(e.name || '').trim().toLowerCase();
+  const aktiv = mitarbeiter.filter(m => Number(m.aktiv ?? 1) === 1);
+  const m = Number.isInteger(e.mitarbeiter_id) ? mitarbeiter.find(x => Number(x.id) === e.mitarbeiter_id)
+    : aktiv.find(x => (fullName(x) || '').toLowerCase() === name || String(x.name).toLowerCase() === name)
+      || (name ? aktiv.filter(x => (fullName(x) || x.name).toLowerCase().includes(name)) : []).at(0);
+  if (!m) { return { modell: { fehler: name || e.mitarbeiter_id ? 'Person nicht gefunden' : 'mitarbeiter_id oder name noetig' } }; }
+  const heute = isoTag(), bis = plusTage(heute, 13), treffer = [];
+  const modell = { vollstaendig: true, person: fullName(m) || m.name, kategorie: String(m.anstellungskategorie || '') || null };
+  const ein = await asEinsaetzeFrisch();
+  if (ein.kein_recht || ein.fehler) { modell.einsaetze = ein.kein_recht ? { kein_recht: true } : { fehler: ein.fehler }; } else {
+    const seine = einsaetze.filter(x => x.status !== 'abgesagt' && (x.mitarbeiter || []).some(z => Number(z.id) === Number(m.id) && zaehltAlsBesetzt(z.zusage)))
+      .filter(x => { const d = String(x.datum).slice(0, 10); return d >= heute && d <= bis; })
+      .sort((a, b) => (String(a.datum) + hm(a.von)).localeCompare(String(b.datum) + hm(b.von)));
+    const zusage = x => ((x.mitarbeiter || []).find(z => Number(z.id) === Number(m.id)) || {}).zusage || 'offen';
+    modell.einsaetze = { naechste_14_tage: seine.length, stunden_geplant_diese_woche: asPlanStunden(m.id, heute),
+      liste: seine.slice(0, 10).map(x => ({ datum: String(x.datum).slice(0, 10), von: hm(x.von), bis: hm(x.bis), kunde: x.kunde_name || '', zusage: zusage(x) })) };
+    seine.slice(0, 8).forEach(x => treffer.push({ text: `${asTag(x.datum)} ${hm(x.von)}–${hm(x.bis)} · ${x.kunde_name || x.titel || 'Einsatz'}`, sub: `Zusage: ${zusage(x)}`, oeffnen: () => epAuf(x.id) }));
+  }
+  const aw = await asLaden(`abwesenheit_list.php?von=${heute}&bis=${bis}`);
+  modell.abwesenheiten = aw.kein_recht ? { kein_recht: true } : aw.fehler ? { fehler: aw.fehler }
+    : { liste: (aw.data.abwesenheiten || []).filter(a => Number(a.mitarbeiter_id) === Number(m.id))
+        .map(a => ({ typ: a.typ || 'Abwesenheit', von: String(a.von).slice(0, 10), bis: String(a.bis).slice(0, 10), status: a.status })) };
+  return { modell, treffer };
 }
 
 // Der Knopf "Zuteilen" (ENT-711). Nur ein Klick der Person loest ihn aus;
@@ -13754,6 +13933,9 @@ async function asWzErgaenzen(e) {
     return { modell: { fehler: 'Es ist kein vorbereitetes Formular offen. Zuerst formular_vorbereiten.' } };
   }
   const geaendert = [], hinweise = [];
+  if (asFormular.bereich === 'beleg' && typeof ofFormFassung !== 'undefined' && ofFormFassung && ofFormFassung.gesperrt) {
+    return { modell: { fehler: 'Dieser Beleg ist gesperrt (versendet oder entschieden) und laesst sich nicht mehr aendern.' } };
+  }
   if (asFormular.bereich === 'beleg') {
     if (e.kunde_name) {
       $('of_kunde').value = String(e.kunde_name).trim();

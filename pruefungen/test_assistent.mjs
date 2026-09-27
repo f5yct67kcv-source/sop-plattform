@@ -100,6 +100,12 @@ const modellNeu = (staende, datei, stoer) => { modellServer = { staende, datei: 
 // Der Server-Weg fuer "Zuteilen" (ENT-711): jede Anfrage wird gemerkt; die
 // Antwort bestimmt zuteilenAntwort(body) -> [status, json].
 const zuteilungen = [];
+// Offene Seite (ENT-716): mitgeschickter Bezug je Anfrage an den Assistenten.
+const bezuege = [];
+const BELEG_LESEN = { status: 'ok', kunde: { id: 9, name: 'Muster GmbH' }, fassung: { gesperrt: false },
+  beleg: { id: 26, art: 'offerte', nummer: 'OF-6', status: 'angeschaut', gueltig_bis: tag(20), entscheidung_am: null,
+    entscheidung_gesehen_am: null, total_rappen: 10000, summen: { total_rappen: 10000 },
+    positionen: [{ produkt_name: 'Verkehrsdienst', menge: 8, einheit: 'Std.' }, { produkt_name: '', menge: 1 }] } };
 let zuteilenAntwort = () => [200, { status: 'ok' }];
 let drehbuch = null, belegeGesperrt = false, abwesenheitGesperrt = true, assistentAntwort = null, routerAntwort = null;
 const rufe = [];
@@ -186,6 +192,7 @@ async function neueSeite() {
     if (p.startsWith('ki_assistent')) {
       if (assistentAntwort) return send(assistentAntwort[0], assistentAntwort[1]);
       const body = JSON.parse(req.postData() || '{}');
+      bezuege.push(body.bezug || null);
       const letzte = body.messages[body.messages.length - 1];
       if (typeof letzte.content === 'string') {
         return send({ status: 'ok', stop_reason: 'tool_use', content: [
@@ -212,6 +219,7 @@ async function neueSeite() {
       const roh = Buffer.from(body);
       return route.fulfill({ status: code, contentType: 'application/octet-stream', body: roh.subarray(n * TEIL, (n + 1) * TEIL) });
     }
+    if (p.startsWith('beleg_lesen')) return send(BELEG_LESEN);
     if (p.startsWith('einsatz_person_zuteilen')) {
       const body = JSON.parse(req.postData() || '{}');
       zuteilungen.push(body);
@@ -351,7 +359,7 @@ check('Bei gleicher Qualität die Schweizer Stimme; künstliche Stimmen (Eloquen
 check('Nur eine einfache Stimme da: einmal der Hinweis, wo es eine bessere gibt', await page.evaluate(() =>
   (document.getElementById('asVerlauf').textContent.match(/Klingt die Stimme blechern/g) || []).length === 1));
 check('Die Antwort wird vorgelesen', (await page.evaluate(() => window.__gesprochen)).includes('Zwei Einsätze haben noch vier offene Plätze.'));
-await page.evaluate(() => { window.__epAuf = null; window.epAuf = id => { window.__epAuf = id; }; });
+await page.evaluate(() => { window.__epAuf = null; window.__epAufEcht = window.epAuf; window.epAuf = id => { window.__epAuf = id; }; });
 await page.click('#asVerlauf .as-msg.er:last-child .as-treffer button');
 check('Ein Klick auf einen Treffer öffnet den Einsatz', await page.evaluate(() => window.__epAuf === 11));
 
@@ -563,6 +571,84 @@ check('Lehnt der Server ab, steht sein Grund in der Zeile und der Knopf ist weg'
   const z = [...[...document.querySelectorAll('#asVerlauf .as-msg.er')].pop().querySelectorAll('.as-t-zeile')].find(x => x.textContent.includes('Lea Probe'));
   return /voll besetzt/.test(z.textContent) && !z.querySelector('.as-t-aktion') && !z.querySelector('.as-t-erledigt'); }));
 zuteilenAntwort = () => [200, { status: 'ok' }];
+
+// ══════════ OFFENE SEITE UND AUSKUENFTE (ENT-716)
+// Die echte epAuf zurueck: Weiter oben wird sie fuer den Treffer-Klick ersetzt.
+await page.evaluate(() => { window.epAuf = window.__epAufEcht; epAuf(15); });
+await page.waitForTimeout(300);
+if (!(await page.isVisible('#asPanel'))) { await page.click('#asFigur'); await page.waitForTimeout(100); }
+await page.waitForTimeout(1600);
+check('Die offene Seite steht als feine Zeile über dem Eingabefeld', await page.isVisible('#asBezug')
+  && /Bezug: Einsatz .*Muster GmbH/.test(await page.textContent('#asBezug')));
+const bzMass = await page.evaluate(() => {
+  $('asBezugText').textContent = 'Bezug: Einsatz ' + 'sehr langer Kundenname '.repeat(8);
+  const z = $('asBezug').getBoundingClientRect(), t = $('asText').getBoundingClientRect(), p = $('asPanel').getBoundingClientRect(), x = $('asBezugWeg').getBoundingClientRect();
+  return { ueber: z.bottom <= t.top + 1, einzeilig: z.height < 26, drin: z.right <= p.right + 1 && x.right <= p.right + 1 && x.width > 0 };
+});
+await page.evaluate(() => asBezugZeigen());
+check('Gemessen: die Bezugszeile steht über dem Eingabefeld, bleibt einzeilig und das × im Fenster, auch bei langem Text',
+  bzMass.ueber && bzMass.einzeilig && bzMass.drin);
+const vorBezug = bezuege.length;
+r = await fragen('Wer kann den übernehmen?', { name: 'disposition_vorschlaege', input: { einsatz_id: 15 }, antwort: 'Lea Probe.' });
+check('KRITISCH: der Bezug geht mit (Art und Nummer), und die Vorschläge gelten nur diesem Einsatz',
+  bezuege[vorBezug] && bezuege[vorBezug].art === 'einsatz' && bezuege[vorBezug].id === 15
+  && r.posten.length === 1 && r.posten[0].titel === 'Nachtwache');
+await page.click('#asBezugWeg');
+check('Ein × blendet den Bezug aus', !(await page.isVisible('#asBezug')));
+const vorWeg = bezuege.length;
+r = await fragen('Was ist noch offen?', { name: 'offene_enden', input: { bereich: 'planung' }, antwort: 'Vier Plätze.' });
+check('Weggelassen gilt nur für die nächste Frage: diese ohne Bezug, danach steht er wieder da',
+  bezuege.slice(vorWeg).every(b => b === null));
+await page.waitForTimeout(1600);
+check('... und danach ist er wieder sichtbar', await page.isVisible('#asBezug'));
+r = await fragen('Gibt es den?', { name: 'disposition_vorschlaege', input: { einsatz_id: 999 }, antwort: 'Nein.' });
+check('Ein unbekannter Einsatz ergibt einen Fehler, keine Liste über alle', !!r.fehler && r.posten === undefined);
+
+// Offerte offen: Auskunft, Ergaenzen nur solange nicht gesperrt.
+await page.evaluate(() => { ofFormId = 26; ofArt = 'offerte'; ofFormFassung = { gesperrt: false }; go('offerte'); });
+await page.waitForTimeout(1600);
+check('Offene Offerte: der Bezug nennt sie', /Bezug: Offerte/.test(await page.textContent('#asBezug')));
+r = await fragen('Hat der Kunde schon entschieden?', { name: 'beleg_auskunft', input: { beleg_id: 26 }, antwort: 'Noch nicht.' });
+check('Beleg-Auskunft: Nummer, Kunde, kein Entscheid, bearbeitbar, nur benannte Positionen',
+  r.nummer === 'OF-6' && r.kunde === 'Muster GmbH' && r.entscheid === null && r.bearbeitbar === true
+  && r.positionen.length === 1 && r.positionen[0].leistung === 'Verkehrsdienst');
+r = await fragen('Füg einen Titel hinzu', { name: 'formular_ergaenzen', input: { titel: 'Sommerfest' }, antwort: 'Ergänzt.' });
+check('Ein offener, nicht gesperrter Entwurf lässt sich ergänzen', !r.fehler && r.geaendert.includes('Titel')
+  && (await page.inputValue('#of_titel')) === 'Sommerfest');
+await page.evaluate(() => { ofFormFassung = { gesperrt: true }; });
+r = await fragen('Füg noch eine Bemerkung hinzu', { name: 'formular_ergaenzen', input: { bemerkung: 'x' }, antwort: 'Geht nicht.' });
+check('KRITISCH: ein gesperrter Beleg (versendet/entschieden) lässt sich nicht ergänzen', /gesperrt/.test(r.fehler || '')
+  && (await page.inputValue('#of_bemerkung')) !== 'x');
+await page.evaluate(() => { ofFormFassung = null; ofFormId = null; go('uebersicht'); });
+
+// Tagesplan
+r = await fragen('Was läuft übermorgen bis in vier Tagen?', { name: 'tagesplan', input: { von: tag(2), bis: tag(4) }, antwort: 'Drei Einsätze.' });
+check('Tagesplan: laufende und abgesagte Einsätze getrennt, offene Plätze gezählt, wer eingeteilt ist',
+  r.einsaetze === 3 && r.abgesagt === 1 && r.offene_plaetze === 4
+  && r.posten.find(p => p.titel === 'Verkehrsdienst').eingeteilt.join() === 'Hans Muster (zugesagt)');
+r = await fragen('Und die nächsten zwei Wochen?', { name: 'tagesplan', input: { von: tag(0), bis: tag(13) }, antwort: 'Zu lang.' });
+check('Tagesplan höchstens 7 Tage', !!r.fehler && r.posten === undefined);
+
+// Kunde und Person
+r = await fragen('Was ist bei der Muster GmbH offen?', { name: 'kunde_auskunft', input: { name: 'Muster GmbH' }, antwort: 'Zwei Offerten.' });
+check('Kunde: offene Offerten (Entwurf, ohne Entscheid, Archiviertes zählt nicht), offene Rechnungen, nächste Einsätze',
+  r.kunde === 'Muster GmbH' && r.offerten.offen === 2 && r.offerten.entwuerfe === 1 && r.rechnungen.offen === 1
+  && r.rechnungen.ueberfaellig === 0 && r.einsaetze.naechste_14_tage === 2 && r.einsaetze.letzter_vergangener === tag(-3));
+belegeGesperrt = true;
+r = await fragen('Und bei der Beispiel AG?', { name: 'kunde_auskunft', input: { name: 'beispiel' }, antwort: 'Teilweise.' });
+check('KRITISCH: ohne Belegrecht meldet der Kunde-Teil kein_recht, die Einsätze kommen trotzdem',
+  r.kunde === 'Beispiel AG' && r.offerten.kein_recht === true && r.rechnungen.kein_recht === true && typeof r.einsaetze.naechste_14_tage === 'number');
+belegeGesperrt = false;
+r = await fragen('Wann arbeitet Peter?', { name: 'person_auskunft', input: { name: 'peter' }, antwort: 'Am Freitag.' });
+check('Person: nächste Einsätze mit Zusage, Kategorie, Abwesenheiten',
+  r.person === 'Peter Test' && r.kategorie === 'B' && r.einsaetze.naechste_14_tage === 1 && r.einsaetze.liste[0].zusage === 'offen'
+  && r.abwesenheiten.liste.length === 1 && r.abwesenheiten.liste[0].status === 'genehmigt');
+abwesenheitGesperrt = true;
+r = await fragen('Und Lea?', { name: 'person_auskunft', input: { name: 'Lea Probe' }, antwort: 'Nichts.' });
+check('Ohne Recht auf Abwesenheiten steht kein_recht, nicht „keine“', r.person === 'Lea Probe' && r.abwesenheiten.kein_recht === true);
+abwesenheitGesperrt = false;
+r = await fragen('Und Zorro?', { name: 'person_auskunft', input: { name: 'zorro' }, antwort: 'Kenne ich nicht.' });
+check('Eine unbekannte Person ergibt „nicht gefunden“', /nicht gefunden/.test(r.fehler || ''));
 
 // ══════════ KEIN RECHT, FALSCHE EINGABE
 belegeGesperrt = true;

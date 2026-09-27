@@ -31,7 +31,10 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $heute)) {
     $heute = date('Y-m-d');
 }
 
-$antwort = anthropic_assistent($nachrichten, $heute);
+// Die offene Seite (ENT-716): geprueft, sonst weggelassen -- nie abgewiesen.
+$bezug = ki_bezug_pruefen($input['bezug'] ?? null);
+
+$antwort = anthropic_assistent($nachrichten, $heute, $bezug);
 if ($antwort === null) {
     ki_fehler_melden();
 }
