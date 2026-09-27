@@ -701,7 +701,13 @@ function demo_einsaetze_erzeugen(PDO $pdo, array $objekte, array $mitarbeitende,
 // sich nicht einbinden -- sie fuehrt beim Laden sofort require_session()
 // aus (kein Request-Kontext hier), derselbe Grund, aus dem diese Datei
 // von backend/api/demo_daten_erzeugen.php getrennt ist.
-function demo_lohnlauf_erzeugen(PDO $pdo, string $von, string $bis, int $erstelltVon): ?int
+// Die drei letzten Parameter (ENT-714) braucht der Testdaten-Erzeuger der
+// Testseite: Er stellt nicht jeden Lauf bis "ausbezahlt" durch (der
+// Vormonat bleibt "freigegeben"), traegt eine eigene Bemerkung und haengt
+// einen Ersatzlauf an einen stornierten. Der Demo-Aufruf bleibt unveraendert.
+function demo_lohnlauf_erzeugen(PDO $pdo, string $von, string $bis, int $erstelltVon,
+                                string $endStatus = 'ausbezahlt', ?string $bemerkung = null,
+                                ?int $ersetztLaufId = null): ?int
 {
     $personenStmt = $pdo->query(
         "SELECT id, vorname, nachname, name, personalnummer, anstellungskategorie,
@@ -737,8 +743,11 @@ function demo_lohnlauf_erzeugen(PDO $pdo, string $von, string $bis, int $erstell
         'INSERT INTO lohnlauf (periode_von, periode_bis, status, erstellt_von, bemerkung)
          VALUES (?, ?, ?, ?, ?)'
     );
-    $einLauf->execute([$von, $bis, 'entwurf', $erstelltVon, 'Musterbetrieb-Lohnlauf (ENT-523, Stufe 2b)']);
+    $einLauf->execute([$von, $bis, 'entwurf', $erstelltVon, $bemerkung ?? 'Musterbetrieb-Lohnlauf (ENT-523, Stufe 2b)']);
     $laufId = (int)$pdo->lastInsertId();
+    if ($ersetztLaufId !== null) {
+        $pdo->prepare('UPDATE lohnlauf SET ersetzt_lauf_id = ? WHERE id = ?')->execute([$ersetztLaufId, $laufId]);
+    }
 
     $pIn = $pdo->prepare(
         'INSERT INTO lohnlauf_person
@@ -780,8 +789,10 @@ function demo_lohnlauf_erzeugen(PDO $pdo, string $von, string $bis, int $erstell
     // FREIGEGEBENER LAUF WIRD NIE NEU GERECHNET".
     $freigegebenAm = (new DateTimeImmutable($bis))->modify('+3 days')->format('Y-m-d H:i:s');
     $ausbezahltAm  = (new DateTimeImmutable($bis))->modify('+5 days')->format('Y-m-d H:i:s');
+    if ($endStatus === 'entwurf') { return $laufId; }
     $pdo->prepare('UPDATE lohnlauf SET status = ?, freigegeben_am = ?, freigegeben_von = ? WHERE id = ?')
         ->execute(['freigegeben', $freigegebenAm, $erstelltVon, $laufId]);
+    if ($endStatus === 'freigegeben') { return $laufId; }
     $pdo->prepare('UPDATE lohnlauf SET status = ?, ausbezahlt_am = ?, ausbezahlt_von = ? WHERE id = ?')
         ->execute(['ausbezahlt', $ausbezahltAm, $erstelltVon, $laufId]);
 

@@ -593,6 +593,7 @@ for (const [datei, titel] of [
   ['pruef_neuerungen.php', 'KRITISCH: Neuerungsliste und Etappen der Einrichtung stimmen (ENT-698)'],
   ['pruef_lohn.php', 'KRITISCH: Lohnform, Mindestlohn, Ferienentschaedigung und PaKo-Beitrag stimmen mit dem GAV ueberein (ENT-451)'],
   ['pruef_lohnlauf.php', 'KRITISCH: der Lohnlauf zaehlt nur abgeglichene Schichten, sperrt Reinigung und rechnet nichts auf fehlender Grundlage (ENT-451)'],
+  ['pruef_testdaten.php', 'KRITISCH: die Testdaten (ENT-714) laufen nur auf Staging, lassen Cockpit-Konten stehen, rechnen Lohn und Auslagen ueber die echten Rechenwege und bauen keinen Lauf ohne Regelwerk'],
   ['pruef_finanzen.php', 'KRITISCH: die Finanz-Kostenseite zaehlt nur freigegebene Laeufe, laesst fehlende Monate fehlen statt 0 und gibt Lohn- und Auslagenbetraege nur mit ihrem Recht heraus (ENT-712)'],
   ['pruef_lohn_position.php', 'KRITISCH: persoenliche Zulagen zaehlen im AHV-Lohn mit, und ein abgeschlossener Monat aendert sich nicht mehr (ENT-713)'],
   ['pruef_logbuch.php', 'KRITISCH: das Logbuch haelt fest, wer was geaendert hat'],
@@ -707,6 +708,10 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
     // festgeschriebene Schicht darf angesehen werden -- der Vermerk beruehrt
     // weder den Plan noch die Ist-Zeiten, auf denen die Feststellung beruht.
     'meine_gesehen.php': 'haelt nur fest, dass die eigene Schicht angesehen wurde',
+    // Testdaten der Testseite (ENT-714): leert zuerst alle Schichten und
+    // legt danach nur NEUE an -- eine neue Schicht kann nicht abgeglichen
+    // sein, gleicher Grund wie schichten_erzeugen.php. Nur auf Staging.
+    'testdaten.php': 'leert zuerst und legt nur neue Schichten an (ENT-714, nur Staging)',
   };
   const luecken = apiDateien.filter(f => {
     const q = ohneKommentar(f);

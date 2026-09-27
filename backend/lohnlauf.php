@@ -1321,7 +1321,8 @@ function fin_lohn_monate(PDO $pdo, string $von, string $bis): array
     $st = $pdo->prepare(
         "SELECT l.id, l.periode_von,
                 COALESCE(SUM(p.brutto_rappen), 0) AS brutto,
-                COUNT(p.id) AS personen
+                COUNT(p.id) AS personen,
+                SUM(CASE WHEN p.gesperrt_grund IS NOT NULL THEN 1 ELSE 0 END) AS gesperrt
          FROM lohnlauf l
          LEFT JOIN lohnlauf_person p ON p.lauf_id = l.id
          WHERE l.status IN ($platz) AND l.periode_von BETWEEN ? AND ?
@@ -1331,9 +1332,14 @@ function fin_lohn_monate(PDO $pdo, string $von, string $bis): array
     $monate = [];
     foreach ($st->fetchAll() as $r) {
         $m = substr((string)$r['periode_von'], 0, 7);
-        if (!isset($monate[$m])) { $monate[$m] = ['brutto_rappen' => 0, 'laeufe' => 0]; }
+        if (!isset($monate[$m])) { $monate[$m] = ['brutto_rappen' => 0, 'laeufe' => 0, 'personen' => 0, 'gesperrt' => 0]; }
         $monate[$m]['brutto_rappen'] += (int)$r['brutto'];
         $monate[$m]['laeufe']++;
+        // Personen ohne Betrag (gesperrt, z. B. kein Regelwerk) werden
+        // GEZAEHLT. Ein Lauf, in dem alle gesperrt sind, hat einen Bruttolohn
+        // von 0 -- das heisst "nicht rechenbar", nicht "keine Kosten".
+        $monate[$m]['personen'] += (int)$r['personen'];
+        $monate[$m]['gesperrt'] += (int)$r['gesperrt'];
     }
     ksort($monate);
     return $monate;

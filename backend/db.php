@@ -133,6 +133,21 @@ function umgebung_ist_demo(string $wert): bool
     return $wert === 'demo';
 }
 
+// Testseite (ENT-714): dieselbe Bauart, fail-safe auf den EINEN exakten Wert
+// "staging". Daran haengt das Leeren und Neubefuellen der Testdaten -- eine
+// falsch erkannte Umgebung verloere dort echte Daten. Darum kein Rueckfall
+// ueber !ist_produktion(), und ein unersetzter Platzhalter gilt als NICHT
+// Staging.
+function umgebung_ist_staging(string $wert): bool
+{
+    return $wert === 'staging';
+}
+
+function ist_staging(): bool
+{
+    return umgebung_ist_staging(APP_ENV);
+}
+
 function ist_demo(): bool
 {
     return umgebung_ist_demo(APP_ENV);

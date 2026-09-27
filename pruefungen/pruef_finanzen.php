@@ -20,7 +20,7 @@ $pdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE
                                                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
 $pdo->exec('CREATE TABLE lohnlauf (id INTEGER PRIMARY KEY, periode_von TEXT, periode_bis TEXT, status TEXT,
             freigegeben_am TEXT, ausbezahlt_am TEXT)');
-$pdo->exec('CREATE TABLE lohnlauf_person (id INTEGER PRIMARY KEY, lauf_id INT, mitarbeiter_id INT, brutto_rappen INT)');
+$pdo->exec('CREATE TABLE lohnlauf_person (id INTEGER PRIMARY KEY, lauf_id INT, mitarbeiter_id INT, brutto_rappen INT, gesperrt_grund TEXT)');
 $pdo->exec('CREATE TABLE einsaetze (id INTEGER PRIMARY KEY, datum TEXT, status TEXT)');
 $pdo->exec('CREATE TABLE einsatz_zuteilung (einsatz_id INT, mitarbeiter_id INT, ist_status TEXT)');
 $pdo->exec('CREATE TABLE einsatz_auslagen (einsatz_id INT, mitarbeiter_id INT, fahrzeitersatz_rappen INT,
@@ -40,7 +40,7 @@ $pid = 1;
 foreach ($laeufe as [$id, $von, $bis, $status, $betraege]) {
     $pdo->prepare('INSERT INTO lohnlauf VALUES (?,?,?,?,NULL,NULL)')->execute([$id, $von, $bis, $status]);
     foreach ($betraege as $b) {
-        $pdo->prepare('INSERT INTO lohnlauf_person VALUES (?,?,?,?)')->execute([$pid++, $id, 1, $b]);
+        $pdo->prepare('INSERT INTO lohnlauf_person VALUES (?,?,?,?,NULL)')->execute([$pid++, $id, 1, $b]);
     }
 }
 
@@ -51,6 +51,15 @@ pruef('Februar: freigegeben zaehlt', ($m['2025-02']['brutto_rappen'] ?? null) ==
 pruef('Maerz: nur ein Entwurf -> Monat FEHLT, steht nicht mit 0 da', !array_key_exists('2025-03', $m));
 pruef('April: Storno zaehlt nicht, nur der Ersatzlauf', ($m['2025-04']['brutto_rappen'] ?? null) === 60000);
 pruef('Mai: ohne Lauf fehlt der Monat', !array_key_exists('2025-05', $m));
+pruef('Januar: keine gesperrte Person', ($m['2025-01']['gesperrt'] ?? null) === 0 && ($m['2025-01']['personen'] ?? null) === 3);
+
+// Ein Lauf, in dem ALLE Personen gesperrt sind (etwa kein Regelwerk), hat
+// Bruttolohn 0 -- das muss als "gesperrt" erkennbar sein, nicht als 0 Kosten.
+$pdo->exec("INSERT INTO lohnlauf VALUES (20, '2024-12-01', '2024-12-31', 'ausbezahlt', NULL, NULL)");
+$pdo->exec("INSERT INTO lohnlauf_person VALUES (100, 20, 1, 0, 'kein_regelwerk'), (101, 20, 2, 0, 'kein_regelwerk')");
+$mD = fin_lohn_monate($pdo, '2024-12-01', '2024-12-31');
+pruef('KRITISCH: ein ganz gesperrter Lauf meldet gesperrt = personen (nicht bloss 0.00)',
+    ($mD['2024-12']['gesperrt'] ?? null) === 2 && ($mD['2024-12']['personen'] ?? null) === 2);
 
 $letzte = fin_letzte_laeufe($pdo, 3);
 pruef('Letzte Laeufe: genau drei', count($letzte) === 3);

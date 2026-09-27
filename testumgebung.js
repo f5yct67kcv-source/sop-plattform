@@ -52,6 +52,10 @@
   // Anmeldemaske in dashboard.html -- ohne eigene __APP_ENV__-Ersetzung dort
   // anzulegen, die die Deploy-sed-Zeile (siehe oben) erst noch kennen muesste.
   window.APP_UMGEBUNG_DEMO = istDemo;
+  // Testseite (ENT-714): Nur dort erscheint die Kachel "Testdaten". Exakt
+  // "staging" -- ein unersetzter Platzhalter ist keine Testseite. Die
+  // eigentliche Sperre sitzt im Server (api/testdaten.php, ist_staging()).
+  window.APP_UMGEBUNG_STAGING = APP_ENV === 'staging';
 
   // Zweite, engere Unterscheidung INNERHALB von "demo" (Befund des
   // Projektinhabers, 2026-09-21): APP_ENV=demo traegt sowohl die eine

@@ -99,6 +99,10 @@
      die Lohnlinie ist eine dritte, klar andere Farbe. */
   --fin-bezahlt:  #1B2B52;
   --fin-lohn:     #7C4DDB;
+  /* Testseite (ENT-714), derselbe Ton wie das Band in testumgebung.js. */
+  --test-violett:         #7a4fae;
+  --test-violett-linie:   #d7c6ec;
+  --test-violett-flaeche: #f3edfa;
 
   /* Semantik */
   --pos:      #0E7C55;  --pos-soft:  #E6F6EF;
@@ -201,6 +205,9 @@ html[data-thema="dunkel"] {
   --accent-line:  #2D3D63;
   --fin-bezahlt:  #E4EAF8;
   --fin-lohn:     #B69BFA;
+  --test-violett:         #b99be6;
+  --test-violett-linie:   #4a3a66;
+  --test-violett-flaeche: #2a2140;
 
   --pos:      #4FCE96;  --pos-soft:  #10281E;
   --neg:      #F27F70;  --neg-soft:  #2E1A18;
@@ -1209,6 +1216,25 @@ tr.klickbar.gewaehlt td { background: var(--accent-soft); }
   color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .bk-kachel-ic svg.i { width: 28px; height: 28px; }
 .bk-kachel-lbl { font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+.bk-kachel-zusatz { font-size: 11px; font-weight: 600; color: var(--test-violett); margin-top: -6px; }
+/* Testdaten (ENT-714): der violette Ton des Testumgebungs-Bands
+   (testumgebung.js), damit die Kachel nicht wie eine echte Einstellung
+   aussieht. */
+.bk-kachel-test { border-color: var(--test-violett-linie); }
+.bk-kachel-test:hover { border-color: var(--test-violett); }
+.bk-kachel-test .bk-kachel-ic, .card-hd .card-ic.td-ic, html[data-thema="dunkel"] .card-hd .card-ic.td-ic { background: var(--test-violett-flaeche); color: var(--test-violett); }
+.td-note { color: var(--test-violett) !important; border-color: var(--test-violett-linie) !important; }
+.td-text { margin: 0 0 12px; line-height: 1.55; max-width: 72ch; }
+.td-liste { margin: 0 0 18px; padding-left: 18px; line-height: 1.55; max-width: 72ch; color: var(--ink-2); }
+.td-liste li { margin-bottom: 5px; }
+.td-aktion { margin-top: 12px; }
+.td-stand { margin-top: 14px; font-size: 13px; line-height: 1.5; }
+.td-stand .td-fehler { color: var(--neg); }
+.td-stand .td-balken { height: 6px; border-radius: 4px; background: var(--line-soft); overflow: hidden; max-width: 420px; margin: 8px 0; }
+.td-stand .td-balken i { display: block; height: 100%; background: var(--test-violett); transition: width .2s; }
+.td-stand dl { display: grid; grid-template-columns: max-content max-content; gap: 4px 18px; margin: 8px 0 12px; }
+.td-stand dt { color: var(--ink-3); }
+.td-stand dd { margin: 0; font-weight: 650; font-variant-numeric: tabular-nums; }
 /* Verkleinerte Kachel-Variante -- Revision aus ENT-274, siehe ENT-275/276:
    der Projektinhaber fand die kleine Variante nach dem Ausliefern zu klein
    -- die Navigations-Kacheln sind die Hauptreiter dieser Seite und gingen
@@ -8704,6 +8730,15 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M3 13l2-5.5A2 2 0 0 1 6.9 6h10.2a2 2 0 0 1 1.9 1.5L21 13"/><path d="M3 13h18v4a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/></svg></span>
               <span class="bk-kachel-lbl">Dienstfahrzeuge</span>
             </button>
+            <!-- Testdaten (ENT-714). NUR auf der Testseite und nur mit dem
+                 Recht, Rollen zu vergeben -- siehe tdKachelSetzen(). Im
+                 violetten Ton des Testumgebungs-Bands, damit sie sich von
+                 den echten Einstellungen daneben unterscheidet. -->
+            <button type="button" class="bk-kachel bk-kachel-test" id="bkKachelTd" style="display:none" onclick="bkAbschnittZeigen('td')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg></span>
+              <span class="bk-kachel-lbl">Testdaten</span>
+              <span class="bk-kachel-zusatz">nur Testseite</span>
+            </button>
           </div>
 
           <div class="card">
@@ -9050,6 +9085,47 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
              weggelassen: "Es gibt noch keine Fahrzeuge zum Auswaehlen; ein
              leeres Auswahlfeld auf Vorrat waere Attrappe") wird erst gebaut,
              wenn hier Fahrzeuge stehen -- also nach diesem Schritt. -->
+        <!-- Testdaten (ENT-714): leeren und neu befuellen. Die Sperre
+             sitzt im Server (api/testdaten.php: nur Staging, nur mit dem
+             Recht rechte_schreiben); diese Karte erspart nur den Umweg. -->
+        <div class="bk-abschnitt" id="bkAb-td" style="display:none">
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
+        <div class="grid">
+        <div class="card td-karte">
+          <div class="card-hd">
+            <span class="card-ic td-ic"><svg class="i" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg></span>
+            <h3>Testdaten</h3>
+            <div class="sp"></div>
+            <span class="note td-note">nur Testseite</span>
+          </div>
+          <div class="card-bd">
+            <p class="td-text">Leert die Testseite und füllt sie mit einem <b>erfundenen Bewachungsbetrieb</b>:
+              rund 30 Mitarbeitende, 12 Kunden, 18 Objekte und 15 Monate Geschichte mit
+              Einsätzen, Abgleich, Auslagenersatz, Rechnungen, Offerten und Lohnläufen, dazu
+              drei Wochen Planung nach vorne. Lohn und Auslagenersatz rechnen die echten
+              Rechenwege. Absichtlich eingebaut sind Sonderfälle wie überfällige Rechnungen,
+              Entwürfe und ein stornierter Lohnlauf.</p>
+            <ul class="td-liste">
+              <li><b>Gelöscht wird:</b> alles Fachliche, also Personen ohne Cockpit-Zugang, Kunden, Objekte,
+                Planung, Rapporte, Belege, Lohn und Revierdienst.</li>
+              <li><b>Bleibt stehen:</b> jedes Konto mit Cockpit-Zugang samt Rollen und Anmeldung, die
+                Angaben zum Betrieb und die Kataloge der Einrichtung.</li>
+              <li>Für Monate vor dem GAV-Regelwerk 2026 entsteht <b>kein Lohnlauf</b>. Dort rechnet der
+                Lohn nichts, und das bleibt sichtbar so.</li>
+            </ul>
+            <div class="f" style="max-width:360px">
+              <label for="tdWort">Zum Bestätigen <b>TESTDATEN</b> eintippen</label>
+              <input class="inp" id="tdWort" autocomplete="off" spellcheck="false" oninput="tdWortPruefen()">
+            </div>
+            <div class="td-aktion">
+              <button type="button" class="btn btn-danger" id="tdKnopf" disabled onclick="tdStarten()">Leeren und neu befüllen</button>
+            </div>
+            <div class="td-stand" id="tdStand" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+        </div>
+        </div>
+
         <div class="bk-abschnitt" id="bkAb-fz" style="display:none">
         <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
         <div class="grid">
@@ -14750,7 +14826,7 @@ function go(view) {
   if (view !== 'planung' && view !== 'mitarbeiter') { weiteAnsicht(ANSICHT_WEIT.includes(view)); }
   if (view === 'planung' && MOBIL() && pTab === 'uebersicht') goTab('einsaetze');
   if (view === 'mitarbeiter' && !mitarbeiter.length) loadMitarbeiter();
-  if (view === 'betrieb') { ladeBetrieb(); zfLaden(); rvLaden(); lmSichtbarkeit(); }
+  if (view === 'betrieb') { ladeBetrieb(); zfLaden(); rvLaden(); lmSichtbarkeit(); tdKachelSetzen(); }
   // Die Administrationsgruppe klappt auf, wenn eine ihrer Seiten offen ist --
   // und der Elternpunkt wird mitmarkiert, sonst sieht die Seitenleiste aus,
   // als waere man nirgends (dasselbe Muster wie bei den Kunden, ENT-039).
@@ -22097,8 +22173,12 @@ function finMonatsDaten(monate) {
       verrechnet: imMonat.reduce((s, b) => s + finNetto(b), 0),
       bezahlt: bezahlt.reduce((s, b) => s + finNetto(b), 0),
       offen: imMonat.filter(b => !Number(b.bezahlt)).reduce((s, b) => s + finNetto(b), 0),
-      // null heisst: fuer diesen Monat gibt es noch keinen zaehlenden Lauf.
-      brutto: lm ? Number(lm.brutto_rappen) || 0 : null,
+      // null heisst: fuer diesen Monat gibt es keinen rechenbaren Lauf --
+      // entweder keinen zaehlenden Lauf, oder einen, in dem ALLE Personen
+      // gesperrt sind (etwa kein GAV-Regelwerk). Beides ist keine 0.
+      brutto: lm && !finLohnNichtRechenbar(lm) ? Number(lm.brutto_rappen) || 0 : null,
+      lohnGesperrt: lm ? Number(lm.gesperrt) || 0 : 0,
+      lohnNichtRechenbar: !!(lm && finLohnNichtRechenbar(lm)),
       auslagen: am ? Number(am.rappen) || 0 : (ausl && ausl.zugriff && ausl.eingerichtet ? 0 : null),
       auslagenGesperrt: am ? Number(am.gesperrt) || 0 : 0,
       offeneSchichten: ausl && ausl.zugriff && ausl.eingerichtet ? Number((ausl.offene_schichten || {})[m]) || 0 : 0,
@@ -22210,7 +22290,8 @@ function finKpiZeichnen() {
   } else if (!lohn.eingerichtet) {
     karten.push(ohne(ic.lohn, 'Lohnkosten', 'Lohnbereich noch nicht eingerichtet'));
   } else {
-    const monate = Object.keys(lohn.monate || {}).filter(m => m <= finMonat(0)).sort();
+    const monate = Object.keys(lohn.monate || {})
+      .filter(m => m <= finMonat(0) && !finLohnNichtRechenbar(lohn.monate[m])).sort();
     const letzter = monate[monate.length - 1];
     if (!letzter) {
       karten.push(ohne(ic.lohn, 'Lohnkosten', 'noch kein freigegebener Lohnlauf'));
@@ -22218,7 +22299,7 @@ function finKpiZeichnen() {
       const d = new Date(letzter + '-01T00:00:00');
       const vor = finMonat(-1, d);
       const b = Number(lohn.monate[letzter].brutto_rappen) || 0;
-      const bVor = lohn.monate[vor] ? Number(lohn.monate[vor].brutto_rappen) || 0 : null;
+      const bVor = lohn.monate[vor] && !finLohnNichtRechenbar(lohn.monate[vor]) ? Number(lohn.monate[vor].brutto_rappen) || 0 : null;
       const ausl = finKosten.auslagen;
       const aM = ausl && ausl.zugriff && ausl.eingerichtet ? (ausl.monate || {})[letzter] : null;
       const auslText = !ausl || !ausl.zugriff ? ''
@@ -22277,6 +22358,10 @@ function finRundeGrenze(wert) {
 }
 
 let finChartDaten = [];
+
+// Ein Lauf, in dem jede Person gesperrt ist, traegt Bruttolohn 0 -- das ist
+// "nicht rechenbar", nicht "keine Kosten".
+const finLohnNichtRechenbar = lm => Number(lm.personen) > 0 && Number(lm.gesperrt) >= Number(lm.personen);
 
 function finChartZeichnen(daten) {
   finChartDaten = daten;
@@ -22452,11 +22537,15 @@ function finTipZeigen(i) {
   }
   if (lohn && lohn.zugriff && lohn.eingerichtet) {
     html += '<div class="fin-tip-trenner"></div>';
-    if (d.brutto === null) {
+    if (d.lohnNichtRechenbar) {
+      html += zeile('lohn', 'Lohnkosten', 'nicht rechenbar', 'ohne');
+      html += `<div class="fin-tip-hinweis">Lauf vorhanden, aber alle ${nf(d.lohnGesperrt)} Personen ohne Betrag (gesperrt)</div>`;
+    } else if (d.brutto === null) {
       html += zeile('lohn', 'Lohnkosten', 'noch kein Lohnlauf', 'ohne');
     } else {
       html += zeile('lohn', 'Lohnkosten', 'CHF ' + chf(d.brutto + (d.auslagen || 0)));
       html += zeile('', 'Bruttolohn', 'CHF ' + chf(d.brutto), 'fein');
+      if (d.lohnGesperrt) { html += `<div class="fin-tip-hinweis">${nf(d.lohnGesperrt)} ${d.lohnGesperrt === 1 ? 'Person' : 'Personen'} ohne Betrag (gesperrt)</div>`; }
     }
     if (ausl && ausl.zugriff && ausl.eingerichtet) {
       html += zeile('', 'Auslagenersatz', 'CHF ' + chf(d.auslagen || 0), 'fein');
@@ -28013,6 +28102,68 @@ function sfProtokollLaden() {
     }).join('');
   }).catch(() => { $('sfProtokoll').innerHTML = '<div style="color:var(--ink-3)">Nicht abrufbar.</div>'; });
 }
+// ══════════════════════════════════════════ TESTDATEN (ENT-714)
+// Nur auf der Testseite und nur mit dem Recht, Rollen zu vergeben. Die
+// Sperre sitzt im Server; hier wird nur nicht angeboten, was dort ohnehin
+// abgewiesen wuerde.
+function tdKachelSetzen() {
+  const k = $('bkKachelTd');
+  if (k) { k.style.display = window.APP_UMGEBUNG_STAGING && darf('rechte_schreiben') ? '' : 'none'; }
+}
+function tdWortPruefen() {
+  $('tdKnopf').disabled = $('tdWort').value.trim() !== 'TESTDATEN';
+}
+const TD_MONAT = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+const tdMonatText = m => `${TD_MONAT[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
+
+// Schritt fuer Schritt: leeren und Stammdaten, dann jeder Monat einzeln,
+// dann der Abschluss. Eine einzige Anfrage fuer 15 Monate koennte auf dem
+// Hosting an der Laufzeitgrenze abbrechen.
+async function tdStarten() {
+  const stand = $('tdStand');
+  const knopf = $('tdKnopf');
+  const post = body => api('testdaten.php', { method: 'POST', body });
+  const zeigen = (text, anteil) => {
+    stand.innerHTML = `<div>${esc(text)}</div>`
+      + (anteil === undefined ? '' : `<div class="td-balken"><i style="width:${Math.round(anteil * 100)}%"></i></div>`);
+  };
+  const abbruch = (wo, antwort) => {
+    const msg = (antwort && antwort.data && antwort.data.message) || 'Keine Antwort vom Server.';
+    stand.innerHTML = `<div class="td-fehler">Abgebrochen bei „${esc(wo)}“: ${esc(msg)}</div>
+      <div>Ein erneuter Klick beginnt wieder mit dem Leeren.</div>`;
+    knopf.disabled = false;
+  };
+  knopf.disabled = true;
+  $('tdWort').value = '';
+  zeigen('Leere die Testseite und lege die Stammdaten an …', 0);
+  let a = await post({ schritt: 'start', bestaetigung: 'TESTDATEN' });
+  if (a.status === 401) { doLogout(); return; }
+  if (!a.ok || a.data.status !== 'ok') { abbruch('Leeren', a); return; }
+  const monate = a.data.monate || [];
+  const gesamt = monate.length + 2;
+  for (let i = 0; i < monate.length; i++) {
+    zeigen(`Monat ${i + 1} von ${monate.length}: ${tdMonatText(monate[i])} …`, (i + 1) / gesamt);
+    a = await post({ schritt: 'monat', monat: monate[i] });
+    if (!a.ok || a.data.status !== 'ok') { abbruch(tdMonatText(monate[i]), a); return; }
+  }
+  zeigen('Offerten und Sonderfälle …', (gesamt - 1) / gesamt);
+  a = await post({ schritt: 'abschluss' });
+  if (!a.ok || a.data.status !== 'ok') { abbruch('Abschluss', a); return; }
+  const z = a.data.zusammenfassung || {};
+  stand.innerHTML = `<div><b>Fertig.</b> Die Testseite ist neu befüllt.</div>
+    <dl>
+      <dt>Mitarbeitende</dt><dd>${nf(z.mitarbeitende)}</dd>
+      <dt>Kunden</dt><dd>${nf(z.kunden)}</dd>
+      <dt>Objekte</dt><dd>${nf(z.objekte)}</dd>
+      <dt>Einsätze</dt><dd>${nf(z.einsaetze)}</dd>
+      <dt>Rechnungen</dt><dd>${nf(z.rechnungen)}</dd>
+      <dt>Offerten</dt><dd>${nf(z.offerten)}</dd>
+      <dt>Lohnläufe</dt><dd>${nf(z.lohnlaeufe)}</dd>
+    </dl>
+    <button type="button" class="btn btn-primary btn-sm" onclick="location.reload()">Seite neu laden</button>
+    <span style="color:var(--ink-3);margin-left:8px">Bereits geladene Listen zeigen sonst noch den alten Stand.</span>`;
+}
+
 function bkAbschnittZeigen(id) {
   $('bkUebersicht').style.display = 'none';
   document.querySelectorAll('#view-betrieb .bk-abschnitt').forEach(a => { a.style.display = 'none'; });
