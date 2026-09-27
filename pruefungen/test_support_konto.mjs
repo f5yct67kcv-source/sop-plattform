@@ -53,6 +53,9 @@ const AUSNAHMEN = {
     + 'Supportzugriff bewusst mit -- der Betrieb soll ihn in seinen eigenen Daten sehen.',
   'demo_daten.php': 'Waehlt nach anstellungskategorie; das Support-Konto hat keine und '
     + 'faellt schon dadurch heraus.',
+  'api/testdaten.php': 'Testdaten der Testseite (ENT-714): Die Abfragen SOLLEN jede Zeile '
+    + 'erreichen -- das Support-Konto wird ausdruecklich als stehenbleibend erkannt '
+    + '(td_konten_behalten) und nie geloescht, die Personenwahl geht ueber feste erfundene Namen.',
   'demo_instanz.php': 'Sammelt vergebene Namen, um keine Dublette zu erzeugen -- '
     + 'der Name des Support-Kontos SOLL dabei sein.',
   'planung_einrichten_kern.php': 'Datenpflege der Einrichtung (Nulldaten, Rollen aus '
