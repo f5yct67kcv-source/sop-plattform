@@ -99,6 +99,9 @@ const ablageLeeren = () => page.evaluate(() => caches.delete('guardops-weckwort'
 const modellNeu = (staende, datei, stoer) => { modellServer = { staende, datei: datei || [200, MODELL], posts: 0, teile: [], stoer: stoer || null }; };
 // Der Server-Weg fuer "Zuteilen" (ENT-711): jede Anfrage wird gemerkt; die
 // Antwort bestimmt zuteilenAntwort(body) -> [status, json].
+// Morgenlage (ENT-716): zuschaltbare Einsaetze fuer heute/morgen, damit die
+// uebrigen Zaehlungen unberuehrt bleiben.
+let zusatzEI = [];
 const zuteilungen = [];
 // Offene Seite (ENT-716): mitgeschickter Bezug je Anfrage an den Assistenten.
 const bezuege = [];
@@ -229,7 +232,7 @@ async function neueSeite() {
     if (p.startsWith('ki_router_parse')) return routerAntwort ? send(routerAntwort[1], routerAntwort[0]) : send({ status: 'error', message: 'kein Mock' }, 502);
     if (p.startsWith('produkt_list')) return send({ status: 'ok', produkte: PR });
     if (p.startsWith('kunden_list')) return send({ status: 'ok', kunden: KU });
-    if (p.startsWith('einsatz_list')) return send({ status: 'ok', einsaetze: EI });
+    if (p.startsWith('einsatz_list')) return send({ status: 'ok', einsaetze: EI.concat(zusatzEI) });
     if (p.startsWith('mitarbeiter_list')) return send({ status: 'ok', mitarbeiter: MA, listen: {} });
     if (p.startsWith('verfuegbarkeit_list')) return send({ status: 'ok', sperren: [{ mitarbeiter_id: 4, datum: tag(2), bemerkung: 'Familienfest' }] });
     if (p.startsWith('abwesenheit_list')) return abwesenheitGesperrt
@@ -649,6 +652,33 @@ check('Ohne Recht auf Abwesenheiten steht kein_recht, nicht „keine“', r.pers
 abwesenheitGesperrt = false;
 r = await fragen('Und Zorro?', { name: 'person_auskunft', input: { name: 'zorro' }, antwort: 'Kenne ich nicht.' });
 check('Eine unbekannte Person ergibt „nicht gefunden“', /nicht gefunden/.test(r.fehler || ''));
+
+// ══════════ MORGENLAGE (ENT-716)
+const lageLesen = () => page.evaluate(async () => {
+  await asMorgenlage();
+  const m = [...document.querySelectorAll('#asVerlauf .as-msg.er')].pop();
+  return m ? m.textContent : '';
+});
+zusatzEI = [{ id: 30, datum: tag(1), von: '08:00:00', bis: '12:00:00', bedarf: 3, status: 'geplant', kunde_name: 'Beispiel AG', titel: 'Morgen',
+  mitarbeiter: [{ id: 4, name: 'lprobe', zusage: 'zugesagt' }] }];
+await page.evaluate(() => localStorage.removeItem('as_lage_tag'));
+const gesprochenLage = (await page.evaluate(() => window.__gesprochen)).length;
+let lage = await lageLesen();
+check('Morgenlage: nur Dringendes -- offene Plätze heute/morgen, überfällige Rechnung, ungesehener Entscheid',
+  /fehlen noch 2 Leute in 1 Einsatz/.test(lage) && /1 Rechnung ist überfällig/.test(lage)
+  && /1 Kunde hat über eine Offerte entschieden, noch nicht angesehen/.test(lage) && !/Plätze offen in 14/.test(lage));
+check('Die Morgenlage wird vorgelesen', (await page.evaluate(() => window.__gesprochen)).length === gesprochenLage + 1);
+const anzahlNachLage = await page.evaluate(() => document.querySelectorAll('#asVerlauf .as-msg.er').length);
+await page.evaluate(() => asMorgenlage());
+await page.waitForTimeout(200);
+check('Nur beim ersten Wecken des Tages', await page.evaluate(() => document.querySelectorAll('#asVerlauf .as-msg.er').length) === anzahlNachLage);
+zusatzEI = [];
+belegeGesperrt = true;
+await page.evaluate(() => localStorage.removeItem('as_lage_tag'));
+lage = await lageLesen();
+check('KRITISCH: fehlt ein Recht, heisst „nichts Dringendes“ nur „in dem, was du sehen darfst“',
+  /In dem, was du sehen darfst, steht nichts Dringendes an/.test(lage));
+belegeGesperrt = false;
 
 // ══════════ KEIN RECHT, FALSCHE EINGABE
 belegeGesperrt = true;

@@ -327,6 +327,14 @@ pruef('Mit Bezug nennt der Systemtext Art, Nummer und das passende Werkzeug; ohn
     str_contains(ki_assistent_system('2000-01-05', ['art' => 'rechnung', 'id' => 44, 'text' => 'RE-9']), 'Rechnung mit der Nummer 44')
     && str_contains(ki_assistent_system('2000-01-05', ['art' => 'rechnung', 'id' => 44, 'text' => 'RE-9']), 'beleg_auskunft mit beleg_id 44')
     && !str_contains(ki_assistent_system('2000-01-05'), 'gerade offen'));
+// Zwischenspeicher (ENT-716): Der feste Teil darf nichts enthalten, was von
+// Tag oder offener Seite abhaengt -- sonst trifft der Zwischenspeicher nie.
+pruef('KRITISCH: der zwischengespeicherte Teil des Systemtexts enthaelt weder das Datum noch die offene Seite',
+    !preg_match('/\d{4}-\d{2}-\d{2}|Heute ist|gerade offen/', ki_assistent_system_fest())
+    && ki_assistent_system_fest() === ki_assistent_system_fest());
+pruef('Datum und offene Seite stehen im wechselnden Teil',
+    str_contains(ki_assistent_system_wechselnd('2000-01-05', ['art' => 'kunde', 'id' => 7, 'text' => 'X']), 'Mittwoch, 2000-01-05')
+    && str_contains(ki_assistent_system_wechselnd('2000-01-05', ['art' => 'kunde', 'id' => 7, 'text' => 'X']), 'Kunde mit der Nummer 7'));
 $wzNamen = array_keys(ki_assistent_werkzeuge());
 pruef('Jedes Werkzeug, auf das der Bezug verweist, gibt es wirklich',
     array_reduce(array_keys(KI_BEZUG_ARTEN), function ($ok, $art) use ($wzNamen) {
