@@ -1,0 +1,63 @@
+
+# ═══ Ladezeit: Komprimierung und Zwischenspeicher ═══════════════════════
+# Diese Datei wird beim Deploy an JEDE ausgelieferte .htaccess angehaengt
+# (Rapport-Tool, cupi24, guardops, Betreiber, Kundenportal, Demo-Plaetze).
+# Eine eigene Datei statt einer Ergaenzung in htaccess-hostpoint: Staging
+# pflegt seine .htaccess von Hand (ENT-384), und jede Aenderung an
+# htaccess-hostpoint haelt den Staging-Deploy an, bis sie dort nachgetragen
+# ist. Staging bekommt diese Regeln darum nicht -- dort geht es nicht um
+# Ladezeit.
+#
+# Alles steht in <IfModule>: Fehlt ein Modul, bleibt die Regel wirkungslos,
+# statt die Seite mit einem Serverfehler abzuschalten.
+
+# ── Komprimierung ───────────────────────────────────────────────────────
+# Das Cockpit ist rund 2 MB gross, komprimiert rund 580 KB. Gilt auch fuer
+# die Antworten der API (JSON) -- die Rapportliste etwa ist reiner Text.
+# Bilder und Schriften (woff2) sind schon komprimiert und bleiben aussen vor.
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml
+  AddOutputFilterByType DEFLATE application/javascript text/javascript
+  AddOutputFilterByType DEFLATE application/json application/manifest+json
+  AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
+
+# ── Zwischenspeicher (so entschieden am 2026-09-24: "vorsichtig") ──────
+# Ohne jede Angabe raet der Browser selbst, wie lange eine Datei frisch ist
+# -- und kann nach einem Deploy eine alte dashboard.html zeigen, die mit
+# einem neuen Server nicht mehr zusammenpasst.
+#
+# Seiten und Skripte: bei JEDEM Aufruf nachfragen ("no-cache" heisst nicht
+# "nicht speichern", sondern "vor Gebrauch pruefen"). Ist die Datei
+# unveraendert, antwortet der Server kurz mit 304 und ohne Inhalt. Ein
+# Deploy ist damit sofort sichtbar, und die 2 MB gehen trotzdem nur einmal
+# ueber die Leitung.
+#
+# Schriften 30 Tage, Icons, Bilder und Videos 7 Tage: Sie tragen keinen
+# Versionsvermerk im Namen. Ein neues Logo unter demselben Namen erscheint
+# darum erst, wenn die Frist abgelaufen ist -- laenger wollten wir das
+# nicht.
+#
+# Die API (PHP) bekommt hier bewusst NICHTS. Ohne Last-Modified legt der
+# Browser eine PHP-Antwort ohnehin nicht zwischen, und wo es darauf ankommt
+# (Fotos, PDFs), setzt PHP selbst "private, no-store". Eine Regel fuer
+# .php hier wuerde genau diesen Kopf ueberschreiben.
+# Kein ETag, nur Last-Modified. Mit Komprimierung haengt Apache "-gzip"
+# an das ETag; der Browser fragt dann mit einem ETag nach, das der Server
+# nicht mehr wiedererkennt, und bekommt jedes Mal die ganze Datei statt
+# einer kurzen 304-Antwort -- "no-cache" unten waere so teurer als noetig.
+# Gemessen an Apache 2.4.58. Das Aenderungsdatum setzt der Upload beim
+# Deploy neu, es taugt als Vergleich.
+FileETag None
+
+<IfModule mod_headers.c>
+  <FilesMatch "\.(html|js|css|json|webmanifest|txt)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+  <FilesMatch "\.(woff2|woff|ttf)$">
+    Header set Cache-Control "public, max-age=2592000"
+  </FilesMatch>
+  <FilesMatch "\.(png|jpg|jpeg|gif|svg|ico|webp|mp4|webm)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+</IfModule>

@@ -7,7 +7,13 @@
 //     Verbindung zum Server, ein Zwischenspeicher riskierte nur veraltete
 //     Daten.
 //  2. Push-Benachrichtigungen (ENT-424).
-self.addEventListener('fetch', () => {});
+//
+// BEWUSST KEIN fetch-Handler. Frueher stand hier ein leerer
+// (addEventListener('fetch', () => {})), weil Chrome ihn einmal fuer die
+// Installierbarkeit verlangte. Das tut es seit Version 108 (Android) bzw.
+// 112 (Desktop) nicht mehr. Ein leerer Handler tut nichts, kostet aber:
+// Jede Anfrage der App laeuft erst durch den Service Worker, der dafuer
+// geweckt werden muss -- auch jeder API-Abruf.
 
 // ── Push ───────────────────────────────────────────────────────────────
 // Es kommt KEINE Nutzlast an (so entschieden, siehe backend/push.php):

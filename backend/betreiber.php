@@ -622,6 +622,19 @@ function be_unterschrift_von(PDO $pdo, int $kontoId): ?string
     return trim((string)($s->fetchColumn() ?: ''));
 }
 
+// Nur OB gezeichnet ist, ohne das Bild zu holen -- fuer die Kontenliste,
+// die das Bild ausschliesslich am eigenen Konto zeigt. Dieselben drei
+// Aussagen wie be_unterschrift_von(): null = nicht eingerichtet, sonst
+// true/false. Ohne diese Abfrage zog die Liste jedes fremde Bild aus der
+// Datenbank, nur um es gleich wieder wegzuwerfen.
+function be_unterschrift_da(PDO $pdo, int $kontoId): ?bool
+{
+    if (!hat_spalte($pdo, 'betreiber', 'unterschrift')) { return null; }
+    $s = $pdo->prepare("SELECT COALESCE(LENGTH(TRIM(unterschrift)), 0) > 0 FROM betreiber WHERE id = ?");
+    $s->execute([$kontoId]);
+    return (bool)(int)$s->fetchColumn();
+}
+
 function be_beleg_nachrichten(PDO $pdo, int $belegId): array
 {
     if (!be_beleg_nachricht_tabelle_da($pdo)) { return []; }
