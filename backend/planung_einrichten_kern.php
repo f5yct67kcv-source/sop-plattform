@@ -1989,6 +1989,42 @@ CREATE TABLE IF NOT EXISTS lohn_zahlung (
   FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+// Persoenliche Zulagen und Abzuege (ENT-713). Eine Zeile je Lohnart und
+// Zeitraum. Die drei GAV-Zuschlaege nach Art. 19 stehen BEWUSST NICHT hier,
+// sondern bleiben in lohn_ansatz: Sie haengen an offenen Auslegungen
+// (GAV-AUS-014, -015) und an der Anordnung je Schicht. Hier stehen nur
+// betriebliche Vereinbarungen aus dem Lohnartenkatalog.
+//
+// WIE gerechnet wird (pro Stunde, pro Monat, Abzug), sagt die LOHNART und
+// nicht diese Zeile -- sonst koennten Katalog und Person einander
+// widersprechen. Hier steht nur der Betrag, immer positiv; das Vorzeichen
+// folgt ebenfalls aus der Lohnart.
+//
+// NUR GANZE MONATE: gueltig_ab ist immer ein Monatserster, gueltig_bis
+// immer ein Monatsletzter (oder leer = offen). Einen Teilmonat gibt es
+// nicht, darum auch keine Pro-rata-Rechnung. 'Einmalig' ist ein Zeitraum
+// von genau einem Monat, kein eigenes Feld.
+//
+// Eine Aenderung UEBERSCHREIBT NICHT: Die alte Zeile endet, eine neue
+// beginnt. Was ein abgeschlossener Lohnlauf verwendet hat, bleibt stehen.
+'lohn_position' => "
+CREATE TABLE IF NOT EXISTS lohn_position (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mitarbeiter_id INT NOT NULL,
+  lohnart_id INT NOT NULL,
+  betrag_rappen INT NOT NULL,
+  gueltig_ab DATE NOT NULL,
+  gueltig_bis DATE NULL,
+  bemerkung TEXT NULL,
+  erfasst_am DATETIME DEFAULT CURRENT_TIMESTAMP,
+  erfasst_von INT NULL,
+  geaendert_am DATETIME NULL,
+  geaendert_von INT NULL,
+  KEY idx_person (mitarbeiter_id, gueltig_ab),
+  FOREIGN KEY (mitarbeiter_id) REFERENCES mitarbeiter(id) ON DELETE CASCADE,
+  FOREIGN KEY (lohnart_id) REFERENCES lohnart(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 // ══ Lohnlauf (ENT-451, Etappe 3) ════════════════════════════════════════
 // Drei Ebenen, weil drei verschiedene Dinge: der LAUF (eine Periode ueber
 // alle Personen), die PERSON darin (Zeitsummen und Bruttolohn) und die
@@ -3147,6 +3183,25 @@ if (!$nurPruefen && hat_tabelle_jetzt($pdo, 'lohnart')) {
             $n = 0;
             foreach ($lohnarten as $la) { $ein->execute($la); $n += $ein->rowCount(); }
             if ($n > 0) { $getan[] = "Lohnartenkatalog angelegt ($n Lohnarten, ENT-451)"; }
+        }
+        // Nachtraeglich hinzugekommene Systemlohnarten (ENT-713), AUSSERHALB
+        // der Startbestands-Bedingung -- ein bestehender Katalog bekaeme sie
+        // sonst nie. Gleiche Bauart wie die Ereignisarten oben. Unbedenklich,
+        // weil Systemlohnarten sich nicht loeschen lassen: Es kommt nichts
+        // zurueck, was jemand bewusst entfernt hat.
+        $nachtrag = array_values(array_filter(lohnart_startbestand(),
+            fn($la) => in_array($la[0], ['ferien_auf_zulage', 'anteil_13ml_auf_zulage'], true)));
+        $ein5 = $pdo->prepare(
+            'INSERT IGNORE INTO lohnart
+             (schluessel, bezeichnung, art, basis_schluessel, satz_bp,
+              ahv_pflichtig, ferien_pflichtig, ml13_pflichtig,
+              bvg_pflichtig, uvg_pflichtig, qst_pflichtig,
+              gav_grundlage, system, sortierung, bemessung)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)'
+        );
+        foreach ($nachtrag as $la) {
+            $ein5->execute($la);
+            if ($ein5->rowCount() === 1) { $getan[] = 'Lohnart „' . $la[1] . '" angelegt (ENT-713)'; }
         }
     } catch (Throwable $e) {
         $fehler[] = 'Lohnarten-Startbestand — ' . $e->getMessage();

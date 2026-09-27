@@ -2409,6 +2409,32 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
     + (leer.length ? ` — ins Leere: ${[...new Set(leer)].join(', ')}` : ''), leer.length === 0);
 }
 
+// ── Ladezeit-Regeln an JEDER ausgelieferten .htaccess ─────────────────────
+// htaccess-leistung (Komprimierung, Zwischenspeicher, kein ETag) wird im
+// Deploy angehaengt, nicht in die einzelnen Vorlagen geschrieben -- sonst
+// hielte jede Aenderung den Staging-Deploy an (ENT-384). Die Gefahr ist
+// dieselbe wie bei den Backend-Modulen oben: Ein neues Buendel bekommt
+// seine .htaccess mit cp und die Regeln nicht, und niemand merkt es, weil
+// die Seite auch ohne sie laeuft -- nur langsamer.
+// Geprueft wird die Aussage: Jedes Ziel, an das eine .htaccess kopiert
+// wird, bekommt danach htaccess-leistung angehaengt. Die Ziele werden aus
+// dem Workflow gelesen, nicht aufgezaehlt.
+{
+  const ziele = [...workflow.matchAll(/^\s*cp htaccess-[a-z0-9-]+\s+("?[^\s"]+\/\.htaccess"?)\s*$/gm)].map(m => m[1]);
+  const ohne = ziele.filter(z => !workflow.includes(`cat htaccess-leistung >> ${z}`)
+    && !new RegExp(`cat htaccess-leistung >>\\s+${z.replace(/[.$*?"/]/g, '\\$&')}\\s*$`, 'm').test(workflow));
+  check('Der Workflow erzeugt mehrere .htaccess (sonst prueft die naechste Zeile nichts)', ziele.length >= 6);
+  check('KRITISCH: jede ausgelieferte .htaccess bekommt die Ladezeit-Regeln (htaccess-leistung)', ohne.length === 0);
+  ohne.forEach(z => bad.push('   ↳ ohne htaccess-leistung: ' + z));
+  const regeln = readFileSync(`${WURZEL}/htaccess-leistung`, 'utf8').replace(/^\s*#.*$/gm, '');
+  // Kein Wortlaut-Abgleich des Inhalts -- der steht am echten Apache
+  // gemessen im Commit. Hier nur, was sonst unbemerkt kippt: Eine Regel
+  // fuer .php wuerde das "private, no-store" der Foto- und PDF-Endpunkte
+  // ueberschreiben.
+  check('KRITISCH: htaccess-leistung setzt keinen Cache-Kopf fuer PHP-Antworten',
+    !/FilesMatch[^>]*php/i.test(regeln));
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

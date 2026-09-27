@@ -938,6 +938,15 @@ jobs:
       # (if-Bedingung); dist/qa-version.json existiert dort in keinem Lauf
       # und wird folglich auch nie hochgeladen -- Production bleibt damit
       # strukturell unveraendert, nicht nur der Absicht nach.
+      - name: Ladezeit-Regeln an die .htaccess haengen
+        # Komprimierung, Zwischenspeicher, kein ETag -- an jede ausgelieferte
+        # .htaccess angehaengt, siehe Kopf von htaccess-leistung. Eigener
+        # Schritt, weil der Block davor an der Groessengrenze von GitHub
+        # steht. Staging laedt seine .htaccess nicht hoch (ENT-384) und
+        # bekommt die Regeln darum nicht, obwohl sie hier an dist/ haengen.
+        run: |
+          cat htaccess-leistung >> dist/.htaccess
+
       - name: qa-version.json erzeugen (nur Staging)
         if: ${{ env.UMGEBUNG == 'staging' }}
         # Bei einem Push auf den Branch "test" (ENT-679) steht in "qa_tag"
@@ -1097,6 +1106,7 @@ jobs:
             dist-guardops/impressum.html
           cp recht.css                   dist-guardops/recht.css
           cp htaccess-guardops           dist-guardops/.htaccess
+          cat htaccess-leistung >>       dist-guardops/.htaccess
           cp robots-guardops.txt         dist-guardops/robots.txt
 
           # HIER STEHEN ABSICHTLICH KEINE DATENBANK-ZUGANGSDATEN. db.php wird
@@ -1402,6 +1412,7 @@ jobs:
           cp backend/api/mandant_einladung_pruefen.php   dist-betreiber/api/mandant_einladung_pruefen.php
           cp backend/api/mandant_einladung_einloesen.php dist-betreiber/api/mandant_einladung_einloesen.php
           cp htaccess-betreiber        dist-betreiber/.htaccess
+          cat htaccess-leistung >>     dist-betreiber/.htaccess
           cp robots-betreiber.txt      dist-betreiber/robots.txt
 
           # ECHTE Produktions-Datenbank -- dieselben Werte wie das
@@ -1645,6 +1656,7 @@ jobs:
           cp backend/mailer.php        dist-portal/mailer.php
           cp backend/api/portal_*.php  dist-portal/api/
           cp htaccess-portal           dist-portal/.htaccess
+          cat htaccess-leistung >>     dist-portal/.htaccess
           cp robots-portal.txt         dist-portal/robots.txt
 
           # ECHTE Produktions-Datenbank -- dieselben Werte wie das
@@ -1859,6 +1871,7 @@ jobs:
           # Grund wie bei planung_einrichten_kern.php zwei Zeilen darueber.
           cp backend/tutorial.php dist-cupi24/tutorial.php
           cp htaccess-cupi24 dist-cupi24/.htaccess
+          cat htaccess-leistung >> dist-cupi24/.htaccess
           cp backend/api/*.php dist-cupi24/api/
           cp handbuch/*.php dist-cupi24/handbuch/
           cp handbuch/*.css dist-cupi24/handbuch/
@@ -2452,6 +2465,7 @@ jobs:
             # Bedingung geknuepft.
             cp htaccess-hostpoint "dist-demo/$PLATZ/.htaccess"
             cat htaccess-demo-zusatz >> "dist-demo/$PLATZ/.htaccess"
+            cat htaccess-leistung >> "dist-demo/$PLATZ/.htaccess"
             cp robots-demo.txt "dist-demo/$PLATZ/robots.txt"
 
             # ── Kein uebersehener Platzhalter ────────────────────────────

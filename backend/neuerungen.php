@@ -30,12 +30,36 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 20,
+            'datum' => '2026-09-26',
+            'art'   => 'verbesserung',
+            'fuer'  => ['betreiber'],
+            'titel' => 'Betreiberbereich startet schneller',
+            'text'  => 'Mandanten, Konten, Offerten, Rechnungen und die übrigen Listen laden beim Öffnen jetzt gleichzeitig statt nacheinander. Klemmt eine davon, erscheinen die anderen trotzdem.',
+        ],
+        [
+            'nr'    => 19,
+            'datum' => '2026-09-24',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Persönliche Zulagen und Abzüge',
+            'text'  => 'Im Reiter „Lohn“ der Personalakte gibt es die neue Karte „Zulagen und Abzüge“. Dort erfasst du pro Person Beträge aus deinen eigenen Lohnarten: pro Stunde, pro Monat oder einmalig, jeweils ab einem Monat und auf Wunsch bis zu einem Monat. Der Lohnlauf rechnet sie mit. Änderst du einen Betrag, endet die alte Position und eine neue beginnt, so bleibt jeder Monat nachvollziehbar.',
+        ],
+        [
             'nr'    => 18,
             'datum' => '2026-09-24',
             'art'   => 'fehlerbehebung',
             'fuer'  => ['cockpit'],
             'titel' => 'Kein falscher Konflikt nach einer Absage',
             'text'  => 'Hat jemand eine Schicht abgelehnt oder ist sie für die Person entfallen, zeigt die Planung sie zur selben Zeit nicht mehr als „bereits eingeteilt“. Speichern ging schon vorher, jetzt stimmt auch die Anzeige.',
+        ],
+        [
+            'nr'    => 17,
+            'datum' => '2026-09-24',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Cockpit startet schneller',
+            'text'  => 'Seiten und Daten kommen jetzt komprimiert, und was sich nicht geändert hat, lädt dein Browser nicht noch einmal. Die Unterschriften der Rapporte kommen erst, wenn du einen Rapport öffnest, druckst oder teilst.',
         ],
         [
             'nr'    => 16,

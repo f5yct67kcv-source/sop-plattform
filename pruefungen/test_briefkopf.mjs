@@ -135,8 +135,9 @@ check('KRITISCH: der Server verknuepft den Kunden ueber die SCHICHT, nicht ueber
 check('KRITISCH: nirgends wird auf den Kundennamen verknuepft — Namen wiederholen und aendern sich',
   !/JOIN kunden[\s\S]{0,80}k\.name\s*=/.test(RLIST) && !/ON\s+k\.name/.test(RLIST));
 check('KRITISCH: die Kundenstammdaten gehen nur an den Zugang, der ohnehin alle Rapporte sieht',
-  /if \(darf\(\$user, 'abgleich_lesen'\)\)[\s\S]{0,200}\$kundenFelder/.test(RLIST)
-  && /\} else \{[\s\S]{0,200}\$basis \. \$von/.test(RLIST));
+  /\$alle = darf\(\$user, 'abgleich_lesen'\)/.test(RLIST)
+  && /if \(\$alle\) \{[\s\S]{0,200}\$kundenFelder/.test(RLIST)
+  && /\} else \{[\s\S]{0,200}\$basis \. \$hatUnterschrift \. \$von/.test(RLIST));
 
 check('KRITISCH: die sechs Rechnungsadress-Spalten werden nachgetragen',
   ['re_name', 're_zusatz', 're_strasse', 're_hausnummer', 're_plz', 're_ort']
@@ -281,7 +282,14 @@ await page.waitForSelector('#shell.on'); await page.waitForTimeout(600);
 // Drucken darf die Suite nicht wirklich -- window.print() haelt den Browser an.
 await page.evaluate(() => { window.__gedruckt = 0; window.print = () => { window.__gedruckt++; }; });
 
-const drucken = id => page.evaluate(i => { drawerId = i; printReport(); return $('printArea').innerHTML; }, id);
+// printReport() holt vorher die Unterschrift (rapportUnterschrift) und
+// druckt darum nicht mehr im selben Takt -- auf den Druck warten.
+const drucken = id => page.evaluate(i => new Promise(fertig => {
+  const vorher = window.__gedruckt;
+  drawerId = i; printReport();
+  const warten = () => window.__gedruckt > vorher ? fertig($('printArea').innerHTML) : setTimeout(warten, 10);
+  warten();
+}), id);
 
 // ── Leerer Briefkopf: nichts erfinden
 let html = await drucken(10);
