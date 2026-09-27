@@ -1197,14 +1197,26 @@ function ki_bezug_pruefen($roh): ?array
     return ['art' => $art, 'id' => $id, 'text' => $text];
 }
 
+// Der Systemtext in zwei Teilen (ENT-716, schneller): Der feste Teil steht
+// zuerst und wird bei der Schnittstelle zwischengespeichert; Datum und offene
+// Seite wechseln und stehen dahinter. Ein Zwischenspeicher gilt nur bis zur
+// ersten Stelle, die sich aendert -- stuende das Datum vorne, traefe er nie.
 function ki_assistent_system(string $heute, ?array $bezug = null): string
+{
+    return ki_assistent_system_fest() . "\n\n" . ki_assistent_system_wechselnd($heute, $bezug);
+}
+function ki_assistent_system_wechselnd(string $heute, ?array $bezug = null): string
 {
     $tage = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
     $ts = strtotime($heute . ' 12:00:00');
     $wochentag = $ts ? $tage[(int)date('w', $ts)] : '';
+    return "Heute ist {$wochentag}, {$heute}." . ki_bezug_text($bezug);
+}
+function ki_assistent_system_fest(): string
+{
     $koennen = implode(', ', array_map(fn($w) => $w['titel'], ki_assistent_werkzeuge()));
     return "Du bist der Assistent von GuardOpS, einer Software fuer Sicherheitsdienste, und sprichst mit einer "
-        . "Person aus der Einsatzplanung. Heute ist {$wochentag}, {$heute}.\n\n"
+        . "Person aus der Einsatzplanung.\n\n"
         . "Antworte auf Deutsch in Schweizer Rechtschreibung (kein scharfes S), in du-Form. Deine Antwort wird "
         . "vorgelesen, darum knapp wie am Funk: ein Satz, hoechstens zwei, unter 30 Woertern. Kein 'Gerne', keine "
         . "Wiederholung der Frage, keine Einleitung, kein Angebot am Schluss, keine Aufzaehlungen, kein Markdown. "
@@ -1235,8 +1247,7 @@ function ki_assistent_system(string $heute, ?array $bezug = null): string
         . "sag das.\n"
         . "- Rechne relative Angaben (morgen, Samstag, diese Woche) selbst in Daten um.\n"
         . "- Passt keine Frage zu deinen Werkzeugen, sag in einem Satz, dass du dabei nicht helfen kannst, und nenne "
-        . "zwei passende Beispiele aus dem, was du kannst: {$koennen}."
-        . ki_bezug_text($bezug);
+        . "zwei passende Beispiele aus dem, was du kannst: {$koennen}.";
 }
 
 // Absatz zur offenen Seite fuer den Systemtext, leer ohne Bezug.
@@ -1327,15 +1338,24 @@ function anthropic_assistent(array $nachrichten, string $heute, ?array $bezug = 
     foreach (ki_assistent_werkzeuge() as $name => $w) {
         $tools[] = ['name' => $name, 'description' => $w['description'], 'input_schema' => $w['input_schema']];
     }
+    // Zwischenspeicher (ENT-716): Werkzeuge und fester Systemtext aendern sich
+    // zwischen den Anfragen nicht -- Marke auf dem letzten Werkzeug und am
+    // Ende des festen Teils; die dritte, automatische Marke deckt den
+    // Gespraechsverlauf ab, der in der Werkzeugschleife jede Runde waechst.
+    $tools[count($tools) - 1]['cache_control'] = ['type' => 'ephemeral'];
     // Sonnet statt Haiku (Entscheid des Projektinhabers, ENT-699): Hier waehlt
     // das Modell Werkzeuge selbst und fasst zusammen; das kleine Modell tut
     // das bei zusammengesetzten Fragen weniger verlaesslich.
     $data = ki_aufruf([
         'model' => 'claude-sonnet-5',
         'max_tokens' => 800,
-        'system' => ki_assistent_system($heute, $bezug),
+        'system' => [
+            ['type' => 'text', 'text' => ki_assistent_system_fest(), 'cache_control' => ['type' => 'ephemeral']],
+            ['type' => 'text', 'text' => ki_assistent_system_wechselnd($heute, $bezug)],
+        ],
         'tools' => $tools,
         'messages' => $nachrichten,
+        'cache_control' => ['type' => 'ephemeral'],
     ], 40);
     if ($data === null) {
         return null;
