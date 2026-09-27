@@ -193,8 +193,17 @@ pruef('Leere Bytes ergeben keinen Typ', logo_mime_am_inhalt('') === null);
 // mitlesen, sobald sie ihn irgendwie an eine angemeldete Person schickt.
 pruef('Die native App-Huelle wird erkannt (iOS)',
     cors_erlaubte_herkunft('capacitor://localhost') === 'capacitor://localhost');
-pruef('Die native App-Huelle wird erkannt (Android)',
-    cors_erlaubte_herkunft('http://localhost') === 'http://localhost');
+// Die Android-Herkunft wird aus der Huelle selbst abgeleitet, nicht hier
+// abgeschrieben: Bis zum ersten Android-Bau stand in der Liste
+// http://localhost, die Huelle lud aber (Capacitor ab 6) unter https --
+// und diese Zeile pruefte die Liste gegen sich selbst und blieb gruen.
+// Fehlt server.androidScheme, gilt Capacitors Vorgabe "https".
+$capKonfig = json_decode((string)file_get_contents(__DIR__ . '/../mobile/capacitor.config.json'), true);
+$androidHerkunft = (($capKonfig['server']['androidScheme'] ?? 'https')) . '://localhost';
+pruef("KRITISCH: die Android-Huelle ($androidHerkunft, aus capacitor.config.json) wird erkannt",
+    cors_erlaubte_herkunft($androidHerkunft) === $androidHerkunft);
+pruef('KRITISCH: die Liste erlaubt keine Herkunft, unter der keine Huelle laedt',
+    array_diff(APP_NATIVE_HERKUENFTE, ['capacitor://localhost', $androidHerkunft]) === []);
 pruef('KRITISCH: eine fremde Herkunft wird abgewiesen',
     cors_erlaubte_herkunft('https://angreifer.example') === null);
 pruef('KRITISCH: leer wird abgewiesen', cors_erlaubte_herkunft('') === null);

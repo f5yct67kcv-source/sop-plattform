@@ -4,5 +4,8 @@
   "webDir": "www",
   "ios": {
     "zoomEnabled": true
+  },
+  "server": {
+    "androidScheme": "https"
   }
 }
