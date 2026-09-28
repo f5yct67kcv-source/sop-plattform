@@ -326,6 +326,11 @@ try {
     const vorher = zeigt('zeitMin');
     const neu = vorher[0] === '07' ? '08' : '07';
     const ruhigVorher = !k.classList.contains('laeuft');
+    // Den Minutentakt anhalten: Faellt der echte Minutenwechsel in die
+    // Wartesekunde unten, setzt die Uhr die echte Minute zurueck, und die
+    // Pruefung wird rot, ohne dass die Kachel etwas falsch macht (so im
+    // Gesamtlauf vom 2026-09-28 zweimal hintereinander).
+    clearTimeout(zeitTakt);
     klappSetzen(k, neu);
     return { vorher, neu, ruhigVorher, laeuftJetzt: k.classList.contains('laeuft') };
   }, SICHTBARE_ZIFFERN);
