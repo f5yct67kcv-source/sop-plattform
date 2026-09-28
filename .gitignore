@@ -53,6 +53,12 @@ mobile/.maps-key
 # lahm. Ebenfalls ein echter Schluessel, ebenfalls nie ins Repository.
 mobile/.maps-ios-key
 
+# Dasselbe fuer Android (ENT-717): eingeschraenkt auf den Paketnamen und den
+# Signatur-Fingerabdruck. aufs-android.sh setzt ihn ins Buendel, Gradle ins
+# AndroidManifest (manifestPlaceholders). Ein echter Schluessel, nie ins
+# Repository.
+mobile/.maps-android-key
+
 # Aus dem Plugin zusammengefasste Kartenschicht (ENT-609), erzeugt von
 # esbuild in aufs-handy.sh aus node_modules. Erzeugtes Erzeugnis, keine
 # Quelle -- und es haengt an der Fassung in node_modules, die hier nicht

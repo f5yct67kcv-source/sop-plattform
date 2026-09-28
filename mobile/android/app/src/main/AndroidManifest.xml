@@ -24,6 +24,13 @@
 
         </activity>
 
+        <!-- Schluessel der nativen Karte (ENT-717), von Gradle eingesetzt aus
+             mobile/.maps-android-key (app/build.gradle). Nie hier eintragen:
+             Diese Datei ist versioniert. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_ANDROID_KEY}" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

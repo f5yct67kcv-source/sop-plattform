@@ -132,6 +132,77 @@ check('aufs-android.sh ist gueltiges bash', syntax);
     lauf(t => gs(t, JSON.parse(readFileSync(`${MOBIL}/capacitor.config.json`, 'utf8')).appId)) === 'durch');
 }
 
+// ── Die native Karte (ENT-717) ────────────────────────────────────────
+/* Auf Android liest das Karten-SDK den Schluessel NUR aus dem Manifest.
+   Dort darf er aber nicht stehen -- das Manifest ist versioniert. Also
+   steht dort ein Gradle-Platzhalter, und Gradle fuellt ihn aus einer
+   ignorierten Datei. Geprueft wird die Kette, nicht ein Wortlaut: Der
+   Platzhaltername wird aus dem Manifest gelesen und muss in build.gradle
+   als manifestPlaceholder definiert sein. */
+{
+  const meta = manifest.match(/<meta-data[^>]*android:name="com\.google\.android\.geo\.API_KEY"[^>]*android:value="([^"]*)"/);
+  check('KRITISCH: das Manifest traegt einen Eintrag fuer den Karten-Schluessel -- ohne ihn bleibt die native Karte grau',
+    !!meta);
+  const wert = meta ? meta[1] : '';
+  const platz = (wert.match(/^\$\{([A-Za-z_]+)\}$/) || [])[1];
+  check('KRITISCH: dort steht ein Platzhalter und kein Schluessel', !!platz);
+  check(`KRITISCH: Gradle definiert genau diesen Platzhalter (${platz || '?'})`,
+    !!platz && new RegExp(`manifestPlaceholders[^\\n]*\\b${platz}\\s*:`).test(appGradle));
+  const quelle = (appGradle.match(/rootProject\.file\('([^']+)'\)/) || [])[1];
+  const datei = quelle ? `mobile/${quelle.replace(/^\.\.\//, '')}` : '';
+  check(`Gradle liest ihn aus einer Datei (${datei || '?'})`, !!datei);
+  let ign = false, vers = '?';
+  try { execFileSync('git', ['check-ignore', '-q', datei], { cwd: WURZEL }); ign = true; } catch (e) {}
+  try { vers = execFileSync('git', ['ls-files', datei], { cwd: WURZEL, encoding: 'utf8' }).trim(); } catch (e) {}
+  check('KRITISCH: diese Datei nimmt Git nie mit', !!datei && ign && vers === '');
+  check('KRITISCH: es ist dieselbe Datei, die aufs-android.sh ins Buendel einsetzt -- sonst sagte die App "eingerichtet" und die Karte bliebe grau',
+    !!datei && readFileSync(skript, 'utf8').includes(`schluessel_einsetzen ${datei} `));
+}
+
+/* Kein echter Schluessel irgendwo im versionierten Android-Projekt. */
+{
+  const dateien = execFileSync('git', ['ls-files', 'mobile/android'], { cwd: WURZEL, encoding: 'utf8' })
+    .split('\n').filter(f => /\.(xml|gradle|java|kt|properties|json)$/.test(f));
+  const mitSchluessel = dateien.filter(f => /AIza[0-9A-Za-z_-]{30,}/.test(readFileSync(`${WURZEL}/${f}`, 'utf8')));
+  check(`KRITISCH: kein Google-Schluessel im versionierten Android-Projekt (${mitSchluessel.join(', ') || 'keiner'})`,
+    dateien.length > 0 && mitSchluessel.length === 0);
+}
+
+/* Beide Bauskripte fuellen DENSELBEN Platzhalter, den app.html fuer die
+   native Karte fragt. Der Platzhalter wird aus app.html gelesen, nicht
+   hier abgeschrieben. */
+{
+  const app = readFileSync(`${WURZEL}/app.html`, 'utf8');
+  const ph = (app.match(/const RGS_MAPS_NATIV_SCHLUESSEL = '(__[A-Z_]+__)'/) || [])[1];
+  check('app.html fragt fuer die native Karte einen Platzhalter ab', !!ph);
+  check(`aufs-android.sh setzt ${ph} ein`, !!ph && new RegExp(`schluessel_einsetzen \\S+ ${ph} `).test(readFileSync(skript, 'utf8')));
+  check(`aufs-handy.sh setzt ${ph} ein`, !!ph
+    && new RegExp(`maps_schluessel_einsetzen \\S+ \\S+ ${ph}\\s*$`, 'm').test(readFileSync(`${WURZEL}/aufs-handy.sh`, 'utf8')));
+
+  /* Und das Einsetzen selbst, am Verhalten: Die Funktion wird aus dem
+     Skript herausgeloest und gegen eine Probedatei laufen gelassen. */
+  const q = readFileSync(skript, 'utf8');
+  const fn = q.slice(q.indexOf('schluessel_einsetzen() {'), q.indexOf('\n}\n', q.indexOf('schluessel_einsetzen() {')) + 3);
+  const probe = (inhalt) => {
+    const tmp = execFileSync('mktemp', ['-d'], { encoding: 'utf8' }).trim();
+    try {
+      execFileSync('bash', ['-c', `printf '%s' "$1" > k; printf 'a=${ph};' > b`, '_', inhalt], { cwd: tmp });
+      const aus = execFileSync('bash', ['-c',
+        `set -euo pipefail\nwarnen() { echo "WARN $1"; }\nBUENDEL_DATEI=b\n${fn}\nschluessel_einsetzen k ${ph} Probe || echo NEIN\ncat b`],
+        { cwd: tmp, encoding: 'utf8' });
+      return aus;
+    } finally { execFileSync('rm', ['-rf', tmp]); }
+  };
+  const echt = 'AIza' + 'Sy' + 'P'.repeat(33);
+  const r1 = probe(echt);
+  check('Ein Schluessel in der Form von Google wird eingesetzt', r1.includes(`a=${echt};`) && !r1.includes('NEIN'));
+  const r2 = probe('DER_NEUE_SCHLUESSEL_AUS_DER_ANLEITUNG_HIER_EINTRAGEN');
+  check('KRITISCH: Beispieltext aus einer Anleitung wird NICHT eingesetzt -- die App sagte sonst "eingerichtet"',
+    r2.includes(`a=${ph};`) && r2.includes('NEIN') && r2.includes('WARN'));
+  const r3 = probe('');
+  check('Eine leere Datei ebenso, mit Warnung', r3.includes(`a=${ph};`) && r3.includes('WARN'));
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { console.log(bad.map(n => '  ✗ ' + n).join('\n')); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

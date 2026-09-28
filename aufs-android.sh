@@ -163,10 +163,19 @@ echo "        google-services.json passt zur App"
 echo "── 2/5  Buendel erzeugen"
 python3 mobile-buendel-erstellen.py
 
-# Der Maps-JS-Schluessel fuer die Karte im WebView -- dieselbe Datei wie
-# bei iOS (mobile/.maps-key). Die NATIVE Karte (ENT-609) ist fuer Android
-# noch nicht entschieden: Der Platzhalter __MAPS_IOS_KEY__ bleibt darum
-# absichtlich stehen, und app.html faellt auf die Browserkarte zurueck.
+# Zwei Schluessel, wie bei iOS (siehe aufs-handy.sh):
+#   mobile/.maps-key          die Browserkarte (JavaScript-API) -- derselbe
+#                             wie bei iOS, und nur der Ersatz, falls die
+#                             native Karte fehlt
+#   mobile/.maps-android-key  die NATIVE Karte (ENT-609, Android: ENT-717).
+#                             Ein eigener Schluessel, eingeschraenkt auf den
+#                             Paketnamen und den Signatur-Fingerabdruck.
+#
+# Der native geht an ZWEI Stellen: ins Buendel (__MAPS_NATIV_KEY__, daran
+# erkennt app.html, dass die native Karte eingerichtet ist) und ins
+# AndroidManifest. Das zweite erledigt Gradle selbst aus derselben Datei
+# (app/build.gradle, manifestPlaceholders) -- das Karten-SDK liest den
+# Schluessel auf Android NUR dort, nicht aus dem Code.
 #
 # Das Buendel wird vorher gesichert und am Ende zurueckgesetzt, auch bei
 # Abbruch -- Begruendung in aufs-handy.sh (OP-608): sonst stuende der
@@ -183,32 +192,49 @@ buendel_zuruecksetzen() {
 }
 trap buendel_zuruecksetzen EXIT INT TERM
 
-KEY="$( [ -f mobile/.maps-key ] && tr -d '[:space:]' < mobile/.maps-key || true)"
-case "$KEY" in
-  AIza*)
-    if sed --version >/dev/null 2>&1; then
-      LC_ALL=C sed -i "s|__MAPS_JS_KEY__|$KEY|g" "$BUENDEL_DATEI"
-    else
-      LC_ALL=C sed -i '' "s|__MAPS_JS_KEY__|$KEY|g" "$BUENDEL_DATEI"
-    fi
-    echo "        Maps-Schluessel eingesetzt"
-    # Android laedt die Seite unter https://localhost (server.androidScheme
-    # in capacitor.config.json). Ist der Schluessel nur fuer die
-    # Web-Adresse freigegeben, lehnt Google ihn dort vermutlich ab -- am
-    # Geraet noch nicht gesehen, darum als Hinweis und nicht als Abbruch.
-    echo "        Bleibt die Karte grau: den Schluessel in der Google-Cloud-Konsole"
-    echo "        zusaetzlich fuer https://localhost/* freigeben." ;;
-  "") warnen "KEINE Karte: mobile/.maps-key fehlt oder ist leer." ;;
-  *)  warnen "KEINE Karte: mobile/.maps-key enthaelt keinen Google-Schluessel (beginnt nicht mit AIza)." ;;
-esac
+# Gibt 0 zurueck, wenn der Schluessel eingesetzt wurde. Dieselbe Formpruefung
+# wie in aufs-handy.sh: Ein Schluessel von Google beginnt mit AIza und ist
+# laenger als 30 Zeichen. Das faengt Beispieltext aus einer Anleitung ab,
+# keinen falschen echten Schluessel.
+schluessel_einsetzen() {
+  QUELLE="$1"; PLATZ="$2"; WAS="$3"
+  K="$( [ -f "$QUELLE" ] && tr -d '[:space:]' < "$QUELLE" || true)"
+  case "$K" in
+    "")    warnen "KEINE $WAS: $QUELLE fehlt oder ist leer."; return 1 ;;
+    AIza*) ;;
+    *)     warnen "KEINE $WAS: $QUELLE enthaelt keinen Google-Schluessel (beginnt nicht mit AIza)."; return 1 ;;
+  esac
+  if [ "${#K}" -lt 30 ]; then warnen "KEINE $WAS: der Schluessel in $QUELLE ist zu kurz."; return 1; fi
+  if sed --version >/dev/null 2>&1; then
+    LC_ALL=C sed -i "s|$PLATZ|$K|g" "$BUENDEL_DATEI"
+  else
+    LC_ALL=C sed -i '' "s|$PLATZ|$K|g" "$BUENDEL_DATEI"
+  fi
+  echo "        $WAS: Schluessel eingesetzt"
+}
+
+if schluessel_einsetzen mobile/.maps-key __MAPS_JS_KEY__ "Browserkarte"; then
+  # Android laedt die Seite unter https://localhost (server.androidScheme
+  # in capacitor.config.json). Ist der Schluessel nur fuer die Web-Adresse
+  # freigegeben, lehnt Google ihn dort vermutlich ab -- am Geraet noch
+  # nicht gesehen, darum als Hinweis und nicht als Abbruch.
+  echo "        Bleibt die Browserkarte grau: den Schluessel in der Google-Cloud-Konsole"
+  echo "        zusaetzlich fuer https://localhost/* freigeben."
+fi
+NATIV_KARTE=0
+if schluessel_einsetzen mobile/.maps-android-key __MAPS_NATIV_KEY__ "native Karte"; then
+  NATIV_KARTE=1
+else
+  echo "        Die Runde zeigt dann die Browserkarte -- sofern die eingerichtet ist."
+fi
 
 echo "── 3/5  Nach Android uebertragen"
 cd mobile
 # Erst installieren, dann uebertragen -- sonst fehlt ein neu eingetragenes
 # Plugin im nativen Projekt (dieselbe Falle wie bei iOS, siehe aufs-handy.sh).
 npm install --silent
-# Die Kartenschicht wie bei iOS mitbauen, damit beide Buendel gleich sind.
-# Auf Android wird sie heute nicht geladen (siehe oben), stoert aber nicht.
+# Die Kartenschicht fuer die native Karte zusammenfassen -- dieselbe wie bei
+# iOS (Begruendung im Kopf von karte-nativ-eingang.js).
 npx --no-install esbuild karte-nativ-eingang.js \
   --bundle --format=iife --global-name=KarteNativ \
   --outfile=www/karte-nativ.js --log-level=warning
@@ -299,6 +325,22 @@ echo "        installieren"
 "$ADB" -s "$ZIEL" install -r "$APK" >/dev/null
 echo "        starten"
 "$ADB" -s "$ZIEL" shell am start -n "$APPID/.MainActivity" >/dev/null
+
+# Der Fingerabdruck, auf den der native Schluessel eingeschraenkt werden
+# muss. Er gehoert zum Signierschluessel DIESES Rechners (Gradle legt ihn
+# beim ersten Bau unter ~/.android an) -- ein anderer Mac, und spaeter die
+# Signatur von Google Play, haben je einen eigenen. Steht er nicht in der
+# Google-Cloud-Konsole, bleibt die native Karte grau, ohne Fehlermeldung
+# in der App. Darum wird er hier bei jedem Lauf genannt.
+DEBUG_KS="$HOME/.android/debug.keystore"
+if [ "$NATIV_KARTE" = "1" ] && [ -f "$DEBUG_KS" ]; then
+  SHA1="$("$JAVA_HOME/bin/keytool" -list -v -keystore "$DEBUG_KS" -alias androiddebugkey \
+          -storepass android 2>/dev/null | sed -nE 's/^[[:space:]]*SHA1:[[:space:]]*//p' | head -1 || true)"
+  if [ -n "$SHA1" ]; then
+    echo "        Fingerabdruck fuer die Einschraenkung des Android-Schluessels:"
+    echo "            $APPID  $SHA1"
+  fi
+fi
 
 echo ""
 echo "Fertig. Die App laeuft auf $ZIEL."

@@ -104,7 +104,7 @@ function offenePlatzhalter(text) {
       // (ENT-609, gehoert ins App-Buendel) -- dieselben zwei Ausnahmen
       // wie im Waechter des Deploys.
       // __FILE__ ist wie __DIR__ PHPs eigene Konstante (FPDF, ENT-688).
-      if (t === '__DIR__' || t === '__FILE__' || t === '__MAPS_IOS_KEY__') { continue; }
+      if (t === '__DIR__' || t === '__FILE__' || t === '__MAPS_NATIV_KEY__') { continue; }
       if (!b.includes(`ersetze ${t} "`) || !b.includes(`"${zielImPlatz}"`)
           || !new RegExp(`ersetze ${t} "[^\n]*" "${zielImPlatz.replace(/[$/.]/g, '\\$&')}"`).test(b)) {
         offen.add(`${t} in ${ziel}`);

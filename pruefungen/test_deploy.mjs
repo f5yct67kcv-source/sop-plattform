@@ -1595,7 +1595,7 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     // __MANDANT_SECRETS__ wird seit OP-526 auch hier per sed ersetzt (siehe
     // Kommentar beim betreiber-Bündel oben). Zwei bleiben aus:
     //   __DIR__          PHPs eigene Konstante, kein Platzhalter.
-    //   __MAPS_IOS_KEY__ der Schlüssel der NATIVEN Karte (ENT-609). Er
+    //   __MAPS_NATIV_KEY__ der Schlüssel der NATIVEN Karte (ENT-609). Er
     //                    gehört ins App-Bündel und wird dort von
     //                    aufs-handy.sh eingesetzt; die Web-Fassung nimmt
     //                    ihn nie in die Hand und zeichnet weiterhin mit
@@ -1605,7 +1605,7 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     //                    bleibt, ist im Code abgefangen:
     //                    mapsSchluesselTauglich() erkennt ihn.
     //   __FILE__         ebenso PHPs eigene Konstante (FPDF, ENT-688).
-    const absichtlichCupi = /^(__DIR__|__MAPS_IOS_KEY__|__FILE__)$/;
+    const absichtlichCupi = /^(__DIR__|__MAPS_NATIV_KEY__|__FILE__)$/;
 
     const offenCupi = [];
     for (const { quelle, ziel } of textDateienCupi) {
@@ -1623,14 +1623,14 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     // Arbeitsablauf. Das ist Absicht -- sie hält an, bevor etwas
     // hochgeladen wird. Nur: Wer hier eine Ausnahme einträgt und dort
     // nicht, bekommt eine grüne Regression und einen abgebrochenen Deploy.
-    // Genau so geschehen: __MAPS_IOS_KEY__ stand hier, nicht dort, und der
+    // Genau so geschehen: __MAPS_NATIV_KEY__ stand hier, nicht dort, und der
     // Deploy brach nach dem Hauptbündel ab -- cupi24.guardops.ch blieb auf
     // dem alten Stand, während alles andere schon live war.
     {
       const zeile = bauen.match(/dist-cupi24\/ \\\n\s*\| grep -v ([^\\\n]*)/);
       const imDeploy = new Set(
         [...(zeile ? zeile[1] : '').matchAll(/'\^?(__[A-Z0-9_]+__)\$?'/g)].map(m => m[1]));
-      const hier = ['__DIR__', '__MAPS_IOS_KEY__', '__FILE__'].filter(p => absichtlichCupi.test(p));
+      const hier = ['__DIR__', '__MAPS_NATIV_KEY__', '__FILE__'].filter(p => absichtlichCupi.test(p));
       check('KRITISCH: der Deploy selbst kennt dieselben Ausnahmen wie diese Prüfung',
         !!zeile && hier.length > 0 && hier.every(p => imDeploy.has(p)));
     }
@@ -2231,7 +2231,7 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
     const ordner = mkdtempSync(join(tmpdir(), 'buendel-'));
     try {
       const datei = join(ordner, 'index.html');
-      writeFileSync(datei, 'vorher key=__MAPS_IOS_KEY__ ende\n');
+      writeFileSync(datei, 'vorher key=__MAPS_NATIV_KEY__ ende\n');
       // Genau der Ablauf aus dem Skript: sichern, Schlüssel einsetzen,
       // zurücksetzen.
       execFileSync('bash', ['-c', [
@@ -2239,14 +2239,14 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
         'BUENDEL_KOPIE=""',
         sichern, zurueck,
         'buendel_sichern',
-        `sed -i 's|__MAPS_IOS_KEY__|AIzaSyGEHEIMGEHEIMGEHEIMGEHEIMGEHEIM|g' ${JSON.stringify(datei)}`,
+        `sed -i 's|__MAPS_NATIV_KEY__|AIzaSyGEHEIMGEHEIMGEHEIMGEHEIMGEHEIM|g' ${JSON.stringify(datei)}`,
         'buendel_zuruecksetzen',
       ].join('\n')], { encoding: 'utf8' });
       const danach = lies(datei, 'utf8');
       check('KRITISCH: nach dem Lauf steht kein Schlüssel mehr im versionierten Bündel',
         !/AIza/.test(danach));
       check('KRITISCH: und der Platzhalter ist wieder da, das Bündel also unverändert',
-        danach === 'vorher key=__MAPS_IOS_KEY__ ende\n');
+        danach === 'vorher key=__MAPS_NATIV_KEY__ ende\n');
     } finally { rmSync(ordner, { recursive: true, force: true }); }
   } else {
     ['KRITISCH: nach dem Lauf steht kein Schlüssel mehr im versionierten Bündel',

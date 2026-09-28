@@ -9133,15 +9133,24 @@ function rgLaufFunktionen() {
 // unvermeidbar (Client-Schluessel), der Schutz laeuft weiterhin ueber die
 // Referrer-Einschraenkung, nicht ueber Geheimhaltung.
 const RGS_MAPS_SCHLUESSEL = '__MAPS_JS_KEY__';
-/* Der Schluessel fuer die NATIVE Karte (ENT-609). Ein anderer als der
-   darueber, und das ist keine Doppelung: Dieser ist auf die Bundle-ID
-   ch.guardops.mitarbeiter und auf das Maps-SDK eingeschraenkt, jener auf
-   die Web-Adresse und die JavaScript-API. Eine Website-Einschraenkung kann
-   in der App nach Googles eigener Dokumentation gar nicht greifen -- die
-   WebView laedt ihre Seiten aus dem Buendel und schickt dabei keinen
-   Referrer mit. In der Web-Fassung bleibt hier der Platzhalter stehen; sie
-   braucht ihn nicht und kaeme auch nicht daran vorbei. */
-const RGS_MAPS_IOS_SCHLUESSEL = '__MAPS_IOS_KEY__';
+/* Der Schluessel fuer die NATIVE Karte (ENT-609, Android seit ENT-717).
+   Ein anderer als der darueber, und das ist keine Doppelung: Dieser ist
+   auf die App (Bundle-ID bzw. Paketname und Signatur) und auf das Maps-SDK
+   eingeschraenkt, jener auf die Web-Adresse und die JavaScript-API. Eine
+   Website-Einschraenkung kann in der App nach Googles eigener Dokumentation
+   gar nicht greifen -- die WebView laedt ihre Seiten aus dem Buendel und
+   schickt dabei keinen Referrer mit. In der Web-Fassung bleibt hier der
+   Platzhalter stehen; sie braucht ihn nicht und kaeme auch nicht daran
+   vorbei.
+
+   EIN Platzhalter fuer beide Telefone: aufs-handy.sh setzt den iOS-
+   Schluessel ein, aufs-android.sh den Android-Schluessel. Auf Android
+   liest das Karten-SDK den Schluessel allerdings NICHT aus create(),
+   sondern nur aus dem AndroidManifest (dorthin bringt ihn Gradle aus
+   derselben Datei). Hier dient er auf Android nur als Auskunft, OB die
+   native Karte eingerichtet ist -- ohne ihn baut die App die Browserkarte,
+   statt eine native Karte ohne Schluessel grau stehen zu lassen. */
+const RGS_MAPS_NATIV_SCHLUESSEL = '__MAPS_NATIV_KEY__';
 let rgsMapsVersprechen = null;
 let rgsKarte = null, rgsKartenMarken = [], rgsKartenKreise = [], rgsStandortMarke = null;
 /* Der mitwachsende Kreis waehrend der Verweilzeit (ENT-579). Bewusst NICHT
@@ -9301,7 +9310,7 @@ let rgsMapsSchluesselDa = mapsSchluesselTauglich(RGS_MAPS_SCHLUESSEL);
 
 /* ══ Die native Karte (ENT-609) ══════════════════════════════════════
    In der App zeichnet nicht mehr die JavaScript-Karte, sondern das native
-   Maps-SDK. Der Grund steht bei RGS_MAPS_IOS_SCHLUESSEL: Die
+   Maps-SDK. Der Grund steht bei RGS_MAPS_NATIV_SCHLUESSEL: Die
    JavaScript-Karte laesst sich in der App gar nicht ordentlich absichern.
 
    Die Browser-Fassung bleibt unveraendert daneben bestehen, solange es die
@@ -9351,7 +9360,7 @@ let rgsNativVersprechen = null; // das einmal geladene Kartenplugin
 let rgsNativAbbau = Promise.resolve();
 
 function rgKarteNativMoeglich() {
-  return nativeAppHuelle() && mapsSchluesselTauglich(RGS_MAPS_IOS_SCHLUESSEL);
+  return nativeAppHuelle() && mapsSchluesselTauglich(RGS_MAPS_NATIV_SCHLUESSEL);
 }
 
 /* Die zusammengefasste Kartenschicht nachladen (karte-nativ.js, erzeugt in
@@ -10030,7 +10039,7 @@ async function rgKarteNativBauen(d, bauLauf) {
     rgsNativKarte = await window.KarteNativ.GoogleMap.create({
       id: 'rgs-karte',
       element: el,
-      apiKey: RGS_MAPS_IOS_SCHLUESSEL,
+      apiKey: RGS_MAPS_NATIV_SCHLUESSEL,
       config: {
         center: { lat: d.zeigbar[0].lat, lng: d.zeigbar[0].lng },
         zoom: 17,

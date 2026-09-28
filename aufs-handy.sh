@@ -309,8 +309,9 @@ maps_schluessel_einsetzen mobile/www/index.html
 # der obige auf die Web-Adresse und die JavaScript-API. In der App wird
 # der native gebraucht -- eine Website-Einschraenkung kann dort nach
 # Googles eigener Dokumentation gar nicht greifen, weil die WebView beim
-# Laden aus dem Buendel keinen Referrer mitschickt.
-maps_schluessel_einsetzen mobile/www/index.html mobile/.maps-ios-key __MAPS_IOS_KEY__
+# Laden aus dem Buendel keinen Referrer mitschickt. Derselbe Platzhalter
+# traegt in aufs-android.sh den Android-Schluessel (ENT-717).
+maps_schluessel_einsetzen mobile/www/index.html mobile/.maps-ios-key __MAPS_NATIV_KEY__
 
 echo "── 3/5  Nach iOS uebertragen"
 cd mobile
