@@ -51,10 +51,16 @@ $art = str_starts_with($argVariante, 'offerte') ? 'offerte' : 'rechnung';
 $status = $argVariante === 'offerte_entschieden' ? 'bestaetigt' : 'versendet';
 $entscheidung = $argVariante === 'offerte_entschieden' ? date('Y-m-d H:i:s') : null;
 $unterschriftsseite = $argVariante === 'offerte_unterschrift' ? 1 : 0;
+// Daten relativ zu heute: Mit festen Daten galt die Offerte ab dem Tag nach
+// "gueltig_bis" als abgelaufen, und die Seite liess Annehmen/Ablehnen samt
+// Unterschrift weg -- die Pruefung wurde rot, ohne dass sich am Code etwas
+// geaendert hatte (so geschehen am 2026-09-28).
+$belegDatum = date('Y-m-d', strtotime('-30 days'));
+$fristBis   = date('Y-m-d', strtotime('+30 days'));
 $pdo->exec("INSERT INTO belege VALUES (1,'tok123','$art','" . ($art === 'offerte' ? 'OF-0127' : 'RE-0002')
-    . "',1,1,'Ladenüberwachung RE-0002',NULL,'2026-08-28',"
-    . ($art === 'offerte' ? "'2026-09-27'" : 'NULL') . ","
-    . ($art === 'rechnung' ? "'2026-09-27'" : 'NULL')
+    . "',1,1,'Ladenüberwachung RE-0002',NULL,'$belegDatum',"
+    . ($art === 'offerte' ? "'$fristBis'" : 'NULL') . ","
+    . ($art === 'rechnung' ? "'$fristBis'" : 'NULL')
     . ",0,'$status',0,NULL," . ($entscheidung ? "'$entscheidung'" : 'NULL') . ",NULL,NULL,NULL,$unterschriftsseite)");
 $pdo->exec("INSERT INTO kunden VALUES (1,'abc consulting gmbh',NULL,'Hochgasse','7',NULL,'4632','Trimbach')");
 $pdo->exec("INSERT INTO kunden_person VALUES (1,'Herr','Adrian','Muster')");
