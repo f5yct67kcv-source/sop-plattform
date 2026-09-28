@@ -302,6 +302,143 @@ function ki_aufruf(array $payload, int $timeout): ?array
     return $data;
 }
 
+// ── Strom (ENT-716). Die Schnittstelle sendet mit "stream": true Ereignisse
+// (Server-Sent Events): message_start, content_block_start/_delta/_stop,
+// message_delta (stop_reason), message_stop, dazu ping und error. Hier werden
+// sie zerlegt und wieder zu derselben Antwort zusammengesetzt, die ohne Strom
+// kaeme. Rein und ohne Netz pruefbar: ki_sse_zerlegen und ki_strom_sammeln.
+
+// Zerlegt einen Puffer in vollstaendige Ereignisse; der unvollstaendige Rest
+// bleibt im Puffer fuer das naechste Stueck. Ereignisse enden mit einer
+// Leerzeile; Zeilenenden \n oder \r\n.
+function ki_sse_zerlegen(string &$puffer): array
+{
+    $puffer = str_replace("\r\n", "\n", $puffer);
+    $ereignisse = [];
+    while (($pos = strpos($puffer, "\n\n")) !== false) {
+        $block = substr($puffer, 0, $pos);
+        $puffer = substr($puffer, $pos + 2);
+        $daten = [];
+        foreach (explode("\n", $block) as $zeile) {
+            if (strncmp($zeile, 'data:', 5) === 0) { $daten[] = ltrim(substr($zeile, 5)); }
+        }
+        if (!$daten) { continue; }
+        $e = json_decode(implode("\n", $daten), true);
+        if (is_array($e)) { $ereignisse[] = $e; }
+    }
+    return $ereignisse;
+}
+
+// Ein Ereignis in den Zustand einarbeiten. Gibt ein neues Stueck Text zurueck,
+// sonst ''. $z: ['content' => [...], 'json' => [index => roh], 'stop_reason',
+// 'fehler' => null|array].
+function ki_strom_sammeln(array &$z, array $e): string
+{
+    $z += ['content' => [], 'json' => [], 'stop_reason' => '', 'fehler' => null];
+    $typ = (string)($e['type'] ?? '');
+    $i = (int)($e['index'] ?? 0);
+    if ($typ === 'content_block_start') {
+        $b = is_array($e['content_block'] ?? null) ? $e['content_block'] : [];
+        if (($b['type'] ?? '') === 'tool_use') { $b['input'] = []; $z['json'][$i] = ''; }
+        if (($b['type'] ?? '') === 'text') { $b['text'] = ''; }
+        $z['content'][$i] = $b;
+    } elseif ($typ === 'content_block_delta') {
+        $d = is_array($e['delta'] ?? null) ? $e['delta'] : [];
+        if (($d['type'] ?? '') === 'text_delta' && isset($z['content'][$i])) {
+            $t = (string)($d['text'] ?? '');
+            $z['content'][$i]['text'] = ($z['content'][$i]['text'] ?? '') . $t;
+            return $t;
+        }
+        if (($d['type'] ?? '') === 'input_json_delta' && isset($z['json'][$i])) {
+            $z['json'][$i] .= (string)($d['partial_json'] ?? '');
+        }
+    } elseif ($typ === 'content_block_stop') {
+        if (isset($z['json'][$i])) {
+            $roh = trim($z['json'][$i]);
+            $in = $roh === '' ? [] : json_decode($roh, true);
+            // Unvollstaendige Eingabe (Abbruch mitten im Werkzeugaufruf) ist
+            // kein leeres Objekt, sondern ein Fehler.
+            if (!is_array($in)) { $z['fehler'] = ['type' => 'eingabe_unvollstaendig', 'message' => 'Werkzeugeingabe unvollstaendig']; $in = []; }
+            $z['content'][$i]['input'] = $in;
+            unset($z['json'][$i]);
+        }
+    } elseif ($typ === 'message_delta') {
+        $sr = $e['delta']['stop_reason'] ?? null;
+        if (is_string($sr)) { $z['stop_reason'] = $sr; }
+    } elseif ($typ === 'error') {
+        $z['fehler'] = is_array($e['error'] ?? null) ? $e['error'] : ['type' => 'unbekannt'];
+    }
+    return '';
+}
+
+// Aufruf mit Strom. Wie ki_aufruf: EIN Ort fuer Schluessel und Fehlereinordnung.
+function ki_strom(array $payload, int $timeout, callable $text): ?array
+{
+    ki_fehler_einzelheit('');
+    $schluessel = ki_schluessel();
+    if (ki_schluessel_fehlt($schluessel)) {
+        ki_fehlergrund('nicht_eingerichtet');
+        return null;
+    }
+    $koerper = ki_koerper($payload);
+    if ($koerper === null) {
+        return null;
+    }
+    $status = 0; $puffer = ''; $fehlerRumpf = ''; $z = [];
+    $ch = curl_init('https://api.anthropic.com/v1/messages');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => [
+            'content-type: application/json',
+            'x-api-key: ' . $schluessel,
+            'anthropic-version: 2023-06-01',
+        ],
+        CURLOPT_POSTFIELDS => $koerper,
+        CURLOPT_TIMEOUT => $timeout,
+        CURLOPT_HEADERFUNCTION => function ($c, $zeile) use (&$status) {
+            if (preg_match('#^HTTP/\S+\s+(\d{3})#', $zeile, $m)) { $status = (int)$m[1]; }
+            return strlen($zeile);
+        },
+        CURLOPT_WRITEFUNCTION => function ($c, $stueck) use (&$status, &$puffer, &$fehlerRumpf, &$z, $text) {
+            if ($status !== 200) { $fehlerRumpf .= $stueck; return strlen($stueck); }
+            $puffer .= $stueck;
+            foreach (ki_sse_zerlegen($puffer) as $e) {
+                $t = ki_strom_sammeln($z, $e);
+                if ($t !== '') { $text($t); }
+            }
+            return strlen($stueck);
+        },
+    ]);
+    curl_exec($ch);
+    $curlFehler = curl_errno($ch);
+    curl_close($ch);
+
+    if ($curlFehler !== 0 || $status !== 200) {
+        ki_fehlergrund(ki_fehler_einordnen($curlFehler, $status, $fehlerRumpf));
+        ki_fehler_einzelheit(ki_fehler_einzelheit_lesen($fehlerRumpf));
+        error_log('KI-Strom fehlgeschlagen (' . ki_fehlergrund() . ', HTTP ' . $status . ', curl ' . $curlFehler . '): '
+            . substr($fehlerRumpf, 0, 500));
+        return null;
+    }
+    if (!empty($z['fehler'])) {
+        // Fehler mitten im Strom (z. B. ueberlastet): wie eine Fehlerantwort einordnen.
+        $rumpf = json_encode(['type' => 'error', 'error' => $z['fehler']]);
+        ki_fehlergrund(ki_fehler_einordnen(0, ($z['fehler']['type'] ?? '') === 'overloaded_error' ? 529 : 500, (string)$rumpf));
+        error_log('KI-Strom: Fehler im Strom -- ' . substr((string)$rumpf, 0, 300));
+        return null;
+    }
+    if (($z['stop_reason'] ?? '') === 'refusal') {
+        ki_fehlergrund('inhalt_abgelehnt');
+        return null;
+    }
+    if (empty($z['content'])) {
+        ki_fehlergrund('kein_ergebnis');
+        return null;
+    }
+    ksort($z['content']);
+    return ['content' => array_values($z['content']), 'stop_reason' => (string)($z['stop_reason'] ?? '')];
+}
+
 // Die Eingabe des erwarteten Werkzeugs aus einer Antwort holen. Fehlt sie,
 // hat das Modell geantwortet, aber nichts Brauchbares geliefert -- das ist
 // etwas anderes als ein Fehlschlag des Aufrufs und bekommt seinen eigenen
@@ -1334,6 +1471,27 @@ function ki_assistent_antwort_filtern(array $data): array
 
 function anthropic_assistent(array $nachrichten, string $heute, ?array $bezug = null): ?array
 {
+    $data = ki_aufruf(ki_assistent_anfrage($nachrichten, $heute, $bezug), 40);
+    if ($data === null) {
+        return null;
+    }
+    return ki_assistent_antwort_filtern($data);
+}
+
+// Wie anthropic_assistent, aber als Strom (ENT-716, schneller): Jedes Stueck
+// Text geht sofort an $text(string); zurueck kommt am Ende dieselbe gefilterte
+// Antwort wie ohne Strom -- die Werkzeugschleife im Browser bleibt dieselbe.
+function anthropic_assistent_strom(array $nachrichten, string $heute, ?array $bezug, callable $text): ?array
+{
+    $data = ki_strom(ki_assistent_anfrage($nachrichten, $heute, $bezug) + ['stream' => true], 40, $text);
+    if ($data === null) {
+        return null;
+    }
+    return ki_assistent_antwort_filtern($data);
+}
+
+function ki_assistent_anfrage(array $nachrichten, string $heute, ?array $bezug = null): array
+{
     $tools = [];
     foreach (ki_assistent_werkzeuge() as $name => $w) {
         $tools[] = ['name' => $name, 'description' => $w['description'], 'input_schema' => $w['input_schema']];
@@ -1346,7 +1504,7 @@ function anthropic_assistent(array $nachrichten, string $heute, ?array $bezug = 
     // Sonnet statt Haiku (Entscheid des Projektinhabers, ENT-699): Hier waehlt
     // das Modell Werkzeuge selbst und fasst zusammen; das kleine Modell tut
     // das bei zusammengesetzten Fragen weniger verlaesslich.
-    $data = ki_aufruf([
+    return [
         'model' => 'claude-sonnet-5',
         'max_tokens' => 800,
         'system' => [
@@ -1356,11 +1514,7 @@ function anthropic_assistent(array $nachrichten, string $heute, ?array $bezug = 
         'tools' => $tools,
         'messages' => $nachrichten,
         'cache_control' => ['type' => 'ephemeral'],
-    ], 40);
-    if ($data === null) {
-        return null;
-    }
-    return ki_assistent_antwort_filtern($data);
+    ];
 }
 
 // ══════════════════════════════════════════ WECKWORT (ENT-702, nur Testumgebung)

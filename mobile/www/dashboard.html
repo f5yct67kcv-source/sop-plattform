@@ -12941,10 +12941,11 @@ function asStimmeHinweis(v) {
     : 'Klingt die Stimme blechern? In den Spracheinstellungen des Systems lässt sich eine hochwertigere deutsche Stimme installieren; danach die Seite neu laden.');
 }
 
-function asSprechen(text) {
+function asSprechen(text, folge) {
   if (asStumm() || !text || !window.speechSynthesis || typeof SpeechSynthesisUtterance !== 'function') { return; }
   try {
-    window.speechSynthesis.cancel();
+    // folge: an das bereits Gesprochene anhaengen (Strom, ENT-716) statt es abzubrechen.
+    if (!folge) { window.speechSynthesis.cancel(); }
     const u = new SpeechSynthesisUtterance(text);
     const v = asBesteStimme(window.speechSynthesis.getVoices());
     if (v) { u.voice = v; }
@@ -13065,6 +13066,48 @@ function asBezugWeglassen() { asBezugWegGelassen = true; asBezugZeigen(); }
 // wird der Bezug darum im Takt nachgefuehrt.
 setInterval(() => { if ($('asPanel') && !$('asPanel').hidden) { asBezugZeigen(); } }, 1500);
 
+// ── Antwort als Strom (ENT-716, schneller). Der Server schickt Textstuecke
+// ({t}) und am Ende die ganze Antwort ({ende}) oder einen Fehler ({fehler}).
+// Antwortet er als JSON (Fehler vor dem Strom), gilt das wie bisher. Puffert
+// ein Zwischenglied, kommt der Strom am Stueck -- dann eben ohne Vorschau.
+async function asAnfrage(body, beiText) {
+  if (!API) { return { ok: false, status: 0, data: {} }; }
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) { headers['X-Auth-Token'] = token; }
+  let r;
+  try { r = await fetch(API + 'ki_assistent.php', { method: 'POST', headers, body: JSON.stringify({ ...body, stream: true }) }); }
+  catch (e) { return { ok: false, status: 0, data: {} }; }
+  if (!/event-stream/i.test(r.headers.get('Content-Type') || '')) {
+    try { return { ok: r.ok, status: r.status, data: await r.json() }; } catch (e) { return { ok: false, status: r.status, data: {} }; }
+  }
+  let ergebnis = null, puffer = '';
+  const verarbeiten = block => {
+    const daten = block.split('\n').filter(z => z.startsWith('data:')).map(z => z.slice(5).trim()).join('\n');
+    if (!daten) { return; }
+    let d; try { d = JSON.parse(daten); } catch (e) { return; }
+    if (typeof d.t === 'string') { beiText(d.t); }
+    else if (d.ende) { ergebnis = { ok: true, status: 200, data: d.ende }; }
+    else if (d.fehler) { ergebnis = { ok: false, status: 502, data: { status: 'error', message: d.fehler.message, grund: d.fehler.grund } }; }
+  };
+  try {
+    const leser = r.body.getReader(), dec = new TextDecoder();
+    for (;;) {
+      const { done, value } = await leser.read();
+      if (done) { break; }
+      puffer = (puffer + dec.decode(value, { stream: true })).replace(/\r\n/g, '\n');
+      let pos;
+      while ((pos = puffer.indexOf('\n\n')) >= 0) { verarbeiten(puffer.slice(0, pos)); puffer = puffer.slice(pos + 2); }
+    }
+    if (puffer.trim()) { verarbeiten(puffer); }
+  } catch (e) { /* unten: Abbruch */ }
+  return ergebnis || { ok: false, status: 0, data: { message: 'Die Antwort brach unterwegs ab. Bitte nochmals fragen.' } };
+}
+// Fertige Saetze aus dem laufenden Text; der Rest wartet auf das Satzende.
+function asSatzEnde(text, ab) {
+  const m = /[.!?…](?=\s|$)(?![\s\S]*[.!?…](?=\s|$))/.exec(text.slice(ab));
+  return m ? ab + m.index + 1 : ab;
+}
+
 async function asSenden() {
   const text = $('asText').value.trim();
   if (!text || asLaeuft) { return; }
@@ -13093,7 +13136,16 @@ async function asSenden() {
     for (let runde = 0; runde < AS_RUNDEN; runde++) {
       const body = { messages: asNachrichten, heute: isoTag() };
       if (bezug) { body.bezug = { art: bezug.art, id: bezug.id, text: bezug.text }; }
-      const { ok, status, data } = await api('ki_assistent.php', { method: 'POST', body });
+      // Der Text erscheint in der Blase "Ich sehe nach …", fertige Saetze
+      // werden sofort gesprochen. Endet die Runde mit einem Werkzeugaufruf,
+      // geht die Blase zurueck auf "Ich sehe nach …".
+      let live = '', gesprochen = 0;
+      const { ok, status, data } = await asAnfrage(body, t => {
+        live += t;
+        warten.textContent = live;
+        const bis = asSatzEnde(live, gesprochen);
+        if (bis > gesprochen) { asSprechen(live.slice(gesprochen, bis).trim(), true); gesprochen = bis; }
+      });
       if (status === 401) { doLogout(); return; }
       if (!ok || data.status !== 'ok') {
         // Die Frage bleibt nicht als unbeantwortete Nachricht im Gespraech
@@ -13109,7 +13161,9 @@ async function asSenden() {
         const antwort = inhalt.filter(b => b.type === 'text').map(b => b.text).join(' ').trim()
           || 'Dazu habe ich keine Antwort.';
         asNachricht('er', antwort, asTreffer, asTrefferMax);
-        asSprechen(antwort);
+        // Schon im Strom Gesprochenes nicht wiederholen, nur den Rest.
+        if (live) { const rest = live.slice(gesprochen).trim(); if (rest) { asSprechen(rest, gesprochen > 0); } }
+        else { asSprechen(antwort); }
         // Ein Formular ist aufgegangen (ENT-700): Fenster zu, damit es frei
         // ist; die Figur bleibt und zeigt die Antwort kurz als Sprechblase.
         if (asFormularNeu) { asPanelZu(); asBlase(antwort); }
@@ -13125,6 +13179,7 @@ async function asSenden() {
         if (r.trefferMax) { asTrefferMax = Math.max(asTrefferMax, r.trefferMax); }
       }
       asNachrichten.push({ role: 'user', content: ergebnisse });
+      warten.textContent = 'Ich sehe nach …';
     }
     asNachricht('fehler', 'Die Frage brauchte zu viele Schritte. Bitte einfacher oder in Teilen fragen.');
     asNachrichten = [];

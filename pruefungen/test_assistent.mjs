@@ -102,6 +102,9 @@ const modellNeu = (staende, datei, stoer) => { modellServer = { staende, datei: 
 // Morgenlage (ENT-716): zuschaltbare Einsaetze fuer heute/morgen, damit die
 // uebrigen Zaehlungen unberuehrt bleiben.
 let zusatzEI = [];
+// Strom (ENT-716): Schalter fuer die Attrappe des Assistenten.
+let alsStrom = false, stromFehler = null, stromAbbruch = false;
+const stromAnfragen = [];
 const zuteilungen = [];
 // Offene Seite (ENT-716): mitgeschickter Bezug je Anfrage an den Assistenten.
 const bezuege = [];
@@ -196,15 +199,27 @@ async function neueSeite() {
       if (assistentAntwort) return send(assistentAntwort[0], assistentAntwort[1]);
       const body = JSON.parse(req.postData() || '{}');
       bezuege.push(body.bezug || null);
+      stromAnfragen.push(!!body.stream);
+      // Strom (ENT-716): mit alsStrom kommt dieselbe Antwort als Ereignisse --
+      // Text Wort fuer Wort ({t}), am Ende die ganze Antwort ({ende}).
+      const antworte = a => {
+        if (!alsStrom || !body.stream) return send(a);
+        const text = a.content.filter(b => b.type === 'text').map(b => b.text).join('');
+        const woerter = text.match(/\S+\s*/g) || [];
+        const ev = d => 'data: ' + JSON.stringify(d) + '\n\n';
+        const koerper = ':' + ' '.repeat(100) + '\n\n' + woerter.map(w => ev({ t: w })).join('')
+          + (stromFehler ? ev({ fehler: stromFehler }) : stromAbbruch ? '' : ev({ ende: a }));
+        return route.fulfill({ status: 200, contentType: 'text/event-stream; charset=utf-8', body: koerper });
+      };
       const letzte = body.messages[body.messages.length - 1];
       if (typeof letzte.content === 'string') {
-        return send({ status: 'ok', stop_reason: 'tool_use', content: [
+        return antworte({ status: 'ok', stop_reason: 'tool_use', content: [
           { type: 'text', text: 'Ich sehe nach.' },
           { type: 'tool_use', id: 'wz_' + zurueck.length, name: drehbuch.name, input: drehbuch.input }] });
       }
       const r = letzte.content.find(b => b.type === 'tool_result');
       zurueck.push(JSON.parse(r.content));
-      return send({ status: 'ok', stop_reason: 'end_turn', content: [{ type: 'text', text: drehbuch.antwort }] });
+      return antworte({ status: 'ok', stop_reason: 'end_turn', content: [{ type: 'text', text: drehbuch.antwort }] });
     }
     if (p.startsWith('assistent_weckwort_modell')) {
       if (req.method() === 'POST') { modellServer.posts++; return send({ status: 'ok' }); }
@@ -679,6 +694,48 @@ lage = await lageLesen();
 check('KRITISCH: fehlt ein Recht, heisst „nichts Dringendes“ nur „in dem, was du sehen darfst“',
   /In dem, was du sehen darfst, steht nichts Dringendes an/.test(lage));
 belegeGesperrt = false;
+
+// ══════════ STROM (ENT-716)
+check('Der Browser verlangt die Antwort als Strom', stromAnfragen.length > 0 && stromAnfragen.every(Boolean));
+alsStrom = true;
+const gesprochenStrom = (await page.evaluate(() => window.__gesprochen)).length;
+r = await fragen('Wie viele Plätze fehlen?', { name: 'offene_plaetze', input: { von: tag(0), bis: tag(6) }, antwort: 'Vier Plätze fehlen. Zwei davon am Freitag.' });
+check('KRITISCH: als Strom kommt dieselbe Antwort an, samt Werkzeugrunde und Trefferliste',
+  (await letzteAntwort()) === 'Vier Plätze fehlen. Zwei davon am Freitag.' && r.offene_plaetze_gesamt === 4
+  && await page.evaluate(() => !![...document.querySelectorAll('#asVerlauf .as-msg.er')].pop().querySelector('.as-treffer')));
+const neuGesprochen = (await page.evaluate(() => window.__gesprochen)).slice(gesprochenStrom);
+check('Gesprochen wird Satz für Satz, nichts doppelt',
+  neuGesprochen.join(' ').replace(/\s+/g, ' ').trim() === 'Ich sehe nach. Vier Plätze fehlen. Zwei davon am Freitag.'
+  && neuGesprochen.filter(x => x.includes('Vier Plätze')).length === 1);
+stromFehler = { message: 'Die KI ist gerade überlastet.', grund: 'ueberlastet' };
+await fragen('Und morgen?', { name: 'offene_plaetze', input: { von: tag(1), bis: tag(1) }, antwort: 'x' });
+check('Ein Fehler im Strom erscheint als Fehlermeldung mit dem Satz des Servers',
+  /überlastet/.test(await page.evaluate(() => [...document.querySelectorAll('#asVerlauf .as-msg.fehler')].pop()?.textContent || '')));
+stromFehler = null; stromAbbruch = true;
+await fragen('Und übermorgen?', { name: 'offene_plaetze', input: { von: tag(2), bis: tag(2) }, antwort: 'x' });
+check('KRITISCH: bricht der Strom ohne Schluss ab, sagt die Seite das -- keine halbe Antwort als ganze',
+  /brach unterwegs ab/.test(await page.evaluate(() => [...document.querySelectorAll('#asVerlauf .as-msg.fehler')].pop()?.textContent || '')));
+stromAbbruch = false; alsStrom = false;
+// Vorschau: Stuecke mit Pausen -- der Text steht schon da, bevor die Antwort fertig ist.
+await page.evaluate(() => {
+  window.__fetchEcht = window.fetch;
+  window.fetch = (url, opts) => {
+    if (!String(url).includes('ki_assistent.php')) return window.__fetchEcht(url, opts);
+    const enc = new TextEncoder();
+    const teile = ['data: {"t":"Heute "}\n\n', 'data: {"t":"läuft "}\n\n', 'data: {"t":"wenig."}\n\n',
+      'data: {"ende":{"status":"ok","stop_reason":"end_turn","content":[{"type":"text","text":"Heute läuft wenig."}]}}\n\n'];
+    const strom = new ReadableStream({ async start(c) { for (const t of teile) { c.enqueue(enc.encode(t)); await new Promise(ok => setTimeout(ok, 250)); } c.close(); } });
+    return Promise.resolve(new Response(strom, { headers: { 'Content-Type': 'text/event-stream' } }));
+  };
+});
+await page.fill('#asText', 'Was läuft heute?');
+await page.click('#asBtn');
+await page.waitForTimeout(420);
+const zwischen = await page.evaluate(() => [...document.querySelectorAll('#asVerlauf .as-msg.leise')].pop()?.textContent || '');
+check('KRITISCH: der Text erscheint, während die Antwort noch läuft (Vorschau in der Blase)', /^Heute läuft/.test(zwischen) && !/wenig/.test(zwischen));
+await page.waitForFunction(() => !document.getElementById('asBtn').disabled, null, { timeout: 5000 });
+check('... und steht danach als Antwort da', (await letzteAntwort()) === 'Heute läuft wenig.');
+await page.evaluate(() => { window.fetch = window.__fetchEcht; });
 
 // ══════════ KEIN RECHT, FALSCHE EINGABE
 belegeGesperrt = true;
