@@ -46,6 +46,7 @@ if (!empty($input['stream'])) {
     header('Content-Type: text/event-stream; charset=utf-8');
     header('Cache-Control: no-cache, no-transform');
     header('X-Accel-Buffering: no');
+    ki_strom_aktiv(true);
     $senden = function (array $d): void {
         echo 'data: ' . json_encode($d, JSON_UNESCAPED_UNICODE) . "\n\n";
         @flush();
@@ -56,11 +57,9 @@ if (!empty($input['stream'])) {
     @flush();
     $antwort = anthropic_assistent_strom($nachrichten, $heute, $bezug, fn(string $t) => $senden(['t' => $t]));
     if ($antwort === null) {
-        $f = ki_fehler_text();
-        $senden(['fehler' => ['message' => $f['message'], 'grund' => $f['grund']]]);
-    } else {
-        $senden(['ende' => ['status' => 'ok'] + $antwort]);
+        ki_fehler_melden();
     }
+    $senden(['ende' => ['status' => 'ok'] + $antwort]);
     exit;
 }
 

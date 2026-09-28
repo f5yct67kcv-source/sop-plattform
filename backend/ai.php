@@ -208,9 +208,24 @@ function ki_fehler_text(?string $grund = null): array
 // kuenftiger fuenfter Endpunkt wieder beim einen Satz fuer alles landet.
 // $eigenerText nur dort, wo ein Grund im jeweiligen Bereich wirklich etwas
 // anderes bedeutet (siehe ki_kunden_recherche.php).
+// Laeuft gerade eine Antwort als Strom (ENT-716)? Dann sind die Koepfe schon
+// gesendet, und ein Fehler geht als Ereignis {fehler} hinaus statt als JSON.
+function ki_strom_aktiv(?bool $setzen = null): bool
+{
+    static $aktiv = false;
+    if ($setzen !== null) { $aktiv = $setzen; }
+    return $aktiv;
+}
+
 function ki_fehler_melden(?string $eigenerText = null): void
 {
     $f = ki_fehler_text();
+    if (ki_strom_aktiv()) {
+        echo 'data: ' . json_encode(['fehler' => ['message' => $eigenerText ?? $f['message'], 'grund' => $f['grund']]],
+            JSON_UNESCAPED_UNICODE) . "\n\n";
+        @flush();
+        exit;
+    }
     json_response([
         'status'  => 'error',
         'message' => $eigenerText ?? $f['message'],
