@@ -286,21 +286,62 @@ maps_schluessel_einsetzen() {
 # app.html geaendert wurde), ein zweiter Lauf des Erzeugers braeuchte
 # ihn erst recht. Die Kopie gibt genau den Stand zurueck, der vor der
 # Ersetzung da war, und sonst nichts.
-BUENDEL_DATEI="$PWD/mobile/www/index.html"
-BUENDEL_KOPIE=""
+#
+# Seit ENT-696 sind es zwei Dateien: Der Software-Stand wird auch in
+# mobile/www/dashboard.html eingesetzt (Cockpit in der Huelle), und auch
+# sie ist versioniert und wird von test_php.mjs mit dem Original
+# verglichen. Darum sichert und setzt diese Stelle beide zurueck.
+BUENDEL_DATEIEN=("$PWD/mobile/www/index.html" "$PWD/mobile/www/dashboard.html")
+BUENDEL_KOPIEN=""
 buendel_sichern() {
-  BUENDEL_KOPIE="$(mktemp)"
-  cp "$BUENDEL_DATEI" "$BUENDEL_KOPIE"
+  BUENDEL_KOPIEN="$(mktemp -d)"
+  local i
+  for i in "${!BUENDEL_DATEIEN[@]}"; do
+    cp "${BUENDEL_DATEIEN[$i]}" "$BUENDEL_KOPIEN/$i"
+  done
 }
 buendel_zuruecksetzen() {
-  if [ -n "$BUENDEL_KOPIE" ] && [ -f "$BUENDEL_KOPIE" ]; then
-    cp "$BUENDEL_KOPIE" "$BUENDEL_DATEI"
-    rm -f "$BUENDEL_KOPIE"
-    BUENDEL_KOPIE=""
+  if [ -n "$BUENDEL_KOPIEN" ] && [ -d "$BUENDEL_KOPIEN" ]; then
+    local i
+    for i in "${!BUENDEL_DATEIEN[@]}"; do
+      [ -f "$BUENDEL_KOPIEN/$i" ] && cp "$BUENDEL_KOPIEN/$i" "${BUENDEL_DATEIEN[$i]}"
+    done
+    rm -rf "$BUENDEL_KOPIEN"
+    BUENDEL_KOPIEN=""
   fi
 }
 buendel_sichern
 trap buendel_zuruecksetzen EXIT INT TERM
+
+# Software-Stand (ENT-696). Dasselbe, was der Web-Deploy in dashboard.html
+# und app.html einsetzt -- hier fuer die App, die nicht ueber den Deploy
+# laeuft. Datum des Commits in Zuercher Zeit und seine Kurzkennung.
+#
+# "+ lokal geaendert", wenn der Arbeitsbaum ungesicherte Aenderungen
+# traegt: Dann baut dieser Lauf etwas, das es in keinem Commit gibt, und
+# die Kennung allein wuerde das Gegenteil behaupten. Ausgenommen sind die
+# Ordner, die der Bau selbst beschreibt (mobile/www, mobile/ios,
+# mobile/android) -- sonst truege JEDER Bau den Zusatz, auch ein sauberer.
+# Neue, noch nie hinzugefuegte Dateien zaehlen nicht: Was nirgends
+# eingebunden ist, landet auch nicht in der App.
+stand_einsetzen() {
+  local datum kurz stand f
+  datum="$(TZ=Europe/Zurich git log -1 --date=format-local:%Y-%m-%d --format=%cd)"
+  kurz="$(git rev-parse --short=7 HEAD)"
+  stand="$datum · $kurz"
+  if [ -n "$(git status --porcelain --untracked-files=no -- . \
+        ':(exclude)mobile/www' ':(exclude)mobile/ios' ':(exclude)mobile/android')" ]; then
+    stand="$stand + lokal geändert"
+  fi
+  # "-i.standalt" statt "-i" / "-i ''": Das einzige Muster, das GNU- und
+  # BSD-sed (macOS) gleich verstehen.
+  for f in "$@"; do
+    LC_ALL=C sed -i.standalt "s|%%APP_STAND%%|$stand|g" "$f"
+    rm -f "$f.standalt"
+  done
+  echo "        Stand: $stand"
+}
+stand_einsetzen mobile/www/index.html mobile/www/dashboard.html
 
 maps_schluessel_einsetzen mobile/www/index.html
 
