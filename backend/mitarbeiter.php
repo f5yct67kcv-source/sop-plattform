@@ -285,7 +285,7 @@ function ma_spalte_da(PDO $pdo, string $spalte): bool
 // Der Login-Name laesst sich nach dem Anlegen nicht mehr aendern -- eine
 // frei getippte erste Fassung liesse sich also nie mehr korrigieren.
 // Darum wird er hier zentral aus Vorname und Nachname gebildet, klein
-// geschrieben und ohne Leerzeichen ("Adrian von Arb" -> "adrian.vonarb").
+// geschrieben und ohne Leerzeichen ("Adrian von Muster" -> "adrian.vonmuster").
 // Das laeuft im Server, nicht nur im Formular (mitarbeiter_create.php ruft
 // dies auf und ignoriert einen mitgeschickten Login-Namen) -- eine Sperre,
 // die sich am Browser vorbei umgehen liesse, waere keine.
