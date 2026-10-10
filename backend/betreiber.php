@@ -685,6 +685,95 @@ function be_beleg_nachricht_absender(array $n): string
 
 const BE_EINLADUNG_STUNDEN = 48;
 
+// ── Die Nachricht ─────────────────────────────────────────────────────
+//
+// Wirft bei Versandfehler, statt ihn zu verschlucken: Der Aufrufer ist
+// angemeldet und muss erfahren, dass nichts hinausging (siehe oben).
+//
+// $erneut: dieselbe Nachricht fuer eine NEUE Einladung an ein Konto, dessen
+// erste nie eingeloest wurde (betreiber_einladung_erneuern.php). Sie sagt
+// dazu, dass ein frueherer Link nicht mehr gilt -- wer zwei Nachrichten im
+// Postfach hat, soll nicht raten muessen, welche zaehlt.
+//
+// Den LINK baut der Aufrufer, nicht diese Funktion: Wo die Seite liegt,
+// haengt am Ort des Endpunkts im Buendel (siehe unten), und den kennt nur
+// er ueber sein eigenes __DIR__.
+function be_einladung_versenden(string $link, string $email, string $name,
+                                string $vorname, string $vonName, bool $erneut): void
+{
+    // KEINE eigene Seite: Der Link fuehrt in dasselbe Tor, das die Person
+    // danach taeglich sieht -- dritter Zustand von betreiber.html, wie
+    // app.html?reset=... bei der Passwort-Ruecksetzung (ENT-373). Eine
+    // zweite Datei haette dieselbe Anmeldekarte ein zweites Mal gebraucht.
+    //
+    // WO DIESE SEITE LIEGT, ist je Buendel VERSCHIEDEN, und ein fest
+    // geschriebener Pfad waere in genau dem Buendel falsch, das am
+    // wichtigsten ist: Auf betreiber.guardops.ch gehoert der Bereich auf
+    // "/", der Deploy legt ihn dort als index.html ab -- ein
+    // "/betreiber.html" gibt es da NICHT und der Link liefe ins Leere. Im
+    // Cockpit-Buendel und bei cupi24 liegt die Datei dagegen unter ihrem
+    // eigenen Namen.
+    //
+    // Darum wird nicht geraten, sondern nachgesehen: Der Endpunkt liegt in
+    // api/, die Seite eine Ebene darueber. Liegt dort eine betreiber.html,
+    // ist das der Pfad; sonst ist dieses Buendel eines, in dem sie die
+    // Startseite IST. Wer die Buendel spaeter umbaut, bekommt damit
+    // automatisch den richtigen Link, statt einen, der erst auffaellt,
+    // wenn jemand ihn anklickt. Das Nachsehen steht beim Aufrufer.
+    $std  = BE_EINLADUNG_STUNDEN;
+
+    // KEIN Name des Betriebs, sondern die Marke: Ein Betreiber-Konto gehoert
+    // keinem Mandanten (ENT-568).
+    $absender = 'GuardOpS';
+    $anrede   = $vorname !== '' ? 'Guten Tag ' . $vorname : 'Guten Tag';
+
+    $betreff = 'Ihr Zugang zum Betreiber-Bereich von GuardOpS';
+    $einleitung = $vonName . ' hat für Sie einen Zugang zum Betreiber-Bereich von GuardOpS eingerichtet.';
+    $nachsatz   = $erneut ? 'Das ist eine neue Einladung. Ein früherer Link gilt nicht mehr.' : '';
+    $text = "$anrede\n\n"
+        . $einleitung . ($erneut ? ' ' . $nachsatz : '') . "\n\n"
+        . "Über diesen Link setzen Sie Ihr Passwort selbst ($std Stunden gültig):\n$link\n\n"
+        . "Im Anschluss richten Sie die Zwei-Faktor-Anmeldung ein. Sie ist auf dieser "
+        . "Ebene Pflicht, nicht freiwillig.\n\n"
+        . "Falls Sie damit nichts anfangen können: Bitte melden Sie sich bei "
+        . "$vonName, statt den Link zu benutzen.\n\n"
+        . "Freundliche Grüsse\n$absender";
+
+    // Gleiche Bauart wie passwort_vergessen.php (ENT-373): eigenes
+    // font-family je Textelement, weil der Rendermotor von Outlook es sonst
+    // nicht verlaesslich vererbt.
+    $e = static fn(string $w): string => htmlspecialchars($w, ENT_QUOTES, 'UTF-8');
+    $schrift = "font-family:-apple-system,'Segoe UI',Arial,sans-serif";
+    $html = '<div style="' . $schrift . ';color:#14161A;max-width:520px">'
+        . '<p style="' . $schrift . ';margin:0 0 16px">' . $e($anrede) . '</p>'
+        . '<p style="' . $schrift . ';margin:0 0 16px">' . $e($vonName)
+        . ' hat für Sie einen Zugang zum <strong>Betreiber-Bereich von GuardOpS</strong> eingerichtet.'
+        . ($erneut ? ' ' . $e($nachsatz) : '') . '</p>'
+        . '<p style="' . $schrift . ';margin:28px 0">'
+        . '<a href="' . $e($link) . '" '
+        . 'style="' . $schrift . ';background:#2F5BD7;color:#fff;padding:12px 24px;border-radius:8px;'
+        . 'font-weight:700;text-decoration:none;display:inline-block">Passwort setzen</a></p>'
+        . '<p style="' . $schrift . ';color:#6B7280;font-size:12px;margin:0 0 16px">'
+        . 'Funktioniert der Knopf nicht? Diesen Link in den Browser kopieren:<br>' . $e($link) . '</p>'
+        . '<p style="' . $schrift . ';color:#6B7280;font-size:12px;margin:0 0 16px">'
+        . 'Der Link ist ' . $std . ' Stunden gültig. Im Anschluss richten Sie die '
+        . 'Zwei-Faktor-Anmeldung ein — sie ist auf dieser Ebene Pflicht.</p>'
+        . '<p style="' . $schrift . ';color:#6B7280;font-size:12px;margin:0 0 16px">'
+        . 'Falls Sie damit nichts anfangen können: Bitte melden Sie sich bei '
+        . $e($vonName) . ', statt den Link zu benutzen.</p>'
+        . '<p style="' . $schrift . ';margin:0">Freundliche Grüsse<br>' . $e($absender) . '</p>'
+        . '</div>';
+
+    try {
+        smtp_senden($email, $name, $betreff, $html, $text);
+    } catch (Throwable $e2) {
+        // Ohne Folgesatz: Was danach mit dem Konto ist, weiss nur der
+        // Aufrufer (beim ersten Einladen entsteht es nicht, beim erneuten
+        // bleibt es, wie es war).
+        throw new RuntimeException('Die Einladung liess sich nicht verschicken.');
+    }
+}
+
 function be_einladung_tabelle_da(PDO $pdo): bool
 {
     return hat_tabelle($pdo, 'betreiber_einladung');
@@ -699,6 +788,58 @@ function be_einladung_offen(PDO $pdo, int $betreiberId): bool
     $s = $pdo->prepare('SELECT 1 FROM betreiber_einladung WHERE betreiber_id = ?');
     $s->execute([$betreiberId]);
     return $s->fetchColumn() !== false;
+}
+
+// Der Stand einer offenen Einladung -- oder null, wenn keine offen ist.
+//
+// WARUM ES DAS BRAUCHT: be_einladung_offen() sagt nur OB. Die Oberflaeche
+// zeigte darum "eingeladen" auch Wochen nach Ablauf des Links, und ein
+// toter Link sah aus wie ein gueltiger. "Unbekannt darf nie wie keine
+// aussehen" (CLAUDE.md) -- und abgelaufen nie wie offen.
+//
+// Ob die Frist vorbei ist, sagt die DATENBANK (NOW()), aus demselben Grund
+// wie bei be_einladung_konto(): Es soll dieselbe Uhr entscheiden, die auch
+// beim Einloesen entscheidet. Sonst koennte die Liste "gueltig" zeigen,
+// waehrend der Link schon abgewiesen wird.
+function be_einladung_stand(PDO $pdo, int $betreiberId): ?array
+{
+    if (!be_einladung_tabelle_da($pdo)) { return null; }
+    $s = $pdo->prepare(
+        'SELECT gueltig_bis, CASE WHEN gueltig_bis > NOW() THEN 1 ELSE 0 END AS gilt
+           FROM betreiber_einladung WHERE betreiber_id = ?'
+    );
+    $s->execute([$betreiberId]);
+    $r = $s->fetch(PDO::FETCH_ASSOC);
+    if ($r === false) { return null; }
+    return ['bis' => (string)$r['gueltig_bis'], 'abgelaufen' => (int)$r['gilt'] !== 1];
+}
+
+// Eine offene Einladung durch eine neue ersetzen (betreiber_einladung_erneuern.php).
+//
+// EIN UPDATE, KEIN ZWEITER EINTRAG: Die Tabelle fuehrt je Konto hoechstens
+// eine Einladung (Schluessel ist die Konto-ID). Der neue Abdruck
+// ueberschreibt den alten -- damit ist der fruehere Link im selben Schritt
+// tot, auch wenn er noch nicht abgelaufen war. Zwei gueltige Links waeren
+// zwei offene Tueren.
+//
+// Gibt false zurueck, wenn keine Einladung offen ist: Ein eingeloestes
+// Konto bekommt so keinen neuen Link, ueber den sich sein Passwort ein
+// zweites Mal setzen liesse.
+//
+// $frist ist die Frist als SQL-Ausdruck. Im Betrieb DATE_ADD(NOW(), ...);
+// die Pruefung reicht fuer SQLite einen eigenen nach. Er kommt nie aus
+// einer Anfrage.
+function be_einladung_ersetzen(PDO $pdo, int $betreiberId, string $tokenRoh,
+                               int $vonId, ?string $frist = null): bool
+{
+    $frist ??= 'DATE_ADD(NOW(), INTERVAL ' . BE_EINLADUNG_STUNDEN . ' HOUR)';
+    $s = $pdo->prepare(
+        'UPDATE betreiber_einladung
+            SET token = ?, gueltig_bis = ' . $frist . ', erstellt_am = NOW(), erstellt_von = ?
+          WHERE betreiber_id = ?'
+    );
+    $s->execute([hash('sha256', $tokenRoh), $vonId, $betreiberId]);
+    return $s->rowCount() === 1;
 }
 
 // Sucht das Konto zu einem rohen Token -- oder gibt null zurueck.

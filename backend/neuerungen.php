@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 21,
+            'datum' => '2026-10-10',
+            'art'   => 'neu',
+            'fuer'  => ['betreiber'],
+            'titel' => 'Abgelaufene Einladungen neu verschicken',
+            'text'  => 'Hat jemand den Einladungslink verstreichen lassen, schickt „Neu einladen“ im Reiter „Zugang“ des Kontos einen frischen Link an die hinterlegte Adresse. Der alte Link gilt danach nicht mehr. Ausserdem zeigt das Konto jetzt, ob der Link noch gilt oder abgelaufen ist, statt einfach „eingeladen“.',
+        ],
+        [
             'nr'    => 20,
             'datum' => '2026-09-26',
             'art'   => 'verbesserung',
