@@ -1047,6 +1047,13 @@ jobs:
           cp fonts/archivo-OFL.txt                dist-guardops/fonts/
           cp fonts/ibm-plex-LICENSE.txt           dist-guardops/fonts/
           cp icons/guardops-*.png                 dist-guardops/icons/
+          # Die beiden Bildschirmfotos der Homepage (Zurueckbau 2026-10-10):
+          # echte Aufnahmen aus der Demo-Umgebung, siehe Kopf von
+          # homepage.html. test_deploy.mjs leitet aus der Seite ab, welche
+          # Bilder mitmuessen -- fehlt eines, bleibt live ein leeres
+          # Rechteck, und lokal faellt es nicht auf.
+          mkdir -p dist-guardops/img
+          cp img/homepage-*.webp                  dist-guardops/img/
 
           # Der Endpunkt und seine vier Einbindungen. KEIN anmeldung.php und
           # kein Produktcode -- die Seite hat mit dem Rapport-Tool nichts zu
