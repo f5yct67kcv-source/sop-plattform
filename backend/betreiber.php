@@ -1120,7 +1120,10 @@ function be_monate_dazu(string $datum, int $monate): string
     $d = DateTimeImmutable::createFromFormat('!Y-m-d', substr($datum, 0, 10));
     if (!$d) { return $datum; }
     $tag = (int)$d->format('j');
-    $erster = $d->modify('first day of this month')->modify('+' . $monate . ' months');
+    // Das Vorzeichen kommt aus sprintf('%+d'), nie als '+' davorgeklebt:
+    // '+-1 months' liest PHP je nach Version als PLUS einen Monat, und der
+    // Kuendigungsstichtag rutschte damit hinter das Vertragsende.
+    $erster = $d->modify('first day of this month')->modify(sprintf('%+d months', $monate));
     $letzterImZiel = (int)$erster->format('t');
     return $erster->setDate((int)$erster->format('Y'), (int)$erster->format('n'),
                             min($tag, $letzterImZiel))->format('Y-m-d');
