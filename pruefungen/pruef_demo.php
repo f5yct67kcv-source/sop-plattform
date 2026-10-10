@@ -100,11 +100,11 @@ check('KRITISCH: ein echter, konfigurierter DEMO_TESTMAIL-Wert gilt NICHT als of
 // smtp_absender_name() -- Demo braucht ein EIGENES Praefix, kein
 // "[STAGING]" fuer eine Demo-Mail.
 check('KRITISCH: auf Produktion bleibt der konfigurierte Absendername unveraendert (istDemo irrelevant)',
-    smtp_absender_name('Cupi 24 GmbH', true, true) === 'Cupi 24 GmbH');
+    smtp_absender_name('Muster Sicherheit GmbH', true, true) === 'Muster Sicherheit GmbH');
 check('KRITISCH: ausserhalb der Produktion traegt der Absender in der Demo das Praefix [DEMO], NICHT [STAGING]',
-    smtp_absender_name('Cupi 24 GmbH', false, true) === '[DEMO] Cupi 24 GmbH');
+    smtp_absender_name('Muster Sicherheit GmbH', false, true) === '[DEMO] Muster Sicherheit GmbH');
 check('KRITISCH (Gegenprobe): das Demo-Praefix unterscheidet sich vom Staging-Praefix bei sonst gleichen Argumenten',
-    smtp_absender_name('Cupi 24 GmbH', false, true) !== smtp_absender_name('Cupi 24 GmbH', false, false));
+    smtp_absender_name('Muster Sicherheit GmbH', false, true) !== smtp_absender_name('Muster Sicherheit GmbH', false, false));
 check('KRITISCH: ein leerer Absendername bleibt in der Demo trotzdem als Demo erkennbar',
     smtp_absender_name('', false, true) === '[DEMO]');
 
