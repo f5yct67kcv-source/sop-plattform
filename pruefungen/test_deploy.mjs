@@ -770,9 +770,9 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     icons.length >= 3 && icons.every(i => wirdKopiert(i)));
 
   // Und die Fotos: Seit dem Zurueckbau (2026-10-10) zeigt die Seite echte
-  // Bildschirmfotos per <img src="img/..."> -- ein dritter Weg neben
+  // Bildschirmfotos per <img src="homepage-bilder/..."> -- ein dritter Weg neben
   // Schriften und Icons, den dieselbe Luecke traefe.
-  const bilder = [...new Set([...homepage.matchAll(/<img[^>]+src="(img\/[^"]+)"/g)].map(m => m[1]))];
+  const bilder = [...new Set([...homepage.matchAll(/<img[^>]+src="(homepage-bilder\/[^"]+)"/g)].map(m => m[1]))];
   const fehlendeBilder = bilder.filter(b => !wirdKopiert(b));
   check('KRITISCH: jedes Bild, das homepage.html einbindet, wird ins guardops-Bündel kopiert',
     bilder.length >= 2 && fehlendeBilder.length === 0);
