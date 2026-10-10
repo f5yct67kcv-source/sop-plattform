@@ -46,11 +46,11 @@ page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
 // Eine Schicht heute, damit "Heute" nicht der Leerzustand ist -- und eine
 // weit in der Zukunft, damit "Plan" laenger wird als der Bildschirm.
 const SCHICHTEN = { status: 'ok', von: tag(-1), bis: tag(90), schichten: [
-  { id: 61, kunde_name: 'Cupi24 GmbH', titel: 'Revierdienst Beispiel', strasse: 'Musterweg 1',
+  { id: 61, kunde_name: 'Muster Sicherheit GmbH', titel: 'Revierdienst Beispiel', strasse: 'Musterweg 1',
     ort: '4632 Trimbach', einsatzart: 'Revierdienst', datum: tag(0), von: '20:00:00', bis: '23:00:00',
     status: 'bestaetigt', bemerkung: null, zusage: 'zugesagt', objekt_name: null, im_team: 1 },
   ...Array.from({ length: 14 }, (_, i) => ({
-    id: 100 + i, kunde_name: 'Cupi24 GmbH', titel: 'Schicht ' + (i + 1), strasse: null,
+    id: 100 + i, kunde_name: 'Muster Sicherheit GmbH', titel: 'Schicht ' + (i + 1), strasse: null,
     ort: '5013 Musterdorf', einsatzart: 'Verkehrsdienst', datum: tag(1 + i), von: '08:00:00',
     bis: '16:00:00', status: 'bestaetigt', bemerkung: null, zusage: 'zugesagt',
     objekt_name: null, im_team: 1 }))

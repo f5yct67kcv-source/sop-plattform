@@ -34,7 +34,7 @@ const einsaetze = [
     ist_status: 'offen', mitarbeiter: [P({ ist_status: 'anwesend', ist_von: '08:00:00', ist_bis: '12:00:00',
       ist_pause_von: null, ist_pause_min: null, ist_pause_bezahlt_ma: null })] },
   // Samstag 08:00–18:00 mit 60 Min. BEZAHLTER Pause -> kein Bonus, Netto 10 h
-  { id: 4, kunde_name: 'Cupi24', titel: 'Verkehrsdienst', ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst',
+  { id: 4, kunde_name: 'Muster Sicherheit', titel: 'Verkehrsdienst', ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst',
     sparte: 'sicherheit', datum: SA, von: '08:00:00', bis: '18:00:00', bedarf: 1, status: 'geplant',
     ist_status: 'offen', mitarbeiter: [P({ ist_status: 'anwesend', ist_von: '08:00:00', ist_bis: '18:00:00',
       ist_pause_von: '12:00:00', ist_pause_min: 60, ist_pause_bezahlt_ma: 1 })] },

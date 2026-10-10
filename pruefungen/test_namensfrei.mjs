@@ -38,7 +38,10 @@ const check = (n, c) => (c ? ok : bad).push(n);
 // 'objekt' kam mit der Ausweitung auf objekt_name dazu: Die Objekt-Fixtures
 // im Haus heissen durchgehend "Objekt Nord", "Objekt A", "Objekt Mit" --
 // eine gewachsene Konvention, kein neu erfundener Freibrief.
-const MARKEN = /muster|beispiel|test|fremd|kunde|probe|objekt|nordbau|grossbau|techmuster|werkmuster|abc |cupi/i;
+// 'cupi' stand hier, solange CUPI 24 als eigener Betrieb galt (ENT-008).
+// Seit ENT-568 ist sie Mandantin, also Kundin, und ihr Name ist kein
+// Platzhalter mehr -- siehe die Pruefung auf die Mandantin weiter unten.
+const MARKEN = /muster|beispiel|test|fremd|kunde|probe|objekt|nordbau|grossbau|techmuster|werkmuster|abc /i;
 
 // Werte, die keine Namen sind, sondern Beschriftungen und Zustaende: Sie
 // stehen in Namensfeldern, weil die Pruefung dort eine Zeile wiedererkennen
@@ -78,6 +81,26 @@ check('KRITISCH: kein Nachname und kein Kundenname in den Testdaten sieht nach e
 betroffen.forEach(f => bad.push(`${f}: ${[...new Set(funde[f])].join(', ')}`));
 
 check(`Geprueft: ${dateien.length - 1} Suiten auf Namensfelder`, dateien.length > 1);
+
+// ── Die Mandantin als Firma oder Kontakt (ENT-568) ────────────────────
+//
+// Die Feldpruefung oben sieht nur Namensfelder. Die Mandantin stand aber
+// auch im Briefkopf, in Fusszeilen, als Absender und in E-Mail-Adressen --
+// ueberall dort, wo eine Testfirma gebraucht wurde, war es ihre.
+//
+// Geprueft wird die Mandantin als FIRMA (mit Rechtsform) und als KONTAKT
+// (ihre Domain). Ihr Kurzname als technische Kennung bleibt erlaubt: Das
+// Deploy-Buendel und die Subdomain heissen so, und Pruefungen, die den
+// Deploy nachmessen, muessen sie nennen koennen. Ihre Adresse und UID
+// stehen hier bewusst NICHT -- diese Pruefung soll nicht selbst das
+// Dokument werden, das die Daten enthaelt.
+const MANDANTIN = /cupi\s?24\s*(gmbh|ag)\b|@cupi24\b|cupi24\.ch\b/i;
+const alleDateien = readdirSync(HIER)
+  .filter(f => /^(test_|pruef_).*\.(mjs|php)$/.test(f) && f !== 'test_namensfrei.mjs');
+const mandantFunde = alleDateien.filter(f => MANDANTIN.test(readFileSync(HIER + '/' + f, 'utf8')));
+check('KRITISCH: die Mandantin steht in keinen Testdaten als Firma oder Kontakt',
+  mandantFunde.length === 0);
+mandantFunde.forEach(f => bad.push(`Mandantin als Firma oder Kontakt in ${f}`));
 
 console.log(bad.length ? `\n✓ ${ok.length} bestanden\n\n✗ ${bad.length} FEHLGESCHLAGEN:\n  - ${bad.join('\n  - ')}`
                        : `\n✓ ${ok.length} bestanden`);

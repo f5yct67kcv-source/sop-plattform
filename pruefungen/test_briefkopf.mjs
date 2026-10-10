@@ -330,14 +330,14 @@ check('KRITISCH: "Zurück" fuehrt wieder auf die Kachel-Uebersicht',
   await page.isVisible('#bkUebersicht') && !(await page.isVisible('#bkKarte')));
 await page.click('.bk-kachel:has-text("Briefkopf für Rapporte")');
 await page.waitForTimeout(200);
-await page.fill('#bkFirma', 'CUPI 24 GmbH');
+await page.fill('#bkFirma', 'Muster Sicherheit GmbH');
 await page.fill('#bkZusatz', 'Sicherheits- und Verkehrsdienst');
 await page.fill('#bkFuss', 'Musterweg 1 · 4600 Olten · 062 000 00 00');
 await page.fill('#bkFuss2', 'Zweigstelle · Bahnhofstrasse 3 · 8200 Schaffhausen');
 await page.click('#bkKarte .btn-primary');
 await page.waitForTimeout(400);
 check('KRITISCH: der Briefkopf wird gespeichert',
-  gesendet.some(b => b.firma === 'CUPI 24 GmbH' && b.zusatz === 'Sicherheits- und Verkehrsdienst'));
+  gesendet.some(b => b.firma === 'Muster Sicherheit GmbH' && b.zusatz === 'Sicherheits- und Verkehrsdienst'));
 check('Die zweite Fusszeile wird mitgeschickt',
   gesendet.some(b => b.fusszeile2 === 'Zweigstelle · Bahnhofstrasse 3 · 8200 Schaffhausen'));
 
@@ -368,16 +368,16 @@ await page.dispatchEvent('#bkQrIban', 'input');
 check('KRITISCH: eine echte QR-IBAN wird als gueltig erkannt',
   /Gültige QR-IBAN erkannt/.test(await page.textContent('#bkQrIbanHinweis')));
 
-await page.fill('#bkQrStrasse', 'Baslerstrasse');
-await page.fill('#bkQrHausnummer', '67');
-await page.fill('#bkQrPlz', '4632');
-await page.fill('#bkQrOrt', 'Trimbach');
+await page.fill('#bkQrStrasse', 'Musterweg');
+await page.fill('#bkQrHausnummer', '1');
+await page.fill('#bkQrPlz', '4600');
+await page.fill('#bkQrOrt', 'Olten');
 gesendet.length = 0;
 await page.click('#bkKarte .btn-primary');
 await page.waitForTimeout(300);
 check('KRITISCH: die QR-Rechnungsangaben werden mitgespeichert',
-  gesendet.some(b => b.qr_iban === 'CH44 3199 9123 0008 8901 2' && b.qr_strasse === 'Baslerstrasse'
-    && b.qr_hausnummer === '67' && b.qr_plz === '4632' && b.qr_ort === 'Trimbach'));
+  gesendet.some(b => b.qr_iban === 'CH44 3199 9123 0008 8901 2' && b.qr_strasse === 'Musterweg'
+    && b.qr_hausnummer === '1' && b.qr_plz === '4600' && b.qr_ort === 'Olten'));
 
 // Erneutes Oeffnen der Ansicht laedt die gespeicherten Werte wieder ein.
 await page.evaluate(() => { go('kunden'); });
@@ -390,7 +390,7 @@ check('Und der Hinweis zeigt sofort wieder "gueltig", ohne erneute Eingabe',
   /Gültige QR-IBAN erkannt/.test(await page.textContent('#bkQrIbanHinweis')));
 
 html = await drucken(10);
-check('KRITISCH: der gepflegte Firmenname steht jetzt im Kopf', /CUPI 24 GmbH/.test(html));
+check('KRITISCH: der gepflegte Firmenname steht jetzt im Kopf', /Muster Sicherheit GmbH/.test(html));
 check('Der Zusatz ebenfalls', /Sicherheits- und Verkehrsdienst/.test(html));
 check('KRITISCH: die Fusszeile steht am Seitenende', /Musterweg 1 · 4600 Olten/.test(html));
 check('KRITISCH: die zweite Fusszeile (Zweitsitz) steht daneben', /Bahnhofstrasse 3/.test(html));
@@ -401,8 +401,8 @@ check('KRITISCH: beide Fusszeilen-Bloecke stehen vertikal zueinander zentriert, 
     return getComputedStyle(bloecke[0].parentElement).alignItems === 'center';
   }));
 check('KRITISCH: Firma und Zusatz im Kopf sind zueinander zentriert, nicht rechtsbuendig',
-  /text-align:center;font-size:12px;color:#6B7280;line-height:1.5">[\s\S]*?CUPI 24 GmbH/.test(html)
-    && !/text-align:right;font-size:12px;color:#6B7280;line-height:1.5">[\s\S]*?CUPI 24 GmbH/.test(html));
+  /text-align:center;font-size:12px;color:#6B7280;line-height:1.5">[\s\S]*?Muster Sicherheit GmbH/.test(html)
+    && !/text-align:right;font-size:12px;color:#6B7280;line-height:1.5">[\s\S]*?Muster Sicherheit GmbH/.test(html));
 
 // ── Kundennummer und Adresse: nur bei sauberer Verknuepfung
 check('KRITISCH: bei einem aus einer Schicht entstandenen Rapport steht die Kunden-Nr.',
@@ -472,7 +472,7 @@ check('KRITISCH: das Logo im Ausdruck ist groesser als vor der Ueberarbeitung',
 check('KRITISCH: das Logo steht ueber Firma/Zusatz zentriert statt daneben rechtsbuendig',
   await page.evaluate(() => {
     const logo = document.querySelector('#printArea img[src^="data:image/png"]');
-    const firma = [...document.querySelectorAll('#printArea div')].find(d => d.textContent === 'CUPI 24 GmbH');
+    const firma = [...document.querySelectorAll('#printArea div')].find(d => d.textContent === 'Muster Sicherheit GmbH');
     if (!logo || !firma) return false;
     const lr = logo.getBoundingClientRect(), fr = firma.getBoundingClientRect();
     return Math.abs((lr.left + lr.width / 2) - (fr.left + fr.width / 2)) < 1;
@@ -517,7 +517,7 @@ check('Der Hinweis steht UNTER dem Feld, nicht darueber (gemessen)',
     return h.top >= i.bottom - 1;
   }));
 check('KRITISCH: Firma/Name kommt bereits aus dem Briefkopf vorausgefuellt — dieselbe Spalte',
-  (await page.inputValue('#bdFirma')) === 'CUPI 24 GmbH');
+  (await page.inputValue('#bdFirma')) === 'Muster Sicherheit GmbH');
 
 await page.fill('#bdStrasse', 'Musterweg 1');
 await page.fill('#bdPlz', '4600');
@@ -533,10 +533,10 @@ check('KRITISCH: das Hauptdomizil wird eigenstaendig gespeichert',
 check('KRITISCH: die Pikettnummer geht dabei als eigenes Feld mit -- getrennt von telefon (ENT-299)',
   gesendet.some(b => b.pikett_telefon === '079 111 22 33' && b.telefon === '044 123 45 67'));
 check('KRITISCH: Firma wird dabei mitgeschickt (dieselbe Spalte wie im Briefkopf) — Zusatz/QR-Felder aber nicht',
-  gesendet.some(b => 'domizil_strasse' in b && b.firma === 'CUPI 24 GmbH')
+  gesendet.some(b => 'domizil_strasse' in b && b.firma === 'Muster Sicherheit GmbH')
   && !gesendet.some(b => 'domizil_strasse' in b && ('zusatz' in b || 'fusszeile' in b || 'qr_iban' in b)));
 check('KRITISCH: der zuvor gespeicherte Briefkopf (Zusatz) bleibt dabei unveraendert stehen',
-  BETRIEB.firma === 'CUPI 24 GmbH' && BETRIEB.zusatz === 'Sicherheits- und Verkehrsdienst');
+  BETRIEB.firma === 'Muster Sicherheit GmbH' && BETRIEB.zusatz === 'Sicherheits- und Verkehrsdienst');
 
 await page.evaluate(() => { go('kunden'); });
 await page.waitForTimeout(150);
@@ -551,7 +551,7 @@ check('Nach dem Neuladen steht das Hauptdomizil wieder im Formular',
 check('Die Pikettnummer steht nach dem Neuladen ebenfalls wieder da',
   (await page.inputValue('#bdPikett')) === '079 111 22 33');
 check('Und der Briefkopf ist beim erneuten Oeffnen ebenfalls noch da',
-  BETRIEB.firma === 'CUPI 24 GmbH');
+  BETRIEB.firma === 'Muster Sicherheit GmbH');
 
 // KRITISCH: Firma/Name ist ein Pflichtfeld -- ein Speichern mit leerem Feld
 // muss abgewiesen werden, nicht heimlich einen leeren Firmennamen ablegen.
@@ -561,7 +561,7 @@ await page.waitForTimeout(400);
 check('KRITISCH: ein leeres Firma/Name-Feld wird beim Speichern abgewiesen',
   /Pflichtfeld/.test(await page.textContent('#bdErr')));
 check('KRITISCH: der bestehende Firmenname bleibt dabei unangetastet',
-  BETRIEB.firma === 'CUPI 24 GmbH');
+  BETRIEB.firma === 'Muster Sicherheit GmbH');
 
 // KRITISCH: die beiden Karten (Hauptdomizil, Briefkopf) zeigen dieselbe
 // Spalte -- ein Speichern in der einen muss die andere sofort nachziehen,
@@ -573,7 +573,7 @@ await page.evaluate(() => { bkAbschnittZeigen('bk'); });
 check('KRITISCH: die Briefkopf-Karte zieht den geaenderten Firmennamen ohne Neuladen nach',
   (await page.inputValue('#bkFirma')) === 'Muster AG');
 await page.evaluate(() => { bkAbschnittZeigen('be'); });
-await page.fill('#bdFirma', 'CUPI 24 GmbH');
+await page.fill('#bdFirma', 'Muster Sicherheit GmbH');
 await page.click('#bdKarte .btn-primary');
 await page.waitForTimeout(400);
 

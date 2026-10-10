@@ -98,12 +98,12 @@ try {
     // 28.08.2026) -- dieselben Angaben wie oben im Absender-Block stehen
     // NOCH EINMAL unten, wie im internen Ausdruck (bkFusszeile()).
     check('KRITISCH: die zweite Betriebs-Fusszeile steht am unteren Blattrand',
-      /info@cupi24\.ch/.test(await page.textContent('#dokumentSeite'))
-      && /CHE-255\.301\.179/.test(await page.textContent('#dokumentSeite')));
+      /info@example\.invalid/.test(await page.textContent('#dokumentSeite'))
+      && /CHE-999\.888\.777/.test(await page.textContent('#dokumentSeite')));
     check('KRITISCH: kein doppelter Zeilenumbruch in der Fusszeile (nl2br + white-space:pre-line)',
       await page.evaluate(() => {
         const bloecke = [...document.querySelectorAll('#dokumentSeite div[style*="white-space:pre-line"]')];
-        const fuss = bloecke.find(b => b.textContent.includes('info@cupi24.ch'));
+        const fuss = bloecke.find(b => b.textContent.includes('info@example.invalid'));
         return !!fuss && !fuss.innerHTML.includes('<br>');
       }));
 
@@ -175,7 +175,7 @@ try {
     check('KRITISCH: der Unterschriftsblock steht im Dokument (Ort, Datum, zwei Unterschriftsfelder)',
       /Ort, Datum/.test(await page.textContent('#dokumentGanz'))
       && /Unterschrift abc consulting gmbh/.test(await page.textContent('#dokumentGanz'))
-      && /Unterschrift Cupi 24 GmbH/.test(await page.textContent('#dokumentGanz')));
+      && /Unterschrift Muster Sicherheit GmbH/.test(await page.textContent('#dokumentGanz')));
     // ENT-425: Der Block liegt seither IM Blatt (#dokumentSeite), nicht mehr
     // als eigenes Geschwister dahinter mit erzwungenem Umbruch. Gemessen am
     // gerenderten Zustand, nicht am Quelltext: Wo steht das Feld wirklich,
