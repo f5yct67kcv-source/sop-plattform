@@ -43,7 +43,7 @@ const MS = { status: 'ok', masterschichten: [
     pause_von: null, pause_bis: null, pause_min: 30, arbeitszeit_h: 5.5, farbe: null, auf_abruf: 1,
     rhythmus: 'intervall', bedarf_mo: 0, bedarf_di: 0, bedarf_mi: 0, bedarf_do: 0, bedarf_fr: 0,
     bedarf_sa: 0, bedarf_so: 0, bedarf_feiertag: 0, intervall_tage: 2, intervall_start: '2026-04-01',
-    bedarf_intervall: 1, gueltig_ab: '2026-04-01', gueltig_bis: '2026-10-31', ersetzt_id: null, laeuft: true }
+    bedarf_intervall: 1, gueltig_ab: '2026-04-01', gueltig_bis: `${new Date().getFullYear() + 1}-10-31`, ersetzt_id: null, laeuft: true }
 ]};
 
 const FEIERTAGE = { status: 'ok', kanton: 'SO', feiertage: [
@@ -284,7 +284,7 @@ check('Wochenmuster wird gezeigt', msText.includes('Mo 1') && msText.includes('F
 check('Intervall wird als Text gezeigt', msText.includes('Jeden 2. Tag'));
 check('Auf Abruf ist gekennzeichnet', msText.includes('auf Abruf'));
 check('Nachtschicht als Folgetag erkannt', msText.includes('Folgetag'));
-check('Saisonfenster sichtbar', msText.includes('bis 31.10.2026'));
+check('Saisonfenster sichtbar', msText.includes(`bis 31.10.${new Date().getFullYear() + 1}`));
 check('Oeffnen der Objekt-Detailseite schreibt nichts', writes().length === 0);
 await page.screenshot({ path: `${OUT}/32-objekt-masterschichten.png` });
 

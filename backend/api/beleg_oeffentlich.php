@@ -92,7 +92,8 @@ function portal_seite(string $titel, string $inhalt): void
                          .keindruck{display:none}}
             .pos-rahmen{overflow-x:auto;-webkit-overflow-scrolling:touch}
             @media print{.pos-rahmen{overflow:visible}}
-            @media (max-width:720px){.buehne{display:block}.zusammenfassung{margin-bottom:20px}
+            @media (max-width:720px){body{padding-left:8px;padding-right:8px}
+                                     .buehne{display:block}.zusammenfassung{margin-bottom:20px}
                                      .karte,.zusammenfassung{padding:22px 16px}
                                      .pos-rahmen td,.pos-rahmen th{padding-left:4px!important;padding-right:4px!important;font-size:11px!important}}
           ' . beleg_unterschrift_css() . '</style></head><body><div class="buehne">' . $inhalt . '</div></body></html>';

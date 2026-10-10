@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 22,
+            'datum' => '2026-10-10',
+            'art'   => 'fehlerbehebung',
+            'fuer'  => ['betreiber'],
+            'titel' => 'Kündigungstermin bei Mandantenverträgen korrigiert',
+            'text'  => 'Der Tag, bis zu dem eine Kündigung spätestens eintreffen muss, landete auf manchen Servern um die Kündigungsfrist NACH dem Vertragsende statt davor. Das betraf auch die Anzeige „Kündigung in den nächsten 90 Tagen“. Die Termine stimmen jetzt.',
+        ],
+        [
             'nr'    => 21,
             'datum' => '2026-10-10',
             'art'   => 'neu',
