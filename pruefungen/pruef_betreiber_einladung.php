@@ -141,6 +141,52 @@ $pruef('ein eingeloestes Konto hat keine offene Einladung',
 $pruef('KRITISCH: ein abgelaufener Link macht das Konto nicht zu einem gewoehnlichen',
     be_einladung_offen($db, 2) === true && be_einladung_konto($db, $tokenAlt) === null);
 
+// ── 4b. Der Stand sagt, ob der Link noch gilt ─────────────────────────
+//
+// "eingeladen" allein liess einen toten Link aussehen wie einen offenen.
+// Geprueft wird die Aussage an beiden Seiten der Frist -- und dass ein
+// Konto ohne Einladung KEINEN Stand hat, statt eines "nicht abgelaufen".
+$standGut = be_einladung_stand($db, 1);
+$standAlt = be_einladung_stand($db, 2);
+$pruef('KRITISCH: ein gueltiger Link meldet sich als nicht abgelaufen',
+    $standGut !== null && $standGut['abgelaufen'] === false && $standGut['bis'] !== '');
+$pruef('KRITISCH: ein abgelaufener Link meldet sich als abgelaufen',
+    $standAlt !== null && $standAlt['abgelaufen'] === true);
+$pruef('ein Konto ohne Einladung hat keinen Stand, nicht "gueltig"',
+    be_einladung_stand($db, 3) === null);
+
+// ── 4c. Neu einladen ersetzt den Link ─────────────────────────────────
+//
+// Konto 2 hat einen abgelaufenen Link. Nach dem Ersetzen muss der NEUE
+// tragen, der ALTE nicht -- und es darf weiterhin genau eine Zeile geben.
+// Die Frist reicht die Pruefung als SQLite-Ausdruck nach, weil DATE_ADD
+// dort fehlt; geprueft wird alles andere an der echten Abfrage.
+$tokenNeu = 'cccc1111dddd2222eeee3333ffff4444aaaa5555bbbb6666cccc7777dddd8888';
+$frist = "'" . date('Y-m-d H:i:s', time() + 3600) . "'";
+$pruef('ein offenes Konto laesst sich neu einladen',
+    be_einladung_ersetzen($db, 2, $tokenNeu, 3, $frist) === true);
+$pruef('KRITISCH: der neue Link findet sein Konto',
+    ($t = be_einladung_konto($db, $tokenNeu)) !== null && (int)$t['id'] === 2);
+$pruef('… und der Stand gilt danach wieder als offen',
+    ($st = be_einladung_stand($db, 2)) !== null && $st['abgelaufen'] === false);
+$pruef('KRITISCH: es bleibt genau eine Einladung je Konto',
+    (int)$db->query('SELECT COUNT(*) FROM betreiber_einladung WHERE betreiber_id = 2')->fetchColumn() === 1);
+// Gegenprobe zum "tot im selben Schritt": Der alte Link bekommt eine Frist
+// in der Zukunft zurueck -- haette das Ersetzen eine zweite Zeile angelegt
+// oder den Abdruck nicht ueberschrieben, truege er jetzt wieder.
+$db->prepare('UPDATE betreiber_einladung SET gueltig_bis = ? WHERE betreiber_id = 2')
+   ->execute([date('Y-m-d H:i:s', time() + 7200)]);
+$pruef('KRITISCH: GEGENPROBE — der alte Link traegt auch mit gueltiger Frist nicht mehr',
+    be_einladung_konto($db, $tokenAlt) === null && be_einladung_konto($db, $tokenNeu) !== null);
+$pruef('KRITISCH: in der Tabelle steht auch nach dem Ersetzen nur der Abdruck',
+    $db->query('SELECT token FROM betreiber_einladung WHERE betreiber_id = 2')->fetchColumn()
+        === hash('sha256', $tokenNeu));
+// Ein eingeloestes Konto (keine Zeile) bekommt keinen Link -- sonst liesse
+// sich sein Passwort darueber ein zweites Mal setzen.
+$pruef('KRITISCH: ein Konto ohne offene Einladung bekommt keinen neuen Link',
+    be_einladung_ersetzen($db, 3, $tokenNeu . 'x', 3, $frist) === false
+    && be_einladung_offen($db, 3) === false);
+
 // ── 5. Das Einloesen beendet die Einladung ────────────────────────────
 //
 // Nachgestellt wie in betreiber_einladung_einloesen.php. Der Punkt ist die

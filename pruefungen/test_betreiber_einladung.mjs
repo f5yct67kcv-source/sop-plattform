@@ -234,6 +234,43 @@ check('die Frist ist eine benannte Groesse im Modul',
 check('KRITISCH: die Oberflaeche schreibt die Frist nicht selbst aus, sondern nimmt sie vom Server',
   /gueltig_stunden/.test(seite));
 
+// ── 12. Neu einladen (abgelaufener Link) ──────────────────────────────
+//
+// Bis hierher sass ein Konto fest, sobald der Link verstrichen war: Die
+// Adresse war belegt, von Hand freischalten gesperrt. Die reinen Teile
+// (Ersetzen, Stand) laufen in pruef_betreiber_einladung.php; hier steht,
+// was der Endpunkt darum herum zusagen muss.
+const erneuern = nurCode(lies(API + 'betreiber_einladung_erneuern.php'));
+check('KRITISCH: neu einladen verlangt dieselbe Wache wie das erste Einladen',
+  /require_betreiber_voll\(\)/.test(erneuern) && /require_betreiber_voll\(\)/.test(einladen));
+// Die Adresse kommt aus dem Konto, nie aus der Anfrage -- sonst waere der
+// Knopf ein Weg, ein fremdes Konto an eine eigene Adresse umzuleiten, ohne
+// dass das Logbuch eine Adressaenderung zeigt.
+check('KRITISCH: die Adresse kommt aus dem Konto, nie aus der Anfrage',
+  !/\$in\[\s*'email'/.test(erneuern) && /\$konto\['email'\]/.test(erneuern));
+// Nur bei offener Einladung, und die Pruefung steht VOR dem Ersetzen.
+const posOffen    = erneuern.indexOf('be_einladung_offen');
+const posErsetzen = erneuern.indexOf('be_einladung_ersetzen');
+check('KRITISCH: ein eingeloestes Konto wird abgewiesen, bevor etwas ersetzt wird',
+  posOffen > 0 && posErsetzen > 0 && posOffen < posErsetzen);
+check('KRITISCH: scheitert der Versand, bleibt der alte Link, wie er war',
+  /beginTransaction/.test(erneuern) && /rollBack/.test(erneuern)
+  && erneuern.indexOf('beginTransaction') < posErsetzen);
+check('KRITISCH: der neue Link kommt aus basis_url(), nie aus dem Host-Kopf',
+  /basis_url\(\)/.test(erneuern) && !/HTTP_HOST/.test(erneuern));
+{
+  const pfad = q => (q.match(/is_file\(\s*__DIR__\s*\.\s*'([^']+)'\s*\)/) || [, null])[1];
+  check('KRITISCH: und sucht die Seite dort, wo auch das erste Einladen sie sucht',
+    pfad(erneuern) !== null && pfad(erneuern) === pfad(einladen));
+}
+check('die Oberflaeche bietet "Neu einladen" an und ruft den Endpunkt',
+  /betreiber_einladung_erneuern\.php/.test(seite) && /Neu einladen/.test(seite));
+// "Abgelaufen" ist ein eigener Zustand: Server meldet ihn, Oberflaeche zeigt ihn.
+check('KRITISCH: der Server meldet, ob der Link abgelaufen ist',
+  /'einladung_abgelaufen'\]/.test(liste) && /be_einladung_stand/.test(liste));
+check('KRITISCH: und die Oberflaeche zeigt abgelaufen anders als offen',
+  /k\.einladung_abgelaufen/.test(seite));
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');
