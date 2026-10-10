@@ -769,6 +769,15 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   check('KRITISCH: die Icons der Seite werden ins guardops-Bündel kopiert',
     icons.length >= 3 && icons.every(i => wirdKopiert(i)));
 
+  // Und die Fotos: Seit dem Zurueckbau (2026-10-10) zeigt die Seite echte
+  // Bildschirmfotos per <img src="homepage-bilder/..."> -- ein dritter Weg neben
+  // Schriften und Icons, den dieselbe Luecke traefe.
+  const bilder = [...new Set([...homepage.matchAll(/<img[^>]+src="(homepage-bilder\/[^"]+)"/g)].map(m => m[1]))];
+  const fehlendeBilder = bilder.filter(b => !wirdKopiert(b));
+  check('KRITISCH: jedes Bild, das homepage.html einbindet, wird ins guardops-Bündel kopiert',
+    bilder.length >= 2 && fehlendeBilder.length === 0);
+  if (fehlendeBilder.length) { bad.push('fehlt im guardops-Bündel: ' + fehlendeBilder.join(', ')); }
+
   // Die Einbindungen des Endpunkts, aus dem Endpunkt gelesen.
   const endpunkt = readFileSync(`${WURZEL}/backend/api/demo_senden.php`, 'utf8');
   const noetig = [...endpunkt.matchAll(/require __DIR__ \. '\/\.\.\/([a-z_]+\.php)'/g)].map(m => m[1]);

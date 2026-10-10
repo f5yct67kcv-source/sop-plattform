@@ -8,24 +8,28 @@
   Begleitnotiz liegen im Projekt-Repository unter
   02-gate2-produkt-mvp/homepage-entwurf*.
 
-  MARKE: Der Name GuardOpS steht in der Konstante BRAND am Dateiende und in
-  allen <span data-brand>-Stellen; Die Original-SVG fehlt noch, siehe unten.
+  ZURUECKGEBAUT 2026-10-10 (Anordnung des Projektinhabers): Zwoelf
+  Abschnitte wurden fuenf, und die beiden nachgezeichneten Bildschirme
+  (Cockpit, App) sind durch ECHTE BILDSCHIRMFOTOS ersetzt -- homepage-bilder/
+  cockpit.webp und homepage-bilder/app.webp (eigener Ordner, nicht img/:
+  img/ wandert komplett ins Handy-Buendel, die Fotos gehoeren dort nicht hin). Die Fotos zeigen das ausgelieferte
+  Cockpit (dashboard.html) und die ausgelieferte App (app.html) mit den
+  Beispieldaten der Demo-Umgebung (backend/demo_daten.php: erfundener
+  Betrieb, erfundene Personen, Kunden und Objekte). Aufgenommen mit
+  Playwright gegen einen vorgetaeuschten Server, so wie die Pruefungen
+  es tun -- die Oberflaeche ist die echte, die Daten sind die der Demo.
+  Aendert sich die Oberflaeche sichtbar, sind die Fotos neu aufzunehmen;
+  ein nachgezeichnetes Bild veraltete dagegen still.
+
+  MARKE: Der Name GuardOpS steht in allen <span data-brand>-Stellen.
 
   DIE BILDMARKE IN <symbol id="marke"> IST NACHGEZEICHNET, nicht das
-  Original: Die Original-SVG liess sich nicht uebermitteln (der Chat nimmt
-  keine SVG an), darum aus icons/guardops-1024 vermessen und als Polygon
-  nachgebaut -- reine Geraden, 18 Punkte. Gegen das Original gerendert und
-  pixelweise verglichen: 99.3 % Deckung, die Abweichung sind einzelne
-  Kantenpixel an den Schraegen (Rasterung, kein Geometriefehler). SOBALD DIE
-  ORIGINAL-SVG VORLIEGT, wird dieser Pfad dadurch ersetzt.
+  Original: aus icons/guardops-1024 vermessen und als Polygon nachgebaut,
+  99.3 % Deckung. SOBALD DIE ORIGINAL-SVG VORLIEGT, wird der Pfad ersetzt.
+  DIE WORTMARKE IST GESETZT, NICHT DAS ORIGINAL: "GuardOpS" in Archivo.
 
-  DIE WORTMARKE IST GESETZT, NICHT DAS ORIGINAL: Der Schriftzug im Logo
-  steht in einer runden geometrischen Grotesk, die hier nicht vorliegt.
-  Bis dahin steht "GuardOpS" in Archivo -- sichtbar eine andere Schrift.
-
-  Alle Personen, Kunden und Objekte in den Bildschirmen sind erfunden. Diese
-  Seite laedt keinen Produktcode; ihre einzige Verbindung zum Server ist das
-  Demo-Selbstbedienung (api/demo_anfordern.php).
+  Diese Seite laedt keinen Produktcode; ihre einzige Verbindung zum Server
+  ist die Demo-Selbstbedienung (api/demo_anfordern.php).
 -->
 <title>GuardOpS – Betriebssoftware für Schweizer Sicherheitsdienste</title>
 <meta name="description" content="Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen in einer Software – für kleine und mittlere Sicherheitsdienste in der Schweiz, mit dem GAV Sicherheit im Kern.">
@@ -33,9 +37,7 @@
 <link rel="icon" href="icons/guardops-16.png" sizes="16x16" type="image/png">
 <link rel="apple-touch-icon" href="icons/guardops-180.png">
 <!-- Die kanonische Adresse (OP-566). Die Weiterleitung in der .htaccess
-     schickt www hierher; diese Zeile sagt es zusaetzlich in der Seite, damit
-     es auch dann stimmt, wenn die Seite ueber einen anderen Weg erreicht
-     wird -- ein Verweis mit angehaengten Parametern etwa. -->
+     schickt www hierher; diese Zeile sagt es zusaetzlich in der Seite. -->
 <link rel="canonical" href="https://guardops.ch/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="GuardOpS – Betriebssoftware für Schweizer Sicherheitsdienste">
@@ -43,18 +45,14 @@
 <meta property="og:image" content="icons/guardops-512.png">
 <style>
 /* Schriften selbst ausgeliefert (wie Inter fuer das Cockpit, ENT-223/OP-224):
-   Kein Abruf bei Google von der oeffentlichen Seite aus. Lateinischer
-   Zeichenvorrat genuegt (Umlaute, «», –, ' liegen darin); fuer alles
-   andere greift der Rueckfall-Stapel. Lizenzen: fonts/archivo-OFL.txt,
-   fonts/ibm-plex-LICENSE.txt (SIL OFL 1.1). */
+   Kein Abruf bei Google von der oeffentlichen Seite aus. Lizenzen:
+   fonts/archivo-OFL.txt, fonts/ibm-plex-LICENSE.txt (SIL OFL 1.1). */
 @font-face{font-family:"Archivo";font-style:normal;font-weight:100 900;font-stretch:62% 125%;font-display:swap;src:url(fonts/archivo-variable-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 @font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:100 700;font-display:swap;src:url(fonts/plex-sans-variable-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 @font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/plex-mono-400-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 @font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/plex-mono-500-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 /* ─────────────────────────────────────────────────────────────
    Farben, Schrift, Raster
-   Nacht/Nebel: der Tag eines Sicherheitsdienstes, von 22:00 bis
-   zum Monatsende. Bernstein: die Rundumleuchte, sparsam gesetzt.
    ───────────────────────────────────────────────────────────── */
 :root{
   /* Dunkle Gruende = das dunkle Glas-Thema des Cockpits (dashboard.html, html[data-thema="dunkel"]),
@@ -185,191 +183,23 @@ p{margin:0 0 1em}
   .held-fakten div:nth-child(n+2){padding-left:0}
   .held-fakten div:last-child{border-bottom:0}
 }
-.held-bild{margin:64px auto 0;position:relative}
-.held-bild::after{content:"";position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(to bottom,transparent,var(--nacht));pointer-events:none}
+
 
 /* ─────────────────────────────────────────────────────────────
-   Bildschirme (Produkt-Mockups) — das Cockpit im dunklen Glas-Thema,
-   so wie es der Betrieb sieht. Die einzigen gerundeten, schattierten
-   Objekte der Seite: sie sind Geräte.
+   Die beiden Fotos. Echte Bildschirmfotos aus der Demo-Umgebung --
+   die einzigen gerundeten, schattierten Objekte der Seite: sie sind
+   Geraete. Die Breite folgt dem Bild, die Hoehe dem Seitenverhaeltnis
+   (width/height am <img>), damit nichts springt, bevor es geladen ist.
    ───────────────────────────────────────────────────────────── */
-.cockpit{background:var(--p-bg);color:var(--p-ink);border-radius:12px;box-shadow:0 40px 90px -30px rgba(0,0,0,.8),0 0 0 1px var(--p-line-hi);overflow:hidden;font-family:var(--body);font-size:12.5px;line-height:1.4;text-align:left}
-.ck-chrome{display:flex;align-items:center;gap:8px;height:36px;padding:0 14px;background:#0B0D11;border-bottom:1px solid #23272F}
-.ck-chrome i{width:10px;height:10px;border-radius:50%;background:#2A2E37}
-.ck-chrome .url{margin-left:12px;flex:1;max-width:360px;height:22px;border-radius:5px;background:#14171C;color:#8A919E;font-family:var(--mono);font-size:11px;display:flex;align-items:center;padding:0 10px}
-.ck-top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;height:66px;padding:0 20px;background:var(--p-shell);border-bottom:1px solid var(--p-shell-line)}
-.ck-nav{grid-column:2;display:flex;gap:2px}
-.ck-nav span{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:86px;padding:7px 8px;border-radius:9px;color:var(--p-shell-txt);font-size:11.5px;font-weight:600}
-.ck-nav span svg{width:20px;height:20px}
-.ck-nav span.on{background:var(--p-shell-hi);color:var(--p-shell-txt-hi)}
-.ck-nav span.on svg{color:var(--p-accent)}
-.ck-recht{grid-column:3;display:flex;justify-content:flex-end;align-items:center;gap:16px}
-.ck-glocke{position:relative;color:var(--p-ink2)}
-.ck-glocke svg{width:20px;height:20px}
-.ck-glocke b{position:absolute;top:-7px;right:-9px;background:var(--p-neg);color:#fff;font-size:9px;font-weight:700;border-radius:999px;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 4px}
-.ck-avatar{width:30px;height:30px;border-radius:50%;background:var(--p-surface-2);border:1px solid var(--p-line-hi);color:var(--p-ink);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px}
-.ck-sub{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 22px;background:var(--p-surface);border-bottom:1px solid var(--p-line)}
-.ck-titel{font-size:17px;font-weight:600;letter-spacing:-.01em}
-.ck-untertitel{color:var(--p-ink2);font-size:12px;margin-top:2px}
-.ck-werkzeuge{display:flex;align-items:center;gap:10px}
-.ck-sprechen{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 14px;border-radius:999px;background:linear-gradient(180deg,#4A78F2,#2F5BD7);color:#fff;font-weight:600;font-size:12.5px}
-.ck-sprechen svg{width:14px;height:14px}
-.ck-schalter{width:52px;height:30px;border-radius:999px;border:1px solid var(--p-accent-line);background:var(--p-accent-soft);position:relative}
-.ck-schalter::after{content:"";position:absolute;top:4px;left:26px;width:20px;height:20px;border-radius:50%;background:var(--p-accent)}
-.ck-body{padding:16px 22px 22px;display:grid;gap:14px}
-.ck-oben{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:14px}
-.ck-karte{background:var(--p-surface);border:1px solid var(--p-line);border-radius:12px;padding:14px 16px;min-width:0}
-.ck-karte h5{margin:0 0 6px;font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:baseline}
-.ck-karte h5 span{font-size:11px;color:var(--p-ink3);font-weight:400}
-.ck-kpis{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.kpi{background:var(--p-surface);border:1px solid var(--p-line);border-radius:12px;padding:14px 16px;min-width:0}
-.kpi .l{display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--p-ink3);font-weight:600;white-space:nowrap}
-.kpi .l svg{width:12px;height:12px;flex:none}
-.kpi .z{font-size:26px;font-weight:700;letter-spacing:-.02em;margin:10px 0 4px;font-variant-numeric:tabular-nums;line-height:1}
-.kpi .z small{font-size:13px;font-weight:500;color:var(--p-ink3);margin-left:2px}
-.kpi .u{font-size:11.5px;color:var(--p-ink2)}
-.ck-ereignis{display:grid;grid-template-columns:44px 1fr;gap:10px;padding:8px 0;border-bottom:1px solid var(--p-line-soft)}
-.ck-ereignis:last-child{border-bottom:0;padding-bottom:0}
-.ck-ereignis .zeit{font-family:var(--mono);font-size:11px;color:var(--p-ink3);padding-top:2px}
-.ck-ereignis b{display:block;font-weight:600;font-size:12.5px}
-.ck-ereignis span{color:var(--p-ink2);font-size:12px}
-.ck-ereignis.neu b::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--p-accent);margin-right:6px;vertical-align:middle}
-.ck-tabellen{overflow-x:auto}
-.ck-tag{font-size:11.5px;color:var(--p-ink2);display:flex;gap:10px;align-items:baseline;margin:0 0 6px}
-.ck-tag b{color:var(--p-ink);font-weight:600}
-.ck-tabelle{width:100%;border-collapse:collapse}
-.ck-tabelle th{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--p-ink3);text-align:left;padding:6px 8px;border-bottom:1px solid var(--p-line);font-weight:600}
-.ck-tabelle td{padding:9px 8px;border-bottom:1px solid var(--p-line-soft);vertical-align:middle;white-space:nowrap}
-.ck-tabelle tr:last-child td{border-bottom:0}
-.ck-tabelle .zeit{font-family:var(--mono);font-size:11.5px;color:var(--p-ink)}
-.ck-tabelle .obj b{display:block;font-weight:600}
-.ck-tabelle .obj span{color:var(--p-ink2)}
-.ck-tabelle .sparte{color:var(--p-ink2)}
-.ck-team{display:flex}
-.mono-chip{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--p-surface-3);color:var(--p-ink);font-size:10px;font-weight:600;border:2px solid var(--p-surface);margin-left:-6px}
-.mono-chip:first-child{margin-left:0}
-.mono-chip.offen{background:var(--p-warn-soft);color:var(--p-warn);border-style:dashed;border-color:var(--p-warn-line)}
-.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:600}
-.pill.pos{background:var(--p-pos-soft);color:var(--p-pos)}
-.pill.warn{background:var(--p-warn-soft);color:var(--p-warn)}
-.pill.neutral{background:var(--p-surface-2);color:var(--p-ink2)}
-.pill.fest{background:var(--p-surface-2);color:var(--p-ink2)}
-.pill svg{width:11px;height:11px}
-@media (max-width:1100px){.ck-oben{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:760px){.ck-top{grid-template-columns:minmax(0,1fr) auto;height:auto;padding:8px 12px}.ck-nav{grid-column:1;overflow-x:auto;scrollbar-width:none}.ck-nav span{min-width:72px}.ck-recht{grid-column:2;position:relative;z-index:1;background:var(--p-shell);padding-left:12px;box-shadow:-14px 0 12px -6px var(--p-shell)}.kpi .l{white-space:normal}.ck-sub{flex-direction:column;align-items:flex-start;gap:10px;padding:12px 14px}.ck-body{padding:12px 14px 16px}.ck-tabelle{min-width:560px}.ck-chrome .url{max-width:none}}
-
-/* Telefon */
-.phone{width:320px;max-width:100%;margin:0 auto;background:#0E1117;border-radius:40px;padding:12px;box-shadow:0 40px 90px -30px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.1),inset 0 0 0 2px #1E232D;color:var(--p-ink);font-family:var(--body);text-align:left}
-.ph-screen{background:var(--p-bg);border-radius:30px;overflow:hidden;min-height:620px;display:flex;flex-direction:column}
-.ph-status{display:flex;justify-content:space-between;align-items:center;padding:14px 22px 6px;font-size:12px;font-weight:600;font-family:var(--mono)}
-.ph-status span:last-child{letter-spacing:.06em;font-size:10px}
-.ph-kopf{padding:8px 20px 12px}
-.ph-eyebrow{font-size:11px;color:var(--p-pos);font-weight:600;letter-spacing:.04em;text-transform:uppercase;display:flex;align-items:center;gap:6px}
-.ph-eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--p-pos);animation:puls 2s ease-in-out infinite}
-@keyframes puls{0%,100%{opacity:1}50%{opacity:.35}}
-@media (prefers-reduced-motion:reduce){.ph-eyebrow::before{animation:none}}
-.ph-titel{font-size:21px;font-weight:600;letter-spacing:-.01em;margin-top:4px}
-.ph-sub{font-size:12.5px;color:var(--p-ink2);margin-top:2px}
-.ph-progress{padding:0 20px 12px}
-.ph-bar{height:8px;border-radius:999px;background:var(--p-surface-3);overflow:hidden}
-.ph-bar i{display:block;height:100%;width:62.5%;background:var(--p-accent);border-radius:999px}
-.ph-prog-txt{display:flex;justify-content:space-between;font-size:12px;color:var(--p-ink2);margin-top:6px;font-variant-numeric:tabular-nums}
-.ph-liste{list-style:none;margin:0 14px;padding:0;background:var(--p-surface);border:1px solid var(--p-line);border-radius:12px;overflow:hidden}
-.ph-liste li{display:grid;grid-template-columns:44px 1fr auto;gap:8px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--p-line-soft);font-size:13px;min-height:44px}
-.ph-liste li:last-child{border-bottom:0}
-.ph-liste .zeit{font-family:var(--mono);font-size:11.5px;color:var(--p-ink3)}
-.ph-liste li.ok .zeit{color:var(--p-pos)}
-.ph-liste li.ok .name::before{content:"✓";color:var(--p-pos);font-weight:700;margin-right:6px}
-.ph-liste li.jetzt{background:var(--p-accent-soft)}
-.ph-liste li.jetzt .name{font-weight:600;color:var(--p-accent)}
-.ph-liste small{display:block;font-size:11px;color:var(--p-ink2);font-weight:400}
-.ph-liste .art{font-size:10.5px;color:var(--p-ink3);text-transform:uppercase;letter-spacing:.05em}
-.ph-aktionen{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 14px 4px}
-.ph-aktionen button{height:46px;border-radius:10px;border:1px solid var(--p-line);background:var(--p-surface);font-weight:600;font-size:14px}
-.ph-aktionen button.prim{background:var(--p-knopf);color:#fff;border-color:var(--p-knopf)}
-.ph-notruf{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px 14px 16px;margin-top:auto}
-.ph-notruf a{min-height:56px;border-radius:10px;background:var(--p-surface);border:1px solid var(--p-line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
-.ph-notruf a b{font-size:16px;font-weight:700;letter-spacing:-.02em}
-.ph-notruf a small{font-size:10px;color:var(--p-ink2)}
-.ph-notruf a.zentrale{background:var(--p-accent-soft);border-color:var(--p-accent-line)}
-.ph-notruf a.zentrale b{color:var(--p-accent);font-size:13px}
-.ph-notruf a.notruf b{color:var(--p-neg)}
-
-/* Portal (Tablet-Karte) */
-.portal{background:var(--p-surface);color:var(--p-ink);border-radius:12px;box-shadow:0 30px 70px -30px rgba(16,20,31,.45),0 0 0 1px var(--p-line-hi);overflow:hidden;font-family:var(--body);font-size:13px;text-align:left;max-width:100%}
-.po-scroll{overflow-x:auto}
-.po-scroll > *{min-width:560px}
-.po-kopf{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--p-line);background:var(--p-bg)}
-.po-kopf b{font-weight:600;display:flex;align-items:center;gap:8px}
-.po-kopf b svg{height:16px;width:12.4px;color:var(--p-accent)}
-.po-kopf span{font-size:12px;color:var(--p-ink2)}
-.po-titel{padding:16px 18px 6px;font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:baseline}
-.po-titel span{font-weight:400;font-size:12px;color:var(--p-ink3)}
-.po-tabelle{width:100%;border-collapse:collapse}
-.po-tabelle th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--p-ink3);padding:6px 18px;border-bottom:1px solid var(--p-line);font-weight:600}
-.po-tabelle td{padding:10px 18px;border-bottom:1px solid var(--p-line-soft);vertical-align:middle;white-space:nowrap}
-.po-tabelle tr.offen td{border-bottom:0;background:var(--p-bg)}
-.po-tabelle .zeit{font-family:var(--mono);font-size:12px}
-.po-balken{display:flex;align-items:center;gap:10px}
-.po-balken i{display:block;width:120px;height:6px;border-radius:999px;background:var(--p-surface-3);overflow:hidden}
-.po-balken i b{display:block;height:100%;background:var(--p-pos);border-radius:999px}
-.po-balken span{font-variant-numeric:tabular-nums;color:var(--p-ink2);font-size:12px}
-.po-foto{display:inline-flex;align-items:center;gap:5px;color:var(--p-ink2);font-size:12px}
-.po-foto svg{width:14px;height:14px}
-.po-detail{padding:4px 18px 16px;background:var(--p-bg);border-bottom:1px solid var(--p-line)}
-.po-detail ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:0 16px}
-.po-detail li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:0 8px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--p-line-soft);font-size:12.5px}
-.po-detail li .zeit{color:var(--p-pos)}
-.po-detail li em{display:block;grid-column:2;font-style:normal;color:var(--p-ink2);font-size:11px}
-@media (max-width:760px){.po-detail ol{grid-template-columns:repeat(2,minmax(0,1fr))}.po-balken i{width:90px}}
-
-/* Beleg (Rechnung mit QR-Zahlteil) */
-.beleg{background:#fff;color:#14161A;border-radius:6px;box-shadow:0 30px 70px -30px rgba(16,20,31,.35),0 0 0 1px #E5E8EC;padding:28px 30px;font-family:var(--body);font-size:12.5px;text-align:left;max-width:560px;margin:0 auto}
-.bl-kopf{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding-bottom:16px;border-bottom:1px solid #E5E8EC}
-.bl-kopf .firma{font-weight:600;font-size:14px}
-.bl-kopf .firma small{display:block;font-weight:400;color:#545B67;font-size:11.5px;line-height:1.4}
-.bl-nr{text-align:right;font-family:var(--mono);font-size:11px;color:#545B67;line-height:1.6}
-.bl-nr b{display:block;font-family:var(--body);font-size:18px;color:#14161A;font-weight:600;letter-spacing:-.01em}
-.bl-adresse{padding:14px 0;color:#545B67;line-height:1.45}
-.bl-adresse b{color:#14161A;font-weight:600}
-.bl-pos{width:100%;border-collapse:collapse;margin-top:6px}
-.bl-pos th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#8B919D;padding:6px 0;border-bottom:1px solid #E5E8EC;font-weight:600}
-.bl-pos td{padding:8px 0;border-bottom:1px solid #EFF1F4;vertical-align:top}
-.bl-pos td small{display:block;color:#545B67;font-size:11px}
-.bl-pos .r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:12px}
-.bl-pos tr.summe td{border-bottom:0;padding:5px 0;color:#545B67}
-.bl-pos tr.total td{font-weight:600;color:#14161A;border-top:1px solid #14161A;padding-top:8px;font-size:14px}
-.bl-qr{margin-top:18px;border-top:1px dashed #E5E8EC;padding-top:14px;display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:start}
-.bl-qr .qr{width:104px;height:104px;background:
-  repeating-linear-gradient(0deg,#14161A 0 4px,transparent 4px 8px),
-  repeating-linear-gradient(90deg,#14161A 0 4px,transparent 4px 8px);background-blend-mode:multiply;position:relative;border:6px solid #fff;outline:1px solid #E5E8EC}
-.bl-qr .qr::before,.bl-qr .qr::after{content:"";position:absolute;background:#fff}
-.bl-qr .qr::before{left:50%;top:50%;width:22px;height:22px;transform:translate(-50%,-50%);background:#14161A}
-.bl-qr .qr::after{left:50%;top:50%;width:12px;height:12px;transform:translate(-50%,-50%);background:#fff;clip-path:polygon(40% 0,60% 0,60% 40%,100% 40%,100% 60%,60% 60%,60% 100%,40% 100%,40% 60%,0 60%,0 40%,40% 40%)}
-.bl-qr dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 14px;font-size:11.5px}
-.bl-qr dt{color:#8B919D;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding-top:1px}
-.bl-qr dd{margin:0;font-family:var(--mono);font-size:11px;color:#14161A}
-.bl-qr .zahlteil{grid-column:1/-1;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:#8B919D;font-weight:600;margin-top:-6px}
-@media (max-width:560px){.beleg{padding:20px}.bl-qr{grid-template-columns:1fr}}
-
-/* Stundenkarte */
-.stunden{background:var(--p-surface);color:var(--p-ink);border-radius:12px;box-shadow:0 30px 70px -30px rgba(0,0,0,.6),0 0 0 1px var(--p-line-hi);padding:22px 24px;font-family:var(--body);max-width:440px;margin:0 auto;text-align:left}
-.st-kopf{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
-.st-kopf b{font-size:15px;font-weight:600}
-.st-kopf span{font-size:12px;color:var(--p-ink3)}
-.stunden dl{margin:0;display:grid;grid-template-columns:1fr auto;gap:0}
-.stunden dt,.stunden dd{padding:9px 0;border-bottom:1px solid var(--p-line-soft);margin:0;font-size:13.5px}
-.stunden dt{color:var(--p-ink2)}
-.stunden dt small{display:block;font-size:11px;color:var(--p-ink3)}
-.stunden dd{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;font-size:13.5px}
-.stunden .ein dt{padding-left:16px}
-.stunden .plus dd{color:var(--p-pos)}
-.stunden .minus dd{color:var(--p-ink2)}
-.stunden .summe dt,.stunden .summe dd{border-bottom:0;border-top:1px solid var(--p-line-hi);font-weight:600;color:var(--p-ink);padding-top:10px;font-size:14.5px}
-.stunden .hinweis{margin:12px 0 0;font-size:11.5px;color:var(--p-ink3);line-height:1.45}
+.foto{margin:64px auto 0;position:relative}
+.foto img{width:100%;height:auto;border-radius:12px;box-shadow:0 40px 90px -30px rgba(0,0,0,.8),0 0 0 1px var(--nacht-linie-2)}
+.foto figcaption{margin:14px 0 0;font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--t3)}
+.handy{width:320px;max-width:100%;margin:0 auto;background:#0E1117;border-radius:40px;padding:12px;box-shadow:0 40px 90px -30px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.1),inset 0 0 0 2px #1E232D}
+.handy img{width:100%;height:auto;border-radius:30px;display:block}
+.handy-tag{margin:14px 0 0;font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);text-align:center}
 
 /* ─────────────────────────────────────────────────────────────
-   Zweispaltige Abschnitte, Fahrplanraster, Bausteine
+   Zweispaltige Abschnitte, Bausteine
    ───────────────────────────────────────────────────────────── */
 .zwei{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:clamp(40px,6vw,96px);align-items:center}
 .zwei > *,.kopfzeile > *,.dk > *,.vorher-nachher > *,.protokoll li > *{min-width:0}
@@ -386,19 +216,6 @@ p{margin:0 0 1em}
 .punkte li:last-child{border-bottom:1px solid var(--rule)}
 .punkte li b{color:var(--t);font-weight:600}
 .punkte li svg{width:20px;height:20px;color:var(--acc-t);margin-top:3px}
-
-/* Fahrplanraster: Zellen mit Haarlinien, keine Karten */
-.raster{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--rule);border-left:1px solid var(--rule)}
-.raster > div{padding:28px 26px 30px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);position:relative;transition:background .2s}
-.raster > div:hover{background:rgba(112,152,247,.06)}
-.raster .nr{font-family:var(--mono);font-size:11.5px;color:var(--t3);letter-spacing:.08em;margin-bottom:22px;display:flex;justify-content:space-between}
-.raster h3{font-family:var(--display);font-stretch:80%;font-weight:700;text-transform:uppercase;font-size:24px;line-height:1;letter-spacing:.005em;margin:0 0 12px;color:var(--t)}
-.raster p{color:var(--t2);font-size:15px;line-height:1.55;margin:0 0 14px}
-.raster ul{list-style:none;margin:0;padding:0}
-.raster li{font-size:13.5px;color:var(--t2);padding:5px 0 5px 16px;position:relative;line-height:1.4}
-.raster li::before{content:"";position:absolute;left:0;top:12px;width:7px;height:1px;background:var(--acc-t)}
-@media (max-width:1100px){.raster{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:600px){.raster{grid-template-columns:minmax(0,1fr)}}
 
 /* Ausgangslage: verstreut → vereint */
 .vorher-nachher{display:grid;grid-template-columns:1fr auto 1fr;gap:24px;align-items:center;margin-top:8px}
@@ -433,27 +250,18 @@ p{margin:0 0 1em}
 .protokoll .was q{font-family:var(--mono);font-size:14px;color:var(--t);quotes:"„" "“"}
 @media (max-width:900px){.protokoll li{grid-template-columns:minmax(0,1fr);gap:6px;padding:22px 0}.protokoll .zeit{font-size:38px}.protokoll .zeit small{display:inline;margin-left:10px}.protokoll .wo{padding-top:4px}.protokoll .was{padding-top:4px}}
 
-/* Diktat */
-.diktat{display:grid;gap:16px}
-.dk{display:grid;grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr);gap:14px;align-items:center;padding:18px 0;border-top:1px solid var(--rule)}
-.dk:last-child{border-bottom:1px solid var(--rule)}
-.dk .satz{font-family:var(--mono);font-size:14.5px;line-height:1.5;color:var(--t);display:flex;gap:12px;align-items:flex-start}
-.dk .satz svg{width:20px;height:20px;flex:none;color:var(--acc-t);margin-top:2px}
-.dk .satz small{display:block;font-family:var(--body);font-size:12.5px;color:var(--t3);margin-top:4px}
-.dk .pfeil{color:var(--t3)}
-.dk .pfeil svg{width:28px;height:28px;margin:0 auto}
-.dk .ergebnis{background:var(--p-surface);color:var(--p-ink);border:1px solid var(--p-line-hi);border-radius:10px;padding:12px 14px;font-size:12.5px;box-shadow:0 12px 30px -20px rgba(16,20,31,.4)}
-.dk .ergebnis b{display:block;font-weight:600;margin-bottom:6px;font-size:13px}
-.dk .ergebnis dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 12px}
-.dk .ergebnis dt{color:var(--p-ink3);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding-top:2px}
-.dk .ergebnis dd{margin:0}
-.dk .ergebnis .knoepfe{display:flex;gap:6px;margin-top:10px}
-.dk .ergebnis .knoepfe span{border-radius:5px;padding:4px 9px;font-size:11.5px;font-weight:600;border:1px solid var(--p-line)}
-.dk .ergebnis .knoepfe span.prim{background:var(--p-knopf);border-color:var(--p-knopf);color:#fff}
-@media (max-width:760px){.dk{grid-template-columns:minmax(0,1fr)}.dk .pfeil svg{transform:rotate(90deg)}}
+/* Neben dem Foto wird das Protokoll schmaler: zwei Spalten statt drei,
+   das "Wo" rutscht als Zeile ueber den Titel. */
+.zwei .protokoll li{grid-template-columns:110px minmax(0,1fr);gap:8px 20px;padding:20px 0}
+.zwei .protokoll .zeit{font-size:34px}
+.zwei .protokoll .wo{grid-column:2;padding-top:0}
+.zwei .protokoll .was{grid-column:2;padding-top:0}
+.zwei .protokoll .was b{font-size:17px}
+.zwei .protokoll .was p{font-size:15px}
+@media (max-width:900px){.zwei .protokoll li{grid-template-columns:minmax(0,1fr)}.zwei .protokoll .wo,.zwei .protokoll .was{grid-column:1}}
 
 /* GAV-Artikel */
-.artikel{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--rule);border-left:1px solid var(--rule);margin-top:48px}
+.artikel{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--rule);border-left:1px solid var(--rule)}
 .artikel > div{padding:28px 26px 30px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
 .artikel .art{font-family:var(--display);font-stretch:66%;font-weight:700;font-size:64px;line-height:.9;color:var(--acc-t);letter-spacing:-.01em;margin-bottom:12px}
 .artikel .art small{display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:10px;font-weight:400}
@@ -462,20 +270,13 @@ p{margin:0 0 1em}
 @media (max-width:900px){.artikel{grid-template-columns:minmax(0,1fr)}}
 
 /* Sicherheit */
-.sicher{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--rule);border-left:1px solid var(--rule)}
+.sicher{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--rule);border-left:1px solid var(--rule)}
 .sicher > div{padding:26px 24px 28px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
 .sicher svg{width:26px;height:26px;color:var(--acc-t);margin-bottom:18px}
 .sicher h3{font-size:16px;font-weight:600;margin:0 0 8px;color:var(--t)}
 .sicher p{font-size:14px;color:var(--t2);margin:0;line-height:1.5}
 @media (max-width:1000px){.sicher{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:560px){.sicher{grid-template-columns:minmax(0,1fr)}}
-
-/* Haltung */
-.haltung .display{max-width:1100px}
-.haltung p.lead{margin-top:28px}
-.haltung .unter{display:flex;gap:40px;flex-wrap:wrap;margin-top:40px;padding-top:24px;border-top:1px solid var(--rule)}
-.haltung .unter div{font-size:14.5px;color:var(--t2);max-width:32ch}
-.haltung .unter b{display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--acc-t);margin-bottom:8px;font-weight:500}
 
 /* FAQ */
 .faq{max-width:860px;margin:0 auto;border-top:1px solid var(--rule)}
@@ -573,7 +374,6 @@ p{margin:0 0 1em}
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
-    <!-- Platzhalter-Marke: Kontrollpunkt-Ring mit Leuchte -->
     <!-- Schild-G, nachgezeichnet aus icons/guardops-1024 (siehe Dateikopf).
          Ein einziger geschlossener Streckenzug: Aussenkante des Schilds, durch
          die Oeffnung rechts in die Innenkante, um den Innenraum herum und ueber
@@ -585,22 +385,12 @@ p{margin:0 0 1em}
     <symbol id="i-haken" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-pfeil" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-schloss" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
-    <symbol id="i-kamera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
     <symbol id="i-mikro" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
-    <symbol id="i-bild" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 16l4-4 3 3 2-2 3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="15.5" cy="9.5" r="1.3" fill="currentColor"/></symbol>
     <symbol id="i-schild" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-rollen" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16.5 14c2.5.2 4 1.8 4 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="i-auge-zu" viewBox="0 0 24 24"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 20L20 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
-    <symbol id="i-buch" viewBox="0 0 24 24"><path d="M4 5h6a3 3 0 0 1 3 3v11a2 2 0 0 0-2-2H4zM20 5h-6a3 3 0 0 0-3 3v11a2 2 0 0 1 2-2h7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
-    <symbol id="i-glocke" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
     <symbol id="i-trenn" viewBox="0 0 24 24"><rect x="3" y="5" width="7" height="14" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="5" width="7" height="14" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3v18" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2 3"/></symbol>
     <symbol id="i-server" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="4" y="13.5" width="16" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="7.25" r="1" fill="currentColor"/><circle cx="8" cy="16.75" r="1" fill="currentColor"/></symbol>
-    <symbol id="i-raster" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
-    <symbol id="i-kalender" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
-    <symbol id="i-abgleich" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 12.5l2.7 2.7L16.5 9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="i-koffer" viewBox="0 0 24 24"><rect x="3.5" y="7.5" width="17" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 7.5V5.5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5.5v2M3.5 12.5h17" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
-    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.4" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
-    <symbol id="i-zahnrad" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3.5v2.5M12 18v2.5M3.5 12H6M18 12h2.5M6 6l1.8 1.8M16.2 16.2 18 18M6 18l1.8-1.8M16.2 7.8 18 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   </defs>
 </svg>
@@ -609,10 +399,8 @@ p{margin:0 0 1em}
   <div class="wrap">
     <a class="marke" href="#" aria-label="GuardOpS – Startseite"><svg><use href="#marke"/></svg><span class="wortmarke" data-brand>GuardOpS</span></a>
     <nav id="nav" aria-label="Hauptnavigation">
+      <a href="#ausgangslage">Ausgangslage</a>
       <a href="#ein-tag">Ein Tag</a>
-      <a href="#module">Module</a>
-      <a href="#revierdienst">Revierdienst</a>
-      <a href="#portal">Kundenportal</a>
       <a href="#gav">GAV</a>
       <a href="#sicherheit">Sicherheit</a>
       <a href="#faq">Fragen</a>
@@ -631,10 +419,10 @@ p{margin:0 0 1em}
     <div class="held-text">
       <p class="vorzeile">Betriebssoftware für Sicherheitsdienste · Schweiz</p>
       <h1 class="display">Der ganze Betrieb.<span class="z2">Eine Software.</span></h1>
-      <p class="lead">Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen – an einem Ort, mit dem GAV Sicherheit im Kern. Gebaut im Alltag eines Schweizer Sicherheitsdienstes, nicht am Reissbrett.</p>
+      <p class="lead">Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen – an einem Ort, mit dem GAV Sicherheit im Kern. Gebaut im laufenden Betrieb eines Schweizer Sicherheitsdienstes: Jede Funktion ist da, weil sie im Alltag gefehlt hat.</p>
       <div class="held-aktionen">
         <a class="btn primaer" href="#demo">Demo anfragen <svg><use href="#i-pfeil"/></svg></a>
-        <a class="btn sekundaer" href="#module">Module ansehen</a>
+        <a class="btn sekundaer" href="#ein-tag">Ein Tag im Betrieb</a>
       </div>
     </div>
     <div class="held-fakten">
@@ -642,56 +430,12 @@ p{margin:0 0 1em}
       <div><b>App</b><span>für die Mitarbeitenden auf dem eigenen Handy: Schichten, Rapport, Rundgang.</span></div>
       <div><b>Portal</b><span>für Ihre Kunden: jeder Rundgang mit Zeit, Fortschritt und Fotobeleg.</span></div>
     </div>
-    <div class="held-bild">
-      <div class="cockpit" role="img" aria-label="Cockpit im dunklen Thema: Symbolleiste oben, Einsätze der Woche mit Kennzahlen, Ereignissen und Zuteilung. Beispieldaten.">
-        <div class="ck-chrome"><i></i><i></i><i></i><div class="url">cockpit.guardops.ch/planung</div></div>
-        <div class="ck-top">
-          <div class="ck-nav">
-            <span><svg><use href="#i-raster"/></svg>Übersicht</span>
-            <span class="on"><svg><use href="#i-kalender"/></svg>Planung</span>
-            <span><svg><use href="#i-abgleich"/></svg>Abgleich</span>
-            <span><svg><use href="#i-koffer"/></svg>Kunden</span>
-            <span><svg><use href="#i-pin"/></svg>Revierdienst</span>
-            <span><svg><use href="#i-schild"/></svg>Auswertung</span>
-            <span><svg><use href="#i-zahnrad"/></svg>Administration</span>
-          </div>
-          <div class="ck-recht"><span class="ck-glocke"><svg><use href="#i-glocke"/></svg><b>3</b></span><span class="ck-avatar">MS</span></div>
-        </div>
-        <div class="ck-sub">
-          <div><div class="ck-titel">Einsätze</div><div class="ck-untertitel">Woche 38 · 14 Einsätze · 3 offene Plätze</div></div>
-          <div class="ck-werkzeuge"><span class="ck-sprechen"><svg><use href="#i-mikro"/></svg>Sprechen</span><span class="ck-schalter" aria-hidden="true"></span></div>
-        </div>
-        <div class="ck-body">
-          <div class="ck-oben">
-            <div class="ck-karte">
-              <h5>Ereignisse <span>seit gestern 22:00</span></h5>
-              <div class="ck-ereignis neu"><div class="zeit">07:12</div><div><b>Verfügbarkeit gemeldet</b><span>2 Personen für Samstag und Sonntag</span></div></div>
-              <div class="ck-ereignis neu"><div class="zeit">06:48</div><div><b>Rapport eingegangen</b><span>Areal Süd, mit Unterschrift des Kunden</span></div></div>
-              <div class="ck-ereignis"><div class="zeit">05:31</div><div><b>Rundgang beendet</b><span>Logistikpark Ost · 8 von 8 Kontrollpunkten</span></div></div>
-              <div class="ck-ereignis"><div class="zeit">23:40</div><div><b>Ereignis gemeldet</b><span>Tor 3 offen vorgefunden · Foto liegt bei</span></div></div>
-            </div>
-            <div class="ck-kpis">
-              <div class="kpi"><div class="l"><svg><use href="#i-kalender"/></svg>Einsätze heute</div><div class="z">4</div><div class="u">1 davon Revierdienst</div></div>
-              <div class="kpi"><div class="l"><svg><use href="#i-rollen"/></svg>Offene Plätze</div><div class="z">1</div><div class="u">in 1 Einsatz, heute 14:00</div></div>
-              <div class="kpi"><div class="l"><svg><use href="#i-haken"/></svg>Zusagen ausstehend</div><div class="z">2<small>/ 7</small></div><div class="u">angefragt für diese Woche</div></div>
-              <div class="kpi"><div class="l"><svg><use href="#i-pin"/></svg>Rundgänge heute</div><div class="z">1</div><div class="u">läuft · 5 von 8 Kontrollpunkten</div></div>
-            </div>
-          </div>
-          <div class="ck-karte ck-tabellen">
-            <div class="ck-tag"><b>Montag 14.</b> 4 Einsätze · 1 offener Platz</div>
-            <table class="ck-tabelle">
-              <thead><tr><th>Zeit</th><th>Objekt</th><th>Sparte</th><th>Team</th><th>Status</th></tr></thead>
-              <tbody>
-                <tr><td class="zeit">06:00–14:00</td><td class="obj"><b>Baustelle Areal Süd</b><span>Zugangskontrolle</span></td><td class="sparte">Sicherheit</td><td><span class="ck-team"><i class="mono-chip">LB</i><i class="mono-chip">SR</i></span></td><td><span class="pill fest"><svg><use href="#i-schloss"/></svg>Abgeglichen</span></td></tr>
-                <tr><td class="zeit">14:00–22:00</td><td class="obj"><b>Einkaufszentrum West</b><span>Bewachung</span></td><td class="sparte">Sicherheit</td><td><span class="ck-team"><i class="mono-chip">MF</i><i class="mono-chip offen">+1</i></span></td><td><span class="pill warn">1 Platz offen</span></td></tr>
-                <tr><td class="zeit">18:00–23:30</td><td class="obj"><b>Festgelände Stadtpark</b><span>Verkehrsdienst</span></td><td class="sparte">Sicherheit</td><td><span class="ck-team"><i class="mono-chip">DV</i><i class="mono-chip">NK</i><i class="mono-chip">AH</i></span></td><td><span class="pill pos">Zugesagt 3/3</span></td></tr>
-                <tr><td class="zeit">22:00–06:00</td><td class="obj"><b>Logistikpark Ost</b><span>Revierdienst · Runde Nacht A</span></td><td class="sparte">Sicherheit</td><td><span class="ck-team"><i class="mono-chip">RB</i></span></td><td><span class="pill pos">Zugesagt 1/1</span></td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Echtes Bildschirmfoto, siehe Dateikopf. width/height = Bildmasse,
+         damit der Platz vor dem Laden feststeht. -->
+    <figure class="foto">
+      <img src="homepage-bilder/cockpit.webp" width="2880" height="2240" alt="Das Cockpit, Bereich Planung: Kennzahlen zu kommenden Einsätzen und offenen Schichten, darunter die Einsätze der nächsten Tage mit Objekt, Einsatzart, Besetzung und Status. Beispieldaten der Demo-Umgebung." fetchpriority="high">
+      <figcaption>Cockpit · Planung · Beispieldaten der Demo-Umgebung</figcaption>
+    </figure>
   </div>
 </section>
 
@@ -737,287 +481,56 @@ p{margin:0 0 1em}
       </div>
       <p class="lead">Von der Planung am Morgen über den Rundgang in der Nacht bis zur Rechnung am Monatsende: Jede Station schreibt in dieselbe Datenbasis. Nichts wird abgetippt, nichts geht per Chat verloren.</p>
     </div>
+    <div class="zwei tausch">
+      <div>
     <ol class="protokoll">
       <li>
         <div class="zeit">06:40<small>Cockpit</small></div>
         <div class="wo">Einsatzleitung</div>
-        <div class="was"><b>Planung per Diktat</b><p><q>Setze die Schliessrunde jeden Tag auf den August.</q> Die Software zeigt eine Vorschau mit 31 Schichten. Ein Klick, und sie stehen im Plan – Feiertage nach Kanton markiert, Doppelbelegungen gesperrt.</p></div>
+        <div class="was"><b>Planung per Diktat</b><p><q>Setze die Schliessrunde jeden Tag auf den August.</q> Die Software zeigt eine Vorschau mit 31 Schichten. Ein Klick, und sie stehen im Plan – Doppelbelegungen gesperrt.</p></div>
       </li>
       <li>
         <div class="zeit">07:05<small>App</small></div>
         <div class="wo">Mitarbeitende</div>
-        <div class="was"><b>Zusagen statt Rückfragen</b><p>Push auf das Handy: «Neue Mitteilung». Zwei Personen sagen ihre Schicht zu, eine meldet Verfügbarkeit fürs Wochenende. Die Einsatzleitung sieht es sofort im Ereignis-Feed.</p></div>
-      </li>
-      <li>
-        <div class="zeit">09:30<small>Cockpit</small></div>
-        <div class="wo">Verkauf</div>
-        <div class="was"><b>Neuer Kunde, fertige Offerte</b><p>Ein Satz genügt, die Recherche ergänzt Adresse, UID und Webseite aus dem Handelsregister. Die Offerte entsteht aus dem Leistungsstamm und geht per Mail hinaus – Rappen-genau gerechnet.</p></div>
+        <div class="was"><b>Zusagen statt Rückfragen</b><p>Push auf das Handy. Zwei Personen sagen ihre Schicht zu, eine meldet Verfügbarkeit fürs Wochenende. Die Einsatzleitung sieht es sofort.</p></div>
       </li>
       <li>
         <div class="zeit">14:00<small>App</small></div>
         <div class="wo">Vor Ort</div>
-        <div class="was"><b>Fahrzeug übernommen, Rapport unterschrieben</b><p>Übernahme des Dienstfahrzeugs mit Tachofoto. Am Schichtende der Rapport – der Kunde unterschreibt direkt auf dem Handy, bildschirmfüllend.</p></div>
+        <div class="was"><b>Rapport unterschrieben</b><p>Am Schichtende der Rapport – der Kunde unterschreibt direkt auf dem Handy. Nichts wird abgetippt.</p></div>
       </li>
       <li class="live">
         <div class="zeit">22:00<small>App</small></div>
         <div class="wo">Revierdienst</div>
-        <div class="was"><b>Der Rundgang läuft</b><p>Kontrollpunkte per NFC oder Geofence, Aufgaben je Punkt, Ereignis mit Foto. Die Zentrale ist einen Tipp entfernt. Ortung nur, solange die Runde läuft.</p></div>
-      </li>
-      <li>
-        <div class="zeit">23:12<small>Portal</small></div>
-        <div class="wo">Kunde</div>
-        <div class="was"><b>Der Kunde sieht es selbst</b><p>Rundgang beendet, 8 von 8. Im Kundenportal stehen Beginn, Fortschritt, Zeit je Kontrollpunkt und der Fotobeleg – ohne dass jemand einen Bericht schreiben muss.</p></div>
+        <div class="was"><b>Der Rundgang läuft</b><p>Kontrollpunkte per NFC oder Geofence, Ereignis mit Foto, Ersatzscan, wenn ein Chip fehlt. Zentrale und Notruf einen Tipp entfernt. Der Kunde sieht die Runde danach im Portal.</p></div>
       </li>
       <li>
         <div class="zeit">31.<small>Monatsende · Cockpit</small></div>
         <div class="wo">Abrechnung</div>
-        <div class="was"><b>Abgleich, Stunden, Rechnung</b><p>Soll gegen Ist, Schicht für Schicht, danach festgeschrieben. Stunden mit Zeitbonus, Auslagenersatz nach Zone, Rechnung mit Schweizer QR-Zahlteil. Alles aus denselben Daten, die um 06:40 entstanden sind.</p></div>
+        <div class="was"><b>Abgleich, Stunden, Rechnung</b><p>Soll gegen Ist, danach festgeschrieben. Stunden mit Zeitbonus, Auslagenersatz nach Zone, Rechnung mit Schweizer QR-Zahlteil – aus denselben Daten, die um 06:40 entstanden sind.</p></div>
       </li>
     </ol>
-  </div>
-</section>
-
-<!-- ═══════════════ MODULE ═══════════════ -->
-<section class="abs hell" id="module">
-  <div class="wrap">
-    <div class="kopfzeile">
-      <div>
-        <p class="vorzeile">Module</p>
-        <h2 class="display">Acht Module. Eine Datenbasis.</h2>
-      </div>
-      <p class="lead">Alles, was ein Sicherheitsdienst braucht – und nichts, was er nicht braucht. Jedes Modul ist da, weil es im Alltag gefehlt hat, nicht weil ein Prospekt es verlangt.</p>
-    </div>
-    <div class="raster">
-      <div>
-        <div class="nr"><span>Cockpit</span><span>Planung</span></div>
-        <h3>Einsatzplanung</h3>
-        <p>Masterschichten je Objekt, daraus die Schichten des Monats. Objektplanung, Tagesplan, Reihen über Wochen.</p>
-        <ul><li>Doppelbelegung wird gesperrt, nicht nur gemeldet</li><li>Ruhezeiten und Pensen im Blick</li><li>Feiertage nach Kanton, einmal pro Jahr eingetragen</li><li>Einsatzarten je Objekt: Bewachung, Revier-, Verkehrs- und Veranstaltungsdienst</li></ul>
       </div>
       <div>
-        <div class="nr"><span>App</span><span>iOS · Android</span></div>
-        <h3>Mitarbeiter-App</h3>
-        <p>Auf dem eigenen Handy: eigene Schichten sehen und zusagen, Verfügbarkeit melden, Abwesenheit beantragen.</p>
-        <ul><li>Rapport mit Unterschrift des Kunden</li><li>Eigene Stunden mit Zeitbonus, getrennt ausgewiesen</li><li>Mitteilungen mit Push, ohne Gruppenchat</li><li>Jede Person sieht nur die eigenen Daten</li></ul>
-      </div>
-      <div>
-        <div class="nr"><span>Cockpit</span><span>Kontrolle</span></div>
-        <h3>Rapport &amp; Abgleich</h3>
-        <p>Soll gegen Ist, Schicht für Schicht. Einmal abgeglichen, ist eine Schicht festgeschrieben.</p>
-        <ul><li>Abweichungen sichtbar, bevor sie auf der Lohnabrechnung landen</li><li>Arbeitsergebnisse und Pensen pro Person</li><li>Auslagenersatz entsteht beim Abgleich, serverseitig</li></ul>
-      </div>
-      <div>
-        <div class="nr"><span>App · Cockpit</span><span>Nacht</span></div>
-        <h3>Revierdienst</h3>
-        <p>Kontrollpunkte per NFC-Chip oder Geofence, Runden mit Zeitfenster, Aufgaben je Kontrollpunkt.</p>
-        <ul><li>Ereignis melden mit Foto</li><li>Ersatzscan mit Foto, wenn ein Chip fehlt</li><li>Zentrale und Notruf mit einem Tipp</li><li>Verbunden mit Kunde, Objekt und Schicht – keine Insel</li></ul>
-      </div>
-      <div>
-        <div class="nr"><span>Portal</span><span>Kunde</span></div>
-        <h3>Kundenportal</h3>
-        <p>Ihre Kunden sehen ihre Rundgänge selbst: Beginn, Fortschritt, Zeit je Kontrollpunkt, Fotobeleg.</p>
-        <ul><li>Eigener Zugang per Link und eigenem Passwort</li><li>Nur die eigenen Objekte</li><li>Technisch getrennt von der Verwaltung</li></ul>
-      </div>
-      <div>
-        <div class="nr"><span>Cockpit</span><span>Verkauf</span></div>
-        <h3>Offerten &amp; Rechnungen</h3>
-        <p>Leistungen mit Preisstamm, Offerte per Mail, Rechnung mit Schweizer QR-Zahlteil.</p>
-        <ul><li>Öffentliche Belegseite für den Kunden</li><li>Rappen-genau gerechnet, MWST exakt</li><li>Eigener Briefkopf</li></ul>
-      </div>
-      <div>
-        <div class="nr"><span>Cockpit</span><span>Personal</span></div>
-        <h3>Personal &amp; Abwesenheiten</h3>
-        <p>Personalakte mit Dossier und Verlauf. Vertrauliche Angaben nur mit eigenem Recht.</p>
-        <ul><li>Ferienanspruch nach Art. 20 GAV</li><li>Abwesenheiten beantragen und entscheiden</li><li>Rollen statt Admin-Schalter</li></ul>
-      </div>
-      <div>
-        <div class="nr"><span>App · Cockpit</span><span>Betrieb</span></div>
-        <h3>Fahrzeuge &amp; Auslagen</h3>
-        <p>Dienstfahrzeuge mit Übernahme, Tachofoto und Logbuch. Wegstrecken je Objekt.</p>
-        <ul><li>Auslagenersatz nach Art. 18 GAV aus der Wegstrecke</li><li>Zone und Betrag entstehen beim Abgleich, nicht im Kopf</li><li>Unplausible Kilometersprünge werden benannt</li></ul>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════ REVIERDIENST ═══════════════ -->
-<section class="abs nacht-2" id="revierdienst">
-  <div class="wrap">
-    <div class="zwei">
-      <div>
-        <p class="vorzeile">22:00 · Revierdienst</p>
-        <h2 class="display">Der Rundgang weiss, wohin er gehört.</h2>
-        <p class="lead">Rundgang-Apps gibt es viele. Der Unterschied liegt nicht im Scannen, sondern in der Verbindung: Jede Runde hängt an Kunde, Objekt und Schicht. Die Einsatzleitung sieht sie live, der Kunde danach im Portal, die Abrechnung am Monatsende.</p>
-        <ul class="punkte">
-          <li><svg><use href="#i-haken"/></svg><span><b>NFC-Chip oder Geofence.</b> Ein Kontrollpunkt ist ein Chip an der Wand oder ein Radius von 20 bis 25 Metern – je Punkt wählbar.</span></li>
-          <li><svg><use href="#i-haken"/></svg><span><b>Aufgaben am Kontrollpunkt.</b> «Fenster prüfen», «Tor verriegeln». Was nicht geht, wird als Ereignis gemeldet, nicht stillschweigend übersprungen.</span></li>
-          <li><svg><use href="#i-haken"/></svg><span><b>Ereignis mit Foto, Ersatzscan mit Foto.</b> Ein fehlender Chip bricht die Runde nicht ab – er hinterlässt einen Beleg.</span></li>
-          <li><svg><use href="#i-haken"/></svg><span><b>Zentrale und Notruf.</b> Pikettnummer des Betriebs zuoberst, 117, 118 und 144 darunter. Einen Tipp entfernt, auch mit Handschuhen.</span></li>
-          <li><svg><use href="#i-haken"/></svg><span><b>Ortung nur während der Runde.</b> Nach dem Beenden nimmt der Server keine Position mehr an – die App hört auf, und der Server verlässt sich nicht darauf.</span></li>
-        </ul>
-      </div>
-      <div>
-        <div class="phone" role="img" aria-label="Mitarbeiter-App: laufender Rundgang mit Kontrollpunkten, Aufgabe, Ereignis-Knopf und Notrufkacheln. Beispieldaten.">
-          <div class="ph-screen">
-            <div class="ph-status"><span>22:41</span><span>●●● ◔ ▮</span></div>
-            <div class="ph-kopf">
-              <div class="ph-eyebrow">Rundgang läuft · 41 min</div>
-              <div class="ph-titel">Logistikpark Ost</div>
-              <div class="ph-sub">Runde Nacht A · Zeitfenster bis 23:30</div>
-            </div>
-            <div class="ph-progress"><div class="ph-bar"><i></i></div><div class="ph-prog-txt"><span>5 von 8 Kontrollpunkten</span><span>im Rahmen</span></div></div>
-            <ul class="ph-liste">
-              <li class="ok"><span class="zeit">22:03</span><span class="name">Eingang Nord</span><span class="art">NFC</span></li>
-              <li class="ok"><span class="zeit">22:11</span><span class="name">Lager B</span><span class="art">NFC</span></li>
-              <li class="ok"><span class="zeit">22:19</span><span class="name">Parkdeck 2</span><span class="art">Geofence</span></li>
-              <li class="ok"><span class="zeit">22:27</span><span class="name">Technikraum</span><span class="art">NFC</span></li>
-              <li class="ok"><span class="zeit">22:36</span><span class="name">Tor 3</span><span class="art">Ersatzscan</span></li>
-              <li class="jetzt"><span class="zeit">→</span><span class="name">Büro EG<small>Aufgabe: Fenster prüfen</small></span><span class="art">nächster</span></li>
-              <li><span class="zeit">–</span><span class="name">Rampe Süd</span><span class="art">NFC</span></li>
-              <li><span class="zeit">–</span><span class="name">Eingang Nord</span><span class="art">NFC</span></li>
-            </ul>
-            <div class="ph-aktionen"><button class="prim" type="button">Ereignis melden</button><button type="button">Pause</button></div>
-            <div class="ph-notruf">
-              <a class="zentrale" href="#revierdienst" tabindex="-1"><b>Zentrale</b><small>Pikett</small></a>
-              <a class="notruf" href="#revierdienst" tabindex="-1"><b>117</b><small>Polizei</small></a>
-              <a class="notruf" href="#revierdienst" tabindex="-1"><b>118</b><small>Feuerwehr</small></a>
-              <a class="notruf" href="#revierdienst" tabindex="-1"><b>144</b><small>Sanität</small></a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════ KUNDENPORTAL ═══════════════ -->
-<section class="abs hell" id="portal">
-  <div class="wrap">
-    <div class="zwei tausch">
-      <div>
-        <p class="vorzeile">23:12 · Kundenportal</p>
-        <h2 class="display">Der Kunde sieht, was er bezahlt.</h2>
-        <p class="lead">Kein Wochenbericht, kein Telefonat, kein «war jemand da?». Jeder Rundgang steht im Portal, sobald er beendet ist – mit Beginn, Fortschritt, Zeit je Kontrollpunkt und Fotobeleg.</p>
-        <ul class="punkte">
-          <li><svg><use href="#i-haken"/></svg><span><b>Eigener Zugang.</b> Der Kunde bekommt einen Link, setzt sein Passwort und meldet sich damit an. Keine Codes, die niemand findet.</span></li>
-          <li><svg><use href="#i-haken"/></svg><span><b>Nur die eigenen Objekte.</b> Welcher Kunde was sieht, entscheidet die Sitzung auf dem Server – nie die Anfrage aus dem Browser.</span></li>
-          <li><svg><use href="#i-haken"/></svg><span><b>Getrennt gebaut.</b> Eigene Tabellen, eigene Anmeldung. Ein Kundenzugang erreicht keinen einzigen Verwaltungsendpunkt – technisch, nicht nur ausgeblendet.</span></li>
-          <li><svg><use href="#i-haken"/></svg><span><b>Rundgang-Rapport per Mail.</b> Für Kunden, die lieber ein Dokument ablegen als ein Portal öffnen.</span></li>
-        </ul>
-      </div>
-      <div>
-        <div class="portal" role="img" aria-label="Kundenportal: Liste der Rundgänge mit Fortschrittsbalken, Beginn und Fotobeleg, ein Rundgang aufgeklappt mit Zeit je Kontrollpunkt. Beispieldaten.">
-          <div class="po-kopf"><b><svg><use href="#marke"/></svg>Kundenportal</b><span>Logistikpark Ost · Abmelden</span></div>
-          <div class="po-titel">Rundgänge <span>letzte 7 Nächte</span></div>
-          <div class="po-scroll"><div>
-          <table class="po-tabelle">
-            <thead><tr><th>Nacht</th><th>Beginn</th><th>Kontrollpunkte</th><th>Beleg</th></tr></thead>
-            <tbody>
-              <tr class="offen"><td>Mo → Di</td><td class="zeit">22:03</td><td><div class="po-balken"><i><b style="width:100%"></b></i><span>8 von 8</span></div></td><td><span class="po-foto"><svg><use href="#i-kamera"/></svg>1 Foto</span></td></tr>
-            </tbody>
-          </table>
-          <div class="po-detail">
-            <ol>
-              <li><span class="zeit">22:03</span>Eingang Nord</li>
-              <li><span class="zeit">22:11</span>Lager B</li>
-              <li><span class="zeit">22:19</span>Parkdeck 2</li>
-              <li><span class="zeit">22:27</span>Technikraum</li>
-              <li><span class="zeit">22:36</span>Tor 3 <em>Fotobeleg</em></li>
-              <li><span class="zeit">22:44</span>Büro EG</li>
-              <li><span class="zeit">22:52</span>Rampe Süd</li>
-              <li><span class="zeit">23:01</span>Eingang Nord</li>
-            </ol>
-          </div>
-          <table class="po-tabelle">
-            <tbody>
-              <tr><td>So → Mo</td><td class="zeit">22:07</td><td><div class="po-balken"><i><b style="width:100%"></b></i><span>8 von 8</span></div></td><td><span class="po-foto">–</span></td></tr>
-              <tr><td>Sa → So</td><td class="zeit">22:01</td><td><div class="po-balken"><i><b style="width:100%"></b></i><span>8 von 8</span></div></td><td><span class="po-foto"><svg><use href="#i-kamera"/></svg>2 Fotos</span></td></tr>
-              <tr><td>Fr → Sa</td><td class="zeit">22:14</td><td><div class="po-balken"><i><b style="width:87.5%"></b></i><span>7 von 8</span></div></td><td><span class="po-foto"><svg><use href="#i-kamera"/></svg>1 Foto</span></td></tr>
-              <tr><td>Do → Fr</td><td class="zeit">22:02</td><td><div class="po-balken"><i><b style="width:100%"></b></i><span>8 von 8</span></div></td><td><span class="po-foto">–</span></td></tr>
-            </tbody>
-          </table>
-          </div></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════ OFFERTE BIS ZAHLUNG ═══════════════ -->
-<section class="abs nebel" id="belege">
-  <div class="wrap">
-    <div class="zwei">
-      <div>
-        <p class="vorzeile">Offerten und Rechnungen</p>
-        <h2 class="display">Von der Offerte bis zur Zahlung.</h2>
-        <p class="lead">Leistungen einmal mit Preis hinterlegen. Daraus entstehen Offerte und Rechnung – mit Ihrem Briefkopf, per Mail versandt, mit einer Belegseite, die der Kunde ohne Anmeldung öffnet.</p>
-        <ul class="punkte">
-          <li><svg><use href="#i-haken"/></svg><span><b>Schweizer QR-Zahlteil.</b> QR-IBAN und QR-Referenz nach den Richtlinien von SIX. Solange keine echte QR-IBAN hinterlegt ist, wird lieber kein Zahlteil gezeigt als ein falscher.</span></li>
-          <li><svg><use href="#i-haken"/></svg><span><b>Rappen-genau.</b> Beträge werden ganzzahlig in Rappen gerechnet, Prozentsätze in Basispunkten. Keine Rundungsdrift über viele Positionen.</span></li>
-          <li><svg><use href="#i-haken"/></svg><span><b>Auf dem Server gerechnet.</b> Was auf einem Dokument an den Kunden steht, entsteht nicht im Browser – der Browser zeigt nur die Vorschau.</span></li>
-          <li><svg><use href="#i-haken"/></svg><span><b>Offerte auf dem Handy.</b> Herunterladen und teilen, direkt beim Kunden vor Ort.</span></li>
-        </ul>
-      </div>
-      <div>
-        <div class="beleg" role="img" aria-label="Rechnung mit Positionen, Mehrwertsteuer, Total und Schweizer QR-Zahlteil. Beispieldaten, erfundene Firma.">
-          <div class="bl-kopf">
-            <div class="firma">Muster Sicherheitsdienst AG<small>Bahnhofstrasse 1 · 4600 Olten<br>CHE-000.000.000 MWST</small></div>
-            <div class="bl-nr"><b>Rechnung</b>R-0142<br>Datum 30.09.<br>Fällig 30.10.</div>
-          </div>
-          <div class="bl-adresse"><b>Beispiel Logistik AG</b><br>Industriestrasse 12<br>4600 Olten</div>
-          <table class="bl-pos">
-            <thead><tr><th>Leistung</th><th class="r">Menge</th><th class="r">Preis</th><th class="r">Betrag</th></tr></thead>
-            <tbody>
-              <tr><td>P0007 Bewachung Nacht 22–06<small>Logistikpark Ost · 8 Nächte</small></td><td class="r">64.00 h</td><td class="r">50.00</td><td class="r">3'200.00</td></tr>
-              <tr><td>P0012 Revierdienst Runde Nacht A<small>Logistikpark Ost · September</small></td><td class="r">30 Runden</td><td class="r">40.00</td><td class="r">1'200.00</td></tr>
-              <tr class="summe"><td colspan="3">Zwischentotal</td><td class="r">4'400.00</td></tr>
-              <tr class="summe"><td colspan="3">MWST 8.1 %</td><td class="r">356.40</td></tr>
-              <tr class="total"><td colspan="3">Total CHF</td><td class="r">4'756.40</td></tr>
-            </tbody>
-          </table>
-          <div class="bl-qr">
-            <div class="zahlteil">Zahlteil</div>
-            <div class="qr" aria-hidden="true"></div>
-            <dl>
-              <dt>Konto / Zahlbar an</dt><dd>CH00 0000 0000 0000 0000 0<br>Muster Sicherheitsdienst AG</dd>
-              <dt>Referenz</dt><dd>00 00000 00000 00000 00000 01427</dd>
-              <dt>Währung · Betrag</dt><dd>CHF · 4 756.40</dd>
-            </dl>
-          </div>
-        </div>
+        <!-- Echtes Bildschirmfoto der App, siehe Dateikopf. -->
+        <figure class="handy">
+          <img src="homepage-bilder/app.webp" width="1170" height="2532" alt="Die Mitarbeiter-App während eines Rundgangs: Laufzeit, Fortschritt 3 von 6 Kontrollpunkten, bestätigte Punkte mit Uhrzeit, am nächsten Punkt die Wahl zwischen Ersatzscan und «Nicht verfügbar». Beispieldaten der Demo-Umgebung.">
+        </figure>
+        <p class="handy-tag">App · Rundgang · Beispieldaten der Demo-Umgebung</p>
       </div>
     </div>
   </div>
 </section>
 
 <!-- ═══════════════ GAV ═══════════════ -->
-<section class="abs nacht" id="gav">
+<section class="abs hell" id="gav">
   <div class="wrap">
-    <div class="zwei tausch">
+    <div class="kopfzeile">
       <div>
         <p class="vorzeile">GAV Sicherheit</p>
         <h2 class="display">Der GAV ist eingebaut, nicht angehängt.</h2>
-        <p class="lead">Ein versioniertes Regelwerk mit Gültigkeitszeitraum. Eine Revision ändert alte Abrechnungen nie rückwirkend. Und keine Zahl ist eine Blackbox: Rohzeit, Pause, Nettozeit und Zeitbonus bleiben getrennt nachvollziehbar – so, wie Art. 12 Ziff. 5 die Abrechnung verlangt.</p>
-        <ul class="punkte">
-          <li><svg><use href="#i-haken"/></svg><span><b>Getrennt, nie nur eine Summe.</b> Der Zeitbonus für Nacht und Sonntag steht neben der Nettozeit, nicht darin versteckt.</span></li>
-          <li><svg><use href="#i-haken"/></svg><span><b>Dieselbe Regel auf beiden Seiten.</b> Cockpit und App rechnen aus derselben Datei. Dieselbe Schicht ergibt an beiden Orten dieselbe Zahl.</span></li>
-          <li><svg><use href="#i-haken"/></svg><span><b>Keine stillen Annahmen.</b> Wo der Wortlaut des GAV nicht eindeutig ist, rechnet die Software nicht auf Verdacht – sie markiert und sagt es.</span></li>
-        </ul>
       </div>
-      <div>
-        <div class="stunden" role="img" aria-label="Stundenkarte einer Person: Rohzeit, unbezahlte Pause, Nettozeit, Zeitbonus Nacht und Sonntag, bewertete Zeit. Beispielwerte.">
-          <div class="st-kopf"><b>Meine Stunden</b><span>September · 22 Schichten</span></div>
-          <dl>
-            <div style="display:contents"><dt>Rohzeit</dt><dd>172:00</dd></div>
-            <div class="minus" style="display:contents"><dt>Unbezahlte Pause</dt><dd>−6:00</dd></div>
-            <div style="display:contents"><dt>Nettozeit</dt><dd>166:00</dd></div>
-            <div class="plus ein" style="display:contents"><dt>Zeitbonus Nacht<small>Art. 12 Ziff. 2</small></dt><dd>+4:10</dd></div>
-            <div class="plus ein" style="display:contents"><dt>Zeitbonus Sonntag<small>Art. 12 Ziff. 2</small></dt><dd>+1:30</dd></div>
-            <div class="summe" style="display:contents"><dt>Bewertete Zeit</dt><dd>171:40</dd></div>
-          </dl>
-          <p class="hinweis">Fahrzeit-Schichten sind ausgenommen und als «keine Arbeitszeit» markiert. Auslagenersatz nach Art. 18 steht auf einer eigenen Karte.</p>
-        </div>
-      </div>
+      <p class="lead">Ein versioniertes Regelwerk mit Gültigkeitszeitraum. Eine Revision ändert alte Abrechnungen nie rückwirkend. Und keine Zahl ist eine Blackbox: Rohzeit, Pause, Nettozeit und Zeitbonus bleiben getrennt nachvollziehbar – so, wie Art. 12 Ziff. 5 die Abrechnung verlangt. Wo der Wortlaut nicht eindeutig ist, rechnet <span data-brand>GuardOpS</span> nicht auf Verdacht, sondern markiert es.</p>
     </div>
     <div class="artikel">
       <div>
@@ -1039,36 +552,6 @@ p{margin:0 0 1em}
   </div>
 </section>
 
-<!-- ═══════════════ KI ═══════════════ -->
-<section class="abs hell" id="diktat">
-  <div class="wrap">
-    <div class="kopfzeile">
-      <div>
-        <p class="vorzeile">Diktat und Recherche</p>
-        <h2 class="display">Sagen statt tippen. Bestätigen statt hoffen.</h2>
-      </div>
-      <p class="lead">KI dort, wo sie Zeit spart – beim Anlegen von Einsätzen, Kunden und Mitarbeitenden. Und bewusst nicht dort, wo Sorgfalt zählt: Der Rapport wird von Hand ausgefüllt. Nichts wird gespeichert, bevor ein Mensch es bestätigt.</p>
-    </div>
-    <div class="diktat">
-      <div class="dk">
-        <div class="satz"><svg><use href="#i-mikro"/></svg><div>«Setze die Schliessrunde jeden Tag auf den August.»<small>Diktat im Bereich Planung, Objekt aus dem Bildschirm</small></div></div>
-        <div class="pfeil" aria-hidden="true"><svg><use href="#i-pfeil"/></svg></div>
-        <div class="ergebnis"><b>Vorschau: 31 Schichten</b><dl><dt>Objekt</dt><dd>Logistikpark Ost</dd><dt>Vorlage</dt><dd>Schliessrunde 22:00–23:00</dd><dt>Zeitraum</dt><dd>1. – 31. August, täglich</dd><dt>Feiertag</dt><dd>1. August markiert</dd></dl><div class="knoepfe"><span class="prim">Anwenden</span><span>Verwerfen</span></div></div>
-      </div>
-      <div class="dk">
-        <div class="satz"><svg><use href="#i-mikro"/></svg><div>«Neuer Kunde: Beispiel Logistik AG in Olten.»<small>Recherche im Handelsregister ergänzt, was fehlt</small></div></div>
-        <div class="pfeil" aria-hidden="true"><svg><use href="#i-pfeil"/></svg></div>
-        <div class="ergebnis"><b>Kunde anlegen</b><dl><dt>Firma</dt><dd>Beispiel Logistik AG</dd><dt>Adresse</dt><dd>Industriestrasse 12, 4600 Olten</dd><dt>UID</dt><dd>CHE-000.000.000</dd><dt>Webseite</dt><dd>beispiel-logistik.example</dd></dl><div class="knoepfe"><span class="prim">Speichern</span><span>Bearbeiten</span></div></div>
-      </div>
-      <div class="dk">
-        <div class="satz"><svg><use href="#i-bild"/></svg><div>Foto einer Auftragsmail<small>Screenshot oder Auftragszettel, aus der App oder dem Cockpit</small></div></div>
-        <div class="pfeil" aria-hidden="true"><svg><use href="#i-pfeil"/></svg></div>
-        <div class="ergebnis"><b>Einsatz-Entwurf</b><dl><dt>Kunde</dt><dd>Beispiel Logistik AG</dd><dt>Datum</dt><dd>Sa 27., 18:00–02:00</dd><dt>Art</dt><dd>Bewachung, 2 Personen</dd><dt>Ort</dt><dd>Industriestrasse 12, Olten</dd></dl><div class="knoepfe"><span class="prim">Übernehmen</span><span>Verwerfen</span></div></div>
-      </div>
-    </div>
-  </div>
-</section>
-
 <!-- ═══════════════ SICHERHEIT ═══════════════ -->
 <section class="abs nacht-2" id="sicherheit">
   <div class="wrap">
@@ -1077,31 +560,15 @@ p{margin:0 0 1em}
         <p class="vorzeile">Vertrauen</p>
         <h2 class="display">Sicherheit auch hinter dem Bildschirm.</h2>
       </div>
-      <p class="lead">Wer Personaldaten, Kundenobjekte und Aufenthaltsspuren verwaltet, braucht mehr als ein Passwortfeld. Diese Regeln stehen im Server, nicht in der Oberfläche – eine Sperre, die man am Browser vorbei umgehen könnte, wäre keine.</p>
+      <p class="lead">Wer Personaldaten, Kundenobjekte und Aufenthaltsspuren verwaltet, braucht mehr als ein Passwortfeld. Bei <span data-brand>GuardOpS</span> stehen diese Regeln im Server, nicht in der Oberfläche – eine Sperre, die man am Browser vorbei umgehen könnte, wäre keine.</p>
     </div>
     <div class="sicher">
       <div><svg><use href="#i-schild"/></svg><h3>Zwei-Faktor-Anmeldung</h3><p>Zeitbasierter Code (TOTP) für Verwaltungszugänge – mit jeder gängigen Authenticator-App.</p></div>
       <div><svg><use href="#i-rollen"/></svg><h3>Rollen statt Admin-Schalter</h3><p>Sechs Systemrollen, von «Mitarbeitend» bis «Verwaltung». Eine einzige Stelle im Server entscheidet, wer was darf.</p></div>
       <div><svg><use href="#i-auge-zu"/></svg><h3>Vertrauliche Personaldaten</h3><p>AHV-Nummer, Aufenthaltsstatus und Registerdaten verlassen den Server nur mit eigenem Recht. Wer sie nicht sehen darf, kann sie auch nicht ändern.</p></div>
       <div><svg><use href="#i-schloss"/></svg><h3>Festgeschrieben nach dem Abgleich</h3><p>Eine abgeglichene Schicht ändert sich nicht mehr still. Die Zahl auf der Lohnabrechnung bleibt die Zahl vom Abgleich.</p></div>
-      <div><svg><use href="#i-buch"/></svg><h3>Logbuch</h3><p>Wer hat wann was geändert – bei Vertrags- und Personaldaten mit Zeitstempel und Person.</p></div>
-      <div><svg><use href="#i-glocke"/></svg><h3>Push ohne Inhalt</h3><p>Auf dem Sperrbildschirm steht «Neue Mitteilung», nie der Text. Kein Mitteilungsinhalt läuft über die Server von Apple und Google.</p></div>
       <div><svg><use href="#i-trenn"/></svg><h3>Kundenportal getrennt</h3><p>Eigene Tabellen, eigene Anmeldung, eigene Sitzungsprüfung. Ein Kundenzugang erreicht keinen Verwaltungsendpunkt.</p></div>
       <div><svg><use href="#i-server"/></svg><h3>Betrieb in der Schweiz</h3><p>Gehostet bei einem Schweizer Anbieter, verschlüsselt übertragen (HTTPS, HSTS). Diktat und Recherche sind optionale Zusatzfunktionen.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════ HALTUNG ═══════════════ -->
-<section class="abs hell haltung" id="haltung">
-  <div class="wrap">
-    <p class="vorzeile">Warum es das gibt</p>
-    <h2 class="display">Gebaut im Betrieb, nicht am Reissbrett.</h2>
-    <p class="lead"><span data-brand>GuardOpS</span> ist im laufenden Betrieb eines Schweizer Sicherheitsdienstes entstanden – mit zwei Sparten, Nachtschichten, Verkehrsdiensten und einem GAV, der keine Annahmen verzeiht. Jede Funktion ist da, weil sie im Alltag gefehlt hat. Und jede, die niemand brauchte, ist weggeblieben.</p>
-    <div class="unter">
-      <div><b>Kleinstmögliche Software</b>Nicht möglichst viel Software, sondern die kleinste, die ein echtes Problem zuverlässig löst.</div>
-      <div><b>Unbekannt ist nicht «keine»</b>Nicht eingerichtet, kein Zugriff, nichts vorhanden und kein Treffer sind vier verschiedene Aussagen – und bekommen vier verschiedene Texte.</div>
-      <div><b>Gemessen, nicht angenommen</b>Jede Regel im Server, jede Berechnung als Protokoll darstellbar, jede Oberfläche am gerenderten Zustand geprüft.</div>
     </div>
   </div>
 </section>
@@ -1114,6 +581,7 @@ p{margin:0 0 1em}
         <p class="vorzeile">Fragen</p>
         <h2 class="display">Was Betriebe zuerst wissen wollen.</h2>
       </div>
+      <p class="lead">Alles Weitere zeigen wir an Ihrem eigenen Beispiel: Die Demo ist in einer Minute eingerichtet, und was dort steht, ist dieselbe Software.</p>
     </div>
     <div class="faq">
       <details open>
@@ -1125,24 +593,12 @@ p{margin:0 0 1em}
         <p>Nein. Die App läuft auf dem eigenen Handy, iOS und Android. Für Kontrollpunkte genügen günstige NFC-Chips am Objekt – oder ein Geofence, der ganz ohne Chip auskommt.</p>
       </details>
       <details>
-        <summary><span class="frage">Wie kommen unsere bestehenden Kunden hinein?</span></summary>
-        <p>Per Sammelimport aus einer CSV-Datei. Jede Zeile läuft durch dieselbe Prüfung wie das Anlegen von Hand. Was fehlt, ergänzt die Recherche aus dem Handelsregister: Adresse, UID, Webseite.</p>
-      </details>
-      <details>
         <summary><span class="frage">Rechnet die Software unseren Lohn?</span></summary>
         <p>Nein, und das ist Absicht. Sie führt Rohzeit, Nettozeit, Zeitbonus und Auslagenersatz getrennt und nachvollziehbar – als Grundlage für Ihr Lohnprogramm oder Ihre Treuhandstelle. Frankenbeträge für den Lohn entstehen dort, nicht hier.</p>
       </details>
       <details>
-        <summary><span class="frage">Ersetzt <span data-brand>GuardOpS</span> unser Rundgang-System?</span></summary>
-        <p>Ja. Kontrollpunkte per NFC oder Geofence, Runden mit Zeitfenster, Aufgaben, Ereignisse mit Foto – und im Unterschied zur Insellösung mit Verbindung zu Planung, Kundenportal und Abrechnung.</p>
-      </details>
-      <details>
         <summary><span class="frage">Wo liegen unsere Daten?</span></summary>
         <p>Auf Servern in der Schweiz, verschlüsselt übertragen, mit Zwei-Faktor-Anmeldung für Verwaltungszugänge. Für die optionalen Diktat- und Recherchefunktionen wird ein externer KI-Anbieter angebunden – wer sie nicht will, betreibt die Software ohne.</p>
-      </details>
-      <details>
-        <summary><span class="frage">Was kostet <span data-brand>GuardOpS</span>?</span></summary>
-        <p>Das hängt von der Zahl der Mitarbeitenden und den gewählten Modulen ab. Wir zeigen es Ihnen an Ihrem eigenen Beispiel – fragen Sie eine Demo an.</p>
       </details>
     </div>
   </div>
@@ -1249,11 +705,11 @@ p{margin:0 0 1em}
       </div>
       <div>
         <h4>Produkt</h4>
-        <ul><li><a href="#module">Module</a></li><li><a href="#revierdienst">Revierdienst</a></li><li><a href="#portal">Kundenportal</a></li><li><a href="#gav">GAV Sicherheit</a></li><li><a href="#sicherheit">Sicherheit</a></li></ul>
+        <ul><li><a href="#ein-tag">Ein Tag im Betrieb</a></li><li><a href="#gav">GAV Sicherheit</a></li><li><a href="#sicherheit">Sicherheit</a></li></ul>
       </div>
       <div>
         <h4>Unternehmen</h4>
-        <ul><li><a href="#haltung">Warum es das gibt</a></li><li><a href="#demo">Demo anfragen</a></li><li><a href="#faq">Fragen</a></li></ul>
+        <ul><li><a href="#demo">Demo anfragen</a></li><li><a href="#faq">Fragen</a></li></ul>
       </div>
       <div>
         <h4>Rechtliches</h4>
