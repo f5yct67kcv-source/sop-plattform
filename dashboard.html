@@ -20362,8 +20362,12 @@ function finMonatsDaten(monate) {
       verrechnet: imMonat.reduce((s, b) => s + finNetto(b), 0),
       bezahlt: bezahlt.reduce((s, b) => s + finNetto(b), 0),
       offen: imMonat.filter(b => !Number(b.bezahlt)).reduce((s, b) => s + finNetto(b), 0),
-      // null heisst: fuer diesen Monat gibt es noch keinen zaehlenden Lauf.
-      brutto: lm ? Number(lm.brutto_rappen) || 0 : null,
+      // null heisst: fuer diesen Monat gibt es keinen rechenbaren Lauf --
+      // entweder keinen zaehlenden Lauf, oder einen, in dem ALLE Personen
+      // gesperrt sind (etwa kein GAV-Regelwerk). Beides ist keine 0.
+      brutto: lm && !finLohnNichtRechenbar(lm) ? Number(lm.brutto_rappen) || 0 : null,
+      lohnGesperrt: lm ? Number(lm.gesperrt) || 0 : 0,
+      lohnNichtRechenbar: !!(lm && finLohnNichtRechenbar(lm)),
       auslagen: am ? Number(am.rappen) || 0 : (ausl && ausl.zugriff && ausl.eingerichtet ? 0 : null),
       auslagenGesperrt: am ? Number(am.gesperrt) || 0 : 0,
       offeneSchichten: ausl && ausl.zugriff && ausl.eingerichtet ? Number((ausl.offene_schichten || {})[m]) || 0 : 0,
@@ -20475,7 +20479,8 @@ function finKpiZeichnen() {
   } else if (!lohn.eingerichtet) {
     karten.push(ohne(ic.lohn, 'Lohnkosten', 'Lohnbereich noch nicht eingerichtet'));
   } else {
-    const monate = Object.keys(lohn.monate || {}).filter(m => m <= finMonat(0)).sort();
+    const monate = Object.keys(lohn.monate || {})
+      .filter(m => m <= finMonat(0) && !finLohnNichtRechenbar(lohn.monate[m])).sort();
     const letzter = monate[monate.length - 1];
     if (!letzter) {
       karten.push(ohne(ic.lohn, 'Lohnkosten', 'noch kein freigegebener Lohnlauf'));
@@ -20483,7 +20488,7 @@ function finKpiZeichnen() {
       const d = new Date(letzter + '-01T00:00:00');
       const vor = finMonat(-1, d);
       const b = Number(lohn.monate[letzter].brutto_rappen) || 0;
-      const bVor = lohn.monate[vor] ? Number(lohn.monate[vor].brutto_rappen) || 0 : null;
+      const bVor = lohn.monate[vor] && !finLohnNichtRechenbar(lohn.monate[vor]) ? Number(lohn.monate[vor].brutto_rappen) || 0 : null;
       const ausl = finKosten.auslagen;
       const aM = ausl && ausl.zugriff && ausl.eingerichtet ? (ausl.monate || {})[letzter] : null;
       const auslText = !ausl || !ausl.zugriff ? ''
@@ -20542,6 +20547,10 @@ function finRundeGrenze(wert) {
 }
 
 let finChartDaten = [];
+
+// Ein Lauf, in dem jede Person gesperrt ist, traegt Bruttolohn 0 -- das ist
+// "nicht rechenbar", nicht "keine Kosten".
+const finLohnNichtRechenbar = lm => Number(lm.personen) > 0 && Number(lm.gesperrt) >= Number(lm.personen);
 
 function finChartZeichnen(daten) {
   finChartDaten = daten;
@@ -20717,11 +20726,15 @@ function finTipZeigen(i) {
   }
   if (lohn && lohn.zugriff && lohn.eingerichtet) {
     html += '<div class="fin-tip-trenner"></div>';
-    if (d.brutto === null) {
+    if (d.lohnNichtRechenbar) {
+      html += zeile('lohn', 'Lohnkosten', 'nicht rechenbar', 'ohne');
+      html += `<div class="fin-tip-hinweis">Lauf vorhanden, aber alle ${nf(d.lohnGesperrt)} Personen ohne Betrag (gesperrt)</div>`;
+    } else if (d.brutto === null) {
       html += zeile('lohn', 'Lohnkosten', 'noch kein Lohnlauf', 'ohne');
     } else {
       html += zeile('lohn', 'Lohnkosten', 'CHF ' + chf(d.brutto + (d.auslagen || 0)));
       html += zeile('', 'Bruttolohn', 'CHF ' + chf(d.brutto), 'fein');
+      if (d.lohnGesperrt) { html += `<div class="fin-tip-hinweis">${nf(d.lohnGesperrt)} ${d.lohnGesperrt === 1 ? 'Person' : 'Personen'} ohne Betrag (gesperrt)</div>`; }
     }
     if (ausl && ausl.zugriff && ausl.eingerichtet) {
       html += zeile('', 'Auslagenersatz', 'CHF ' + chf(d.auslagen || 0), 'fein');
