@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 23,
+            'datum' => '2026-10-13',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Neuer Bereich „Finanzen“',
+            'text'  => 'Rechnungen, Lohn und eine Geldübersicht liegen jetzt an einem Ort. „Finanzen“ ersetzt in der Kopfleiste den Bereich „Lohn“ und hat drei Reiter: Übersicht, Rechnungen und Lohn. Die Übersicht zeigt den offenen und den überfälligen Betrag, was im Monat bezahlt wurde, die Lohnkosten und eine Grafik mit verrechnet, bezahlt und Lohnkosten über die letzten Monate. Rechnungen findest du nicht mehr unter Kunden, sondern unter Finanzen. Offerten bleiben bei Kunden. Rechnungsentwürfe zählen in der Übersicht nicht mit. Die Lohnkosten sind ohne Arbeitgeberbeiträge gerechnet. Finanzen gibt es nur am Computer, nicht am Handy.',
+        ],
+        [
             'nr'    => 22,
             'datum' => '2026-10-10',
             'art'   => 'fehlerbehebung',
