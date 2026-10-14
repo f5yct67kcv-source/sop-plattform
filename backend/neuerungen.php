@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 29,
+            'datum' => '2026-10-14',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Lohn der Mitarbeitenden auf einer Seite',
+            'text'  => 'Unter Mitarbeitende → Lohn steht jetzt alles auf einer Seite: links der geltende Lohnansatz und die Abzüge, rechts Zulagen, Zahlungsverbindung und der Verlauf. Mit „bearbeiten“ klappt der Block an Ort und Stelle auf, ohne eigenes Fenster. Oben stehen die Werte aus dem GAV in einer Zeile.',
+        ],
+        [
             'nr'    => 28,
             'datum' => '2026-10-14',
             'art'   => 'fehlerbehebung',

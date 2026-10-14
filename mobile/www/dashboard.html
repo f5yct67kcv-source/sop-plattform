@@ -2306,6 +2306,54 @@ html:not(.hat-reinigung) [data-sparte-feld] { display: none !important; }
 .dlg-ft { padding: 14px 22px; border-top: 1px solid var(--line-soft); display: flex; gap: 9px; justify-content: flex-end; flex: none; }
 /* Update-Fenster (ENT-698) */
 .dlg.upd { max-width: 520px; }
+
+/* ── Lohnseite der Personalakte auf einer Seite (ENT-721, Schritt 1).
+   Am Desktop zwei Spalten: links der geltende Ansatz und die Abzuege als
+   Zeilen, rechts die Tabellen. Die vier bisherigen Lohnfenster werden nicht
+   nachgebaut, sondern klappen an Ort und Stelle im Block auf
+   (lohnFormOeffnen) -- dieselben Felder, dieselbe Pruefung, derselbe
+   Schreibweg. Unter 1360 px eine Spalte -- daneben bliebe der Zahlungstabelle
+   zu wenig Platz --, unter 901 px wieder das Fenster. */
+.lohn-gav { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px;
+  background: var(--line-soft); border: 1px solid var(--line-soft); border-radius: var(--r-lg); overflow: hidden; }
+.lohn-gav > div { background: var(--surface); padding: 11px 14px; min-width: 0; }
+.lohn-gav .k { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--ink-3); }
+.lohn-gav .w { font-size: 14px; margin-top: 3px; }
+.lohn-gav .n { font-size: 11.5px; color: var(--ink-3); line-height: 1.4; margin-top: 2px; }
+.lohn-zwei { display: grid; gap: 16px; align-items: start; }
+.lohn-spalte { display: grid; gap: 16px; min-width: 0; }
+/* Ohne das nimmt eine Karte die Breite ihres Inhalts an (Grid-Vorgabe
+   min-width:auto) und schiebt sich ueber die Nachbarspalte. */
+.lohn-spalte > * { min-width: 0; }
+@media (min-width: 1360px) {
+  .lohn-zwei { grid-template-columns: minmax(400px, 480px) minmax(0, 1fr); }
+}
+.lohn-zeilen { display: grid; grid-template-columns: minmax(110px, 150px) minmax(0, 1fr); margin: 0; }
+.lohn-zeilen > dt, .lohn-zeilen > dd { padding: 7px 0; border-bottom: 1px solid var(--line-soft); margin: 0; font-size: 13.5px; }
+.lohn-zeilen > dt { color: var(--ink-3); padding-right: 12px; }
+.lohn-zeilen > dt:last-of-type, .lohn-zeilen > dd:last-of-type { border-bottom: 0; }
+.lohn-zeilen .zone-note { margin: 2px 0 0; }
+.lohn-kopf-zus { font-size: 12px; color: var(--ink-3); font-weight: 400; margin-left: 8px; }
+.lohn-knoepfe { display: flex; gap: 8px; margin-left: auto; }
+.lohn-staende { margin: 12px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.lohn-staende .tbl { margin-top: 4px; }
+.lohn-gav-titel { font-size: 12.5px; font-weight: 620; margin: 0 0 6px; }
+.lohn-gav-titel span { font-weight: 400; color: var(--ink-3); }
+.lohn-slot:empty { display: none; }
+.lohn-slot { padding: 16px 20px; border-bottom: 1px solid var(--line-soft); background: var(--surface-2); }
+.lohn-slot .dlg { max-width: none; width: auto; max-height: none; box-shadow: none; border-radius: 0;
+  background: transparent; display: block; margin: 0 !important; }
+.lohn-slot .dlg-hd { padding: 0; cursor: default; }
+.lohn-slot .dlg-hd h2 { font-size: 14.5px; }
+.lohn-slot .dlg-bd { padding: 14px 0 0; overflow: visible; }
+.lohn-slot .dlg-ft { padding: 12px 0 0; border-top: 0; justify-content: flex-start; }
+.lohn-slot .feld { display: grid; grid-template-columns: minmax(110px, 150px) minmax(0, 1fr);
+  gap: 0 12px; align-items: start; margin-bottom: 8px; }
+.lohn-slot .feld > label:not(.check) { padding-top: 8px; margin: 0; }
+.lohn-slot .feld > :not(label:first-child) { grid-column: 2; }
+.lohn-slot .feld > .zone-note { margin: 3px 0 0; }
+.lohn-slot .feld > label.check { grid-column: 2; }
+.lohn-slot h3 { font-size: 13.5px; }
 .upd-griff { display: none; }
 .upd-kopf { display: flex; align-items: center; gap: 14px; padding-bottom: 16px; }
 .upd-ikone { flex: none; width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
@@ -10613,7 +10661,7 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
       <p class="err" id="lpaFehler" style="display:none"></p>
     </div>
     <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgLohnAnsatz')">Abbrechen</button>
+      <button class="btn btn-plain" onclick="lohnFormSchliessen('dlgLohnAnsatz')">Abbrechen</button>
       <button class="btn btn-quiet" id="lpaLoeschKnopf" onclick="lohnAkteLoeschen('ansatz', Number($('lpaId').value), 'dlgLohnAnsatz', 'lpaFehler')">Löschen</button>
       <button class="btn btn-primary" onclick="lohnAnsatzSpeichern()">Speichern</button>
     </div>
@@ -10691,7 +10739,7 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
       <p class="err" id="lpbFehler" style="display:none"></p>
     </div>
     <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgLohnAbzug')">Abbrechen</button>
+      <button class="btn btn-plain" onclick="lohnFormSchliessen('dlgLohnAbzug')">Abbrechen</button>
       <button class="btn btn-quiet" id="lpbLoeschKnopf" onclick="lohnAkteLoeschen('abzug', Number($('lpbId').value), 'dlgLohnAbzug', 'lpbFehler')">Löschen</button>
       <button class="btn btn-primary" onclick="lohnAbzugSpeichern()">Speichern</button>
     </div>
@@ -10733,7 +10781,7 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
       <p class="err" id="lpzFehler" style="display:none"></p>
     </div>
     <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgLohnZahlung')">Abbrechen</button>
+      <button class="btn btn-plain" onclick="lohnFormSchliessen('dlgLohnZahlung')">Abbrechen</button>
       <button class="btn btn-quiet" id="lpzLoeschKnopf" onclick="lohnAkteLoeschen('zahlung', Number($('lpzId').value), 'dlgLohnZahlung', 'lpzFehler')">Löschen</button>
       <button class="btn btn-primary" onclick="lohnZahlungSpeichern()">Speichern</button>
     </div>
@@ -10787,7 +10835,7 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
       <p class="err" id="lpoFehler" style="display:none"></p>
     </div>
     <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgLohnPosition')">Abbrechen</button>
+      <button class="btn btn-plain" onclick="lohnFormSchliessen('dlgLohnPosition')">Abbrechen</button>
       <button class="btn btn-quiet" id="lpoLoeschKnopf" onclick="lohnPositionLoeschen()">Löschen</button>
       <button class="btn btn-primary" onclick="lohnPositionSpeichern()">Speichern</button>
     </div>
@@ -25385,6 +25433,7 @@ function lohnAkteLaden() {
   const id = maAkte && maAkte.id;
   if (!id) { ziel.innerHTML = '<div style="color:var(--ink-3)">Wird geladen …</div>'; return; }
   if (lohnAkteFuer === id && lohnAkte) { lohnAkteZeichnen(); return; }
+  if (lohnFormOffen) { lohnFormSchliessen(lohnFormOffen); }
   ziel.innerHTML = '<div style="color:var(--ink-3)">Wird geladen …</div>';
   api('lohn_person.php?id=' + encodeURIComponent(id)).then(({ ok, status, data }) => {
     if (!ok) { ziel.innerHTML = lohnLeer(lohnLeerArt(status, data), data?.message); return; }
@@ -25406,40 +25455,31 @@ function lohnAkteZeichnen() {
   const ml = d.mindestlohn || {};
   const fe = d.ferienentschaedigung || {};
 
-  const mlText = ml.wert === null || ml.wert === undefined
-    ? lohnUnbekannt(ml.text)
-    : `<b>${lohnFr(ml.wert)} CHF</b> ${ml.einheit === 'stunde' ? 'pro Stunde' : 'pro Jahr'}
-       <div class="zone-note" style="margin:2px 0 0">${esc(ml.text || '')}</div>`;
-
-  // Die Ferienentschaedigung wird ABGELEITET und nicht eingetippt: Ein frei
-  // erfasster Prozentsatz driftet vom Anspruch weg, und dann stimmt der
-  // Feriensaldo nicht mehr mit dem ausbezahlten Betrag ueberein.
-  const feText = `<b>${lohnPz(fe.bp)}</b>
-    <div class="zone-note" style="margin:2px 0 0">${esc(fe.text || '')}</div>`;
-
-  const abgeleitet = `<div class="card"><div class="card-hd"><h3>Aus dem GAV abgeleitet</h3></div>
-    <div class="card-bd">
-      <p class="zone-note" style="margin:0 0 12px">Diese Werte entstehen aus Anstellungskategorie,
-        Eintritt und Alter. Sie lassen sich hier nicht erfassen — wer sie ändern will, ändert die
-        Angabe, aus der sie entstehen.</p>
-      <dl class="ku-detail-info">
-        <dt>Lohnform</dt><dd>${d.lohnform ? esc(d.lohnform_text) : lohnUnbekannt(d.lohnform_text)}</dd>
-        <dt>Dienstjahr</dt><dd>${d.dienstjahr ? esc(String(d.dienstjahr)) + '. Dienstjahr'
-          : lohnUnbekannt('Ohne Eintrittsdatum kein Dienstjahr (Art. 16 Ziff. 2)')}</dd>
-        <dt>GAV-Mindestlohn</dt><dd>${mlText}</dd>
-        <dt>Ferienentschädigung</dt><dd>${feText}</dd>
-        <dt>BVG-pflichtig ab</dt><dd>${d.bvg_pflichtig_ab ? dmy(d.bvg_pflichtig_ab)
-          : lohnUnbekannt('Ohne Geburtsdatum keine Eintrittsschwelle (Art. 25 Ziff. 3)')}</dd>
-        <dt>AHV-Nummer</dt><dd>${p.ahv_erfasst
-          ? 'erfasst'
-          : '<span class="chip chip-w">fehlt — ohne sie ist keine Abrechnung möglich</span>'}</dd>
-      </dl>
+  // ── Kopfzeile: was aus dem GAV folgt (ENT-721). Anzeige, kein Formular --
+  //    darum Beschriftung oben, Wert darunter. Die Herkunft steht klein
+  //    darunter, weil sie sagt, WORAUS der Wert entsteht.
+  const kachel = (k, w, n) => `<div><div class="k">${k}</div><div class="w">${w}</div>${
+    n ? `<div class="n">${esc(n)}</div>` : ''}</div>`;
+  const abgeleitet = `<div><div class="lohn-gav-titel">Aus dem GAV abgeleitet
+      <span>— entsteht aus Anstellungskategorie, Eintritt und Alter; ändern lässt es sich nur dort</span></div>
+    <div class="lohn-gav">
+      ${kachel('Lohnform', d.lohnform ? esc(d.lohnform_text) : lohnUnbekannt(d.lohnform_text))}
+      ${kachel('Dienstjahr', d.dienstjahr ? esc(String(d.dienstjahr)) + '. Dienstjahr'
+          : lohnUnbekannt('Ohne Eintrittsdatum kein Dienstjahr (Art. 16 Ziff. 2)'))}
+      ${kachel('GAV-Mindestlohn', ml.wert === null || ml.wert === undefined ? lohnUnbekannt(ml.text)
+          : `<b>${lohnFr(ml.wert)} CHF</b> ${ml.einheit === 'stunde' ? 'pro Stunde' : 'pro Jahr'}`,
+          ml.wert === null || ml.wert === undefined ? '' : ml.text)}
+      ${kachel('Ferienentschädigung', `<b>${lohnPz(fe.bp)}</b>`, fe.text)}
+      ${kachel('BVG-pflichtig ab', d.bvg_pflichtig_ab ? dmy(d.bvg_pflichtig_ab)
+          : lohnUnbekannt('Ohne Geburtsdatum keine Eintrittsschwelle (Art. 25 Ziff. 3)'))}
+      ${kachel('AHV-Nummer', p.ahv_erfasst ? 'erfasst'
+          : '<span class="chip chip-w">fehlt — ohne sie keine Abrechnung</span>')}
     </div></div>`;
 
   // Die Mindestlohnwarnung steht OBEN und nicht bei der Ansatzzeile: Wer
   // unter Tarif zahlt, soll es sehen, bevor er scrollt.
   const w = lohnAkte.warnung;
-  const warnung = w ? `<div class="msg-warn" style="margin:0 0 14px">
+  const warnung = w ? `<div class="msg-warn" style="margin:0">
       <b>Der Ansatz liegt unter dem GAV-Mindestlohn.</b>
       <div style="margin:4px 0 0">${esc(w.text)}</div>
       <div class="zone-note" style="margin:6px 0 0">Das ist eine Warnung, keine Sperre — Anhang 1
@@ -25447,103 +25487,227 @@ function lohnAkteZeichnen() {
         wendet diese Kann-Bestimmung nie von sich aus an.</div>
     </div>` : '';
 
-  // ── Ansätze, neueste zuerst. Der heute geltende ist markiert; ein
-  //    künftiger ist erfasst, aber noch nicht gültig, und darf nicht
-  //    aussehen wie der aktuelle.
-  const aktuellId = lohnAkte.ansatz_aktuell ? lohnAkte.ansatz_aktuell.id : null;
   const heute = d.stichtag || '';
-  const ansaetze = (lohnAkte.ansaetze || []).map(a => {
-    const kuenftig = a.gueltig_ab > heute;
-    const marke = a.id === aktuellId
-      ? ' <span class="chip chip-ok">gilt heute</span>'
-      : (kuenftig ? ' <span class="chip">ab ' + dmy(a.gueltig_ab) + '</span>' : '');
-    const zus = [];
-    if (a.zuschlag_fachausweis_rappen) { zus.push(`Fachausweis ${lohnFr(a.zuschlag_fachausweis_rappen)} / ${a.zuschlag_fachausweis_art === 'monat' ? 'Monat' : 'Stunde'}`); }
-    if (a.zuschlag_hund_rappen) { zus.push(`Diensthund ${lohnFr(a.zuschlag_hund_rappen)} / ${a.zuschlag_hund_art === 'monat' ? 'Monat' : 'Stunde'}`); }
-    if (a.zuschlag_waffe_rappen) { zus.push(`Schusswaffe ${lohnFr(a.zuschlag_waffe_rappen)} / ${a.zuschlag_waffe_art === 'monat' ? 'Monat' : 'Stunde'}`); }
-    return `<tr${kuenftig ? ' style="opacity:.7"' : ''}>
-      <td>${dmy(a.gueltig_ab)}${marke}</td>
-      <td style="text-align:right"><b>${lohnFr(a.ansatz_rappen)}</b></td>
-      <td>${a.kategorie ? 'Kat. ' + esc(a.kategorie) : lohnUnbekannt('ohne Kategorie')}</td>
-      <td>${a.ml13_bp ? lohnPz(a.ml13_bp) : '<span class="zone-note" title="Kein 13. Monatslohn vereinbart — er ist keine GAV-Pflicht">keiner</span>'}</td>
-      <td>${a.ferien_laufend ? 'laufend' : '<span title="Der Ferienlohn wird beim Bezug ausbezahlt, Art. 20 Ziff. 2">beim Bezug</span>'}</td>
-      <td>${zus.length ? esc(zus.join(' · ')) : '<span class="zone-note">keine</span>'}</td>
-      <td style="text-align:right">${lohnSchreiben()
-        ? `<button class="btn btn-quiet btn-sm" onclick="lohnAnsatzOeffnen(${a.id})">Ändern</button>` : ''}</td>
-    </tr>`;
-  }).join('');
+  const schreiben = lohnSchreiben();
+  const slot = dlg => `<div class="lohn-slot" data-slot="${dlg}"></div>`;
+  const zuschlag = (a, feld) => a['zuschlag_' + feld + '_rappen']
+    ? `${lohnFr(a['zuschlag_' + feld + '_rappen'])} CHF pro ${a['zuschlag_' + feld + '_art'] === 'monat' ? 'Monat' : 'Stunde'}`
+    : '<span class="zone-note" style="margin:0">keiner</span>';
 
+  // ── Links oben: der heute geltende Lohnansatz, Zeile fuer Zeile wie im
+  //    Formular. "bearbeiten" klappt genau diese Zeilen zum Formular auf.
+  const alleAnsaetze = lohnAkte.ansaetze || [];
+  // Die volle Zeile aus der Liste: Dort stehen auch die Zuschlaege.
+  const ak = lohnAkte.ansatz_aktuell
+    ? (alleAnsaetze.find(x => x.id === lohnAkte.ansatz_aktuell.id) || lohnAkte.ansatz_aktuell) : null;
+  const einheit = (d.lohnform === 'monat') ? 'pro Monat' : (d.lohnform === 'stunde' ? 'pro Stunde' : '');
+  let ansatzInhalt;
+  if (ak) {
+    ansatzInhalt = `<dl class="lohn-zeilen">
+      <dt>Gültig ab</dt><dd>${dmy(ak.gueltig_ab)} <span class="chip chip-ok">gilt heute</span></dd>
+      <dt>Ansatz</dt><dd><b>${lohnFr(ak.ansatz_rappen)} CHF</b> ${einheit}</dd>
+      <dt>Kategorie</dt><dd>${ak.kategorie ? 'Kat. ' + esc(ak.kategorie) : lohnUnbekannt('ohne Kategorie')}</dd>
+      <dt>13. Monatslohn</dt><dd>${ak.ml13_bp ? lohnPz(ak.ml13_bp)
+        : '<span class="zone-note" style="margin:0" title="Kein 13. Monatslohn vereinbart — er ist keine GAV-Pflicht">nicht vereinbart</span>'}</dd>
+      <dt>Ferienlohn</dt><dd>${Number(ak.ferien_laufend) ? 'laufend ausbezahlt' : 'beim Bezug ausbezahlt'}</dd>
+      <dt>Fachausweis</dt><dd>${zuschlag(ak, 'fachausweis')}</dd>
+      <dt>Diensthund</dt><dd>${zuschlag(ak, 'hund')}</dd>
+      <dt>Schusswaffe</dt><dd>${zuschlag(ak, 'waffe')}</dd>
+      ${ak.bemerkung ? `<dt>Bemerkung</dt><dd>${esc(ak.bemerkung)}</dd>` : ''}
+    </dl>`;
+  } else if (alleAnsaetze.length) {
+    // Erfasst, aber noch keiner gilt: das ist nicht dasselbe wie "keiner".
+    ansatzInhalt = lohnLeer('leer', 'Heute gilt noch kein Ansatz. Der erste erfasste beginnt am '
+      + dmy(alleAnsaetze[alleAnsaetze.length - 1].gueltig_ab) + '.');
+  } else {
+    ansatzInhalt = lohnLeer('leer', 'Noch kein Lohnansatz erfasst. Ohne ihn kann für diese Person nicht abgerechnet werden.');
+  }
   const ansatzKarte = `<div class="card"><div class="card-hd"><h3>Lohnansatz</h3>
-      ${lohnSchreiben() ? `<button class="btn btn-primary btn-sm" onclick="lohnAnsatzOeffnen(null)">Ansatz erfassen</button>` : ''}</div>
-    <div class="card-bd">
-      ${warnung}
-      ${ansaetze ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr>
-          <th>Gültig ab</th><th style="text-align:right">Ansatz CHF</th><th>Kategorie</th>
-          <th>13. ML</th><th>Ferienlohn</th><th>Zuschläge Art. 19</th><th></th>
-        </tr></thead><tbody>${ansaetze}</tbody></table></div>
-        <p class="zone-note">Ein neuer Ansatz wird <b>zusätzlich</b> erfasst — der alte bleibt stehen,
-          damit abgeschlossene Abrechnungen sich nicht rückwirkend ändern.</p>`
-        : lohnLeer('leer', 'Noch kein Lohnansatz erfasst. Ohne ihn kann für diese Person nicht abgerechnet werden.')}
-    </div></div>`;
+      ${schreiben ? `<div class="lohn-knoepfe">
+        ${ak ? `<button class="btn btn-quiet btn-sm" onclick="lohnAnsatzOeffnen(${ak.id})">bearbeiten</button>` : ''}
+        <button class="btn btn-primary btn-sm" onclick="lohnAnsatzOeffnen(null)">Neuer Ansatz</button></div>` : ''}</div>
+    ${slot('dlgLohnAnsatz')}
+    <div class="card-bd" data-lese="dlgLohnAnsatz">${ansatzInhalt}</div></div>`;
 
-  // ── Abzugsparameter je Person ──────────────────────────────────────────
-  const abz = (lohnAkte.abzuege || []).map(a => `<tr>
-      <td>${dmy(a.gueltig_ab)}</td>
-      <td>${a.nbu_pflichtig === null || a.nbu_pflichtig === undefined
-        ? '<span class="zone-note">automatisch</span>'
-        : `<span class="chip ${Number(a.nbu_pflichtig) ? 'chip-ok' : 'chip-x'}">${
-             Number(a.nbu_pflichtig) ? 'versichert' : 'nicht versichert'}</span>
-           <div class="zone-note">von Hand${a.nbu_grund ? ': ' + esc(a.nbu_grund) : ' — ohne Begründung'}${
-             a.nbu_am ? ', ' + dmy(String(a.nbu_am).slice(0, 10)) : ''}</div>`}</td>
-      <td>${Number(a.ktg_pflichtig) ? 'ja' : 'nein'}</td>
-      <td>${Number(a.bvg_angeschlossen)
-        ? (a.bvg_beitrag_rappen !== null ? lohnFr(a.bvg_beitrag_rappen) + ' CHF/Monat'
+  // ── Links unten: die Abzugsangaben, die heute gelten. Fruehere und
+  //    kuenftige Staende stehen als Zeile darunter, nicht als eigene Tabelle.
+  const abzuege = lohnAkte.abzuege || [];
+  const ab = abzuege.find(x => x.gueltig_ab <= heute) || null;
+  const nbuText = x => x.nbu_pflichtig === null || x.nbu_pflichtig === undefined
+    ? 'automatisch <span class="zone-note" style="margin:0">nach den geleisteten Stunden</span>'
+    : `<span class="chip ${Number(x.nbu_pflichtig) ? 'chip-ok' : 'chip-x'}">${
+         Number(x.nbu_pflichtig) ? 'versichert' : 'nicht versichert'}</span>
+       <div class="zone-note">von Hand${x.nbu_grund ? ': ' + esc(x.nbu_grund) : ' — ohne Begründung'}${
+         x.nbu_am ? ', ' + dmy(String(x.nbu_am).slice(0, 10)) : ''}</div>`;
+  let abzugInhalt;
+  if (ab) {
+    abzugInhalt = `<dl class="lohn-zeilen">
+      <dt>Gültig ab</dt><dd>${dmy(ab.gueltig_ab)}</dd>
+      <dt>NBU</dt><dd>${nbuText(ab)}</dd>
+      <dt>KTG</dt><dd>${Number(ab.ktg_pflichtig) ? 'ja' : 'nein'}</dd>
+      <dt>BVG</dt><dd>${Number(ab.bvg_angeschlossen)
+        ? (ab.bvg_beitrag_rappen !== null ? lohnFr(ab.bvg_beitrag_rappen) + ' CHF pro Monat'
            : lohnUnbekannt('angeschlossen, Betrag fehlt'))
-        : 'nicht angeschlossen'}</td>
-      <td>${Number(a.qst_pflichtig)
-        ? esc((a.qst_kanton || '?') + ' · Tarif ' + (a.qst_tarifcode || '?')
-              + (a.qst_kinder ? ' · ' + a.qst_kinder + ' Kind(er)' : ''))
-        : 'nein'}</td>
-      <td style="text-align:right">${lohnSchreiben()
-        ? `<button class="btn btn-quiet btn-sm" onclick="lohnAbzugOeffnen(${a.id})">Ändern</button>` : ''}</td>
-    </tr>`).join('');
+        : 'nicht angeschlossen'}</dd>
+      <dt>Quellensteuer</dt><dd>${Number(ab.qst_pflichtig)
+        ? esc((ab.qst_kanton || '?') + ' · Tarif ' + (ab.qst_tarifcode || '?')
+              + (ab.qst_kinder ? ' · ' + ab.qst_kinder + ' Kind(er)' : ''))
+        : 'nein'}</dd>
+      ${ab.bemerkung ? `<dt>Bemerkung</dt><dd>${esc(ab.bemerkung)}</dd>` : ''}
+    </dl>`;
+  } else if (abzuege.length) {
+    abzugInhalt = lohnLeer('leer', 'Heute gilt noch kein Eintrag. Der erste beginnt am '
+      + dmy(abzuege[abzuege.length - 1].gueltig_ab) + '.');
+  } else {
+    abzugInhalt = lohnLeer('leer', 'Noch nichts erfasst. Ohne diese Angaben ist offen, was abgezogen wird — '
+      + 'und offen ist nicht dasselbe wie null.');
+  }
+  // Fruehere und kuenftige Staende knapp darunter -- mit allem, was sie
+  // sagen, auch einer begruendeten Uebersteuerung.
+  const andere = abzuege.filter(x => x !== ab);
+  const staende = andere.length ? `<div class="lohn-staende">${andere.length === 1 ? 'Weiterer Stand' : 'Weitere Stände'}
+      <div style="overflow-x:auto"><table class="tbl"><thead><tr>
+        <th>Gültig ab</th><th>NBU</th><th>KTG</th><th>BVG</th><th>QST</th><th></th>
+      </tr></thead><tbody>${andere.map(x => `<tr${x.gueltig_ab > heute ? ' style="opacity:.7"' : ''}>
+        <td>${x.gueltig_ab > heute ? 'ab ' : ''}${dmy(x.gueltig_ab)}</td>
+        <td>${nbuText(x)}</td>
+        <td>${Number(x.ktg_pflichtig) ? 'ja' : 'nein'}</td>
+        <td>${Number(x.bvg_angeschlossen) ? (x.bvg_beitrag_rappen !== null ? lohnFr(x.bvg_beitrag_rappen) : lohnUnbekannt('Betrag fehlt')) : 'nein'}</td>
+        <td>${Number(x.qst_pflichtig) ? esc((x.qst_kanton || '?') + ' ' + (x.qst_tarifcode || '?')) : 'nein'}</td>
+        <td style="text-align:right">${schreiben
+          ? `<button class="btn btn-quiet btn-sm" onclick="lohnAbzugOeffnen(${Number(x.id)})">Ändern</button>` : ''}</td>
+      </tr>`).join('')}</tbody></table></div>
+    </div>` : '';
+  const abzugKarte = `<div class="card"><div class="card-hd"><h3>Abzüge</h3>
+      ${schreiben ? `<div class="lohn-knoepfe">
+        ${ab ? `<button class="btn btn-quiet btn-sm" onclick="lohnAbzugOeffnen(${Number(ab.id)})">bearbeiten</button>` : ''}
+        <button class="btn btn-primary btn-sm" onclick="lohnAbzugOeffnen(null)">${abzuege.length ? 'Neuer Stand' : 'Erfassen'}</button></div>` : ''}</div>
+    ${slot('dlgLohnAbzug')}
+    <div class="card-bd" data-lese="dlgLohnAbzug">${abzugInhalt}${staende}
+      ${abzuege.length ? `<p class="zone-note" style="margin:10px 0 0">Der BVG-Betrag kommt aus der Meldung der Pensionskasse und wird nicht
+        hergeleitet — die Skala der Kasse ist deren Vertragswerk, nicht der GAV.</p>` : ''}</div></div>`;
 
-  const abzugKarte = `<div class="card"><div class="card-hd"><h3>Abzüge dieser Person</h3>
-      ${lohnSchreiben() ? `<button class="btn btn-primary btn-sm" onclick="lohnAbzugOeffnen(null)">Erfassen</button>` : ''}</div>
-    <div class="card-bd">
-      ${abz ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr>
-          <th>Gültig ab</th><th>NBU</th><th>KTG</th><th>BVG</th><th>Quellensteuer</th><th></th>
-        </tr></thead><tbody>${abz}</tbody></table></div>
-        <p class="zone-note">Der BVG-Betrag kommt aus der Meldung der Pensionskasse und wird nicht
-          hergeleitet — die Skala der Kasse ist deren Vertragswerk, nicht der GAV.</p>`
-        : lohnLeer('leer', 'Noch nichts erfasst. Ohne diese Angaben ist offen, was abgezogen wird — '
-                 + 'und offen ist nicht dasselbe wie null.')}
-    </div></div>`;
-
-  // ── Zahlungswege ───────────────────────────────────────────────────────
+  // ── Rechts: Zahlungsverbindungen ───────────────────────────────────────
   const zahl = (lohnAkte.zahlungen || []).map(z => `<tr${Number(z.aktiv) ? '' : ' style="opacity:.55"'}>
       <td>${z.reihenfolge}</td>
-      <td>${z.art === 'fix' ? lohnFr(z.betrag_rappen) + ' CHF fest' : 'Restbetrag'}</td>
       <td style="font-variant-numeric:tabular-nums">${esc(z.iban)}</td>
-      <td>${esc(z.empfaenger || '')}${z.bank ? '<div class="zone-note">' + esc(z.bank) + '</div>' : ''}</td>
+      <td>${esc(z.empfaenger || '')}${z.bank ? '<div class="zone-note" style="margin:0">' + esc(z.bank) + '</div>' : ''}</td>
+      <td>${z.art === 'fix' ? lohnFr(z.betrag_rappen) + ' CHF fest' : 'Restbetrag'}</td>
       <td>${Number(z.aktiv) ? 'aktiv' : 'inaktiv'}</td>
-      <td style="text-align:right">${lohnSchreiben()
+      <td style="text-align:right">${schreiben
         ? `<button class="btn btn-quiet btn-sm" onclick="lohnZahlungOeffnen(${z.id})">Ändern</button>` : ''}</td>
     </tr>`).join('');
-
-  const zahlKarte = `<div class="card"><div class="card-hd"><h3>Auszahlung</h3>
-      ${lohnSchreiben() ? `<button class="btn btn-primary btn-sm" onclick="lohnZahlungOeffnen(null)">Empfänger erfassen</button>` : ''}</div>
+  const zahlKarte = `<div class="card"><div class="card-hd"><h3>Zahlungsverbindung</h3>
+      ${schreiben ? `<div class="lohn-knoepfe"><button class="btn btn-primary btn-sm" onclick="lohnZahlungOeffnen(null)">Erfassen</button></div>` : ''}</div>
+    ${slot('dlgLohnZahlung')}
     <div class="card-bd">
       ${zahl ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr>
-          <th>Nr.</th><th>Anteil</th><th>IBAN</th><th>Empfänger</th><th></th><th></th>
+          <th>Nr.</th><th>IBAN</th><th>Empfänger</th><th>Anteil</th><th></th><th></th>
         </tr></thead><tbody>${zahl}</tbody></table></div>
-        <p class="zone-note">Genau ein Empfänger bekommt den Restbetrag. Weitere brauchen einen festen
+        <p class="zone-note" style="margin:10px 0 0">Genau ein Empfänger bekommt den Restbetrag. Weitere brauchen einen festen
           Betrag — so lässt sich der Lohn auf mehrere Konten aufteilen.</p>`
         : lohnLeer('leer', 'Noch kein Empfänger erfasst. Ohne IBAN lässt sich der Lohn nicht auszahlen.')}
     </div></div>`;
 
+  // ── Rechts unten: alle Ansaetze, neueste zuerst. Der heute geltende ist
+  //    markiert; ein kuenftiger ist erfasst, aber noch nicht gueltig, und
+  //    darf nicht aussehen wie der aktuelle.
+  const aktuellId = ak ? ak.id : null;
+  const verlauf = alleAnsaetze.map(a => {
+    const kuenftig = a.gueltig_ab > heute;
+    const marke = a.id === aktuellId
+      ? ' <span class="chip chip-ok">gilt heute</span>'
+      : (kuenftig ? ' <span class="chip">künftig</span>' : '');
+    return `<tr${kuenftig ? ' style="opacity:.7"' : ''}>
+      <td>${dmy(a.gueltig_ab)}${marke}</td>
+      <td style="text-align:right"><b>${lohnFr(a.ansatz_rappen)}</b></td>
+      <td>${a.kategorie ? 'Kat. ' + esc(a.kategorie) : lohnUnbekannt('ohne Kategorie')}</td>
+      <td>${a.ml13_bp ? lohnPz(a.ml13_bp) : '<span class="zone-note" style="margin:0">keiner</span>'}</td>
+      <td>${Number(a.ferien_laufend) ? 'laufend' : 'beim Bezug'}</td>
+      <td style="text-align:right">${schreiben
+        ? `<button class="btn btn-quiet btn-sm" onclick="lohnAnsatzOeffnen(${a.id})">Ändern</button>` : ''}</td>
+    </tr>`;
+  }).join('');
+  const verlaufKarte = alleAnsaetze.length ? `<div class="card"><div class="card-hd"><h3>Verlauf Lohnansatz</h3>
+      <span class="lohn-kopf-zus">${alleAnsaetze.length} ${alleAnsaetze.length === 1 ? 'Eintrag' : 'Einträge'}</span></div>
+    <div class="card-bd">
+      <div style="overflow-x:auto"><table class="tbl"><thead><tr>
+        <th>Gültig ab</th><th style="text-align:right">Ansatz CHF</th><th>Kategorie</th>
+        <th>13. ML</th><th>Ferienlohn</th><th></th>
+      </tr></thead><tbody>${verlauf}</tbody></table></div>
+      <p class="zone-note" style="margin:10px 0 0">Ein neuer Ansatz wird <b>zusätzlich</b> erfasst — der alte bleibt stehen,
+        damit abgeschlossene Abrechnungen sich nicht rückwirkend ändern.</p>
+    </div></div>` : '';
+
+  lohnFormZurueck();
   ziel.innerHTML = `<div class="ma-lohn" style="display:grid;gap:16px">
-    ${abgeleitet}${ansatzKarte}${lohnPositionKarte(heute)}${abzugKarte}${zahlKarte}</div>`;
+    ${abgeleitet}${warnung}
+    <div class="lohn-zwei">
+      <div class="lohn-spalte">${ansatzKarte}${abzugKarte}</div>
+      <div class="lohn-spalte">${lohnPositionKarte(heute)}${zahlKarte}${verlaufKarte}</div>
+    </div></div>`;
+  lohnFormEinsetzen();
+}
+
+// ── Lohnformulare an Ort und Stelle (ENT-721) ────────────────────────────
+// Die vier Lohnfenster bleiben im Dokument, wie sie sind. Am Desktop wird
+// ihr Inhalt beim Oeffnen in den Block verschoben, zu dem er gehoert, und
+// beim Schliessen zurueck. So gibt es weiterhin genau EIN Formular je Sache:
+// dieselben Felder, dieselbe Pruefung, derselbe Schreibweg -- nur der Ort
+// ist ein anderer. Unter 901 px bleibt es das Fenster.
+let lohnFormOffen = null;
+// Der verschobene Kasten wird festgehalten. Ersetzt jemand den Lohnbereich
+// (andere Person, Neuladen), waere er sonst mit dem alten Inhalt weg.
+let lohnFormKasten = null;
+
+function lohnFormInline() {
+  return window.innerWidth >= 901 && !!document.querySelector('#mdBereich_lohn .lohn-slot');
+}
+
+// Steht am Anfang jedes der vier ...Oeffnen(): Die Felder muessen zurueck im
+// Dokument sein, bevor sie befuellt werden.
+function lohnFormVorbereiten() {
+  if (lohnFormOffen) { lohnFormSchliessen(lohnFormOffen); }
+}
+
+function lohnFormOeffnen(dlg) {
+  if (!lohnFormInline()) { openDlg(dlg); return; }
+  lohnFormOffen = dlg;
+  lohnFormEinsetzen();
+  const s = document.querySelector(`#mdBereich_lohn [data-slot="${dlg}"]`);
+  if (s && lohnFormOffen) {
+    s.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const erstes = s.querySelector('input:not([type=hidden]), select, textarea');
+    if (erstes) { erstes.focus({ preventScroll: true }); }
+  }
+}
+
+function lohnFormSchliessen(dlg) {
+  if (lohnFormOffen !== dlg) { closeDlg(dlg); return; }
+  lohnFormZurueck();
+  lohnFormOffen = null;
+  lohnFormKasten = null;
+  document.querySelectorAll('#mdBereich_lohn [data-lese]').forEach(e => { e.style.display = ''; });
+}
+
+// Vor jedem Neuzeichnen zurueck ins Fenster -- sonst risse innerHTML die
+// Felder mit, und das naechste Oeffnen faende sie nicht mehr.
+function lohnFormZurueck() {
+  if (!lohnFormOffen || !lohnFormKasten) { return; }
+  const scrim = $(lohnFormOffen);
+  if (scrim && lohnFormKasten.parentNode !== scrim) { scrim.appendChild(lohnFormKasten); }
+}
+
+function lohnFormEinsetzen() {
+  if (!lohnFormOffen) { return; }
+  const s = document.querySelector(`#mdBereich_lohn [data-slot="${lohnFormOffen}"]`);
+  const scrim = $(lohnFormOffen);
+  const kasten = lohnFormKasten || (scrim && scrim.querySelector('.dlg'));
+  if (!s || !kasten) { lohnFormZurueck(); lohnFormOffen = null; lohnFormKasten = null; return; }
+  lohnFormKasten = kasten;
+  s.appendChild(kasten);
+  const lese = document.querySelector(`#mdBereich_lohn [data-lese="${lohnFormOffen}"]`);
+  if (lese) { lese.style.display = 'none'; }
 }
 
 // ── Persönliche Zulagen und Abzüge (ENT-713) ─────────────────────────────
@@ -25568,8 +25732,9 @@ function lohnPositionKarte(heute) {
   const liste = lohnAkte.positionen;
   const waehlbar = lohnAkte.positionen_lohnarten || [];
   const knopf = lohnSchreiben() && liste !== null && liste !== undefined && waehlbar.length
-    ? `<button class="btn btn-primary btn-sm" onclick="lohnPositionOeffnen(null)">Erfassen</button>` : '';
-  const kopf = `<div class="card-hd"><h3>Zulagen und Abzüge</h3>${knopf}</div>`;
+    ? `<div class="lohn-knoepfe"><button class="btn btn-primary btn-sm" onclick="lohnPositionOeffnen(null)">Erfassen</button></div>` : '';
+  const kopf = `<div class="card-hd"><h3>Zulagen und Abzüge</h3>${knopf}</div>
+    <div class="lohn-slot" data-slot="dlgLohnPosition"></div>`;
   const gavHinweis = `<p class="zone-note" style="margin:10px 0 0">Die GAV-Zuschläge nach Art. 19
     (Fachausweis, Diensthund, Schusswaffe) stehen beim Lohnansatz.</p>`;
 
@@ -25640,6 +25805,7 @@ function lohnPositionKarte(heute) {
 
 // ── Dialog: persönliche Position ─────────────────────────────────────────
 function lohnPositionOeffnen(id) {
+  lohnFormVorbereiten();
   const p = id ? (lohnAkte.positionen || []).find(x => x.id === id) : null;
   const waehlbar = lohnAkte.positionen_lohnarten || [];
   $('lpoId').value = p ? p.id : '';
@@ -25684,7 +25850,7 @@ function lohnPositionOeffnen(id) {
   lohnPositionWegUmschalten();
   lohnPositionEinheit();
   lohnPositionEinmalig();
-  openDlg('dlgLohnPosition');
+  lohnFormOeffnen('dlgLohnPosition');
 }
 
 function lohnPositionWeg() {
@@ -25756,6 +25922,7 @@ function lohnPositionLoeschen() {
 
 // ── Dialog: Lohnansatz ───────────────────────────────────────────────────
 function lohnAnsatzOeffnen(id) {
+  lohnFormVorbereiten();
   const a = id ? (lohnAkte.ansaetze || []).find(x => x.id === id) : null;
   $('lpaTitel').textContent = a ? 'Lohnansatz ändern' : 'Lohnansatz erfassen';
   $('lpaId').value = a ? a.id : '';
@@ -25776,7 +25943,7 @@ function lohnAnsatzOeffnen(id) {
   $('lpaEinheit').textContent = form === 'monat' ? 'CHF pro Monat'
     : (form === 'stunde' ? 'CHF pro Stunde' : 'Einheit unbekannt — ohne Anstellungskategorie');
   $('lpaFehler').style.display = 'none';
-  openDlg('dlgLohnAnsatz');
+  lohnFormOeffnen('dlgLohnAnsatz');
 }
 
 function lohnAnsatzSpeichern() {
@@ -25797,6 +25964,7 @@ function lohnAnsatzSpeichern() {
 
 // ── Dialog: Abzüge der Person ────────────────────────────────────────────
 function lohnAbzugOeffnen(id) {
+  lohnFormVorbereiten();
   const a = id ? (lohnAkte.abzuege || []).find(x => Number(x.id) === id) : null;
   $('lpbTitel').textContent = a ? 'Abzüge ändern' : 'Abzüge erfassen';
   $('lpbId').value = a ? a.id : '';
@@ -25817,7 +25985,7 @@ function lohnAbzugOeffnen(id) {
   $('lpbLoeschKnopf').style.display = a ? '' : 'none';
   $('lpbFehler').style.display = 'none';
   lohnQstUmschalten();
-  openDlg('dlgLohnAbzug');
+  lohnFormOeffnen('dlgLohnAbzug');
 }
 
 // Quellensteuerfelder nur zeigen, wenn sie gebraucht werden. Ein leeres
@@ -25875,6 +26043,7 @@ function lohnAbzugSpeichern() {
 
 // ── Dialog: Zahlungsempfänger ────────────────────────────────────────────
 function lohnZahlungOeffnen(id) {
+  lohnFormVorbereiten();
   const z = id ? (lohnAkte.zahlungen || []).find(x => Number(x.id) === id) : null;
   $('lpzTitel').textContent = z ? 'Empfänger ändern' : 'Empfänger erfassen';
   $('lpzId').value = z ? z.id : '';
@@ -25888,7 +26057,7 @@ function lohnZahlungOeffnen(id) {
   $('lpzLoeschKnopf').style.display = z ? '' : 'none';
   $('lpzFehler').style.display = 'none';
   lohnZahlArtUmschalten();
-  openDlg('dlgLohnZahlung');
+  lohnFormOeffnen('dlgLohnZahlung');
 }
 
 function lohnZahlArtUmschalten() {
@@ -25920,7 +26089,7 @@ function lohnAkteSchreiben(body, dialog, fehlerId, meldung) {
       return;
     }
     lohnAkte = data;
-    closeDlg(dialog);
+    lohnFormSchliessen(dialog);
     lohnAkteZeichnen();
     toast(meldung);
   });
