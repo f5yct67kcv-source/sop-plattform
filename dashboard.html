@@ -5434,6 +5434,64 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   .glas-schalter .knopf { width: 22px; height: 22px; }
   html[data-glas="an"] .glas-schalter .knopf { transform: translateX(18px); } }
 
+/* ── Kompakte Darstellung (Versuch auf der Testumgebung, 2026-10-14).
+   Frage des Projektinhabers: Arbeitet es sich mit einer dichteren
+   Darstellung, wie sie andere Planungsprogramme zeigen, leichter? Darum ein
+   Schalter zum direkten Vergleich, keine Entscheidung. Festgelegt im
+   Gespraech: Schalter in der Kopfleiste (Bauart wie Glas und hell/dunkel),
+   mittlere Dichte (Felder rund 30 statt 41 px), Erklaertexte in
+   Formularabschnitten hinter ein (i).
+   NUR DESKTOP: Am Handy gelten 44 px Trefferflaeche und 16 px Schrift in
+   Eingabefeldern; der mobile Zuschnitt ist eine eigene Entscheidung. Darum
+   haengt jede Regel hier an min-width: 901px -- dieselbe Grenze, an der
+   .ohne-schublade den Schalter ausblendet.
+   Alles haengt an html[data-dichte="kompakt"]; ohne das Attribut aendert
+   dieser Block nichts. */
+.dichte-schalter { flex: none; width: 52px; height: 30px; border-radius: 999px; padding: 0;
+  border: 1px solid var(--line); background: var(--bg); cursor: pointer; position: relative;
+  transition: background .18s, border-color .18s; }
+.dichte-schalter:hover { border-color: var(--line-hi); }
+.dichte-schalter .knopf { position: absolute; top: 2px; left: 2px; width: 24px; height: 24px;
+  border-radius: 50%; background: var(--surface); box-shadow: var(--sh-1);
+  display: flex; align-items: center; justify-content: center; transition: transform .2s; }
+.dichte-schalter svg { width: 14px; height: 14px; fill: none; stroke-width: 2.1;
+  stroke-linecap: round; stroke-linejoin: round; stroke: var(--ink-3); transition: stroke .16s; }
+html[data-dichte="kompakt"] .dichte-schalter { background: var(--accent-soft); border-color: var(--accent-line); }
+html[data-dichte="kompakt"] .dichte-schalter .knopf { transform: translateX(22px); }
+html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
+@media (prefers-reduced-motion: reduce) {
+  .dichte-schalter, .dichte-schalter .knopf, .dichte-schalter svg { transition: none; }
+}
+/* Das (i) an der Abschnittsueberschrift. Gebaut wird es immer (dichteInfoBauen),
+   sichtbar ist es nur kompakt -- normal stehen die Texte ohnehin da. */
+.abs-info { display: none; }
+@media (min-width: 901px) {
+  html[data-dichte="kompakt"] .content { padding: 16px 20px; }
+  html[data-dichte="kompakt"] .card-bd { padding: 14px 16px; }
+  html[data-dichte="kompakt"] .bar-tools { margin-bottom: 10px; }
+  html[data-dichte="kompakt"] .inp { padding: 5px 9px; font-size: 13px; }
+  html[data-dichte="kompakt"] .f { margin-bottom: 8px; }
+  html[data-dichte="kompakt"] .f label { margin-bottom: 4px; }
+  html[data-dichte="kompakt"] .form-zeilen .f { margin-bottom: 5px; }
+  html[data-dichte="kompakt"] .form-zeilen .f > label { margin: 0; }
+  html[data-dichte="kompakt"] .abschnitt { margin: 8px 0 4px; padding-top: 9px; }
+  html[data-dichte="kompakt"] .abschnitt:first-of-type { margin-top: 0; padding-top: 0; }
+  html[data-dichte="kompakt"] .abschnitt > h3 { margin-bottom: 7px; display: flex; align-items: center; }
+  html[data-dichte="kompakt"] .card-bd > p.note { margin-bottom: 8px; }
+  /* Erklaertexte: zu, bis jemand das (i) anklickt. Nur DIREKTE Kinder des
+     Abschnitts -- Zustandsmeldungen (Zone, Warnungen) stehen in den Feldern
+     und bleiben immer sichtbar: Das ist keine Erklaerung, sondern eine
+     Aussage ueber genau diesen Einsatz. */
+  html[data-dichte="kompakt"] .abschnitt:not(.info-offen) > .note { display: none; }
+  html[data-dichte="kompakt"] .abschnitt > .note { margin-bottom: 8px !important; }
+  html[data-dichte="kompakt"] .abs-info { display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; margin-left: 8px; padding: 0; border-radius: 50%;
+    border: 1px solid var(--line); background: transparent; color: var(--ink-3);
+    font: 600 11px/1 inherit; font-style: italic; text-transform: none; cursor: pointer; }
+  html[data-dichte="kompakt"] .abs-info:hover,
+  html[data-dichte="kompakt"] .abschnitt.info-offen .abs-info { border-color: var(--accent-line); color: var(--accent); background: var(--accent-soft); }
+}
+
 /* ══ MITTEILUNGEN (ENT-421) ═══════════════════════════════════════════
    Zwei Spalten nebeneinander, ab 900 px Fensterbreite. Darunter
    untereinander -- ein 320 px breites Formular neben einer 320 px breiten
@@ -5501,6 +5559,13 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   var g = 'an';
   try { g = localStorage.getItem('rv3_glas') === 'aus' ? 'aus' : 'an'; } catch (e) {}
   document.documentElement.setAttribute('data-glas', g);
+})();
+/* Kompakte Darstellung (Versuch 2026-10-14). Ohne gespeicherte Wahl: normal.
+   Eigener Block mit eigenem try -- wie beim Glas oben. */
+(function () {
+  var d = 'normal';
+  try { d = localStorage.getItem('rv3_dichte') === 'kompakt' ? 'kompakt' : 'normal'; } catch (e) {}
+  document.documentElement.setAttribute('data-dichte', d);
 })();
 /* Anmeldemaske gar nicht erst zeigen, wenn schon eine Anmeldung im
    Speicher liegt (siehe die Regel "html.vorangemeldet #gate" oben).
@@ -6225,6 +6290,16 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
            genau das ("er sitzt rechts", Abstand zum Rand < 30 px). Ein
            neuer Schalter rechts daneben haette ihn um rund 56 px nach
            innen geschoben -- gemessen, nicht vermutet. -->
+      <!-- Kompakte Darstellung (Versuch 2026-10-14). Dieselbe Art Wahl wie
+           Glas und hell/dunkel, darum dieselbe Bauart und derselbe Ort --
+           links davon, aus demselben Grund wie beim Glas (hell/dunkel bleibt
+           aussen rechts). Nur Desktop (ohne-schublade). Das Zeichen: zwei
+           Zeilen, die von oben und unten zusammengeschoben werden. -->
+      <button class="dichte-schalter ohne-schublade" id="btnDichte" onclick="dichteUm()" role="switch" aria-checked="false" title="Kompakte Darstellung" aria-label="Kompakte Darstellung ein- oder ausschalten">
+        <span class="knopf">
+          <svg viewBox="0 0 24 24"><line x1="4" y1="10.5" x2="20" y2="10.5"/><line x1="4" y1="14.5" x2="20" y2="14.5"/><polyline points="9,2.5 12,5.5 15,2.5"/><polyline points="9,21.5 12,18.5 15,21.5"/></svg>
+        </span>
+      </button>
       <button class="glas-schalter ohne-schublade" id="btnGlas" onclick="glasUm()" role="switch" aria-checked="false" title="Durchscheinende Oberfläche" aria-label="Durchscheinende Oberfläche ein- oder ausschalten">
         <span class="knopf">
           <svg class="i-glas" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="12" height="12" rx="3.4"/><path d="M8.5 20.5h8a4 4 0 0 0 4-4v-8"/></svg>
@@ -11669,6 +11744,8 @@ function enter() {
   // nachziehen.
   themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell');
   glasSetzen(document.documentElement.getAttribute('data-glas') === 'an');
+  dichteSetzen(document.documentElement.getAttribute('data-dichte') === 'kompakt');
+  dichteInfoBauen();
   // Im Buendel liegen app.html und index.html unter anderen Namen
   // (index.html bzw. rapport-tool.html, siehe mobile-buendel-erstellen.py)
   // -- "app.html" gibt es dort gar nicht.
@@ -12953,6 +13030,49 @@ function glasSetzen(an) {
 
 function glasUm() {
   glasSetzen(document.documentElement.getAttribute('data-glas') !== 'an');
+}
+
+// ══════════════════════════════════════════ KOMPAKTE DARSTELLUNG (Versuch)
+// Dieselbe Bauart wie Glas: Der Wert steht schon im Kopf der Seite am
+// Dokument, hier wird umgeschaltet und gespeichert. Nur ein Schalter -- am
+// Handy gibt es die Wahl bewusst nicht (siehe CSS-Block .dichte-schalter).
+function dichteSetzen(kompakt) {
+  document.documentElement.setAttribute('data-dichte', kompakt ? 'kompakt' : 'normal');
+  try { localStorage.setItem('rv3_dichte', kompakt ? 'kompakt' : 'normal'); } catch (e) {}
+  const b = $('btnDichte');
+  if (b) {
+    b.setAttribute('aria-checked', kompakt ? 'true' : 'false');
+    b.title = kompakt ? 'Normale Darstellung' : 'Kompakte Darstellung';
+  }
+}
+
+function dichteUm() {
+  dichteSetzen(document.documentElement.getAttribute('data-dichte') !== 'kompakt');
+}
+
+// Ein (i) an jede Abschnittsueberschrift, unter der ein Erklaertext steht.
+// Einmal beim Start: Die Abschnitte stehen fest im HTML. Ein Knopf statt
+// eines title-Attributs, weil die Texte Links tragen ("Zur Objektplanung")
+// und ein Tooltip weder klickbar ist noch per Tastatur erreichbar.
+function dichteInfoBauen() {
+  document.querySelectorAll('.abschnitt').forEach(a => {
+    const h3 = a.querySelector(':scope > h3');
+    if (!h3 || h3.querySelector('.abs-info') || !a.querySelector(':scope > .note')) { return; }
+    const k = document.createElement('button');
+    k.type = 'button';
+    k.className = 'abs-info';
+    k.textContent = 'i';
+    k.title = 'Erklärung anzeigen';
+    k.setAttribute('aria-expanded', 'false');
+    k.onclick = () => {
+      const offen = a.classList.toggle('info-offen');
+      k.setAttribute('aria-expanded', offen ? 'true' : 'false');
+      k.title = offen ? 'Erklärung ausblenden' : 'Erklärung anzeigen';
+    };
+    // Vor einer Unterzeile (.note in der h3), damit das (i) beim Titel steht.
+    const unter = h3.querySelector('.note');
+    h3.insertBefore(k, unter || null);
+  });
 }
 
 // Welche Ansichten die volle Breite wollen -- EINE Liste statt verstreuter
