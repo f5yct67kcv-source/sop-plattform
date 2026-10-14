@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 28,
+            'datum' => '2026-10-14',
+            'art'   => 'fehlerbehebung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Neuer Einsatz: ruhigere Schrift',
+            'text'  => 'Im Formular „Neuer Einsatz“ standen die Hinweise in fetten Grossbuchstaben, und alles, was du eingetippt hast, erschien fett. Jetzt sind beide in normaler Schrift. Der Hinweis zur Zone unter „Weg und Auslagenersatz“ läuft wieder über die ganze Breite, statt nach drei Wörtern umzubrechen.',
+        ],
+        [
             'nr'    => 26,
             'datum' => '2026-10-14',
             'art'   => 'verbesserung',
