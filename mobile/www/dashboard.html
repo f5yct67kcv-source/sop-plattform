@@ -14000,6 +14000,9 @@ const EREIGNIS_ART = {
   // Grund wie oben: Ein gemeldeter Vorfall ist nie Routine -- er soll
   // auffallen, nicht im Strom der Bestaetigungen untergehen.
   vorfall:  { punkt: 'warn', wort: 'hat ein Ereignis gemeldet' },
+  // Offener Abwesenheitsantrag (ENT-720, Antrag ENT-255). Gelb wie der
+  // Sperrtag: Jemand fehlt. Ohne Haken -- weg erst mit dem Entscheid.
+  abwesenheit: { punkt: 'warn', wort: 'hat eine Abwesenheit beantragt' },
   // Antwort auf die eigene Supportanfrage (ENT-685). 'ok': Es ist eine gute
   // Nachricht -- da ist die Antwort, auf die jemand gewartet hat. Nicht
   // 'warn', das ist fuer Dinge reserviert, die schieflaufen koennen.
@@ -14090,6 +14093,30 @@ function ereignisseOffen() {
   }
   return Number(stats && stats.ereignisse_gesamt) || 0;
 }
+
+// Dasselbe fuer die Glocke (ENT-720): Sie zaehlt nur, was eine Handlung
+// verlangt, aus der eigenen Zaehlung des Servers. Ohne sie (aelterer
+// Server) bleibt es bei der Zahl der Kachel.
+function glockeOffen() {
+  const je = stats && stats.glocke_je_art;
+  if (je && typeof je === 'object') {
+    return Object.keys(je).filter(t => EREIGNIS_ART[t])
+      .reduce((n, t) => n + (Number(je[t]) || 0), 0);
+  }
+  return ereignisseOffen();
+}
+
+// Die Liste der Glocke: eigene Liste vom Server (ENT-720), nur bekannte
+// Arten. Fehlt sie (aelterer Server), dieselbe wie die Kachel.
+function glockeListe() {
+  const g = stats && Array.isArray(stats.glocke) ? stats.glocke : (stats && stats.ereignisse) || [];
+  return g.filter(x => EREIGNIS_ART[x.typ]);
+}
+
+// Ein Ereignis eindeutig: Art, Nummer und -- bei der Zusage -- die Person.
+// Glocke und Kachel haben seit ENT-720 verschiedene Listen; der Platz in der
+// einen sagt nichts ueber den in der anderen.
+const ereignisSchluessel = x => x.typ + '|' + x.id + '|' + (x.mitarbeiter_id || 0);
 
 function renderEreignisse() {
   // Nur bekannte Arten. Eine Art, die der Feed nicht kennt, wuerde sonst als
@@ -14222,7 +14249,18 @@ function ereignisAbhakbar(typ) {
 
 function ereignisZeile(x) {
   if (x.typ === 'rapport')  { return `hat einen Rapport gesendet — ${x.kunde || '?'}, ${dmy(x.datum)}`; }
-  if (x.typ === 'sperrtag') { return `hat sich ${dmy(x.datum)} gesperrt${x.bemerkung ? ' — ' + x.bemerkung : ''}`; }
+  if (x.typ === 'sperrtag') {
+    // Mit Konflikt (ENT-720): Die Person ist an dem Tag eingeteilt -- die
+    // Zeile nennt die Schicht, damit niemand erst suchen muss, was fehlt.
+    const k = x.konflikt;
+    const schicht = k ? `, ist dort eingeteilt: ${k.kunde || k.titel || 'Schicht'}${k.von ? ' ' + hm(k.von) + '–' + hm(k.bis) : ''}` : '';
+    return `hat sich ${dmy(x.datum)} gesperrt${schicht}${x.bemerkung ? ' — ' + x.bemerkung : ''}`;
+  }
+  if (x.typ === 'abwesenheit') {
+    const art = (typeof AW_TYP_TEXT !== 'undefined' && AW_TYP_TEXT[x.abwesenheitstyp]) || 'eine Abwesenheit';
+    const zeit = x.von ? ' — ' + dmy(x.von) + (x.bis && x.bis !== x.von ? '–' + dmy(x.bis) : '') : '';
+    return `hat ${art} beantragt${zeit}`;
+  }
   // 'abgesagt' gibt es nicht -- meine_zusage.php kennt offen | zugesagt |
   // abgelehnt. Der Vergleich traf nie zu, und JEDE Ablehnung stand hier als
   // Zusage: das Gegenteil dessen, was passiert war (ENT-113).
@@ -14260,6 +14298,9 @@ function ereignisAufklappen(i, zeile) {
   if (x.typ === 'rapport') {
     wege.push(`<button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); go('kunden'); kuGoTab('rapporte')">Zu den Rapporten</button>`);
   }
+  if (x.typ === 'abwesenheit') {
+    wege.push(`<button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); go('abwesenheiten')">Zum Entscheid</button>`);
+  }
   if (x.typ === 'offerte') {
     wege.push(`<button class="btn btn-plain btn-sm" onclick="event.stopPropagation(); go('kunden'); kuGoTab('offerten'); ofOeffnen(${x.id})">Zur Offerte</button>`);
   }
@@ -14269,7 +14310,10 @@ function ereignisAufklappen(i, zeile) {
   const zeilen = [];
   if (x.typ === 'offerte' && x.nummer) { zeilen.push(['Offerte', x.nummer]); }
   if (x.datum)      { zeilen.push(['Datum', dmy(x.datum)]); }
-  if (x.von)        { zeilen.push(['Zeit', `${x.von} – ${x.bis}`]); }
+  if (x.typ === 'abwesenheit') {
+    if (x.abwesenheitstyp) { zeilen.push(['Art', (typeof AW_TYP_TEXT !== 'undefined' && AW_TYP_TEXT[x.abwesenheitstyp]) || x.abwesenheitstyp]); }
+    if (x.von) { zeilen.push(['Zeitraum', dmy(x.von) + (x.bis ? ' – ' + dmy(x.bis) : '')]); }
+  } else if (x.von) { zeilen.push(['Zeit', `${x.von} – ${x.bis}`]); }
   if (x.kunde)      { zeilen.push(['Kunde', x.kunde]); }
   if (x.ort)        { zeilen.push(['Ort', x.ort]); }
   if (x.einsatzart) { zeilen.push(['Einsatzart', x.einsatzart]); }
@@ -14302,10 +14346,20 @@ function ereignisZumTag(datum) {
 // Rapport, Sperre und Zusage bleiben gueltig (ENT-033/ENT-090). Optimistisch:
 // die Zeile verschwindet sofort, ein Fehlschlag holt sie beim naechsten
 // loadStats() zurueck.
-function ereignisErledigt(i) {
-  const x = (stats.ereignisse || [])[i];
+function ereignisErledigt(i, quelle) {
+  // Aus der Glocke oder aus der Kachel -- seit ENT-720 zwei Listen. Der
+  // Eintrag verschwindet aus BEIDEN, gefunden ueber seinen Schluessel.
+  const x = (quelle === 'glocke' ? glockeListe() : (stats.ereignisse || []))[i];
   if (!x) { return; }
-  stats.ereignisse = (stats.ereignisse || []).filter((y, k) => k !== i);
+  const weg = ereignisSchluessel(x);
+  stats.ereignisse = (stats.ereignisse || []).filter(y => ereignisSchluessel(y) !== weg);
+  if (Array.isArray(stats.glocke)) {
+    stats.glocke = stats.glocke.filter(y => ereignisSchluessel(y) !== weg);
+  }
+  const gj = stats.glocke_je_art;
+  if (x.glocke && gj && typeof gj === 'object' && Number(gj[x.typ]) > 0) {
+    gj[x.typ] = Number(gj[x.typ]) - 1;
+  }
   // Ohne das haette die "X von Y"-Notiz (bei gekuerzter Liste) und seit
   // ENT-197 auch der Glocke-Zaehler nach dem Abhaken weiter die alte,
   // servergelieferte Gesamtzahl gezeigt -- eine Zahl, die nicht mehr stimmt.
@@ -14329,7 +14383,8 @@ function ereignisErledigt(i) {
     // Ist die sichtbare Liste leer, aber auf dem Server noch etwas offen
     // (die Liste zeigt nur die neuesten 12), wird die naechste Tranche
     // geholt: Eine leere Glocke mit einer Zahl daran ist ein Widerspruch.
-    if (!ok || (!(stats.ereignisse || []).length && ereignisseOffen() > 0)) {
+    if (!ok || (!(stats.ereignisse || []).length && ereignisseOffen() > 0)
+        || (!glockeListe().length && glockeOffen() > 0)) {
       ereignisseNachladen();
     }
   }).catch(() => ereignisseNachladen());
@@ -14343,6 +14398,8 @@ function ereignisseNachladen() {
     stats.ereignisse = data.ereignisse || [];
     stats.ereignisse_gesamt = data.ereignisse_gesamt;
     stats.ereignisse_je_art = data.ereignisse_je_art;
+    stats.glocke = data.glocke;
+    stats.glocke_je_art = data.glocke_je_art;
     stats.ereignisse_gekuerzt = data.ereignisse_gekuerzt;
     stats.ereignisse_unvollstaendig = data.ereignisse_unvollstaendig;
     stats.stand = data.stand;
@@ -14358,10 +14415,13 @@ function ereignisseNachladen() {
 // denselben Zeitstempel wie in der vollen Liste (Festlegung 2 in
 // ereignisse.php).
 function glockeAktualisieren(f, fehlt) {
+  // Seit ENT-720 zeigt die Glocke ihre EIGENE Liste: nur, was eine Handlung
+  // verlangt. Das uebergebene f (die Kachel) zaehlt hier nicht mehr.
+  f = glockeListe();
   const badge = $('glockeBadge');
   // Die Zahl am Abzeichen ist die der offenen Ereignisse auf dem Server --
   // nie kleiner als die Zeilen, die tatsaechlich darunter stehen.
-  const anzahl = Math.max(ereignisseOffen(), f.length);
+  const anzahl = Math.max(glockeOffen(), f.length);
   if (badge) {
     badge.style.display = anzahl ? '' : 'none';
     badge.textContent = anzahl > 99 ? '99+' : String(anzahl);
@@ -14400,7 +14460,7 @@ function glockeAktualisieren(f, fehlt) {
         <b>${esc(wer)}</b>
         <span>${esc(ereignisZeile(x))}</span>
       </div>
-      ${ereignisAbhakbar(x.typ) ? `<button class="rank-erledigt" title="Als erledigt markieren" aria-label="Als erledigt markieren" onclick="event.stopPropagation(); ereignisErledigt(${i})">
+      ${ereignisAbhakbar(x.typ) ? `<button class="rank-erledigt" title="Als erledigt markieren" aria-label="Als erledigt markieren" onclick="event.stopPropagation(); ereignisErledigt(${i}, 'glocke')">
         <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
       </button>` : ''}
     </div>`;
@@ -14472,7 +14532,13 @@ function glockeZeileGeklickt(i) {
   /* Eine Supportantwort fuehrt dorthin, wo sie steht (ENT-685) -- nicht in
      die Uebersicht, wo nur dieselbe Zeile noch einmal stuende. Erst dort
      gilt sie als gelesen; der Endpunkt setzt den Stempel beim Oeffnen. */
-  const e = (stats.ereignisse || [])[i];
+  const e = glockeListe()[i];
+  if (e && e.typ === 'abwesenheit') {
+    // Zum Entscheid (ENT-720): Dort steht der Antrag mit Genehmigen und
+    // Ablehnen; erst der Entscheid nimmt ihn aus der Glocke.
+    go('abwesenheiten');
+    return;
+  }
   if (e && e.typ === 'support_antwort') {
     /* Derselbe Weg, den der Support-Eintrag der Seitenleiste nimmt. Seit
        ENT-682 ist das eine eigene Ansicht, und go() holt die Vorgaenge
@@ -14483,9 +14549,17 @@ function glockeZeileGeklickt(i) {
     return;
   }
   go('uebersicht');
-  const zeile = document.querySelectorAll('#ereignisFeed .rank.erg')[i];
-  if (!zeile) { return; }
-  ereignisAufklappen(i, zeile);
+  // Die Zeile der Kachel ueber den Schluessel suchen, nicht ueber den Platz:
+  // Glocke und Kachel sind seit ENT-720 verschiedene Listen.
+  const k = e ? (stats.ereignisse || []).findIndex(y => ereignisSchluessel(y) === ereignisSchluessel(e)) : -1;
+  const zeile = k >= 0 ? document.querySelectorAll('#ereignisFeed .rank.erg')[k] : null;
+  if (!zeile) {
+    // Nicht unter den neuesten der Kachel: wenigstens dorthin, wo es steht.
+    if (e && e.typ === 'offerte') { go('kunden'); kuGoTab('offerten'); ofOeffnen(e.id); }
+    else if (e && e.datum) { ereignisZumTag(String(e.datum).slice(0, 10)); }
+    return;
+  }
+  ereignisAufklappen(k, zeile);
   // Das Ereignis-Widget steht je nach eigener Anordnung der Uebersicht weit
   // unten, unterhalb der Kennzahlen -- ohne Hinscrollen sieht man das
   // aufgeklappte Detail nie und der Klick wirkt wirkungslos.

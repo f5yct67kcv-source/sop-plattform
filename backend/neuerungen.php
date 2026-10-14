@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 27,
+            'datum' => '2026-10-14',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Die Glocke zeigt nur noch, was zu tun ist',
+            'text'  => 'In der Glocke stehen jetzt nur Dinge, bei denen du handeln musst: abgelehnte Schichten, gemeldete Vorfälle, Entscheide zu Offerten, spontan gestartete Rundgänge, Antworten vom Support und neu auch Abwesenheitsanträge. Ein Sperrtag erscheint dort nur noch, wenn die Person an diesem Tag schon eingeteilt ist, und die Zeile nennt die betroffene Schicht. Eingegangene Rapporte und bestätigte Zusagen stehen nicht mehr in der Glocke, aber weiter in den Ereignissen auf der Übersicht. Abwesenheitsanträge siehst du nur, wenn du sie entscheiden darfst. Ein Klick führt zum Entscheid, abhaken lassen sie sich nicht.',
+        ],
+        [
             'nr'    => 26,
             'datum' => '2026-10-14',
             'art'   => 'verbesserung',

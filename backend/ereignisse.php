@@ -68,7 +68,8 @@ function ereignis_abhakbar(string $typ): bool
 
 // "Alle als gelesen" aus der Glocke (14.10.2026).
 //
-// Je Art dieselbe Bedingung wie in ereignisse_sammeln() -- und NUR die: Ein
+// Je Art dieselbe Bedingung wie fuer die Glocke in ereignisse_sammeln() --
+// und NUR die (ENT-720): Ein
 // Stempel an einer Zeile, die gar nicht im Feed stand, wuerde sie
 // unsichtbar machen, bevor sie je erscheint (etwa eine noch offene Zusage,
 // die morgen beantwortet wird, oder ein normal geplanter Rundgang).
@@ -82,10 +83,17 @@ function ereignis_abhakbar(string $typ): bool
 //
 // Abwesenheit und Supportantwort fehlen absichtlich, wie in EREIGNIS_ARTEN.
 const EREIGNIS_ALLE_ABHAKEN = [
-    'rapport'  => ['tabelle' => 'rapporte', 'spalte' => 'gesehen_am', 'zeit' => 'erfasst_am', 'wo' => '1 = 1'],
-    'sperrtag' => ['tabelle' => 'verfuegbarkeiten', 'spalte' => 'gesehen_am', 'zeit' => 'erfasst_am', 'wo' => '1 = 1'],
+    // Seit ENT-720 hakt "alle" nur ab, was die GLOCKE zeigt: Rapporte gar
+    // nicht, Sperrtage nur mit Konflikt, Zusagen nur die Ablehnungen. Wer
+    // in der Glocke "alle" klickt, soll auf der Uebersicht nichts verlieren,
+    // was er dort nie gesehen hat.
+    'sperrtag' => ['tabelle' => 'verfuegbarkeiten', 'spalte' => 'gesehen_am', 'zeit' => 'erfasst_am',
+                   'wo' => "EXISTS (SELECT 1 FROM einsatz_zuteilung kz JOIN einsaetze ke ON ke.id = kz.einsatz_id
+                             WHERE kz.mitarbeiter_id = verfuegbarkeiten.mitarbeiter_id
+                               AND ke.datum = verfuegbarkeiten.datum
+                               AND kz.zusage <> 'abgelehnt' AND ke.status <> 'abgesagt')"],
     'zusage'   => ['tabelle' => 'einsatz_zuteilung', 'spalte' => 'zusage_gesehen_am', 'zeit' => 'zugeteilt_am',
-                   'wo' => "zusage <> 'offen'"],
+                   'wo' => "zusage = 'abgelehnt'"],
     'offerte'  => ['tabelle' => 'belege', 'spalte' => 'entscheidung_gesehen_am', 'zeit' => 'entscheidung_am',
                    'wo' => 'entscheidung_am IS NOT NULL'],
     'rundgang_spontan' => ['tabelle' => 'rundgang', 'spalte' => 'gesehen_am', 'zeit' => 'vorbereitet_am',
@@ -149,11 +157,20 @@ function ereignis_zaehlen(PDO $pdo, string $sql, int $gelesen): int
 // OPTIONAL und nicht Pflicht: Der Feed ist der Herzschlag der Uebersicht --
 // er darf nicht davon abhaengen, dass die Betreiber-Ebene erreichbar ist.
 // Fehlt sie, fehlt genau diese eine Art, und das steht in 'unvollstaendig'.
+// $mitAbwesenheit (ENT-720): Offene Abwesenheitsantraege nur fuer Konten,
+// die sie entscheiden duerfen. Wer es nicht darf, haette sonst eine Zahl an
+// der Glocke, die er nie wegbekommt -- ein Antrag verschwindet erst mit dem
+// Entscheid, nicht mit einem Haken.
 function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
-                            ?PDO $stamm = null, ?int $mandantId = null): array
+                            ?PDO $stamm = null, ?int $mandantId = null,
+                            bool $mitAbwesenheit = true): array
 {
     $fehler = [];
     $liste  = [];
+    // Je Art, wie viele davon in die GLOCKE gehoeren (ENT-720). Die Glocke
+    // zeigt nur, was eine Handlung verlangt; die Kachel auf der Uebersicht
+    // weiter alles. Jede Zeile traegt dazu 'glocke' => true|false.
+    $glockeJeArt = [];
     $jeArt  = [];  // alle offenen je Art, nicht nur die gelesenen (ereignis_zaehlen)
 
     // ── Rapport eingegangen. Der Hauptfall: Der Mitarbeitende hat gemeldet,
@@ -174,6 +191,9 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
             'person' => ['id' => (int)$r['mitarbeiter_id'], 'name' => $r['name'],
                          'vorname' => $r['vorname'], 'nachname' => $r['nachname']],
             'titel' => 'Rapport eingegangen',
+            // Nicht in der Glocke (ENT-720): Rapporte werden im Abgleich
+            // bearbeitet; einer pro Schicht waere dort reine Routine.
+            'glocke' => false,
             'datum' => $r['datum'], 'kunde' => $r['kunde'], 'ort' => $r['ort'],
             'einsatzart' => $r['einsatzart'], 'netto_h' => $r['netto_h'],
         ];
@@ -181,58 +201,104 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
 
     // ── Sperrtag gemeldet. Nur kuenftige oder heutige Tage: eine Sperre fuer
     // gestern ist kein Ereignis mehr, das jemanden zum Handeln bringt.
-    $zeilen = ereignis_lesen($pdo,
-        "SELECT v.id, v.datum, v.bemerkung, v.erfasst_am,
-                m.id AS mitarbeiter_id, m.name, m.vorname, m.nachname
-           FROM verfuegbarkeiten v JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
-          WHERE v.datum >= CURDATE() AND v.gesehen_am IS NULL
-          ORDER BY v.erfasst_am DESC LIMIT 20", $fehler, 'sperrtag');
-    $jeArt['sperrtag'] = ereignis_zaehlen($pdo,
-        "SELECT COUNT(*)
-           FROM verfuegbarkeiten v JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
-          WHERE v.datum >= CURDATE() AND v.gesehen_am IS NULL", count($zeilen));
-    foreach ($zeilen as $v) {
-        $liste[] = [
-            'typ' => 'sperrtag', 'id' => (int)$v['id'], 'zeit' => $v['erfasst_am'],
-            'person' => ['id' => (int)$v['mitarbeiter_id'], 'name' => $v['name'],
-                         'vorname' => $v['vorname'], 'nachname' => $v['nachname']],
-            'titel' => 'Tag gesperrt',
-            'datum' => $v['datum'], 'bemerkung' => $v['bemerkung'],
-        ];
+    //
+    // In die Glocke nur bei einem KONFLIKT (ENT-720): Die Person ist an dem
+    // Tag schon einer Schicht zugeteilt, die nicht abgesagt ist und die sie
+    // nicht abgelehnt hat. Dann fehlt jemand -- sonst ist der Sperrtag
+    // Routine und steht nur in der Kachel. Zwei Abfragen statt einer, damit
+    // die Grenze von 20 die Konflikte nicht hinter gewoehnlichen Sperrtagen
+    // abschneidet.
+    $sperrSchicht = "FROM einsatz_zuteilung kz JOIN einsaetze ke ON ke.id = kz.einsatz_id
+                     WHERE kz.mitarbeiter_id = v.mitarbeiter_id AND ke.datum = v.datum
+                       AND kz.zusage <> 'abgelehnt' AND ke.status <> 'abgesagt'";
+    $sperrKonflikt = "EXISTS (SELECT 1 $sperrSchicht)";
+    $jeArt['sperrtag'] = 0;
+    $glockeJeArt['sperrtag'] = 0;
+    foreach ([true, false] as $konflikt) {
+        $bedingung = 'v.datum >= CURDATE() AND v.gesehen_am IS NULL AND '
+            . ($konflikt ? $sperrKonflikt : "NOT $sperrKonflikt");
+        $zeilen = ereignis_lesen($pdo,
+            "SELECT v.id, v.datum, v.bemerkung, v.erfasst_am,
+                    m.id AS mitarbeiter_id, m.name, m.vorname, m.nachname,
+                    (SELECT ke.kunde_name $sperrSchicht ORDER BY ke.von LIMIT 1) AS k_kunde,
+                    (SELECT ke.titel      $sperrSchicht ORDER BY ke.von LIMIT 1) AS k_titel,
+                    (SELECT ke.von        $sperrSchicht ORDER BY ke.von LIMIT 1) AS k_von,
+                    (SELECT ke.bis        $sperrSchicht ORDER BY ke.von LIMIT 1) AS k_bis
+               FROM verfuegbarkeiten v JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
+              WHERE $bedingung
+              ORDER BY v.erfasst_am DESC LIMIT 20", $fehler, 'sperrtag');
+        $n = ereignis_zaehlen($pdo,
+            "SELECT COUNT(*)
+               FROM verfuegbarkeiten v JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
+              WHERE $bedingung", count($zeilen));
+        $jeArt['sperrtag'] += $n;
+        if ($konflikt) { $glockeJeArt['sperrtag'] = $n; }
+        foreach ($zeilen as $v) {
+            $liste[] = [
+                'typ' => 'sperrtag', 'id' => (int)$v['id'], 'zeit' => $v['erfasst_am'],
+                'person' => ['id' => (int)$v['mitarbeiter_id'], 'name' => $v['name'],
+                             'vorname' => $v['vorname'], 'nachname' => $v['nachname']],
+                'titel' => 'Tag gesperrt',
+                'datum' => $v['datum'], 'bemerkung' => $v['bemerkung'],
+                'glocke' => $konflikt,
+                // Die betroffene Schicht -- die Zeile in der Glocke nennt sie,
+                // sonst muesste der Planer erst suchen, WAS da fehlt.
+                'konflikt' => $konflikt ? [
+                    'kunde' => $v['k_kunde'], 'titel' => $v['k_titel'],
+                    'von' => $v['k_von'], 'bis' => $v['k_bis'],
+                ] : null,
+            ];
+        }
     }
+    $fehler = array_values(array_unique($fehler));
 
     // ── Zusage oder Absage zu einer Schicht.
-    $zeilen = ereignis_lesen($pdo,
-        "SELECT z.einsatz_id, z.mitarbeiter_id, z.zusage, z.zugeteilt_am,
-                e.datum, e.von, e.bis, e.kunde_name, e.titel AS einsatz_titel, e.ort,
-                m.name, m.vorname, m.nachname
-           FROM einsatz_zuteilung z
-           JOIN einsaetze e   ON e.id = z.einsatz_id
-           JOIN mitarbeiter m ON m.id = z.mitarbeiter_id
-          WHERE z.zusage <> 'offen' AND z.zusage_gesehen_am IS NULL
-          ORDER BY z.zugeteilt_am DESC LIMIT 20", $fehler, 'zusage');
-    $jeArt['zusage'] = ereignis_zaehlen($pdo,
-        "SELECT COUNT(*)
-           FROM einsatz_zuteilung z
-           JOIN einsaetze e   ON e.id = z.einsatz_id
-           JOIN mitarbeiter m ON m.id = z.mitarbeiter_id
-          WHERE z.zusage <> 'offen' AND z.zusage_gesehen_am IS NULL", count($zeilen));
-    foreach ($zeilen as $z) {
-        $liste[] = [
-            'typ' => 'zusage', 'id' => (int)$z['einsatz_id'],
-            'mitarbeiter_id' => (int)$z['mitarbeiter_id'], 'zeit' => $z['zugeteilt_am'],
-            'person' => ['id' => (int)$z['mitarbeiter_id'], 'name' => $z['name'],
-                         'vorname' => $z['vorname'], 'nachname' => $z['nachname']],
-            // 'abgesagt' gibt es nicht: meine_zusage.php kennt nur
-            // offen | zugesagt | abgelehnt. Der Vergleich traf darum nie zu,
-            // und JEDE Ablehnung stand hier als Zusage -- das Gegenteil
-            // dessen, was passiert war (ENT-113).
-            'titel' => $z['zusage'] === 'abgelehnt' ? 'Schicht abgelehnt' : 'Schicht zugesagt',
-            'zusage' => $z['zusage'], 'datum' => $z['datum'],
-            'von' => $z['von'], 'bis' => $z['bis'],
-            'kunde' => $z['kunde_name'], 'einsatz_titel' => $z['einsatz_titel'], 'ort' => $z['ort'],
-        ];
+    //
+    // In die Glocke nur die ABLEHNUNG (ENT-720): Dann ist eine Schicht
+    // wieder offen. Eine Zusage hinterlaesst nichts zu tun und steht nur in
+    // der Kachel. Zwei Abfragen, damit Ablehnungen nicht hinter der Grenze
+    // von 20 Zusagen verschwinden.
+    $jeArt['zusage'] = 0;
+    $glockeJeArt['zusage'] = 0;
+    foreach ([true, false] as $abgelehnt) {
+        $bedingung = ($abgelehnt ? "z.zusage = 'abgelehnt'" : "z.zusage NOT IN ('offen', 'abgelehnt')")
+            . ' AND z.zusage_gesehen_am IS NULL';
+        $zeilen = ereignis_lesen($pdo,
+            "SELECT z.einsatz_id, z.mitarbeiter_id, z.zusage, z.zugeteilt_am,
+                    e.datum, e.von, e.bis, e.kunde_name, e.titel AS einsatz_titel, e.ort,
+                    m.name, m.vorname, m.nachname
+               FROM einsatz_zuteilung z
+               JOIN einsaetze e   ON e.id = z.einsatz_id
+               JOIN mitarbeiter m ON m.id = z.mitarbeiter_id
+              WHERE $bedingung
+              ORDER BY z.zugeteilt_am DESC LIMIT 20", $fehler, 'zusage');
+        $n = ereignis_zaehlen($pdo,
+            "SELECT COUNT(*)
+               FROM einsatz_zuteilung z
+               JOIN einsaetze e   ON e.id = z.einsatz_id
+               JOIN mitarbeiter m ON m.id = z.mitarbeiter_id
+              WHERE $bedingung", count($zeilen));
+        $jeArt['zusage'] += $n;
+        if ($abgelehnt) { $glockeJeArt['zusage'] = $n; }
+        foreach ($zeilen as $z) {
+            $liste[] = [
+                'typ' => 'zusage', 'id' => (int)$z['einsatz_id'],
+                'mitarbeiter_id' => (int)$z['mitarbeiter_id'], 'zeit' => $z['zugeteilt_am'],
+                'person' => ['id' => (int)$z['mitarbeiter_id'], 'name' => $z['name'],
+                             'vorname' => $z['vorname'], 'nachname' => $z['nachname']],
+                // 'abgesagt' gibt es nicht: meine_zusage.php kennt nur
+                // offen | zugesagt | abgelehnt. Der Vergleich traf darum nie zu,
+                // und JEDE Ablehnung stand hier als Zusage -- das Gegenteil
+                // dessen, was passiert war (ENT-113).
+                'titel' => $z['zusage'] === 'abgelehnt' ? 'Schicht abgelehnt' : 'Schicht zugesagt',
+                'zusage' => $z['zusage'], 'datum' => $z['datum'],
+                'von' => $z['von'], 'bis' => $z['bis'],
+                'kunde' => $z['kunde_name'], 'einsatz_titel' => $z['einsatz_titel'], 'ort' => $z['ort'],
+                'glocke' => $abgelehnt,
+            ];
+        }
     }
+    $fehler = array_values(array_unique($fehler));
 
     // ── Kunde hat im Portal ueber eine Offerte entschieden (ENT-192). Ohne
     // Rueckruf vom Portal ins Dashboard war das bislang leicht zu uebersehen
@@ -252,19 +318,20 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
             'typ' => 'offerte', 'id' => (int)$o['id'], 'zeit' => $o['entscheidung_am'],
             'titel' => $o['status'] === 'abgelehnt' ? 'Offerte abgelehnt' : 'Offerte angenommen',
             'nummer' => $o['nummer'], 'kunde' => $o['kunde_name'], 'status' => $o['status'],
+            'glocke' => true,
         ];
     }
 
     // ── Abwesenheitsantrag wartet auf Entscheidung (ENT-255). Nicht
     // abhakbar wie die Faelle oben (siehe EREIGNIS_ARTEN) -- verschwindet
     // erst, wenn abwesenheit_entscheiden.php tatsaechlich entschieden hat.
-    $zeilen = ereignis_lesen($pdo,
+    $zeilen = !$mitAbwesenheit ? [] : ereignis_lesen($pdo,
         "SELECT a.id, a.typ, a.von, a.bis, a.bemerkung, a.beantragt_am,
                 m.id AS mitarbeiter_id, m.name, m.vorname, m.nachname
            FROM abwesenheiten a JOIN mitarbeiter m ON m.id = a.mitarbeiter_id
           WHERE a.status = 'beantragt' AND a.gesehen_am IS NULL
           ORDER BY a.beantragt_am DESC LIMIT 20", $fehler, 'abwesenheit');
-    $jeArt['abwesenheit'] = ereignis_zaehlen($pdo,
+    if ($mitAbwesenheit) $jeArt['abwesenheit'] = ereignis_zaehlen($pdo,
         "SELECT COUNT(*)
            FROM abwesenheiten a JOIN mitarbeiter m ON m.id = a.mitarbeiter_id
           WHERE a.status = 'beantragt' AND a.gesehen_am IS NULL", count($zeilen));
@@ -276,6 +343,9 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
             'titel' => 'Abwesenheit beantragt',
             'abwesenheitstyp' => $a['typ'], 'von' => $a['von'], 'bis' => $a['bis'],
             'bemerkung' => $a['bemerkung'],
+            // In die Glocke, aber ohne Haken (ENT-720): weg erst mit dem
+            // Entscheid (ENT-255).
+            'glocke' => true,
         ];
     }
 
@@ -308,6 +378,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
             'datum' => $r['datum'], 'von' => $r['von'], 'bis' => $r['bis'],
             'kunde' => $r['kunde_name'], 'einsatz_titel' => $r['einsatz_titel'], 'ort' => $r['ort'],
             'ausnahme_grund' => $r['ausnahme_grund'],
+            'glocke' => true,
         ];
     }
 
@@ -353,6 +424,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
             'bemerkung' => $r['bemerkung'],
             'vorfall_am' => $r['vorfall_am'],
             'hat_foto' => $r['foto_mime'] !== null,
+            'glocke' => true,
         ];
     }
 
@@ -387,6 +459,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
                     'titel' => 'Support hat geantwortet',
                     'betreff' => (string)$v['betreff'],
                     'status'  => (string)$v['status'],
+                    'glocke'  => true,
                 ];
             }
         } catch (Throwable $e) {
@@ -403,6 +476,10 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
     // Die echte Zahl, nicht die Laenge der je Art abgeschnittenen Liste
     // (siehe ereignis_zaehlen).
     $gesamt = max(array_sum($jeArt), count($liste));
+    foreach (['offerte', 'abwesenheit', 'rundgang_spontan', 'vorfall', 'support_antwort'] as $t) {
+        if (isset($jeArt[$t])) { $glockeJeArt[$t] = $jeArt[$t]; }
+    }
+    $fuerGlocke = array_values(array_filter($liste, fn($e) => !empty($e['glocke'])));
 
     return [
         'ereignisse' => array_slice($liste, 0, $grenze),
@@ -414,6 +491,11 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
         // sie auch anzeigen kann -- eine Art, die gezaehlt, aber nie als Zeile
         // gezeigt wird, ergibt eine Zahl ueber einer leeren Liste.
         'je_art'     => $jeArt,
+        // Die Glocke bekommt ihre EIGENE Liste (ENT-720), nicht einen Filter
+        // ueber die gekuerzte Kachel-Liste: Zwoelf Rapporte oben auf der
+        // Kachel liessen sonst eine Ablehnung aus der Glocke fallen.
+        'glocke'        => array_slice($fuerGlocke, 0, $grenze),
+        'glocke_je_art' => $glockeJeArt,
         // Welche Arten gar nicht abgefragt werden konnten. Leer ist gut;
         // nicht leer heisst: hier fehlt etwas, und zwar bekannt.
         'unvollstaendig' => $fehler,

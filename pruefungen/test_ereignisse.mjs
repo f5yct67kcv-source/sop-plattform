@@ -683,9 +683,10 @@ try {
 // bleibt offen (geprueft in pruef_ereignisse.php).
 try {
   // Bleibt nach "alle" stehen: Die Supportantwort ist sichtbar, aber nicht
-  // abhakbar (erst Oeffnen liest sie). Der Abwesenheitsantrag zaehlt der
-  // Server mit, das Cockpit zeigt ihn aber nicht -- er darf die Zahl an der
-  // Glocke nicht erhoehen, sonst steht wieder eine Zahl ohne Zeile da.
+  // abhakbar (erst Oeffnen liest sie), der Abwesenheitsantrag ebenso (erst
+  // der Entscheid nimmt ihn weg, ENT-720). Eine Art, die das Cockpit gar
+  // nicht kennt ('unbekannt'), darf die Zahl nicht erhoehen -- sonst steht
+  // wieder eine Zahl ohne Zeile da.
   const SUPPORT = { typ: 'support_antwort', id: 9, zeit: vorMin(10),
     person: { id: 0, name: 'GuardOpS Support', vorname: '', nachname: '' },
     titel: 'Support hat geantwortet', betreff: 'Frage zur Planung', status: 'beantwortet' };
@@ -695,7 +696,7 @@ try {
   const p = await glockenSeite([
     { ereignisse: EREIGNISSE, ereignisse_gesamt: 40, ereignisse_gekuerzt: true, stand: '2026-09-01T12:00:00+02:00' },
     { ereignisse: [SUPPORT, ABW], ereignisse_gesamt: 2, ereignisse_gekuerzt: false,
-      ereignisse_je_art: { support_antwort: 1, abwesenheit: 1 }, stand: '2026-09-01T12:01:00+02:00' },
+      ereignisse_je_art: { support_antwort: 1, abwesenheit: 1, unbekannt: 4 }, stand: '2026-09-01T12:01:00+02:00' },
   ]);
   await p.click('#btnGlocke');
   const lage = await p.evaluate(() => {
@@ -716,7 +717,7 @@ try {
     !!post && post.bis === '2026-09-01T12:00:00+02:00' && glockePosts.length === 1);
   const danach = await glockeStand(p);
   check('KRITISCH: danach steht nur noch, was sich nicht abhaken laesst -- mit richtiger Zahl',
-    danach.zeilen === 1 && danach.zahl === 1);
+    danach.zeilen === 2 && danach.zahl === 2);
   check('KRITISCH: eine Art, die das Cockpit nicht als Zeile zeigt, zaehlt auch nicht an der Glocke',
     danach.zahl === danach.zeilen);
   check('Die Glocke bleibt dabei offen', await p.evaluate(() => document.getElementById('glockePanel').style.display !== 'none'));
@@ -740,6 +741,68 @@ try {
   await h.screenshot({ path: `${OUT}/glocke-alle-handy.png` });
   await h.close();
 } catch (e) { bad.push('Alle als gelesen: ' + String(e).split('\n')[0].slice(0, 160)); }
+
+// ══════════ GLOCKE NUR FUER HANDLUNGSBEDARF (ENT-720)
+// Die Glocke zeigt ihre eigene Liste vom Server; die Kachel weiter alles.
+// Abhaken an einer Stelle nimmt den Eintrag an beiden weg.
+try {
+  const RAPPORT = EREIGNISSE[0];
+  const ZUSAGE = EREIGNISSE[2];
+  const SPERR_KONFLIKT = { typ: 'sperrtag', id: 30, zeit: vorMin(15), glocke: true,
+    person: { id: 5, name: 'beat', vorname: 'Beat', nachname: 'Beispiel' }, titel: 'Tag gesperrt', datum: MORGEN,
+    konflikt: { kunde: 'Beispiel AG', titel: null, von: '07:00:00', bis: '16:00:00' } };
+  const ABL = { ...ABLEHNUNG, glocke: true };
+  const ANTRAG = { typ: 'abwesenheit', id: 4, zeit: vorMin(40), glocke: true,
+    person: { id: 5, name: 'beat', vorname: 'Beat', nachname: 'Beispiel' }, titel: 'Abwesenheit beantragt',
+    abwesenheitstyp: 'ferien', von: MORGEN, bis: MORGEN };
+  glockePosts.length = 0;
+  const p = await glockenSeite([{
+    ereignisse: [RAPPORT, SPERR_KONFLIKT, ABL, ANTRAG, ZUSAGE], ereignisse_gesamt: 5,
+    ereignisse_je_art: { rapport: 1, sperrtag: 1, zusage: 2, abwesenheit: 1 },
+    glocke: [SPERR_KONFLIKT, ABL, ANTRAG], glocke_je_art: { sperrtag: 1, zusage: 1, abwesenheit: 1 },
+    stand: '2026-09-01T12:00:00+02:00' }]);
+  const g = await glockeStand(p);
+  check('KRITISCH: die Glocke zeigt nur Handlungsbedarf -- drei Zeilen, Zahl 3', g.zeilen === 3 && g.zahl === 3);
+  check('KRITISCH: kein Rapport und keine Zusage in der Glocke',
+    !/Rapport gesendet/.test(g.text) && !/hat zugesagt/.test(g.text));
+  check('Der Sperrtag in der Glocke nennt die betroffene Schicht',
+    /gesperrt, ist dort eingeteilt: Beispiel AG 07:00–16:00/.test(g.text));
+  check('Der Antrag steht mit Art und Datum in der Glocke', /hat Ferien beantragt/.test(g.text));
+  check('Der Antrag hat keinen Haken (weg erst mit dem Entscheid)',
+    await p.evaluate(() => [...document.querySelectorAll('#glockeListe .glocke-row')]
+      .filter(r => /beantragt/.test(r.textContent)).every(r => !r.querySelector('.rank-erledigt'))));
+  const kachel = await p.$$eval('#ereignisFeed .rank.erg', els => els.length);
+  check('KRITISCH: die Kachel zeigt weiter alles (fuenf Zeilen, auch Rapport und Zusage)', kachel === 5);
+
+  // Abhaken auf der Kachel nimmt die Ablehnung auch aus der Glocke.
+  await p.evaluate(() => {
+    const z = [...document.querySelectorAll('#ereignisFeed .rank.erg')].find(r => /HAT ABGELEHNT/.test(r.textContent));
+    z.querySelector('.rank-erledigt').click();
+  });
+  await p.waitForTimeout(300);
+  const g2 = await glockeStand(p);
+  check('KRITISCH: auf der Kachel abgehakt -- auch aus der Glocke weg, Zahl sinkt',
+    g2.zeilen === 2 && g2.zahl === 2 && !/ABGELEHNT/.test(g2.text));
+  const post = glockePosts.find(b => b.typ === 'zusage');
+  check('Und an den Server geht genau diese Zusage', !!post && post.id === ABL.id && post.mitarbeiter_id === ABL.mitarbeiter_id);
+
+  // Ein Rapport auf der Kachel abgehakt: Die Glocke bleibt, wie sie ist.
+  await p.evaluate(() => {
+    const z = [...document.querySelectorAll('#ereignisFeed .rank.erg')].find(r => /Rapport gesendet/.test(r.textContent));
+    z.querySelector('.rank-erledigt').click();
+  });
+  await p.waitForTimeout(300);
+  check('Ein Rapport abgehakt aendert an der Glocke nichts', (await glockeStand(p)).zahl === 2);
+
+  // Klick auf den Antrag in der Glocke fuehrt zum Entscheid.
+  await p.click('#btnGlocke');
+  await p.evaluate(() => [...document.querySelectorAll('#glockeListe .glocke-row')]
+    .find(r => /beantragt/.test(r.textContent)).click());
+  await p.waitForTimeout(400);
+  check('Klick auf den Antrag fuehrt zu den Abwesenheiten',
+    await p.evaluate(() => document.getElementById('nav-kontrolle-abwesenheiten').classList.contains('on')));
+  await p.close();
+} catch (e) { bad.push('Glocke ENT-720: ' + String(e).split('\n')[0].slice(0, 160)); }
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

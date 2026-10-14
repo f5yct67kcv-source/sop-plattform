@@ -106,7 +106,10 @@ try {
     $svStamm = null;
 }
 
-$ereignisse = ereignisse_sammeln(db(), 12, $svStamm, $svMandant);
+// Offene Abwesenheitsantraege nur fuer Konten, die sie entscheiden duerfen
+// (ENT-720) -- derselbe Recht-Name wie in abwesenheit_entscheiden.php.
+$ereignisse = ereignisse_sammeln(db(), 12, $svStamm, $svMandant,
+    darf($user, 'abwesenheiten_schreiben'));
 
 // ── Letzte Rapporte
 $letzte = db()->query(
@@ -136,6 +139,9 @@ json_response([
     'ereignisse_gesamt'     => $ereignisse['gesamt'],
     'ereignisse_gekuerzt'   => $ereignisse['gekuerzt'],
     'ereignisse_je_art'     => $ereignisse['je_art'],
+    // Die Glocke (ENT-720): eigene Liste, eigene Zahlen je Art.
+    'glocke'                => $ereignisse['glocke'],
+    'glocke_je_art'         => $ereignisse['glocke_je_art'],
     // Welche Arten sich nicht abfragen liessen -- meist eine Spalte, die die
     // Einrichtung noch nicht angelegt hat. Die Oberflaeche muss den
     // Unterschied hinschreiben koennen: "nichts passiert" und "hier fehlt

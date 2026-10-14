@@ -151,11 +151,12 @@ $pdo3->exec("UPDATE rapporte SET gesehen_am = '2026-09-03 08:00:00' WHERE id = 1
 pruef('KRITISCH: ein Haken senkt die Zahl wirklich -- 32, nicht wieder dieselbe',
     ereignisse_sammeln($pdo3)['gesamt'] === 32);
 
-// ══════════════ "ALLE ALS GELESEN" (14.10.2026)
-// Drei Aussagen: Alles, was im Feed stand, ist danach weg. Was NACH dem
-// Laden einging, bleibt. Und was nie im Feed stand (offene Zusage, normal
-// geplanter Rundgang, Abwesenheitsantrag), bekommt keinen Stempel -- sonst
-// waere es unsichtbar, bevor es je erscheint.
+// ══════════════ GLOCKE NUR FUER HANDLUNGSBEDARF (ENT-720) UND "ALLE ALS GELESEN"
+// Die Glocke bekommt eine eigene Liste: abgelehnte Schicht, Sperrtag mit
+// Konflikt, Offerte, Vorfall, spontaner Rundgang, Abwesenheitsantrag.
+// Rapporte, Zusagen und Sperrtage ohne Konflikt stehen nur in der Kachel.
+// "Alle als gelesen" hakt nur ab, was die Glocke zeigt, und nur bis zum
+// Stand der geladenen Liste.
 $pdo4 = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                                                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
 // CURDATE() gibt es in SQLite nicht; der Sperrtag-Block braucht es.
@@ -166,7 +167,7 @@ $pdo4->exec('CREATE TABLE rapporte (id INTEGER PRIMARY KEY, mitarbeiter_id INTEG
 $pdo4->exec('CREATE TABLE verfuegbarkeiten (id INTEGER PRIMARY KEY, mitarbeiter_id INTEGER, datum TEXT,
     bemerkung TEXT, erfasst_am TEXT, gesehen_am TEXT)');
 $pdo4->exec('CREATE TABLE einsaetze (id INTEGER PRIMARY KEY, spontan_erzeugt INTEGER NOT NULL DEFAULT 0,
-    datum TEXT, von TEXT, bis TEXT, kunde_name TEXT, titel TEXT, ort TEXT)');
+    datum TEXT, von TEXT, bis TEXT, kunde_name TEXT, titel TEXT, ort TEXT, status TEXT NOT NULL DEFAULT "geplant")');
 $pdo4->exec('CREATE TABLE einsatz_zuteilung (einsatz_id INTEGER, mitarbeiter_id INTEGER, zusage TEXT,
     zugeteilt_am TEXT, zusage_gesehen_am TEXT)');
 $pdo4->exec('CREATE TABLE belege (id INTEGER PRIMARY KEY, nummer TEXT, kunde_id INTEGER, status TEXT,
@@ -180,36 +181,72 @@ $pdo4->exec('CREATE TABLE ereignis_meldung (id INTEGER PRIMARY KEY, objekt_id IN
     ereignisart_id INTEGER, erfasst_am TEXT, vorfall_am TEXT, bemerkung TEXT, foto_mime TEXT, gesehen_am TEXT)');
 $pdo4->exec('CREATE TABLE abwesenheiten (id INTEGER PRIMARY KEY, mitarbeiter_id INTEGER, typ TEXT,
     von TEXT, bis TEXT, bemerkung TEXT, status TEXT, beantragt_am TEXT, gesehen_am TEXT)');
-$pdo4->exec("INSERT INTO mitarbeiter VALUES (1, 'anna', 'Anna', 'Muster')");
+$pdo4->exec("INSERT INTO mitarbeiter VALUES (1, 'anna', 'Anna', 'Muster'), (2, 'beat', 'Beat', 'Beispiel')");
 $pdo4->exec("INSERT INTO objekte VALUES (1, 'Lager Beispiel', 'Muster AG')");
 $vor = '2026-09-01 08:00:00'; $stand = '2026-09-01 12:00:00'; $nach = '2026-09-01 12:05:00';
+// Ein kuenftiger Tag, relativ zu heute (kein festes Datum nahe beim heutigen).
+$tag = date('Y-m-d', strtotime('+10 days'));
 $pdo4->exec("INSERT INTO rapporte (id, mitarbeiter_id, datum, kunde, erfasst_am) VALUES (1, 1, '2026-09-01', 'Muster AG', '$vor')");
 $pdo4->exec("INSERT INTO rapporte (id, mitarbeiter_id, datum, kunde, erfasst_am) VALUES (2, 1, '2026-09-01', 'Muster AG', '$nach')");
-$pdo4->exec("INSERT INTO verfuegbarkeiten (id, mitarbeiter_id, datum, erfasst_am) VALUES (1, 1, '2999-01-01', '$vor')");
-$pdo4->exec("INSERT INTO einsaetze (id, spontan_erzeugt, datum) VALUES (10, 1, '2026-09-01'), (11, 0, '2026-09-01')");
-$pdo4->exec("INSERT INTO einsatz_zuteilung VALUES (10, 1, 'zugesagt', '$vor', NULL), (11, 1, 'offen', '$vor', NULL)");
+// Einsatz 20 an $tag: Anna eingeteilt (zugesagt), Beat hat ABGELEHNT.
+// Einsatz 21 an $tag: abgesagt, Beat zugeteilt -- zaehlt nicht als Konflikt.
+$pdo4->exec("INSERT INTO einsaetze (id, datum, von, bis, kunde_name, status) VALUES
+    (20, '$tag', '07:00:00', '16:00:00', 'Beispiel AG', 'geplant'),
+    (21, '$tag', '18:00:00', '22:00:00', 'Muster AG', 'abgesagt')");
+$pdo4->exec("INSERT INTO einsatz_zuteilung VALUES (20, 1, 'zugesagt', '$vor', NULL), (20, 2, 'abgelehnt', '$vor', NULL),
+    (21, 2, 'zugesagt', '$vor', '$vor')");
+// Sperrtag 1: Anna an $tag -- eingeteilt, also KONFLIKT. Sperrtag 2: Beat
+// an $tag -- hat abgelehnt bzw. die Schicht ist abgesagt, KEIN Konflikt.
+$pdo4->exec("INSERT INTO verfuegbarkeiten (id, mitarbeiter_id, datum, erfasst_am) VALUES (1, 1, '$tag', '$vor'), (2, 2, '$tag', '$vor')");
 $pdo4->exec("INSERT INTO belege (id, nummer, status, entscheidung_am) VALUES (1, 'OF-1', 'bestaetigt', '$vor'), (2, 'OF-2', 'offen', NULL)");
+$pdo4->exec("INSERT INTO einsaetze (id, spontan_erzeugt, datum) VALUES (10, 1, '2026-09-01'), (11, 0, '2026-09-01')");
 $pdo4->exec("INSERT INTO rundgang (id, einsatz_id, mitarbeiter_id, vorbereitet_am) VALUES (100, 10, 1, '$vor'), (101, 11, 1, '$vor')");
 $pdo4->exec("INSERT INTO ereignis_meldung (id, objekt_id, mitarbeiter_id, erfasst_am) VALUES (1, 1, 1, '$vor')");
-$pdo4->exec("INSERT INTO abwesenheiten (id, mitarbeiter_id, typ, status, beantragt_am) VALUES (1, 1, 'ferien', 'beantragt', '$vor')");
+$pdo4->exec("INSERT INTO abwesenheiten (id, mitarbeiter_id, typ, von, bis, status, beantragt_am) VALUES (1, 1, 'ferien', '$tag', '$tag', 'beantragt', '$vor')");
 
+$schluessel = fn(array $l) => (function () use ($l) {
+    $k = array_map(fn($x) => $x['typ'] . ':' . $x['id'] . (isset($x['mitarbeiter_id']) ? '/' . $x['mitarbeiter_id'] : ''), $l);
+    sort($k); return $k;
+})();
 $vorher4 = ereignisse_sammeln($pdo4);
-pruef('Vorbedingung: alle Arten sind abfragbar und stehen im Feed (8 Ereignisse)',
-    $vorher4['unvollstaendig'] === [] && $vorher4['gesamt'] === 8);
+pruef('Vorbedingung: alle Arten sind abfragbar', $vorher4['unvollstaendig'] === []);
+pruef('KRITISCH: die Kachel zeigt weiter ALLES -- auch Rapporte, Zusagen und Sperrtage ohne Konflikt',
+    $schluessel($vorher4['ereignisse']) === ['abwesenheit:1', 'offerte:1', 'rapport:1', 'rapport:2',
+        'rundgang_spontan:100', 'sperrtag:1', 'sperrtag:2', 'vorfall:1', 'zusage:20/1', 'zusage:20/2']);
+pruef('KRITISCH: die Glocke zeigt nur Handlungsbedarf -- Ablehnung, Sperrtag mit Konflikt, Offerte, Rundgang, Vorfall, Antrag',
+    $schluessel($vorher4['glocke']) === ['abwesenheit:1', 'offerte:1', 'rundgang_spontan:100',
+        'sperrtag:1', 'vorfall:1', 'zusage:20/2']);
+pruef('Die Zahl der Glocke stimmt mit ihrer Liste ueberein (6)', array_sum($vorher4['glocke_je_art']) === 6);
+$sp = array_values(array_filter($vorher4['glocke'], fn($x) => $x['typ'] === 'sperrtag'));
+pruef('KRITISCH: der Sperrtag in der Glocke nennt die betroffene Schicht',
+    $sp !== [] && ($sp[0]['konflikt']['kunde'] ?? '') === 'Beispiel AG' && ($sp[0]['konflikt']['von'] ?? '') === '07:00:00');
+pruef('Ohne das Recht, Abwesenheiten zu entscheiden, kein Antrag -- weder Liste noch Zahl',
+    (function () use ($pdo4) {
+        $e = ereignisse_sammeln($pdo4, 12, null, null, false);
+        return !array_filter($e['ereignisse'], fn($x) => $x['typ'] === 'abwesenheit')
+            && !isset($e['glocke_je_art']['abwesenheit']) && !isset($e['je_art']['abwesenheit']);
+    })());
+
 $r4 = ereignisse_alle_abhaken($pdo4, $stand, '2026-09-01 12:10:00');
 pruef('Alle Arten liessen sich abhaken', $r4['fehler'] === []);
-$rest = ereignisse_sammeln($pdo4)['ereignisse'];
-$restTypId = array_map(fn($x) => $x['typ'] . ':' . $x['id'], $rest);
-sort($restTypId);
-pruef('KRITISCH: uebrig bleiben genau der NACH dem Laden eingegangene Rapport und der Abwesenheitsantrag',
-    $restTypId === ['abwesenheit:1', 'rapport:2']);
+$nach4 = ereignisse_sammeln($pdo4);
+pruef('KRITISCH: "alle" leert die Glocke bis auf den Antrag (der braucht einen Entscheid)',
+    $schluessel($nach4['glocke']) === ['abwesenheit:1']);
+pruef('KRITISCH: und laesst auf der Kachel stehen, was die Glocke nie gezeigt hat',
+    $schluessel($nach4['ereignisse']) === ['abwesenheit:1', 'rapport:1', 'rapport:2', 'sperrtag:2', 'zusage:20/1']);
 pruef('KRITISCH: eine offene Zusage bekommt keinen Stempel (sonst erschiene ihre spaetere Antwort nie)',
-    $pdo4->query('SELECT zusage_gesehen_am FROM einsatz_zuteilung WHERE einsatz_id = 11')->fetchColumn() === null);
+    $pdo4->query("SELECT COUNT(*) FROM einsatz_zuteilung WHERE zusage = 'zugesagt' AND einsatz_id = 20 AND zusage_gesehen_am IS NULL")->fetchColumn() == 1);
 pruef('KRITISCH: ein normal geplanter Rundgang bekommt keinen Stempel',
     $pdo4->query('SELECT gesehen_am FROM rundgang WHERE id = 101')->fetchColumn() === null);
 pruef('Eine noch nicht entschiedene Offerte bekommt keinen Stempel',
     $pdo4->query('SELECT entscheidung_gesehen_am FROM belege WHERE id = 2')->fetchColumn() === null);
-pruef('Die Zahl stimmt: 6 Zeilen markiert', $r4['geaendert'] === 6);
+pruef('Die Zahl stimmt: 5 Zeilen markiert', $r4['geaendert'] === 5);
+
+// Was NACH dem Laden einging, bleibt -- auch wenn es in die Glocke gehoert.
+$pdo4->exec("INSERT INTO ereignis_meldung (id, objekt_id, mitarbeiter_id, erfasst_am) VALUES (2, 1, 1, '$nach')");
+ereignisse_alle_abhaken($pdo4, $stand, '2026-09-01 12:10:00');
+pruef('KRITISCH: ein Vorfall, der nach dem Laden einging, bleibt in der Glocke',
+    in_array('vorfall:2', $schluessel(ereignisse_sammeln($pdo4)['glocke']), true));
 
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }
