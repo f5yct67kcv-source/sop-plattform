@@ -24,8 +24,8 @@ pruef('Vorname.Nachname wird klein geschrieben',
     ma_login_generieren('Hans', 'Muster', $pdo) === 'hans.muster');
 
 // ── Das Beispiel des Projektinhabers: ein Leerzeichen IM Nachnamen ────────
-pruef('KRITISCH: "Adrian von Arb" wird zu "adrian.vonarb" -- das Leerzeichen im Nachnamen faellt weg',
-    ma_login_generieren('Adrian', 'von Arb', $pdo) === 'adrian.vonarb');
+pruef('KRITISCH: "Adrian von Muster" wird zu "adrian.vonmuster" -- das Leerzeichen im Nachnamen faellt weg',
+    ma_login_generieren('Adrian', 'von Muster', $pdo) === 'adrian.vonmuster');
 
 // ── Ohne Vor- oder Nachname gibt es keinen Login-Namen ────────────────────
 pruef('KRITISCH: ohne Vorname kein Login-Name', ma_login_generieren('', 'Muster', $pdo) === '');
@@ -58,7 +58,7 @@ pruef('Ein unverwandter Name kollidiert nicht mit',
 // auch fuer eine von Hand eingetragene Korrektur akzeptieren -- sonst
 // wiedersprechen sich Erzeugung und Pruefung.
 pruef('KRITISCH: eine automatisch gebildete Form gilt auch als gueltige Korrektur',
-    ma_login_name_gueltig(ma_login_generieren('Adrian', 'von Arb', $pdo)));
+    ma_login_name_gueltig(ma_login_generieren('Adrian', 'von Muster', $pdo)));
 pruef('KRITISCH: Gross-/Kleinschreibung wird abgelehnt', !ma_login_name_gueltig('Max.Muster'));
 pruef('KRITISCH: ein Leerzeichen wird abgelehnt', !ma_login_name_gueltig('max muster'));
 pruef('KRITISCH: ohne Punkt (kein vorname.nachname) wird abgelehnt', !ma_login_name_gueltig('maxmuster'));

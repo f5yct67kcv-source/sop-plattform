@@ -71,7 +71,7 @@ const SCHICHTEN = () => ({ status: 'ok', von: GESTERN, bis: tag(90), schichten: 
   // ENT-128/130: vom Server gesetzt, sobald alle zugesagten Personen
   // rapportiert haben -- app.html fuehrt seine eigene STATUS_MARKE-Kopie und
   // hatte "abgeschlossen" zunaechst vergessen (fiel still auf "Geplant" zurueck).
-  { id: 46, kunde_name: 'Cupi24 GmbH', titel: 'Bereits rapportiert',
+  { id: 46, kunde_name: 'Muster Sicherheit GmbH', titel: 'Bereits rapportiert',
     strasse: null, ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst',
     datum: HEUTE, von: '08:00:00', bis: '10:00:00', status: 'abgeschlossen', bemerkung: null,
     zusage: 'zugesagt', objekt_name: null, im_team: 1 }]});
@@ -89,7 +89,7 @@ const RAP = { status: 'ok', rapporte: [{ id: 1, datum: GESTERN, mitarbeiter: 'da
   bemerkung: null, erfasst_am: GESTERN + ' 16:12:00' },
   // Zu Schicht 46 (status 'abgeschlossen'), fuer die Kartenanzeige (ENT-133).
   { id: 2, einsatz_id: 46, datum: GESTERN, mitarbeiter: 'dario.beispiel',
-    kunde: 'Cupi24 GmbH', strasse: null, ort: '4632 Trimbach',
+    kunde: 'Muster Sicherheit GmbH', strasse: null, ort: '4632 Trimbach',
     auftrag_nr: null, einsatzart: 'Verkehrsdienst', von: '08:00:00', bis: '10:00:00',
     pause_min: 0, netto_h: '2.00', unterzeichner: null, unterschrift: null,
     bemerkung: null, erfasst_am: GESTERN + ' 15:30:00' }]};
@@ -102,14 +102,14 @@ let schichtenDaten = SCHICHTEN();
 // ENT-134: eine bereits vergangene Schicht des laufenden Monats -- lange
 // genug her, dass sie zugleich als "ueberfaellig, nie rapportiert" dient.
 if (frueherImMonat) {
-  schichtenDaten.schichten.push({ id: 47, kunde_name: 'Cupi24 GmbH', titel: 'Frueher im Monat, nie rapportiert',
+  schichtenDaten.schichten.push({ id: 47, kunde_name: 'Muster Sicherheit GmbH', titel: 'Frueher im Monat, nie rapportiert',
     strasse: null, ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst',
     datum: frueherImMonat, von: '08:00:00', bis: '10:00:00', status: 'bestaetigt', bemerkung: null,
     zusage: 'zugesagt', objekt_name: null, im_team: 1 });
 }
 // Gegenprobe zur Monatsansicht: liegt ausserhalb des laufenden Monats und
 // darf im Plan nicht auftauchen.
-schichtenDaten.schichten.push({ id: 48, kunde_name: 'Cupi24 GmbH', titel: 'Schicht aus dem Vormonat',
+schichtenDaten.schichten.push({ id: 48, kunde_name: 'Muster Sicherheit GmbH', titel: 'Schicht aus dem Vormonat',
   strasse: null, ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst',
   datum: VORMONAT, von: '08:00:00', bis: '10:00:00', status: 'bestaetigt', bemerkung: null,
   zusage: 'zugesagt', objekt_name: null, im_team: 1 });

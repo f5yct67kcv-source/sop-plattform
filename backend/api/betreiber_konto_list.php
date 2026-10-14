@@ -58,6 +58,12 @@ $liste = array_map(static function (array $k) use ($ich, $pdo, $geteilt, $hatArc
     // boete einen Schalter "aktivieren" an, den der Server zu Recht
     // zurueckweist. "Unbekannt darf nie wie keine aussehen" (CLAUDE.md).
     $k['eingeladen'] = be_einladung_offen($pdo, $k['id']);
+    // Und ob der Link noch gilt. Ohne das zeigte die Liste "eingeladen"
+    // auch Wochen nach Ablauf -- ein toter Link saehe aus wie ein offener,
+    // und niemand kaeme auf die Idee, neu einzuladen.
+    $stand = $k['eingeladen'] ? be_einladung_stand($pdo, $k['id']) : null;
+    $k['einladung_bis']        = $stand['bis'] ?? null;
+    $k['einladung_abgelaufen'] = $stand !== null && $stand['abgelaufen'];
     // Archiviert heisst: aus der Liste genommen, nicht geloescht (ENT-672).
     // Ohne die Spalte gilt "nicht archiviert" -- das ist der Zustand, den
     // eine Anlage vor dem Nachtrag tatsaechlich hat, keine Annahme.

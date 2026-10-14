@@ -108,7 +108,7 @@ await page.route('**/api/**', route => {
       'betrieb_lesen', 'betrieb_schreiben', 'fahrzeuge_lesen',
       'fahrzeuge_schreiben'] });
   if (u.includes('einsatz_bericht')) { berichtRufe++; return s({ status: 'ok', bericht: BERICHT }); }
-  if (u.includes('betrieb.php')) return s({ status: 'ok', betrieb: { firma: 'CUPI 24 GmbH',
+  if (u.includes('betrieb.php')) return s({ status: 'ok', betrieb: { firma: 'Muster Sicherheit GmbH',
     zusatz: 'Sicherheits- und Verkehrsdienst', fusszeile: 'Musterweg 1 · 4600 Olten',
     fusszeile2: 'Zweitsitz · Bahnhofstrasse 3', logo: null,
     logo_mime: null, logo_groesse: null } });
@@ -134,7 +134,7 @@ check('KRITISCH: auch die unterschiedlichen Pausen stehen einzeln da',
   /30′/.test(blatt) && /45′/.test(blatt));
 check('KRITISCH: die Summe der Nettostunden stimmt (7.50 + 8.25 = 15.75)', /15\.75 h/.test(blatt));
 check('Die Kunden-Nr. steht auf dem Blatt', /K0001/.test(blatt));
-check('Der Briefkopf aus den Betriebseinstellungen ist da', /CUPI 24 GmbH/.test(blatt));
+check('Der Briefkopf aus den Betriebseinstellungen ist da', /Muster Sicherheit GmbH/.test(blatt));
 check('Die Fusszeile ebenfalls', /Musterweg 1/.test(blatt));
 check('KRITISCH: der zweite Fusszeilen-Block (Zweitsitz, ENT-169) steht daneben', /Bahnhofstrasse 3/.test(blatt));
 check('KRITISCH: eine Bemerkung wird der Person zugeordnet, nicht anonym angehängt',

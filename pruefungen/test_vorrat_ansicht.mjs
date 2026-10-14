@@ -194,6 +194,10 @@ const browser = await chromium.launch({ executablePath: browserPfad() });
   await page.evaluate(() => mandGo('vorrat'));
   await page.click('#knopf-vorrat-neu');
   await page.waitForFunction(() => document.getElementById('dlgVorrat').classList.contains('on'));
+  // Der Dialog setzt den Fokus 30 ms verzoegert aufs erste Feld. Wer vorher
+  // schon das zweite fuellt, dem springt der Fokus mitten im Tippen zurueck,
+  // und der Text landet im Host-Feld (etwa jeder sechste Lauf, 2026-09-28).
+  await page.waitForFunction(() => document.activeElement === document.getElementById('v_host'));
   await page.fill('#v_host', 'db.beispiel.invalid');
   await page.fill('#v_db', 'vorrat3');
   await page.fill('#v_user', 'vorrat3');

@@ -272,21 +272,14 @@ check('EINRICHTUNG: die Tabelle objekt_distanz wird angelegt',
 check('EINRICHTUNG: die PLZ am Objekt wird nachgetragen',
   /objekte.*plz|ADD COLUMN plz/.test(einPhp));
 
-// ── Die beiden Anstellungsorte werden einmalig hinterlegt (ENT-055)
-check('EINRICHTUNG: Trimbach wird als HAO angelegt',
-  /Trimbach/.test(einPhp) && /'hao'/.test(einPhp));
-check('EINRICHTUNG: Gelterkinden wird als NAO angelegt',
-  /Gelterkinden/.test(einPhp) && /'nao'/.test(einPhp));
-check('EINRICHTUNG: die gemessenen 18.0 km zwischen den Orten sind hinterlegt',
-  /18\.0/.test(einPhp));
-check('KRITISCH: die geschaetzten 19 km sind nirgends mehr hinterlegt',
-  !/19\.0/.test(einPhp));
-check('EINRICHTUNG: die Herkunft der Zahl steht dabei',
-  /Google Maps/.test(einPhp) && /kuerzeste|kürzeste/.test(einPhp));
-check('KRITISCH: der Nachtrag laeuft nur bei leerer Tabelle und ueberschreibt nichts',
-  /SELECT COUNT\(\*\) FROM anstellungsorte/.test(einPhp) && /\$anzahl === 0/.test(einPhp));
-check('EINRICHTUNG: der Nachtrag meldet sich auch im Trockenlauf',
-  /nurPruefen[\s\S]{0,400}Anstellungsorte Trimbach/.test(einPhp));
+// ── Die Einrichtung legt KEINE Anstellungsorte mehr an (ENT-568)
+// Bis dahin schrieb sie die beiden Orte von CUPI 24 (ENT-055) in jede
+// Datenbank mit leerer Tabelle -- seit es Mandanten gibt, waeren das die
+// Adressen einer Kundin in der Datenbank einer anderen. Geprueft am
+// Schreibweg, nicht an Ortsnamen: Ein INSERT in die Tabelle, egal mit
+// welchen Werten, waere derselbe Fehler.
+check('KRITISCH: die Einrichtung schreibt keine Anstellungsorte in die Datenbank',
+  !/INSERT INTO anstellungsorte/i.test(einPhp));
 // 18.0 km liegen unter 40 -- damit gilt Ziff. 3.2.5 und im Nebengebiet ist
 // nichts geschuldet. Das ist die Rechtsfolge dieser einen Zahl. Sie haette
 // auch bei der laengsten von Google angebotenen Route (20.4 km) so gelautet;

@@ -20,7 +20,7 @@ const RAPPORTE = { status: 'ok', rapporte: [
 ]};
 
 const MA = { status: 'ok', mitarbeiter: [
-  { name: 'adrian', ist_admin: 1, personalnummer: '1001', anrede: 'Herr', vorname: 'Adrian', nachname: 'Muster', geburtsdatum: '1988-04-12', strasse: 'Hochgasse 7', ort: '4632 Trimbach', telefon: '062 555 11 22', mobil: '079 555 11 22', email: 'a@cupi24.ch', erstellt_am: '2026-01-05 10:00:00' },
+  { name: 'adrian', ist_admin: 1, personalnummer: '1001', anrede: 'Herr', vorname: 'Adrian', nachname: 'Muster', geburtsdatum: '1988-04-12', strasse: 'Hochgasse 7', ort: '4632 Trimbach', telefon: '062 555 11 22', mobil: '079 555 11 22', email: 'a@example.invalid', erstellt_am: '2026-01-05 10:00:00' },
   { name: 'dario.beispiel', ist_admin: 0, personalnummer: '1002', anrede: 'Herr', vorname: 'Dario', nachname: 'Beispiel', geburtsdatum: null, strasse: 'Bahnhofstrasse 9', ort: '4600 Olten', telefon: null, mobil: '079 444 33 22', email: null, erstellt_am: '2026-02-01 09:00:00' }
 ]};
 

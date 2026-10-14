@@ -532,9 +532,9 @@ await page.waitForTimeout(200);
 // TEIL 4 — Das gedruckte Blatt
 // ══════════════════════════════════════════════════════════════════════════
 const blatt = await page.evaluate(() => {
-  briefkopf.firma = 'Cupi 24 GmbH';
-  briefkopf.fusszeile = 'Cupi 24 GmbH\nBaslerstrasse 67\nCH-4632 Trimbach\n0763047648';
-  briefkopf.fusszeile2 = 'info@cupi24.ch\nwww.cupi24.ch\nCHE-255.301.179';
+  briefkopf.firma = 'Muster Sicherheit GmbH';
+  briefkopf.fusszeile = 'Muster Sicherheit GmbH\nMusterweg 11\nCH-4600 Olten\n062 000 00 00';
+  briefkopf.fusszeile2 = 'info@example.invalid\nwww.example.invalid\nCHE-999.888.777';
   const b = { art: 'offerte', nummer: 'OF-0093', titel: 'Verkehrsdienst', referenz: 'B-12',
     datum: '2026-02-25', gueltig_bis: '2026-03-27', rabatt_bp: 700,
     positionen: [
@@ -556,8 +556,8 @@ check('Die Referenz erscheint nur, wenn es eine gibt', blatt.html.includes('B-12
 check('KRITISCH: das Total steht darauf (3’111.90)', blatt.html.includes('3’111.90'));
 check('KRITISCH: die MWST-Grundlage steht darauf (2’734.20)', blatt.html.includes('2’734.20'));
 check('Die Rundungsdifferenz wird ausgewiesen', blatt.html.includes('Rundungsdifferenz'));
-check('Der Absender kommt aus dem Briefkopf', blatt.html.includes('Baslerstrasse 67'));
-check('Die zweispaltige Fusszeile hängt an (ENT-172)', blatt.html.includes('CHE-255.301.179'));
+check('Der Absender kommt aus dem Briefkopf', blatt.html.includes('Musterweg 11'));
+check('Die zweispaltige Fusszeile hängt an (ENT-172)', blatt.html.includes('CHE-999.888.777'));
 check('Mehrzeilige Beschreibungen bleiben mehrzeilig', blatt.html.includes('white-space:pre-line'));
 
 // Der Test, an dem der Kundenrapport schon einmal gescheitert ist (ENT-179).

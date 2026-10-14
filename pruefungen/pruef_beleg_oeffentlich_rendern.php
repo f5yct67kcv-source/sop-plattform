@@ -33,28 +33,34 @@ $argVariante = $argv[1] ?? 'rechnung_offen';
 // ueberhaupt eingebettet wird (dieselbe Quelle wie test_briefkopf.mjs).
 $png1x1 = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
 $fusszeile = "Musterweg 1\n4600 Olten\n062 000 00 00";
-$fusszeile2 = "info@cupi24.ch\nwww.cupi24.ch\nCHE-255.301.179 MWST";
+$fusszeile2 = "info@example.invalid\nwww.example.invalid\nCHE-999.888.777 MWST";
 $hatQr = $argVariante === 'rechnung_qr';
 $stmt = $pdo->prepare('INSERT INTO betrieb VALUES (1,?,?,?,?,?,?,?,?,?,?)');
-$stmt->bindValue(1, 'Cupi 24 GmbH');
+$stmt->bindValue(1, 'Muster Sicherheit GmbH');
 $stmt->bindValue(2, $fusszeile);
 $stmt->bindValue(3, $fusszeile2);
 $stmt->bindValue(4, 'image/png');
 $stmt->bindValue(5, $png1x1, PDO::PARAM_LOB);
 $stmt->bindValue(6, $hatQr ? 'CH44 3199 9123 0008 8901 2' : null);
-$stmt->bindValue(7, $hatQr ? 'Baslerstrasse' : null);
-$stmt->bindValue(8, $hatQr ? '67' : null);
-$stmt->bindValue(9, $hatQr ? '4632' : null);
-$stmt->bindValue(10, $hatQr ? 'Trimbach' : null);
+$stmt->bindValue(7, $hatQr ? 'Musterweg' : null);
+$stmt->bindValue(8, $hatQr ? '1' : null);
+$stmt->bindValue(9, $hatQr ? '4600' : null);
+$stmt->bindValue(10, $hatQr ? 'Olten' : null);
 $stmt->execute();
 $art = str_starts_with($argVariante, 'offerte') ? 'offerte' : 'rechnung';
 $status = $argVariante === 'offerte_entschieden' ? 'bestaetigt' : 'versendet';
 $entscheidung = $argVariante === 'offerte_entschieden' ? date('Y-m-d H:i:s') : null;
 $unterschriftsseite = $argVariante === 'offerte_unterschrift' ? 1 : 0;
+// Daten relativ zu heute: Mit festen Daten galt die Offerte ab dem Tag nach
+// "gueltig_bis" als abgelaufen, und die Seite liess Annehmen/Ablehnen samt
+// Unterschrift weg -- die Pruefung wurde rot, ohne dass sich am Code etwas
+// geaendert hatte (so geschehen am 2026-09-28).
+$belegDatum = date('Y-m-d', strtotime('-30 days'));
+$fristBis   = date('Y-m-d', strtotime('+30 days'));
 $pdo->exec("INSERT INTO belege VALUES (1,'tok123','$art','" . ($art === 'offerte' ? 'OF-0127' : 'RE-0002')
-    . "',1,1,'Ladenüberwachung RE-0002',NULL,'2026-08-28',"
-    . ($art === 'offerte' ? "'2026-09-27'" : 'NULL') . ","
-    . ($art === 'rechnung' ? "'2026-09-27'" : 'NULL')
+    . "',1,1,'Ladenüberwachung RE-0002',NULL,'$belegDatum',"
+    . ($art === 'offerte' ? "'$fristBis'" : 'NULL') . ","
+    . ($art === 'rechnung' ? "'$fristBis'" : 'NULL')
     . ",0,'$status',0,NULL," . ($entscheidung ? "'$entscheidung'" : 'NULL') . ",NULL,NULL,NULL,$unterschriftsseite)");
 $pdo->exec("INSERT INTO kunden VALUES (1,'abc consulting gmbh',NULL,'Hochgasse','7',NULL,'4632','Trimbach')");
 $pdo->exec("INSERT INTO kunden_person VALUES (1,'Herr','Adrian','Muster')");

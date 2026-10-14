@@ -89,17 +89,15 @@ const farben = await desktop.evaluate(() => {
   const f = (sel, eig) => { const e = document.querySelector(sel); return e ? getComputedStyle(e)[eig] : ''; };
   return {
     grundDunkel: getComputedStyle(document.body).backgroundColor,
-    grundHell: f('#belege', 'backgroundColor'),
+    grundHell: f('#faq', 'backgroundColor'),
     vorzeileDunkel: f('.abs.nacht .vorzeile', 'color'),
     vorzeileHell: f('.abs.hell .vorzeile', 'color'),
     knopf: f('.held .btn.primaer', 'backgroundColor'),
     live: f('.protokoll li.live .wo', 'color'),
     andereZeile: f('.protokoll li:not(.live) .wo', 'color'),
-    cockpitGrund: f('.cockpit', 'backgroundColor'),
   };
 });
 check('KRITISCH: der dunkle Grund der Homepage ist der dunkle Grund des Cockpits', farben.grundDunkel === rgb(marke(dunkel, 'bg')));
-check('KRITISCH: der Cockpit-Bildschirm im Kopfbereich traegt den dunklen Cockpit-Grund', farben.cockpitGrund === rgb(marke(dunkel, 'bg')));
 check('Der helle Grund der Homepage ist der helle Grund des Cockpits', farben.grundHell === rgb(marke(hell, 'bg')));
 check('KRITISCH: Blau bedient -- die Vorzeile traegt auf dunklem Grund den dunklen, auf hellem den hellen Cockpit-Akzent',
   farben.vorzeileDunkel === rgb(marke(dunkel, 'accent')) && farben.vorzeileHell === rgb(marke(hell, 'accent')));
@@ -108,6 +106,25 @@ const [kr, kg, kb] = kanal(farben.knopf);
 check('KRITISCH: der Demo-Knopf ist blau, nicht bernsteinfarben', kb > kr + 60 && kb > kg);
 check('Bernstein meldet -- nur der laufende Rundgang traegt die Warnfarbe des Cockpits, die uebrigen Zeilen Blau',
   farben.live === rgb(marke(dunkel, 'warn')) && farben.andereZeile === rgb(marke(dunkel, 'accent')));
+
+// ── Die beiden Fotos (Zurueckbau 2026-10-10): echte Bildschirmfotos aus
+// der Demo-Umgebung statt nachgezeichneter Bildschirme. Gemessen wird,
+// dass sie WIRKLICH geladen sind (naturalWidth) -- ein falscher Pfad
+// zeigt sonst nur ein leeres Rechteck -- und dass jedes eine Beschreibung
+// traegt, die sagt, dass es Beispieldaten sind. Ohne diesen Hinweis
+// wuerde ein erfundener Betrieb wie ein Kunde aussehen.
+const fotos = await desktop.evaluate(() => [...document.querySelectorAll('main img')].map(i => ({
+  src: i.getAttribute('src'), geladen: i.complete && i.naturalWidth > 0,
+  verhaeltnis: Math.abs(i.naturalWidth / i.naturalHeight - Number(i.getAttribute('width')) / Number(i.getAttribute('height'))),
+  alt: i.getAttribute('alt') || '', breite: i.getBoundingClientRect().width,
+})));
+check('KRITISCH: genau zwei Fotos -- Cockpit und App -- und beide sind wirklich geladen',
+  fotos.length === 2 && fotos.every(f => f.geladen) && fotos.some(f => /cockpit/.test(f.src)) && fotos.some(f => /app/.test(f.src)));
+check('KRITISCH: jedes Foto sagt in seiner Beschreibung, dass es Beispieldaten zeigt',
+  fotos.length === 2 && fotos.every(f => /Beispieldaten/.test(f.alt) && f.alt.length > 40));
+check('Die angegebenen Bildmasse stimmen mit dem Bild ueberein (kein Springen beim Laden)',
+  fotos.length === 2 && fotos.every(f => f.verhaeltnis < 0.01));
+check('Beide Fotos sind am Desktop sichtbar gross', fotos.every(f => f.breite >= 280));
 
 // ── Die Marke (ENT-562). Gemessen, nicht im Quelltext nachgelesen:
 // Der Name steht an einer Stelle (BRAND) und muss ueberall derselbe sein;

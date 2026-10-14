@@ -42,7 +42,7 @@ $akteur = ['id' => 99, 'name' => 'verwaltung-test'];
     $pdo = neueDb();
     // Genau das Beispiel des Projektinhabers, unter dem alten, frei
     // getippten Namen ohne Punkt.
-    $pdo->exec("INSERT INTO mitarbeiter VALUES (1, 'adrianvonarb', 'Adrian', 'von Arb', 'P-001', 1, '2025-01-05 10:00:00')");
+    $pdo->exec("INSERT INTO mitarbeiter VALUES (1, 'adrianvonmuster', 'Adrian', 'von Muster', 'P-001', 1, '2025-01-05 10:00:00')");
     // Zwei Namensgleiche -- id 2 war zuerst da, bekommt die saubere Form.
     // Eine davon INAKTIV: genau der Fall, der beim ersten echten Einsatz
     // dieser Funktion auffiel -- eine Karteileiche, die in der normalen
@@ -64,8 +64,8 @@ $akteur = ['id' => 99, 'name' => 'verwaltung-test'];
     $von = fn($id) => current(array_filter($plan, fn($p) => $p['id'] === $id));
 
     pruef('Genau 5 Zeilen im Plan, eine je Person', count($plan) === 5);
-    pruef('KRITISCH: "Adrian von Arb" wird zu "adrian.vonarb"',
-        $von(1)['neu'] === 'adrian.vonarb' && $von(1)['status'] === 'umbenannt');
+    pruef('KRITISCH: "Adrian von Muster" wird zu "adrian.vonmuster"',
+        $von(1)['neu'] === 'adrian.vonmuster' && $von(1)['status'] === 'umbenannt');
     // "max.muster" selbst ist durch das Systemkonto (id 4) fest belegt --
     // beide Max Muster muessen sich also schon mit einer Nummer begnuegen,
     // in der Reihenfolge ihres Anlegens.
@@ -92,7 +92,7 @@ $akteur = ['id' => 99, 'name' => 'verwaltung-test'];
 //    protokolliert nur echte Aenderungen ───────────────────────────────────
 {
     $pdo = neueDb();
-    $pdo->exec("INSERT INTO mitarbeiter VALUES (1, 'adrianvonarb', 'Adrian', 'von Arb', 'P-001', 1, '2025-01-05 10:00:00')");
+    $pdo->exec("INSERT INTO mitarbeiter VALUES (1, 'adrianvonmuster', 'Adrian', 'von Muster', 'P-001', 1, '2025-01-05 10:00:00')");
     $pdo->exec("INSERT INTO mitarbeiter VALUES (4, 'max.muster', 'Systemkonto', '', NULL, 1, '2024-01-01 00:00:00')");
     $pdo->exec("INSERT INTO mitarbeiter VALUES (5, 'erika.muster', 'Erika', 'Muster', 'P-005', 1, '2025-02-02 08:00:00')");
     // Je eine Sitzung fuer alle drei -- nur die von id 1 (wird umbenannt)
@@ -105,7 +105,7 @@ $akteur = ['id' => 99, 'name' => 'verwaltung-test'];
 
     $name = fn($id) => $pdo->query("SELECT name FROM mitarbeiter WHERE id=$id")->fetch()['name'];
     pruef('KRITISCH: der Name steht in der Datenbank wirklich um',
-        $name(1) === 'adrian.vonarb');
+        $name(1) === 'adrian.vonmuster');
     pruef('Das uebersprungene Konto behaelt seinen Namen', $name(4) === 'max.muster');
     pruef('Das bereits passende Konto behaelt seinen Namen', $name(5) === 'erika.muster');
 
@@ -122,7 +122,7 @@ $akteur = ['id' => 99, 'name' => 'verwaltung-test'];
         count($log) === 1);
     pruef('Der Eintrag nennt alten und neuen Namen und wen es betraf',
         count($log) === 1 && (int)$log[0]['objekt_id'] === 1
-        && $log[0]['wert_alt'] === 'adrianvonarb' && $log[0]['wert_neu'] === 'adrian.vonarb'
+        && $log[0]['wert_alt'] === 'adrianvonmuster' && $log[0]['wert_neu'] === 'adrian.vonmuster'
         && $log[0]['akteur_name'] === 'verwaltung-test');
 
     // ── Idempotenz: ein zweiter Lauf veraendert nichts mehr ───────────────

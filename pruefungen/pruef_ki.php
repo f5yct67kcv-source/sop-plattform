@@ -335,6 +335,46 @@ pruef('KRITISCH: der zwischengespeicherte Teil des Systemtexts enthaelt weder da
 pruef('Datum und offene Seite stehen im wechselnden Teil',
     str_contains(ki_assistent_system_wechselnd('2000-01-05', ['art' => 'kunde', 'id' => 7, 'text' => 'X']), 'Mittwoch, 2000-01-05')
     && str_contains(ki_assistent_system_wechselnd('2000-01-05', ['art' => 'kunde', 'id' => 7, 'text' => 'X']), 'Kunde mit der Nummer 7'));
+// Strom (ENT-716): zerlegt und wieder zusammengesetzt ergibt er dieselbe
+// Antwort wie ohne Strom -- auch wenn die Stuecke mitten in Zeilen reissen.
+$sse = "event: message_start\r\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"m1\"}}\r\n\r\n"
+    . "event: ping\ndata: {\"type\":\"ping\"}\n\n"
+    . "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+    . "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Ich sehe \"}}\n\n"
+    . "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"nach. Ä\"}}\n\n"
+    . "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+    . "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"tagesplan\",\"input\":{}}}\n\n"
+    . "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"von\\\": \\\"2026\"}}\n\n"
+    . "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"-10-01\\\"}\"}}\n\n"
+    . "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\n"
+    . "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\"}}\n\n"
+    . "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n";
+$strom = function (string $roh, int $groesse) {
+    $puffer = ''; $z = []; $text = '';
+    foreach (str_split($roh, $groesse) as $stueck) {
+        $puffer .= $stueck;
+        foreach (ki_sse_zerlegen($puffer) as $e) { $text .= ki_strom_sammeln($z, $e); }
+    }
+    ksort($z['content']);
+    return [$text, $z];
+};
+$stromOk = true;
+foreach ([1, 7, 64, 4096] as $g) {
+    [$t, $z] = $strom($sse, $g);
+    $stromOk = $stromOk && $t === 'Ich sehe nach. Ä' && $z['stop_reason'] === 'tool_use' && $z['fehler'] === null
+        && $z['content'][0] === ['type' => 'text', 'text' => 'Ich sehe nach. Ä']
+        && $z['content'][1]['type'] === 'tool_use' && $z['content'][1]['name'] === 'tagesplan' && $z['content'][1]['input'] === ['von' => '2026-10-01'];
+}
+pruef('KRITISCH: der Strom ergibt Text und Werkzeugaufruf wie ohne Strom, egal wo die Stuecke reissen (1, 7, 64, 4096 Byte, auch \\r\\n)', $stromOk);
+[, $z] = $strom("data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+    . "event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}\n\n", 5);
+pruef('Ein Fehler mitten im Strom wird festgehalten, nicht verschluckt', ($z['fehler']['type'] ?? '') === 'overloaded_error');
+[, $z] = $strom("data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"t\",\"name\":\"tagesplan\",\"input\":{}}}\n\n"
+    . "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"von\"}}\n\n"
+    . "data: {\"type\":\"content_block_stop\",\"index\":0}\n\n", 9);
+pruef('KRITISCH: eine abgebrochene Werkzeugeingabe ist ein Fehler, kein leeres Objekt', ($z['fehler']['type'] ?? '') === 'eingabe_unvollstaendig');
+$puffer = "data: {\"type\":\"ping\"}\n";
+pruef('Ein unvollstaendiges Ereignis bleibt im Puffer, bis die Leerzeile kommt', ki_sse_zerlegen($puffer) === [] && $puffer !== '');
 $wzNamen = array_keys(ki_assistent_werkzeuge());
 pruef('Jedes Werkzeug, auf das der Bezug verweist, gibt es wirklich',
     array_reduce(array_keys(KI_BEZUG_ARTEN), function ($ok, $art) use ($wzNamen) {
