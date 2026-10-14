@@ -51,7 +51,7 @@ $pdo->exec('CREATE TABLE einsaetze (id INTEGER PRIMARY KEY, kunde_id INT, kunde_
     bedarf INT, status TEXT, ist_status TEXT NOT NULL DEFAULT "offen", ist_von TEXT, ist_bis TEXT,
     ist_pause_min INT, ist_pause_bezahlt_ma INT, abgeglichen_von INT, abgeglichen_am TEXT)');
 $pdo->exec('CREATE TABLE einsatz_zuteilung (einsatz_id INT, mitarbeiter_id INT, zusage TEXT,
-    ist_status TEXT NOT NULL DEFAULT "offen", ist_von TEXT, ist_bis TEXT, ist_pause_min INT,
+    zusage_gesehen_am TEXT, ist_status TEXT NOT NULL DEFAULT "offen", ist_von TEXT, ist_bis TEXT, ist_pause_min INT,
     ist_pause_bezahlt_ma INT, abgeglichen_von INT, abgeglichen_am TEXT)');
 
 // ── Datenkonsistenz der reinen Listen (kein DB-Zugriff) ─────────────────
@@ -234,6 +234,19 @@ $anwesendZahl = (int)$pdo->query("SELECT COUNT(*) FROM einsatz_zuteilung WHERE i
 $offenZahl    = (int)$pdo->query("SELECT COUNT(*) FROM einsatz_zuteilung WHERE ist_status = 'offen'")->fetchColumn();
 pruef('KRITISCH: die Fixture erzeugt tatsaechlich BEIDE Zustaende (sonst waere obiges nur zufaellig gruen)',
     $anwesendZahl > 0 && $offenZahl > 0);
+
+// Keine Demo-Zuteilung steht als Ereignis in der Glocke. Bis zum 14.10.2026
+// trug jede die Zusage 'bestätigt' (unbekannter Wert) ohne gesehen-Stempel,
+// und der Feed fuehrte alle als "hat zugesagt" -- Hunderte. Geprueft mit
+// derselben Bedingung, die ereignisse.php fuer die Zusage verwendet.
+$zusageUnbekannt = (int)$pdo->query(
+    "SELECT COUNT(*) FROM einsatz_zuteilung WHERE zusage NOT IN ('offen', 'zugesagt', 'abgelehnt')"
+)->fetchColumn();
+pruef('KRITISCH: jede Demo-Zusage traegt einen Wert, den meine_zusage.php kennt', $zusageUnbekannt === 0);
+$zusageImFeed = (int)$pdo->query(
+    "SELECT COUNT(*) FROM einsatz_zuteilung WHERE zusage <> 'offen' AND zusage_gesehen_am IS NULL"
+)->fetchColumn();
+pruef('KRITISCH: keine Demo-Zuteilung flutet die Glocke als ungesehene Zusage', $zusageImFeed === 0);
 
 // Der unbesetzte Platz heute bleibt trotz der neuen Abgleich-Weiche offen
 // -- eine Schicht von heute darf nie abgeglichen sein (siehe oben), das

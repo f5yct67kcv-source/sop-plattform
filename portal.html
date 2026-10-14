@@ -968,10 +968,33 @@ input:focus{outline:2px solid var(--ink-3);outline-offset:1px}
   </div>
 
   <div id="gate-bereich">
-    <video class="gate-video" autoplay muted loop playsinline>
-      <source src="img/anmeldung-nacht.webm" type="video/webm">
-      <source src="img/anmeldung-nacht.mp4" type="video/mp4">
-    </video>
+    <video class="gate-video" autoplay muted loop playsinline id="gate-video"></video>
+    <script>
+    /* Die Videoquellen kommen erst nach dem Laden der Seite dazu, und nur,
+       wenn das Video ueberhaupt gezeigt wird (2026-10-14, wie im Cockpit und
+       in der App). Standen sie fest im Markup, lud das Video (rund 250 KB)
+       gleichzeitig mit der Seite -- auch am Handy, wo das CSS es ausblendet.
+       Bis dahin steht das Foto aus dem Hintergrund von #gate-bereich da. */
+    (function () {
+      var gv = document.getElementById('gate-video');
+      // Erst geladen, wenn es sichtbar ist -- und dann einmal. Wird das
+      // Fenster spaeter breiter (Tablet gedreht, Fenster aufgezogen), holt
+      // der Groessenwechsel es nach.
+      var geladen = false;
+      function laden() {
+        if (geladen || getComputedStyle(gv).display === 'none') { return; }
+        geladen = true;
+        window.removeEventListener('resize', laden);
+        gv.insertAdjacentHTML('beforeend',
+          '<source src="img/anmeldung-nacht.webm" type="video/webm">' +
+          '<source src="img/anmeldung-nacht.mp4" type="video/mp4">');
+        gv.load();
+      }
+      function bereit() { laden(); if (!geladen) { window.addEventListener('resize', laden); } }
+      if (document.readyState === 'complete') { bereit(); }
+      else { window.addEventListener('load', bereit, { once: true }); }
+    })();
+    </script>
     <div class="gate-schleier"></div>
     <div class="gate-mitte">
 

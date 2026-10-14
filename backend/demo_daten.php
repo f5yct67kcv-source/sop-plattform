@@ -594,9 +594,18 @@ function demo_einsaetze_erzeugen(PDO $pdo, array $objekte, array $mitarbeitende,
     $kundenNamen = [];
     foreach ($pdo->query('SELECT id, name FROM kunden')->fetchAll() as $k) { $kundenNamen[(int)$k['id']] = $k['name']; }
 
+    // 'zugesagt' und schon GESEHEN (zusage_gesehen_am): Bis zum 14.10.2026
+    // stand hier 'bestätigt' -- ein Wert, den meine_zusage.php nicht kennt
+    // (offen | zugesagt | abgelehnt). Die App zeigte die Schichten darum als
+    // unbeantwortet, und weil der Feed jede Zusage <> 'offen' ohne
+    // gesehen-Stempel als Ereignis fuehrt, stand JEDE Demo-Zuteilung als
+    // "hat zugesagt" in der Glocke -- Hunderte, die sich nicht wegklicken
+    // liessen. Ein gefuehrter Betrieb hat die Zusagen seiner Leute laengst
+    // zur Kenntnis genommen.
     $einZuteilung = $pdo->prepare(
-        'INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, zusage) VALUES (?, ?, ?)'
+        'INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, zusage, zusage_gesehen_am) VALUES (?, ?, ?, ?)'
     );
+    $zusageGesehen = date('Y-m-d H:i:s');
     // Stufe 2b (Lohnlauf, ENT-523): JEDE VERGANGENE Schicht wird gleich
     // beim Anlegen als abgeglichen markiert -- "anwesend", mit den
     // Ist-Zeiten gleich den geplanten. Ein real gefuehrter Betrieb glicht
@@ -667,7 +676,7 @@ function demo_einsaetze_erzeugen(PDO $pdo, array $objekte, array $mitarbeitende,
             for ($p = 0; $p < $brauchtPersonen; $p++) {
                 $person = $team[$drehscheibe % count($team)];
                 $drehscheibe++;
-                $einZuteilung->execute([$einsatzId, $person['id'], 'bestätigt']);
+                $einZuteilung->execute([$einsatzId, $person['id'], 'zugesagt', $zusageGesehen]);
                 $zugeteilte[] = $person['id'];
             }
 

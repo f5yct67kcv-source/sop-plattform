@@ -20,6 +20,25 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $in  = json_decode(file_get_contents('php://input'), true) ?? [];
+
+// "Alle als gelesen" aus der Glocke. Derselbe Endpunkt und dasselbe Recht
+// wie der einzelne Haken -- ein zweiter Endpunkt waere eine zweite Stelle,
+// an der die Rechtepruefung auseinanderlaufen kann (siehe Kopf).
+// 'bis' ist der Stand der geladenen Liste: Was danach eingeht, bleibt offen.
+if (!empty($in['alle'])) {
+    try {
+        $bis = (new DateTimeImmutable((string)($in['bis'] ?? '')))->format('Y-m-d H:i:s');
+    } catch (Throwable $e) {
+        $bis = '';
+    }
+    if (trim((string)($in['bis'] ?? '')) === '' || $bis === '') {
+        json_response(['status' => 'error', 'message' => 'bis erforderlich (Stand der geladenen Liste)'], 400);
+    }
+    $r = ereignisse_alle_abhaken(db(), $bis, date('Y-m-d H:i:s'));
+    json_response(['status' => 'ok', 'alle' => true, 'geaendert' => $r['geaendert'],
+                   'unvollstaendig' => $r['fehler']]);
+}
+
 $typ = trim((string)($in['typ'] ?? ''));
 $id  = (int)($in['id'] ?? 0);
 

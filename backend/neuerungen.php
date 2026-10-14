@@ -30,6 +30,30 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 26,
+            'datum' => '2026-10-14',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit', 'app'],
+            'titel' => 'Anmeldung lädt schneller',
+            'text'  => 'Das Hintergrundvideo der Anmeldung kommt erst, wenn die Seite fertig geladen ist, und am Handy gar nicht mehr. Dort war es ohnehin nie zu sehen. Das CUPI-24-Siegel ist jetzt ein Zwanzigstel so gross, es sieht gleich aus.',
+        ],
+        [
+            'nr'    => 25,
+            'datum' => '2026-10-14',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit', 'app', 'betreiber'],
+            'titel' => 'Seiten laden schneller',
+            'text'  => 'Cockpit, App und Betreiberbereich sind beim ersten Öffnen nach einem Update nur noch etwa halb so gross. Bei langsamer Verbindung merkst du das am deutlichsten.',
+        ],
+        [
+            'nr'    => 24,
+            'datum' => '2026-10-14',
+            'art'   => 'fehlerbehebung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Glocke: Zahl stimmt, alles auf einmal als gelesen markieren',
+            'text'  => 'Die Zahl an der Glocke zeigt jetzt, wie viele Ereignisse wirklich offen sind. Bisher blieb sie bei 20 stehen, auch wenn mehr offen waren, und nach dem Abhaken stand dieselbe Zahl wieder da. Hast du alle sichtbaren Einträge abgehakt und es sind noch weitere offen, erscheinen die nächsten gleich in der Liste, statt dass eine Zahl über „Nichts Neues“ steht. Gemeldete Vorfälle lassen sich jetzt auch in der Glocke abhaken. Klappt ein Haken nicht, kommt der Eintrag sofort zurück. Neu steht oben in der Glocke „Alle als gelesen markieren“: Damit hakst du alles auf einmal ab, was bis zum Öffnen eingegangen ist. Abwesenheitsanträge und Antworten vom Support bleiben stehen, bis du sie entschieden oder geöffnet hast.',
+        ],
+        [
             'nr'    => 23,
             'datum' => '2026-10-13',
             'art'   => 'neu',

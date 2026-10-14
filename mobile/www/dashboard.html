@@ -2142,6 +2142,10 @@ html:not(.hat-reinigung) [data-sparte-feld] { display: none !important; }
   align-items: center; gap: 0 14px; margin-bottom: 9px; }
 .form-zeilen .f > label { margin: 0; text-align: left; }
 .form-zeilen .f.wide { grid-column: 1 / -1; }
+/* Ein breites Feld ohne Beschriftung (z. B. die Zonenanzeige unter "Weg und
+   Auslagenersatz") hat nur EIN Kind. Ohne diese Regel landet es in der
+   Beschriftungsspalte (168 px) und bricht jeden Satz nach drei Woertern um. */
+.form-zeilen .f.wide > :only-child:not(label) { grid-column: 1 / -1; }
 .form-zeilen .f.hoch { align-items: start; }
 .form-zeilen .f.hoch > label { padding-top: 9px; }
 /* Die Anlegen-Ansicht laeuft seit ENT-118 ueber die volle Fensterbreite. Fuer
@@ -2831,7 +2835,13 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .ku-person { border: 1px solid var(--line-soft); border-radius: var(--r-sm); padding: 13px 14px 4px; margin-bottom: 11px; }
 .ku-person .form-grid { grid-template-columns: 120px 1fr 1fr; }
 .ku-person-ft { display: flex; gap: 9px; justify-content: space-between; margin: 2px 0 10px; }
-.abschnitt { font-size: 11.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink-3); margin: 20px 0 10px; }
+/* Nur noch der Abstand. Bis 2026-10-14 stand hier zusaetzlich die Schrift
+   einer Zwischenueberschrift (11.5px, fett, Versalien). Kein Element nutzt
+   .abschnitt als Ueberschrift -- die Regel traf als spaetere gleicher
+   Eigenspezifitaet die Formularabschnitte ("Neuer Einsatz", Kontrollrunde)
+   und setzte deren Hinweise in fette Versalien und, ueber font:inherit, jeden
+   Feldwert fett. Die Ueberschrift des Abschnitts ist .abschnitt > h3. */
+.abschnitt { margin: 20px 0 10px; }
 .abschnitt:first-child { margin-top: 0; }
 @media (max-width: 620px) {
   .kw-reihe { grid-template-columns: 1fr auto; }
@@ -3849,7 +3859,15 @@ svg.i-glocke { width: 19px; height: 19px; }
 .glocke-panel { position: fixed; width: 340px; max-width: calc(100vw - 24px);
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
   box-shadow: var(--sh-2); z-index: 40; overflow: hidden; }
-.glocke-kopf { padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.glocke-kopf { padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 13px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+/* "Alle als gelesen" -- ein unauffaelliger Textlink, kein Knopf: Er ist
+   eine Abkuerzung, nicht die Hauptsache der Glocke. Nur sichtbar, wenn es
+   etwas abzuhaken gibt (glockeAktualisieren). */
+.glocke-alle { border: 0; background: none; padding: 0; font: inherit; font-size: 12px;
+  color: var(--accent); cursor: pointer; white-space: nowrap; }
+.glocke-alle:hover { text-decoration: underline; }
+.glocke-alle:disabled { color: var(--ink-3); cursor: default; text-decoration: none; }
 .glocke-liste { max-height: 360px; overflow-y: auto; }
 .glocke-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 16px; cursor: pointer; }
 .glocke-row .dot { margin-top: 6px; }
@@ -3864,6 +3882,7 @@ svg.i-glocke { width: 19px; height: 19px; }
     border-radius: var(--r) var(--r) 0 0; max-height: 70vh; padding-bottom: env(safe-area-inset-bottom); }
   .glocke-liste { max-height: calc(70vh - 45px); }
   .glocke-row .rank-erledigt { width: 44px; height: 44px; }
+  .glocke-alle { min-height: 44px; font-size: 13px; }
 }
 
 /* ── Umschalter hell/dunkel (ENT-029) */
@@ -5518,6 +5537,64 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   .glas-schalter .knopf { width: 22px; height: 22px; }
   html[data-glas="an"] .glas-schalter .knopf { transform: translateX(18px); } }
 
+/* ── Kompakte Darstellung (Versuch auf der Testumgebung, 2026-10-14).
+   Frage des Projektinhabers: Arbeitet es sich mit einer dichteren
+   Darstellung, wie sie andere Planungsprogramme zeigen, leichter? Darum ein
+   Schalter zum direkten Vergleich, keine Entscheidung. Festgelegt im
+   Gespraech: Schalter in der Kopfleiste (Bauart wie Glas und hell/dunkel),
+   mittlere Dichte (Felder rund 30 statt 41 px), Erklaertexte in
+   Formularabschnitten hinter ein (i).
+   NUR DESKTOP: Am Handy gelten 44 px Trefferflaeche und 16 px Schrift in
+   Eingabefeldern; der mobile Zuschnitt ist eine eigene Entscheidung. Darum
+   haengt jede Regel hier an min-width: 901px -- dieselbe Grenze, an der
+   .ohne-schublade den Schalter ausblendet.
+   Alles haengt an html[data-dichte="kompakt"]; ohne das Attribut aendert
+   dieser Block nichts. */
+.dichte-schalter { flex: none; width: 52px; height: 30px; border-radius: 999px; padding: 0;
+  border: 1px solid var(--line); background: var(--bg); cursor: pointer; position: relative;
+  transition: background .18s, border-color .18s; }
+.dichte-schalter:hover { border-color: var(--line-hi); }
+.dichte-schalter .knopf { position: absolute; top: 2px; left: 2px; width: 24px; height: 24px;
+  border-radius: 50%; background: var(--surface); box-shadow: var(--sh-1);
+  display: flex; align-items: center; justify-content: center; transition: transform .2s; }
+.dichte-schalter svg { width: 14px; height: 14px; fill: none; stroke-width: 2.1;
+  stroke-linecap: round; stroke-linejoin: round; stroke: var(--ink-3); transition: stroke .16s; }
+html[data-dichte="kompakt"] .dichte-schalter { background: var(--accent-soft); border-color: var(--accent-line); }
+html[data-dichte="kompakt"] .dichte-schalter .knopf { transform: translateX(22px); }
+html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
+@media (prefers-reduced-motion: reduce) {
+  .dichte-schalter, .dichte-schalter .knopf, .dichte-schalter svg { transition: none; }
+}
+/* Das (i) an der Abschnittsueberschrift. Gebaut wird es immer (dichteInfoBauen),
+   sichtbar ist es nur kompakt -- normal stehen die Texte ohnehin da. */
+.abs-info { display: none; }
+@media (min-width: 901px) {
+  html[data-dichte="kompakt"] .content { padding: 16px 20px; }
+  html[data-dichte="kompakt"] .card-bd { padding: 14px 16px; }
+  html[data-dichte="kompakt"] .bar-tools { margin-bottom: 10px; }
+  html[data-dichte="kompakt"] .inp { padding: 5px 9px; font-size: 13px; }
+  html[data-dichte="kompakt"] .f { margin-bottom: 8px; }
+  html[data-dichte="kompakt"] .f label { margin-bottom: 4px; }
+  html[data-dichte="kompakt"] .form-zeilen .f { margin-bottom: 5px; }
+  html[data-dichte="kompakt"] .form-zeilen .f > label { margin: 0; }
+  html[data-dichte="kompakt"] .abschnitt { margin: 8px 0 4px; padding-top: 9px; }
+  html[data-dichte="kompakt"] .abschnitt:first-of-type { margin-top: 0; padding-top: 0; }
+  html[data-dichte="kompakt"] .abschnitt > h3 { margin-bottom: 7px; display: flex; align-items: center; }
+  html[data-dichte="kompakt"] .card-bd > p.note { margin-bottom: 8px; }
+  /* Erklaertexte: zu, bis jemand das (i) anklickt. Nur DIREKTE Kinder des
+     Abschnitts -- Zustandsmeldungen (Zone, Warnungen) stehen in den Feldern
+     und bleiben immer sichtbar: Das ist keine Erklaerung, sondern eine
+     Aussage ueber genau diesen Einsatz. */
+  html[data-dichte="kompakt"] .abschnitt:not(.info-offen) > .note { display: none; }
+  html[data-dichte="kompakt"] .abschnitt > .note { margin-bottom: 8px !important; }
+  html[data-dichte="kompakt"] .abs-info { display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; margin-left: 8px; padding: 0; border-radius: 50%;
+    border: 1px solid var(--line); background: transparent; color: var(--ink-3);
+    font: 600 11px/1 inherit; font-style: italic; text-transform: none; cursor: pointer; }
+  html[data-dichte="kompakt"] .abs-info:hover,
+  html[data-dichte="kompakt"] .abschnitt.info-offen .abs-info { border-color: var(--accent-line); color: var(--accent); background: var(--accent-soft); }
+}
+
 /* ══ MITTEILUNGEN (ENT-421) ═══════════════════════════════════════════
    Zwei Spalten nebeneinander, ab 900 px Fensterbreite. Darunter
    untereinander -- ein 320 px breites Formular neben einer 320 px breiten
@@ -5585,6 +5662,13 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   var g = 'an';
   try { g = localStorage.getItem('rv3_glas') === 'aus' ? 'aus' : 'an'; } catch (e) {}
   document.documentElement.setAttribute('data-glas', g);
+})();
+/* Kompakte Darstellung (Versuch 2026-10-14). Ohne gespeicherte Wahl: normal.
+   Eigener Block mit eigenem try -- wie beim Glas oben. */
+(function () {
+  var d = 'normal';
+  try { d = localStorage.getItem('rv3_dichte') === 'kompakt' ? 'kompakt' : 'normal'; } catch (e) {}
+  document.documentElement.setAttribute('data-dichte', d);
 })();
 /* Anmeldemaske gar nicht erst zeigen, wenn schon eine Anmeldung im
    Speicher liegt (siehe die Regel "html.vorangemeldet #gate" oben).
@@ -5725,13 +5809,37 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   // und die Maske kommt doch, bleibt das Foto aus dem CSS-Hintergrund
   // stehen -- dieselbe Ausweiche wie auf dem Handy, wo das Video ohnehin nie
   // laeuft.
+  // Dritter Grund (2026-10-14): Die Quellen kommen erst nach dem Laden der
+  // Seite dazu ("load"), nicht schon beim Lesen dieser Zeile. Vorher lud
+  // das Video (rund 250 KB) gleichzeitig mit der Seite selbst und nahm ihr
+  // auf einer langsamen Leitung die Bandbreite weg (am 2026-10-14 im
+  // Browser gesehen: 25 s fuer die Seite, Video und Siegel parallel).
+  // Bis dahin steht das Foto aus dem
+  // CSS-Hintergrund da, wie bisher in den ersten Sekunden auch.
+  // Und nur, wenn das Video ueberhaupt gezeigt wird: Am Handy und bei
+  // reduzierter Bewegung blendet das CSS es aus, ein Abruf waere dort
+  // Datenverbrauch fuer nichts.
   if (!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
       && !document.documentElement.classList.contains('vorangemeldet')) {
-    var gv = document.getElementById('gate-video');
-    gv.insertAdjacentHTML('beforeend',
-      '<source src="img/anmeldung-nacht.webm" type="video/webm">' +
-      '<source src="img/anmeldung-nacht.mp4" type="video/mp4">');
-    gv.load();
+    (function () {
+      var gv = document.getElementById('gate-video');
+      // Erst geladen, wenn es sichtbar ist -- und dann einmal. Wird das
+      // Fenster spaeter breiter (Tablet gedreht, Fenster aufgezogen), holt
+      // der Groessenwechsel es nach.
+      var geladen = false;
+      function laden() {
+        if (geladen || getComputedStyle(gv).display === 'none') { return; }
+        geladen = true;
+        window.removeEventListener('resize', laden);
+        gv.insertAdjacentHTML('beforeend',
+          '<source src="img/anmeldung-nacht.webm" type="video/webm">' +
+          '<source src="img/anmeldung-nacht.mp4" type="video/mp4">');
+        gv.load();
+      }
+      function bereit() { laden(); if (!geladen) { window.addEventListener('resize', laden); } }
+      if (document.readyState === 'complete') { bereit(); }
+      else { window.addEventListener('load', bereit, { once: true }); }
+    })();
   }
   </script>
   <!-- Der Schleier ueber dem Video, gleicher Wert wie in app.html. Als
@@ -6285,6 +6393,16 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
            genau das ("er sitzt rechts", Abstand zum Rand < 30 px). Ein
            neuer Schalter rechts daneben haette ihn um rund 56 px nach
            innen geschoben -- gemessen, nicht vermutet. -->
+      <!-- Kompakte Darstellung (Versuch 2026-10-14). Dieselbe Art Wahl wie
+           Glas und hell/dunkel, darum dieselbe Bauart und derselbe Ort --
+           links davon, aus demselben Grund wie beim Glas (hell/dunkel bleibt
+           aussen rechts). Nur Desktop (ohne-schublade). Das Zeichen: zwei
+           Zeilen, die von oben und unten zusammengeschoben werden. -->
+      <button class="dichte-schalter ohne-schublade" id="btnDichte" onclick="dichteUm()" role="switch" aria-checked="false" title="Kompakte Darstellung" aria-label="Kompakte Darstellung ein- oder ausschalten">
+        <span class="knopf">
+          <svg viewBox="0 0 24 24"><line x1="4" y1="10.5" x2="20" y2="10.5"/><line x1="4" y1="14.5" x2="20" y2="14.5"/><polyline points="9,2.5 12,5.5 15,2.5"/><polyline points="9,21.5 12,18.5 15,21.5"/></svg>
+        </span>
+      </button>
       <button class="glas-schalter ohne-schublade" id="btnGlas" onclick="glasUm()" role="switch" aria-checked="false" title="Durchscheinende Oberfläche" aria-label="Durchscheinende Oberfläche ein- oder ausschalten">
         <span class="knopf">
           <svg class="i-glas" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="12" height="12" rx="3.4"/><path d="M8.5 20.5h8a4 4 0 0 0 4-4v-8"/></svg>
@@ -10893,7 +11011,9 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
      glockeUmschalten() setzt die Position bei jedem Oeffnen selbst, weil das
      Panel nicht mehr automatisch unter dem Knopf sitzt. -->
 <div class="glocke-panel" id="glockePanel" style="display:none">
-  <div class="glocke-kopf"><b>Benachrichtigungen</b></div>
+  <div class="glocke-kopf"><b>Benachrichtigungen</b>
+    <button type="button" class="glocke-alle" id="glockeAlle" onclick="glockeAlleGelesen(event)" hidden>Alle als gelesen markieren</button>
+  </div>
   <div class="glocke-liste" id="glockeListe"></div>
 </div>
 
@@ -11836,6 +11956,8 @@ function enter() {
   // nachziehen.
   themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell');
   glasSetzen(document.documentElement.getAttribute('data-glas') === 'an');
+  dichteSetzen(document.documentElement.getAttribute('data-dichte') === 'kompakt');
+  dichteInfoBauen();
   // Im Buendel liegen app.html und index.html unter anderen Namen
   // (index.html bzw. rapport-tool.html, siehe mobile-buendel-erstellen.py)
   // -- "app.html" gibt es dort gar nicht.
@@ -14816,6 +14938,49 @@ function glasUm() {
   glasSetzen(document.documentElement.getAttribute('data-glas') !== 'an');
 }
 
+// ══════════════════════════════════════════ KOMPAKTE DARSTELLUNG (Versuch)
+// Dieselbe Bauart wie Glas: Der Wert steht schon im Kopf der Seite am
+// Dokument, hier wird umgeschaltet und gespeichert. Nur ein Schalter -- am
+// Handy gibt es die Wahl bewusst nicht (siehe CSS-Block .dichte-schalter).
+function dichteSetzen(kompakt) {
+  document.documentElement.setAttribute('data-dichte', kompakt ? 'kompakt' : 'normal');
+  try { localStorage.setItem('rv3_dichte', kompakt ? 'kompakt' : 'normal'); } catch (e) {}
+  const b = $('btnDichte');
+  if (b) {
+    b.setAttribute('aria-checked', kompakt ? 'true' : 'false');
+    b.title = kompakt ? 'Normale Darstellung' : 'Kompakte Darstellung';
+  }
+}
+
+function dichteUm() {
+  dichteSetzen(document.documentElement.getAttribute('data-dichte') !== 'kompakt');
+}
+
+// Ein (i) an jede Abschnittsueberschrift, unter der ein Erklaertext steht.
+// Einmal beim Start: Die Abschnitte stehen fest im HTML. Ein Knopf statt
+// eines title-Attributs, weil die Texte Links tragen ("Zur Objektplanung")
+// und ein Tooltip weder klickbar ist noch per Tastatur erreichbar.
+function dichteInfoBauen() {
+  document.querySelectorAll('.abschnitt').forEach(a => {
+    const h3 = a.querySelector(':scope > h3');
+    if (!h3 || h3.querySelector('.abs-info') || !a.querySelector(':scope > .note')) { return; }
+    const k = document.createElement('button');
+    k.type = 'button';
+    k.className = 'abs-info';
+    k.textContent = 'i';
+    k.title = 'Erklärung anzeigen';
+    k.setAttribute('aria-expanded', 'false');
+    k.onclick = () => {
+      const offen = a.classList.toggle('info-offen');
+      k.setAttribute('aria-expanded', offen ? 'true' : 'false');
+      k.title = offen ? 'Erklärung ausblenden' : 'Erklärung anzeigen';
+    };
+    // Vor einer Unterzeile (.note in der h3), damit das (i) beim Titel steht.
+    const unter = h3.querySelector('.note');
+    h3.insertBefore(k, unter || null);
+  });
+}
+
 // Welche Ansichten die volle Breite wollen -- EINE Liste statt verstreuter
 // Bedingungen (ENT-086, OP-87). Mehr Platz ist nicht ueberall besser: Eine
 // Liste gewinnt Spalten, ein Formular verliert Lesbarkeit, wenn Beschriftung
@@ -15952,6 +16117,20 @@ function renderKurzwahl() {
     </button>`).join('');
 }
 
+// Wie viele Ereignisse auf dem Server offen sind -- gezaehlt NUR ueber die
+// Arten, die dieser Feed auch als Zeile zeigen kann (EREIGNIS_ART). Der
+// Server zaehlt auch Abwesenheitsantraege, die hier nicht erscheinen; mit
+// ihnen stand an der Glocke eine Zahl ueber einer leeren Liste (14.10.2026).
+// Ohne Aufschluesselung (aelterer Server) bleibt es bei der Gesamtzahl.
+function ereignisseOffen() {
+  const je = stats && stats.ereignisse_je_art;
+  if (je && typeof je === 'object') {
+    return Object.keys(je).filter(t => EREIGNIS_ART[t])
+      .reduce((n, t) => n + (Number(je[t]) || 0), 0);
+  }
+  return Number(stats && stats.ereignisse_gesamt) || 0;
+}
+
 function renderEreignisse() {
   // Nur bekannte Arten. Eine Art, die der Feed nicht kennt, wuerde sonst als
   // leere Zeile erscheinen -- eine Zeile ohne Aussage ist schlimmer als gar
@@ -15969,7 +16148,7 @@ function renderEreignisse() {
     // abfragen liess, ist etwas anderes als "nichts passiert".
     note.textContent = fehlt.length
       ? 'unvollständig — ' + fehlt.join(', ') + ' nicht abfragbar'
-      : (stats.ereignisse_gekuerzt ? f.length + ' von ' + (stats.ereignisse_gesamt || f.length) : '');
+      : (stats.ereignisse_gekuerzt ? f.length + ' von ' + Math.max(ereignisseOffen(), f.length) : '');
     note.style.color = fehlt.length ? 'var(--warn)' : '';
   }
 
@@ -15989,7 +16168,11 @@ function renderEreignisse() {
   if (!f.length) {
     $('ereignisFeed').innerHTML = fehlt.length
       ? hinweis
-      : EMPTY('Nichts Neues', 'Hier erscheinen eingegangene Rapporte, Sperrtage, Rückmeldungen zu Schichten und Entscheidungen zu Offerten.');
+      // Leer abgehakt, aber auf dem Server noch offen: Die naechsten kommen
+      // (ereignisseNachladen) -- das ist nicht "Nichts Neues".
+      : (ereignisseOffen() > 0
+        ? EMPTY('Weitere werden geladen …', 'Die sichtbaren Ereignisse sind abgehakt, auf dem Server stehen noch ' + ereignisseOffen() + ' offen.')
+        : EMPTY('Nichts Neues', 'Hier erscheinen eingegangene Rapporte, Sperrtage, Rückmeldungen zu Schichten und Entscheidungen zu Offerten.'));
     glockeAktualisieren([], fehlt);
     // Auch hier: Ein Abzeichen, das vom letzten Laden stehen bleibt,
     // behauptet eine Antwort, die es nicht mehr gibt.
@@ -16067,10 +16250,14 @@ function ereignisArt(x) {
 }
 
 // Dieselbe Liste wie im Endpunkt, hier bloss zum Ausblenden des Knopfes.
-// Alle vier Arten lassen sich abhaken: Jede von ihnen ist etwas Geschehenes,
+// Alle diese Arten lassen sich abhaken: Jede von ihnen ist etwas Geschehenes,
 // das man zur Kenntnis nimmt.
+// Die Vorfallmeldung fehlte hier bis zum 14.10.2026, obwohl der Server sie
+// seit ENT-297 abhaken laesst: Sie stand in der Glocke ohne Haken und hielt
+// den Zaehler oben, ohne dass man sie loswerden konnte.
 function ereignisAbhakbar(typ) {
-  return typ === 'rapport' || typ === 'sperrtag' || typ === 'zusage' || typ === 'offerte' || typ === 'rundgang_spontan';
+  return typ === 'rapport' || typ === 'sperrtag' || typ === 'zusage' || typ === 'offerte'
+    || typ === 'rundgang_spontan' || typ === 'vorfall';
 }
 
 function ereignisZeile(x) {
@@ -16165,13 +16352,42 @@ function ereignisErledigt(i) {
   if (typeof stats.ereignisse_gesamt === 'number' && stats.ereignisse_gesamt > 0) {
     stats.ereignisse_gesamt--;
   }
+  const je = stats.ereignisse_je_art;
+  if (je && typeof je === 'object' && Number(je[x.typ]) > 0) {
+    je[x.typ] = Number(je[x.typ]) - 1;
+  }
   // NEU ZEICHNEN, nicht bloss die Zeile entfernen. Die Zeilen verweisen ueber
   // ihren Platz in der Liste auf das Ereignis; faellt einer weg, zeigen alle
   // dahinter auf das jeweils naechste. Ein Haken haette dann das falsche
   // Ereignis abgehakt -- gefunden hat es die Pruefung, nicht das Auge.
   renderEreignisse();
   api('ereignis_erledigt.php', { method: 'POST',
-    body: { typ: x.typ, id: x.id, mitarbeiter_id: x.mitarbeiter_id || 0 } }).catch(() => {});
+    body: { typ: x.typ, id: x.id, mitarbeiter_id: x.mitarbeiter_id || 0 } }).then(({ ok }) => {
+    // Hat der Server NICHT abgehakt, kommt die Zeile sofort zurueck -- nicht
+    // erst beim naechsten Neuladen. Sonst sieht ein gescheiterter Haken aus
+    // wie ein gelungener und taucht beim Aktualisieren wieder auf.
+    // Ist die sichtbare Liste leer, aber auf dem Server noch etwas offen
+    // (die Liste zeigt nur die neuesten 12), wird die naechste Tranche
+    // geholt: Eine leere Glocke mit einer Zahl daran ist ein Widerspruch.
+    if (!ok || (!(stats.ereignisse || []).length && ereignisseOffen() > 0)) {
+      ereignisseNachladen();
+    }
+  }).catch(() => ereignisseNachladen());
+}
+
+// Holt NUR den Feed neu, ohne die uebrige Uebersicht in Platzhalter zu
+// tauchen (loadStats() zeichnet alle Kacheln neu).
+function ereignisseNachladen() {
+  return api('dashboard_stats.php').then(({ ok, data }) => {
+    if (!ok || !data || data.status !== 'ok' || !stats) { return; }
+    stats.ereignisse = data.ereignisse || [];
+    stats.ereignisse_gesamt = data.ereignisse_gesamt;
+    stats.ereignisse_je_art = data.ereignisse_je_art;
+    stats.ereignisse_gekuerzt = data.ereignisse_gekuerzt;
+    stats.ereignisse_unvollstaendig = data.ereignisse_unvollstaendig;
+    stats.stand = data.stand;
+    renderEreignisse();
+  });
 }
 
 // ══════════════════════════════════════════ GLOCKE (ENT-197)
@@ -16183,10 +16399,22 @@ function ereignisErledigt(i) {
 // ereignisse.php).
 function glockeAktualisieren(f, fehlt) {
   const badge = $('glockeBadge');
-  const anzahl = stats.ereignisse_gesamt || f.length;
+  // Die Zahl am Abzeichen ist die der offenen Ereignisse auf dem Server --
+  // nie kleiner als die Zeilen, die tatsaechlich darunter stehen.
+  const anzahl = Math.max(ereignisseOffen(), f.length);
   if (badge) {
     badge.style.display = anzahl ? '' : 'none';
     badge.textContent = anzahl > 99 ? '99+' : String(anzahl);
+  }
+  // Der Link nur, wenn es etwas gibt, das er abhaken KANN: eine abhakbare
+  // Zeile in der Liste, oder mehr offen als sichtbar. Stehen nur noch ein
+  // Abwesenheitsantrag oder eine Supportantwort da, bliebe ein Klick
+  // wirkungslos -- die verschwinden erst mit Entscheid bzw. Oeffnen.
+  const alle = $('glockeAlle');
+  if (alle) {
+    alle.hidden = !(f.some(x => ereignisAbhakbar(x.typ)) || anzahl > f.length);
+    alle.disabled = false;
+    alle.textContent = 'Alle als gelesen markieren';
   }
   const liste = $('glockeListe');
   if (!liste) { return; }
@@ -16195,7 +16423,12 @@ function glockeAktualisieren(f, fehlt) {
     return;
   }
   if (!f.length) {
-    liste.innerHTML = `<div class="glocke-leer">Nichts Neues.</div>`;
+    // "Nichts Neues" nur, wenn auch der Server nichts mehr offen hat. Sonst
+    // ist die naechste Tranche unterwegs (ereignisseNachladen) -- und eine
+    // Zahl am Abzeichen ueber "Nichts Neues" waere ein Widerspruch.
+    liste.innerHTML = anzahl
+      ? `<div class="glocke-leer">Weitere werden geladen …</div>`
+      : `<div class="glocke-leer">Nichts Neues.</div>`;
     return;
   }
   liste.innerHTML = f.map((x, i) => {
@@ -16212,6 +16445,31 @@ function glockeAktualisieren(f, fehlt) {
       </button>` : ''}
     </div>`;
   }).join('');
+}
+
+// Alle abhakbaren Ereignisse auf einmal (14.10.2026). NICHT optimistisch
+// wie der einzelne Haken: Hier verschwinden viele Zeilen, auch solche, die
+// gar nicht sichtbar waren -- erst die Antwort des Servers, dann neu laden.
+// Geschickt wird der Stand der geladenen Liste; was danach eingeht, bleibt
+// offen (siehe ereignisse_alle_abhaken).
+function glockeAlleGelesen(ev) {
+  if (ev) { ev.stopPropagation(); }
+  const knopf = $('glockeAlle');
+  if (!stats || !stats.stand) { ereignisseNachladen(); return; }
+  if (knopf) { knopf.disabled = true; knopf.textContent = 'Wird markiert …'; }
+  api('ereignis_erledigt.php', { method: 'POST', body: { alle: true, bis: stats.stand } })
+    .then(({ ok, data }) => {
+      if (!ok || !data || data.status !== 'ok') {
+        toast((data && data.message) || 'Konnte nicht als gelesen markiert werden.');
+      } else if (data.unvollstaendig && data.unvollstaendig.length) {
+        toast('Nicht alles markiert — ' + data.unvollstaendig.join(', ') + ' liess sich nicht abhaken.');
+      }
+      return ereignisseNachladen();
+    })
+    .catch(() => ereignisseNachladen())
+    .finally(() => {
+      if (knopf) { knopf.disabled = false; knopf.textContent = 'Alle als gelesen markieren'; }
+    });
 }
 
 function glockeUmschalten(ev) {
