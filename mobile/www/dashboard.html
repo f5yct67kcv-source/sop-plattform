@@ -5580,6 +5580,14 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
   html[data-dichte="kompakt"] .abschnitt { margin: 8px 0 4px; padding-top: 9px; }
   html[data-dichte="kompakt"] .abschnitt:first-of-type { margin-top: 0; padding-top: 0; }
   html[data-dichte="kompakt"] .abschnitt > h3 { margin-bottom: 7px; display: flex; align-items: center; }
+  /* Ein breites Feld, das nur EIN Textfeld traegt (Kunde, Strasse), endet
+     kompakt nach zwei Rasterspalten -- buendig mit dem zweiten Feld darunter.
+     Ein Firmenname oder eine Strasse fuellt keine 1900 px; die freie Flaeche
+     daneben nehmen die naechsten Felder ein (Wunsch des Projektinhabers,
+     2026-10-14). Hat das Raster nur zwei Spalten, ist das ohnehin die volle
+     Breite. Zeitraum, Weg und Zuteilung tragen mehr als ein Feld und
+     bleiben breit. */
+  html[data-dichte="kompakt"] .form-breit.form-zeilen > .f.wide:has(> input.inp:only-of-type) { grid-column: span 2; }
   html[data-dichte="kompakt"] .card-bd > p.note { margin-bottom: 8px; }
   /* Erklaertexte: zu, bis jemand das (i) anklickt. Nur DIREKTE Kinder des
      Abschnitts -- Zustandsmeldungen (Zone, Warnungen) stehen in den Feldern
