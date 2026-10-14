@@ -914,6 +914,7 @@ p{margin:0 0 1em}
       if (a.ok && a.json && a.json.status === 'ok') {
         if (a.json.message) document.getElementById('demoDankeText').textContent = a.json.message;
         formular.classList.add('gesendet');
+        if (window.goMessen) { window.goMessen('generate_lead'); }
         return;
       }
       if (a.json && a.json.felder) {
@@ -982,9 +983,9 @@ p{margin:0 0 1em}
   // die Seite neu. Ohne JavaScript bleibt der Streifen verborgen und es
   // wird nichts geladen -- das ist dieselbe Aussage wie "abgelehnt".
   //
-  // Die beiden Kennungen sind absichtlich leer, bis die Konten bestehen.
-  // Leer heisst: auch nach Zustimmung wird nichts geladen.
-  var MESSUNG = { ga: '', meta: '' };
+  // Eine leere Kennung heisst: dieser Dienst wird auch nach Zustimmung
+  // nicht geladen. Die Meta-Kennung bleibt leer, bis das Konto besteht.
+  var MESSUNG = { ga: 'G-DK3G9YGFB8', meta: '' };
   var SCHLUESSEL = 'go_einwilligung';
   var DAUER = 183 * 24 * 60 * 60 * 1000;
 
@@ -1016,6 +1017,9 @@ p{margin:0 0 1em}
       window.dataLayer = window.dataLayer || [];
       window.gtag = function(){ window.dataLayer.push(arguments); };
       window.gtag('js', new Date());
+      // Einwilligungsmodus: Das Skript laedt erst NACH der Zustimmung, also
+      // ist "erteilt" hier die Wahrheit, nicht eine Vorgabe.
+      window.gtag('consent', 'default', { ad_storage: 'granted', analytics_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'granted' });
       window.gtag('config', MESSUNG.ga, { anonymize_ip: true });
       skript('https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(MESSUNG.ga));
     }
@@ -1041,6 +1045,40 @@ p{margin:0 0 1em}
       document.cookie = name + '=; Max-Age=0; path=/';
     });
   }
+  // Ereignisse fuer die Auswertung -- nur solange die Messung laeuft.
+  // Ohne Zustimmung gehen sie verloren; es wird nichts nachgereicht.
+  //   abschnitt_gesehen  Ein Abschnitt hat die Bildschirmmitte erreicht
+  //                      (einmal je Abschnitt): wie weit liest jemand?
+  //   formular_begonnen  Erste Eingabe im Demo-Formular.
+  //   generate_lead      Demo-Zugang angefordert, Server hat angenommen
+  //                      (Googles Standardname fuer "Lead"; bei Meta "Lead").
+  window.goMessen = function(name, daten){
+    if (!laeuft) { return; }
+    if (MESSUNG.ga && window.gtag) { window.gtag('event', name, daten || {}); }
+    if (MESSUNG.meta && window.fbq) {
+      if (name === 'generate_lead') { window.fbq('track', 'Lead'); }
+      else { window.fbq('trackCustom', name, daten || {}); }
+    }
+  };
+  if ('IntersectionObserver' in window) {
+    var gesehen = {};
+    var beobachter = new IntersectionObserver(function(eintraege){
+      eintraege.forEach(function(e){
+        if (!e.isIntersecting || gesehen[e.target.id]) { return; }
+        gesehen[e.target.id] = true;
+        window.goMessen('abschnitt_gesehen', { abschnitt: e.target.id });
+      });
+    }, { rootMargin: '-40% 0px -40% 0px', threshold: 0 });
+    Array.prototype.forEach.call(document.querySelectorAll('section[id]'), function(a){ beobachter.observe(a); });
+  }
+  var demoFormular = document.getElementById('demoFormular');
+  if (demoFormular) {
+    demoFormular.addEventListener('input', function einmal(){
+      demoFormular.removeEventListener('input', einmal);
+      window.goMessen('formular_begonnen');
+    });
+  }
+
   function zeigen(){ streifen.hidden = false; }
   function verbergen(){ streifen.hidden = true; }
 

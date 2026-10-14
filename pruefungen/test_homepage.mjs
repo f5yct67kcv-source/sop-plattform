@@ -43,6 +43,11 @@ desktop.on('request', r => { if (/^https?:/.test(r.url())) { fremdeAbrufe.push(r
 // Browser weist den Aufruf vorher als Cross-Origin ab).
 const aufrufe = [];
 let antwort = { status: 200, body: { status: 'ok', message: 'Vielen Dank. Sie erhalten in Kürze eine E-Mail mit Ihren Zugangsdaten.' } };
+// Google und Meta werden nie wirklich erreicht: Die Prueflaeufe sollen in
+// keiner echten Statistik landen. Ihr Skript wird durch ein leeres ersetzt,
+// der Abruf selbst aber gezaehlt -- gemessen wird, OB die Seite holt.
+await desktop.route(/googletagmanager\.com|google-analytics\.com|connect\.facebook\.net|facebook\.com\/tr/, route =>
+  route.fulfill({ status: 200, contentType: 'application/javascript', body: '' }));
 await desktop.route('**/api/demo_anfordern.php', async route => {
   const r = route.request();
   aufrufe.push({ methode: r.method(), typ: r.headers()['content-type'] || '', daten: r.postDataJSON() });
@@ -100,8 +105,29 @@ if (fremdeAbrufe.length) { bad.push('fremd: ' + fremdeAbrufe.slice(0, 3).join(',
     wahl: (JSON.parse(localStorage.getItem('go_einwilligung') || '{}')).wahl,
   }));
   check('Nach Zustimmen ist der Hinweis weg und die Wahl gespeichert', !nachJa.sichtbar && nachJa.wahl === 'ja');
-  check('Solange keine Kennung eingetragen ist, laedt auch nach Zustimmen nichts von fremden Servern',
-    fremdeAbrufe.length === 0);
+  // Nach Zustimmen laedt genau das, was die Datenschutzerklaerung nennt --
+  // und nichts sonst. test_recht.mjs koppelt die Nennung an den Code.
+  const ga = fremdeAbrufe.filter(u => /googletagmanager\.com\/gtag\/js\?id=G-[A-Z0-9]+/.test(u));
+  const meta = fremdeAbrufe.filter(u => /connect\.facebook\.net/.test(u));
+  const anderes = fremdeAbrufe.filter(u => !ga.includes(u) && !meta.includes(u));
+  const datenschutzText = readFileSync(new URL('../datenschutz.html', import.meta.url), 'utf8');
+  check('KRITISCH: nach Zustimmen laedt Google Analytics genau dann, wenn die Datenschutzerklaerung es nennt',
+    (ga.length === 1) === /<strong>Google Analytics 4<\/strong>/.test(datenschutzText));
+  check('KRITISCH: nach Zustimmen laedt der Meta-Pixel genau dann, wenn die Datenschutzerklaerung ihn nennt',
+    (meta.length === 1) === /<strong>Meta-Pixel<\/strong>/.test(datenschutzText));
+  check('KRITISCH: nach Zustimmen laedt nichts ausser den genannten Diensten', anderes.length === 0);
+  if (anderes.length) { bad.push('fremd nach Zustimmen: ' + anderes.slice(0, 3).join(', ')); }
+  // Wie weit jemand liest: Abschnitte melden sich, sobald sie die Mitte
+  // erreichen -- einmal je Abschnitt, auch beim zweiten Vorbeiscrollen.
+  for (const id of ['ausgangslage', 'gav', 'ausgangslage']) {
+    await desktop.evaluate(i => document.getElementById(i).scrollIntoView({ block: 'center', behavior: 'instant' }), id);
+    await desktop.waitForTimeout(250);
+  }
+  const abschnitte = await desktop.evaluate(() => (window.dataLayer || [])
+    .filter(e => e[0] === 'event' && e[1] === 'abschnitt_gesehen').map(e => e[2].abschnitt));
+  check('Gelesene Abschnitte werden gemeldet, jeder nur einmal',
+    abschnitte.includes('ausgangslage') && abschnitte.includes('gav')
+    && abschnitte.filter(a => a === 'ausgangslage').length === 1);
   // Fuer die weiteren Pruefungen: Hinweis weg, damit er keinen Klick abfaengt.
   await desktop.evaluate(() => document.fonts.ready);
 }
@@ -390,6 +416,13 @@ check('Nach dem Erfolg steht die Antwort des Servers da und die Felder sind weg'
   && (await desktop.textContent('#demoDankeText')).includes('Zugangsdaten')
   && !(await desktop.isVisible('#demoKnopf')));
 await desktop.screenshot({ path: `${OUT}/homepage-02-gesendet.png`, fullPage: false });
+{
+  const ereignisse = await desktop.evaluate(() => (window.dataLayer || [])
+    .filter(e => e[0] === 'event').map(e => e[1]));
+  check('Nach Zustimmen werden "Formular begonnen" und "Demo angefragt" gemeldet, beides genau einmal',
+    ereignisse.filter(e => e === 'formular_begonnen').length === 1
+    && ereignisse.filter(e => e === 'generate_lead').length === 1);
+}
 
 // "Nicht eingerichtet" ist etwas anderes als "fehlgeschlagen": Die Meldung
 // des Servers muss WOERTLICH ankommen, nicht durch einen Einheitstext ersetzt.
