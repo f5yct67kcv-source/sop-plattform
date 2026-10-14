@@ -24,7 +24,7 @@ function lohnarten_lesen(): array
         'SELECT * FROM lohnart ORDER BY sortierung, bezeichnung'
     )->fetchAll();
     return array_map(function ($r) {
-        foreach (['id','satz_bp','system','sortierung','aktiv','ahv_pflichtig',
+        foreach (['id','satz_bp','standard_rappen','system','sortierung','aktiv','ahv_pflichtig',
                   'ferien_pflichtig','ml13_pflichtig','bvg_pflichtig',
                   'uvg_pflichtig','qst_pflichtig'] as $f) {
             if (isset($r[$f]) && $r[$f] !== null) { $r[$f] = (int)$r[$f]; }
@@ -67,6 +67,18 @@ if (!empty($input['loeschen'])) {
             'message' => '„' . $vorhanden['bezeichnung'] . '" ist eine Systemlohnart und lässt '
                        . 'sich nicht löschen. Sie kann deaktiviert werden.'], 400);
     }
+    // Eine Leistungsart, die an einer Zuteilung gewaehlt ist, bleibt
+    // (ENT-721). Geloescht stuende dort eine Nummer ins Leere, und der
+    // Lohnlauf faende die Stunden keiner Leistungsart mehr zu.
+    if (hat_spalte($pdo, 'einsatz_zuteilung', 'leistungsart_id')) {
+        $n = $pdo->prepare('SELECT COUNT(*) FROM einsatz_zuteilung WHERE leistungsart_id = ?');
+        $n->execute([$id]);
+        if ((int)$n->fetchColumn() > 0) {
+            json_response(['status' => 'error',
+                'message' => '„' . $vorhanden['bezeichnung'] . '" ist an Schichten gewählt und lässt sich '
+                           . 'darum nicht löschen. Sie kann deaktiviert werden.'], 400);
+        }
+    }
     $pdo->prepare('DELETE FROM lohnart WHERE id = ?')->execute([$id]);
     json_response(['status' => 'ok', 'lohnarten' => lohnarten_lesen()]);
 }
@@ -101,6 +113,22 @@ $sortierung = (int)($input['sortierung'] ?? 100);
 $aktiv  = isset($input['aktiv']) && !$input['aktiv'] ? 0 : 1;
 $bem    = trim((string)($input['bemerkung'] ?? '')) ?: null;
 
+// Leistungsart (ENT-721): Nummer und Standardsatz pro Stunde. Bei jeder
+// anderen Art bleiben beide leer -- ein Standardsatz an einer Monatszulage
+// waere eine Zahl ohne Bedeutung.
+$nummer = $art === 'leistung' ? (trim((string)($input['nummer'] ?? '')) ?: null) : null;
+if ($nummer !== null && mb_strlen($nummer) > 10) {
+    json_response(['status' => 'error', 'message' => 'Nummer: höchstens 10 Zeichen'], 400);
+}
+$standard = null;
+if ($art === 'leistung' && trim((string)($input['standard'] ?? '')) !== '') {
+    $t = str_replace(["'", ' ', ','], ['', '', '.'], (string)$input['standard']);
+    if (!is_numeric($t) || (float)$t < 0) {
+        json_response(['status' => 'error', 'message' => 'Standardsatz: Betrag in CHF pro Stunde'], 400);
+    }
+    $standard = (int)round((float)$t * 100);
+}
+
 if ($id > 0) {
     // Der Schluessel bleibt, was er war -- eine Umbenennung wuerde alte
     // Abrechnungszeilen von ihrer Lohnart trennen.
@@ -129,5 +157,11 @@ if ($id > 0) {
         json_response(['status' => 'error',
             'message' => 'Den Schlüssel „' . $schluessel . '" gibt es bereits'], 400);
     }
+}
+if (hat_spalte($pdo, 'lohnart', 'standard_rappen')) {
+    $pdo->prepare('UPDATE lohnart SET nummer = ?, standard_rappen = ? WHERE schluessel = ?')
+        ->execute([$nummer, $standard, $id > 0
+            ? $pdo->query('SELECT schluessel FROM lohnart WHERE id = ' . (int)$id)->fetchColumn()
+            : $schluessel]);
 }
 json_response(['status' => 'ok', 'lohnarten' => lohnarten_lesen()]);

@@ -28,7 +28,10 @@ const check = (n, c) => (c ? ok : bad).push(n);
 const STICHTAG = '2027-05-31';
 
 const DOSSIER = { id: 42, name: 'muster.person', vorname: 'Eine', nachname: 'Person',
-  personalnummer: 'P-0042', anstellungskategorie: 'C', eintritt: '2024-03-01', aktiv: 1 };
+  personalnummer: 'P-0042', anstellungskategorie: 'C', eintritt: '2024-03-01', aktiv: 1,
+  anstellungsort_id: 1, nebenanstellungsort_id: null };
+const ORTE = [{ id: 1, bezeichnung: 'Hauptsitz Beispiel', rolle: 'hao', strasse: 'Beispielweg 1',
+  plz: '3000', ort: 'Beispielstadt', aktiv: 1 }];
 
 // Zwei Antworten desselben Endpunkts: einmal vollstaendig, einmal mit
 // Luecken. Die zweite ist die eigentlich interessante -- sie prueft, dass
@@ -262,6 +265,7 @@ await page.route('**/api/**', async r => {
     // Ohne Zeitraum die Liste, mit Zeitraum die Vorschau.
     return u.includes('von=') ? send(LAUF_VORSCHAU) : send({ status: 'ok', laeufe: [] });
   }
+  if (u.includes('anstellungsorte')) return send({ status: 'ok', orte: ORTE });
   if (u.includes('lohnarten')) return send(LOHNARTEN);
   if (u.includes('lohn_abzuege')) return send(ABZUEGE);
   if (u.includes('mitarbeiter_dossier')) return send({ status: 'ok', eingerichtet: true, mitarbeiter: DOSSIER });
@@ -456,11 +460,116 @@ check('Die IBAN des Zahlungsempfaengers erscheint',
 // Bezugszahl, Vorzeichen, und was der Dialog einer schon abgerechneten
 // Position NICHT mehr anbietet.
 const karten = await page.$$eval('#mdBereich_lohn .card-hd h3', hs => hs.map(h => h.textContent.trim()));
-check('Die Karte "Zulagen und Abzüge" steht direkt unter "Lohnansatz"',
-  karten.indexOf('Zulagen und Abzüge') === karten.indexOf('Lohnansatz') + 1);
+// Seit ENT-721 zwei Spalten: links der geltende Ansatz und die Abzuege,
+// rechts die Tabellen, zuoberst "Zulagen und Abzüge". Gemessen an der Lage.
+const lage = await page.$$eval('#mdBereich_lohn .card', cs => cs.map(c => {
+  const r = c.getBoundingClientRect();
+  return { t: c.querySelector('.card-hd h3')?.textContent.trim(), x: Math.round(r.left), y: Math.round(r.top) };
+}));
+const an = n => lage.find(k => k.t === n) || {};
+check('Lohnansatz und Abzüge stehen links untereinander',
+  an('Lohnansatz').x === an('Abzüge').x && an('Abzüge').y > an('Lohnansatz').y, JSON.stringify(lage));
+check('"Zulagen und Abzüge" steht rechts zuoberst, auf Höhe des Lohnansatzes',
+  an('Zulagen und Abzüge').x > an('Lohnansatz').x && an('Zulagen und Abzüge').y === an('Lohnansatz').y,
+  JSON.stringify(lage));
 const posKarte = page.locator('#mdBereich_lohn .card', { hasText: 'Zulagen und Abzüge' });
-const breiten = await page.$$eval('#mdBereich_lohn .ma-lohn > .card', cs => cs.map(c => Math.round(c.getBoundingClientRect().width)));
-check('Die neue Karte ist so breit wie die übrigen Lohnkarten', new Set(breiten).size === 1);
+// Keine Karte ragt in die Nachbarspalte, auch nicht mit offenem Formular,
+// und die Seite laeuft auf 1280 px nicht seitlich ueber.
+const spalten = () => page.evaluate(() => {
+  const sp = [...document.querySelectorAll('#mdBereich_lohn .lohn-spalte')];
+  const rechtsLinks = sp[1].getBoundingClientRect().left;
+  const breitesteLinks = Math.max(...[...sp[0].children].map(c => c.getBoundingClientRect().right));
+  return { ueber: Math.round(breitesteLinks - rechtsLinks),
+           zwei: rechtsLinks > sp[0].getBoundingClientRect().left,
+           seitlich: document.documentElement.scrollWidth - window.innerWidth };
+});
+for (const [b, offen] of [[1600, false], [1600, true], [1280, false], [1280, true]]) {
+  await page.setViewportSize({ width: b, height: 1100 });
+  if (offen) { await page.evaluate(() => lohnAnsatzOeffnen(1)); }
+  await page.waitForTimeout(150);
+  const m = await spalten();
+  if (b >= 1360) {
+    check(`${b} px${offen ? ', Formular offen' : ''}: zwei Spalten, die linke bleibt links, nichts läuft seitlich über`,
+      m.zwei && m.ueber <= -12 && m.seitlich <= 0, JSON.stringify(m));
+  } else {
+    check(`${b} px${offen ? ', Formular offen' : ''}: eine Spalte, nichts läuft seitlich über`,
+      !m.zwei && m.seitlich <= 0, JSON.stringify(m));
+  }
+  if (offen) { await page.evaluate(() => lohnFormSchliessen('dlgLohnAnsatz')); }
+}
+await page.setViewportSize({ width: 1600, height: 1100 });
+
+// ── 4c. Mutationsgrund und Vertragsorte (ENT-721, Schritt 2) ───────────
+const orteKarte = (await page.locator('#mdBereich_lohn .card', { hasText: 'Vertragsorte' })
+  .textContent()).replace(/\s+/g, ' ');
+check('Die Vertragsorte nennen den Standort als Hauptanstellungsort, mit Adresse',
+  /Hauptanstellungsort\s*Hauptsitz Beispiel/.test(orteKarte) && /Beispielweg 1/.test(orteKarte), orteKarte);
+check('Ohne Nebenanstellungsort steht "keiner erfasst", nicht leer', /keiner erfasst/.test(orteKarte));
+check('Der erste Ansatz zeigt "erster Ansatz" statt eines leeren Mutationsgrunds',
+  /Mutationsgrund\s*erster Ansatz/.test((await page.textContent('#mdBereich_lohn')).replace(/\s+/g, ' ')));
+gesendet.length = 0;
+await page.evaluate(() => lohnAnsatzOeffnen(null));
+await page.fill('#lpaAb', '2027-01-01');
+await page.fill('#lpaAnsatz', '26.00');
+await page.fill('#lpaMutation', 'Neues Dienstjahr');
+await page.evaluate(() => lohnAnsatzSpeichern());
+await page.waitForTimeout(300);
+check('KRITISCH: der Mutationsgrund geht mit dem Ansatz an den Server',
+  gesendet.length === 1 && gesendet[0].mutationsgrund === 'Neues Dienstjahr', JSON.stringify(gesendet));
+
+// ── 4a. Formulare an Ort und Stelle (ENT-721) ────────────────────────────
+// Am Desktop oeffnet "bearbeiten" kein Fenster mehr, sondern klappt den
+// Block selbst zum Formular auf. Gemessen: wo das Feld steht, ob ein
+// Fenster sichtbar ist, und ob die Lesezeilen weichen.
+const ortUndStelle = () => page.evaluate(() => {
+  const feld = document.querySelector('#lpaAnsatz');
+  const karte = feld && feld.closest('.card');
+  return {
+    inKarte: !!karte && karte.querySelector('.card-hd h3')?.textContent.trim() === 'Lohnansatz',
+    fenster: !!document.querySelector('.dlg-scrim.on'),
+    leseSichtbar: !!document.querySelector('[data-lese="dlgLohnAnsatz"]')?.offsetParent,
+    wert: feld ? feld.value : null,
+  };
+});
+await page.locator('#mdBereich_lohn .card', { hasText: 'Lohnansatz' }).first()
+  .getByRole('button', { name: 'bearbeiten' }).click();
+await page.waitForTimeout(300);
+let os = await ortUndStelle();
+check('KRITISCH: "bearbeiten" klappt den Lohnansatz in seiner Karte auf, ohne Fenster',
+  os.inKarte && !os.fenster, JSON.stringify(os));
+check('Die Lesezeilen weichen dem Formular', !os.leseSichtbar);
+check('Das Formular ist mit dem geltenden Ansatz befüllt', os.wert === '25.00', os.wert);
+// Neuzeichnen bei offenem Formular (etwa ein Filter rechts) darf es nicht wegreissen.
+await page.evaluate(() => lohnAkteZeichnen());
+os = await ortUndStelle();
+check('Neu zeichnen lässt das offene Formular stehen', os.inKarte && os.wert === '25.00', JSON.stringify(os));
+// Der Abbrechen-Knopf im Block; fehlt er, schliesst die Pruefung selbst,
+// damit sie nicht haengen bleibt -- angeschlagen hat sie dann schon oben.
+await page.evaluate(() => {
+  const b = document.querySelector('#mdBereich_lohn [data-slot="dlgLohnAnsatz"] .dlg-ft .btn-plain');
+  if (b) { b.click(); } else { lohnFormSchliessen('dlgLohnAnsatz'); closeDlg('dlgLohnAnsatz'); }
+});
+os = await ortUndStelle();
+check('Abbrechen bringt die Lesezeilen zurück und das Formular ins Fenster',
+  os.leseSichtbar && !os.inKarte && !os.fenster, JSON.stringify(os));
+// Ein Wechsel der Person bei offenem Formular: Das naechste Oeffnen muss
+// die Felder noch finden.
+await page.evaluate(() => lohnAbzugOeffnen(5));
+await page.evaluate(() => { lohnAkte = null; lohnAkteFuer = null; mdGoTab('lohn'); });
+await page.waitForTimeout(500);
+await page.evaluate(() => lohnAnsatzOeffnen(null));
+os = await ortUndStelle();
+check('Nach Neuladen bei offenem Formular lässt sich wieder eins öffnen',
+  os.inKarte && os.wert === '', JSON.stringify(os));
+await page.evaluate(() => lohnFormSchliessen('dlgLohnAnsatz'));
+// Unter 901 px bleibt es das Fenster.
+await page.setViewportSize({ width: 860, height: 1100 });
+await page.evaluate(() => lohnAnsatzOeffnen(1));
+os = await ortUndStelle();
+check('Schmaler als 901 px öffnet weiterhin das Fenster', os.fenster && !os.inKarte, JSON.stringify(os));
+await page.evaluate(() => lohnFormSchliessen('dlgLohnAnsatz'));
+await page.setViewportSize({ width: 1600, height: 1100 });
+await page.waitForTimeout(200);
 let posText = (await posKarte.textContent()).replace(/\s+/g, ' ');
 check('Beendete Positionen sind ausgeblendet, laufende und künftige stehen da',
   /Funktionszulage/.test(posText) && /Pauschalspesen/.test(posText)
@@ -511,7 +620,7 @@ await page.waitForTimeout(300);
 check('Eine noch nicht abgerechnete Position lässt sich korrigieren und löschen',
   (await page.$$eval('#lpoWeg option', os => os.map(o => o.value))).includes('korrigieren')
   && (await sichtbar('lpoLoeschKnopf')));
-await page.evaluate(() => closeDlg('dlgLohnPosition'));
+await page.evaluate(() => lohnFormSchliessen('dlgLohnPosition'));
 
 // Der Dialog fuer eine neue Position: Einheit folgt der Lohnart.
 await page.evaluate(() => lohnPositionOeffnen(null));
@@ -633,7 +742,7 @@ await page.selectOption('#lpbNbu', 'versichert');
 await page.waitForTimeout(200);
 check('Stimmt die Wahl mit der Rechnung ueberein, steht kein Widerspruch da',
   !/widersprechen/.test((await page.textContent('#lpbNbuStand')).replace(/\s+/g, ' ')));
-await page.evaluate(() => closeDlg('dlgLohnAbzug'));
+await page.evaluate(() => lohnFormSchliessen('dlgLohnAbzug'));
 await page.waitForTimeout(200);
 
 // ── 5b. Der Lohnlauf: Stunden und Franken getrennt, Gesperrtes benannt ───

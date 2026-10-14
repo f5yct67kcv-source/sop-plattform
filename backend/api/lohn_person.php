@@ -284,6 +284,16 @@ if ($was === 'ansatz') {
     if ($rappen === null || $rappen <= 0) {
         json_response(['status' => 'error', 'message' => 'Ansatz: Betrag erforderlich'], 400);
     }
+    // Mutationsgrund (ENT-721): Pflicht, sobald ein frueherer Ansatz besteht.
+    // Der erste Ansatz einer Person ist der Eintritt und braucht keinen.
+    // Im Server und nicht nur im Formular -- eine Pflicht, die man am
+    // Browser vorbei umgehen kann, ist keine.
+    $grund = trim((string)($input['mutationsgrund'] ?? ''));
+    $mitGrund = hat_spalte($pdo, 'lohn_ansatz', 'mutationsgrund');
+    if ($mitGrund) {
+        $f = lohn_mutationsgrund_fehler($pdo, $id, $ab, $grund);
+        if ($f !== null) { json_response(['status' => 'error', 'message' => $f], 400); }
+    }
     // Die Kategorie wird als Schnappschuss mitgeschrieben, nicht vom
     // Bedienenden erfragt: Sie steht in der Akte, und zwei Eingabestellen
     // fuer dieselbe Angabe waeren zwei Wahrheiten.
@@ -325,6 +335,10 @@ if ($was === 'ansatz') {
         trim((string)($input['bemerkung'] ?? '')) ?: null,
         (int)$user['id'],
     ]);
+    if ($mitGrund) {
+        $pdo->prepare('UPDATE lohn_ansatz SET mutationsgrund = ? WHERE mitarbeiter_id = ? AND gueltig_ab = ?')
+            ->execute([$grund !== '' ? $grund : null, $id, $ab]);
+    }
     json_response(lohn_person_lesen($id, $stichtag));
 }
 

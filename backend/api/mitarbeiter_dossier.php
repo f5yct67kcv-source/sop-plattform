@@ -43,7 +43,7 @@ if (!$row) {
 $row['id'] = (int)$row['id'];
 $row['ist_admin'] = (bool)$row['ist_admin'];
 $row['aktiv'] = (bool)$row['aktiv'];
-foreach (['funktion_id', 'abteilung_id', 'anstellungsort_id', 'pensum_stunden'] as $z) {
+foreach (['funktion_id', 'abteilung_id', 'anstellungsort_id', 'nebenanstellungsort_id', 'pensum_stunden'] as $z) {
     if (array_key_exists($z, $row)) { $row[$z] = $row[$z] === null ? null : (int)$row[$z]; }
 }
 // Das Passwort verlaesst die Datenbank nie -- auch nicht als Hash.

@@ -30,6 +30,30 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 31,
+            'datum' => '2026-10-14',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Zulage je Leistungsart',
+            'text'  => 'Unter Lohn → Lohnarten gibt es die neue Art „Leistungsart“, etwa Hundeführer, mit Nummer und Standardsatz pro Stunde. Im Einsatzplan wählst du je Person, welche Leistungsart sie erbringt. Der Lohnlauf zahlt die Zulage nur für diese Stunden. Hat jemand einen eigenen Satz, gilt dieser statt des Standards; er wird wie eine persönliche Zulage auf der Lohnseite erfasst.',
+        ],
+        [
+            'nr'    => 30,
+            'datum' => '2026-10-14',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Mutationsgrund und Nebenanstellungsort',
+            'text'  => 'Ein neuer Lohnansatz braucht jetzt einen Mutationsgrund, etwa „neues Dienstjahr“. Nur der erste Ansatz einer Person braucht keinen. Unter Anstellung lässt sich neben dem Standort ein Nebenanstellungsort eintragen, wie ihn Art. 18 GAV kennt. Auf der Lohnseite stehen beide Orte unter „Vertragsorte“.',
+        ],
+        [
+            'nr'    => 29,
+            'datum' => '2026-10-14',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Lohn der Mitarbeitenden auf einer Seite',
+            'text'  => 'Unter Mitarbeitende → Lohn steht jetzt alles auf einer Seite: links der geltende Lohnansatz und die Abzüge, rechts Zulagen, Zahlungsverbindung und der Verlauf. Mit „bearbeiten“ klappt der Block an Ort und Stelle auf, ohne eigenes Fenster. Oben stehen die Werte aus dem GAV in einer Zeile.',
+        ],
+        [
             'nr'    => 28,
             'datum' => '2026-10-14',
             'art'   => 'fehlerbehebung',
