@@ -48,7 +48,7 @@ $rows = array_map(function ($r) use ($rollenKarte) {
     $r['ist_admin'] = (bool)$r['ist_admin'];
     $r['rollen'] = $rollenKarte[$r['id']]
         ?? [$r['ist_admin'] ? ROLLE_VERWALTUNG : ROLLE_MITARBEITEND];
-    foreach (['funktion_id', 'abteilung_id', 'anstellungsort_id', 'pensum_stunden'] as $z) {
+    foreach (['funktion_id', 'abteilung_id', 'anstellungsort_id', 'nebenanstellungsort_id', 'pensum_stunden'] as $z) {
         if (array_key_exists($z, $r)) { $r[$z] = $r[$z] === null ? null : (int)$r[$z]; }
     }
     return $r;

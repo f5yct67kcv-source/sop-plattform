@@ -10629,6 +10629,10 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
       <input type="hidden" id="lpaId">
       <div class="feld"><label for="lpaAb">Gültig ab</label>
         <input class="inp" type="date" id="lpaAb"></div>
+      <div class="feld"><label for="lpaMutation">Mutationsgrund</label>
+        <input class="inp" id="lpaMutation" maxlength="200" placeholder="z. B. neues Dienstjahr, Vertragsänderung">
+        <div class="zone-note">Pflicht, sobald es einen früheren Ansatz gibt. Der erste Ansatz ist der
+          Eintritt und braucht keinen.</div></div>
       <div class="feld"><label for="lpaAnsatz">Ansatz</label>
         <input class="inp" id="lpaAnsatz" placeholder="z. B. 25.00">
         <div class="zone-note" id="lpaEinheit"></div></div>
@@ -25435,7 +25439,8 @@ function lohnAkteLaden() {
   if (lohnAkteFuer === id && lohnAkte) { lohnAkteZeichnen(); return; }
   if (lohnFormOffen) { lohnFormSchliessen(lohnFormOffen); }
   ziel.innerHTML = '<div style="color:var(--ink-3)">Wird geladen …</div>';
-  api('lohn_person.php?id=' + encodeURIComponent(id)).then(({ ok, status, data }) => {
+  const orte = anstellungsorte.length ? Promise.resolve() : ladeAnstellungsorte();
+  Promise.all([api('lohn_person.php?id=' + encodeURIComponent(id)), orte]).then(([{ ok, status, data }]) => {
     if (!ok) { ziel.innerHTML = lohnLeer(lohnLeerArt(status, data), data?.message); return; }
     lohnAkte = data; lohnAkteFuer = id;
     lohnAkteZeichnen();
@@ -25505,6 +25510,7 @@ function lohnAkteZeichnen() {
   if (ak) {
     ansatzInhalt = `<dl class="lohn-zeilen">
       <dt>Gültig ab</dt><dd>${dmy(ak.gueltig_ab)} <span class="chip chip-ok">gilt heute</span></dd>
+      <dt>Mutationsgrund</dt><dd>${lohnMutation(ak, alleAnsaetze)}</dd>
       <dt>Ansatz</dt><dd><b>${lohnFr(ak.ansatz_rappen)} CHF</b> ${einheit}</dd>
       <dt>Kategorie</dt><dd>${ak.kategorie ? 'Kat. ' + esc(ak.kategorie) : lohnUnbekannt('ohne Kategorie')}</dd>
       <dt>13. Monatslohn</dt><dd>${ak.ml13_bp ? lohnPz(ak.ml13_bp)
@@ -25624,6 +25630,7 @@ function lohnAkteZeichnen() {
       <td>${a.kategorie ? 'Kat. ' + esc(a.kategorie) : lohnUnbekannt('ohne Kategorie')}</td>
       <td>${a.ml13_bp ? lohnPz(a.ml13_bp) : '<span class="zone-note" style="margin:0">keiner</span>'}</td>
       <td>${Number(a.ferien_laufend) ? 'laufend' : 'beim Bezug'}</td>
+      <td>${lohnMutation(a, alleAnsaetze)}</td>
       <td style="text-align:right">${schreiben
         ? `<button class="btn btn-quiet btn-sm" onclick="lohnAnsatzOeffnen(${a.id})">Ändern</button>` : ''}</td>
     </tr>`;
@@ -25633,7 +25640,7 @@ function lohnAkteZeichnen() {
     <div class="card-bd">
       <div style="overflow-x:auto"><table class="tbl"><thead><tr>
         <th>Gültig ab</th><th style="text-align:right">Ansatz CHF</th><th>Kategorie</th>
-        <th>13. ML</th><th>Ferienlohn</th><th></th>
+        <th>13. ML</th><th>Ferienlohn</th><th>Mutationsgrund</th><th></th>
       </tr></thead><tbody>${verlauf}</tbody></table></div>
       <p class="zone-note" style="margin:10px 0 0">Ein neuer Ansatz wird <b>zusätzlich</b> erfasst — der alte bleibt stehen,
         damit abgeschlossene Abrechnungen sich nicht rückwirkend ändern.</p>
@@ -25644,9 +25651,44 @@ function lohnAkteZeichnen() {
     ${abgeleitet}${warnung}
     <div class="lohn-zwei">
       <div class="lohn-spalte">${ansatzKarte}${abzugKarte}</div>
-      <div class="lohn-spalte">${lohnPositionKarte(heute)}${zahlKarte}${verlaufKarte}</div>
+      <div class="lohn-spalte">${lohnPositionKarte(heute)}${zahlKarte}${lohnOrteKarte()}${verlaufKarte}</div>
     </div></div>`;
   lohnFormEinsetzen();
+}
+
+// Der Grund einer Lohnmutation (ENT-721). Der frueheste Ansatz ist der
+// Eintritt und braucht keinen; fehlt er bei einem spaeteren, steht das da
+// -- leer saehe aus wie "es gab keinen Grund".
+function lohnMutation(a, alle) {
+  if (a.mutationsgrund) { return esc(a.mutationsgrund); }
+  const erster = !alle.some(x => x.gueltig_ab < a.gueltig_ab);
+  return erster ? '<span class="zone-note" style="margin:0">erster Ansatz</span>'
+    : lohnUnbekannt('nicht erfasst');
+}
+
+// ── Vertragsorte nach Art. 18 Ziff. 2 (ENT-721) ─────────────────────────
+// Hoechstens zwei: der Standort der Person als Hauptanstellungsort und ein
+// Nebenanstellungsort. Gepflegt werden beide unter "Anstellung" -- hier
+// stehen sie, weil der Lohn (Weg, Auslagen) an ihnen haengt.
+function lohnOrteKarte() {
+  const m = maAkte || {};
+  const ort = id => {
+    const o = anstellungsorte.find(x => Number(x.id) === Number(id));
+    if (!o) { return lohnUnbekannt('Ort Nr. ' + id + ' ist nicht in der Liste der Anstellungsorte'); }
+    const adr = [o.strasse, [o.plz, o.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    return `${esc(o.bezeichnung)}${adr ? `<div class="zone-note" style="margin:0">${esc(adr)}</div>` : ''}`;
+  };
+  const hao = m.anstellungsort_id ? ort(m.anstellungsort_id) : lohnUnbekannt('nicht erfasst');
+  const nao = m.nebenanstellungsort_id ? ort(m.nebenanstellungsort_id)
+    : (m.anstellungsort_id ? '<span class="zone-note" style="margin:0">keiner erfasst</span>' : '—');
+  return `<div class="card"><div class="card-hd"><h3>Vertragsorte</h3>
+      <div class="lohn-knoepfe"><button class="btn btn-quiet btn-sm" onclick="mdGoTab('anstellung')">unter Anstellung ändern</button></div></div>
+    <div class="card-bd"><dl class="lohn-zeilen">
+      <dt>Hauptanstellungsort</dt><dd>${hao}</dd>
+      <dt>Nebenanstellungsort</dt><dd>${nao}</dd>
+    </dl>
+    <p class="zone-note" style="margin:10px 0 0">Höchstens zwei vereinbarte Orte, einer davon als
+      Hauptanstellungsort (Art. 18 Ziff. 2).</p></div></div>`;
 }
 
 // ── Lohnformulare an Ort und Stelle (ENT-721) ────────────────────────────
@@ -25927,6 +25969,7 @@ function lohnAnsatzOeffnen(id) {
   $('lpaTitel').textContent = a ? 'Lohnansatz ändern' : 'Lohnansatz erfassen';
   $('lpaId').value = a ? a.id : '';
   $('lpaAb').value = a ? a.gueltig_ab : '';
+  $('lpaMutation').value = a ? (a.mutationsgrund || '') : '';
   $('lpaAnsatz').value = a ? (a.ansatz_rappen / 100).toFixed(2) : '';
   $('lpaMl13').value = a && a.ml13_bp ? (a.ml13_bp / 100).toFixed(2) : '';
   $('lpaFerienLaufend').checked = a ? !!Number(a.ferien_laufend) : false;
@@ -25951,6 +25994,7 @@ function lohnAnsatzSpeichern() {
     id: lohnAkte.person.id, was: 'ansatz',
     eintrag_id: $('lpaId').value ? Number($('lpaId').value) : 0,
     gueltig_ab: $('lpaAb').value,
+    mutationsgrund: $('lpaMutation').value.trim(),
     ansatz: $('lpaAnsatz').value.trim(),
     ml13_bp: $('lpaMl13').value.trim() === '' ? '' : Math.round(parseFloat($('lpaMl13').value.replace(',', '.')) * 100),
     ferien_laufend: $('lpaFerienLaufend').checked,
@@ -36681,6 +36725,10 @@ const MB_ABSCHNITTE = [
     ['funktion_id',       'Funktion',       'a', 'funktion'],
     ['abteilung_id',      'Abteilung',      'a', 'abteilung'],
     ['anstellungsort_id', 'Standort',       'a', 'anstellungsort'],
+    // Zweiter vereinbarter Ort nach Art. 18 Ziff. 2 (ENT-721). Der Standort
+    // ist der Hauptanstellungsort; mehr als zwei kennt der GAV nicht.
+    ['nebenanstellungsort_id', 'Nebenanstellungsort', 'a', 'anstellungsort',
+      'Nur wenn im Vertrag ein zweiter Ort steht (Art. 18 Ziff. 2)'],
     ['beruf',             'Beruf',          'f'],
     ['eintritt',          'Eintritt',       'd'],
     ['austritt',          'Austritt',       'd'],

@@ -1873,6 +1873,9 @@ CREATE TABLE IF NOT EXISTS lohn_ansatz (
   -- Anteil 13. Monatslohn in Basispunkten. BETRIEBLICH, keine GAV-Pflicht --
   -- NULL heisst 'kein 13. Monatslohn vereinbart', nicht '0 %'.
   ml13_bp INT NULL,
+  -- Warum dieser Ansatz gilt (ENT-721). Pflicht ab dem zweiten Ansatz einer
+  -- Person; der erste ist der Eintritt und braucht keinen Grund.
+  mutationsgrund VARCHAR(200) NULL,
   -- Art. 19: je Zuschlag entweder 'monat' oder 'stunde' und der Betrag.
   -- Wer waehlt und wie 'pro rata' bemisst, ist GAV-AUS-014; erfasst wird
   -- darum, was im Vertrag steht, statt es herzuleiten.
@@ -2372,6 +2375,8 @@ function kern_spalten(): array {
     ['lohn_person', 'nbu_grund',  "ALTER TABLE lohn_person ADD COLUMN nbu_grund TEXT NULL"],
     ['lohn_person', 'nbu_von',    "ALTER TABLE lohn_person ADD COLUMN nbu_von INT NULL"],
     ['lohn_person', 'nbu_am',     "ALTER TABLE lohn_person ADD COLUMN nbu_am DATETIME NULL"],
+    // Lohnseite auf einer Seite (ENT-721): der Grund einer Lohnmutation.
+    ['lohn_ansatz', 'mutationsgrund', "ALTER TABLE lohn_ansatz ADD COLUMN mutationsgrund VARCHAR(200) NULL AFTER ml13_bp"],
     ['mitarbeiter', 'anstellungskategorie', "ALTER TABLE mitarbeiter ADD COLUMN anstellungskategorie CHAR(1) NULL"],
     ['mitarbeiter', 'pensum_stunden',      "ALTER TABLE mitarbeiter ADD COLUMN pensum_stunden INT NULL"],
     // Eintrittsdatum fuer die Pro-rata-Regel aus Art. 8 Ziff. 1b.
@@ -2417,6 +2422,10 @@ function kern_spalten(): array {
     ['mitarbeiter', 'funktion_id',      "ALTER TABLE mitarbeiter ADD COLUMN funktion_id INT NULL"],
     ['mitarbeiter', 'abteilung_id',     "ALTER TABLE mitarbeiter ADD COLUMN abteilung_id INT NULL"],
     ['mitarbeiter', 'anstellungsort_id',"ALTER TABLE mitarbeiter ADD COLUMN anstellungsort_id INT NULL"],
+    // Zweiter vertraglich vereinbarter Ort nach Art. 18 Ziff. 2 (ENT-721).
+    // Hoechstens zwei: der Standort oben ist der Hauptanstellungsort, dieser
+    // der Nebenanstellungsort. Eine Liste waere mehr, als der GAV kennt.
+    ['mitarbeiter', 'nebenanstellungsort_id', "ALTER TABLE mitarbeiter ADD COLUMN nebenanstellungsort_id INT NULL AFTER anstellungsort_id"],
     ['mitarbeiter', 'beruf',            "ALTER TABLE mitarbeiter ADD COLUMN beruf VARCHAR(200) NULL"],
     // Austritt gehoert neben den Eintritt. Die Vorlage kennt ihn nicht, aber
     // ohne ihn laesst sich nicht sagen, wer noch beschaeftigt ist -- und die

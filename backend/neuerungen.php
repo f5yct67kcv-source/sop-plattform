@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 30,
+            'datum' => '2026-10-14',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Mutationsgrund und Nebenanstellungsort',
+            'text'  => 'Ein neuer Lohnansatz braucht jetzt einen Mutationsgrund, etwa „neues Dienstjahr“. Nur der erste Ansatz einer Person braucht keinen. Unter Anstellung lässt sich neben dem Standort ein Nebenanstellungsort eintragen, wie ihn Art. 18 GAV kennt. Auf der Lohnseite stehen beide Orte unter „Vertragsorte“.',
+        ],
+        [
             'nr'    => 29,
             'datum' => '2026-10-14',
             'art'   => 'verbesserung',

@@ -28,7 +28,10 @@ const check = (n, c) => (c ? ok : bad).push(n);
 const STICHTAG = '2027-05-31';
 
 const DOSSIER = { id: 42, name: 'muster.person', vorname: 'Eine', nachname: 'Person',
-  personalnummer: 'P-0042', anstellungskategorie: 'C', eintritt: '2024-03-01', aktiv: 1 };
+  personalnummer: 'P-0042', anstellungskategorie: 'C', eintritt: '2024-03-01', aktiv: 1,
+  anstellungsort_id: 1, nebenanstellungsort_id: null };
+const ORTE = [{ id: 1, bezeichnung: 'Hauptsitz Beispiel', rolle: 'hao', strasse: 'Beispielweg 1',
+  plz: '3000', ort: 'Beispielstadt', aktiv: 1 }];
 
 // Zwei Antworten desselben Endpunkts: einmal vollstaendig, einmal mit
 // Luecken. Die zweite ist die eigentlich interessante -- sie prueft, dass
@@ -262,6 +265,7 @@ await page.route('**/api/**', async r => {
     // Ohne Zeitraum die Liste, mit Zeitraum die Vorschau.
     return u.includes('von=') ? send(LAUF_VORSCHAU) : send({ status: 'ok', laeufe: [] });
   }
+  if (u.includes('anstellungsorte')) return send({ status: 'ok', orte: ORTE });
   if (u.includes('lohnarten')) return send(LOHNARTEN);
   if (u.includes('lohn_abzuege')) return send(ABZUEGE);
   if (u.includes('mitarbeiter_dossier')) return send({ status: 'ok', eingerichtet: true, mitarbeiter: DOSSIER });
@@ -494,6 +498,24 @@ for (const [b, offen] of [[1600, false], [1600, true], [1280, false], [1280, tru
   if (offen) { await page.evaluate(() => lohnFormSchliessen('dlgLohnAnsatz')); }
 }
 await page.setViewportSize({ width: 1600, height: 1100 });
+
+// ── 4c. Mutationsgrund und Vertragsorte (ENT-721, Schritt 2) ───────────
+const orteKarte = (await page.locator('#mdBereich_lohn .card', { hasText: 'Vertragsorte' })
+  .textContent()).replace(/\s+/g, ' ');
+check('Die Vertragsorte nennen den Standort als Hauptanstellungsort, mit Adresse',
+  /Hauptanstellungsort\s*Hauptsitz Beispiel/.test(orteKarte) && /Beispielweg 1/.test(orteKarte), orteKarte);
+check('Ohne Nebenanstellungsort steht "keiner erfasst", nicht leer', /keiner erfasst/.test(orteKarte));
+check('Der erste Ansatz zeigt "erster Ansatz" statt eines leeren Mutationsgrunds',
+  /Mutationsgrund\s*erster Ansatz/.test((await page.textContent('#mdBereich_lohn')).replace(/\s+/g, ' ')));
+gesendet.length = 0;
+await page.evaluate(() => lohnAnsatzOeffnen(null));
+await page.fill('#lpaAb', '2027-01-01');
+await page.fill('#lpaAnsatz', '26.00');
+await page.fill('#lpaMutation', 'Neues Dienstjahr');
+await page.evaluate(() => lohnAnsatzSpeichern());
+await page.waitForTimeout(300);
+check('KRITISCH: der Mutationsgrund geht mit dem Ansatz an den Server',
+  gesendet.length === 1 && gesendet[0].mutationsgrund === 'Neues Dienstjahr', JSON.stringify(gesendet));
 
 // ── 4a. Formulare an Ort und Stelle (ENT-721) ────────────────────────────
 // Am Desktop oeffnet "bearbeiten" kein Fenster mehr, sondern klappt den

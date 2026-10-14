@@ -117,6 +117,7 @@ function ma_felder(): array
         'funktion_id'          => 'id',
         'abteilung_id'         => 'id',
         'anstellungsort_id'    => 'id',
+        'nebenanstellungsort_id' => 'id',
         'beruf'                => 'text',
         'eintritt'             => 'datum',
         'austritt'             => 'datum',
@@ -182,7 +183,7 @@ function ma_listenfelder(): array
         'personalnummer', 'anrede', 'vorname', 'nachname',
         'strasse', 'hausnummer', 'plz', 'ort',
         'telefon', 'mobil', 'email',
-        'kurzzeichen', 'funktion_id', 'abteilung_id', 'anstellungsort_id',
+        'kurzzeichen', 'funktion_id', 'abteilung_id', 'anstellungsort_id', 'nebenanstellungsort_id',
         'eintritt', 'austritt', 'anstellungskategorie', 'pensum_stunden',
         // Die Berechtigungen gehoeren in die Liste, die Ausbildungsdaten
         // nicht: Wer einteilt, muss sehen, wer Hund oder Waffe fuehren darf --
@@ -609,6 +610,19 @@ function ma_eingabe_lesen(array $input, array $bestand = [], ?PDO $pdo = null): 
         if ($vorher !== '' && $spalten['anstellungskategorie'] === null) {
             $fehler[] = 'Anstellungskategorie: nur A, B oder C';
         }
+    }
+    // Art. 18 Ziff. 2: zwei vereinbarte Orte muessen zwei verschiedene sein.
+    // Derselbe Ort zweimal waere ein Nebenanstellungsgebiet um den
+    // Hauptanstellungsort herum -- das gibt es nicht.
+    // Geprueft gegen den Bestand, wenn nur eines der beiden Felder kommt.
+    $nao = array_key_exists('nebenanstellungsort_id', $spalten)
+        ? $spalten['nebenanstellungsort_id'] : ($bestand['nebenanstellungsort_id'] ?? null);
+    $hao = array_key_exists('anstellungsort_id', $spalten)
+        ? $spalten['anstellungsort_id'] : ($bestand['anstellungsort_id'] ?? null);
+    if ((int)$nao > 0 && (int)$hao <= 0) {
+        $fehler[] = 'Nebenanstellungsort: setzt einen Standort als Hauptanstellungsort voraus (Art. 18 Ziff. 2)';
+    } elseif ((int)$nao > 0 && (int)$nao === (int)$hao) {
+        $fehler[] = 'Nebenanstellungsort: muss ein anderer Ort sein als der Standort (Art. 18 Ziff. 2)';
     }
     if (array_key_exists('pensum_stunden', $spalten)) {
         $vorher = $spalten['pensum_stunden'];

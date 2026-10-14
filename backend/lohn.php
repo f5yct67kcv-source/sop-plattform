@@ -88,6 +88,20 @@ function lohn_form(?string $kategorie): ?string
 //
 // Rueckgabe ab 1. Ein Datum vor dem Eintritt ergibt null -- da gab es das
 // Arbeitsverhaeltnis noch nicht, und 0 saehe aus wie ein Ergebnis.
+// Mutationsgrund eines Lohnansatzes (ENT-721). Pflicht, sobald die Person
+// einen frueheren Ansatz hat; der erste ist der Eintritt und braucht keinen.
+// null heisst: in Ordnung.
+function lohn_mutationsgrund_fehler(PDO $pdo, int $maId, string $ab, string $grund): ?string
+{
+    if (mb_strlen($grund) > 200) { return 'Mutationsgrund: höchstens 200 Zeichen'; }
+    $frueher = $pdo->prepare('SELECT 1 FROM lohn_ansatz WHERE mitarbeiter_id = ? AND gueltig_ab < ? LIMIT 1');
+    $frueher->execute([$maId, $ab]);
+    if ($frueher->fetchColumn() && $grund === '') {
+        return 'Mutationsgrund: erforderlich, sobald es einen früheren Ansatz gibt';
+    }
+    return null;
+}
+
 function lohn_dienstjahr(?string $eintritt, string $stichtag): ?int
 {
     if (!$eintritt || strlen($eintritt) < 10 || strlen($stichtag) < 10) { return null; }
