@@ -14079,7 +14079,11 @@ function renderEreignisse() {
   if (!f.length) {
     $('ereignisFeed').innerHTML = fehlt.length
       ? hinweis
-      : EMPTY('Nichts Neues', 'Hier erscheinen eingegangene Rapporte, Sperrtage, Rückmeldungen zu Schichten und Entscheidungen zu Offerten.');
+      // Leer abgehakt, aber auf dem Server noch offen: Die naechsten kommen
+      // (ereignisseNachladen) -- das ist nicht "Nichts Neues".
+      : (stats.ereignisse_gesamt > 0
+        ? EMPTY('Weitere werden geladen …', 'Die sichtbaren Ereignisse sind abgehakt, auf dem Server stehen noch ' + stats.ereignisse_gesamt + ' offen.')
+        : EMPTY('Nichts Neues', 'Hier erscheinen eingegangene Rapporte, Sperrtage, Rückmeldungen zu Schichten und Entscheidungen zu Offerten.'));
     glockeAktualisieren([], fehlt);
     // Auch hier: Ein Abzeichen, das vom letzten Laden stehen bleibt,
     // behauptet eine Antwort, die es nicht mehr gibt.
@@ -14157,10 +14161,14 @@ function ereignisArt(x) {
 }
 
 // Dieselbe Liste wie im Endpunkt, hier bloss zum Ausblenden des Knopfes.
-// Alle vier Arten lassen sich abhaken: Jede von ihnen ist etwas Geschehenes,
+// Alle diese Arten lassen sich abhaken: Jede von ihnen ist etwas Geschehenes,
 // das man zur Kenntnis nimmt.
+// Die Vorfallmeldung fehlte hier bis zum 14.10.2026, obwohl der Server sie
+// seit ENT-297 abhaken laesst: Sie stand in der Glocke ohne Haken und hielt
+// den Zaehler oben, ohne dass man sie loswerden konnte.
 function ereignisAbhakbar(typ) {
-  return typ === 'rapport' || typ === 'sperrtag' || typ === 'zusage' || typ === 'offerte' || typ === 'rundgang_spontan';
+  return typ === 'rapport' || typ === 'sperrtag' || typ === 'zusage' || typ === 'offerte'
+    || typ === 'rundgang_spontan' || typ === 'vorfall';
 }
 
 function ereignisZeile(x) {
@@ -14261,7 +14269,30 @@ function ereignisErledigt(i) {
   // Ereignis abgehakt -- gefunden hat es die Pruefung, nicht das Auge.
   renderEreignisse();
   api('ereignis_erledigt.php', { method: 'POST',
-    body: { typ: x.typ, id: x.id, mitarbeiter_id: x.mitarbeiter_id || 0 } }).catch(() => {});
+    body: { typ: x.typ, id: x.id, mitarbeiter_id: x.mitarbeiter_id || 0 } }).then(({ ok }) => {
+    // Hat der Server NICHT abgehakt, kommt die Zeile sofort zurueck -- nicht
+    // erst beim naechsten Neuladen. Sonst sieht ein gescheiterter Haken aus
+    // wie ein gelungener und taucht beim Aktualisieren wieder auf.
+    // Ist die sichtbare Liste leer, aber auf dem Server noch etwas offen
+    // (die Liste zeigt nur die neuesten 12), wird die naechste Tranche
+    // geholt: Eine leere Glocke mit einer Zahl daran ist ein Widerspruch.
+    if (!ok || (!(stats.ereignisse || []).length && stats.ereignisse_gesamt > 0)) {
+      ereignisseNachladen();
+    }
+  }).catch(() => ereignisseNachladen());
+}
+
+// Holt NUR den Feed neu, ohne die uebrige Uebersicht in Platzhalter zu
+// tauchen (loadStats() zeichnet alle Kacheln neu).
+function ereignisseNachladen() {
+  return api('dashboard_stats.php').then(({ ok, data }) => {
+    if (!ok || !data || data.status !== 'ok' || !stats) { return; }
+    stats.ereignisse = data.ereignisse || [];
+    stats.ereignisse_gesamt = data.ereignisse_gesamt;
+    stats.ereignisse_gekuerzt = data.ereignisse_gekuerzt;
+    stats.ereignisse_unvollstaendig = data.ereignisse_unvollstaendig;
+    renderEreignisse();
+  });
 }
 
 // ══════════════════════════════════════════ GLOCKE (ENT-197)
@@ -14273,7 +14304,9 @@ function ereignisErledigt(i) {
 // ereignisse.php).
 function glockeAktualisieren(f, fehlt) {
   const badge = $('glockeBadge');
-  const anzahl = stats.ereignisse_gesamt || f.length;
+  // Die Zahl am Abzeichen ist die der offenen Ereignisse auf dem Server --
+  // nie kleiner als die Zeilen, die tatsaechlich darunter stehen.
+  const anzahl = Math.max(Number(stats.ereignisse_gesamt) || 0, f.length);
   if (badge) {
     badge.style.display = anzahl ? '' : 'none';
     badge.textContent = anzahl > 99 ? '99+' : String(anzahl);
@@ -14285,7 +14318,12 @@ function glockeAktualisieren(f, fehlt) {
     return;
   }
   if (!f.length) {
-    liste.innerHTML = `<div class="glocke-leer">Nichts Neues.</div>`;
+    // "Nichts Neues" nur, wenn auch der Server nichts mehr offen hat. Sonst
+    // ist die naechste Tranche unterwegs (ereignisseNachladen) -- und eine
+    // Zahl am Abzeichen ueber "Nichts Neues" waere ein Widerspruch.
+    liste.innerHTML = anzahl
+      ? `<div class="glocke-leer">Weitere werden geladen …</div>`
+      : `<div class="glocke-leer">Nichts Neues.</div>`;
     return;
   }
   liste.innerHTML = f.map((x, i) => {

@@ -81,6 +81,23 @@ function ereignis_lesen(PDO $pdo, string $sql, array &$fehler, string $art): arr
     }
 }
 
+// Wie viele Ereignisse einer Art insgesamt offen sind -- OHNE die Grenze der
+// Liste. Bis zum 14.10.2026 stand als "gesamt" die Laenge der Liste, und die
+// war je Art bei 20 abgeschnitten: Bei 300 offenen Zusagen zeigte die Glocke
+// 20, jeder Haken holte die naechste nach, und nach dem Neuladen stand wieder
+// 20 da -- es sah aus, als bleibe das Abhaken nicht haengen. Gezaehlt wird
+// mit derselben Bedingung wie die Liste. Scheitert die Zaehlung, steht die Art
+// schon ueber ereignis_lesen() in $fehler; gezaehlt wird dann die gelesene
+// Laenge, keine erfundene Zahl.
+function ereignis_zaehlen(PDO $pdo, string $sql, int $gelesen): int
+{
+    try {
+        return max($gelesen, (int)$pdo->query($sql)->fetchColumn());
+    } catch (Throwable $e) {
+        return $gelesen;
+    }
+}
+
 // $stamm und $mandantId kommen fuer die Supportantwort dazu (ENT-685).
 // OPTIONAL und nicht Pflicht: Der Feed ist der Herzschlag der Uebersicht --
 // er darf nicht davon abhaengen, dass die Betreiber-Ebene erreichbar ist.
@@ -90,15 +107,21 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
 {
     $fehler = [];
     $liste  = [];
+    $anzahl = 0;   // alle offenen, nicht nur die gelesenen (ereignis_zaehlen)
 
     // ── Rapport eingegangen. Der Hauptfall: Der Mitarbeitende hat gemeldet,
     // die Verwaltung muss es ansehen.
-    foreach (ereignis_lesen($pdo,
+    $zeilen = ereignis_lesen($pdo,
         "SELECT r.id, r.datum, r.kunde, r.ort, r.einsatzart, r.netto_h, r.erfasst_am,
                 m.id AS mitarbeiter_id, m.name, m.vorname, m.nachname
            FROM rapporte r JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
           WHERE r.gesehen_am IS NULL
-          ORDER BY r.erfasst_am DESC, r.id DESC LIMIT 20", $fehler, 'rapport') as $r) {
+          ORDER BY r.erfasst_am DESC, r.id DESC LIMIT 20", $fehler, 'rapport');
+    $anzahl += ereignis_zaehlen($pdo,
+        "SELECT COUNT(*)
+           FROM rapporte r JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
+          WHERE r.gesehen_am IS NULL", count($zeilen));
+    foreach ($zeilen as $r) {
         $liste[] = [
             'typ' => 'rapport', 'id' => (int)$r['id'], 'zeit' => $r['erfasst_am'],
             'person' => ['id' => (int)$r['mitarbeiter_id'], 'name' => $r['name'],
@@ -111,12 +134,17 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
 
     // ── Sperrtag gemeldet. Nur kuenftige oder heutige Tage: eine Sperre fuer
     // gestern ist kein Ereignis mehr, das jemanden zum Handeln bringt.
-    foreach (ereignis_lesen($pdo,
+    $zeilen = ereignis_lesen($pdo,
         "SELECT v.id, v.datum, v.bemerkung, v.erfasst_am,
                 m.id AS mitarbeiter_id, m.name, m.vorname, m.nachname
            FROM verfuegbarkeiten v JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
           WHERE v.datum >= CURDATE() AND v.gesehen_am IS NULL
-          ORDER BY v.erfasst_am DESC LIMIT 20", $fehler, 'sperrtag') as $v) {
+          ORDER BY v.erfasst_am DESC LIMIT 20", $fehler, 'sperrtag');
+    $anzahl += ereignis_zaehlen($pdo,
+        "SELECT COUNT(*)
+           FROM verfuegbarkeiten v JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
+          WHERE v.datum >= CURDATE() AND v.gesehen_am IS NULL", count($zeilen));
+    foreach ($zeilen as $v) {
         $liste[] = [
             'typ' => 'sperrtag', 'id' => (int)$v['id'], 'zeit' => $v['erfasst_am'],
             'person' => ['id' => (int)$v['mitarbeiter_id'], 'name' => $v['name'],
@@ -127,7 +155,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
     }
 
     // ── Zusage oder Absage zu einer Schicht.
-    foreach (ereignis_lesen($pdo,
+    $zeilen = ereignis_lesen($pdo,
         "SELECT z.einsatz_id, z.mitarbeiter_id, z.zusage, z.zugeteilt_am,
                 e.datum, e.von, e.bis, e.kunde_name, e.titel AS einsatz_titel, e.ort,
                 m.name, m.vorname, m.nachname
@@ -135,7 +163,14 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
            JOIN einsaetze e   ON e.id = z.einsatz_id
            JOIN mitarbeiter m ON m.id = z.mitarbeiter_id
           WHERE z.zusage <> 'offen' AND z.zusage_gesehen_am IS NULL
-          ORDER BY z.zugeteilt_am DESC LIMIT 20", $fehler, 'zusage') as $z) {
+          ORDER BY z.zugeteilt_am DESC LIMIT 20", $fehler, 'zusage');
+    $anzahl += ereignis_zaehlen($pdo,
+        "SELECT COUNT(*)
+           FROM einsatz_zuteilung z
+           JOIN einsaetze e   ON e.id = z.einsatz_id
+           JOIN mitarbeiter m ON m.id = z.mitarbeiter_id
+          WHERE z.zusage <> 'offen' AND z.zusage_gesehen_am IS NULL", count($zeilen));
+    foreach ($zeilen as $z) {
         $liste[] = [
             'typ' => 'zusage', 'id' => (int)$z['einsatz_id'],
             'mitarbeiter_id' => (int)$z['mitarbeiter_id'], 'zeit' => $z['zugeteilt_am'],
@@ -155,12 +190,17 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
     // ── Kunde hat im Portal ueber eine Offerte entschieden (ENT-192). Ohne
     // Rueckruf vom Portal ins Dashboard war das bislang leicht zu uebersehen
     // (ENT-197) -- derselbe Grund, aus dem der Rapport-Fall oben existiert.
-    foreach (ereignis_lesen($pdo,
+    $zeilen = ereignis_lesen($pdo,
         "SELECT b.id, b.nummer, b.status, b.entscheidung_am,
                 k.name AS kunde_name
            FROM belege b LEFT JOIN kunden k ON k.id = b.kunde_id
           WHERE b.entscheidung_am IS NOT NULL AND b.entscheidung_gesehen_am IS NULL
-          ORDER BY b.entscheidung_am DESC LIMIT 20", $fehler, 'offerte') as $o) {
+          ORDER BY b.entscheidung_am DESC LIMIT 20", $fehler, 'offerte');
+    $anzahl += ereignis_zaehlen($pdo,
+        "SELECT COUNT(*)
+           FROM belege b LEFT JOIN kunden k ON k.id = b.kunde_id
+          WHERE b.entscheidung_am IS NOT NULL AND b.entscheidung_gesehen_am IS NULL", count($zeilen));
+    foreach ($zeilen as $o) {
         $liste[] = [
             'typ' => 'offerte', 'id' => (int)$o['id'], 'zeit' => $o['entscheidung_am'],
             'titel' => $o['status'] === 'abgelehnt' ? 'Offerte abgelehnt' : 'Offerte angenommen',
@@ -171,12 +211,17 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
     // ── Abwesenheitsantrag wartet auf Entscheidung (ENT-255). Nicht
     // abhakbar wie die Faelle oben (siehe EREIGNIS_ARTEN) -- verschwindet
     // erst, wenn abwesenheit_entscheiden.php tatsaechlich entschieden hat.
-    foreach (ereignis_lesen($pdo,
+    $zeilen = ereignis_lesen($pdo,
         "SELECT a.id, a.typ, a.von, a.bis, a.bemerkung, a.beantragt_am,
                 m.id AS mitarbeiter_id, m.name, m.vorname, m.nachname
            FROM abwesenheiten a JOIN mitarbeiter m ON m.id = a.mitarbeiter_id
           WHERE a.status = 'beantragt' AND a.gesehen_am IS NULL
-          ORDER BY a.beantragt_am DESC LIMIT 20", $fehler, 'abwesenheit') as $a) {
+          ORDER BY a.beantragt_am DESC LIMIT 20", $fehler, 'abwesenheit');
+    $anzahl += ereignis_zaehlen($pdo,
+        "SELECT COUNT(*)
+           FROM abwesenheiten a JOIN mitarbeiter m ON m.id = a.mitarbeiter_id
+          WHERE a.status = 'beantragt' AND a.gesehen_am IS NULL", count($zeilen));
+    foreach ($zeilen as $a) {
         $liste[] = [
             'typ' => 'abwesenheit', 'id' => (int)$a['id'], 'zeit' => $a['beantragt_am'],
             'person' => ['id' => (int)$a['mitarbeiter_id'], 'name' => $a['name'],
@@ -192,7 +237,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
     // Wahl einer Person in der App entstanden ist. Immer ein Ereignis,
     // unabhaengig davon, ob dabei ein Ausnahme-Grund noetig war (ausdrueckliche
     // Vorgabe Projektinhaber: "alle spontanen", nicht nur die Grenzfaelle).
-    foreach (ereignis_lesen($pdo,
+    $zeilen = ereignis_lesen($pdo,
         "SELECT r.id, r.ausnahme_grund, r.vorbereitet_am,
                 e.datum, e.von, e.bis, e.kunde_name, e.titel AS einsatz_titel, e.ort,
                 m.id AS mitarbeiter_id, m.name, m.vorname, m.nachname
@@ -200,7 +245,14 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
            JOIN einsaetze e   ON e.id = r.einsatz_id
            JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
           WHERE e.spontan_erzeugt = 1 AND r.gesehen_am IS NULL
-          ORDER BY r.vorbereitet_am DESC LIMIT 20", $fehler, 'rundgang_spontan') as $r) {
+          ORDER BY r.vorbereitet_am DESC LIMIT 20", $fehler, 'rundgang_spontan');
+    $anzahl += ereignis_zaehlen($pdo,
+        "SELECT COUNT(*)
+           FROM rundgang r
+           JOIN einsaetze e   ON e.id = r.einsatz_id
+           JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
+          WHERE e.spontan_erzeugt = 1 AND r.gesehen_am IS NULL", count($zeilen));
+    foreach ($zeilen as $r) {
         $liste[] = [
             'typ' => 'rundgang_spontan', 'id' => (int)$r['id'], 'zeit' => $r['vorbereitet_am'],
             'person' => ['id' => (int)$r['mitarbeiter_id'], 'name' => $r['name'],
@@ -224,7 +276,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
     // isoliert gegen SQLite). ereignis_lesen() faengt eine fehlende Tabelle
     // ohnehin ab und meldet die Art als unvollstaendig -- genau derselbe
     // Weg wie bei allen anderen Bloecken hier.
-    foreach (ereignis_lesen($pdo,
+    $zeilen = ereignis_lesen($pdo,
         "SELECT v.id, v.erfasst_am, v.vorfall_am, v.bemerkung, v.foto_mime,
                 v.objekt_id, o.name AS objekt_name, o.kunde_name,
                 a.bezeichnung AS art,
@@ -234,7 +286,15 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
            JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
            LEFT JOIN ereignisart a ON a.id = v.ereignisart_id
           WHERE v.gesehen_am IS NULL
-          ORDER BY v.erfasst_am DESC LIMIT 20", $fehler, 'vorfall') as $r) {
+          ORDER BY v.erfasst_am DESC LIMIT 20", $fehler, 'vorfall');
+    $anzahl += ereignis_zaehlen($pdo,
+        "SELECT COUNT(*)
+           FROM ereignis_meldung v
+           JOIN objekte o     ON o.id = v.objekt_id
+           JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
+           LEFT JOIN ereignisart a ON a.id = v.ereignisart_id
+          WHERE v.gesehen_am IS NULL", count($zeilen));
+    foreach ($zeilen as $r) {
         $liste[] = [
             'typ' => 'vorfall', 'id' => (int)$r['id'], 'zeit' => $r['erfasst_am'],
             'person' => ['id' => (int)$r['mitarbeiter_id'], 'name' => $r['name'],
@@ -264,7 +324,9 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
     // Anmelden macht.
     if ($stamm !== null) {
         try {
-            foreach (sv_kunde_ungelesen($stamm, $mandantId) as $v) {
+            $zeilen = sv_kunde_ungelesen($stamm, $mandantId);
+            $anzahl += count($zeilen);
+            foreach ($zeilen as $v) {
                 $liste[] = [
                     'typ'   => 'support_antwort',
                     'id'    => (int)$v['id'],
@@ -291,7 +353,9 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
     // Neueste zuerst. Ein leerer Zeitstempel sortiert nach hinten statt eine
     // Ausnahme zu werfen.
     usort($liste, fn($a, $b) => strcmp((string)($b['zeit'] ?? ''), (string)($a['zeit'] ?? '')));
-    $gesamt = count($liste);
+    // Die echte Zahl, nicht die Laenge der je Art abgeschnittenen Liste
+    // (siehe ereignis_zaehlen).
+    $gesamt = max($anzahl, count($liste));
 
     return [
         'ereignisse' => array_slice($liste, 0, $grenze),

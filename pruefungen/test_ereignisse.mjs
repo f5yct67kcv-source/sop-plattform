@@ -587,6 +587,94 @@ try {
   await p.close();
 } catch (e) { bad.push('Glocke leer: ' + String(e).split('\n')[0].slice(0, 120)); }
 
+// ══════════ DIE GLOCKE: ZAHL UND LISTE SAGEN DASSELBE (14.10.2026)
+// Gemeldet: An der Glocke stand 8, darunter "Nichts Neues"; nach dem Neuladen
+// wieder 20. Die Liste zeigt nur die neuesten -- wer sie leer abhakt, waehrend
+// auf dem Server noch mehr offen ist, muss die naechsten bekommen, nicht eine
+// Zahl ueber einer leeren Liste. Und ein Haken, den der Server ablehnt,
+// darf nicht wie ein gelungener aussehen.
+async function glockenSeite(antworten, erledigtStatus = 200) {
+  let abruf = 0;
+  const p = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  p.setDefaultTimeout(5000);
+  p.on('pageerror', e => bad.push('JS-Fehler (Glocke): ' + e.message));
+  await p.route('**/api/**', r => {
+    const pf = r.request().url().split('/api/')[1].split('?')[0];
+    const send = (b, st = 200) => r.fulfill({ status: st, contentType: 'application/json', body: JSON.stringify(b) });
+    if (pf.includes('login')) return send({ status: 'ok', token: 't', name: 'adrian', ist_admin: true });
+    if (pf.includes('ereignis_erledigt')) {
+      return erledigtStatus === 200 ? send({ status: 'ok' }) : send({ status: 'error', message: 'x' }, erledigtStatus);
+    }
+    if (pf.includes('dashboard_stats')) {
+      const a = antworten[Math.min(abruf++, antworten.length - 1)];
+      return send({ status: 'ok', kpi: {}, verlauf: [], angemeldet: [], pro_mitarbeiter: [],
+        letzte_rapporte: [], ereignisse_unvollstaendig: [], ...a });
+    }
+    return send({ status: 'ok', rapporte: [], objekte: [], masterschichten: [], einsaetze: [],
+      kunden: [], mitarbeiter: [], orte: [], feiertage: [], gepflegt: {} });
+  });
+  await p.goto(URL);
+  await p.evaluate(() => localStorage.removeItem('rv3_dash_layout'));
+  await p.fill('#gName', 'adrian'); await p.fill('#gPass', 'x'); await p.click('#gBtn');
+  await p.waitForSelector('#shell.on'); await p.waitForTimeout(700);
+  return p;
+}
+const glockeStand = p => p.evaluate(() => {
+  const b = document.getElementById('glockeBadge');
+  return { zahl: b.style.display === 'none' ? 0 : Number(b.textContent),
+           zeilen: document.querySelectorAll('#glockeListe .glocke-row').length,
+           text: document.getElementById('glockeListe').textContent.replace(/\s+/g, ' ').trim() };
+});
+try {
+  const NACHSCHUB = [
+    { typ: 'rapport', id: 8, zeit: vorMin(300),
+      person: { id: 5, name: 'beat', vorname: 'Beat', nachname: 'Beispiel' },
+      titel: 'Rapport eingegangen', datum: GESTERN, kunde: 'Beispiel AG' },
+    { typ: 'vorfall', id: 3, zeit: vorMin(400),
+      person: { id: 5, name: 'beat', vorname: 'Beat', nachname: 'Beispiel' },
+      titel: 'Ereignis gemeldet', art: 'Brandgefahr', objekt: 'Lager Beispiel' },
+  ];
+  const p = await glockenSeite([
+    { ereignisse: EREIGNISSE, ereignisse_gesamt: 5, ereignisse_gekuerzt: true },
+    { ereignisse: NACHSCHUB, ereignisse_gesamt: 2, ereignisse_gekuerzt: false },
+  ]);
+  const vorher = await glockeStand(p);
+  check('Glocke: die Zahl ist die Gesamtzahl vom Server, nicht nur die sichtbaren Zeilen',
+    vorher.zahl === 5 && vorher.zeilen === 3);
+  await p.click('#btnGlocke');
+  for (let k = 0; k < 3; k++) {
+    await p.click('#glockeListe .glocke-row .rank-erledigt');
+    await p.waitForTimeout(150);
+  }
+  await p.waitForTimeout(500);
+  const nachher = await glockeStand(p);
+  check('KRITISCH: Glocke leer abgehakt, Server hat noch mehr -- die naechsten erscheinen',
+    nachher.zeilen === 2 && nachher.zahl === 2);
+  check('KRITISCH: nie eine Zahl am Abzeichen ueber "Nichts Neues"',
+    !(nachher.zahl > 0 && /Nichts Neues/.test(nachher.text)));
+  check('Eine Vorfallmeldung laesst sich in der Glocke abhaken (der Server erlaubt es seit ENT-297)',
+    await p.evaluate(() => [...document.querySelectorAll('#glockeListe .glocke-row')]
+      .some(r => /Brandgefahr/.test(r.textContent) && r.querySelector('.rank-erledigt'))));
+  for (let k = 0; k < 2; k++) {
+    await p.click('#glockeListe .glocke-row .rank-erledigt');
+    await p.waitForTimeout(150);
+  }
+  await p.waitForTimeout(300);
+  const leer = await glockeStand(p);
+  check('Alles abgehakt: kein Abzeichen und "Nichts Neues"', leer.zahl === 0 && /Nichts Neues/.test(leer.text));
+  await p.close();
+
+  // Der Server lehnt den Haken ab: Die Zeile kommt zurueck, sofort.
+  const q = await glockenSeite([{ ereignisse: EREIGNISSE, ereignisse_gesamt: 3 }], 403);
+  await q.click('#btnGlocke');
+  await q.click('#glockeListe .glocke-row .rank-erledigt');
+  await q.waitForTimeout(600);
+  const zurueck = await glockeStand(q);
+  check('KRITISCH: ein abgelehnter Haken sieht nicht aus wie ein gelungener -- die Zeile ist wieder da',
+    zurueck.zeilen === 3 && zurueck.zahl === 3);
+  await q.close();
+} catch (e) { bad.push('Glocke Zahl/Liste: ' + String(e).split('\n')[0].slice(0, 160)); }
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }

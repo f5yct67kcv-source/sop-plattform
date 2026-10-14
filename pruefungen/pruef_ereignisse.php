@@ -117,5 +117,39 @@ pruef('Die Zeile traegt Person, Kunde, Zeiten und Ausnahme-Grund aus der echten 
     && $treffer[0]['kunde'] === 'Muster AG' && $treffer[0]['von'] === '08:15:00'
     && $treffer[0]['ausnahme_grund'] === 'planer_freigabe');
 
+// ══════════════ DIE ZAHL AN DER GLOCKE IST DIE ECHTE
+// Bis zum 14.10.2026 war "gesamt" die Laenge der Liste, und die ist je Art
+// bei 20 abgeschnitten. Bei 30 offenen Rapporten stand an der Glocke 20;
+// jeder Haken holte den naechsten nach, nach dem Neuladen stand wieder 20
+// da -- als bliebe das Abhaken nicht haengen. Zwei Arten, damit die
+// Summierung ueber die Arten mitgeprueft ist und nicht nur eine Zaehlung.
+$pdo3 = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                                                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+$pdo3->exec('CREATE TABLE mitarbeiter (id INTEGER PRIMARY KEY, name TEXT, vorname TEXT, nachname TEXT)');
+$pdo3->exec('CREATE TABLE rapporte (id INTEGER PRIMARY KEY, mitarbeiter_id INTEGER, datum TEXT,
+    kunde TEXT, ort TEXT, einsatzart TEXT, netto_h REAL, erfasst_am TEXT, gesehen_am TEXT)');
+$pdo3->exec('CREATE TABLE belege (id INTEGER PRIMARY KEY, nummer TEXT, kunde_id INTEGER,
+    status TEXT, entscheidung_am TEXT, entscheidung_gesehen_am TEXT)');
+$pdo3->exec('CREATE TABLE kunden (id INTEGER PRIMARY KEY, name TEXT)');
+$pdo3->exec("INSERT INTO mitarbeiter (id, name, vorname, nachname) VALUES (1, 'anna', 'Anna', 'Muster')");
+for ($i = 1; $i <= 35; $i++) {
+    // 30 offen, 5 schon gesehen -- die gesehenen duerfen nicht mitzaehlen.
+    $gesehen = $i > 30 ? "'2026-09-02 08:00:00'" : 'NULL';
+    $pdo3->exec("INSERT INTO rapporte (id, mitarbeiter_id, datum, kunde, erfasst_am, gesehen_am)
+                 VALUES ($i, 1, '2026-09-01', 'Muster AG', '2026-09-01 " . sprintf('%02d', $i % 24) . ":00:00', $gesehen)");
+}
+for ($i = 1; $i <= 3; $i++) {
+    $pdo3->exec("INSERT INTO belege (id, nummer, status, entscheidung_am)
+                 VALUES ($i, 'OF-$i', 'bestaetigt', '2026-09-01 12:00:00')");
+}
+$e3 = ereignisse_sammeln($pdo3);
+pruef('KRITISCH: gesamt zaehlt ALLE offenen (30 Rapporte + 3 Offerten), nicht die bei 20 abgeschnittene Liste',
+    $e3['gesamt'] === 33);
+pruef('Die Liste selbst bleibt auf die Grenze gekuerzt und sagt das',
+    count($e3['ereignisse']) === 12 && $e3['gekuerzt'] === true);
+$pdo3->exec("UPDATE rapporte SET gesehen_am = '2026-09-03 08:00:00' WHERE id = 1");
+pruef('KRITISCH: ein Haken senkt die Zahl wirklich -- 32, nicht wieder dieselbe',
+    ereignisse_sammeln($pdo3)['gesamt'] === 32);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }

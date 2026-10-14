@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 24,
+            'datum' => '2026-10-14',
+            'art'   => 'fehlerbehebung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Glocke: Zahl und Liste stimmen wieder überein',
+            'text'  => 'Die Zahl an der Glocke zeigt jetzt, wie viele Ereignisse wirklich offen sind. Bisher blieb sie bei 20 stehen, auch wenn mehr offen waren, und nach dem Abhaken stand dieselbe Zahl wieder da. Hast du alle sichtbaren Einträge abgehakt und es sind noch weitere offen, erscheinen die nächsten gleich in der Liste, statt dass eine Zahl über „Nichts Neues“ steht. Gemeldete Vorfälle lassen sich jetzt auch in der Glocke abhaken. Klappt ein Haken nicht, kommt der Eintrag sofort zurück.',
+        ],
+        [
             'nr'    => 23,
             'datum' => '2026-10-13',
             'art'   => 'neu',
