@@ -2444,6 +2444,42 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
     !/FilesMatch[^>]*php/i.test(regeln));
 }
 
+// ── Sitemap fuer guardops.ch ───────────────────────────────────────────
+// Die Sitemap nennt genau die Seiten, die (1) ins guardops-Buendel kopiert
+// werden, (2) nicht auf noindex stehen und (3) eine kanonische Adresse auf
+// guardops.ch tragen. Abgeleitet aus dem Workflow und den Dateien, nicht
+// aus einer zweiten Liste -- eine neue Rechtsseite ohne Sitemap-Eintrag
+// schlaegt hier an, eine geloeschte mit Eintrag ebenso.
+{
+  const karte = existsSync(`${WURZEL}/sitemap-guardops.xml`) ? readFileSync(`${WURZEL}/sitemap-guardops.xml`, 'utf8') : '';
+  const genannt = new Set([...karte.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1]));
+  const sollte = new Set();
+  for (const m of workflow.matchAll(/^\s*cp\s+(\S+\.html)\s+dist-guardops\/(\S+\.html)\s*$/gm)) {
+    const quelle = `${WURZEL}/${m[1]}`;
+    if (!existsSync(quelle)) { continue; }
+    const html = readFileSync(quelle, 'utf8');
+    if (/<meta name="robots" content="[^"]*noindex/i.test(html)) { continue; }
+    const kan = html.match(/<link rel="canonical" href="(https:\/\/guardops\.ch\/[^"]*)"/);
+    if (kan) { sollte.add(kan[1]); }
+  }
+  const fehlt = [...sollte].filter(u => !genannt.has(u));
+  const zuviel = [...genannt].filter(u => !sollte.has(u));
+  check('KRITISCH: die Sitemap nennt jede indexierbare Seite von guardops.ch', sollte.size > 0 && fehlt.length === 0);
+  if (fehlt.length) { bad.push('fehlt in der Sitemap: ' + fehlt.join(', ')); }
+  check('KRITISCH: die Sitemap nennt keine Seite, die nicht ausgeliefert oder auf noindex ist', zuviel.length === 0);
+  if (zuviel.length) { bad.push('zu viel in der Sitemap: ' + zuviel.join(', ')); }
+  // Gueltiges XML: "--" in einem Kommentar macht die Datei unlesbar, und
+  // Google verwirft sie dann ganz (so beim ersten Entwurf passiert).
+  const kommentare = [...karte.matchAll(/<!--([\s\S]*?)-->/g)].map(m => m[1]);
+  check('KRITISCH: die Sitemap ist wohlgeformt (XML-Kopf, urlset, kein "--" in Kommentaren)',
+    /^<\?xml version="1\.0" encoding="UTF-8"\?>/.test(karte) && /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">[\s\S]*<\/urlset>\s*$/.test(karte)
+    && kommentare.every(k => !k.includes('--')));
+  check('Die Sitemap wird als sitemap.xml ins guardops-Buendel kopiert',
+    /cp\s+sitemap-guardops\.xml\s+dist-guardops\/sitemap\.xml/.test(workflow));
+  check('robots.txt von guardops.ch verweist auf die Sitemap',
+    /^Sitemap:\s*https:\/\/guardops\.ch\/sitemap\.xml\s*$/m.test(readFileSync(`${WURZEL}/robots-guardops.txt`, 'utf8')));
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

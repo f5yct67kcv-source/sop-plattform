@@ -1115,6 +1115,7 @@ jobs:
           cp htaccess-guardops           dist-guardops/.htaccess
           cat htaccess-leistung >>       dist-guardops/.htaccess
           cp robots-guardops.txt         dist-guardops/robots.txt
+          cp sitemap-guardops.xml        dist-guardops/sitemap.xml
 
           # HIER STEHEN ABSICHTLICH KEINE DATENBANK-ZUGANGSDATEN. db.php wird
           # frisch aus backend/ kopiert und bekommt NUR APP_ENV -- die

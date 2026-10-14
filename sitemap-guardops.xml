@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Sitemap fuer guardops.ch, im Deploy als sitemap.xml ausgeliefert.
+     Enthaelt genau die Seiten, die im Buendel liegen, index,follow tragen
+     und eine kanonische Adresse haben. test_deploy.mjs haelt das gegen
+     die Dateien. Absichtlich ohne lastmod: Ein Datum, das niemand pflegt,
+     ist schlechter als keines. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://guardops.ch/</loc></url>
+  <url><loc>https://guardops.ch/impressum.html</loc></url>
+  <url><loc>https://guardops.ch/datenschutz.html</loc></url>
+  <url><loc>https://guardops.ch/nutzungsbedingungen.html</loc></url>
+  <url><loc>https://guardops.ch/datenschutz-demo.html</loc></url>
+  <url><loc>https://guardops.ch/datenschutz-demo-platz.html</loc></url>
+</urlset>

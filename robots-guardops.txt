@@ -3,8 +3,9 @@
 # Sie SOLL gefunden werden: Genau umgekehrt zur Testinstanz, deren eigene
 # robots.txt alles aussperrt (ENT-387).
 #
-# Kein Sitemap-Eintrag: Es gibt eine einzige Seite, dafuer braucht es keine
-# Sitemap. Sobald eine zweite dazukommt (Impressum, Datenschutz), gehoert
-# hier eine Zeile "Sitemap: https://guardops.ch/sitemap.xml" hin.
+# Seit es Impressum, Datenschutz und Nutzungsbedingungen gibt, mit Sitemap
+# (sitemap-guardops.xml, im Deploy als sitemap.xml ausgeliefert).
 User-agent: *
 Disallow:
+
+Sitemap: https://guardops.ch/sitemap.xml
