@@ -12,8 +12,8 @@ require __DIR__ . '/../backend/qrrechnung.php';
 // Browser gescannter Code wird so tatsaechlich einmal durchlaufen, nicht nur
 // mit einer selbst ausgedachten Testzeichenkette.
 if (in_array('--json', $argv ?? [], true)) {
-    $betrieb = ['firma' => 'Cupi 24 GmbH', 'qr_iban' => 'CH44 3199 9123 0008 8901 2',
-        'qr_strasse' => 'Baslerstrasse', 'qr_hausnummer' => '67', 'qr_plz' => '4632', 'qr_ort' => 'Trimbach'];
+    $betrieb = ['firma' => 'Muster Sicherheit GmbH', 'qr_iban' => 'CH44 3199 9123 0008 8901 2',
+        'qr_strasse' => 'Musterweg', 'qr_hausnummer' => '1', 'qr_plz' => '4600', 'qr_ort' => 'Olten'];
     $debitor = ['name' => 'abc consulting gmbh', 'strasse' => 'Hochgasse', 'hausnummer' => '7',
         'plz' => '4632', 'ort' => 'Trimbach'];
     echo json_encode(['spc' => qr_spc_payload($betrieb, 48.65, 'RE0962', $debitor)], JSON_UNESCAPED_UNICODE), "\n";
@@ -71,8 +71,8 @@ check('Verschiedene Rechnungsnummern ergeben verschiedene Referenzen',
     qrr_referenz('RE0951') !== $refA);
 
 // ── SPC-Zahlungsteil ──────────────────────────────────────────────────────
-$betrieb = ['firma' => 'Cupi 24 GmbH', 'qr_iban' => 'CH44 3199 9123 0008 8901 2',
-    'qr_strasse' => 'Baslerstrasse', 'qr_hausnummer' => '67', 'qr_plz' => '4632', 'qr_ort' => 'Trimbach'];
+$betrieb = ['firma' => 'Muster Sicherheit GmbH', 'qr_iban' => 'CH44 3199 9123 0008 8901 2',
+    'qr_strasse' => 'Musterweg', 'qr_hausnummer' => '1', 'qr_plz' => '4600', 'qr_ort' => 'Olten'];
 $zeilen = qr_spc_zeilen($betrieb, 48.65, 'RE0962', null);
 
 check('KRITISCH: der SPC-Zahlungsteil hat genau 31 Zeilen (SIX-Vorgabe)', count($zeilen) === 31);

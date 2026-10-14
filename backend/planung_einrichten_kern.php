@@ -3402,44 +3402,16 @@ if (hat_spalte($pdo, 'kunden', 'kundennummer')) {
     }
 }
 
-// ── 2b2. Die beiden Anstellungsorte einmalig hinterlegen (ENT-055).
-// Auf ausdrueckliche Bitte des Projektinhabers, damit er sie nicht von Hand
-// erfassen muss. Laeuft NUR, wenn die Tabelle leer ist -- wer die Orte
-// spaeter ueber die Oberflaeche aendert, bekommt sie nicht wieder
-// ueberschrieben.
-//
-// Die 18.0 km sind gemessen, nicht geschaetzt (OP-44 erledigt): kuerzeste
-// effektive Wegstrecke Trimbach -> Gelterkinden gemaess Google Maps, wie es
-// Art. 18 Ziff. 2 GAV verlangt. Google bietet auf dieser Strecke auch 19.2
-// und 20.4 km an; massgebend ist die kuerzeste, nicht die schnellste.
-// Unter 40 km, also gilt Art. 18 Ziff. 3.2.
-//
-// Betriebsdaten im Code sind an sich unschoen. Hier vertretbar, weil das
-// Werkzeug rein intern eingesetzt wird (ENT-008) und die Adressen auf
-// cupi24.ch oeffentlich stehen. Wuerde daraus je ein Produkt fuer Dritte,
-// muss dieser Block als Erstes verschwinden.
-//
-// Die 19 km stammen aus der Angabe des Projektinhabers, nicht aus einer
-// eigenen Messung. Sie entscheiden nach Art. 18: unter 40 km ist im
-// Nebenanstellungsgebiet nichts geschuldet (Ziff. 3.2.5).
-if (hat_tabelle_jetzt($pdo, 'anstellungsorte')) {
-    $anzahl = (int)$pdo->query('SELECT COUNT(*) FROM anstellungsorte')->fetchColumn();
-    if ($anzahl === 0) {
-        if ($nurPruefen) {
-            $getan[] = 'Anstellungsorte Trimbach (HAO) und Gelterkinden (NAO) hinterlegen';
-        } else {
-            $ins = $pdo->prepare(
-                'INSERT INTO anstellungsorte (bezeichnung, rolle, strasse, plz, ort, km_zum_anderen, aktiv, bemerkung)
-                 VALUES (?, ?, ?, ?, ?, ?, 1, ?)'
-            );
-            $ins->execute(['Hauptsitz Trimbach', 'hao', 'Baslerstrasse 67', '4632', 'Trimbach', 18.0,
-                'Hauptanstellungsort nach Art. 18 Ziff. 2 GAV (ENT-055). Von hier wird gemessen.']);
-            $ins->execute(['Standort Gelterkinden', 'nao', 'Rünenbergerstrasse 44', '4460', 'Gelterkinden', 18.0,
-                'Nebenanstellungsort nach Art. 18 Ziff. 2 GAV (ENT-055). Erzeugt das Nebenanstellungsgebiet.']);
-            $getan[] = 'Anstellungsorte Trimbach (HAO) und Gelterkinden (NAO) hinterlegt, 18.0 km auseinander';
-        }
-    }
-}
+// ── 2b2. (entfallen) Die beiden Anstellungsorte von CUPI 24 wurden hier
+// einmalig hinterlegt (ENT-055), auf Bitte des Projektinhabers, solange
+// das Werkzeug rein intern lief (ENT-008). Der Block trug selbst den
+// Vermerk, dass er als Erstes verschwinden muss, sobald daraus ein Produkt
+// fuer Dritte wird. Das ist seit ENT-568 so: Er haette die Adressen der
+// Mandantin in jede neue Mandanten-Datenbank geschrieben, deren Tabelle
+// noch leer ist. Bei CUPI 24 selbst stehen die Orte laengst in der
+// Datenbank und bleiben dort. Neue Mandanten erfassen ihre Orte unter
+// Betrieb; die Oberflaeche sagt bis dahin "Noch kein Anstellungsort
+// erfasst" und rechnet keine Zone.
 
 // ── 2b3. Dasselbe fuer Mitarbeitende (ENT-072). Bis hierher stand auch dort
 // die PLZ mit dem Ort zusammen in einem Feld. Getrennt wird nur, wo das

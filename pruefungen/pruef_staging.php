@@ -74,9 +74,9 @@ check('KRITISCH (Gegenprobe ENT-192): ein echter, konfigurierter Wert gilt NICHT
 // was im Secret konfiguriert ist. Mit frei gewaehlten Namen geprueft, nicht
 // nur mit dem einen Platzhalter-Zustand dieser Umgebung.
 check('KRITISCH: auf Produktion bleibt der konfigurierte Absendername unveraendert',
-    smtp_absender_name('Cupi 24 GmbH', true) === 'Cupi 24 GmbH');
+    smtp_absender_name('Muster Sicherheit GmbH', true) === 'Muster Sicherheit GmbH');
 check('KRITISCH (ENT-371 Bedingung 4): ausserhalb der Produktion traegt der Absender das Praefix [STAGING]',
-    smtp_absender_name('Cupi 24 GmbH', false) === '[STAGING] Cupi 24 GmbH');
+    smtp_absender_name('Muster Sicherheit GmbH', false) === '[STAGING] Muster Sicherheit GmbH');
 check('KRITISCH: ein leerer Absendername bleibt ausserhalb der Produktion trotzdem als Staging erkennbar',
     smtp_absender_name('', false) === '[STAGING]');
 

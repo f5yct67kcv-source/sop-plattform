@@ -34,7 +34,7 @@ const SCHICHTEN = { status: 'ok', von: tag(-1), bis: tag(90), schichten: [
     strasse: 'Dorfstrasse 1', ort: '5013 Musterdorf', einsatzart: 'Verkehrsdienst',
     datum: MORGEN, von: '07:30:00', bis: '16:30:00', status: 'provisorisch', bemerkung: null,
     zusage: 'zugesagt', objekt_name: null, im_team: 1 },
-  { id: 46, kunde_name: 'Cupi24 GmbH', titel: 'Bereits rapportiert',
+  { id: 46, kunde_name: 'Muster Sicherheit GmbH', titel: 'Bereits rapportiert',
     strasse: null, ort: '4632 Trimbach', einsatzart: 'Verkehrsdienst',
     datum: HEUTE, von: '08:00:00', bis: '10:00:00', status: 'abgeschlossen', bemerkung: null,
     zusage: 'zugesagt', objekt_name: null, im_team: 1 }]};

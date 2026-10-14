@@ -93,7 +93,7 @@ const sichtbareNamen = await page.evaluate(() => {
 check(`KRITISCH: der Anmeldename steht im Menü genau einmal (gefunden: ${sichtbareNamen.length})`,
   sichtbareNamen.length === 1);
 check('Und der volle Name steht darüber',
-  (await page.textContent('.pr-kopf-name') || '').trim() === 'Dario von Arb'
+  (await page.textContent('.pr-kopf-name') || '').trim() === 'Dario von Muster'
   || (await page.textContent('.pr-kopf-name') || '').trim() === 'Dario Beispiel');
 
 // ── Abmelden oben in der Karte

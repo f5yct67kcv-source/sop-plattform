@@ -4702,13 +4702,28 @@ function kZfMerker(k) {
    meint -- und sie haette praktische Folgen, weil der Server das
    Freischalten eines eingeladenen Kontos zurueckweist. */
 function kZustandMerker(k) {
-  if (k.eingeladen) { return '<span class="merker m-warn">eingeladen</span>'; }
+  /* Abgelaufen ist nicht offen: Ein toter Link, der "eingeladen" heisst,
+     sieht aus, als muesse man nur warten. */
+  if (k.eingeladen) {
+    return k.einladung_abgelaufen
+      ? '<span class="merker m-warn">Einladung abgelaufen</span>'
+      : '<span class="merker m-warn">eingeladen</span>';
+  }
   /* Archiviert setzt stillgelegt voraus und sagt zusaetzlich, dass das
      Konto aus der Liste genommen wurde -- beides steht da, weil das eine
      das andere nicht ersetzt (ENT-672). */
   if (k.archiviert) { return '<span class="merker m-ruhe">stillgelegt · archiviert</span>'; }
   return k.aktiv ? '<span class="merker m-pos">aktiv</span>'
                  : '<span class="merker m-ruhe">stillgelegt</span>';
+}
+/* Bis wann der Link gilt -- oder seit wann nicht mehr. Nur an einem
+   eingeladenen Konto; die Zeile erscheint sonst gar nicht. */
+function kEinladungZeile(k) {
+  if (!k.eingeladen) { return ''; }
+  const zeit = esc(String(k.einladung_bis || '').slice(0, 16).replace('T', ' '));
+  return kZeile('Einladungslink', zeit
+    ? (k.einladung_abgelaufen ? 'abgelaufen seit ' + zeit : 'gültig bis ' + zeit)
+    : '<span style="color:var(--ink-3)">Frist nicht abrufbar</span>');
 }
 /* "Noch nie angemeldet" ist etwas anderes als ein leeres Feld. */
 function kAnmeldung(k) {
@@ -4783,7 +4798,7 @@ function kdZeichnen() {
 
   $('kdName').textContent = k.name || '–';
   $('kdSub').textContent = [k.email,
-    k.eingeladen ? 'eingeladen, noch nicht eingelöst'
+    k.eingeladen ? (k.einladung_abgelaufen ? 'eingeladen, Link abgelaufen' : 'eingeladen, noch nicht eingelöst')
                  : (k.aktiv ? 'aktiv' : (k.archiviert ? 'stillgelegt, archiviert' : 'stillgelegt')),
     k.ich ? 'das bin ich' : ''].filter(Boolean).join(' · ');
 
@@ -4799,6 +4814,7 @@ function kdZeichnen() {
       <div class="card"><div class="card-hd"><h3>Zugang</h3></div>
         <div class="card-bd"><dl class="ku-detail-info">
           ${kZeile('Zustand',            kZustandMerker(k))}
+          ${kEinladungZeile(k)}
           ${kZeile('Zwei-Faktor',        kZfMerker(k))}
           ${kZeile('Angelegt',           strich(String(k.angelegt_am || '').slice(0, 10)))}
           ${kZeile('Zuletzt angemeldet', kAnmeldung(k))}
@@ -4816,10 +4832,15 @@ function kdZeichnen() {
    Zwei-Faktor zurücksetzen  nur an einem FREMDEN; das eigene erneuert man
      ueber die Einrichtung und weist sich dabei mit einem Code aus.
    Stilllegen  nie am letzten aktiven Konto -- danach kaeme niemand mehr
-     herein, und es gibt keine Ebene darueber, die wieder hereinliesse. */
+     herein, und es gibt keine Ebene darueber, die wieder hereinliesse.
+   Neu einladen  nur an einem Konto, dessen Einladung noch offen ist --
+     abgelaufen oder nicht. Der Server prueft das selbst. */
 function kdZugang(k) {
   const letztes = k.aktiv && kontenAktive <= 1;
   const tasten = [];
+  if (k.eingeladen && !k.archiviert) {
+    tasten.push(`<button type="button" class="btn btn-plain btn-sm" onclick="kNeuEinladen(${Number(k.id)})">Neu einladen</button>`);
+  }
   if (k.ich) {
     tasten.push('<button type="button" class="btn btn-plain btn-sm" onclick="pwOeffnen()">Passwort wechseln</button>');
   } else if (k.zwei_faktor === true) {
@@ -4827,7 +4848,10 @@ function kdZugang(k) {
   }
   if (k.aktiv && !letztes) {
     tasten.push(`<button type="button" class="btn btn-danger btn-sm" onclick="kontoSchalten(${Number(k.id)}, false)">Stilllegen</button>`);
-  } else if (!k.aktiv) {
+  } else if (!k.aktiv && !k.eingeladen) {
+    /* Ein eingeladenes Konto wird von selbst aktiv, sobald die Person ihr
+       Passwort setzt -- von Hand weist der Server es ab (409). Der Knopf
+       stuende neben "Neu einladen" und fuehrte nur zu dieser Meldung. */
     tasten.push(`<button type="button" class="btn btn-plain btn-sm" onclick="kontoSchalten(${Number(k.id)}, true)">Aktivieren</button>`);
   }
   /* Archivieren nur am stillgelegten Konto (ENT-672) -- die Sperre sitzt im
@@ -4844,13 +4868,17 @@ function kdZugang(k) {
       <div class="card-bd">
         <dl class="ku-detail-info">
           ${kZeile('Zustand',            kZustandMerker(k))}
+          ${kEinladungZeile(k)}
           ${kZeile('Zwei-Faktor',        kZfMerker(k))}
           ${kZeile('Zuletzt angemeldet', kAnmeldung(k))}
           ${kZeile('Angelegt',           strich(String(k.angelegt_am || '').slice(0, 10)))}
         </dl>
         ${letztes ? `<div class="of-hinweis" style="margin-top:12px">Das ist das letzte aktive Konto.
           Es lässt sich nicht stilllegen — ohne es käme niemand mehr in diesen Bereich.</div>` : ''}
-        ${k.ich ? '' : `<div class="of-hinweis" style="margin-top:12px">Das Passwort eines fremden Kontos
+        ${k.eingeladen ? `<div class="of-hinweis" style="margin-top:12px">Dieses Konto ist eingeladen und
+          hat noch kein Passwort. „Neu einladen“ schickt einen frischen Link an die hinterlegte Adresse;
+          ein früherer Link gilt danach nicht mehr.</div>` : ''}
+        ${k.ich || k.eingeladen ? '' : `<div class="of-hinweis" style="margin-top:12px">Das Passwort eines fremden Kontos
           lässt sich hier nicht setzen. Wer seines verloren hat, bekommt ein neues Konto und dieses
           wird stillgelegt.</div>`}
         ${k.archiviert ? `<div class="of-hinweis" style="margin-top:12px">Dieses Konto ist archiviert:
@@ -4859,6 +4887,26 @@ function kdZugang(k) {
         <div class="kk-tasten">${tasten.join('')}</div>
         <div class="meldung versteckt" id="kdMeldung" style="margin-top:12px"></div>
       </div></div>`;
+}
+
+/* Neu einladen. Die Adresse ist die hinterlegte -- wer eine andere will,
+   aendert sie unter "Bearbeiten" und laedt danach neu ein. Darum steht sie
+   in der Rueckfrage: Ein Tippfehler in der Adresse ist der haeufigste
+   Grund, warum eine Einladung nie ankam. */
+async function kNeuEinladen(id) {
+  const k = kFindet(id);
+  if (!k) { return; }
+  if (!confirm('Neue Einladung an ' + k.email + ' senden?\n\n'
+      + 'Der bisherige Link gilt danach nicht mehr.')) { return; }
+  const a = await ruf('betreiber_einladung_erneuern.php', { id: id });
+  if (a.status !== 'ok') {
+    melde($('kdMeldung') || $('haus-meldung'), 'fehler', a.message);
+    return;
+  }
+  kdVerlaufFuer = 0;
+  await ladeKonten();
+  kurzmeldung('Einladung an ' + k.email + ' verschickt. Der Link gilt '
+    + Number(a.gueltig_stunden) + ' Stunden.');
 }
 
 async function kontoArchiv(id, archiv) {
@@ -5449,7 +5497,7 @@ const K_BEREICH_NAMEN = {
    Beschriftung und faellt auf, wenn es stoert. */
 const K_FELD_NAMEN = {
   angelegt: 'Angelegt', zustand: 'Zustand', status: 'Status', passwort: 'Passwort',
-  eingeladen: 'Eingeladen', eingeloest: 'Einladung eingelöst', archiv: 'Archiv',
+  eingeladen: 'Eingeladen', neu_eingeladen: 'Neu eingeladen', eingeloest: 'Einladung eingelöst', archiv: 'Archiv',
   email: 'E-Mail', vorname: 'Vorname', nachname: 'Nachname', anrede: 'Anrede',
   bezahlt: 'Bezahlt', versendet: 'Versendet', import: 'Import', logo: 'Logo',
   zwei_faktor_eingerichtet: 'Zwei-Faktor eingerichtet',
@@ -5917,6 +5965,9 @@ const NUTZUNG_REITER = {
   betrieb:           'Betrieb',
   support:           'Support',
   pensen:            'Pensen',
+  finanzen:          'Finanzen · Übersicht',
+  rechnungen:        'Rechnungen',
+  lohnauslagen:      'Finanzen · Auslagenersatz',
   lohnlaeufe:        'Lohnläufe',
   lohnarten:         'Lohnarten',
   lohnsaetze:        'Sätze und Regelwerk',

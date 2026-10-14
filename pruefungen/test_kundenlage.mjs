@@ -1,6 +1,11 @@
 // Kunden-Uebersicht (ENT-555) -- das Geldbild und die Startseite des
 // Kundenbereichs am Desktop.
 //
+// SEIT ENT-712 ZWEIGETEILT: Die Rechnungsteile (offener Betrag, ueberfaellig,
+// Altersbaender, Mahnliste, bezahlt im Monat) stehen unter Finanzen ->
+// Uebersicht; bei Kunden bleibt die Offertenlage. Die Aussagen unten gelten
+// unveraendert -- sie werden nur dort geprueft, wo die Zahl jetzt steht.
+//
 // Vier Dinge haelt diese Suite scharf:
 //
 // 1. UNBEKANNT SIEHT NICHT WIE KEINE AUS. Eine unbezahlte Rechnung OHNE
@@ -149,6 +154,7 @@ async function seite(browser, { rechte = VOLLRECHTE, viewport = { width: 1500, h
       return send(art === 'rechnung' ? rechnungen : offerten);
     }
     if (url.includes('kunden_list')) return send(KU);
+    if (url.includes('finanzen_kosten')) return send({ status: 'ok', lohn: { zugriff: false }, auslagen: { zugriff: false } });
     if (url.includes('dashboard_stats')) return send(STATS);
     return send({ status: 'ok' });
   });
@@ -195,14 +201,25 @@ try {
 try {
   await page.click('#nav-kunden-lage');
   await page.waitForTimeout(500);
+  const ofKpi = await page.evaluate(() => [...document.querySelectorAll('#kuLageKpi .kpi')].map(k => ({
+    l: k.querySelector('.kpi-top span').textContent.trim(),
+    v: k.querySelector('.kpi-val').textContent.trim(),
+    f: k.querySelector('.kpi-foot').textContent.trim(),
+  })));
+  check('KRITISCH: bei Kunden stehen nur noch die zwei Offertenkacheln (ENT-712)', ofKpi.length === 2
+    && !ofKpi.some(k => /Rechnung|überfällig/.test(k.l)));
 
-  const kpi = await page.evaluate(() => [...document.querySelectorAll('#kuLageKpi .kpi')].map(k => ({
+  await page.evaluate(() => go('finanzen'));
+  await page.waitForTimeout(600);
+  const kpiFin = await page.evaluate(() => [...document.querySelectorAll('#finKpi .kpi')].map(k => ({
     l: k.querySelector('.kpi-top span').textContent.trim(),
     v: k.querySelector('.kpi-val').textContent.trim(),
     f: k.querySelector('.kpi-foot').textContent.trim(),
   })));
 
-  check('Vier Kennzahlen stehen oben', kpi.length === 4);
+  // Dieselbe Reihenfolge wie bisher: Rechnungen aus Finanzen, Offerten aus Kunden.
+  const kpi = [kpiFin[0], kpiFin[1], ofKpi[0], kpiFin[2]];
+  check('Vier Kennzahlen stehen oben (Finanzen)', kpiFin.length === 4);
   // 30000 + 50000 + 90000 + 110000 + 5*1000 = 285000 Rappen.
   check('KRITISCH: der offene Betrag ist CHF 2’850.00 (archivierte zaehlen nicht mit)',
     /CHF/.test(kpi[0].v) && /2['’]850\.00/.test(kpi[0].v));
@@ -214,22 +231,24 @@ try {
     !/2['’]550\.00/.test(kpi[1].v));
   check('Die ueberfaellige Kachel nennt Anzahl und Alter der aeltesten',
     /7 Rechnungen/.test(kpi[1].f) && /aelteste seit 90 Tagen/.test(kpi[1].f.replace(/ä/g, 'ae')));
+  check('KRITISCH: offene Betraege sagen "inkl. MWST" (ENT-712, Punkt 9)', /inkl\. MWST/.test(kpi[0].f));
   check('KRITISCH: die Kachel heisst "Davon überfällig" -- eine Teilmenge braucht ihren Bezug',
     kpi[1].l === 'Davon überfällig');
   // 40000 + 60000 + 80000 + 15000 = 195000. Entwurf, bestaetigt, archiviert draussen.
   check('KRITISCH: offene Offerten sind CHF 1’950.00 (Entwurf/bestaetigt/archiviert draussen)',
     /1['’]950\.00/.test(kpi[2].v));
-  check('Die Offertenkachel nennt Anzahl und wieviele bald ablaufen',
-    /4 Offerten/.test(kpi[2].f) && /2 laufen bald ab/.test(kpi[2].f));
+  check('Die Offertenkachel nennt die Anzahl', /4 Offerten/.test(kpi[2].f));
+  check('Die zweite Offertenkachel nennt, wieviele bald ablaufen, und die ohne Datum',
+    /2 Offerten in 30 Tagen oder abgelaufen/.test(ofKpi[1].f) && /1 ohne Gültigkeitsdatum/.test(ofKpi[1].f));
   check('KRITISCH: bezahlt im Monat ist CHF 200.00, der Vormonat CHF 100.00',
     /200\.00/.test(kpi[3].v) && /Vormonat CHF 100\.00/.test(kpi[3].f));
   check('KRITISCH: die bezahlte Rechnung OHNE Zahldatum wird genannt, nicht verschwiegen',
-    /1 ohne Zahldatum/.test(kpi[3].f));
+    /1 bezahlt ohne Zahldatum/.test(kpi[3].f));
 } catch (e) { bad.push('Kennzahlen: ' + String(e).split('\n')[0].slice(0, 160)); }
 
 // ══════════════════════════════════════════ 3. DAS ALTERSBILD
 try {
-  const baender = await page.evaluate(() => [...document.querySelectorAll('#kuLageAlter .bar')].map(b => ({
+  const baender = await page.evaluate(() => [...document.querySelectorAll('#finAlter .bar')].map(b => ({
     lbl: b.querySelector('.bar-lbl').textContent.trim(),
     val: b.querySelector('.bar-val').textContent.trim(),
     cls: b.querySelector('.bar-fill').className,
@@ -264,10 +283,10 @@ try {
   // Eigenspezifitaet wie ".bar-fill.neg" und koennte die Farbe beim
   // Ueberfahren stillschweigend ueberschreiben.
   const vorher = baender[3].bg;
-  await page.hover('#kuLageAlter .bar:nth-child(4)');
+  await page.hover('#finAlter .bar:nth-child(4)');
   await page.waitForTimeout(120);
   const nachher = await page.evaluate(() =>
-    getComputedStyle(document.querySelectorAll('#kuLageAlter .bar')[3].querySelector('.bar-fill')).backgroundColor);
+    getComputedStyle(document.querySelectorAll('#finAlter .bar')[3].querySelector('.bar-fill')).backgroundColor);
   check('KRITISCH: die Balkenfarbe ueberlebt das Ueberfahren (Spezifitaet der Hover-Regel)',
     nachher === vorher);
 
@@ -278,12 +297,12 @@ try {
     const r = rechnungen.find(x => Number(x.id) === 105);
     const alt = r.faellig_bis;
     r.faellig_bis = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
-    renderKundenLage();
-    const b = [...document.querySelectorAll('#kuLageAlter .bar')];
+    finAlterZeichnen();
+    const b = [...document.querySelectorAll('#finAlter .bar')];
     const erg = { ohne: b[4].querySelector('.bar-val').textContent.trim(),
                   offen: b[0].querySelector('.bar-val').textContent.trim() };
     r.faellig_bis = alt;
-    renderKundenLage();
+    finAlterZeichnen();
     return erg;
   });
   check('GEGENPROBE: mit Frist wandert der Betrag nach "noch nicht faellig" (1’400.00) und "Ohne Datum" wird leer',
@@ -293,8 +312,8 @@ try {
 // ══════════════════════════════════════════ 4. DIE BEIDEN LISTEN
 try {
   const mahn = await page.evaluate(() => ({
-    note: document.getElementById('kuLageMahnNote').textContent.trim(),
-    zeilen: [...document.querySelectorAll('#kuLageMahn tbody tr')].map(t => t.innerText.replace(/\s+/g, ' ').trim()),
+    note: document.querySelector('#finMahn thead').textContent.trim(),
+    zeilen: [...document.querySelectorAll('#finMahn tbody tr')].map(t => t.innerText.replace(/\s+/g, ' ').trim()),
   }));
   check('KRITISCH: die gekuerzte Mahnliste nennt ihren Bezug ("die aeltesten 6 von 7")',
     /die ältesten 6 von 7/.test(mahn.note));
@@ -305,6 +324,8 @@ try {
   check('Die archivierte Rechnung steht nicht in der Mahnliste',
     !mahn.zeilen.some(z => /RE-0109/.test(z)));
 
+  await page.evaluate(() => { go('kunden'); kuGoTab('lage'); });
+  await page.waitForTimeout(400);
   const off = await page.evaluate(() => ({
     note: document.getElementById('kuLageOfNote').textContent.trim(),
     zeilen: [...document.querySelectorAll('#kuLageOf tbody tr')].map(t => t.innerText.replace(/\s+/g, ' ').trim()),
@@ -322,14 +343,16 @@ try {
 
 // ══════════════════════════════════════════ 5. GESTALTUNG, GEMESSEN
 try {
+  await page.evaluate(() => go('finanzen'));
+  await page.waitForTimeout(500);
   const mass = await page.evaluate(() => {
-    const k = [...document.querySelectorAll('#kuLageKpi .kpi')];
+    const k = [...document.querySelectorAll('#finKpi .kpi')];
     const g = k.map(x => ({
       lblTop: x.querySelector('.kpi-top').getBoundingClientRect().top,
       valTop: x.querySelector('.kpi-val').getBoundingClientRect().top,
       valSize: getComputedStyle(x.querySelector('.kpi-val')).fontSize,
     }));
-    const karten = [...document.querySelectorAll('#kv-lage .g-1-1 > .card')];
+    const karten = [...document.querySelectorAll('#view-finanzen .g-1-1')[0].children];
     return { g, breiten: karten.map(c => Math.round(c.getBoundingClientRect().width)),
              waehrung: getComputedStyle(k[0].querySelector('.kpi-val .waehrung')).fontSize,
              wert: getComputedStyle(k[0].querySelector('.kpi-val')).fontSize };
@@ -345,7 +368,7 @@ try {
   // Gemessen aufgefallen: Der laengere Fusstext dieser Kacheln liess die
   // Delta-Pille schrumpfen, bis sie in sich umbrach -- "100" ueber "%".
   const pille = await page.evaluate(() => {
-    const d = document.querySelector('#kuLageKpi .kpi:nth-child(4) .delta');
+    const d = document.querySelector('#finKpi .kpi:nth-child(3) .delta');
     if (!d) { return null; }
     const r = d.getBoundingClientRect();
     return { h: r.height, zeile: parseFloat(getComputedStyle(d).fontSize) };
@@ -395,11 +418,13 @@ try {
   const p4 = await seite(browser, { rechnungen: leer, offerten: leer });
   await p4.click('#nav-kunden');
   await p4.waitForTimeout(500);
-  check('KRITISCH: ganz ohne Rechnungen steht "Noch keine Rechnungen", nicht "Alles bezahlt"',
-    /Noch keine Rechnungen/.test(await p4.textContent('#kuLageAlter'))
-    && /Noch keine Rechnungen/.test(await p4.textContent('#kuLageMahn')));
   check('KRITISCH: ganz ohne Offerten steht "Noch keine Offerten"',
     /Noch keine Offerten/.test(await p4.textContent('#kuLageOf')));
+  await p4.evaluate(() => go('finanzen'));
+  await p4.waitForTimeout(500);
+  check('KRITISCH: ganz ohne Rechnungen steht "Noch keine Rechnungen", nicht "Alles bezahlt"',
+    /Noch keine Rechnungen/.test(await p4.textContent('#finAlter'))
+    && !/Alles bezahlt/.test(await p4.textContent('#view-finanzen')));
   await p4.close();
 
   const nurBezahlt = { status: 'ok', naechste_nummer: 'X', belege: [
@@ -407,10 +432,10 @@ try {
       titel: 'Bezahlt', datum: tag(-20), faellig_bis: tag(-5),
       status: 'versendet', bezahlt: 1, bezahlt_am: tag(0), total_rappen: 5000, aktiv: 1 }]};
   const p5 = await seite(browser, { rechnungen: nurBezahlt, offerten: { status: 'ok', naechste_nummer: 'X', belege: [] } });
-  await p5.click('#nav-kunden');
+  await p5.evaluate(() => go('finanzen'));
   await p5.waitForTimeout(500);
   check('KRITISCH: sind alle Rechnungen bezahlt, steht "Alles bezahlt" -- nicht "Noch keine Rechnungen"',
-    /Alles bezahlt/.test(await p5.textContent('#kuLageMahn')));
+    /Alles bezahlt/.test(await p5.textContent('#finAlter')));
   await p5.close();
 
   const keineUeber = { status: 'ok', naechste_nummer: 'X', belege: [
@@ -418,12 +443,12 @@ try {
       titel: 'Noch Zeit', datum: tag(-2), faellig_bis: tag(20),
       status: 'versendet', bezahlt: 0, bezahlt_am: null, total_rappen: 7000, aktiv: 1 }]};
   const p6 = await seite(browser, { rechnungen: keineUeber, offerten: { status: 'ok', naechste_nummer: 'X', belege: [] } });
-  await p6.click('#nav-kunden');
+  await p6.evaluate(() => go('finanzen'));
   await p6.waitForTimeout(500);
   check('KRITISCH: offen aber in der Frist heisst "Nichts ueberfaellig" -- nicht "Alles bezahlt"',
-    /Nichts überfällig/.test(await p6.textContent('#kuLageMahn')));
+    /Nichts überfällig/.test(await p6.textContent('#finMahn')));
   check('Das Altersbild zeigt dann trotzdem Balken, nicht einen Leerzustand',
-    (await p6.evaluate(() => document.querySelectorAll('#kuLageAlter .bar').length)) === 5);
+    (await p6.evaluate(() => document.querySelectorAll('#finAlter .bar').length)) === 5);
   await p6.close();
 } catch (e) { bad.push('Leerzustaende: ' + String(e).split('\n')[0].slice(0, 160)); }
 
@@ -440,13 +465,20 @@ try {
   const sperre = await p7.textContent('#kuLageSperre');
   check('KRITISCH: verweigert der Server die Belege, sagt die Uebersicht das -- statt CHF 0.00',
     /Kein Zugriff auf Offerten und Rechnungen/.test(sperre));
+  await p7.evaluate(() => go('finanzen'));
+  await p7.waitForTimeout(600);
+  const finKacheln = await p7.$$eval('#finKpi .kpi', k => k.slice(0, 3).map(x => x.textContent));
+  check('KRITISCH: auch die Finanz-Uebersicht zeigt bei Verweigerung "Kein Zugriff" statt CHF 0.00',
+    finKacheln.length === 3 && finKacheln.every(x => /Kein Zugriff/.test(x) && !/0\.00/.test(x)));
+  await p7.evaluate(() => { go('kunden'); kuGoTab('lage'); });
+  await p7.waitForTimeout(300);
   check('Und nennt das fehlende Recht beim Namen',
     /Offerten & Rechnungen/.test(sperre) && /Rollen/.test(sperre));
   check('KRITISCH: die Kacheln mit den Nullbetraegen sind dann nicht zu sehen',
     !(await p7.isVisible('#kuLageKpi')));
   check('GEGENPROBE: ohne Verweigerung stehen die Kacheln da und die Sperrflaeche nicht',
     await p7.evaluate(() => {
-      belegZugriff.offerte = true; belegZugriff.rechnung = true;
+      belegZugriff.offerte = true;
       renderKundenLage();
       return !document.getElementById('kuLageSperre').hidden === false
           && !document.getElementById('kuLageInhalt').hidden;
@@ -472,15 +504,15 @@ try {
   const p8 = await seite(browser, { rechte: OHNE_BELEGE });
   await p8.click('#nav-kunden');
   await p8.waitForTimeout(400);
-  check('KRITISCH: ohne "offerten_lesen" fehlt auch der Menuepunkt "Rechnungen"',
-    !(await p8.isVisible('#nav-kunden-rechnungen')));
+  check('KRITISCH: ohne "offerten_lesen" fehlt auch der Menuepunkt "Rechnungen" (seit ENT-712 unter Finanzen)',
+    !(await p8.isVisible('#nav-finanzen-rechnungen')));
   check('Und "Offerten" fehlt weiterhin -- beide haengen am selben Endpunkt',
     !(await p8.isVisible('#nav-kunden-offerten')));
   check('GEGENPROBE: mit dem Recht stehen beide Punkte da',
     await p8.evaluate(() => {
       me.rechte = [...me.rechte, 'offerten_lesen'];
       rechteAnwenden();
-      return getComputedStyle(document.getElementById('nav-kunden-rechnungen')).display !== 'none'
+      return getComputedStyle(document.getElementById('nav-finanzen-rechnungen')).display !== 'none'
           && getComputedStyle(document.getElementById('nav-kunden-offerten')).display !== 'none';
     }));
   await p8.close();

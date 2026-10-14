@@ -30,6 +30,30 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 23,
+            'datum' => '2026-10-13',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Neuer Bereich „Finanzen“',
+            'text'  => 'Rechnungen, Lohn und eine Geldübersicht liegen jetzt an einem Ort. „Finanzen“ ersetzt in der Kopfleiste den Bereich „Lohn“ und hat drei Reiter: Übersicht, Rechnungen und Lohn. Die Übersicht zeigt den offenen und den überfälligen Betrag, was im Monat bezahlt wurde, die Lohnkosten und eine Grafik mit verrechnet, bezahlt und Lohnkosten über die letzten Monate. Rechnungen findest du nicht mehr unter Kunden, sondern unter Finanzen. Offerten bleiben bei Kunden. Rechnungsentwürfe zählen in der Übersicht nicht mit. Die Lohnkosten sind ohne Arbeitgeberbeiträge gerechnet. Finanzen gibt es nur am Computer, nicht am Handy.',
+        ],
+        [
+            'nr'    => 22,
+            'datum' => '2026-10-10',
+            'art'   => 'fehlerbehebung',
+            'fuer'  => ['betreiber'],
+            'titel' => 'Kündigungstermin bei Mandantenverträgen korrigiert',
+            'text'  => 'Der Tag, bis zu dem eine Kündigung spätestens eintreffen muss, landete auf manchen Servern um die Kündigungsfrist NACH dem Vertragsende statt davor. Das betraf auch die Anzeige „Kündigung in den nächsten 90 Tagen“. Die Termine stimmen jetzt.',
+        ],
+        [
+            'nr'    => 21,
+            'datum' => '2026-10-10',
+            'art'   => 'neu',
+            'fuer'  => ['betreiber'],
+            'titel' => 'Abgelaufene Einladungen neu verschicken',
+            'text'  => 'Hat jemand den Einladungslink verstreichen lassen, schickt „Neu einladen“ im Reiter „Zugang“ des Kontos einen frischen Link an die hinterlegte Adresse. Der alte Link gilt danach nicht mehr. Ausserdem zeigt das Konto jetzt, ob der Link noch gilt oder abgelaufen ist, statt einfach „eingeladen“.',
+        ],
+        [
             'nr'    => 20,
             'datum' => '2026-09-26',
             'art'   => 'verbesserung',
