@@ -5,12 +5,18 @@
   DATENSCHUTZERKLAERUNG von guardops.ch (ENT-563/OP-564).
 
   JEDE AUSSAGE HIER IST AUS DEM CODE ABGELEITET, nicht aus einer Vorlage
-  abgeschrieben: keine Cookies (homepage.html setzt keine, der Endpunkt
-  startet keine Sitzung), keine fremden Abrufe (test_homepage.mjs misst
-  das), und die Bremse legt einen Pruefwert der Adresse statt der Adresse
-  ab (backend/demo_bremse.php). Aendert sich einer dieser Punkte im Code,
-  wird diese Seite falsch -- test_recht.mjs haelt die pruefbaren davon
-  gegen den Code.
+  abgeschrieben: ohne Zustimmung keine Cookies und keine fremden Abrufe
+  (test_homepage.mjs misst das am Browser; homepage.html legt vor der Wahl
+  nichts ab, der Endpunkt startet keine Sitzung), und die Bremse legt
+  einen Pruefwert der Adresse statt der Adresse ab (backend/demo_bremse.php).
+  Aendert sich einer dieser Punkte im Code, wird diese Seite falsch --
+  test_recht.mjs haelt die pruefbaren davon gegen den Code.
+
+  SEIT 2026-10-14 MIT EINWILLIGUNG: Die Verkaufsseite fragt beim ersten
+  Besuch, ob Google Analytics 4 und der Meta-Pixel laden duerfen
+  (Anordnung des Projektinhabers: bezahlte Werbung braucht ein
+  Ruecksignal). Die Wahl liegt sechs Monate im lokalen Speicher des
+  Browsers. Abschnitt 2 beschreibt beides.
 
   SEIT ENT-601 WIRD SEHR WOHL GESPEICHERT: Das Formular fuehrt zu
   backend/api/demo_anfordern.php und legt sofort einen Demo-Zugang an
@@ -25,7 +31,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Datenschutzerklärung – GuardOpS</title>
-<meta name="description" content="Welche Daten guardops.ch erhebt – und welche nicht. Keine Cookies, keine Reichweitenmessung, keine fremden Dienste.">
+<meta name="description" content="Welche Daten guardops.ch erhebt – und welche nicht. Reichweitenmessung nur mit Ihrer Zustimmung, sonst keine Cookies und keine fremden Dienste.">
 <link rel="canonical" href="https://guardops.ch/datenschutz.html">
 <meta name="robots" content="index,follow">
 <link rel="icon" href="icons/guardops-32.png" sizes="32x32" type="image/png">
@@ -53,12 +59,15 @@
 <main>
   <p class="vorzeile">Rechtliches</p>
   <h1>Datenschutzerklärung</h1>
-  <p class="stand">Stand: 19. September 2026</p>
+  <p class="stand">Stand: 14. Oktober 2026</p>
 
   <h2>Kurz gefasst</h2>
-  <p>Diese Seite setzt <strong>keine Cookies</strong>, misst kein Verhalten und lädt
-     nichts von fremden Servern nach. Wer das Formular ausfüllt, schickt uns eine
-     E-Mail — mehr geschieht nicht. Eine Datenbank mit Anfragen gibt es nicht.</p>
+  <p>Ohne Ihre Zustimmung setzt diese Seite <strong>keine Cookies</strong>, misst
+     kein Verhalten und lädt nichts von fremden Servern nach. Beim ersten Besuch
+     fragen wir, ob wir die Nutzung der Seite mit Google Analytics und dem
+     Meta-Pixel messen dürfen. Lehnen Sie ab, bleibt es beim Satz davor. Wer
+     einen Demo-Zugang anfordert, gibt Firma, Name, E-Mail und Telefon an; das
+     wird gespeichert, Abschnitt 3 sagt wie.</p>
   <p>Diese Erklärung gilt für <strong>guardops.ch</strong>, also für diese Seite und
      ihr Kontaktformular. Für den Demobereich gilt eine
      <a href="datenschutz-demo.html">eigene Erklärung</a>: Dort gibt es eine
@@ -78,15 +87,42 @@
      Webserver führt sie technische Zugriffsprotokolle: IP-Adresse, Zeitpunkt des
      Abrufs, aufgerufene Datei, übertragene Datenmenge sowie Browser- und
      Systemkennung. Sie dienen dem Betrieb und der Sicherheit des Servers.</p>
-  <p>Was diese Seite <strong>nicht</strong> tut:</p>
+  <p>Was diese Seite <strong>ohne Ihre Zustimmung nicht</strong> tut:</p>
   <ul>
-    <li>Sie setzt keine Cookies und legt nichts im Speicher des Browsers ab.</li>
-    <li>Sie misst keine Reichweite. Es ist kein Analysewerkzeug eingebunden.</li>
+    <li>Sie setzt keine Cookies und legt nichts im Speicher des Browsers ab —
+        ausser Ihrer Wahl selbst, sobald Sie sie getroffen haben.</li>
+    <li>Sie misst keine Reichweite und bindet kein Werbenetzwerk ein.</li>
     <li>Sie lädt nichts von fremden Servern. Auch die Schriften liegen auf
         demselben Server — es geht keine Anfrage an Google Fonts oder ein
         Content Delivery Network.</li>
-    <li>Sie bindet kein Werbenetzwerk ein und erstellt kein Profil.</li>
   </ul>
+
+  <h3>Messung mit Ihrer Zustimmung</h3>
+  <p>Beim ersten Besuch erscheint am unteren Rand ein Hinweis mit zwei gleich
+     grossen Knöpfen, <strong>Zustimmen</strong> und <strong>Ablehnen</strong>.
+     Solange Sie nichts gewählt haben, gilt Ablehnen. Ihre Wahl legen wir im
+     lokalen Speicher Ihres Browsers ab, nicht auf unserem Server; nach sechs
+     Monaten fragen wir neu. Über den Link <strong>Cookie-Einstellungen</strong>
+     in der Fusszeile können Sie die Wahl jederzeit ändern.</p>
+  <p>Stimmen Sie zu, laden wir zwei Dienste nach:</p>
+  <ul>
+    <li><strong>Google Analytics 4</strong> der Google Ireland Limited, Dublin.
+        Es zählt Besuche, aufgerufene Abschnitte, Scrolltiefe und ob das
+        Demo-Formular begonnen oder abgeschickt wurde. Dafür setzt Google
+        Cookies, die Ihren Browser wiedererkennen. Die IP-Adresse wird vor
+        der Speicherung gekürzt. Google verarbeitet die Daten auch in den USA.</li>
+    <li><strong>Meta-Pixel</strong> der Meta Platforms Ireland Limited, Dublin.
+        Er meldet Meta, dass Sie die Seite besucht und ob Sie einen Demo-Zugang
+        angefordert haben, damit wir Anzeigen auf Facebook und Instagram
+        auswerten können. Meta setzt dafür ebenfalls Cookies und verarbeitet
+        die Daten auch in den USA.</li>
+  </ul>
+  <p>Beide Dienste erhalten Ihre IP-Adresse, Browser- und Gerätekennung sowie
+     die aufgerufenen Seiten. Haben Sie bei Google oder Meta ein Konto und sind
+     dort angemeldet, können die Anbieter den Besuch diesem Konto zuordnen;
+     darauf haben wir keinen Einfluss. Lehnen Sie ab oder widerrufen Sie,
+     löschen wir die Cookies, die wir löschen können, und laden nichts mehr
+     nach.</p>
 
   <h2>3. Wenn Sie einen Demo-Zugang anfordern</h2>
   <h3>Was erhoben wird</h3>
@@ -165,12 +201,16 @@
     <li>die <strong>Hostpoint AG</strong> als Betreiberin des Servers und des
         E-Mail-Postfachs,</li>
     <li>der <strong>E-Mail-Anbieter Ihrer Seite</strong>, sobald wir Ihnen
-        antworten — das liegt in der Natur einer E-Mail.</li>
+        antworten — das liegt in der Natur einer E-Mail,</li>
+    <li><strong>Google</strong> und <strong>Meta</strong>, nur wenn Sie der
+        Messung zugestimmt haben (Abschnitt 2).</li>
   </ul>
 
   <h2>6. Wo die Daten liegen</h2>
-  <p>Server und Postfach werden in der Schweiz betrieben. Eine Übermittlung ins
-     Ausland findet von unserer Seite aus nicht statt.</p>
+  <p>Server und Postfach werden in der Schweiz betrieben. Ihre Angaben aus dem
+     Formular verlassen die Schweiz nicht. Nur die Messung nach Ihrer
+     Zustimmung geht an Google und Meta, die Daten auch in den USA verarbeiten;
+     beide sind dem Swiss-U.S. Data Privacy Framework angeschlossen.</p>
 
   <h2>7. Ihre Rechte</h2>
   <p>Sie können jederzeit Auskunft darüber verlangen, welche Daten wir über Sie

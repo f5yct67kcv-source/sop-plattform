@@ -56,11 +56,25 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
 // ist die Seite eine falsche Auskunft an den Besucher -- nicht nur ein
 // veralteter Text.
 {
-  const setztCookies = /document\.cookie|localStorage|sessionStorage|indexedDB/.test(homepage)
-    || ['backend/api/demo_anfordern.php', 'backend/demo_bremse.php', 'backend/demo_zugang.php']
+  // Seit 2026-10-14 heisst die Aussage "OHNE Zustimmung keine Cookies":
+  // Der Server setzt keine, und die Seite legt vor der Wahl nichts ab.
+  // Was sie NACH der Zustimmung laedt, misst test_homepage.mjs am
+  // Browser; hier zaehlt, dass der Server keine Sitzung beginnt und die
+  // Erklaerung die Einwilligung samt Dauer nennt.
+  const serverSetztCookies = ['backend/api/demo_anfordern.php', 'backend/demo_bremse.php', 'backend/demo_zugang.php']
        .some(d => /setcookie|session_start/i.test(lies(d)));
-  check('KRITISCH: die Behauptung "keine Cookies" stimmt mit dem Code ueberein',
-    !setztCookies && /keine Cookies/i.test(datenschutz));
+  check('KRITISCH: die Behauptung "ohne Zustimmung keine Cookies" stimmt mit dem Code ueberein',
+    !serverSetztCookies && /Ohne Ihre Zustimmung setzt diese Seite\s+<strong>keine Cookies/i.test(datenschutz)
+    && /sechs\s+Monaten/i.test(datenschutz) && /Cookie-Einstellungen/.test(datenschutz)
+    && /id="einwilligungAendern"/.test(homepage));
+  // Die Erklaerung nennt genau die Dienste, die das Skript laden kann --
+  // nicht mehr und nicht weniger.
+  const laedtGoogle = /googletagmanager\.com\/gtag\/js/.test(homepage);
+  const laedtMeta = /connect\.facebook\.net/.test(homepage);
+  check('KRITISCH: die Erklaerung nennt Google Analytics genau dann, wenn die Seite es laden kann',
+    laedtGoogle === /<strong>Google Analytics 4<\/strong>/.test(datenschutz));
+  check('KRITISCH: die Erklaerung nennt den Meta-Pixel genau dann, wenn die Seite ihn laden kann',
+    laedtMeta === /<strong>Meta-Pixel<\/strong>/.test(datenschutz));
 
   // Fremde Abrufe: Die Seite behauptet, nichts von fremden Servern zu laden.
   // test_homepage.mjs misst das am Browser; hier wird die BEHAUPTUNG an
@@ -76,7 +90,7 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
     /\ssrc="https?:\/\//.test(ohneKommentare)                                  // Bild, Skript, iframe
     || /<link\b(?![^>]*rel="canonical")[^>]*href="https?:\/\//.test(ohneKommentare)  // Stilblatt, Icon, preload
     || /url\(\s*['"]?https?:\/\//.test(ohneKommentare);                        // CSS
-  check('KRITISCH: die Behauptung "nichts von fremden Servern" stimmt mit dem Code ueberein',
+  check('KRITISCH: die Behauptung "ohne Zustimmung nichts von fremden Servern" stimmt mit dem Code ueberein',
     !holtFremd && /fremden Servern/i.test(datenschutz));
 
   // Seit ENT-601 die Gegenrichtung: Der Endpunkt, an den das Formular

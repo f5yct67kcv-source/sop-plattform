@@ -353,6 +353,28 @@ p{margin:0 0 1em}
 .formular .danke p{margin:0;color:var(--stahl);font-size:15px}
 @media (max-width:560px){.formular .reihe{grid-template-columns:minmax(0,1fr)}.formular{padding:20px}}
 
+/* Einwilligung (Cookie-Hinweis): Streifen am unteren Rand, kein Fenster.
+   Erscheint sofort beim ersten Besuch (Anordnung des Projektinhabers,
+   2026-10-14). Beide Knoepfe gleich gross und gleich auffaellig -- ein
+   grauer Ablehnen-Knopf waere ein Trick, keine Wahl. */
+.einwilligung{position:fixed;left:0;right:0;bottom:0;z-index:90;background:var(--nacht-2);border-top:1px solid var(--nacht-linie-2);box-shadow:0 -20px 50px -30px rgba(0,0,0,.8);color:var(--stahl)}
+.einwilligung[hidden]{display:none}
+.einwilligung .innen{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 32px;align-items:center;padding:18px var(--pad)}
+.einwilligung p{margin:0;font-size:14px;line-height:1.5;max-width:70ch}
+.einwilligung p a{color:var(--stahl-hi);text-decoration:underline;text-underline-offset:3px}
+.einwilligung .wahl{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.einwilligung .btn{height:44px;padding:0 20px;font-size:15px;justify-content:center;min-width:140px}
+.einwilligung .btn.sekundaer{color:var(--stahl-hi);border-color:var(--nacht-linie-2)}
+.einwilligung .btn.sekundaer:hover{border-color:var(--stahl)}
+@media (max-width:720px){
+  .einwilligung .innen{grid-template-columns:minmax(0,1fr)}
+  .einwilligung .wahl{grid-template-columns:1fr 1fr}
+  .einwilligung .btn{min-width:0}
+}
+.fuss .unten button{background:none;border:0;padding:0;min-height:44px;display:inline-flex;align-items:center;font:inherit;color:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.fuss .unten{align-items:center}
+.fuss .unten button:hover{color:var(--stahl-hi)}
+
 /* Fuss */
 .fuss{background:var(--nacht);color:var(--stahl);border-top:1px solid var(--nacht-linie);padding:64px 0 32px;font-size:14px}
 .fuss .oben{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;padding-bottom:40px;border-bottom:1px solid var(--nacht-linie)}
@@ -720,9 +742,22 @@ p{margin:0 0 1em}
     <div class="unten">
       <span>© 2026 <span data-brand>GuardOpS</span> · Alle Angaben ohne Gewähr</span>
       <span class="ch"><i aria-hidden="true"></i>Entwickelt und betrieben in der Schweiz</span>
+      <button type="button" id="einwilligungAendern">Cookie-Einstellungen</button>
     </div>
   </div>
 </footer>
+
+<div class="einwilligung" id="einwilligung" role="region" aria-label="Cookie-Hinweis" hidden>
+  <div class="innen">
+    <p>Wir nutzen Google Analytics und den Meta-Pixel, um zu sehen, wie diese Seite
+       genutzt wird. Beides lädt erst, wenn Sie zustimmen. Mehr dazu in der
+       <a href="datenschutz.html">Datenschutzerklärung</a>.</p>
+    <div class="wahl">
+      <button type="button" class="btn primaer" id="einwilligungJa">Zustimmen</button>
+      <button type="button" class="btn sekundaer" id="einwilligungNein">Ablehnen</button>
+    </div>
+  </div>
+</div>
 
 <script>
 (function(){
@@ -935,6 +970,90 @@ p{margin:0 0 1em}
       }).then(function () { nKnopf.disabled = false; });
     });
   }
+})();
+</script>
+<script>
+(function(){
+  // Einwilligung und Messung (2026-10-14, Anordnung des Projektinhabers:
+  // bezahlte Werbung braucht ein Ruecksignal). Grundsatz: Vor der Zustimmung
+  // laedt NICHTS von Google oder Meta -- test_homepage.mjs misst das am
+  // Browser. Die Wahl liegt sechs Monate im lokalen Speicher; danach fragt
+  // die Seite neu. Ohne JavaScript bleibt der Streifen verborgen und es
+  // wird nichts geladen -- das ist dieselbe Aussage wie "abgelehnt".
+  //
+  // Die beiden Kennungen sind absichtlich leer, bis die Konten bestehen.
+  // Leer heisst: auch nach Zustimmung wird nichts geladen.
+  var MESSUNG = { ga: '', meta: '' };
+  var SCHLUESSEL = 'go_einwilligung';
+  var DAUER = 183 * 24 * 60 * 60 * 1000;
+
+  var streifen = document.getElementById('einwilligung');
+  var ja = document.getElementById('einwilligungJa');
+  var nein = document.getElementById('einwilligungNein');
+  var aendern = document.getElementById('einwilligungAendern');
+  var laeuft = false;
+
+  function lesen(){
+    try {
+      var roh = JSON.parse(localStorage.getItem(SCHLUESSEL) || 'null');
+      if (!roh || typeof roh.bis !== 'number' || roh.bis < Date.now()) { return null; }
+      return roh.wahl === 'ja' ? 'ja' : 'nein';
+    } catch (e) { return null; }
+  }
+  function merken(wahl){
+    try { localStorage.setItem(SCHLUESSEL, JSON.stringify({ wahl: wahl, bis: Date.now() + DAUER })); }
+    catch (e) { /* privater Modus: dann fragt die Seite beim naechsten Mal neu */ }
+  }
+  function skript(url){
+    var s = document.createElement('script'); s.async = true; s.src = url;
+    document.head.appendChild(s);
+  }
+  function messungStarten(){
+    if (laeuft) { return; }
+    laeuft = true;
+    if (MESSUNG.ga) {
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = function(){ window.dataLayer.push(arguments); };
+      window.gtag('js', new Date());
+      window.gtag('config', MESSUNG.ga, { anonymize_ip: true });
+      skript('https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(MESSUNG.ga));
+    }
+    if (MESSUNG.meta) {
+      var f = function(){ f.callMethod ? f.callMethod.apply(f, arguments) : f.queue.push(arguments); };
+      if (!window.fbq) { window.fbq = f; f.push = f; f.loaded = true; f.version = '2.0'; f.queue = []; }
+      window.fbq('init', MESSUNG.meta);
+      window.fbq('track', 'PageView');
+      skript('https://connect.facebook.net/en_US/fbevents.js');
+    }
+  }
+  function spurenLoeschen(){
+    // Was Google und Meta bei einer frueheren Zustimmung abgelegt haben.
+    var teile = location.hostname.split('.');
+    document.cookie.split(';').forEach(function(c){
+      var name = c.split('=')[0].trim();
+      if (!/^(_ga|_gid|_gat|_gcl|_fbp|_fbc)/.test(name)) { return; }
+      for (var i = 0; i < teile.length - 1; i++) {
+        var dom = teile.slice(i).join('.');
+        document.cookie = name + '=; Max-Age=0; path=/; domain=' + dom;
+        document.cookie = name + '=; Max-Age=0; path=/; domain=.' + dom;
+      }
+      document.cookie = name + '=; Max-Age=0; path=/';
+    });
+  }
+  function zeigen(){ streifen.hidden = false; }
+  function verbergen(){ streifen.hidden = true; }
+
+  ja.addEventListener('click', function(){ merken('ja'); verbergen(); messungStarten(); });
+  nein.addEventListener('click', function(){
+    var vorher = laeuft;
+    merken('nein'); verbergen(); spurenLoeschen();
+    if (vorher) { location.reload(); } // geladene Skripte lassen sich nicht entladen
+  });
+  aendern.addEventListener('click', function(){ zeigen(); ja.focus(); });
+
+  var wahl = lesen();
+  if (wahl === 'ja') { messungStarten(); }
+  else if (wahl === null) { zeigen(); }
 })();
 </script>
 </body>

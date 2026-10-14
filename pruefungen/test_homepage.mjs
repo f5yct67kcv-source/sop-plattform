@@ -55,6 +55,57 @@ check('KRITISCH: die Seite laedt nichts von fremden Servern (keine Google-Schrif
   fremdeAbrufe.length === 0);
 if (fremdeAbrufe.length) { bad.push('fremd: ' + fremdeAbrufe.slice(0, 3).join(', ')); }
 
+// ── Einwilligung (2026-10-14) ──────────────────────────────────────────
+// Der Streifen erscheint sofort beim ersten Besuch; vor der Wahl liegt
+// nichts im Browser und nichts geht an Google oder Meta. Beide Knoepfe
+// gleich gross. Nach "Ablehnen" bleibt es dabei, auch nach Neuladen; der
+// Fusszeilen-Link holt den Streifen zurueck. Nach "Zustimmen" wuerde die
+// Messung laden -- mit leeren Kennungen passiert nichts, und genau das
+// wird hier als Grundzustand festgehalten (fremdeAbrufe bleibt leer).
+{
+  const vorher = await desktop.evaluate(() => ({
+    sichtbar: !document.getElementById('einwilligung').hidden
+      && getComputedStyle(document.getElementById('einwilligung')).display !== 'none',
+    gespeichert: localStorage.length, cookies: document.cookie,
+    ja: document.getElementById('einwilligungJa').getBoundingClientRect(),
+    nein: document.getElementById('einwilligungNein').getBoundingClientRect(),
+    unten: innerHeight - document.getElementById('einwilligung').getBoundingClientRect().bottom,
+  }));
+  check('KRITISCH: der Cookie-Hinweis erscheint sofort beim ersten Besuch', vorher.sichtbar);
+  check('KRITISCH: vor der Wahl liegt nichts im Browser (kein Cookie, kein lokaler Speicher)',
+    vorher.gespeichert === 0 && vorher.cookies === '');
+  check('Der Hinweis sitzt am unteren Rand (Streifen, kein Fenster)', Math.abs(vorher.unten) < 1);
+  check('Zustimmen und Ablehnen sind gleich gross und mindestens 44 px hoch',
+    Math.abs(vorher.ja.width - vorher.nein.width) < 1 && Math.abs(vorher.ja.height - vorher.nein.height) < 1
+    && vorher.ja.height >= 44);
+
+  await klick(desktop, '#einwilligungNein');
+  await desktop.reload({ waitUntil: 'load' });
+  const nachNein = await desktop.evaluate(() => ({
+    sichtbar: !document.getElementById('einwilligung').hidden,
+    wahl: (JSON.parse(localStorage.getItem('go_einwilligung') || '{}')).wahl,
+    cookies: document.cookie, gtag: typeof window.gtag, fbq: typeof window.fbq,
+  }));
+  check('KRITISCH: nach Ablehnen bleibt der Hinweis auch nach Neuladen weg', !nachNein.sichtbar && nachNein.wahl === 'nein');
+  check('KRITISCH: nach Ablehnen wird nichts geladen (kein gtag, kein fbq, kein Cookie, kein fremder Abruf)',
+    nachNein.gtag === 'undefined' && nachNein.fbq === 'undefined' && nachNein.cookies === '' && fremdeAbrufe.length === 0);
+
+  await klick(desktop, '#einwilligungAendern');
+  const wieder = await desktop.evaluate(() => !document.getElementById('einwilligung').hidden);
+  check('"Cookie-Einstellungen" in der Fusszeile holt den Hinweis zurueck', wieder);
+  await klick(desktop, '#einwilligungJa');
+  await desktop.waitForTimeout(300);
+  const nachJa = await desktop.evaluate(() => ({
+    sichtbar: !document.getElementById('einwilligung').hidden,
+    wahl: (JSON.parse(localStorage.getItem('go_einwilligung') || '{}')).wahl,
+  }));
+  check('Nach Zustimmen ist der Hinweis weg und die Wahl gespeichert', !nachJa.sichtbar && nachJa.wahl === 'ja');
+  check('Solange keine Kennung eingetragen ist, laedt auch nach Zustimmen nichts von fremden Servern',
+    fremdeAbrufe.length === 0);
+  // Fuer die weiteren Pruefungen: Hinweis weg, damit er keinen Klick abfaengt.
+  await desktop.evaluate(() => document.fonts.ready);
+}
+
 const schriften = await desktop.evaluate(() => ({
   archivo: document.fonts.check('700 40px Archivo'),
   plex: document.fonts.check('400 16px "IBM Plex Sans"'),
@@ -373,6 +424,21 @@ await desktop.close();
 const handy = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 await handy.goto(SEITE, { waitUntil: 'load' });
 await handy.evaluate(() => document.fonts.ready);
+{
+  const h = await handy.evaluate(() => {
+    const r = s => document.querySelector(s).getBoundingClientRect();
+    const ja = r('#einwilligungJa'), nein = r('#einwilligungNein'), st = r('#einwilligung');
+    return { sichtbar: !document.getElementById('einwilligung').hidden, ja, nein,
+             nebeneinander: Math.abs(ja.top - nein.top) < 1, breiteSt: st.width, innerW: innerWidth,
+             ueberlauf: document.documentElement.scrollWidth > innerWidth };
+  });
+  check('Handy: der Cookie-Hinweis erscheint sofort', h.sichtbar);
+  check('Handy: Zustimmen und Ablehnen stehen nebeneinander, gleich breit, mindestens 44 px hoch',
+    h.nebeneinander && Math.abs(h.ja.width - h.nein.width) < 1 && h.ja.height >= 44 && h.nein.height >= 44);
+  check('Handy: der Hinweis erzeugt keinen horizontalen Ueberlauf', !h.ueberlauf && h.breiteSt <= h.innerW);
+  await handy.screenshot({ path: `${OUT}/homepage-04-handy-einwilligung.png` });
+  await klick(handy, '#einwilligungNein');
+}
 const masseHandy = await handy.evaluate(() => {
   const sichtbar = e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const knoepfe = [...document.querySelectorAll('.btn, button, .faq summary')].filter(sichtbar);
