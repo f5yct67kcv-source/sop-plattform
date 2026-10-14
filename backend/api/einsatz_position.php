@@ -28,9 +28,14 @@ $pdo = db();
 
 /** Positionen eines Einsatzes, jeweils mit der zugeteilten Person. */
 function positionen(PDO $pdo, int $einsatzId): array {
+    // Die Leistungsart an der Zuteilung (ENT-721) gibt es erst nach der
+    // Einrichtung. Vorher fehlt der Schluessel ganz -- das ist etwas anderes
+    // als "keine gewaehlt".
+    $mitLeistung = hat_spalte($pdo, 'einsatz_zuteilung', 'leistungsart_id');
     $s = $pdo->prepare(
         'SELECT p.*, z.mitarbeiter_id, z.zusage, z.gesehen_am,
-                z.verkehrsmittel, z.oev_rappen, m.name AS ma_name, m.vorname, m.nachname
+                z.verkehrsmittel, z.oev_rappen, m.name AS ma_name, m.vorname, m.nachname'
+        . ($mitLeistung ? ', z.leistungsart_id' : '') . '
          FROM einsatz_position p
          LEFT JOIN einsatz_zuteilung z ON z.position_id = p.id
          LEFT JOIN mitarbeiter m ON m.id = z.mitarbeiter_id
@@ -38,8 +43,8 @@ function positionen(PDO $pdo, int $einsatzId): array {
          ORDER BY p.nr, p.von, p.id'
     );
     $s->execute([$einsatzId]);
-    return array_map(function ($p) {
-        return [
+    return array_map(function ($p) use ($mitLeistung) {
+        return ($mitLeistung ? ['leistungsart_id' => $p['leistungsart_id'] === null ? null : (int)$p['leistungsart_id']] : []) + [
             'id' => (int)$p['id'],
             'nr' => (int)$p['nr'],
             'funktion' => $p['funktion'],
@@ -70,6 +75,14 @@ function positionen(PDO $pdo, int $einsatzId): array {
             'oev_rappen' => $p['oev_rappen'] === null ? null : (int)$p['oev_rappen'],
         ];
     }, $s->fetchAll());
+}
+
+function einsatz_leistungsarten(PDO $pdo): array {
+    if (!hat_spalte($pdo, 'lohnart', 'nummer')) { return []; }
+    $r = $pdo->query("SELECT id, nummer, bezeichnung, aktiv FROM lohnart
+                      WHERE art = 'leistung' ORDER BY sortierung, nummer, bezeichnung")->fetchAll();
+    return array_map(fn($x) => ['id' => (int)$x['id'], 'nummer' => $x['nummer'],
+        'bezeichnung' => $x['bezeichnung'], 'aktiv' => (int)$x['aktiv']], $r);
 }
 
 function einsatz_oder_ende(PDO $pdo, int $id): array {
@@ -157,6 +170,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                       'von' => $einsatz['von'], 'bis' => $einsatz['bis'],
                       'bedarf' => (int)$einsatz['bedarf']],
         'positionen' => positionen($pdo, $einsatzId),
+        // Die waehlbaren Leistungsarten (ENT-721) -- nur Name und Nummer,
+        // keine Saetze: Wer einteilt, muss nicht sehen, was jemand verdient.
+        'leistungsarten' => einsatz_leistungsarten($pdo),
     ]);
 }
 

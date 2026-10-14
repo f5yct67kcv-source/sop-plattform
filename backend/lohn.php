@@ -1203,5 +1203,8 @@ function lohnart_arten(): array
         'zwischensumme' => 'Zwischensumme — fasst andere Zeilen zusammen und zählt selbst in keine Bemessungsgrundlage',
         'abzug'       => 'Abzug vom Bruttolohn',
         'netto'       => 'Weder AHV-pflichtig noch Abzug — z.B. Auslagenersatz nach Art. 18',
+        // ENT-721: zaehlt nur die Stunden, an deren Zuteilung diese
+        // Leistungsart gewaehlt ist. Satz aus der Person, sonst der Standard.
+        'leistung'    => 'Leistungsart — Zulage je Stunde, nur für Schichten mit dieser Leistungsart',
     ];
 }

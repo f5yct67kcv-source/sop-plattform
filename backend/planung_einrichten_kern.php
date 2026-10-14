@@ -1843,6 +1843,11 @@ CREATE TABLE IF NOT EXISTS lohnart (
   sortierung INT NOT NULL DEFAULT 100,
   aktiv TINYINT(1) NOT NULL DEFAULT 1,
   bemerkung TEXT NULL,
+  -- Nur bei art='leistung' (ENT-721): die Nummer, unter der die Leistungsart
+  -- im Betrieb laeuft, und der Satz pro Stunde, wenn die Person keinen
+  -- eigenen hat.
+  nummer VARCHAR(10) NULL,
+  standard_rappen INT NULL,
   geaendert_am DATETIME NULL,
   geaendert_von INT NULL,
   UNIQUE KEY uq_schluessel (schluessel),
@@ -2377,6 +2382,11 @@ function kern_spalten(): array {
     ['lohn_person', 'nbu_am',     "ALTER TABLE lohn_person ADD COLUMN nbu_am DATETIME NULL"],
     // Lohnseite auf einer Seite (ENT-721): der Grund einer Lohnmutation.
     ['lohn_ansatz', 'mutationsgrund', "ALTER TABLE lohn_ansatz ADD COLUMN mutationsgrund VARCHAR(200) NULL AFTER ml13_bp"],
+    // Leistungsarten (ENT-721): Nummer und Standardsatz am Katalog, die Wahl
+    // an der Zuteilung. NULL an der Zuteilung heisst: keine Leistungsart.
+    ['lohnart', 'nummer',          "ALTER TABLE lohnart ADD COLUMN nummer VARCHAR(10) NULL"],
+    ['lohnart', 'standard_rappen', "ALTER TABLE lohnart ADD COLUMN standard_rappen INT NULL"],
+    ['einsatz_zuteilung', 'leistungsart_id', "ALTER TABLE einsatz_zuteilung ADD COLUMN leistungsart_id INT NULL"],
     ['mitarbeiter', 'anstellungskategorie', "ALTER TABLE mitarbeiter ADD COLUMN anstellungskategorie CHAR(1) NULL"],
     ['mitarbeiter', 'pensum_stunden',      "ALTER TABLE mitarbeiter ADD COLUMN pensum_stunden INT NULL"],
     // Eintrittsdatum fuer die Pro-rata-Regel aus Art. 8 Ziff. 1b.

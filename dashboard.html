@@ -2353,6 +2353,11 @@ html:not(.hat-reinigung) [data-sparte-feld] { display: none !important; }
 .lohn-slot .feld > :not(label:first-child) { grid-column: 2; }
 .lohn-slot .feld > .zone-note { margin: 3px 0 0; }
 .lohn-slot .feld > label.check { grid-column: 2; }
+/* Leistungsart je Person im Einsatzplan (ENT-721): Name links, schmales
+   Auswahlfeld daneben -- nicht ueber die volle Breite gestreckt. */
+.ep-la-zeile { display: grid; grid-template-columns: minmax(140px, 220px) minmax(0, 260px);
+  align-items: center; gap: 0 12px; margin-bottom: 6px; }
+@media (max-width: 720px) { .ep-la-zeile { grid-template-columns: 1fr; gap: 4px; } }
 .lohn-slot h3 { font-size: 13.5px; }
 .upd-griff { display: none; }
 .upd-kopf { display: flex; align-items: center; gap: 14px; padding-bottom: 16px; }
@@ -10883,7 +10888,18 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
         <div class="zone-note">Die stabile Kennung, unter der eine Abrechnungszeile wiedergefunden wird.
           Einmal vergeben, bleibt sie — eine Umbenennung träfe alte Abrechnungen.</div></div>
       <div class="feld"><label for="laArt">Art</label>
-        <select class="inp" id="laArt"></select></div>
+        <select class="inp" id="laArt" onchange="lohnartArtUmschalten(true)"></select></div>
+      <div id="laLeistungFelder" style="display:none">
+        <div class="feld"><label for="laNummer">Nummer</label>
+          <input class="inp" id="laNummer" maxlength="10" placeholder="z. B. 102"></div>
+        <div class="feld"><label for="laStandard">Standardsatz</label>
+          <input class="inp" id="laStandard" placeholder="z. B. 1.50">
+          <div class="zone-note">CHF pro Stunde. Gilt für alle, die keinen eigenen Satz haben. Leer heisst:
+            nur wer einen eigenen Satz hat, bekommt die Zulage.</div></div>
+        <div class="zone-note">Gezählt werden nur die Stunden der Schichten, an deren Zuteilung diese
+          Leistungsart gewählt ist. Ob die Zulage für Ferien und 13. Monatslohn zählt, ist offen
+          (GAV-AUS-019); vorläufig sind beide Haken gesetzt.</div>
+      </div>
       <div class="feld"><label for="laSatz">Satz in Prozent</label>
         <input class="inp" id="laSatz" placeholder="leer lassen, wenn der Satz aus dem GAV kommt">
         <div class="zone-note">Nur bei prozentualen Lohnarten. Die Ferienentschädigung braucht keinen —
@@ -25092,10 +25108,13 @@ function lohnartenZeichnen() {
     const gav = l.gav_grundlage
       ? `<span>${l.gav_grundlage}</span>`
       : '<span class="zone-note" title="Keine GAV-Pflicht — betrieblich vereinbart">betrieblich</span>';
-    const satz = l.satz_bp !== null && l.satz_bp !== undefined ? lohnPz(l.satz_bp)
+    const satz = l.art === 'leistung'
+      ? (l.standard_rappen !== null && l.standard_rappen !== undefined ? lohnFr(l.standard_rappen) + ' / Std.'
+         : '<span class="zone-note" title="Nur wer einen eigenen Satz hat, bekommt die Zulage">nur eigener Satz</span>')
+      : l.satz_bp !== null && l.satz_bp !== undefined ? lohnPz(l.satz_bp)
       : (l.art === 'prozent' ? '<span class="zone-note" title="Der Satz wird aus dem GAV abgeleitet">abgeleitet</span>' : '—');
     return `<tr${l.aktiv ? '' : ' style="opacity:.55"'}>
-      <td><b>${l.bezeichnung}</b>${l.system ? ' <span class="zone-note" title="Vom Werkzeug angelegt, nicht löschbar">System</span>' : ''}
+      <td>${l.nummer ? `<span class="zone-note" style="margin:0 6px 0 0">${esc(l.nummer)}</span>` : ''}<b>${l.bezeichnung}</b>${l.system ? ' <span class="zone-note" title="Vom Werkzeug angelegt, nicht löschbar">System</span>' : ''}
         <div class="zone-note" style="margin:2px 0 0">${l.schluessel}</div></td>
       <td>${(laDaten.arten || {})[l.art] || l.art}</td>
       <td style="text-align:right">${satz}</td>
@@ -25124,6 +25143,9 @@ function lohnartOeffnen(id) {
   $('laArt').innerHTML = Object.entries(laDaten.arten || {})
     .map(([k, t]) => `<option value="${k}">${t}</option>`).join('');
   $('laArt').value = l ? l.art : 'stundensatz';
+  $('laNummer').value = l ? (l.nummer || '') : '';
+  $('laStandard').value = l && l.standard_rappen !== null && l.standard_rappen !== undefined
+    ? (l.standard_rappen / 100).toFixed(2) : '';
   $('laSatz').value = l && l.satz_bp !== null ? (l.satz_bp / 100).toFixed(2) : '';
   $('laGav').value = l ? (l.gav_grundlage || '') : '';
   $('laAktiv').checked = l ? !!l.aktiv : true;
@@ -25133,7 +25155,20 @@ function lohnartOeffnen(id) {
      </label>`).join('');
   $('laLoeschKnopf').style.display = l && !l.system ? '' : 'none';
   $('laFehler').style.display = 'none';
+  lohnartArtUmschalten(false);
   openDlg('dlgLohnart');
+}
+
+// Nummer und Standardsatz nur bei der Leistungsart (ENT-721). Wer eine
+// NEUE Leistungsart anlegt, bekommt die Haken vorgesetzt, die GAV-AUS-019
+// vorlaeufig annimmt -- abwaehlbar, aber nicht vergessen.
+function lohnartArtUmschalten(gewechselt) {
+  const leistung = $('laArt').value === 'leistung';
+  $('laLeistungFelder').style.display = leistung ? '' : 'none';
+  if (gewechselt && leistung && !$('laId').value) {
+    ['ahv_pflichtig', 'ferien_pflichtig', 'ml13_pflichtig', 'bvg_pflichtig', 'uvg_pflichtig', 'qst_pflichtig']
+      .forEach(k => { const e = $('la_' + k); if (e) { e.checked = true; } });
+  }
 }
 
 function lohnartSpeichern() {
@@ -25145,6 +25180,8 @@ function lohnartSpeichern() {
     satz_bp: $('laSatz').value.trim() === '' ? '' : Math.round(parseFloat($('laSatz').value.replace(',', '.')) * 100),
     gav_grundlage: $('laGav').value.trim(),
     aktiv: $('laAktiv').checked,
+    nummer: $('laNummer').value.trim(),
+    standard: $('laStandard').value.trim(),
   };
   Object.keys(LA_KURZ).forEach(k => { body[k] = $('la_' + k).checked; });
   api('lohnarten.php', { method: 'POST', body }).then(({ ok, data }) => {
@@ -25766,7 +25803,9 @@ const lohnMonat = d => d ? String(d).slice(5, 7) + '.' + String(d).slice(0, 4) :
 // und Dialog dieselben Worte brauchen.
 function lohnPositionRechnung(art) {
   return { stundensatz: 'pro Stunde', fixbetrag: 'pro Monat',
-           abzug: 'Abzug pro Monat', netto: 'Nettobetrag pro Monat' }[art]
+           abzug: 'Abzug pro Monat', netto: 'Nettobetrag pro Monat',
+           // ENT-721: nur die Stunden der Schichten mit dieser Leistungsart
+           leistung: 'pro Stunde mit dieser Leistungsart' }[art]
     || 'Rechenart unbekannt';
 }
 
@@ -25830,7 +25869,7 @@ function lohnPositionKarte(heute) {
     return `<tr${vorbei || kuenftig ? ' style="opacity:.7"' : ''}>
       <td>${esc(p.bezeichnung)}${traegt.length ? `<div class="zone-note" style="margin:0">${esc(traegt.join(' · '))}</div>` : ''}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums"><b>${vz}${lohnFr(p.betrag_rappen)}</b></td>
-      <td>${einmalig && p.art !== 'stundensatz' ? 'einmalig' : esc(lohnPositionRechnung(p.art))}</td>
+      <td>${einmalig && !['stundensatz', 'leistung'].includes(p.art) ? 'einmalig' : esc(lohnPositionRechnung(p.art))}</td>
       <td>${zeitraum}${marke}</td>
       <td style="text-align:right">${lohnSchreiben()
         ? `<button class="btn btn-quiet btn-sm" onclick="lohnPositionOeffnen(${p.id})">Ändern</button>` : ''}</td>
@@ -25915,7 +25954,8 @@ function lohnPositionEinheit() {
     || (p && p.lohnart_id === id ? p : null);
   const einheit = !l ? 'CHF'
     : { stundensatz: 'CHF pro Stunde', fixbetrag: 'CHF pro Monat',
-        abzug: 'CHF pro Monat, wird abgezogen', netto: 'CHF pro Monat, netto ausbezahlt' }[l.art] || 'CHF';
+        abzug: 'CHF pro Monat, wird abgezogen', netto: 'CHF pro Monat, netto ausbezahlt',
+        leistung: 'CHF pro Stunde mit dieser Leistungsart' }[l.art] || 'CHF';
   $('lpoBetragLabel').textContent = 'Betrag in ' + einheit;
   $('lpoNeuBetragLabel').textContent = 'Neuer Betrag in ' + einheit;
   const traegt = [];
@@ -25924,6 +25964,9 @@ function lohnPositionEinheit() {
   $('lpoLohnartHinweis').textContent = !l ? ''
     : (l.art === 'abzug' ? 'Wird nach dem Nettolohn abgezogen und ändert keinen Sozialversicherungsbeitrag.'
       : l.art === 'netto' ? 'Kein Lohn: wird nach dem Nettolohn ausbezahlt, ohne Sozialversicherungsbeiträge.'
+      : l.art === 'leistung' ? 'Ersetzt für diese Person den Standardsatz der Leistungsart. Gezählt werden nur die '
+        + 'Stunden der Schichten, an deren Zuteilung sie gewählt ist.'
+        + (traegt.length ? ' Darauf rechnet der Lohnlauf ' + traegt.join(' und ') + ' als eigene Zeile.' : '')
       : traegt.length ? 'Der Lohnlauf rechnet darauf ' + traegt.join(' und ') + ' als eigene Zeile.'
       : 'Trägt weder Ferienentschädigung noch 13. Monatslohn.');
 }
@@ -30491,6 +30534,8 @@ function askDeleteObjekt() {
 // verliert die Staffelung.
 const EP_TAKT = 15;
 let epId = null, epEinsatz = null, epPos = [], epGewaehlt = null, epFilter = 'alle';
+// Waehlbare Leistungsarten (ENT-721), aus derselben Antwort wie die Positionen.
+let epLeistungsarten = [];
 // Angehakte Schichten (Sammelaktionen) und die gerade bearbeiteten Schichten
 // im Dialog. Beides bewusst neben epGewaehlt, nicht darin -- siehe epHaken().
 let epAngehakt = new Set(), epBearbeitet = [];
@@ -30528,6 +30573,7 @@ function epLaden() {
   if (!anstellungsorte.length) { ladeAnstellungsorte().then(() => epKopfZeichnen()); }
   return api('einsatz_position.php?einsatz_id=' + epId).then(({ ok, data }) => {
     epPos = (ok && data.status === 'ok') ? (data.positionen || []) : [];
+    epLeistungsarten = (ok && data.status === 'ok') ? (data.leistungsarten || []) : [];
     // Beim ersten Oeffnen entstehen die Positionen aus dem Bedarf des
     // Einsatzes. Ohne das stuende hier ein Leerzustand, obwohl die Zahl der
     // benoetigten Leute laengst feststeht -- und jede Zeile muesste einzeln
@@ -30671,6 +30717,7 @@ function epKopfZeichnen() {
     ${epWegWarnung(e)}
     ${epGavAus010Warnung(e)}
     ${epFahrtBlock(e)}
+    ${epLeistungBlock(e)}
     <div class="card-bd ep-zone">${epRapportBlock(e)}${epDokBlock()}</div>
     ${epRechnungBlock(e)}`;
 }
@@ -31067,6 +31114,66 @@ function epFahrtBlock(e) {
         ${leute.map(zeile).join('')}
       </div>` : ''}
     </div></div>`;
+}
+
+// ── Leistungsart je Person (ENT-721) ─────────────────────────────────────
+// Welche Leistung jemand auf diesem Einsatz erbringt, etwa als Hundefuehrer.
+// Daran haengt die Zulage je Leistungsart im Lohnlauf. Der Block erscheint
+// nur, wenn es im Katalog eine aktive Leistungsart gibt und jemand
+// eingeteilt ist -- sonst gaebe es nichts zu waehlen.
+function epLeistungBlock(e) {
+  const aktive = epLeistungsarten.filter(l => l.aktiv);
+  // Eine Zuteilung je Person und Einsatz -- auch wenn sie mehrere Positionen deckt.
+  const leute = (epPos || []).filter(epBesetzt)
+    .filter((p, i, a) => a.findIndex(x => Number(x.mitarbeiter_id) === Number(p.mitarbeiter_id)) === i);
+  // Fehlt der Schluessel, ist die Einrichtung noch nicht gelaufen.
+  if (!aktive.length || !leute.length || !leute.some(p => 'leistungsart_id' in p)) { return ''; }
+  const gesperrt = enGesperrt(e);
+  const name = l => (l.nummer ? l.nummer + ' · ' : '') + l.bezeichnung;
+  const zeile = p => {
+    const ma = mitarbeiter.find(m => Number(m.id) === Number(p.mitarbeiter_id));
+    const wer = (ma && (fullName(ma) || ma.name)) || p.mitarbeiter || ('#' + p.mitarbeiter_id);
+    const wert = p.leistungsart_id == null ? '' : String(p.leistungsart_id);
+    // Eine inzwischen deaktivierte, aber gewaehlte Leistungsart bleibt in der
+    // Auswahl -- sonst spraenge das Feld still auf "keine".
+    const liste = aktive.slice();
+    const alt = epLeistungsarten.find(l => String(l.id) === wert && !l.aktiv);
+    if (alt) { liste.push(alt); }
+    return `<div class="ep-la-zeile">
+      <span>${esc(wer)}</span>
+      <select class="inp" data-la-ma="${Number(p.mitarbeiter_id)}"${gesperrt ? ' disabled' : ''}
+              onchange="epLeistungSpeichern(this)" aria-label="Leistungsart von ${esc(wer)}">
+        <option value="">keine</option>
+        ${liste.map(l => `<option value="${l.id}"${String(l.id) === wert ? ' selected' : ''}>${esc(name(l))}${l.aktiv ? '' : ' (deaktiviert)'}</option>`).join('')}
+      </select>
+    </div>`;
+  };
+  return `<div class="card-bd" style="padding:0 16px 14px">
+    <div class="zone">
+      <div class="zone-hd">Leistungsart je Person</div>
+      <div class="zone-note" style="margin-bottom:10px">Massgeblich für die Zulage je Leistungsart im Lohn.
+        Leer heisst: keine.</div>
+      ${leute.map(zeile).join('')}
+    </div></div>`;
+}
+
+function epLeistungSpeichern(sel) {
+  const maId = Number(sel.dataset.laMa);
+  if (!epEinsatz) { return; }
+  const p = epPos.find(x => Number(x.mitarbeiter_id) === maId);
+  const vorher = p ? p.leistungsart_id : null;
+  api('einsatz_leistungsart.php', { method: 'POST', body: {
+    einsatz_id: epEinsatz.id, mitarbeiter_id: maId, leistungsart_id: sel.value,
+  } }).then(({ ok, data }) => {
+    if (!ok || data.status !== 'ok') {
+      toast(data.message || 'Die Leistungsart liess sich nicht speichern.');
+      // Zurueck auf den Stand des Servers, sonst zeigt das Feld etwas, das es nicht gibt.
+      sel.value = vorher == null ? '' : String(vorher);
+      return;
+    }
+    epPos.filter(x => Number(x.mitarbeiter_id) === maId).forEach(x => { x.leistungsart_id = data.leistungsart_id; });
+    toast('Leistungsart gespeichert.');
+  }).catch(() => { sel.value = vorher == null ? '' : String(vorher); toast('Die Leistungsart liess sich nicht speichern.'); });
 }
 
 function epFahrzeugHinweis(e) {

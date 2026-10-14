@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 31,
+            'datum' => '2026-10-14',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Zulage je Leistungsart',
+            'text'  => 'Unter Lohn → Lohnarten gibt es die neue Art „Leistungsart“, etwa Hundeführer, mit Nummer und Standardsatz pro Stunde. Im Einsatzplan wählst du je Person, welche Leistungsart sie erbringt. Der Lohnlauf zahlt die Zulage nur für diese Stunden. Hat jemand einen eigenen Satz, gilt dieser statt des Standards; er wird wie eine persönliche Zulage auf der Lohnseite erfasst.',
+        ],
+        [
             'nr'    => 30,
             'datum' => '2026-10-14',
             'art'   => 'neu',

@@ -46,6 +46,9 @@ function lohnlauf_sperrgruende(): array
         'anordnung_fehlt'    => 'Der Zuschlag ist als Stundenentschädigung vereinbart. Nach Art. 19 entsteht er aus dem angeordneten Einsatz — die Anordnung je Schicht führt das Datenmodell noch nicht.',
         'periode_kein_monat' => 'Persönliche Zulagen und Abzüge gelten je ganzen Kalendermonat. Der Zeitraum dieses Laufs ist kein ganzer Monat — welcher Anteil gilt, ist nicht festgelegt, darum entsteht kein Betrag.',
         'position_art_ungueltig' => 'Die Lohnart dieser persönlichen Position rechnet weder pro Stunde noch als fester Betrag noch als Abzug. Sie ist im Katalog geändert worden, nachdem die Position erfasst war.',
+        'leistungsart_nicht_gewaehlt' => 'Für diese Person ist eine Zulage je Leistungsart hinterlegt, aber an einigen Schichten ist keine Leistungsart gewählt. Für diese Stunden entsteht keine Zulage — ob sie geschuldet ist, sagt die Zuteilung, nicht die Akte.',
+        'leistungsart_ohne_satz' => 'Für diese Leistungsart gibt es weder einen eigenen Satz der Person noch einen Standardsatz im Katalog.',
+        'leistungsart_unbekannt' => 'An Schichten ist eine Leistungsart gewählt, die es im Katalog nicht mehr als Leistungsart gibt.',
         'ausgleich_offen'    => 'Art. 14 Ziff. 3 lässt für die Mehrstunden über 210 die Auszahlung ODER den Ausgleich als Freizeit innerhalb von drei Monaten zu. Welches von beidem gilt, ist nicht festgelegt — bis dahin entsteht kein Betrag.',
         // ── Abzugsseite (Etappe 4) ──────────────────────────────────────
         'kein_sv_regelwerk'  => 'Für dieses Beitragsjahr sind die Sätze für AHV, IV und EO nicht erfasst. Es wird nicht mit den Sätzen eines anderen Jahres gerechnet.',
@@ -78,10 +81,26 @@ function lohnlauf_sperrgruende(): array
 // 'ausgefallen' -- 'abgeglichen' kommt als Spaltenwert nirgends vor. Jede
 // Schicht waere also unabhaengig vom tatsaechlichen Abgleich als offen
 // gezaehlt worden, und kein Lohnlauf haette je einen Betrag ausgewiesen.
+// Gibt es die Leistungsart an der Zuteilung schon (ENT-721)? Gefragt wird
+// die Tabelle selbst, nicht information_schema -- so laeuft dieselbe Frage
+// auch gegen die Pruef-Datenbank.
+function lohnlauf_mit_leistungsart(PDO $pdo): bool
+{
+    static $merk = null;
+    $merk ??= new WeakMap();
+    if (!isset($merk[$pdo])) {
+        try { $pdo->query('SELECT leistungsart_id FROM einsatz_zuteilung LIMIT 0'); $merk[$pdo] = true; }
+        catch (Throwable $e) { $merk[$pdo] = false; }
+    }
+    return $merk[$pdo];
+}
+
 function lohnlauf_zeiten(PDO $pdo, int $maId, string $von, string $bis): array
 {
+    $mitLa = lohnlauf_mit_leistungsart($pdo);
     $sql = "SELECT z.einsatz_id, e.datum, e.sparte, e.kunde_name, e.objekt_id,
-                   z.ist_status, z.ist_von, z.ist_bis, z.ist_pause_min, z.ist_pause_bezahlt_ma
+                   z.ist_status, z.ist_von, z.ist_bis, z.ist_pause_min, z.ist_pause_bezahlt_ma"
+         . ($mitLa ? ", z.leistungsart_id" : "") . "
             FROM einsatz_zuteilung z
             JOIN einsaetze e ON e.id = z.einsatz_id
             WHERE z.mitarbeiter_id = ? AND e.datum BETWEEN ? AND ?
@@ -102,6 +121,7 @@ function lohnlauf_zeiten(PDO $pdo, int $maId, string $von, string $bis): array
             'von' => $r['ist_von'], 'bis' => $r['ist_bis'],
             'pause_min' => $r['ist_pause_min'] === null ? null : (int)$r['ist_pause_min'],
             'sparte' => $r['sparte'],
+            'leistungsart_id' => $mitLa && $r['leistungsart_id'] !== null ? (int)$r['leistungsart_id'] : null,
             'roh_min' => null, 'netto_min' => null, 'bonus_min' => null, 'bewertet_min' => null,
             'gesperrt_grund' => null,
         ];
@@ -736,7 +756,9 @@ function lohnlauf_ansatz(PDO $pdo, int $maId, string $stichtag): ?array
 //   fixbetrag   -> Betrag je Monat, Bruttoseite
 //   abzug       -> Betrag je Monat, nach dem Nettolohn abgezogen
 //   netto       -> Betrag je Monat, nach dem Nettolohn ausbezahlt (kein Lohn)
-const LOHN_POSITION_ARTEN = ['stundensatz', 'fixbetrag', 'abzug', 'netto'];
+//   leistung    -> Betrag x Stunden NUR der Schichten mit dieser Leistungsart
+//                  (ENT-721), eigener Rechenweg in lohnlauf_leistungen()
+const LOHN_POSITION_ARTEN = ['stundensatz', 'fixbetrag', 'abzug', 'netto', 'leistung'];
 
 // Ist der Zeitraum genau ein Kalendermonat? Persoenliche Positionen gelten
 // nur je ganzen Monat -- eine Rechnung fuer einen Teilzeitraum waere eine
@@ -754,7 +776,7 @@ function lohnlauf_positionen(PDO $pdo, int $maId, string $von, string $bis): arr
 {
     try {
         $st = $pdo->prepare(
-            'SELECT p.id, p.betrag_rappen, p.gueltig_ab, p.gueltig_bis,
+            'SELECT p.id, p.lohnart_id, p.betrag_rappen, p.gueltig_ab, p.gueltig_bis,
                     l.schluessel, l.bezeichnung, l.art, l.system,
                     l.ferien_pflichtig, l.ml13_pflichtig
              FROM lohn_position p JOIN lohnart l ON l.id = p.lohnart_id
@@ -1022,6 +1044,111 @@ function lohnlauf_position_gesperrt(array $p, int $sort, string $grund): array
         'hinweis' => 'Persönliche Position aus der Personalakte'];
 }
 
+// ── Zulage je Leistungsart (ENT-721) ─────────────────────────────────────
+// Gezaehlt werden die bewerteten Stunden der Schichten, an deren Zuteilung
+// die Leistungsart gewaehlt ist -- nicht alle Stunden. Der Satz kommt aus
+// der Person (persoenliche Position derselben Lohnart), sonst aus dem
+// Standardsatz des Katalogs. Ferienentschaedigung und 13.-Anteil stehen,
+// wenn die Leistungsart sie traegt, als EIGENE Zeile daneben (GAV-AUS-019,
+// vorlaeufige Annahme).
+//
+// Hat die Person eine Zulage hinterlegt, aber Schichten ohne Leistungsart,
+// entsteht eine gesperrte Zeile: Ob fuer diese Stunden etwas geschuldet ist,
+// sagt die Zuteilung -- und die schweigt. Das soll auffallen, nicht
+// verschwinden.
+function lohnlauf_leistungsarten(PDO $pdo): array
+{
+    try {
+        $st = $pdo->query("SELECT id, schluessel, bezeichnung, standard_rappen,
+                                  ferien_pflichtig, ml13_pflichtig
+                           FROM lohnart WHERE art = 'leistung'");
+        $k = [];
+        foreach ($st->fetchAll() as $r) { $k[(int)$r['id']] = $r; }
+        return $k;
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+function lohnlauf_leistungen(PDO $pdo, array $schichten, array $leistungPos, bool $ganzerMonat,
+                             array $fe, $ml13Bp): array
+{
+    $min = []; $bonus = []; $ohne = ['n' => 0, 'min' => 0.0];
+    foreach ($schichten as $sch) {
+        if ($sch['gesperrt_grund']) { continue; }
+        $la = $sch['leistungsart_id'] ?? null;
+        if ($la === null) { $ohne['n']++; $ohne['min'] += (float)$sch['bewertet_min']; continue; }
+        $min[$la] = ($min[$la] ?? 0.0) + (float)$sch['bewertet_min'];
+        $bonus[$la] = ($bonus[$la] ?? 0.0) + (float)$sch['bonus_min'];
+    }
+    $zeilen = [];
+    if (!$min && !$leistungPos) { return $zeilen; }
+    $katalog = lohnlauf_leistungsarten($pdo);
+
+    foreach ($min as $laId => $m) {
+        $l = $katalog[$laId] ?? null;
+        $stunden = $m / 60;
+        if ($l === null) {
+            $zeilen[] = ['schluessel' => 'leistungsart_' . $laId, 'bezeichnung' => 'Leistungsart Nr. ' . $laId,
+                'basis_rappen' => null, 'satz_bp' => null, 'menge' => round($stunden, 4),
+                'betrag_rappen' => null, 'sortierung' => 39, 'annahme' => 0,
+                'gesperrt_grund' => 'leistungsart_unbekannt', 'hinweis' => 'Zulage je Leistungsart'];
+            continue;
+        }
+        $eigene = $leistungPos[$laId] ?? [];
+        $titel = (string)$l['bezeichnung'];
+        if ($eigene && !$ganzerMonat) {
+            $zeilen[] = lohnlauf_position_gesperrt($eigene[0], 39, 'periode_kein_monat');
+            continue;
+        }
+        $satz = $eigene ? (int)$eigene[0]['betrag_rappen']
+              : ($l['standard_rappen'] === null ? null : (int)$l['standard_rappen']);
+        if ($satz === null) {
+            $zeilen[] = ['schluessel' => (string)$l['schluessel'], 'bezeichnung' => $titel,
+                'basis_rappen' => null, 'satz_bp' => null, 'menge' => round($stunden, 4),
+                'betrag_rappen' => null, 'sortierung' => 39, 'annahme' => 0,
+                'gesperrt_grund' => 'leistungsart_ohne_satz', 'hinweis' => 'Zulage je Leistungsart'];
+            continue;
+        }
+        $betrag = lohn_rappen($satz * $stunden);
+        $zeilen[] = ['schluessel' => (string)$l['schluessel'], 'bezeichnung' => $titel,
+            'basis_rappen' => $satz, 'satz_bp' => null, 'menge' => round($stunden, 4),
+            'betrag_rappen' => $betrag, 'sortierung' => 39,
+            // Der Zeitbonus in diesen Stunden beruht auf GAV-AUS-008, die
+            // Ferien- und 13.-Pflicht auf GAV-AUS-019 -- beides wird gesagt.
+            'annahme' => ($bonus[$laId] ?? 0) > 0 ? 1 : 0,
+            'hinweis' => 'Zulage je Leistungsart: ' . gavzeit_std($m) . ' mit dieser Leistungsart, Satz '
+                . ($eigene ? 'der Person' : 'aus dem Katalog (Standard)')];
+        if ((int)$l['ferien_pflichtig']) {
+            $zeilen[] = ['schluessel' => 'ferien_auf_zulage',
+                'bezeichnung' => 'Ferienentschädigung auf ' . $titel,
+                'basis_rappen' => $betrag, 'satz_bp' => $fe['bp'], 'menge' => null,
+                'betrag_rappen' => lohn_anteil($betrag, $fe['bp']), 'sortierung' => 40,
+                'annahme' => 1, 'hinweis' => $fe['text'] . ' — dass die Zulage mitzählt, ist eine Annahme (GAV-AUS-019)'];
+        }
+        if ((int)$l['ml13_pflichtig'] && $ml13Bp !== null) {
+            $zeilen[] = ['schluessel' => 'anteil_13ml_auf_zulage',
+                'bezeichnung' => 'Anteil 13. Monatslohn auf ' . $titel,
+                'basis_rappen' => $betrag, 'satz_bp' => (int)$ml13Bp, 'menge' => null,
+                'betrag_rappen' => lohn_anteil($betrag, (int)$ml13Bp), 'sortierung' => 41,
+                'annahme' => 1, 'hinweis' => 'Satz aus dem Lohnansatz — dass die Zulage mitzählt, ist eine Annahme (GAV-AUS-019)'];
+        }
+    }
+
+    // Zulage hinterlegt, aber Schichten ohne Leistungsart: auffallen lassen.
+    if ($leistungPos && $ohne['n'] > 0) {
+        $namen = [];
+        foreach ($leistungPos as $laId => $ps) { $namen[] = (string)$ps[0]['bezeichnung']; }
+        $zeilen[] = ['schluessel' => 'leistungsart_offen', 'bezeichnung' => 'Schichten ohne Leistungsart',
+            'basis_rappen' => null, 'satz_bp' => null, 'menge' => round($ohne['min'] / 60, 4),
+            'betrag_rappen' => null, 'sortierung' => 42, 'annahme' => 0,
+            'gesperrt_grund' => 'leistungsart_nicht_gewaehlt',
+            'hinweis' => $ohne['n'] . ($ohne['n'] === 1 ? ' Schicht' : ' Schichten') . ' ohne gewählte Leistungsart; '
+                . 'hinterlegt: ' . implode(', ', $namen)];
+    }
+    return $zeilen;
+}
+
 // ── Die Lohnzeilen einer Person ──────────────────────────────────────────
 // Rueckgabe: ['zeilen' => [...], 'summe' => [...], 'gesperrt_grund' => ?].
 //
@@ -1180,6 +1307,7 @@ function lohnlauf_person(PDO $pdo, array $ma, string $von, string $bis): array
     //    da, statt in der Zulage zu verschwinden (Art. 12 Ziff. 5).
     $ganzerMonat = lohn_ganzer_monat($von, $bis);
     $kopf['positionen_netto'] = [];
+    $leistungPos = [];
     foreach (lohnlauf_positionen($pdo, $maId, $von, $bis) as $p) {
         $art = (string)$p['art'];
         if ((int)$p['system'] || !in_array($art, LOHN_POSITION_ARTEN, true)) {
@@ -1190,6 +1318,10 @@ function lohnlauf_person(PDO $pdo, array $ma, string $von, string $bis): array
             $kopf['positionen_netto'][] = $p + ['ganzer_monat' => $ganzerMonat];
             continue;
         }
+        // Der persoenliche Satz je Leistungsart rechnet nicht auf ALLE
+        // Stunden, sondern nur auf die mit dieser Leistungsart -- eigener
+        // Rechenweg unten (ENT-721).
+        if ($art === 'leistung') { $leistungPos[(int)$p['lohnart_id']][] = $p; continue; }
         if (!$ganzerMonat) {
             $zeilen[] = lohnlauf_position_gesperrt($p, 36, 'periode_kein_monat');
             continue;
@@ -1229,6 +1361,12 @@ function lohnlauf_person(PDO $pdo, array $ma, string $von, string $bis): array
                 'sortierung' => 38, 'annahme' => 0,
                 'hinweis' => 'Betrieblich vereinbart, Satz aus dem Lohnansatz'];
         }
+    }
+
+    // 9. Zulage je Leistungsart (ENT-721).
+    foreach (lohnlauf_leistungen($pdo, $zeit['schichten'], $leistungPos, $ganzerMonat,
+                                 $fe, $ansatz['ml13_bp']) as $z) {
+        $zeilen[] = $z;
     }
 
     $kopf['zeilen'] = $zeilen;
