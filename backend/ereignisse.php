@@ -66,6 +66,53 @@ function ereignis_abhakbar(string $typ): bool
     return isset(EREIGNIS_ARTEN[$typ]);
 }
 
+// "Alle als gelesen" aus der Glocke (14.10.2026).
+//
+// Je Art dieselbe Bedingung wie in ereignisse_sammeln() -- und NUR die: Ein
+// Stempel an einer Zeile, die gar nicht im Feed stand, wuerde sie
+// unsichtbar machen, bevor sie je erscheint (etwa eine noch offene Zusage,
+// die morgen beantwortet wird, oder ein normal geplanter Rundgang).
+//
+// $bis ist der Stand, zu dem die Liste geladen wurde. Was danach eingeht,
+// hat niemand gesehen und bleibt offen. Verglichen wird mit derselben
+// Zeitspalte, nach der der Feed sortiert. Bei der Zusage ist das der
+// Zeitpunkt der Zuteilung, nicht der Antwort -- eine Antwort auf eine alte
+// Zuteilung, die genau zwischen Laden und Klick eingeht, geht mit. Das ist
+// dieselbe Unschaerfe, die der Feed bei der Sortierung schon hat.
+//
+// Abwesenheit und Supportantwort fehlen absichtlich, wie in EREIGNIS_ARTEN.
+const EREIGNIS_ALLE_ABHAKEN = [
+    'rapport'  => ['tabelle' => 'rapporte', 'spalte' => 'gesehen_am', 'zeit' => 'erfasst_am', 'wo' => '1 = 1'],
+    'sperrtag' => ['tabelle' => 'verfuegbarkeiten', 'spalte' => 'gesehen_am', 'zeit' => 'erfasst_am', 'wo' => '1 = 1'],
+    'zusage'   => ['tabelle' => 'einsatz_zuteilung', 'spalte' => 'zusage_gesehen_am', 'zeit' => 'zugeteilt_am',
+                   'wo' => "zusage <> 'offen'"],
+    'offerte'  => ['tabelle' => 'belege', 'spalte' => 'entscheidung_gesehen_am', 'zeit' => 'entscheidung_am',
+                   'wo' => 'entscheidung_am IS NOT NULL'],
+    'rundgang_spontan' => ['tabelle' => 'rundgang', 'spalte' => 'gesehen_am', 'zeit' => 'vorbereitet_am',
+                   'wo' => 'einsatz_id IN (SELECT id FROM einsaetze WHERE spontan_erzeugt = 1)'],
+    'vorfall'  => ['tabelle' => 'ereignis_meldung', 'spalte' => 'gesehen_am', 'zeit' => 'erfasst_am', 'wo' => '1 = 1'],
+];
+
+// Gibt je Art zurueck, wie viele Zeilen den Stempel bekamen. Scheitert eine
+// Art (Spalte fehlt), steht sie in 'fehler' -- die uebrigen laufen trotzdem.
+function ereignisse_alle_abhaken(PDO $pdo, string $bis, string $jetzt): array
+{
+    $geaendert = 0;
+    $fehler = [];
+    foreach (EREIGNIS_ALLE_ABHAKEN as $typ => $a) {
+        try {
+            $st = $pdo->prepare("UPDATE {$a['tabelle']} SET {$a['spalte']} = ?
+                                  WHERE {$a['spalte']} IS NULL AND {$a['wo']}
+                                    AND ({$a['zeit']} IS NULL OR {$a['zeit']} <= ?)");
+            $st->execute([$jetzt, $bis]);
+            $geaendert += $st->rowCount();
+        } catch (Throwable $e) {
+            $fehler[] = $typ;
+        }
+    }
+    return ['geaendert' => $geaendert, 'fehler' => $fehler];
+}
+
 // Eine Abfrage, die an einer fehlenden Spalte oder Tabelle scheitert, liefert
 // eine leere Liste statt den ganzen Feed mitzureissen. Nach dem Grundsatz aus
 // ENT-024: lieber ehrlich unvollstaendig als ein Fehler, der alles blockiert.
@@ -107,7 +154,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
 {
     $fehler = [];
     $liste  = [];
-    $anzahl = 0;   // alle offenen, nicht nur die gelesenen (ereignis_zaehlen)
+    $jeArt  = [];  // alle offenen je Art, nicht nur die gelesenen (ereignis_zaehlen)
 
     // ── Rapport eingegangen. Der Hauptfall: Der Mitarbeitende hat gemeldet,
     // die Verwaltung muss es ansehen.
@@ -117,7 +164,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
            FROM rapporte r JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
           WHERE r.gesehen_am IS NULL
           ORDER BY r.erfasst_am DESC, r.id DESC LIMIT 20", $fehler, 'rapport');
-    $anzahl += ereignis_zaehlen($pdo,
+    $jeArt['rapport'] = ereignis_zaehlen($pdo,
         "SELECT COUNT(*)
            FROM rapporte r JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
           WHERE r.gesehen_am IS NULL", count($zeilen));
@@ -140,7 +187,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
            FROM verfuegbarkeiten v JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
           WHERE v.datum >= CURDATE() AND v.gesehen_am IS NULL
           ORDER BY v.erfasst_am DESC LIMIT 20", $fehler, 'sperrtag');
-    $anzahl += ereignis_zaehlen($pdo,
+    $jeArt['sperrtag'] = ereignis_zaehlen($pdo,
         "SELECT COUNT(*)
            FROM verfuegbarkeiten v JOIN mitarbeiter m ON m.id = v.mitarbeiter_id
           WHERE v.datum >= CURDATE() AND v.gesehen_am IS NULL", count($zeilen));
@@ -164,7 +211,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
            JOIN mitarbeiter m ON m.id = z.mitarbeiter_id
           WHERE z.zusage <> 'offen' AND z.zusage_gesehen_am IS NULL
           ORDER BY z.zugeteilt_am DESC LIMIT 20", $fehler, 'zusage');
-    $anzahl += ereignis_zaehlen($pdo,
+    $jeArt['zusage'] = ereignis_zaehlen($pdo,
         "SELECT COUNT(*)
            FROM einsatz_zuteilung z
            JOIN einsaetze e   ON e.id = z.einsatz_id
@@ -196,7 +243,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
            FROM belege b LEFT JOIN kunden k ON k.id = b.kunde_id
           WHERE b.entscheidung_am IS NOT NULL AND b.entscheidung_gesehen_am IS NULL
           ORDER BY b.entscheidung_am DESC LIMIT 20", $fehler, 'offerte');
-    $anzahl += ereignis_zaehlen($pdo,
+    $jeArt['offerte'] = ereignis_zaehlen($pdo,
         "SELECT COUNT(*)
            FROM belege b LEFT JOIN kunden k ON k.id = b.kunde_id
           WHERE b.entscheidung_am IS NOT NULL AND b.entscheidung_gesehen_am IS NULL", count($zeilen));
@@ -217,7 +264,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
            FROM abwesenheiten a JOIN mitarbeiter m ON m.id = a.mitarbeiter_id
           WHERE a.status = 'beantragt' AND a.gesehen_am IS NULL
           ORDER BY a.beantragt_am DESC LIMIT 20", $fehler, 'abwesenheit');
-    $anzahl += ereignis_zaehlen($pdo,
+    $jeArt['abwesenheit'] = ereignis_zaehlen($pdo,
         "SELECT COUNT(*)
            FROM abwesenheiten a JOIN mitarbeiter m ON m.id = a.mitarbeiter_id
           WHERE a.status = 'beantragt' AND a.gesehen_am IS NULL", count($zeilen));
@@ -246,7 +293,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
            JOIN mitarbeiter m ON m.id = r.mitarbeiter_id
           WHERE e.spontan_erzeugt = 1 AND r.gesehen_am IS NULL
           ORDER BY r.vorbereitet_am DESC LIMIT 20", $fehler, 'rundgang_spontan');
-    $anzahl += ereignis_zaehlen($pdo,
+    $jeArt['rundgang_spontan'] = ereignis_zaehlen($pdo,
         "SELECT COUNT(*)
            FROM rundgang r
            JOIN einsaetze e   ON e.id = r.einsatz_id
@@ -287,7 +334,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
            LEFT JOIN ereignisart a ON a.id = v.ereignisart_id
           WHERE v.gesehen_am IS NULL
           ORDER BY v.erfasst_am DESC LIMIT 20", $fehler, 'vorfall');
-    $anzahl += ereignis_zaehlen($pdo,
+    $jeArt['vorfall'] = ereignis_zaehlen($pdo,
         "SELECT COUNT(*)
            FROM ereignis_meldung v
            JOIN objekte o     ON o.id = v.objekt_id
@@ -325,7 +372,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
     if ($stamm !== null) {
         try {
             $zeilen = sv_kunde_ungelesen($stamm, $mandantId);
-            $anzahl += count($zeilen);
+            $jeArt['support_antwort'] = count($zeilen);
             foreach ($zeilen as $v) {
                 $liste[] = [
                     'typ'   => 'support_antwort',
@@ -355,7 +402,7 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
     usort($liste, fn($a, $b) => strcmp((string)($b['zeit'] ?? ''), (string)($a['zeit'] ?? '')));
     // Die echte Zahl, nicht die Laenge der je Art abgeschnittenen Liste
     // (siehe ereignis_zaehlen).
-    $gesamt = max($anzahl, count($liste));
+    $gesamt = max(array_sum($jeArt), count($liste));
 
     return [
         'ereignisse' => array_slice($liste, 0, $grenze),
@@ -363,6 +410,10 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
         // Wurde die Liste abgeschnitten? Eine stillschweigend gekuerzte Liste
         // liest sich wie eine vollstaendige.
         'gekuerzt'   => $gesamt > $grenze,
+        // Dieselbe Zahl je Art. Die Glocke zaehlt daraus nur die Arten, die
+        // sie auch anzeigen kann -- eine Art, die gezaehlt, aber nie als Zeile
+        // gezeigt wird, ergibt eine Zahl ueber einer leeren Liste.
+        'je_art'     => $jeArt,
         // Welche Arten gar nicht abgefragt werden konnten. Leer ist gut;
         // nicht leer heisst: hier fehlt etwas, und zwar bekannt.
         'unvollstaendig' => $fehler,
