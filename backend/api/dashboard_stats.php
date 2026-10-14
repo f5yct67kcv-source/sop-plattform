@@ -135,6 +135,7 @@ json_response([
     'ereignisse'            => $ereignisse['ereignisse'],
     'ereignisse_gesamt'     => $ereignisse['gesamt'],
     'ereignisse_gekuerzt'   => $ereignisse['gekuerzt'],
+    'ereignisse_je_art'     => $ereignisse['je_art'],
     // Welche Arten sich nicht abfragen liessen -- meist eine Spalte, die die
     // Einrichtung noch nicht angelegt hat. Die Oberflaeche muss den
     // Unterschied hinschreiben koennen: "nichts passiert" und "hier fehlt
