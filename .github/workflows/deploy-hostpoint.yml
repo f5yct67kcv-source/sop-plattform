@@ -1054,6 +1054,7 @@ jobs:
           # Rechteck, und lokal faellt es nicht auf.
           mkdir -p dist-guardops/homepage-bilder
           cp homepage-bilder/*.webp               dist-guardops/homepage-bilder/
+          cp homepage-bilder/vorschau.jpg         dist-guardops/homepage-bilder/
 
           # Der Endpunkt und seine vier Einbindungen. KEIN anmeldung.php und
           # kein Produktcode -- die Seite hat mit dem Rapport-Tool nichts zu

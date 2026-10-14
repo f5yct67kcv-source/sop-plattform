@@ -43,7 +43,64 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="GuardOpS – Betriebssoftware für Schweizer Sicherheitsdienste">
 <meta property="og:description" content="Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen in einer Software – mit dem GAV Sicherheit im Kern.">
-<meta property="og:image" content="icons/guardops-512.png">
+<meta property="og:url" content="https://guardops.ch/">
+<meta property="og:site_name" content="GuardOpS">
+<meta property="og:locale" content="de_CH">
+<!-- Vorschaubild fuer geteilte Links (LinkedIn, Facebook, WhatsApp, Anzeigen).
+     ABSOLUTE ADRESSE: Eine relative nimmt nicht jede Plattform an. 1200x630
+     ist das Format, das Facebook und LinkedIn ohne Beschnitt zeigen.
+     test_deploy.mjs prueft Masse, Datei und dass sie ins Buendel kommt. -->
+<meta property="og:image" content="https://guardops.ch/homepage-bilder/vorschau.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="GuardOpS: Der ganze Betrieb. Eine Software. Daneben das Cockpit mit Beispieldaten.">
+<meta name="twitter:card" content="summary_large_image">
+<!-- Strukturierte Daten fuer Suchmaschinen. Firma und Adresse stehen genau so
+     im Impressum; test_deploy.mjs haelt beides gegeneinander. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://guardops.ch/#firma",
+      "name": "pzu consulting gmbh",
+      "url": "https://guardops.ch/",
+      "email": "info@guardops.ch",
+      "logo": "https://guardops.ch/icons/guardops-512.png",
+      "identifier": "CHE-411.716.010",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Hochgasse 7",
+        "postalCode": "4632",
+        "addressLocality": "Trimbach",
+        "addressCountry": "CH"
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://guardops.ch/#seite",
+      "url": "https://guardops.ch/",
+      "name": "GuardOpS",
+      "inLanguage": "de-CH",
+      "publisher": { "@id": "https://guardops.ch/#firma" }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://guardops.ch/#software",
+      "name": "GuardOpS",
+      "url": "https://guardops.ch/",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "description": "Betriebssoftware für Sicherheitsdienste in der Schweiz: Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen, mit dem GAV Sicherheit im Kern.",
+      "image": "https://guardops.ch/homepage-bilder/vorschau.jpg",
+      "inLanguage": "de-CH",
+      "areaServed": "CH",
+      "publisher": { "@id": "https://guardops.ch/#firma" }
+    }
+  ]
+}
+</script>
 <style>
 /* Schriften selbst ausgeliefert (wie Inter fuer das Cockpit, ENT-223/OP-224):
    Kein Abruf bei Google von der oeffentlichen Seite aus. Lizenzen:
