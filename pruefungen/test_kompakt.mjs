@@ -100,6 +100,26 @@ await pk.click('#enNSerieHinweis >> xpath=.. >> .abs-info'); await pk.waitForTim
 check('kompakt: (i) schliesst ihn wieder', (await mass(pk)).hinweisZu);
 await pk.close();
 
+// ── Breiter Schirm, kompakt: Kunde und Strasse enden nach zwei Spalten,
+// das naechste Feld rueckt in dieselbe Zeile (Wunsch 2026-10-14).
+const pb = await seite(1920, 1000, 'kompakt');
+const breit = await pb.evaluate(() => {
+  const r = id => document.getElementById(id).closest('.f').getBoundingClientRect();
+  const z = (a, b) => Math.abs(r(a).top - r(b).top) < 3;
+  return {
+    kundeNeben: z('enNKunde_name', 'enNEinsatzart'),
+    kundeBuendig: Math.abs(document.getElementById('enNKunde_name').getBoundingClientRect().right
+      - document.getElementById('enNStatus').getBoundingClientRect().right),
+    strasseNeben: z('enNStrasse', 'enNOrt'),
+    zeitraumBreit: r('enNDatum').width / document.getElementById('enNDatum').closest('.form-grid').getBoundingClientRect().width,
+  };
+});
+check('breit kompakt: Einsatzart rueckt neben Kunde', breit.kundeNeben);
+check('breit kompakt: Kunde endet buendig mit dem Feld darunter', breit.kundeBuendig < 2, breit.kundeBuendig);
+check('breit kompakt: PLZ/Ort rueckt neben Strasse', breit.strasseNeben);
+check('breit kompakt: Zeitraum bleibt ueber die ganze Breite', breit.zeitraumBreit > 0.95, breit.zeitraumBreit.toFixed(2));
+await pb.close();
+
 // ── Handy: kompakt im Speicher aendert nichts
 const hn = await seite(390, 844, 'normal');
 const h1 = await mass(hn); await hn.close();
