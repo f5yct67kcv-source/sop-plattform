@@ -5631,13 +5631,37 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   // und die Maske kommt doch, bleibt das Foto aus dem CSS-Hintergrund
   // stehen -- dieselbe Ausweiche wie auf dem Handy, wo das Video ohnehin nie
   // laeuft.
+  // Dritter Grund (2026-10-14): Die Quellen kommen erst nach dem Laden der
+  // Seite dazu ("load"), nicht schon beim Lesen dieser Zeile. Vorher lud
+  // das Video (rund 250 KB) gleichzeitig mit der Seite selbst und nahm ihr
+  // auf einer langsamen Leitung die Bandbreite weg (am 2026-10-14 im
+  // Browser gesehen: 25 s fuer die Seite, Video und Siegel parallel).
+  // Bis dahin steht das Foto aus dem
+  // CSS-Hintergrund da, wie bisher in den ersten Sekunden auch.
+  // Und nur, wenn das Video ueberhaupt gezeigt wird: Am Handy und bei
+  // reduzierter Bewegung blendet das CSS es aus, ein Abruf waere dort
+  // Datenverbrauch fuer nichts.
   if (!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
       && !document.documentElement.classList.contains('vorangemeldet')) {
-    var gv = document.getElementById('gate-video');
-    gv.insertAdjacentHTML('beforeend',
-      '<source src="img/anmeldung-nacht.webm" type="video/webm">' +
-      '<source src="img/anmeldung-nacht.mp4" type="video/mp4">');
-    gv.load();
+    (function () {
+      var gv = document.getElementById('gate-video');
+      // Erst geladen, wenn es sichtbar ist -- und dann einmal. Wird das
+      // Fenster spaeter breiter (Tablet gedreht, Fenster aufgezogen), holt
+      // der Groessenwechsel es nach.
+      var geladen = false;
+      function laden() {
+        if (geladen || getComputedStyle(gv).display === 'none') { return; }
+        geladen = true;
+        window.removeEventListener('resize', laden);
+        gv.insertAdjacentHTML('beforeend',
+          '<source src="img/anmeldung-nacht.webm" type="video/webm">' +
+          '<source src="img/anmeldung-nacht.mp4" type="video/mp4">');
+        gv.load();
+      }
+      function bereit() { laden(); if (!geladen) { window.addEventListener('resize', laden); } }
+      if (document.readyState === 'complete') { bereit(); }
+      else { window.addEventListener('load', bereit, { once: true }); }
+    })();
   }
   </script>
   <!-- Der Schleier ueber dem Video, gleicher Wert wie in app.html. Als

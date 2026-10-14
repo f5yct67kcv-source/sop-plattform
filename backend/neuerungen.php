@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 26,
+            'datum' => '2026-10-14',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit', 'app'],
+            'titel' => 'Anmeldung lädt schneller',
+            'text'  => 'Das Hintergrundvideo der Anmeldung kommt erst, wenn die Seite fertig geladen ist, und am Handy gar nicht mehr. Dort war es ohnehin nie zu sehen. Das CUPI-24-Siegel ist jetzt ein Zwanzigstel so gross, es sieht gleich aus.',
+        ],
+        [
             'nr'    => 25,
             'datum' => '2026-10-14',
             'art'   => 'verbesserung',
