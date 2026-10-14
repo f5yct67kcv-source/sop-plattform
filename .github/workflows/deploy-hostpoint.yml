@@ -82,6 +82,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Abhaengigkeit fuer "HTML verdichten" weiter unten, mit fester Fassung
+      # aus der package-lock.json (npm ci installiert genau diese, nichts
+      # Neueres). continue-on-error: Ohne sie laufen die Verdichter-Schritte
+      # ins Leere und die Seiten gehen unverdichtet hoch -- kein Grund, den
+      # Deploy anzuhalten.
+      - name: Verdichter einrichten
+        continue-on-error: true
+        run: npm ci --prefix werkzeuge/verdichten --no-audit --no-fund
+
       # Erster Schritt, bewusst VOR jedem Kopieren oder Hochladen: waehlt
       # anhand des Refs (main-Branch oder qa-*-Tag, ENT-372) den richtigen
       # Satz Secrets und bricht den
@@ -967,6 +976,14 @@ jobs:
       # Demo-Plaetze brauchen ihn nicht, sie laufen im Produktions-Deploy
       # mit und tragen dessen Stand.)
 
+      - name: HTML verdichten (dist)
+        # Kommentare aus den HTML-Seiten, als letzter Schritt vor dem
+        # Hochladen -- siehe Kopf von werkzeuge/verdichten/verdichten.mjs.
+        # continue-on-error: Klappt es nicht, geht die Seite unverdichtet
+        # hoch (nur groesser), statt den ganzen Deploy anzuhalten.
+        continue-on-error: true
+        run: node werkzeuge/verdichten/verdichten.mjs dist
+
       - name: Nach Hostpoint hochladen (FTPS)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -1182,6 +1199,12 @@ jobs:
 
           echo "Buendel fuer guardops.ch:"
           find dist-guardops -type f | sort
+
+      - name: HTML verdichten (dist-guardops)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_GUARDOPS_FTP_HOST != '' }}
+        # Wie oben bei dist/ (werkzeuge/verdichten/verdichten.mjs).
+        continue-on-error: true
+        run: node werkzeuge/verdichten/verdichten.mjs dist-guardops
 
       - name: Homepage nach guardops.ch hochladen (FTPS)
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_GUARDOPS_FTP_HOST != '' }}
@@ -1584,6 +1607,12 @@ jobs:
           echo "Buendel fuer betreiber.guardops.ch:"
           find dist-betreiber -type f | sort
 
+      - name: HTML verdichten (dist-betreiber)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_BETREIBER_FTP_HOST != '' }}
+        # Wie oben bei dist/ (werkzeuge/verdichten/verdichten.mjs).
+        continue-on-error: true
+        run: node werkzeuge/verdichten/verdichten.mjs dist-betreiber
+
       - name: Betreiber-Bereich nach betreiber.guardops.ch hochladen (FTPS)
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_BETREIBER_FTP_HOST != '' }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -1720,6 +1749,12 @@ jobs:
 
           echo "Buendel fuer portal.guardops.ch:"
           find dist-portal -type f | sort
+
+      - name: HTML verdichten (dist-portal)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_PORTAL_FTP_HOST != '' }}
+        # Wie oben bei dist/ (werkzeuge/verdichten/verdichten.mjs).
+        continue-on-error: true
+        run: node werkzeuge/verdichten/verdichten.mjs dist-portal
 
       - name: Kundenportal nach portal.guardops.ch hochladen (FTPS)
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_PORTAL_FTP_HOST != '' }}
@@ -2060,6 +2095,12 @@ jobs:
 
           echo "Buendel fuer cupi24.guardops.ch:"
           find dist-cupi24 -type f | sort
+
+      - name: HTML verdichten (dist-cupi24)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_CUPI24_FTP_HOST != '' }}
+        # Wie oben bei dist/ (werkzeuge/verdichten/verdichten.mjs).
+        continue-on-error: true
+        run: node werkzeuge/verdichten/verdichten.mjs dist-cupi24
 
       - name: Rapport-Tool nach cupi24.guardops.ch hochladen (FTPS)
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_CUPI24_FTP_HOST != '' }}
@@ -2519,6 +2560,12 @@ jobs:
       # WIRKLICH auf <Elternordner>/demoN zeigen. Stimmt das nicht, laedt
       # der Upload erfolgreich an eine unbediente Stelle, und die Adresse
       # bleibt bei 403 -- ohne dass der Lauf etwas meldet.
+      - name: HTML verdichten (dist-demo)
+        if: ${{ env.UMGEBUNG == 'production' }}
+        # Wie oben bei dist/ (werkzeuge/verdichten/verdichten.mjs).
+        continue-on-error: true
+        run: node werkzeuge/verdichten/verdichten.mjs dist-demo
+
       - name: demo1.guardops.ch beliefern (FTPS)
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO1_ZIEL != '' }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5

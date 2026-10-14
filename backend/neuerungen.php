@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 25,
+            'datum' => '2026-10-14',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit', 'app', 'betreiber'],
+            'titel' => 'Seiten laden schneller',
+            'text'  => 'Cockpit, App und Betreiberbereich sind beim ersten Öffnen nach einem Update nur noch etwa halb so gross. Bei langsamer Verbindung merkst du das am deutlichsten.',
+        ],
+        [
             'nr'    => 24,
             'datum' => '2026-10-14',
             'art'   => 'fehlerbehebung',
