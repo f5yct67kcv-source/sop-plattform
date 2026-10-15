@@ -117,7 +117,9 @@ const fl = await pb.evaluate(() => {
   const zeit = [...document.querySelectorAll('.zeilenfluss .zeitwahl select')].map(e => e.getBoundingClientRect().width);
   const links = ['enNKunde_name', 'enNVeranstaltung', 'enNDatum', 'enNStrasse', 'enNBedarf', 'enNWeg_km', 'enNKontakt_vorname'].map(id => r(id).x);
   const mitte = [];
-  document.querySelectorAll('.zeilenfluss > .f').forEach(f => {
+  // Textfelder und die Personenliste tragen ihre Beschriftung oben (wie
+  // im Raster), alle anderen mittig.
+  document.querySelectorAll('.zeilenfluss > .f:not(.zf-text):not(:has(> .zf-feld))').forEach(f => {
     const l = f.querySelector(':scope > label'), i = f.querySelector('.inp:not([type=hidden])');
     if (!l || !i) return;
     // Der TEXT der Beschriftung, nicht ihr Kasten: Ein Polster verschiebt
@@ -150,6 +152,35 @@ check('Zeilenfluss: Strasse, PLZ/Ort, Kanton in einer Zeile, Bedarf darunter', f
 check('Zeilenfluss: Kontaktperson in einer Zeile', fl.kontakt);
 check('Zeilenfluss: Zonenhinweis neben der Wegzeile', fl.zoneNeben);
 check('Zeilenfluss: Wegfelder 104 px (Einheit nicht verdeckt)', Math.abs(fl.weg - 104) < 0.5, fl.weg);
+const un = await pb.evaluate(() => {
+  const r = id => document.getElementById(id).getBoundingClientRect();
+  const SOLL = { enNFahrzeug_id: 260, enNFahrer_id: 218, enNTreffpunkt: 345, enNQualifikation: 218 };
+  const breiten = Object.entries(SOLL).filter(([id, w]) => Math.abs(r(id).width - w) > 0.5)
+    .map(([id, w]) => `${id} ${r(id).width} statt ${w}`);
+  const spalte = r('enNKunde_name').left;
+  // Kein Feld ragt aus seinem Paar, kein Paar ueberdeckt ein anderes. Genau
+  // das war in Safari zu sehen: Beschriftungen lagen auf dem Feld davor.
+  const ueber = [];
+  const fs = [...document.querySelectorAll('.zeilenfluss > .f')].filter(f => f.getBoundingClientRect().width);
+  fs.forEach(f => {
+    const a = f.getBoundingClientRect();
+    [...f.children].forEach(k => { const c = k.getBoundingClientRect(); if (c.width && c.right > a.right + 0.5) ueber.push('ragt hinaus: ' + f.textContent.trim().slice(0, 20)); });
+    fs.forEach(g => { if (g === f) return; const c = g.getBoundingClientRect();
+      if (a.left < c.right - 0.5 && c.left < a.right - 0.5 && a.top < c.bottom - 0.5 && c.top < a.bottom - 0.5) ueber.push('ueberdeckt: ' + f.textContent.trim().slice(0, 20)); });
+  });
+  return {
+    breiten, ueber,
+    fuss: Math.abs(r('enNMaFoot').left - spalte),
+    text: [r('enNTaetigkeit'), r('enNBemerkung')].map(t => [Math.abs(t.left - spalte), Math.abs(t.right - r('enNQualifikation').right)]),
+    zeilen: Math.abs(r('enNFahrzeug_id').top - r('enNFahrer_id').top) < 1 && Math.abs(r('enNTreffpunkt').top - r('enNQualifikation').top) < 1,
+  };
+});
+check('Zeilenfluss unten: Feldbreiten', !un.breiten.length, un.breiten.join('; '));
+check('Zeilenfluss: nichts ragt hinaus oder ueberdeckt', !un.ueber.length, un.ueber.join('; '));
+check('Zeilenfluss unten: Fusszeile der Zuteilung in der Feldspalte', un.fuss < 0.5, un.fuss);
+check('Zeilenfluss unten: Textfelder in der Feldspalte, buendig mit Qualifikation',
+  un.text.every(([l, rr]) => l < 0.5 && rr < 0.5), JSON.stringify(un.text));
+check('Zeilenfluss unten: Fahrzeug/Fahrer und Treffpunkt/Qualifikation je in einer Zeile', un.zeilen);
 check('Zeilenfluss: Unterzeile Kontaktperson ausgeblendet', await pb.evaluate(() =>
   getComputedStyle(document.querySelector('#enNKontakt_vorname').closest('.abschnitt').querySelector('h3 .note')).display === 'none'));
 await pb.close();
