@@ -84,7 +84,9 @@ check('Beim Öffnen steht der laufende Monat als Zeitraum',
 check('… und endet am letzten Tag des Monats',
   (await page.inputValue('#mxBis')) === `${M}-${tageImMonat}`);
 check('Die Tabelle zeigt genau so viele Tagesspalten', (await spalten()) === tageImMonat);
-check('Der Hinweis nennt den Zeitraum', (await info()).includes('Tage'));
+// Seit 15.10.2026 wiederholt der Hinweis den Zeitraum nicht mehr -- die
+// Datumsfelder direkt darueber sagen dasselbe. Ungefiltert bleibt er leer.
+check('Ungefiltert wiederholt der Hinweis den Zeitraum nicht', (await info()).trim() === '');
 check('Alle drei Objekte sind da', (await zeilen()).length === 3);
 // Der erste Entwurf zeigte hier "Januar", weil die Felder beim ersten
 // Zeichnen nie an den Zeitraum angeglichen wurden.
@@ -99,9 +101,12 @@ check('Die Schnellauswahl bietet Heute/Woche/Monat',
   (await page.evaluate(() => [...document.getElementById('mxSchnell').options].map(o => o.value))).join(',')
   === ',heute,woche,monat');
 check('Es gibt ein Suchfeld in der Übersicht', await page.isVisible('#mxSuche'));
-check('Der Feiertage-Knopf sitzt auf der Reiter-Trennlinie, nicht mehr in der Werkzeugleiste',
-  !(await page.$('.bar-tools button:has-text("Feiertage")'))
-  && await page.isVisible('.tabs button:has-text("Feiertage")'));
+// Seit 15.10.2026 als Icon vor der Suche; die Reiterleiste darueber, deren
+// einziger Desktop-Inhalt er war, ist weg.
+check('Der Feiertage-Knopf steht als Icon in der Werkzeugleiste der Übersicht',
+  await page.isVisible('#pv-uebersicht .bar-tools [aria-label="Feiertage verwalten"]'));
+check('… und die leere Reiterleiste darüber ist am Desktop weg',
+  !(await page.isVisible('#view-planung > .tabs')));
 await page.screenshot({ path: OUT + '/74-mx-start.png' });
 
 // ══════════════════════════════════════════ FREIER ZEITRAUM MIT KALENDER
@@ -109,7 +114,7 @@ await page.fill('#mxVon', t(3));
 await page.fill('#mxBis', t(9));
 await page.waitForTimeout(400);
 check('Ein freier Zeitraum ist möglich, nicht nur ganze Monate', (await spalten()) === 7);
-check('Der Hinweis zeigt die gewählte Länge', (await info()).includes('7 Tage'));
+check('Auch ein freier Zeitraum wird nicht im Hinweis wiederholt', (await info()).trim() === '');
 
 // Ein Zeitraum über eine Monats- und Jahresgrenze hinweg -- das ging mit
 // dem alten Monatsfeld ueberhaupt nicht. "bis" bewusst relativ zu heute
