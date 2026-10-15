@@ -136,6 +136,12 @@
   --nix:        #D8DCE2;   /* der Punkt fuer "hier ist nichts" */
   --we-bg:      #F3F5F8;   /* Wochenende im Raster */
   --fei-bg:     #FDFAF2;   /* Feiertag im Raster */
+  /* Schleier ueber Wochenend- und Feiertagsspalten (15.10.2026). Er liegt
+     UEBER der Belegungsfarbe -- sonst verschwindet das Wochenende, sobald
+     ein Tag gruen ist. */
+  --we-schleier:  rgba(15, 23, 42, .07);
+  --fei-schleier: rgba(214, 140, 20, .14);
+  --we-kopf:      #E3E7EE;
   /* Rasterlinie der Monatsmatrix. Bewusst halbdurchsichtig statt einer festen
      Farbe: so dunkelt sie ab, was darunter liegt, und bleibt damit auch auf
      den eingefaerbten Feldern sichtbar (ENT-036). */
@@ -191,6 +197,9 @@ html[data-thema="dunkel"] {
   --nix:          #3B4560;
   --we-bg:        #1A2030;
   --fei-bg:       #241F14;
+  --we-schleier:  rgba(0, 0, 0, .30);
+  --fei-schleier: rgba(226, 160, 60, .16);
+  --we-kopf:      #2C354B;
   /* Im Dunkeln hellt die Linie auf, statt abzudunkeln -- eine dunkle Linie
      waere auf den ohnehin dunklen Farbfeldern unsichtbar (ENT-036). */
   --mx-linie:     rgba(255, 255, 255, .15);
@@ -2991,8 +3000,8 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .mx thead th { background: var(--surface-2); padding: 6px 3px; font-size: 10px; font-weight: 700; color: var(--ink-3); text-align: center; }
 .mx thead th.obj { background: var(--surface-2); z-index: 3; }
 .mx thead th .wd { display: block; font-size: 9px; font-weight: 600; opacity: .75; }
-.mx thead th.we { color: var(--ink-2); background: var(--we-bg); }
-.mx thead th.fei { color: var(--warn); background: var(--warn-soft); }
+.mx thead th.we { color: var(--ink); background: var(--we-kopf); }
+.mx thead th.fei { color: var(--warn); background: var(--warn-soft); box-shadow: inset 0 2px 0 var(--warn); }
 .mx thead th.heute { color: var(--accent); background: var(--accent-soft); }
 /* Kein Innenabstand: die Zelle selbst füllt das Feld vollständig aus, damit
    die Farbfläche das ganze Tagesfeld ist und nicht nur ein Plättchen darin.
@@ -3028,6 +3037,26 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
    anderen .z-*-Zellarten, die ebenfalls je einen eigenen Hintergrund
    tragen. */
 .mx td.d.z-nix  { background: var(--surface); }
+/* Wochenende und Feiertag als Schleier auf der ganzen Spalte, auch ueber
+   Gruen, Gelb und Rot (15.10.2026). Als innerer Schatten auf dem
+   Zellknopf: der fuellt das Tagesfeld ganz aus und liegt ueber dessen
+   Hintergrund, aber unter der Zahl. */
+.mx td.d.we .zelle { box-shadow: inset 0 0 0 999px var(--we-schleier); }
+.mx td.d.fei .zelle { box-shadow: inset 0 0 0 999px var(--fei-schleier); }
+@media (min-width: 901px) {
+  /* Namensspalte 400 px (vorher dehnte sie sich auf rund 450). Reicht der
+     Platz im Monat dafuer nicht -- etwa mit ausgeklappter Seitenleiste --,
+     gibt sie bis 240 px nach, bevor die Tage schmaler als 41 px werden.
+     Die Tage teilen sich den Rest, hoechstens 100 px je Tag: eine Woche
+     oder ein Tag steht dann links an den Namen statt rechts am Rand
+     (15.10.2026). --mx-tage setzt renderMatrix(). */
+  .mx { container-type: inline-size; }
+  .mx table { width: auto;
+    --mx-obj: clamp(240px, calc(100cqw - var(--mx-tage, 31) * 41px), 400px);
+    --mx-tag: clamp(30px, calc((100cqw - var(--mx-obj)) / var(--mx-tage, 31)), 100px); }
+  .mx th.obj, .mx td.obj { width: var(--mx-obj); min-width: var(--mx-obj); max-width: var(--mx-obj); box-sizing: border-box; }
+  .mx thead th:not(.obj) { box-sizing: border-box; width: var(--mx-tag); min-width: var(--mx-tag); }
+}
 .mx .zelle { display: flex; width: 100%; height: 100%; min-height: 30px; border-radius: 0; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; border: none; padding: 0; font-family: inherit; cursor: pointer; }
 .mx .z-voll { background: var(--pos-soft); color: var(--pos); }
 .mx .z-teil { background: var(--warn-soft); color: var(--warn); }
@@ -36062,7 +36091,7 @@ function renderMatrix() {
     return `<tr><td class="obj">${beschriftung}</td>${zellen}</tr>`;
   }).join('');
 
-  $('mxTable').innerHTML = `<table><thead><tr><th class="obj">Objekt</th>${kopf}</tr></thead><tbody>${koerper}</tbody></table>`;
+  $('mxTable').innerHTML = `<table style="--mx-tage:${tage.length}"><thead><tr><th class="obj">Objekt</th>${kopf}</tr></thead><tbody>${koerper}</tbody></table>`;
 }
 
 function zumTag(datum) {
