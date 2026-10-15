@@ -179,7 +179,9 @@ Vorschläge und Diskussionsstände sind keine.
 Vor jeder Umsetzung so lange nachfragen, bis alles geklärt ist, was sich
 später nur mit Umbau ändern lässt — insbesondere alles, was das Datenmodell
 festlegt. Was im Code nachschlagbar ist, wird nachgeschlagen und **nicht**
-gefragt. Fragen einzeln und mit einer Empfehlung.
+gefragt. Fragen einzeln und mit einer Empfehlung — **immer als Auswahl**
+(Werkzeug `AskUserQuestion`, empfohlene Option zuerst), nicht als Fliesstext
+mit A/B/C. Ausdrücklicher Wunsch des Projektinhabers (2026-10-15).
 
 ## Commits
 

@@ -2910,6 +2910,12 @@ function kern_spalten(): array {
     // Altes. Die Konten, die es beim Einfuehren schon gibt, setzt Abschnitt
     // 2a1b einmalig auf 0: Sie sehen die erste Ankuendigung.
     ['mitarbeiter', 'neuerungen_gesehen_bis', 'ALTER TABLE mitarbeiter ADD COLUMN neuerungen_gesehen_bis INT UNSIGNED NULL DEFAULT NULL'],
+    // Persoenliche Einstellungen (Einstellungsseite, ENT-722): hell/dunkel, Glas und
+    // weitere Darstellungswahlen, die der Person auf jedes Geraet folgen.
+    // JSON mit fester weisser Liste, siehe api/meine_einstellungen.php.
+    // NULL heisst "noch nie gespeichert" -- die Oberflaeche uebernimmt dann
+    // einmal, was ihr Browser bisher wusste.
+    ['mitarbeiter', 'einstellungen', 'ALTER TABLE mitarbeiter ADD COLUMN einstellungen TEXT NULL'],
     ];
 }
 }
