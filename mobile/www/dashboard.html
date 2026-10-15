@@ -5665,8 +5665,14 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
     html[data-dichte="kompakt"] .zeilenfluss > .f { display: flex; align-items: center; gap: 14px;
       margin: 7px 0; flex: none; }
     html[data-dichte="kompakt"] .zeilenfluss > .f > label { flex: none; white-space: nowrap; }
+    /* width, NICHT flex-basis: Safari rechnet die Breite des Paares aus der
+       Textbreite der Beschriftung, wenn die 168 px nur als flex-basis
+       dastehen -- das Paar wurde zu schmal, und die naechste Beschriftung
+       lag auf dem Feld (gesehen 2026-10-15 bei Kunde, Veranstaltung,
+       Vorname; nicht bei "Strasse und Nummer", die die Spalte ohnehin
+       fuellt). Chromium zeigt das nicht, darum steht es hier. */
     html[data-dichte="kompakt"] .zeilenfluss > .f:first-child > label,
-    html[data-dichte="kompakt"] .zeilenfluss > .zf-neu > label { flex: 0 0 168px; white-space: normal; }
+    html[data-dichte="kompakt"] .zeilenfluss > .zf-neu > label { flex: none; width: 168px; min-width: 168px; white-space: normal; }
     /* Ein breites Feld (Zeitraum, Weg) belegt die ganze Zeile -- ausser Kunde
        und Strasse, die in der Zeile weitere Felder tragen. */
     html[data-dichte="kompakt"] .zeilenfluss > .f.wide { flex: 0 0 100%; }
@@ -5717,6 +5723,36 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
     html[data-dichte="kompakt"] .zeilenfluss > .f.zeitraum > label { padding-top: 0; }
     html[data-dichte="kompakt"] .zeilenfluss .zeitraum .zr-gr > .zeitwahl { flex: none; width: auto; min-width: 0; }
     html[data-dichte="kompakt"] .zeilenfluss .zeitwahl select { flex: none; width: 76px; min-width: 0; }
+    /* Unterer Teil (Zuteilung, Angaben, Dokumente) nach denselben Regeln. */
+    html[data-dichte="kompakt"] .zeilenfluss > .f.wide:has(> .zf-feld) { align-items: flex-start; }
+    html[data-dichte="kompakt"] .zeilenfluss > .f.wide:has(> .zf-feld) > label { padding-top: 8px; }
+    html[data-dichte="kompakt"] .zeilenfluss > .f.wide > .zf-feld { flex: 1 1 auto; min-width: 0; }
+    /* Dienstfahrzeug breiter als Fahrer: Es traegt auch die Zustandsmeldung
+       "Kein Fahrzeug im Betrieb erfasst", und die muss ganz lesbar sein --
+       "nicht eingerichtet" darf nicht abgeschnitten wie ein Wert aussehen. */
+    html[data-dichte="kompakt"] #enNFahrzeug_id      { width: 260px; }
+    html[data-dichte="kompakt"] #enNFahrer_id        { width: 218px; }
+    html[data-dichte="kompakt"] #enNTreffpunkt       { width: 345px; }
+    html[data-dichte="kompakt"] #enNQualifikation    { width: 218px; }
+    /* Der Hinweis zum Fahrer steht neben dem Feld, wie der Zonenhinweis. */
+    html[data-dichte="kompakt"] .zeilenfluss > .f.wide:has(#enNFahrerHinweis) { flex: 1 1 300px; min-width: 0; display: block; }
+    html[data-dichte="kompakt"] .zeilenfluss > .f.wide:has(#enNFahrerHinweis:empty) { display: none; }
+    html[data-dichte="kompakt"] #enNFahrerHinweis { margin: 0; }
+    /* Textfelder: 712 px = buendig mit dem rechten Rand von "Qualifikation"
+       in der Zeile darueber (gemessen). Beschriftung oben, auf Hoehe der
+       ersten Textzeile. */
+    html[data-dichte="kompakt"] .zeilenfluss > .zf-text { align-items: flex-start; }
+    html[data-dichte="kompakt"] .zeilenfluss > .zf-text > label { padding-top: 8px; }
+    html[data-dichte="kompakt"] .zeilenfluss > .zf-text > textarea.inp { width: 712px; max-width: none; height: auto; }
+    /* Dokumente: Knopf und Hinweis in einer Zeile, die Liste darueber. */
+    html[data-dichte="kompakt"] .zeilenfluss > .zf-dok { align-items: center; }
+    html[data-dichte="kompakt"] .zeilenfluss > .zf-dok > label { padding-top: 0; }
+    html[data-dichte="kompakt"] .zeilenfluss > .zf-dok > div { display: flex; flex-wrap: wrap; align-items: center; column-gap: 14px; }
+    html[data-dichte="kompakt"] .zeilenfluss > .zf-dok .dok-liste { flex: 0 0 100%; }
+    html[data-dichte="kompakt"] .zeilenfluss > .zf-dok .note { margin: 0 !important; }
+    html[data-dichte="kompakt"] .zeilenfluss > .zf-dok .msg-err { flex: 0 0 100%; }
+    /* Hinweise im Formular in Feldschrift statt Fliesstext (14 px). */
+    html[data-dichte="kompakt"] .zeilenfluss .note { font-size: 13px; line-height: 1.45; color: var(--ink-2); }
   }
   /* Ein breites Feld, das nur EIN Textfeld traegt (Kunde, Strasse), endet
      kompakt nach zwei Rasterspalten -- buendig mit dem zweiten Feld darunter.
@@ -8837,18 +8873,23 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
 
 <div class="abschnitt">
   <h3>Zuteilung</h3>
-  <div class="form-grid form-breit form-zeilen">
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
         <div class="f wide">
           <label>Zugeteilte Mitarbeitende</label>
-          <div class="ma-pick" id="enNMa"></div>
-          <div class="pick-foot" id="enNMaFoot"></div>
+          <!-- Liste und Fusszeile in EINER Huelle: So steht die Fusszeile
+               ("0/1 noch 1 Person offen") unter der Liste in der Feldspalte,
+               statt im Raster in die Beschriftungsspalte zu rutschen. -->
+          <div class="zf-feld">
+            <div class="ma-pick" id="enNMa"></div>
+            <div class="pick-foot" id="enNMaFoot"></div>
+          </div>
         </div>
         <!-- Dienstfahrzeug und Fahrer (ENT-328). Genau das Feld, das ENT-115
              bewusst weggelassen hat, solange es keine Fahrzeuge zu wählen gab
              — seit ENT-313 gibt es sie. Steht hier und nicht bei „Weg und
              Auslagenersatz": Wer fährt, ist eine Frage der Zuteilung. Die
              GELD-Folge steht trotzdem darunter, denn sie entsteht hier. -->
-        <div class="f"><label for="enNFahrzeug_id">Dienstfahrzeug</label>
+        <div class="f zf-neu"><label for="enNFahrzeug_id">Dienstfahrzeug</label>
           <select class="inp" id="enNFahrzeug_id" onchange="enFahrzeugGeaendert()"></select></div>
         <div class="f"><label for="enNFahrer_id">Fahrer</label>
           <select class="inp" id="enNFahrer_id"></select></div>
@@ -8858,15 +8899,15 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
 
 <div class="abschnitt">
   <h3>Angaben für die Eingeteilten<span class="note">steht in der App bei der Schicht</span></h3>
-  <div class="form-grid form-breit form-zeilen">
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
         <div class="f"><label for="enNTreffpunkt">Treffpunkt</label>
           <input class="inp" id="enNTreffpunkt" placeholder="z. B. Haupteingang, Réception"></div>
         <div class="f"><label for="enNQualifikation">Qualifikation</label>
           <input class="inp" id="enNQualifikation" placeholder="z. B. Verkehrsdienstausweis"></div>
-        <div class="f wide"><label for="enNTaetigkeit">Durchzuführende Tätigkeit</label>
+        <div class="f wide zf-neu zf-text"><label for="enNTaetigkeit">Durchzuführende Tätigkeit</label>
           <textarea class="inp" id="enNTaetigkeit" rows="2" style="min-height:64px"></textarea></div>
-        <div class="f wide hoch"><label for="enNBemerkung">Bemerkung</label><textarea class="inp" id="enNBemerkung" rows="3" style="min-height:84px"></textarea></div>
-        <div class="f wide hoch">
+        <div class="f wide hoch zf-neu zf-text"><label for="enNBemerkung">Bemerkung</label><textarea class="inp" id="enNBemerkung" rows="3" style="min-height:84px"></textarea></div>
+        <div class="f wide hoch zf-neu zf-dok">
           <label>Dokumente</label>
           <div>
             <div id="enNDokListe" class="dok-liste"></div>
