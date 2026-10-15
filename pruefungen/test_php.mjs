@@ -871,6 +871,7 @@ const NUR_EIGENE_DATEN = [
   'mein_passwort.php',         // eigenes Passwort aendern
   'mein_profil.php',           // eigene Stammdaten ansehen
   'mein_profil_speichern.php',  // eigene Kontaktangaben selbst pflegen (ENT-460)
+  'meine_einstellungen.php',   // eigene Darstellung (hell/dunkel, Glas) am Konto
   'meine_schichten.php',       // eigene Einsaetze
   'meine_verfuegbarkeit.php',  // eigene Sperrtage
   'meine_zusage.php',          // eigene Zu-/Absage

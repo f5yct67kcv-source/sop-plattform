@@ -66,7 +66,14 @@ const kontrast = (a, b) => {
 let { browser, page } = await starte();
 
 // ══════════════ SCHALTER
-check('Der Schalter ist in der Kopfzeile', await page.isVisible('#btnThema'));
+// Seit der Einstellungsseite (ENT-722) steht der Schalter nicht mehr in
+// der Kopfleiste, sondern unter Einstellungen > Darstellung.
+check('KRITISCH: der Schalter steht nicht mehr in der Kopfleiste',
+  await page.evaluate(() => !$('btnThema').closest('.tb-rechts') && !$('btnThema').offsetParent));
+await page.evaluate(() => go('einstellungen')); await page.waitForTimeout(250);
+check('Er steht auf der Einstellungsseite unter Darstellung', await page.isVisible('#btnThema')
+  && await page.evaluate(() => $('btnThema').closest('.es-teil').dataset.reiter === 'darstellung'));
+await page.evaluate(() => go('uebersicht')); await page.waitForTimeout(250);
 check('Er ist als Schalter ausgezeichnet',
   await page.evaluate(() => $('btnThema').getAttribute('role') === 'switch'));
 // Seit dem Entscheid des Projektinhabers gilt dunkel als Vorgabe, unabhaengig
@@ -153,7 +160,7 @@ check('Eingabefelder heben sich vom Fenster ab', feld.grund !== 'rgba(0, 0, 0, 0
 await page.evaluate(() => closeDlg('dlgAnwenden'));
 
 // ══════════════ EIN KLICK WECHSELT AUF HELL
-await page.click('#btnThema');
+await page.evaluate(() => $('btnThema').click());
 await page.waitForTimeout(350);
 check('Ein Klick schaltet auf hell',
   await page.evaluate(() => document.documentElement.getAttribute('data-thema') === 'hell'));
@@ -192,7 +199,7 @@ const formJeThema = async () => page.evaluate(() => {
            schrift: getComputedStyle(document.body).fontFamily, kpiGrund: k.backgroundColor };
 });
 const formHell = await formJeThema();
-await page.click('#btnThema'); await page.waitForTimeout(350);
+await page.evaluate(() => $('btnThema').click()); await page.waitForTimeout(350);
 const formDunkel = await formJeThema();
 
 check('KRITISCH: die Radien gelten in beiden Themen gleich (ENT-227)',
@@ -215,7 +222,7 @@ const schatten = async () => page.evaluate(() => ({
   rand: getComputedStyle(document.querySelector('.card')).borderTopWidth,
 }));
 const schattenDunkel = await schatten();
-await page.click('#btnThema'); await page.waitForTimeout(350);
+await page.evaluate(() => $('btnThema').click()); await page.waitForTimeout(350);
 const schattenHell = await schatten();
 
 // Formuliert als AUSSAGE, nicht als Wortlaut (ENT-419): "kein Schatten

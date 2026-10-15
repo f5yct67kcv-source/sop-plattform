@@ -131,6 +131,13 @@ const CO_WAHL = {
   'Unterreiter':         ['.top-sub', G.flaeche],
   'Unterreiterknopf':    ['.top-sub button:not(.on)', G.text],
   'Offener Unterreiter': ['.top-sub button.on', G.text],
+};
+// Die Schalter fuer Glas und hell/dunkel stehen im Cockpit seit der
+// Einstellungsseite (ENT-722) nicht mehr in der Kopfleiste, sondern unter
+// Einstellungen > Darstellung. Es sind aber dieselben Bauteile wie im
+// Betreiberbereich -- verglichen wird darum weiter, ob sie GLEICH AUSSEHEN,
+// gemessen dort, wo sie jetzt stehen.
+const CO_SCHALTER = {
   'Glas-Schalter':       ['#btnGlas', G.griff],
   'Thema-Schalter':      ['#btnThema', G.griff],
   'Schalterkopf':        ['#btnThema .knopf', G.bild],
@@ -166,6 +173,9 @@ async function cockpit(breite, thema, glas) {
   await seite.evaluate(() => { huelleSetzen('aus'); go('kunden'); });
   await seite.waitForTimeout(350);
   const m = await seite.evaluate(ABZUG, CO_WAHL);
+  await seite.evaluate(() => go('einstellungen'));
+  await seite.waitForTimeout(250);
+  Object.assign(m, await seite.evaluate(ABZUG, CO_SCHALTER));
   await seite.close();
   return { m, fehler };
 }

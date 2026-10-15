@@ -205,7 +205,7 @@ const nachher = await m.evaluate(() => document.documentElement.getAttribute('da
 check('KRITISCH: der Schalter schaltet die Darstellung wirklich um', vorher !== nachher);
 check('Sein Zustand wird mitgefuehrt',
   (await m.getAttribute('#btnThemaMob', 'aria-checked')) === (nachher === 'dunkel' ? 'true' : 'false'));
-check('KRITISCH: der verborgene Schalter der Kopfzeile steht auf demselben Stand',
+check('KRITISCH: der Schalter der Einstellungsseite steht auf demselben Stand',
   (await m.getAttribute('#btnThema', 'aria-checked')) === (nachher === 'dunkel' ? 'true' : 'false'));
 await m.click('#btnThemaMob'); await m.waitForTimeout(150);
 
@@ -242,7 +242,11 @@ await m.close();
 const d = await seite(1440, 900);
 check('Desktop: kein Burger', !(await d.isVisible('#btnBurger')));
 check('Desktop: die Seitenleiste steht dauerhaft da', await d.isVisible('#side'));
-check('Desktop: der Hell/Dunkel-Schalter bleibt in der Kopfzeile', await d.isVisible('#btnThema'));
+// Seit der Einstellungsseite (ENT-722) steht der Schalter am Desktop
+// unter Einstellungen > Darstellung, nicht mehr in der Kopfzeile.
+check('Desktop: der Hell/Dunkel-Schalter ist ueber die Einstellungsseite erreichbar',
+  await d.evaluate(() => { go('einstellungen'); return !!$('btnThema').offsetParent; }));
+await d.evaluate(() => go('uebersicht'));
 check('Desktop: der Menuekopf des Handys bleibt verborgen',
   await d.evaluate(() => {
     const k = document.querySelector('#side .side-kopf');

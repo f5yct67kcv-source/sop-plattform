@@ -942,6 +942,44 @@ html[data-desktop="an"] .desktop-zurueck { display: inline-flex; }
   color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .rdkr-tab-ic svg.i { width: 15px; height: 15px; }
 .rdkr-tab-lbl { font-size: 13px; font-weight: 600; line-height: 1.2; }
+/* ── Einstellungen (ENT-722). Links eine schmale Spalte mit den
+   Reitern, rechts der Inhalt -- wie die Einstellungen eines Betriebssystems.
+   Die Reiterknoepfe tragen dieselben Symbolkacheln wie .rdkr-tab, damit die
+   Seite zur Familie gehoert, stehen aber untereinander statt in einer Reihe:
+   Die zwei Gruppen "Fuer mich" und "Fuer den Betrieb" brauchen je eine
+   Zwischenueberschrift, und die hat in einer waagrechten Leiste keinen Platz.
+   Die Inhaltsspalte ist auf 760 px begrenzt: Ein Schalter am rechten Rand
+   eines Breitbilds liegt zu weit von seiner Beschriftung weg. */
+.es-raster { display: grid; grid-template-columns: 268px minmax(0, 760px); gap: 22px; align-items: start; }
+.es-nav { display: flex; flex-direction: column; gap: 3px; position: sticky; top: 12px; }
+.es-gruppe { font-size: 10.5px; font-weight: 650; letter-spacing: .7px; text-transform: uppercase;
+  color: var(--ink-3); padding: 0 10px 6px; }
+.es-betrieb { display: flex; flex-direction: column; gap: 3px; margin-top: 18px; }
+.es-nav-knopf { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 10px;
+  border: 1px solid transparent; border-radius: var(--r-sm); background: none; cursor: pointer;
+  font: inherit; color: var(--ink-2); text-align: left; }
+.es-nav-knopf:hover { background: var(--surface); border-color: var(--line); }
+.es-nav-knopf:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.es-nav-knopf.aktiv { background: var(--accent-soft); border-color: var(--accent-line); color: var(--ink); }
+.es-nav-ic { width: 26px; height: 26px; border-radius: 8px; background: var(--accent-soft); color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.es-nav-ic svg.i { width: 15px; height: 15px; }
+.es-nav-knopf.aktiv .es-nav-ic { background: var(--accent); color: #fff; }
+.es-nav-lbl { flex: 1; font-size: 13px; font-weight: 600; line-height: 1.2; white-space: nowrap; }
+.es-inarbeit { flex: none; }
+/* Eine Zeile je Einstellung: Titel oben, Erklaerung darunter, der Schalter
+   rechts auf halber Hoehe. Die Trennlinie steht zwischen den Zeilen, nicht
+   ueber der ersten. */
+.es-zeile { display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  padding: 14px 0; }
+.es-zeile + .es-zeile { border-top: 1px solid var(--line-soft); }
+.es-zeile:first-child { padding-top: 2px; }
+.es-titel { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.es-erkl { font-size: 12.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.4; }
+.es-stand { font-size: 12px; color: var(--ink-3); margin: 10px 0 0; padding-top: 12px;
+  border-top: 1px solid var(--line-soft); }
+.es-stand.warn { color: var(--warn); }
+.es-platz { font-size: 13px; color: var(--ink-2); line-height: 1.55; max-width: 60ch; margin: 0; }
 /* Arbeitsergebnisse (ENT-325). Die Kachelreihe ist dieselbe wie bei
    "Kontrollrunde ändern", die Ausrichtung nicht: Dort steht darunter eine
    mittige Karte, hier eine linksbündige Liste. Eine mittige Reiterreihe über
@@ -4416,6 +4454,7 @@ html[data-desktop="an"] { touch-action: auto; }
   .shell.aus .side-foot .nav-item .lbl { display: block; }
   .shell.aus .side-foot .nav-item svg.i { flex: none; }
   .shell.aus .side-foot #nav-einrichtung { order: 2; }
+  .shell.aus .side-foot #nav-einstellungen { order: 2; }
   .shell.aus .side-foot #nav-zurapp      { order: 3; }
   /* Der Benutzerblock steht oben und traegt wieder Namen und Rolle: Das
      Menue soll zuerst beantworten, WER angemeldet ist -- danach erst, was
@@ -6042,6 +6081,15 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         </span>
         <span class="lbl" id="navEinrichtungLbl">Einrichtung</span>
       </button>
+      <!-- Einstellungen (ENT-722). Gleich unter "Einrichtung", aber mit
+           anderem Zeichen: Schieberegler statt Zahnrad -- zwei Zahnraeder
+           untereinander waeren nicht zu unterscheiden. Nur Desktop wie die
+           Einrichtung: Der mobile Zuschnitt ist eine eigene Entscheidung
+           (CLAUDE.md, Gestaltung). -->
+      <button class="nav-item nur-desktop" id="nav-einstellungen" title="Einstellungen" onclick="go('einstellungen')">
+        <svg class="i" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+        <span class="lbl">Einstellungen</span>
+      </button>
       <!-- Nachschlagewerk fuers Cockpit (Entscheid des Projektinhabers):
            rollenunabhaengig fuer jeden Cockpit-Zugang, nur am Desktop, nie
            in der mobilen App -- "nur-desktop" wie bei "Einrichtung" darueber.
@@ -6216,26 +6264,13 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
         <span class="lbl">Sprechen</span>
       </button>
-      <!-- Liquid Glass (ENT-418). Direkt neben hell/dunkel, weil es dieselbe
-           Art von Wahl ist: Wie die Oberflaeche aussieht, nicht was sie tut.
-           Das Zeichen sind zwei versetzte Scheiben -- eine Flaeche, durch die
-           man eine zweite sieht.
-           LINKS davon, nicht rechts: Der Hell/Dunkel-Schalter ist seit
-           ENT-067 das aeusserste Element rechts, und test_menue.mjs misst
-           genau das ("er sitzt rechts", Abstand zum Rand < 30 px). Ein
-           neuer Schalter rechts daneben haette ihn um rund 56 px nach
-           innen geschoben -- gemessen, nicht vermutet. -->
-      <button class="glas-schalter ohne-schublade" id="btnGlas" onclick="glasUm()" role="switch" aria-checked="false" title="Durchscheinende Oberfläche" aria-label="Durchscheinende Oberfläche ein- oder ausschalten">
-        <span class="knopf">
-          <svg class="i-glas" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="12" height="12" rx="3.4"/><path d="M8.5 20.5h8a4 4 0 0 0 4-4v-8"/></svg>
-        </span>
-      </button>
-      <button class="thema-schalter ohne-schublade" id="btnThema" onclick="themaUm()" role="switch" aria-checked="false" title="Hell oder dunkel" aria-label="Zwischen heller und dunkler Darstellung wechseln">
-        <span class="knopf">
-          <svg class="i-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></svg>
-          <svg class="i-mond" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
-        </span>
-      </button>
+      <!-- Hier standen bis zur Einstellungsseite die Schalter fuer Glas und
+           hell/dunkel (ENT-418, ENT-067). Auf Wunsch des Projektinhabers
+           sind sie auf die Seite "Einstellungen" umgezogen (Kontomenue):
+           Jede Einstellung hat einen Ort, und die Kopfleiste wird ruhiger.
+           Am Handy bleiben die Schalter im Kopf der Schublade
+           (btnGlasMob/btnThemaMob) -- der mobile Zuschnitt ist eine eigene
+           Entscheidung und steht noch aus. -->
       <button class="btn btn-plain btn-sm" onclick="ordBearbeitenStart('uebersicht')" id="btnDashBearbeiten" title="Übersicht anpassen">
         <svg class="i i-sm" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
         <span class="lbl">Bearbeiten</span>
@@ -9164,6 +9199,107 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
            entfaellt auch der Sonderweg, den saZurueck bis ENT-682
            gehen musste, um am Handy nicht in die Kachelübersicht der
            Administration zu fuehren. -->
+      <!-- EINSTELLUNGEN (ENT-722).
+           Eigene Seite, erreichbar nur ueber das Kontomenue -- sie steht
+           nicht in der Hauptnavigation. Links eine Spalte mit zwei Gruppen,
+           rechts der Inhalt:
+             FUER MICH         gilt nur fuer das eigene Konto, auf jedem
+                               Geraet (gespeichert am Konto, siehe
+                               api/meine_einstellungen.php)
+             FUER DEN BETRIEB  gilt fuer alle Konten dieses Betriebs, nur
+                               mit dem Recht "betrieb" sichtbar
+           Die Trennung steht sichtbar da, weil eine Mail-Gestaltung etwas
+           ganz anderes ist als hell/dunkel: Das eine betrifft nur mich, das
+           andere jede Kundin des Betriebs.
+           Reiter, die noch nicht gebaut sind, sind klickbar und sagen, was
+           dort entsteht ("in Arbeit"). Ein leerer Reiter saehe sonst aus
+           wie "hier gibt es nichts einzustellen" -- unbekannt darf nie wie
+           keine aussehen. -->
+      <section class="view" id="view-einstellungen">
+        <div class="es-raster">
+        <nav class="es-nav" aria-label="Einstellungen">
+          <div class="es-gruppe">Für mich</div>
+          <button type="button" class="es-nav-knopf" data-reiter="darstellung" onclick="esReiterZeigen('darstellung')">
+            <span class="es-nav-ic"><svg class="i" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2"/><line x1="8.5" y1="20.5" x2="15.5" y2="20.5"/><line x1="12" y1="17" x2="12" y2="20.5"/></svg></span>
+            <span class="es-nav-lbl">Darstellung</span>
+          </button>
+          <button type="button" class="es-nav-knopf" data-reiter="farben" onclick="esReiterZeigen('farben')">
+            <span class="es-nav-ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.4 0z"/></svg></span>
+            <span class="es-nav-lbl">Farben</span>
+            <span class="chip chip-n es-inarbeit">in Arbeit</span>
+          </button>
+          <button type="button" class="es-nav-knopf" data-reiter="benachrichtigungen" onclick="esReiterZeigen('benachrichtigungen')">
+            <span class="es-nav-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
+            <span class="es-nav-lbl">Benachrichtigungen</span>
+            <span class="chip chip-n es-inarbeit">in Arbeit</span>
+          </button>
+          <div class="es-betrieb" id="esBetriebNav">
+          <div class="es-gruppe">Für den Betrieb</div>
+          <button type="button" class="es-nav-knopf" data-reiter="maildesigner" onclick="esReiterZeigen('maildesigner')">
+            <span class="es-nav-ic"><svg class="i" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="2"/><polyline points="3 6 12 13 21 6"/></svg></span>
+            <span class="es-nav-lbl">E-Mail-Designer</span>
+            <span class="chip chip-n es-inarbeit">in Arbeit</span>
+          </button>
+          <button type="button" class="es-nav-knopf" data-reiter="system" onclick="esReiterZeigen('system')">
+            <span class="es-nav-ic"><svg class="i" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>
+            <span class="es-nav-lbl">System</span>
+            <span class="chip chip-n es-inarbeit">in Arbeit</span>
+          </button>
+          </div>
+        </nav>
+        <div class="es-inhalt">
+          <div class="card es-teil" data-reiter="darstellung">
+            <div class="card-hd"><h2>Darstellung</h2></div>
+            <div class="card-bd">
+              <div class="es-zeile">
+                <div class="es-text">
+                  <div class="es-titel">Dunkle Darstellung</div>
+                  <div class="es-erkl">Heller oder dunkler Hintergrund.</div>
+                </div>
+              <button class="thema-schalter" id="btnThema" onclick="themaUm()" role="switch" aria-checked="false" title="Hell oder dunkel" aria-label="Zwischen heller und dunkler Darstellung wechseln">
+                <span class="knopf">
+                  <svg class="i-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></svg>
+                  <svg class="i-mond" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
+                </span>
+              </button>
+              </div>
+              <div class="es-zeile">
+                <div class="es-text">
+                  <div class="es-titel">Durchscheinende Oberfläche</div>
+                  <div class="es-erkl">Karten und Leisten wie aus Glas, mit farbigem Grund dahinter.</div>
+                </div>
+              <button class="glas-schalter" id="btnGlas" onclick="glasUm()" role="switch" aria-checked="false" title="Durchscheinende Oberfläche" aria-label="Durchscheinende Oberfläche ein- oder ausschalten">
+                <span class="knopf">
+                  <svg class="i-glas" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="12" height="12" rx="3.4"/><path d="M8.5 20.5h8a4 4 0 0 0 4-4v-8"/></svg>
+                </span>
+              </button>
+              </div>
+              <!-- Wo die Wahl gespeichert ist. Vier verschiedene Lagen, vier
+                   verschiedene Saetze (esStandZeigen): am Konto, noch nicht
+                   geladen, Einrichtung fehlt, Speichern fehlgeschlagen. -->
+              <p class="es-stand" id="esStand"></p>
+            </div>
+          </div>
+          <div class="card es-teil" data-reiter="farben" hidden>
+            <div class="card-hd"><h2>Farben</h2><span class="sp"></span><span class="chip chip-n">in Arbeit</span></div>
+            <div class="card-bd"><p class="es-platz">Hier wählst du die Farben deiner Oberfläche, zum Beispiel die Akzentfarbe für Knöpfe und Markierungen. In Arbeit.</p></div>
+          </div>
+          <div class="card es-teil" data-reiter="benachrichtigungen" hidden>
+            <div class="card-hd"><h2>Benachrichtigungen</h2><span class="sp"></span><span class="chip chip-n">in Arbeit</span></div>
+            <div class="card-bd"><p class="es-platz">Hier legst du fest, worüber dich die Glocke informiert und worüber nicht. In Arbeit.</p></div>
+          </div>
+          <div class="card es-teil" data-reiter="maildesigner" hidden>
+            <div class="card-hd"><h2>E-Mail-Designer</h2><span class="sp"></span><span class="chip chip-n">in Arbeit</span></div>
+            <div class="card-bd"><p class="es-platz">Hier gestaltest du die Mails, die dein Betrieb an Kundinnen und Kunden verschickt: Offerten, Rechnungen und Rapporte. Die Einstellung gilt für alle Konten des Betriebs. In Arbeit.</p></div>
+          </div>
+          <div class="card es-teil" data-reiter="system" hidden>
+            <div class="card-hd"><h2>System</h2><span class="sp"></span><span class="chip chip-n">in Arbeit</span></div>
+            <div class="card-bd"><p class="es-platz">Hier entstehen Einstellungen, die für den ganzen Betrieb gelten. In Arbeit.</p></div>
+          </div>
+        </div>
+        </div>
+      </section>
+
       <section class="view" id="view-support">
         <!-- Reiterleiste (ENT-687). Dasselbe Muster wie "Kontrollrunde
              ändern" im Revierdienst (.rdkr-reiter/.rdkr-tab, ENT-261) --
@@ -11667,8 +11803,11 @@ function enter() {
   spartenAnwenden(me && me.sparten, false);
   // Der Wert steht schon am Dokument -- hier nur Schalter und Systemleiste
   // nachziehen.
-  themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell');
-  glasSetzen(document.documentElement.getAttribute('data-glas') === 'an');
+  // "false": Das ist kein Umschalten, nur das Nachziehen eines bekannten
+  // Werts -- er darf nicht als neue Wahl ans Konto gehen und dort einen
+  // Wert ueberschreiben, den ein anderes Geraet gespeichert hat.
+  themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell', false);
+  glasSetzen(document.documentElement.getAttribute('data-glas') === 'an', false);
   // Im Buendel liegen app.html und index.html unter anderen Namen
   // (index.html bzw. rapport-tool.html, siehe mobile-buendel-erstellen.py)
   // -- "app.html" gibt es dort gar nicht.
@@ -11745,6 +11884,9 @@ function enter() {
     rechteAnwenden();
     tutorialAutostartPruefen(data);
   }).catch(() => {});
+  // Die Darstellung vom Konto holen (Einstellungsseite). Bis die Antwort
+  // da ist, gilt, was dieser Browser zuletzt wusste -- darum blitzt nichts.
+  einstellungenLaden();
   ordLaden('uebersicht');
   sprachBereit('rt');
   // Der Briefkopf wird schon hier geholt, nicht erst beim Drucken (ENT-155):
@@ -11897,6 +12039,7 @@ const TITLES = {
   offerte:     ['Offerte', 'Positionen, Preise und Summen'],
   betrieb:     ['Betrieb', 'Anstellungsorte, Briefkopf, Zugang, Rollen und Dienstfahrzeuge'],
   support:     ['Support', 'Anliegen an den Betreiber und befristete Support-Freigabe'],
+  einstellungen: ['Einstellungen', 'Darstellung für dich und Einstellungen für den Betrieb'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
   finanzen:    ['Finanzen', 'Übersicht und Kennzahlen'],
   rechnungen:  ['Rechnungen', 'Rechnungen an Kunden'],
@@ -12910,7 +13053,7 @@ function bildVerkleinern(datei) {
 // ══════════════════════════════════════════ HELL ODER DUNKEL (ENT-029)
 // Die Wahl gilt fuer dieses Geraet und bleibt gespeichert. Der Wert wird
 // schon im Kopf der Seite gesetzt, hier wird nur noch umgeschaltet.
-function themaSetzen(w) {
+function themaSetzen(w, merken = true) {
   const dunkel = w === 'dunkel';
   document.documentElement.setAttribute('data-thema', dunkel ? 'dunkel' : 'hell');
   localStorage.setItem('rv3_thema', dunkel ? 'dunkel' : 'hell');
@@ -12926,6 +13069,7 @@ function themaSetzen(w) {
   // Die Farbe der Systemleiste am Telefon mitziehen.
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', dunkel ? '#0B0D11' : '#16181D');
+  if (merken) { einstellungMerken('thema', dunkel ? 'dunkel' : 'hell'); }
 }
 
 function themaUm() {
@@ -12940,7 +13084,7 @@ function themaUm() {
 //
 // Kein Eingriff in die Systemleistenfarbe (anders als themaSetzen): Glas
 // aendert nicht, ob es hell oder dunkel ist, nur wie dicht die Flaechen sind.
-function glasSetzen(an) {
+function glasSetzen(an, merken = true) {
   document.documentElement.setAttribute('data-glas', an ? 'an' : 'aus');
   try { localStorage.setItem('rv3_glas', an ? 'an' : 'aus'); } catch (e) {}
   ['btnGlas', 'btnGlasMob'].forEach(id => {
@@ -12949,10 +13093,141 @@ function glasSetzen(an) {
     b.setAttribute('aria-checked', an ? 'true' : 'false');
     b.title = an ? 'Durchscheinende Oberfläche ausschalten' : 'Durchscheinende Oberfläche einschalten';
   });
+  if (merken) { einstellungMerken('glas', an ? 'an' : 'aus'); }
 }
 
 function glasUm() {
   glasSetzen(document.documentElement.getAttribute('data-glas') !== 'an');
+}
+
+// ══════════════════════════════════════════ EINSTELLUNGEN AM KONTO
+// ENT-722: Hell/dunkel und Glas gehoeren
+// dem Konto, nicht mehr dem Browser. Der Browser behaelt seine Kopie
+// (rv3_thema, rv3_glas) als Zwischenspeicher, damit beim Laden nichts in
+// der falschen Fassung aufblitzt -- massgeblich ist, was am Konto steht.
+//
+// Vier Lagen, und jede hat ihren eigenen Satz auf der Seite (esStandZeigen):
+//   'laedt'       -- Antwort vom Konto steht noch aus
+//   'konto'       -- am Konto gespeichert, gilt auf jedem Geraet
+//   'nur_browser' -- die Einrichtung hat die Spalte noch nicht gebracht
+//   'fehler'      -- Laden oder Speichern ist fehlgeschlagen
+let esLage = 'laedt';
+let esAusstehend = {};          // gewaehlt, bevor das Konto geantwortet hat
+let esKette = Promise.resolve(); // Speichern nacheinander, nie ueberholend
+
+// Was dieser Browser gerade zeigt. Gebraucht fuer die einmalige Uebernahme:
+// Hat das Konto noch nichts gespeichert, wird daraus der Kontowert --
+// niemand soll nach dem Update ploetzlich eine andere Oberflaeche vorfinden.
+function esBrowserWerte() {
+  const h = document.documentElement;
+  const w = { thema: h.getAttribute('data-thema') === 'dunkel' ? 'dunkel' : 'hell',
+              glas: h.getAttribute('data-glas') === 'an' ? 'an' : 'aus' };
+  // Kompakte Darstellung (Versuch auf dem Branch test): nur, wenn es sie
+  // in dieser Fassung ueberhaupt gibt.
+  if (typeof dichteSetzen === 'function') {
+    w.dichte = h.getAttribute('data-dichte') === 'kompakt' ? 'kompakt' : 'normal';
+  }
+  return w;
+}
+
+function esSenden(werte) {
+  esKette = esKette.then(() => api('meine_einstellungen.php', { method: 'POST', body: { einstellungen: werte } }))
+    .then(antwort => {
+      if (!antwort || !antwort.ok || !antwort.data || antwort.data.status !== 'ok') {
+        esLage = antwort && antwort.data && antwort.data.stand_unbekannt ? 'nur_browser' : 'fehler';
+      }
+      esStandZeigen();
+    })
+    .catch(() => { esLage = 'fehler'; esStandZeigen(); });
+  return esKette;
+}
+
+// Jede Wahl ueber die Setter (Seite, Handy-Schublade) landet hier.
+function einstellungMerken(schluessel, wert) {
+  if (esLage === 'laedt') { esAusstehend[schluessel] = wert; return; }
+  if (esLage === 'nur_browser') { esStandZeigen(); return; }
+  esSenden({ [schluessel]: wert });
+}
+
+function esAnwenden(e) {
+  // Die Setter legen den Wert auch im Browser ab -- der Zwischenspeicher
+  // fuer das naechste Laden zieht so von selbst nach.
+  if (e.thema) { themaSetzen(e.thema, false); }
+  if (e.glas)  { glasSetzen(e.glas === 'an', false); }
+  if (e.dichte && typeof dichteSetzen === 'function') { dichteSetzen(e.dichte === 'kompakt'); }
+}
+
+function einstellungenLaden() {
+  esLage = 'laedt';
+  esStandZeigen();
+  return api('meine_einstellungen.php').then(({ ok, data }) => {
+    // Eine Antwort ohne das Feld "einstellungen" ist keine Auskunft ueber
+    // das Konto -- weder "nichts gespeichert" noch ein Wert. Dann bleibt
+    // es beim Browser, und es wird auch nichts hochgeladen.
+    if (!ok || !data || data.status !== 'ok' || !('einstellungen' in data)) {
+      esLage = 'fehler'; esAusstehend = {}; esStandZeigen(); return;
+    }
+    if (data.stand_unbekannt) {
+      esLage = 'nur_browser'; esAusstehend = {}; esStandZeigen(); return;
+    }
+    esLage = 'konto';
+    const gespeichert = data.einstellungen;
+    if (gespeichert === null) {
+      // Einmal uebernehmen: was dieser Browser bisher wusste, plus was
+      // jemand gewaehlt hat, waehrend die Antwort unterwegs war.
+      esSenden(Object.assign(esBrowserWerte(), esAusstehend));
+    } else {
+      esAnwenden(gespeichert);
+      // Was waehrend des Ladens gewaehlt wurde, ist juenger als der
+      // Kontowert und gewinnt.
+      if (Object.keys(esAusstehend).length) {
+        esAnwenden(esAusstehend);
+        esSenden(esAusstehend);
+      }
+    }
+    esAusstehend = {};
+    esStandZeigen();
+  }).catch(() => { esLage = 'fehler'; esAusstehend = {}; esStandZeigen(); });
+}
+
+const ES_STAND = {
+  laedt:       ['Wird vom Konto geladen. Bis dahin gilt, was dieser Browser gespeichert hat.', false],
+  konto:       ['Gespeichert an deinem Konto. Gilt auf jedem Gerät, an dem du dich anmeldest.', false],
+  nur_browser: ['Nur in diesem Browser gespeichert: Die Einrichtung ist noch nicht auf dem neusten Stand. Danach folgt die Wahl deinem Konto.', true],
+  fehler:      ['Konnte nicht mit dem Konto abgeglichen werden. Die Wahl gilt vorerst nur in diesem Browser.', true],
+};
+function esStandZeigen() {
+  const el = $('esStand');
+  if (!el) { return; }
+  const [text, warn] = ES_STAND[esLage] || ES_STAND.fehler;
+  el.textContent = text;
+  el.classList.toggle('warn', warn);
+}
+
+// Reiter "Fuer den Betrieb" nur mit dem Recht "betrieb" (Lesen genuegt zum
+// Sehen). Heute stehen dort nur Platzhalter ohne Daten -- das Ausblenden ist
+// darum Bequemlichkeit. Sobald dort etwas gespeichert wird, prueft der
+// Endpunkt das Recht selbst (CLAUDE.md: Sperren gehoeren in den Server).
+const ES_BETRIEB = ['maildesigner', 'system'];
+function esDarfBetrieb() { return darf('betrieb_lesen'); }
+
+function esReiterZeigen(reiter) {
+  if (ES_BETRIEB.includes(reiter) && !esDarfBetrieb()) { reiter = 'darstellung'; }
+  document.querySelectorAll('#view-einstellungen .es-nav-knopf').forEach(b => {
+    const an = b.dataset.reiter === reiter;
+    b.classList.toggle('aktiv', an);
+    if (an) { b.setAttribute('aria-current', 'page'); } else { b.removeAttribute('aria-current'); }
+  });
+  document.querySelectorAll('#view-einstellungen .es-teil').forEach(t => {
+    t.hidden = t.dataset.reiter !== reiter;
+  });
+}
+
+function esOeffnen() {
+  const nav = $('esBetriebNav');
+  if (nav) { nav.style.display = esDarfBetrieb() ? '' : 'none'; }
+  esStandZeigen();
+  esReiterZeigen('darstellung');
 }
 
 // Welche Ansichten die volle Breite wollen -- EINE Liste statt verstreuter
@@ -13071,6 +13346,7 @@ function go(view) {
   if (view === 'planung' && MOBIL() && pTab === 'uebersicht') goTab('einsaetze');
   if (view === 'mitarbeiter' && !mitarbeiter.length) loadMitarbeiter();
   if (view === 'betrieb') { ladeBetrieb(); zfLaden(); rvLaden(); lmSichtbarkeit(); }
+  if (view === 'einstellungen') { esOeffnen(); }
   // Die Administrationsgruppe klappt auf, wenn eine ihrer Seiten offen ist --
   // und der Elternpunkt wird mitmarkiert, sonst sieht die Seitenleiste aus,
   // als waere man nirgends (dasselbe Muster wie bei den Kunden, ENT-039).

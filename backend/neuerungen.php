@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 32,
+            'datum' => '2026-10-15',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Einstellungen im Kontomenü',
+            'text'  => 'Oben rechts im Kontomenü gibt es neu „Einstellungen“. Hell oder dunkel und die durchscheinende Oberfläche findest du jetzt dort, nicht mehr in der Kopfleiste. Deine Wahl gilt neu für dein Konto, also auf jedem Gerät, an dem du dich anmeldest. Beim ersten Öffnen wird übernommen, was du bisher eingestellt hattest. Farben, Benachrichtigungen und der E-Mail-Designer sind schon als Reiter da und folgen.',
+        ],
+        [
             'nr'    => 28,
             'datum' => '2026-10-14',
             'art'   => 'fehlerbehebung',
