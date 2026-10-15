@@ -43,6 +43,10 @@ const EINSTELLUNGEN_ERLAUBT = [
     'thema'  => ['hell', 'dunkel'],
     'glas'   => ['an', 'aus'],
     'dichte' => ['normal', 'kompakt'],
+    // Die App der Mitarbeitenden hat seit ENT-398 bewusst eine EIGENE
+    // Hell/Dunkel-Wahl (dort dunkel als Vorgabe, weil sie nachts im Revier
+    // laeuft). Zwei Entscheidungen, zwei Schluessel -- auch am Konto.
+    'app_thema' => ['hell', 'dunkel'],
 ];
 
 // Nimmt, was aus der Anfrage kommt, und gibt nur zurueck, was erlaubt ist.

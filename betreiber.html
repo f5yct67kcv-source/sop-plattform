@@ -335,6 +335,30 @@ body {
 .karte-kopf h2 { margin: 0; font-size: 15.5px; font-weight: 650; letter-spacing: -.01em; }
 .karte-kopf .sub { font-size: 12.5px; color: var(--ink-3); margin-top: 3px; }
 .karte-leib { padding: 20px 22px; }
+/* Einstellungen (ENT-722) -- dieselben Masse wie im Cockpit (.es-* in
+   dashboard.html), damit beide Seiten gleich aussehen. */
+.es-raster { display: grid; grid-template-columns: 268px minmax(0, 760px); gap: 22px; align-items: start; }
+.es-nav { display: flex; flex-direction: column; gap: 3px; }
+.es-gruppe { font-size: 10.5px; font-weight: 650; letter-spacing: .7px; text-transform: uppercase;
+  color: var(--ink-3); padding: 0 10px 6px; }
+.es-nav-knopf { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 10px;
+  border: 1px solid transparent; border-radius: var(--r-sm); background: none; cursor: default;
+  font: inherit; color: var(--ink-2); text-align: left; }
+.es-nav-knopf.aktiv { background: var(--accent-soft); border-color: var(--accent-line); color: var(--ink); }
+.es-nav-ic { width: 26px; height: 26px; border-radius: 8px; background: var(--accent-soft); color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.es-nav-ic svg.i { width: 15px; height: 15px; }
+.es-nav-knopf.aktiv .es-nav-ic { background: var(--accent); color: #fff; }
+.es-nav-lbl { flex: 1; font-size: 13px; font-weight: 600; line-height: 1.2; white-space: nowrap; }
+.es-zeile { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 14px 0; }
+.es-zeile + .es-zeile { border-top: 1px solid var(--line-soft); }
+.es-zeile:first-child { padding-top: 2px; }
+.es-titel { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.es-erkl { font-size: 12.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.4; }
+.es-stand { font-size: 12px; color: var(--ink-3); margin: 10px 0 0; padding-top: 12px;
+  border-top: 1px solid var(--line-soft); }
+.es-stand.warn { color: var(--warn); }
+@media (max-width: 760px) { .es-raster { grid-template-columns: 1fr; } }
 
 /* ── Kennzahlen: Ueberschrift OBEN, Wert darunter (Hausregel) ─────── */
 .zahlen { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 2px;
@@ -1707,6 +1731,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
           </span>
           <span class="lbl">Einrichtung</span>
         </button>
+        <!-- Einstellungen (ENT-722), gleich wie im Cockpit: Schieberegler statt
+             Zahnrad, damit er sich von der Einrichtung unterscheidet. -->
+        <button type="button" class="menue-eintrag" id="knopf-einstellungen" data-bereich="einstellungen">
+          <svg class="i" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+          <span class="lbl">Einstellungen</span>
+        </button>
         <!-- Passwort wechseln (ENT-672). Es gab den Weg schon seit ENT-615,
              aber unter Konten -> eigenes Konto -> Zugang, also drei Klicks
              tief und an einer Stelle, an der man FREMDE Konten verwaltet.
@@ -1770,24 +1800,9 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
          gibt -- dann faellt die mittlere Rasterspalte auf 0 zusammen. -->
     <nav class="top-sub" id="topSub" aria-label="Unterbereiche"></nav>
     <div class="leiste-rechts">
-      <!-- Durchscheinende Oberflaeche an/aus (ENT-418/ENT-419), derselbe
-           Schalter und derselbe Speicherschluessel wie im Cockpit. Links von
-           hell/dunkel, genau wie dort. -->
-      <button type="button" class="glas-schalter" id="btn-glas" role="switch" aria-checked="true"
-              title="Durchscheinende Oberfläche ausschalten"
-              aria-label="Durchscheinende Oberfläche ein- oder ausschalten">
-        <span class="knopf">
-          <svg class="i-glas" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="12" height="12" rx="3.4"/><path d="M8.5 20.5h8a4 4 0 0 0 4-4v-8"/></svg>
-        </span>
-      </button>
-      <button type="button" class="thema-schalter" id="btn-thema" role="switch" aria-checked="false"
-              title="Hell oder dunkel"
-              aria-label="Zwischen heller und dunkler Darstellung wechseln">
-        <span class="knopf">
-          <svg class="i-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></svg>
-          <svg class="i-mond" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
-        </span>
-      </button>
+      <!-- Hier standen die Schalter fuer Glas und hell/dunkel. Seit ENT-722
+           stehen sie wie im Cockpit unter Kontomenue > Einstellungen, und die
+           Wahl gehoert dem Betreiber-Konto. -->
     </div>
   </div>
 
@@ -2287,6 +2302,57 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
          Huelse. Was im Cockpit darueber hinaus dransteht -- Anstellung,
          Einsatz, Lohn, Dienstplaene -- gibt es auf dieser Ebene nicht:
          Ein Betreiber-Konto ist ein Zugang, kein Arbeitsverhaeltnis. -->
+    <!-- ══ Einstellungen (ENT-722) ═════════════════════════════════
+         Gleicher Aufbau wie im Cockpit: links die Reiter, rechts der
+         Inhalt. Hier gibt es vorerst nur "Darstellung" -- die Reiter des
+         Cockpits (Farben, E-Mail-Designer ...) betreffen einen Mandanten,
+         nicht den Betreiber. Die Spalte steht trotzdem, damit weitere
+         Reiter ohne Umbau dazukommen. -->
+    <section class="bereich versteckt" id="b-einstellungen">
+      <div class="es-raster">
+        <nav class="es-nav" aria-label="Einstellungen">
+          <div class="es-gruppe">Für mich</div>
+          <button type="button" class="es-nav-knopf aktiv" aria-current="page">
+            <span class="es-nav-ic"><svg class="i" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2"/><line x1="8.5" y1="20.5" x2="15.5" y2="20.5"/><line x1="12" y1="17" x2="12" y2="20.5"/></svg></span>
+            <span class="es-nav-lbl">Darstellung</span>
+          </button>
+        </nav>
+        <div class="karte">
+          <div class="karte-kopf"><div><h2>Darstellung</h2></div></div>
+          <div class="karte-leib">
+            <div class="es-zeile">
+              <div class="es-text">
+                <div class="es-titel">Dunkle Darstellung</div>
+                <div class="es-erkl">Heller oder dunkler Hintergrund.</div>
+              </div>
+                  <button type="button" class="thema-schalter" id="btn-thema" role="switch" aria-checked="false"
+                          title="Hell oder dunkel"
+                          aria-label="Zwischen heller und dunkler Darstellung wechseln">
+                    <span class="knopf">
+                      <svg class="i-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></svg>
+                      <svg class="i-mond" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
+                    </span>
+                  </button>
+            </div>
+            <div class="es-zeile">
+              <div class="es-text">
+                <div class="es-titel">Durchscheinende Oberfläche</div>
+                <div class="es-erkl">Karten und Leisten wie aus Glas, mit farbigem Grund dahinter.</div>
+              </div>
+                  <button type="button" class="glas-schalter" id="btn-glas" role="switch" aria-checked="true"
+                          title="Durchscheinende Oberfläche ausschalten"
+                          aria-label="Durchscheinende Oberfläche ein- oder ausschalten">
+                    <span class="knopf">
+                      <svg class="i-glas" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="12" height="12" rx="3.4"/><path d="M8.5 20.5h8a4 4 0 0 0 4-4v-8"/></svg>
+                    </span>
+                  </button>
+            </div>
+            <p class="es-stand" id="es-stand"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="bereich versteckt" id="b-konten">
       <div class="tabs haupt" id="kontenTabs" style="margin-bottom:10px">
         <button type="button" class="tab on" id="ktab-konten" onclick="kontenGo('konten')">Konten</button>
@@ -3223,7 +3289,12 @@ const BEREICHE = {
   rechnungen: ['Rechnungen', 'Was die Mandanten für die Nutzung zahlen'],
   support:    ['Support',    'Anfragen der Mandanten, die auf eine Antwort warten'],
   konten:     ['Konten',     'Wer diesen Bereich öffnen darf'],
+  einstellungen: ['Einstellungen', 'Darstellung für dein Konto'],
 };
+// Bereiche, die NICHT im Navigationsband stehen, sondern ueber das
+// Kontomenue erreicht werden (ENT-722) -- wie im Cockpit. Je Eintrag gibt es
+// dort einen Knopf mit data-bereich (test_betreiber_ansicht.mjs prueft das).
+const BEREICHE_KONTOMENUE = ['einstellungen'];
 
 function bereichZeigen(welcher) {
   if (!BEREICHE[welcher]) { welcher = 'uebersicht'; }
@@ -3404,7 +3475,7 @@ document.addEventListener('keydown', e => {
    Der Wert steht schon im Kopf der Seite am Dokument; hier wird nur noch
    umgeschaltet und gespeichert. Derselbe Speicherschluessel wie im
    Cockpit -- Begruendung oben beim Vorab-Skript. */
-function themaSetzen(w) {
+function themaSetzen(w, merken = true) {
   const dunkel = w === 'dunkel';
   document.documentElement.setAttribute('data-thema', dunkel ? 'dunkel' : 'hell');
   try { localStorage.setItem('rv3_thema', dunkel ? 'dunkel' : 'hell'); } catch (e) { /* egal */ }
@@ -3416,6 +3487,7 @@ function themaSetzen(w) {
   // Die Farbe der Systemleiste am Telefon mitziehen.
   const m = document.querySelector('meta[name="theme-color"]');
   if (m) { m.setAttribute('content', dunkel ? '#0B0D11' : '#16181D'); }
+  if (merken) { einstellungMerken('thema', dunkel ? 'dunkel' : 'hell'); }
 }
 function themaUm() {
   themaSetzen(document.documentElement.getAttribute('data-thema') === 'dunkel' ? 'hell' : 'dunkel');
@@ -3426,7 +3498,7 @@ function themaUm() {
    nur umgeschaltet und gespeichert. Kein Eingriff in die Farbe der
    Systemleiste, anders als bei themaSetzen -- Glas aendert nicht, ob es
    hell oder dunkel ist, nur wie dicht die Flaechen sind. */
-function glasSetzen(an) {
+function glasSetzen(an, merken = true) {
   document.documentElement.setAttribute('data-glas', an ? 'an' : 'aus');
   try { localStorage.setItem('rv3_glas', an ? 'an' : 'aus'); } catch (e) { /* egal */ }
   const b = $('btn-glas');
@@ -3434,9 +3506,74 @@ function glasSetzen(an) {
     b.setAttribute('aria-checked', an ? 'true' : 'false');
     b.title = an ? 'Durchscheinende Oberfläche ausschalten' : 'Durchscheinende Oberfläche einschalten';
   }
+  if (merken) { einstellungMerken('glas', an ? 'an' : 'aus'); }
 }
 function glasUm() {
   glasSetzen(document.documentElement.getAttribute('data-glas') !== 'an');
+}
+
+/* ── Einstellungen am Konto (ENT-722) ─────────────────────────────
+   Dieselbe Logik wie im Cockpit (dashboard.html, esLage/einstellungenLaden),
+   gegen api/betreiber_einstellungen.php. Vier Lagen, vier Saetze:
+   laedt / konto / nur_browser (Einrichtung fehlt) / fehler. Was am Konto
+   steht, gilt; was dort fehlt, kommt einmal aus diesem Browser. */
+let esLage = 'laedt';
+let esAusstehend = {};
+let esKette = Promise.resolve();
+
+function esBrowserWerte() {
+  const h = document.documentElement;
+  return { thema: h.getAttribute('data-thema') === 'dunkel' ? 'dunkel' : 'hell',
+           glas: h.getAttribute('data-glas') === 'an' ? 'an' : 'aus' };
+}
+function esSenden(werte) {
+  esKette = esKette.then(() => ruf('betreiber_einstellungen.php', { einstellungen: werte }, 'POST'))
+    .then(a => {
+      if (!a || a.status !== 'ok') { esLage = a && a.stand_unbekannt ? 'nur_browser' : 'fehler'; }
+      esStandZeigen();
+    })
+    .catch(() => { esLage = 'fehler'; esStandZeigen(); });
+  return esKette;
+}
+function einstellungMerken(schluessel, wert) {
+  if (esLage === 'laedt') { esAusstehend[schluessel] = wert; return; }
+  if (esLage === 'nur_browser') { esStandZeigen(); return; }
+  esSenden({ [schluessel]: wert });
+}
+function esAnwenden(e) {
+  if (e.thema) { themaSetzen(e.thema, false); }
+  if (e.glas)  { glasSetzen(e.glas === 'an', false); }
+}
+async function einstellungenLaden() {
+  esLage = 'laedt'; esStandZeigen();
+  let a = null;
+  try { a = await ruf('betreiber_einstellungen.php'); } catch (x) { a = null; }
+  if (!a || a.status !== 'ok' || !('einstellungen' in a)) {
+    esLage = 'fehler'; esAusstehend = {}; esStandZeigen(); return;
+  }
+  if (a.stand_unbekannt) { esLage = 'nur_browser'; esAusstehend = {}; esStandZeigen(); return; }
+  esLage = 'konto';
+  const gespeichert = a.einstellungen || {};
+  esAnwenden(gespeichert);
+  const browser = esBrowserWerte(), senden = {};
+  Object.keys(browser).forEach(k => { if (!(k in gespeichert)) { senden[k] = browser[k]; } });
+  if (Object.keys(esAusstehend).length) { esAnwenden(esAusstehend); Object.assign(senden, esAusstehend); }
+  if (Object.keys(senden).length) { esSenden(senden); }
+  esAusstehend = {};
+  esStandZeigen();
+}
+const ES_STAND = {
+  laedt:       ['Wird vom Konto geladen. Bis dahin gilt, was dieser Browser gespeichert hat.', false],
+  konto:       ['Gespeichert an deinem Konto. Gilt auf jedem Gerät, an dem du dich anmeldest.', false],
+  nur_browser: ['Nur in diesem Browser gespeichert: Die Einrichtung ist noch nicht auf dem neusten Stand. Danach folgt die Wahl deinem Konto.', true],
+  fehler:      ['Konnte nicht mit dem Konto abgeglichen werden. Die Wahl gilt vorerst nur in diesem Browser.', true],
+};
+function esStandZeigen() {
+  const el = $('es-stand');
+  if (!el) { return; }
+  const [text, warn] = ES_STAND[esLage] || ES_STAND.fehler;
+  el.textContent = text;
+  el.classList.toggle('warn', warn);
 }
 
 async function ruf(pfad, daten, methode) {
@@ -3515,6 +3652,7 @@ async function nachAnmeldung(zfSteht) {
   zeig($('zf-tor'), false);
   zeig($('haus'), true);
   bereichZeigen('uebersicht');
+  einstellungenLaden();
   await ladeAlles();
 }
 
@@ -10015,7 +10153,7 @@ $('knopf-zf-start').onclick  = zfStart;
 $('knopf-zf-fertig').onclick = zfFertig;
 $('knopf-zf-weiter').onclick = async () => {
   zeig($('zf-tor'), false); zeig($('haus'), true);
-  bereichZeigen('uebersicht'); await ladeAlles();
+  bereichZeigen('uebersicht'); einstellungenLaden(); await ladeAlles();
 };
 $('knopf-einrichtung').onclick     = einrichtungOeffnen;
 $('knopf-einrichtung-zu').onclick  = einrichtungSchliessen;
@@ -10037,6 +10175,7 @@ $('knopf-sv-alle').onclick     = () => { svNurOffen = false; ladeSupport(); };
 $('knopf-abmelden').onclick   = abmelden;
 /* Das Menue bleibt sonst offen hinter dem Dialog stehen. */
 $('knopf-passwort').onclick   = () => { kontoMenuUm(); pwOeffnen(); };
+$('knopf-einstellungen').onclick = () => { kontoMenuUm(); bereichZeigen('einstellungen'); esStandZeigen(); };
 $('btnMarke').onclick         = kontoMenuUm;
 $('btn-thema').onclick        = themaUm;
 $('btn-glas').onclick         = glasUm;
@@ -10050,8 +10189,9 @@ document.querySelectorAll('[data-springe]').forEach(b => {
   b.onclick = () => bereichZeigen(b.dataset.springe);
 });
 // Die Schalter auf den Stand bringen, den die Vorab-Skripte gesetzt haben.
-themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell');
-glasSetzen(document.documentElement.getAttribute('data-glas') !== 'aus');
+// "false": Nachziehen ist keine neue Wahl und geht nicht ans Konto.
+themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell', false);
+glasSetzen(document.documentElement.getAttribute('data-glas') !== 'aus', false);
 
 /* ── Einladung einloesen (ENT-667) ─────────────────────────────────
    Der Token steht in der URL, weil er aus einer E-Mail kommt -- anders als
