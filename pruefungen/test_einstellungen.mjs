@@ -269,6 +269,74 @@ const standText = page => page.evaluate(() => $('esStand').textContent.trim());
   await browser.close();
 }
 
+// ── 7) Pro Schluessel uebernehmen ──────────────────────────────────────────
+// Hat zuerst die App ihre eigene Wahl gespeichert, ist das Konto nicht mehr
+// leer -- die Wahl des Cockpits fehlt trotzdem und muss einmal kommen.
+{
+  const { browser, page, posts } = await starte({ thema: 'hell', glas: 'aus', konto: { app_thema: 'dunkel' } });
+  await page.waitForTimeout(300);
+  check('KRITISCH: steht nur die App-Wahl am Konto, uebernimmt das Cockpit trotzdem seine eigene',
+    posts.length === 1 && posts[0].thema === 'hell' && posts[0].glas === 'aus' && !('app_thema' in posts[0]));
+  check('Die App-Wahl faerbt das Cockpit nicht (ENT-398: zwei Entscheidungen)',
+    await attr(page, 'data-thema') === 'hell');
+  await browser.close();
+}
+
+// ── 8) App der Mitarbeitenden: eigene Wahl, am Konto ───────────────────────
+async function app({ geraet, konto }) {
+  const browser = await chromium.launch({ executablePath: browserPfad() });
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const fehler = [], posts = [];
+  page.on('pageerror', e => fehler.push(e.message));
+  if (geraet) {
+    await page.addInitScript(v => { try { localStorage.setItem('rv3_app_thema', v); } catch (e) {} }, geraet);
+  }
+  await page.route('**/api/**', route => {
+    const u = route.request().url();
+    const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
+    if (u.includes('login')) return send({ status: 'ok', token: 't', name: 'muster.person', ist_admin: false });
+    if (u.includes('meine_einstellungen')) {
+      if (route.request().method() === 'POST') {
+        posts.push(JSON.parse(route.request().postData()).einstellungen);
+        return send({ status: 'ok', einstellungen: {} });
+      }
+      if (konto === 'stumm') return send({ status: 'ok' });
+      return send({ status: 'ok', einstellungen: konto });
+    }
+    if (u.includes('meine_schichten')) return send({ status: 'ok', schichten: [] });
+    return send({ status: 'ok' });
+  });
+  await page.goto(`file://${WURZEL}/app.html`);
+  await page.fill('#gName', 'a'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
+  await page.waitForSelector('#app.on'); await page.waitForTimeout(500);
+  return { browser, page, fehler, posts };
+}
+{
+  const a = await app({ geraet: 'hell', konto: { thema: 'dunkel', glas: 'an' } });
+  check('KRITISCH: App ohne eigene Kontowahl uebernimmt einmal, was das Telefon wusste',
+    a.posts.length === 1 && JSON.stringify(a.posts[0]) === JSON.stringify({ app_thema: 'hell' }));
+  check('Die Cockpit-Wahl am Konto faerbt die App nicht', await attr(a.page, 'data-thema') === 'hell');
+  await a.page.evaluate(() => themaUm()); await a.page.waitForTimeout(200);
+  check('KRITISCH: Umschalten in der App geht ans Konto, unter eigenem Schluessel',
+    a.posts.length === 2 && JSON.stringify(a.posts[1]) === JSON.stringify({ app_thema: 'dunkel' }));
+  check('Keine JavaScript-Fehler in der App', a.fehler.length === 0);
+  await a.browser.close();
+
+  const b = await app({ geraet: 'dunkel', konto: { app_thema: 'hell' } });
+  check('KRITISCH: ein anderes Telefon hat hell gespeichert -- hier gilt jetzt auch hell',
+    await attr(b.page, 'data-thema') === 'hell');
+  check('und das Telefon merkt es sich fuers naechste Starten',
+    await b.page.evaluate(() => localStorage.getItem('rv3_app_thema') === 'hell'));
+  check('Das Uebernehmen vom Konto schreibt nichts zurueck', b.posts.length === 0);
+  await b.browser.close();
+
+  const c = await app({ geraet: 'hell', konto: 'stumm' });
+  await c.page.evaluate(() => themaUm()); await c.page.waitForTimeout(200);
+  check('Ohne Auskunft vom Konto bleibt die App beim Telefon und laedt nichts hoch',
+    c.posts.length === 0 && await attr(c.page, 'data-thema') === 'dunkel');
+  await c.browser.close();
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

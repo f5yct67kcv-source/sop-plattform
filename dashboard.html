@@ -13171,20 +13171,19 @@ function einstellungenLaden() {
       esLage = 'nur_browser'; esAusstehend = {}; esStandZeigen(); return;
     }
     esLage = 'konto';
-    const gespeichert = data.einstellungen;
-    if (gespeichert === null) {
-      // Einmal uebernehmen: was dieser Browser bisher wusste, plus was
-      // jemand gewaehlt hat, waehrend die Antwort unterwegs war.
-      esSenden(Object.assign(esBrowserWerte(), esAusstehend));
-    } else {
-      esAnwenden(gespeichert);
-      // Was waehrend des Ladens gewaehlt wurde, ist juenger als der
-      // Kontowert und gewinnt.
-      if (Object.keys(esAusstehend).length) {
-        esAnwenden(esAusstehend);
-        esSenden(esAusstehend);
-      }
-    }
+    // Pro Schluessel uebernehmen, nicht nur bei einem ganz leeren Konto:
+    // Hat zuerst die App ihre eigene Wahl gespeichert (app_thema), ist das
+    // Konto nicht mehr leer -- die Wahl des Cockpits fehlt trotzdem. Was am
+    // Konto steht, gilt; was fehlt, kommt einmal aus diesem Browser.
+    const gespeichert = data.einstellungen || {};
+    esAnwenden(gespeichert);
+    const browser = esBrowserWerte();
+    const fehlend = {};
+    Object.keys(browser).forEach(k => { if (!(k in gespeichert)) { fehlend[k] = browser[k]; } });
+    // Was waehrend des Ladens gewaehlt wurde, ist juenger als alles andere.
+    if (Object.keys(esAusstehend).length) { esAnwenden(esAusstehend); }
+    const senden = Object.assign(fehlend, esAusstehend);
+    if (Object.keys(senden).length) { esSenden(senden); }
     esAusstehend = {};
     esStandZeigen();
   }).catch(() => { esLage = 'fehler'; esAusstehend = {}; esStandZeigen(); });
