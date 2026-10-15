@@ -66,6 +66,20 @@ try {
     f.status === 'error' && f.pruefung.http === 409 && f.stand_unbekannt === true);
 } catch (x) { check('Abschnitt Endpunkt ohne Abbruch: ' + x.message, false); }
 
+// Dasselbe gegen den Betreiber-Endpunkt (Tabelle betreiber, ENT-722).
+try {
+  const aufrufB = (m, l, k) => JSON.parse(execFileSync('php',
+    [`${HIER}/pruef_meine_einstellungen.php`, m, l, 'betreiber'],
+    { input: k === undefined ? '' : JSON.stringify(k), encoding: 'utf8' }));
+  check('Betreiber: ohne Gespeichertes null', aufrufB('GET', 'leer').einstellungen === null);
+  const b = aufrufB('POST', 'vorbelegt', { id: 2, einstellungen: { glas: 'an', app_thema: 'hell', dichte: 'kompakt' } });
+  check('KRITISCH Betreiber: das fremde Konto bleibt unberuehrt',
+    JSON.stringify(json(b.pruefung.andere)) === JSON.stringify({ thema: 'hell', glas: 'an' }));
+  check('KRITISCH Betreiber: nur thema und glas -- Schluessel des Cockpits und der App fallen weg',
+    JSON.stringify(json(b.pruefung.ich)) === JSON.stringify({ thema: 'dunkel', glas: 'an' }));
+  check('Betreiber: ohne Spalte "unbekannt"', aufrufB('GET', 'ohne_spalte').stand_unbekannt === true);
+} catch (x) { check('Abschnitt Betreiber-Endpunkt ohne Abbruch: ' + x.message, false); }
+
 // ══════════════════════════════════════════ B) DIE OBERFLAECHE
 // konto: was der Endpunkt beim Laden antwortet -- null (nichts gespeichert),
 // ein Objekt, 'unbekannt' (Spalte fehlt) oder 'stumm' (Antwort ohne Feld).
@@ -335,6 +349,65 @@ async function app({ geraet, konto }) {
   check('Ohne Auskunft vom Konto bleibt die App beim Telefon und laedt nichts hoch',
     c.posts.length === 0 && await attr(c.page, 'data-thema') === 'dunkel');
   await c.browser.close();
+}
+
+// ── 9) Betreiberbereich: gleiche Seite, eigenes Konto ─────────────────────
+async function betreiber({ thema = 'dunkel', glas = 'an', konto }) {
+  const browser = await chromium.launch({ executablePath: browserPfad() });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const fehler = [], posts = [];
+  page.on('pageerror', e => fehler.push(e.message));
+  await page.addInitScript(([t, g]) => {
+    try { localStorage.setItem('rv3_thema', t); localStorage.setItem('rv3_glas', g);
+          sessionStorage.setItem('betreiber-token', 't'); } catch (e) {}
+  }, [thema, glas]);
+  await page.route('**/api/**', route => {
+    const u = route.request().url();
+    const send = b => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
+    if (u.includes('betreiber_zf_status')) return send({ status: 'ok', eingerichtet: true });
+    if (u.includes('betreiber_einstellungen')) {
+      if (route.request().method() === 'POST') {
+        posts.push(JSON.parse(route.request().postData()).einstellungen);
+        return send({ status: 'ok', einstellungen: {} });
+      }
+      return send({ status: 'ok', einstellungen: konto });
+    }
+    return send({ status: 'ok', mandanten: [], liste: [], eintraege: [], konten: [], belege: [] });
+  });
+  await page.goto(`file://${WURZEL}/betreiber.html`);
+  await page.waitForSelector('#haus:not(.versteckt)'); await page.waitForTimeout(500);
+  return { browser, page, fehler, posts };
+}
+{
+  const a = await betreiber({ thema: 'hell', glas: 'aus', konto: null });
+  check('KRITISCH Betreiber: in der Kopfleiste steht kein Schalter mehr',
+    await a.page.evaluate(() => !document.querySelector('.leiste-rechts .thema-schalter, .leiste-rechts .glas-schalter')));
+  check('Betreiber: leeres Konto uebernimmt einmal, was der Browser wusste',
+    a.posts.length === 1 && a.posts[0].thema === 'hell' && a.posts[0].glas === 'aus');
+  await a.page.click('#btnMarke'); await a.page.waitForTimeout(200);
+  await a.page.click('#knopf-einstellungen'); await a.page.waitForTimeout(250);
+  check('Betreiber: das Kontomenue fuehrt auf die Einstellungsseite',
+    await a.page.isVisible('#b-einstellungen') && (await a.page.textContent('#leiste-titel')).trim() === 'Einstellungen');
+  check('Betreiber: dort stehen beide Schalter', await a.page.isVisible('#btn-thema') && await a.page.isVisible('#btn-glas'));
+  check('Betreiber: die Seite sagt, wo die Wahl gespeichert ist',
+    /gespeichert an deinem konto/i.test(await a.page.textContent('#es-stand')));
+  await a.page.click('#btn-thema'); await a.page.waitForTimeout(250);
+  check('KRITISCH Betreiber: Umschalten geht ans Betreiber-Konto',
+    a.posts.length === 2 && JSON.stringify(a.posts[1]) === JSON.stringify({ thema: 'dunkel' }));
+  const lage = await a.page.evaluate(() => {
+    const t = $('btn-thema').getBoundingClientRect(), g = $('btn-glas').getBoundingClientRect();
+    return Math.abs(t.right - g.right) <= 1 && g.top >= t.bottom;
+  });
+  check('Betreiber: die Schalter stehen untereinander auf einer Linie', lage);
+  await a.page.screenshot({ path: `${OUT}/einstellungen-betreiber.png` });
+  check('Betreiber: keine JavaScript-Fehler', a.fehler.length === 0);
+  await a.browser.close();
+
+  const b = await betreiber({ thema: 'dunkel', glas: 'an', konto: { thema: 'hell', glas: 'aus' } });
+  check('KRITISCH Betreiber: der Kontowert gilt', await attr(b.page, 'data-thema') === 'hell'
+    && await attr(b.page, 'data-glas') === 'aus');
+  check('Betreiber: das Uebernehmen vom Konto schreibt nichts zurueck', b.posts.length === 0);
+  await b.browser.close();
 }
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

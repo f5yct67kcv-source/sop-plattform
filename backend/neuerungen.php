@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 33,
+            'datum' => '2026-10-15',
+            'art'   => 'verbesserung',
+            'fuer'  => ['app', 'betreiber'],
+            'titel' => 'Darstellung folgt deinem Konto',
+            'text'  => 'Hell oder dunkel gilt jetzt für dein Konto, auf jedem Gerät, an dem du dich anmeldest. In der App bleibt die Wahl eine eigene, getrennt vom Cockpit. Im Betreiberbereich stehen hell/dunkel und die durchscheinende Oberfläche neu im Kontomenü unter „Einstellungen“, nicht mehr in der Kopfleiste.',
+        ],
+        [
             'nr'    => 32,
             'datum' => '2026-10-15',
             'art'   => 'neu',
