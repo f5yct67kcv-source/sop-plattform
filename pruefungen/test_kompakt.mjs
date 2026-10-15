@@ -22,7 +22,7 @@ const check = (n, c, x) => (c ? ok : bad).push(n + (c || x === undefined ? '' : 
 
 const browser = await chromium.launch({ executablePath: browserPfad() });
 
-async function seite(breite, hoehe, dichte) {
+async function seite(breite, hoehe, dichte, reinigung) {
   const page = await browser.newPage({ viewport: { width: breite, height: hoehe } });
   page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
   await page.route('**/api/**', r => {
@@ -41,6 +41,9 @@ async function seite(breite, hoehe, dichte) {
   await page.reload();
   await page.fill('#gName', 'adrian'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
   await page.waitForSelector('#shell.on'); await page.waitForTimeout(400);
+  // Mit Reinigung im Angebot steht das Feld Sparte da -- so, wie es beim
+  // Projektinhaber aussieht.
+  if (reinigung) { await page.evaluate(() => document.documentElement.classList.add('hat-reinigung')); }
   await page.evaluate(() => openEinsatzNeu()); await page.waitForTimeout(400);
   return page;
 }
@@ -100,25 +103,68 @@ await pk.click('#enNSerieHinweis >> xpath=.. >> .abs-info'); await pk.waitForTim
 check('kompakt: (i) schliesst ihn wieder', (await mass(pk)).hinweisZu);
 await pk.close();
 
-// ── Breiter Schirm, kompakt: Kunde und Strasse enden nach zwei Spalten,
-// das naechste Feld rueckt in dieselbe Zeile (Wunsch 2026-10-14).
-const pb = await seite(1920, 1000, 'kompakt');
-const breit = await pb.evaluate(() => {
-  const r = id => document.getElementById(id).closest('.f').getBoundingClientRect();
-  const z = (a, b) => Math.abs(r(a).top - r(b).top) < 3;
+// ── Breiter Schirm, kompakt: Zeilenfluss nach der Skizze des
+// Projektinhabers (2026-10-15). Feldbreiten exakt, erste Spalte buendig,
+// jede Beschriftung mittig zu ihrem Feld, Zeilen 46 px auseinander.
+const pb = await seite(1920, 1000, 'kompakt', true);
+const fl = await pb.evaluate(() => {
+  const r = id => document.getElementById(id).getBoundingClientRect();
+  const SOLL = { enNKunde_name: 345, enNEinsatzart: 179, enNSparte: 171, enNVeranstaltung: 218,
+    enNStatus: 168, enNDatum: 117, enNDatumBis: 117, enNStrasse: 374, enNOrt: 218, enNKanton: 104,
+    enNBedarf: 52, enNKontakt_vorname: 204, enNKontakt_nachname: 197, enNKontakt_telefon: 171 };
+  const breiten = Object.entries(SOLL).filter(([id, w]) => Math.abs(r(id).width - w) > 0.5)
+    .map(([id, w]) => `${id} ${r(id).width} statt ${w}`);
+  const zeit = [...document.querySelectorAll('.zeilenfluss .zeitwahl select')].map(e => e.getBoundingClientRect().width);
+  const links = ['enNKunde_name', 'enNVeranstaltung', 'enNDatum', 'enNStrasse', 'enNBedarf', 'enNWeg_km', 'enNKontakt_vorname'].map(id => r(id).x);
+  const mitte = [];
+  document.querySelectorAll('.zeilenfluss > .f').forEach(f => {
+    const l = f.querySelector(':scope > label'), i = f.querySelector('.inp:not([type=hidden])');
+    if (!l || !i) return;
+    // Der TEXT der Beschriftung, nicht ihr Kasten: Ein Polster verschiebt
+    // den Text, ohne dass die Mitte des Kastens sich bewegt.
+    const rg = document.createRange(); rg.selectNodeContents(l);
+    const a = rg.getBoundingClientRect(), c = i.getBoundingClientRect();
+    if (a.height && c.height) mitte.push(Math.abs((a.top + a.height / 2) - (c.top + c.height / 2)));
+  });
+  const zeile = (a, b) => Math.abs(r(a).top - r(b).top) < 1;
   return {
-    kundeNeben: z('enNKunde_name', 'enNEinsatzart'),
-    kundeBuendig: Math.abs(document.getElementById('enNKunde_name').getBoundingClientRect().right
-      - document.getElementById('enNStatus').getBoundingClientRect().right),
-    strasseNeben: z('enNStrasse', 'enNOrt'),
-    zeitraumBreit: r('enNDatum').width / document.getElementById('enNDatum').closest('.form-grid').getBoundingClientRect().width,
+    breiten, zeit, links, mitte: Math.max(...mitte),
+    takt: [r('enNVeranstaltung').top - r('enNKunde_name').top, r('enNStrasse').top - r('enNDatum').top,
+           r('enNBedarf').top - r('enNStrasse').top],
+    reihe1: zeile('enNKunde_name', 'enNEinsatzart') && zeile('enNKunde_name', 'enNSparte'),
+    reihe2: zeile('enNVeranstaltung', 'enNStatus') && !zeile('enNKunde_name', 'enNVeranstaltung'),
+    strasse: zeile('enNStrasse', 'enNOrt') && zeile('enNStrasse', 'enNKanton') && !zeile('enNStrasse', 'enNBedarf'),
+    kontakt: zeile('enNKontakt_vorname', 'enNKontakt_nachname') && zeile('enNKontakt_vorname', 'enNKontakt_telefon'),
+    zoneNeben: zeile('enNWeg_km', 'enNWeg_km') && document.getElementById('enNZone').getBoundingClientRect().left > r('enNWeg_minuten').right,
+    weg: r('enNWeg_km').width,
   };
 });
-check('breit kompakt: Einsatzart rueckt neben Kunde', breit.kundeNeben);
-check('breit kompakt: Kunde endet buendig mit dem Feld darunter', breit.kundeBuendig < 2, breit.kundeBuendig);
-check('breit kompakt: PLZ/Ort rueckt neben Strasse', breit.strasseNeben);
-check('breit kompakt: Zeitraum bleibt ueber die ganze Breite', breit.zeitraumBreit > 0.95, breit.zeitraumBreit.toFixed(2));
+check('Zeilenfluss: Feldbreiten wie skizziert', !fl.breiten.length, fl.breiten.join('; '));
+check('Zeilenfluss: vier Zeitfelder je 76 px', fl.zeit.length === 4 && fl.zeit.every(w => Math.abs(w - 76) < 0.5), fl.zeit.join('/'));
+check('Zeilenfluss: erste Spalte buendig', Math.max(...fl.links) - Math.min(...fl.links) < 0.5, fl.links.join('/'));
+check('Zeilenfluss: Beschriftung mittig zum Feld', fl.mitte < 1.5, fl.mitte);
+check('Zeilenfluss: Zeilen 46 px auseinander', fl.takt.every(t => Math.abs(t - 46) < 0.5), fl.takt.join('/'));
+check('Zeilenfluss: Kunde, Einsatzart, Sparte in einer Zeile', fl.reihe1);
+check('Zeilenfluss: Veranstaltung und Status darunter', fl.reihe2);
+check('Zeilenfluss: Strasse, PLZ/Ort, Kanton in einer Zeile, Bedarf darunter', fl.strasse);
+check('Zeilenfluss: Kontaktperson in einer Zeile', fl.kontakt);
+check('Zeilenfluss: Zonenhinweis neben der Wegzeile', fl.zoneNeben);
+check('Zeilenfluss: Wegfelder 104 px (Einheit nicht verdeckt)', Math.abs(fl.weg - 104) < 0.5, fl.weg);
+check('Zeilenfluss: Unterzeile Kontaktperson ausgeblendet', await pb.evaluate(() =>
+  getComputedStyle(document.querySelector('#enNKontakt_vorname').closest('.abschnitt').querySelector('h3 .note')).display === 'none'));
 await pb.close();
+
+// ── Zu schmal fuer die laengste Zeile: kein Feld haengt allein am linken
+// Rand, sondern das kompakte Raster gilt.
+const ps = await seite(1440, 1000, 'kompakt', true);
+const sm = await ps.evaluate(() => {
+  const r = id => document.getElementById(id).getBoundingClientRect();
+  return { kantonLinks: r('enNKanton').left, feldLinks: r('enNStrasse').left,
+    raster: getComputedStyle(document.querySelector('.zeilenfluss')).display };
+});
+check('schmal: kompaktes Raster statt Zeilenfluss', sm.raster === 'grid', sm.raster);
+check('schmal: Kanton nicht vor der Feldspalte', sm.kantonLinks >= sm.feldLinks - 0.5, `${sm.kantonLinks} < ${sm.feldLinks}`);
+await ps.close();
 
 // ── Handy: kompakt im Speicher aendert nichts
 const hn = await seite(390, 844, 'normal');
