@@ -2063,6 +2063,37 @@ html:not(.hat-reinigung) [data-sparte-feld] { display: none !important; }
    eine zweite Zeile. */
 .bar-filter { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; flex: 0 0 auto; min-width: 0; }
 .search-rechts { align-self: center; }
+/* Icon und Suche gehoeren zusammen: sie ruecken gemeinsam nach rechts und
+   brechen, wenn der Platz nicht reicht, gemeinsam in die naechste Zeile. */
+.suche-gruppe { display: flex; align-items: center; gap: 9px; margin-left: auto;
+  flex: 1 1 189px; min-width: 189px; max-width: 389px; justify-content: flex-end; }
+.suche-gruppe .search-rechts { margin-left: 0; }
+
+/* Feiertage als Icon vor der Suche, in jedem Planungsreiter (15.10.2026).
+   Quadratisch und so hoch wie die Felder daneben. */
+.feiertage-knopf { width: 40px; height: 40px; padding: 0; justify-content: center; flex: none; align-self: center; }
+.feiertage-knopf svg.i { width: 16px; height: 16px; }
+/* In den anderen Reitern so hoch wie die Felder der jeweiligen Leiste. */
+#pv-einsaetze .bar-tools .feiertage-knopf,
+.opl-leiste .feiertage-knopf { width: 45px; height: 45px; }
+#pv-tag .bar-tools .feiertage-knopf { width: 43px; height: 43px; }
+@media (min-width: 901px) {
+  /* Die Reiterleiste traegt am Desktop nichts mehr (Reiter in der
+     Kopfzeile, Feiertage in der Werkzeugleiste) und faellt samt Linie weg. */
+  #view-planung > .tabs { display: none; }
+  /* Monatsuebersicht nach Skizze 15.10.2026: Felder 40 px hoch, 32 px unter
+     der Kopfzeile (26 Innenabstand + 6), 47 px bis zur Tabelle. */
+  #pv-uebersicht > .bar-tools { padding: 6px 0 0; margin-bottom: 0; }
+  #pv-uebersicht > .bar-tools .inp { height: 40px; box-sizing: border-box; }
+  /* "September" ist der laengste Monat: 73 px Text + 12 links + 30 fuer
+     den Pfeil + Rand. Mit 91 px stand "Oktobe" da. */
+  #mxMon { width: 118px !important; }
+
+  /* Der Hinweis steht nur da, wenn er mehr sagt als die Felder (Filter,
+     Suche, gekuerzt). Seine Hoehe bleibt auch leer stehen: Filtern laesst
+     die Tabelle nicht springen. */
+  #pv-uebersicht > .mx-info { height: 47px; margin: 0; display: flex; align-items: center; }
+}
 
 /* Detail-Schublade */
 .scrim { position: fixed; inset: 0; background: rgba(16,18,22,.42); z-index: 60; opacity: 0; pointer-events: none; transition: opacity .2s; }
@@ -4597,6 +4628,7 @@ html[data-desktop="an"] { touch-action: auto; }
   /* Auf schmalen Schirmen nimmt die Suche wieder die volle Zeile, das
      Rechtshalten aus der Desktop-Regel muss dafuer weichen. */
   .search-rechts { flex: 1 1 100%; max-width: none; margin-left: 0; }
+  .suche-gruppe { flex: 1 1 100%; max-width: none; min-width: 0; margin-left: 0; }
   .bar-filter { flex: 1 1 100%; gap: 8px; }
   .bar-tools select.inp, .bar-tools input.inp { flex: 1 1 100%; width: 100% !important; min-width: 0; }
   .bar-tools .btn { flex: 1 1 auto; justify-content: center; }
@@ -6649,7 +6681,9 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
              (ENT-165, eine 31-Spalten-Matrix ist auf dem Handy ohnehin nur
              als Tagesliste nutzbar, ENT-024) und sind darum ganz entfallen,
              "Einsaetze"/"Tagesplan" bleiben "nur-schmal" fuer das Handy.
-             "Feiertage" bleibt der einzige Desktop-Inhalt dieser Zeile. -->
+             Am Desktop steht die Zeile seit 15.10.2026 gar nicht mehr da:
+             "Feiertage" war ihr einziger Inhalt und sitzt jetzt als Icon in
+             jeder Werkzeugleiste. -->
         <div class="tabs">
           <button class="tab on nur-schmal" id="ptab-einsaetze" onclick="goTab('einsaetze')">Einsätze</button>
           <button class="tab nur-schmal" id="ptab-tag" onclick="goTab('tag')">Tagesplan</button>
@@ -6661,12 +6695,6 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
                ("Rapporte ansehen") und der Seitenleiste. -->
           <button class="tab nur-schmal" id="ptab-rapporte" onclick="go('kunden'); kuGoTab('rapporte')">Rapporte</button>
           <div class="sp" style="flex:1"></div>
-          <!-- Auf der Trennlinie statt in einer eigenen Werkzeugleiste (ENT-038)
-               -- gilt reiterübergreifend, spart aber Platz in jeder Leiste. -->
-          <button class="tab-nebenan nur-desktop" onclick="openFeiertage()" title="Feiertage verwalten">
-            <svg class="i i-sm" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/></svg>
-            <span class="lbl">Feiertage</span>
-          </button>
         </div>
 
         <!-- ── Reiter: Monatsübersicht ── -->
@@ -6719,9 +6747,16 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
                  ueber margin-left und nicht ueber einen Abstandhalter: bricht
                  die Leiste um, bliebe der in der ersten Zeile zurueck und die
                  Suche stuende in der zweiten links. -->
-            <div class="search search-rechts">
-              <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input class="inp" type="search" id="mxSuche" placeholder="Objekt, Kunde, Ort oder Mitarbeitende …" oninput="renderMatrix()">
+            <!-- Feiertage gelten reiteruebergreifend. Frueher stand der Knopf
+                 allein in einer eigenen Zeile ueber der Leiste; die kostete
+                 rund 50 px Hoehe fuer ein Wort (Skizze 15.10.2026). Jetzt
+                 steht er in jedem Planungsreiter als Icon vor der Suche. -->
+            <div class="suche-gruppe">
+              <button class="btn btn-quiet feiertage-knopf nur-desktop" onclick="openFeiertage()" title="Feiertage verwalten" aria-label="Feiertage verwalten"><svg class="i i-sm" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/></svg></button>
+              <div class="search search-rechts">
+                <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input class="inp" type="search" id="mxSuche" placeholder="Objekt, Kunde, Ort oder Mitarbeitende …" oninput="renderMatrix()">
+              </div>
             </div>
           </div>
           <div class="mx-info" id="mxInfo"></div>
@@ -6788,6 +6823,7 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
           <!-- Suche hinter den Filtern, Abstandhalter davor dem Knopf:
                so stehen die Filter links beisammen und "Neuer Einsatz"
                allein rechts (Skizze 21.08.2026). -->
+          <button class="btn btn-quiet feiertage-knopf nur-desktop" onclick="openFeiertage()" title="Feiertage verwalten" aria-label="Feiertage verwalten"><svg class="i i-sm" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/></svg></button>
           <div class="search">
             <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input class="inp" type="search" id="pQ" placeholder="Kunde, Ort, Bezeichnung oder Mitarbeitende …" oninput="renderPlanung()">
@@ -6859,6 +6895,7 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
               </select>
               <button class="btn btn-quiet btn-sm" onclick="oplSchieben(-1)" title="Zurück, um die Länge des Zeitraums" aria-label="Zurück">‹</button>
               <button class="btn btn-quiet btn-sm" onclick="oplSchieben(1)" title="Weiter, um die Länge des Zeitraums" aria-label="Weiter">›</button>
+              <button class="btn btn-quiet feiertage-knopf nur-desktop" onclick="openFeiertage()" title="Feiertage verwalten" aria-label="Feiertage verwalten"><svg class="i i-sm" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/></svg></button>
               <input class="inp search" id="oplSuche" placeholder="Schicht oder Person" oninput="oplFiltern()">
               <button class="btn btn-quiet btn-sm" onclick="planDiktat('masterplan')" title="Schichten per Diktat setzen">
                 <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
@@ -6894,6 +6931,7 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
             <button class="btn btn-quiet btn-sm" onclick="tgHeute()">Heute</button>
             <button class="btn btn-quiet btn-sm" onclick="tgSchieben(1)">Folgetag ›</button>
             <div class="sp" style="flex:1"></div>
+            <button class="btn btn-quiet feiertage-knopf nur-desktop" onclick="openFeiertage()" title="Feiertage verwalten" aria-label="Feiertage verwalten"><svg class="i i-sm" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/></svg></button>
             <!-- Dieselben zwei Filter wie in der Einsatzliste (ENT-069). Sie
                  ersetzen das frühere Kästchen „nur unbesetzte": dessen
                  einzige Funktion steckt jetzt als „Nur unterbesetzt" im
@@ -33387,7 +33425,10 @@ function renderMatrix() {
 
   // Der Hinweis über der Tabelle sagt, was gerade gilt -- sonst sieht eine
   // gefilterte Ansicht aus wie eine leere Planung.
-  const teile = [`<b>${esc(dmy(von))}</b> bis <b>${esc(dmy(letzterTag))}</b> (${anzTage} Tage)`];
+  // Der Zeitraum selbst steht seit 15.10.2026 nicht mehr hier: Die beiden
+  // Datumsfelder direkt darueber sagen dasselbe. Der Hinweis erscheint nur,
+  // wenn etwas die Ansicht einschraenkt.
+  const teile = [];
   // Die Sparte wird eigens genannt: sie blendet ganze Zeilen aus, bevor
   // überhaupt gezählt wird -- ohne den Hinweis wirkte die Ansicht schlicht leer.
   if (nurSparte) teile.push(`nur <b>${esc(SPARTE_NAME[nurSparte])}</b>`);
