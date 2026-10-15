@@ -5474,9 +5474,94 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
   html[data-dichte="kompakt"] .f label { margin-bottom: 4px; }
   html[data-dichte="kompakt"] .form-zeilen .f { margin-bottom: 5px; }
   html[data-dichte="kompakt"] .form-zeilen .f > label { margin: 0; }
-  html[data-dichte="kompakt"] .abschnitt { margin: 8px 0 4px; padding-top: 9px; }
+  html[data-dichte="kompakt"] .abschnitt { margin: 14px 0 4px; padding-top: 16px; }
   html[data-dichte="kompakt"] .abschnitt:first-of-type { margin-top: 0; padding-top: 0; }
-  html[data-dichte="kompakt"] .abschnitt > h3 { margin-bottom: 7px; display: flex; align-items: center; }
+  html[data-dichte="kompakt"] .abschnitt > h3 { margin-bottom: 12px; display: flex; align-items: center; }
+  html[data-dichte="kompakt"] .nicht-kompakt { display: none; }
+  /* Der Zeilenfluss gilt nur, wenn die laengste Zeile ganz Platz hat
+     (Strasse, PLZ/Ort, Kanton: gemessen 1212 px). Darunter bliebe ein Feld
+     allein am linken Rand haengen, ohne Bezug zur Spalte -- dann lieber das
+     kompakte Raster von oben. Gefragt wird die Breite des Abschnitts, nicht
+     des Fensters: Die Seitenleiste nimmt je nach Stellung 0 bis 232 px. */
+  html[data-dichte="kompakt"] .abschnitt { container: abschnitt / inline-size; }
+  @container abschnitt (min-width: 1220px) {
+    /* ── Zeilenfluss "Neuer Einsatz" (Skizze des Projektinhabers, 2026-10-15).
+       Statt eines Rasters, das jedes Feld auf die Spaltenbreite zieht, steht
+       jedes Feld in seiner eigenen Breite, und die Paare folgen einander in
+       der Zeile. Die Breiten stammen aus der Skizze (gemessen bei 1728 px),
+       die Abstaende sind vereinheitlicht: Beschriftung -> Feld 14 px, Paar ->
+       Paar 44 px, Zeile -> Zeile 14 px.
+       Die ERSTE Beschriftung jeder Zeile behaelt die feste Spalte (168 px),
+       damit die Felder links buendig untereinander beginnen. Welches Feld eine
+       Zeile beginnt, sagt .zf-neu bzw. das erste Kind; den Umbruch davor
+       erzwingt ein Pseudo-Element (Flex kennt keinen "Umbruch vor"): Alles ab
+       .zf-umbruch bekommt order 2, ::after mit voller Breite steht dazwischen.
+       Je Raster genuegt ein Umbruch -- mehr braucht dieses Formular nicht. */
+    /* Zeilenabstand als Rand je Feld (7 + 7 px) statt row-gap: Die leere
+       Umbruchzeile bekaeme sonst einen eigenen Abstand, und Zeile 1 -> 2 laege
+       28 px auseinander statt 14 (gemessen: 59 statt 46 px Zeilenhoehe). Der
+       negative Rand am Raster gleicht die 7 px oben und unten wieder aus. */
+    html[data-dichte="kompakt"] .zeilenfluss { display: flex; flex-wrap: wrap; align-items: center;
+      column-gap: 44px; row-gap: 0; margin: -7px 0; }
+    html[data-dichte="kompakt"] .zeilenfluss:has(> .zf-umbruch)::after { content: ""; order: 1; flex: 0 0 100%; height: 0; }
+    html[data-dichte="kompakt"] .zeilenfluss > .zf-umbruch,
+    html[data-dichte="kompakt"] .zeilenfluss > .zf-umbruch ~ .f { order: 2; }
+    html[data-dichte="kompakt"] .zeilenfluss > .f { display: flex; align-items: center; gap: 14px;
+      margin: 7px 0; flex: none; }
+    html[data-dichte="kompakt"] .zeilenfluss > .f > label { flex: none; white-space: nowrap; }
+    html[data-dichte="kompakt"] .zeilenfluss > .f:first-child > label,
+    html[data-dichte="kompakt"] .zeilenfluss > .zf-neu > label { flex: 0 0 168px; white-space: normal; }
+    /* Ein breites Feld (Zeitraum, Weg) belegt die ganze Zeile -- ausser Kunde
+       und Strasse, die in der Zeile weitere Felder tragen. */
+    html[data-dichte="kompakt"] .zeilenfluss > .f.wide { flex: 0 0 100%; }
+    html[data-dichte="kompakt"] .zeilenfluss > .f.wide:has(#enNKunde_name),
+    html[data-dichte="kompakt"] .zeilenfluss > .f.wide:has(#enNStrasse),
+    html[data-dichte="kompakt"] .zeilenfluss > .f.wide.wegzeile { flex: none; }
+    /* Die Zonenanzeige rueckt neben die Wegzeile und nimmt den Rest. Wird sie
+       zur grossen Warnung, bricht sie auf eine eigene Zeile um, statt sich
+       auf ein paar Zentimeter zusammenzudruecken. */
+    html[data-dichte="kompakt"] .zeilenfluss > .f.wide:has(#enNZone) { flex: 1 1 420px; min-width: 0; display: block; }
+    html[data-dichte="kompakt"] #enNZone > .note { margin: 0; }
+    /* Die Wegzeile bleibt eine Zeile; sonst bricht sie in ihrer eigenen
+       Breite um und ist doppelt so hoch wie ihre Nachbarn (gemessen 76 px). */
+    html[data-dichte="kompakt"] .zeilenfluss .wegzeile .wz { flex-wrap: nowrap; }
+    html[data-dichte="kompakt"] .zeilenfluss .wegzeile .wz-f { flex: none; min-width: 0; }
+    html[data-dichte="kompakt"] #enNWeg_km,
+    html[data-dichte="kompakt"] #enNWeg_minuten     { width: 104px; min-width: 0; }
+    /* Ein leerer Hinweis unter dem Zeitraum traegt sonst seinen Rand mit und
+       schiebt die naechste Zeile 7 px tiefer. */
+    html[data-dichte="kompakt"] .zeilenfluss .zr-note:empty { display: none; }
+    /* Feldbreiten aus der Skizze */
+    /* Alle Felder gleich hoch. Das Datumsfeld bringt sonst 2 px mehr mit
+       (Kalenderzeichen des Browsers) und versetzt seine Zeile. */
+    html[data-dichte="kompakt"] .zeilenfluss .inp { flex: none; height: 32px; }
+    html[data-dichte="kompakt"] #enNKunde_name       { width: 345px; }
+    html[data-dichte="kompakt"] #enNEinsatzart       { width: 179px; }
+    html[data-dichte="kompakt"] #enNSparte           { width: 171px; }
+    html[data-dichte="kompakt"] #enNVeranstaltung    { width: 218px; }
+    html[data-dichte="kompakt"] #enNStatus           { width: 168px; }
+    html[data-dichte="kompakt"] #enNStrasse          { width: 374px; }
+    html[data-dichte="kompakt"] #enNOrt              { width: 218px; }
+    html[data-dichte="kompakt"] #enNKanton           { width: 104px; }
+    html[data-dichte="kompakt"] #enNBedarf           { width: 52px; }
+    html[data-dichte="kompakt"] #enNKontakt_vorname  { width: 204px; }
+    html[data-dichte="kompakt"] #enNKontakt_nachname { width: 197px; }
+    html[data-dichte="kompakt"] #enNKontakt_telefon  { width: 171px; }
+    /* Zeitraum: Datum je 117 px, Stunde und Minute je 76 px -- alle vier
+       Zeitfelder gleich breit, in der Skizze waren es 73 bis 83 px. */
+    html[data-dichte="kompakt"] .zeilenfluss .zeitraum .zr { column-gap: 36px; max-width: none; }
+    html[data-dichte="kompakt"] .zeilenfluss .zeitraum .zr-gr { flex: none; }
+    /* padding-right knapper: Der leere Platzhalter (TT.MM.JJJJ) und das
+       Kalenderzeichen des Browsers brauchen die 117 px fast ganz. */
+    html[data-dichte="kompakt"] .zeilenfluss .zeitraum .zr-gr > .inp { flex: none; width: 117px; min-width: 0; padding-right: 6px; }
+    /* Die Zeitraum-Beschriftung traegt im Raster 10 px Polster (sie steht dort
+       oben an einer mehrzeiligen Zelle). In der Zeile wird sie mittig
+       ausgerichtet wie alle anderen -- sonst sitzt sie 3,5 px zu tief. */
+    html[data-dichte="kompakt"] .zeilenfluss > .f.zeitraum { align-items: center; }
+    html[data-dichte="kompakt"] .zeilenfluss > .f.zeitraum > label { padding-top: 0; }
+    html[data-dichte="kompakt"] .zeilenfluss .zeitraum .zr-gr > .zeitwahl { flex: none; width: auto; min-width: 0; }
+    html[data-dichte="kompakt"] .zeilenfluss .zeitwahl select { flex: none; width: 76px; min-width: 0; }
+  }
   /* Ein breites Feld, das nur EIN Textfeld traegt (Kunde, Strasse), endet
      kompakt nach zwei Rasterspalten -- buendig mit dem zweiten Feld darunter.
      Ein Firmenname oder eine Strasse fuellt keine 1900 px; die freie Flaeche
@@ -8429,7 +8514,7 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
      Diktat-Weg arbeiten damit weiter, nur die Anordnung wechselt. -->
 <div class="abschnitt">
   <h3>Stammdaten</h3>
-  <div class="form-grid form-breit form-zeilen">
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
         <div class="f wide">
           <label for="enNKunde_name">Kunde *</label>
           <input class="inp" id="enNKunde_name" list="dlKunden" autocomplete="off" placeholder="Firma aus der Kundendatei oder frei eingeben">
@@ -8459,7 +8544,7 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
           </select>
           <div id="enNSparteHint"></div>
         </div>
-        <div class="f"><label for="enNVeranstaltung">Veranstaltung</label>
+        <div class="f zf-neu zf-umbruch"><label for="enNVeranstaltung">Veranstaltung</label>
           <input class="inp" id="enNVeranstaltung" placeholder="z. B. Fasnachtsumzug"></div>
         <div class="f"><label for="enNStatus">Status</label><select class="inp" id="enNStatus"><option value="geplant">Geplant</option><option value="bestaetigt">Bestätigt</option><option value="abgesagt">Abgesagt</option></select></div>
   </div>
@@ -8478,7 +8563,7 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
     Rhythmus, Feiertagsregeln und eine Vorschau, bevor etwas entsteht.
     <a href="#" onclick="return enZuObjekten()">Zur Objektplanung</a>
   </div>
-  <div class="form-grid form-breit form-zeilen">
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
         <!-- Datum von-bis und Zeit von-bis auf einer waagerechten Ebene
              (ENT-118).
              Das Bis-Datum erzeugt KEINEN Einsatz ueber mehrere Tage, sondern
@@ -8515,8 +8600,8 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
             <div id="enNZeitraumNote"></div>
           </div>
         </div>
-        <div class="f wide">
-          <label for="enNStrasse">Arbeitsort — Strasse und Nummer *</label>
+        <div class="f wide zf-neu">
+          <label for="enNStrasse"><span class="nicht-kompakt">Arbeitsort — </span>Strasse und Nummer *</label>
           <input class="inp" id="enNStrasse" placeholder="nicht der Firmensitz des Kunden">
         </div>
         <div class="f"><label for="enNOrt">Arbeitsort — PLZ / Ort *</label><input class="inp" id="enNOrt"></div>
@@ -8532,7 +8617,7 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
             <option>ZG</option><option>ZH</option>
           </select>
         </div>
-        <div class="f"><label for="enNBedarf">Benötigte Mitarbeitende</label><input class="inp" id="enNBedarf" type="number" min="0" max="99" value="1" oninput="pickFoot('enN')"></div>
+        <div class="f zf-neu zf-umbruch"><label for="enNBedarf">Benötigte Mitarbeitende</label><input class="inp" id="enNBedarf" type="number" min="0" max="99" value="1" oninput="pickFoot('enN')"></div>
   </div>
 </div>
 
@@ -8545,7 +8630,7 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
        Einzelfallbestätigung durch einen Menschen". Der Link öffnet die
        Route; abgelesen und eingetragen wird von Hand. -->
   <div id="enNWegHinweis" class="note" style="margin-bottom:12px"></div>
-  <div class="form-grid form-breit form-zeilen">
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
         <!-- Strecke, Fahrzeit und der Weg zur Route auf EINER Ebene (ENT-118):
              Die drei gehoeren zu einem Handgriff -- Route oeffnen, kuerzeste
              Strecke ablesen, beides eintragen. Untereinander sah es aus wie
@@ -8574,8 +8659,8 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
 </div>
 
 <div class="abschnitt">
-  <h3>Kontaktperson vor Ort<span class="note">wird den Eingeteilten in der App angezeigt</span></h3>
-  <div class="form-grid form-breit form-zeilen">
+  <h3>Kontaktperson vor Ort<span class="note nicht-kompakt">wird den Eingeteilten in der App angezeigt</span></h3>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
         <div class="f"><label for="enNKontakt_vorname">Vorname</label><input class="inp" id="enNKontakt_vorname"></div>
         <div class="f"><label for="enNKontakt_nachname">Nachname</label><input class="inp" id="enNKontakt_nachname"></div>
         <!-- Eigenes Feld statt im Fliesstext: Auf dem Handy soll die Nummer
