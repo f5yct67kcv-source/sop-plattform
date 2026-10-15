@@ -122,9 +122,12 @@ async function starte({ breite = 1440, thema = 'dunkel', glas = 'an', konto = nu
 const attr = (page, a) => page.evaluate(n => document.documentElement.getAttribute(n), a);
 const standText = page => page.evaluate(() => $('esStand').textContent.trim());
 
+// Ein "vollstaendiges" Konto traegt auch 'dichte': Wo es die kompakte
+// Darstellung gibt (Branch test), wuerde ein fehlender Schluessel sonst
+// richtigerweise einmal aus dem Browser uebernommen.
 // ── 1) Weg dorthin, Kopfleiste, Aufbau ─────────────────────────────────────
 {
-  const { browser, page, fehler, posts } = await starte({ konto: { thema: 'dunkel', glas: 'an' } });
+  const { browser, page, fehler, posts } = await starte({ konto: { thema: 'dunkel', glas: 'an', dichte: 'normal' } });
   check('KRITISCH: in der Werkzeugleiste steht kein Thema- oder Glas-Schalter mehr',
     await page.evaluate(() => !document.querySelector('.tb-rechts .thema-schalter, .tb-rechts .glas-schalter')));
   await page.click('#btnMarke'); await page.waitForTimeout(250);
@@ -235,7 +238,7 @@ const standText = page => page.evaluate(() => $('esStand').textContent.trim());
 
 // ── 4) Das Konto gewinnt ───────────────────────────────────────────────────
 {
-  const { browser, page, posts } = await starte({ thema: 'dunkel', glas: 'an', konto: { thema: 'hell', glas: 'aus' } });
+  const { browser, page, posts } = await starte({ thema: 'dunkel', glas: 'an', konto: { thema: 'hell', glas: 'aus', dichte: 'normal' } });
   await page.waitForTimeout(300);
   check('KRITISCH: ein anderes Geraet hat hell gespeichert -- hier gilt jetzt auch hell',
     await attr(page, 'data-thema') === 'hell' && await attr(page, 'data-glas') === 'aus');
@@ -273,7 +276,7 @@ const standText = page => page.evaluate(() => $('esStand').textContent.trim());
 
 // ── 6) Handy: der Schalter in der Schublade schreibt ebenfalls ans Konto ───
 {
-  const { browser, page, posts } = await starte({ breite: 390, thema: 'dunkel', konto: { thema: 'dunkel', glas: 'an' } });
+  const { browser, page, posts } = await starte({ breite: 390, thema: 'dunkel', konto: { thema: 'dunkel', glas: 'an', dichte: 'normal' } });
   check('Am Handy steht "Einstellungen" nicht im Menue (mobiler Zuschnitt steht noch aus)',
     await page.evaluate(() => !$('nav-einstellungen').getClientRects().length));
   await page.click('.btn-burger'); await page.waitForTimeout(400);
