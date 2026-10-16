@@ -214,6 +214,42 @@ check('schmal: kompaktes Raster statt Zeilenfluss', sm.raster === 'grid', sm.ras
 check('schmal: Kanton nicht vor der Feldspalte', sm.kantonLinks >= sm.feldLinks - 0.5, `${sm.kantonLinks} < ${sm.feldLinks}`);
 await ps.close();
 
+// ── Kompakt darf genauere Regeln nicht ueberschreiben (2026-10-16). Die
+// Kompakt-Werte schlugen frueher jede Bausteinregel: In allen Suchfeldern
+// lief der Text unter die Lupe, in allen Auswahlfeldern unter den Pfeil,
+// und Tabellen in .card-bd.flush rueckten ein. Gemessen wird, wo der Text
+// tatsaechlich beginnt bzw. endet -- nicht, welcher Wert im Quelltext steht.
+const pr = await seite(1440, 900, 'kompakt');
+const sichten = [['planung', 'uebersicht'], ['planung', 'einsaetze'], ['planung', 'tag'],
+  ['planung', 'objektplan'], ['abgleich'], ['kunden'], ['mitarbeiter'], ['rechnungen']];
+const kollisionen = [];
+for (const [v, t] of sichten) {
+  await pr.evaluate(([v, t]) => { go(v); if (t) goTab(t); }, [v, t]); await pr.waitForTimeout(200);
+  kollisionen.push(...await pr.evaluate(sicht => {
+    const aus = [];
+    document.querySelectorAll('.search').forEach(s => {
+      const i = s.querySelector('svg'), f = s.querySelector('.inp');
+      if (!i || !f || !f.offsetParent) return;
+      const textAb = f.getBoundingClientRect().left + parseFloat(getComputedStyle(f).paddingLeft);
+      if (textAb < i.getBoundingClientRect().right + 4) aus.push(`${sicht}: #${f.id} Text unter der Lupe`);
+    });
+    document.querySelectorAll('select.inp').forEach(f => {
+      if (!f.offsetParent) return;
+      // Der Pfeil sitzt 9-19 px vor dem rechten Rand (background-position).
+      if (parseFloat(getComputedStyle(f).paddingRight) < 22) aus.push(`${sicht}: #${f.id} Text unter dem Pfeil`);
+    });
+    document.querySelectorAll('.card-bd.flush').forEach(c => {
+      if (c.offsetParent && parseFloat(getComputedStyle(c).paddingLeft) !== 0) aus.push(`${sicht}: .card-bd.flush mit Polster`);
+    });
+    return aus;
+  }, v + (t ? '/' + t : '')));
+}
+check('kompakt: kein Text unter Lupe oder Pfeil, flache Karten ohne Polster', !kollisionen.length, kollisionen.slice(0, 6).join('; '));
+// Die genaueren Regeln duerfen kompakt nicht aufheben: Feld bleibt niedrig.
+const suchHoehe = await pr.evaluate(() => { go('kunden'); return document.querySelector('#kQ').getBoundingClientRect().height; });
+check('kompakt: Suchfeld bleibt niedrig (<= 34 px)', suchHoehe <= 34, suchHoehe);
+await pr.close();
+
 // ── Handy: kompakt im Speicher aendert nichts
 const hn = await seite(390, 844, 'normal');
 const h1 = await mass(hn); await hn.close();

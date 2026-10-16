@@ -1470,11 +1470,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
    diese Seite die Bausteine fuehrt. test_offerten_gleich.mjs misst beide
    gegeneinander. */
 @media (min-width: 901px) {
-  html[data-dichte="kompakt"] :where(.inp) { padding: 5px 9px; font-size: 13px; }
-  html[data-dichte="kompakt"] select:where(.inp) { padding-right: 30px; }
-  html[data-dichte="kompakt"] .card-bd:not(.flush) { padding: 14px 16px; }
-  html[data-dichte="kompakt"] .f { margin-bottom: 8px; }
-  html[data-dichte="kompakt"] .f label { margin-bottom: 4px; }
+  /* Wie im Cockpit hinter :where(...): kompakt ist nur der Grundwert, was
+     ein Baustein eigens festlegt (Lupe, Pfeil, .flush ...), bleibt stehen. */
+  :where(html[data-dichte="kompakt"]) .inp { padding: 5px 9px; font-size: 13px; }
+  :where(html[data-dichte="kompakt"]) .card-bd { padding: 14px 16px; }
+  :where(html[data-dichte="kompakt"]) .f { margin-bottom: 8px; }
+  :where(html[data-dichte="kompakt"]) .f label { margin-bottom: 4px; }
 }
 </style>
 <!-- Das Zeichenfeld fuer die eigene Unterschrift (ENT-704), dieselbe Datei
