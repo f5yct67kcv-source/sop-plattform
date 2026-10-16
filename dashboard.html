@@ -2928,8 +2928,18 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .form-zeilen .ms-bedarf > .f { grid-template-columns: 64px minmax(0, 1fr); gap: 8px; }
 .form-zeilen .f.wide:has(> .ms-bedarf) { align-items: start; }
 .form-zeilen .f.wide:has(> .ms-bedarf) > label { padding-top: 9px; }
-/* Ein Haekchen ohne eigene Beschriftung steht in der Feldspalte. */
-.form-zeilen .f.zf-feldspalte > label.check { grid-column: 2; }
+/* Ein Haekchen (oder eine Liste davon) ohne eigene Beschriftung steht in
+   der Feldspalte. */
+.form-zeilen .f.zf-feldspalte > * { grid-column: 2; }
+/* Ein Zusatz zum Feld (Einheit, Stand der Rechnung) steht im Raster unter
+   dem Feld, im Zeilenfluss daneben. */
+.form-zeilen .f > .zf-zusatz { grid-column: 2; margin: 4px 0 0; }
+/* Hinweise ueber den Feldern der Lohnformulare: Abstand zur ersten Zeile. */
+.abschnitt > .note + .zf-stapel { margin-top: 10px; }
+/* Betrag und Einheit (pro Stunde / pro Monat) als ein Feld. */
+.zf-gruppe { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.zf-gruppe > input.inp { flex: 1; min-width: 0; }
+.zf-gruppe > select.inp { width: auto; }
 
 /* Kontrollpunkte in der Objekt-Schublade (ENT-180/ENT-183) */
 .kp-zeile { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 11px 13px; margin-bottom: 8px; }
@@ -5706,6 +5716,32 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
        (168 + 14 px), buendig mit den Feldern darueber. */
     html[data-dichte="kompakt"] .zeilenfluss > .f.zf-feldspalte { flex: none; margin-left: 182px; }
     html[data-dichte="kompakt"] .zeilenfluss > .f.zf-feldspalte > label { width: auto; min-width: 0; white-space: nowrap; }
+    /* Lohnformulare: Zeilen untereinander als Stapel. Der Abstand kommt aus
+       row-gap, und der zaehlt nur sichtbare Zeilen -- ausgeblendete
+       (Begruendung, Quellensteuer, Wege einer Position) hinterlassen keine
+       Luecke. Die Gruppen der Position (.zf-block) stapeln ihre Zeilen
+       gleich. 14 px = Zeilenabstand 46 - Feldhoehe 32. */
+    html[data-dichte="kompakt"] .zf-stapel,
+    html[data-dichte="kompakt"] .zf-stapel > .zf-block { display: flex; flex-direction: column; row-gap: 14px; }
+    html[data-dichte="kompakt"] .zf-stapel .zeilenfluss + .zeilenfluss { margin-top: -7px; }
+    html[data-dichte="kompakt"] .zeilenfluss .zf-gruppe { flex: none; }
+    html[data-dichte="kompakt"] .zeilenfluss .zf-gruppe > .inp { flex: none; }
+    html[data-dichte="kompakt"] .zeilenfluss .zf-zusatz { margin: 0; max-width: 640px; }
+    html[data-dichte="kompakt"] .zeilenfluss .zf-zusatz:empty { display: none; }
+    html[data-dichte="kompakt"] .zeilenfluss > .f > textarea.inp { flex: none; }
+    /* Kennzeichen: Kaestchen und Text auf einer Linie, wie die uebrigen
+       Haekchen. Die Zeilen tragen ihre Abstaende inline (Raster-Ansicht). */
+    html[data-dichte="kompakt"] #laKennzeichen label.check { display: flex !important; align-items: center; gap: 8px; margin: 0 0 8px !important; }
+    html[data-dichte="kompakt"] #laKennzeichen label.check:last-child { margin-bottom: 0 !important; }
+    /* Der Stand der NBU-Rechnung steht unter der Auswahl in der Feldspalte;
+       ohne Rechnung (leer) faellt die Zeile ganz weg statt eine Luecke zu
+       lassen. */
+    html[data-dichte="kompakt"] .zf-stapel > .zeilenfluss:has(> .zf-feldspalte > .zf-zusatz:empty) { display: none; }
+    html[data-dichte="kompakt"] .zeilenfluss > .zf-feldspalte > .zf-zusatz { max-width: 900px; }
+    /* Zweizeilige Beschriftungen ("Anteil 13. Monatslohn in Prozent")
+       bleiben unter der Feldhoehe -- sonst wird ihre Zeile 1 bis 2 px
+       hoeher und der Zeilenabstand stimmt nicht mehr. */
+    html[data-dichte="kompakt"] .zeilenfluss > .f > label { line-height: 15px; }
     /* Ein Haekchen in der Zeile steht auf Feldhoehe, Kaestchen und Text auf
        einer Linie. */
     html[data-dichte="kompakt"] .zeilenfluss > .f > label.check { height: 32px; margin: 0; display: flex; align-items: center; }
@@ -7337,6 +7373,252 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
           <div class="tabs" id="mbTabs" style="margin-bottom:14px"></div>
           <div id="mbKarten"></div>
         </div>
+
+      <!-- ══════════════════════ LOHNANSATZ JE PERSON (ENT-451) ══════════════════
+     Ein neuer Ansatz wird ZUSÄTZLICH erfasst, nie überschreibend: Eine
+     Lohnerhöhung darf abgeschlossene Abrechnungen nicht rückwirkend
+     verändern. Ein zweites Speichern zum selben Datum korrigiert die
+     bestehende Zeile — das ist die Tippfehlerkorrektur. -->
+      <div class="ma-tab lohn-form" id="mv-lohnansatz">
+        <div class="bar-tools">
+          <button class="btn btn-plain btn-sm" id="lpaZurueck" onclick="lohnFormSchliessen()">Zurück zur Lohnakte</button>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-quiet btn-sm" id="lpaLoeschKnopf" onclick="lohnAkteLoeschen('ansatz', Number($('lpaId').value), 'lpaFehler')">Löschen</button>
+          <button class="btn btn-primary btn-sm" onclick="lohnAnsatzSpeichern()">Speichern</button>
+        </div>
+        <div class="card"><div class="card-bd">
+          <h2 id="lpaTitel" style="display:none">Lohnansatz erfassen</h2>
+          <input type="hidden" id="lpaId">
+          <p class="err" id="lpaFehler" style="display:none"></p>
+
+<div class="abschnitt">
+  <h3>Lohnansatz</h3>
+  <p class="note">Der Grundlohn <b>ohne</b> Ferienentschädigung — der Zuschlag nach Art. 20 Ziff. 2 kommt obendrauf und wird aus dem Alter abgeleitet, nicht hier eingetragen.</p>
+  <p class="note">Anteil 13. Monatslohn: Keine GAV-Pflicht — der Vertrag kennt ihn nur in Art. 25 Ziff. 2 als Bestandteil der BVG-Bemessung. Leer heisst „nicht vereinbart“, nicht „null Prozent“.</p>
+  <p class="note">Ferienlohn laufend: Nach Art. 20 Ziff. 2 nur zulässig bei unregelmässiger Teilzeit oder kurzen Einsätzen, wenn es <b>schriftlich im Vertrag</b> steht und in <b>jeder</b> Abrechnung separat ausgewiesen wird. Ohne diesen Haken wird der Anspruch als Guthaben geführt und beim Bezug ausbezahlt.</p>
+  <div class="zf-stapel">
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpaAb">Gültig ab</label><input class="inp" type="date" id="lpaAb" style="--zf-b:117px"></div>
+      <div class="f"><label for="lpaAnsatz">Ansatz</label><input class="inp" id="lpaAnsatz" placeholder="z. B. 25.00" style="--zf-b:104px"><span class="zone-note zf-zusatz" id="lpaEinheit"></span></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpaMl13">Anteil 13. Monatslohn in Prozent</label><input class="inp" id="lpaMl13" placeholder="leer = kein 13. Monatslohn vereinbart" style="--zf-b:280px"></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-feldspalte"><label class="check"><input type="checkbox" id="lpaFerienLaufend"> Ferienlohn laufend auszahlen</label></div>
+    </div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Zuschläge nach Art. 19</h3>
+  <p class="note">Der GAV nennt je Zuschlag eine Monatspauschale <b>oder</b> eine Stundenentschädigung und lässt offen, wer wählt (GAV-AUS-014). Erfasst wird darum, was im Vertrag steht. Der Zuschlag entsteht aus dem <b>angeordneten</b> Einsatz, nicht aus der Berechtigung in der Akte.</p>
+  <div class="zf-stapel">
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpaZFach">Fachausweis</label><div class="zf-gruppe"><input class="inp" id="lpaZFach" placeholder="Betrag" style="--zf-b:104px"><select class="inp" id="lpaZFachArt" style="--zf-b:120px"><option value="stunde">pro Stunde</option><option value="monat">pro Monat</option></select></div><span class="zone-note zf-zusatz">mind. 200.– / Monat oder 1.20 / Stunde</span></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpaZHund">Diensthund</label><div class="zf-gruppe"><input class="inp" id="lpaZHund" placeholder="Betrag" style="--zf-b:104px"><select class="inp" id="lpaZHundArt" style="--zf-b:120px"><option value="stunde">pro Stunde</option><option value="monat">pro Monat</option></select></div><span class="zone-note zf-zusatz">mind. 150.– / Monat oder 1.50 / Stunde</span></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpaZWaffe">Schusswaffe</label><div class="zf-gruppe"><input class="inp" id="lpaZWaffe" placeholder="Betrag" style="--zf-b:104px"><select class="inp" id="lpaZWaffeArt" style="--zf-b:120px"><option value="stunde">pro Stunde</option><option value="monat">pro Monat</option></select></div><span class="zone-note zf-zusatz">2.– / Stunde bzw. max. 150.– / Monat</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Weitere Angaben</h3>
+  <div class="zf-stapel">
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f wide zf-neu zf-text"><label for="lpaBemerkung">Bemerkung</label><textarea class="inp" id="lpaBemerkung" rows="2"></textarea></div>
+    </div>
+  </div>
+</div>
+        </div></div>
+      </div>
+
+      <!-- ══════════════════════ ABZÜGE JE PERSON (ENT-451) ══════════════════════
+     Was hier NICHT steht: die Sätze. Die sind betriebsweit und stehen unter
+     Lohn → Sätze. Hier steht nur, WER wovon betroffen ist. -->
+      <div class="ma-tab lohn-form" id="mv-lohnabzug">
+        <div class="bar-tools">
+          <button class="btn btn-plain btn-sm" id="lpbZurueck" onclick="lohnFormSchliessen()">Zurück zur Lohnakte</button>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-quiet btn-sm" id="lpbLoeschKnopf" onclick="lohnAkteLoeschen('abzug', Number($('lpbId').value), 'lpbFehler')">Löschen</button>
+          <button class="btn btn-primary btn-sm" onclick="lohnAbzugSpeichern()">Speichern</button>
+        </div>
+        <div class="card"><div class="card-bd">
+          <h2 id="lpbTitel" style="display:none">Abzüge erfassen</h2>
+          <input type="hidden" id="lpbId">
+          <p class="err" id="lpbFehler" style="display:none"></p>
+
+<div class="abschnitt">
+  <h3>Sozialversicherungen</h3>
+  <p class="note">Wovon diese Person betroffen ist. Die <b>Sätze</b> gelten betriebsweit und stehen unter Lohn → Sätze und Regelwerk.</p>
+  <p class="note">Nichtberufsunfall automatisch heisst: nach Empfehlung 7/87 aus der Zeiterfassung — Durchschnitt über die letzten drei oder zwölf Monate, günstigere Variante, Schwelle 8 Wochenstunden (Merkblatt 6.05 Ziff. 4). Das vertragliche Pensum ist <b>nicht</b> massgebend (BGer 8C_644/2025).</p>
+  <p class="note">Begründung: Pflicht, sobald die gerechnete Unterstellung von Hand geändert wird. Sie steht später auf der Abrechnung, zusammen mit Person und Zeitpunkt.</p>
+  <p class="note">Krankentaggeld: Art. 17 Ziff. 3 — der Betrieb übernimmt mindestens die Hälfte der Prämie.</p>
+  <p class="note">BVG-Beitrag: Wird <b>übernommen</b>, nicht gerechnet: Die Skala der Kasse ist deren Vertragswerk. Art. 25 Ziff. 3 gibt nur die Untergrenze — mindestens 9 % des koordinierten Lohnes, höchstens die Hälfte davon zulasten der Person.</p>
+  <div class="zf-stapel">
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpbAb">Gültig ab</label><input class="inp" type="date" id="lpbAb" style="--zf-b:117px"></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpbNbu">Nichtberufsunfall — Unterstellung</label><select class="inp" id="lpbNbu" onchange="lohnNbuUmschalten()" style="--zf-b:345px"><option value="automatisch">Automatisch aus den geleisteten Stunden (empfohlen)</option><option value="versichert">Von Hand: versichert</option><option value="nicht">Von Hand: nicht versichert</option></select></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-feldspalte"><div id="lpbNbuStand" class="zone-note zf-zusatz"></div></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss" id="lpbNbuGrundFeld" style="display:none">
+      <div class="f zf-neu"><label for="lpbNbuGrund">Begründung der Übersteuerung</label><input class="inp" id="lpbNbuGrund" placeholder="z. B. vom Versicherer schriftlich bestätigt" style="--zf-b:345px"></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-feldspalte"><label class="check"><input type="checkbox" id="lpbKtg"> Krankentaggeld-Beitrag</label></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-feldspalte"><label class="check"><input type="checkbox" id="lpbBvg"> Bei der Pensionskasse angeschlossen</label></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpbBvgBetrag">BVG-Beitrag der Person, CHF pro Monat</label><input class="inp" id="lpbBvgBetrag" placeholder="aus der Meldung der Pensionskasse" style="--zf-b:260px"></div>
+    </div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Quellensteuer</h3>
+  <p class="note">Kanton und Tarifcode sind erforderlich. Ohne sie lässt sich die Quellensteuer nicht berechnen — und ein fehlender Abzug sähe aus wie kein Abzug.</p>
+  <div class="zf-stapel">
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-feldspalte"><label class="check"><input type="checkbox" id="lpbQst" onchange="lohnQstUmschalten()"> Quellensteuerpflichtig</label></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss" id="lpbQstFelder">
+      <div class="f zf-neu"><label for="lpbQstKanton">Kanton</label><input class="inp" id="lpbQstKanton" placeholder="z. B. SO" maxlength="2" style="--zf-b:80px"></div>
+      <div class="f"><label for="lpbQstTarif">Tarifcode</label><input class="inp" id="lpbQstTarif" placeholder="z. B. A0N" style="--zf-b:104px"></div>
+      <div class="f"><label for="lpbQstKinder">Anzahl Kinder</label><input class="inp" id="lpbQstKinder" placeholder="0" style="--zf-b:64px"></div>
+    </div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Weitere Angaben</h3>
+  <div class="zf-stapel">
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f wide zf-neu zf-text"><label for="lpbBemerkung">Bemerkung</label><textarea class="inp" id="lpbBemerkung" rows="2"></textarea></div>
+    </div>
+  </div>
+</div>
+        </div></div>
+      </div>
+
+      <!-- ══════════════════════ ZAHLUNGSEMPFÄNGER (ENT-451) ═════════════════════
+     Mehrere Empfänger je Person, weil der Auszahlungsbetrag aufteilbar sein
+     muss. Genau einer bekommt den Rest — zwei Rest-Zeilen liessen offen,
+     wohin das Geld geht, und das fiele erst beim Zahlungslauf auf. -->
+      <div class="ma-tab lohn-form" id="mv-lohnzahlung">
+        <div class="bar-tools">
+          <button class="btn btn-plain btn-sm" id="lpzZurueck" onclick="lohnFormSchliessen()">Zurück zur Lohnakte</button>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-quiet btn-sm" id="lpzLoeschKnopf" onclick="lohnAkteLoeschen('zahlung', Number($('lpzId').value), 'lpzFehler')">Löschen</button>
+          <button class="btn btn-primary btn-sm" onclick="lohnZahlungSpeichern()">Speichern</button>
+        </div>
+        <div class="card"><div class="card-bd">
+          <h2 id="lpzTitel" style="display:none">Empfänger erfassen</h2>
+          <input type="hidden" id="lpzId">
+          <p class="err" id="lpzFehler" style="display:none"></p>
+
+<div class="abschnitt">
+  <h3>Empfänger</h3>
+  <p class="note">Wohin der Lohn überwiesen wird. Die IBAN wird auf ihre Prüfsumme geprüft.</p>
+  <p class="note">Ein fester Betrag wird vom Auszahlungsbetrag vorweg abgezogen; der Rest geht an den Empfänger mit „Restbetrag“.</p>
+  <p class="note">Ein nicht mehr genutzter Empfänger wird deaktiviert statt gelöscht — sonst fehlte er in älteren Abrechnungen.</p>
+  <div class="zf-stapel">
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpzReihenfolge">Reihenfolge</label><input class="inp" id="lpzReihenfolge" placeholder="1" style="--zf-b:64px"></div>
+      <div class="f"><label for="lpzArt">Anteil</label><select class="inp" id="lpzArt" onchange="lohnZahlArtUmschalten()" style="--zf-b:160px"><option value="rest">Restbetrag</option><option value="fix">fester Betrag</option></select></div>
+      <div class="f" id="lpzBetragFeld"><label for="lpzBetrag">Fester Betrag in CHF</label><input class="inp" id="lpzBetrag" placeholder="z. B. 50.00" style="--zf-b:104px"></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpzIban">IBAN</label><input class="inp" id="lpzIban" placeholder="CH.. .... .... .... .... ." style="--zf-b:345px"></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpzEmpfaenger">Empfänger</label><input class="inp" id="lpzEmpfaenger" placeholder="leer = die mitarbeitende Person selbst" style="--zf-b:345px"></div>
+      <div class="f"><label for="lpzBank">Bank</label><input class="inp" id="lpzBank" style="--zf-b:218px"></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-feldspalte"><label class="check"><input type="checkbox" id="lpzAktiv"> aktiv</label></div>
+    </div>
+  </div>
+</div>
+        </div></div>
+      </div>
+
+      <!-- ══════════════════ PERSÖNLICHE ZULAGEN UND ABZÜGE (ENT-713) ═════════════
+     Neu erfassen und Korrigieren teilen sich die vollen Felder. Eine
+     bestehende Position bietet dagegen die Wege an, die ihre Geschichte
+     erhalten: „Betrag ändern ab" und „Beenden". Korrigieren und Löschen
+     gibt es nur, solange kein abgeschlossener Lohnlauf sie verwendet hat —
+     das entscheidet der Server, der Dialog bietet es nur nicht erst an. -->
+      <div class="ma-tab lohn-form" id="mv-lohnposition">
+        <div class="bar-tools">
+          <button class="btn btn-plain btn-sm" id="lpoZurueck" onclick="lohnFormSchliessen()">Zurück zur Lohnakte</button>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-quiet btn-sm" id="lpoLoeschKnopf" onclick="lohnPositionLoeschen()">Löschen</button>
+          <button class="btn btn-primary btn-sm" onclick="lohnPositionSpeichern()">Speichern</button>
+        </div>
+        <div class="card"><div class="card-bd">
+          <h2 id="lpoTitel" style="display:none">Zulage oder Abzug erfassen</h2>
+          <input type="hidden" id="lpoId">
+          <!-- Kopf in einem eigenen Block: Der Abschnitt darunter ist dann
+               nicht mehr der erste und bekommt die Trennlinie, wie unter dem
+               Einleitungssatz der Masterschicht. -->
+          <div class="lohn-kopf">
+            <p class="note" id="lpoUnter">Gilt je ganzen Monat. Wie gerechnet wird, sagt die Lohnart.</p>
+            <p class="zone-note" id="lpoSperrHinweis" style="display:none"></p>
+            <p class="err" id="lpoFehler" style="display:none"></p>
+          </div>
+
+<div class="abschnitt">
+  <h3>Position</h3>
+  <p class="note">Bis Monat: leer lassen, wenn die Position bis auf Weiteres gilt.</p>
+  <p class="note">Betrag ändern ab einem Monat: Die bisherige Position endet im Monat davor und bleibt stehen.</p>
+  <p class="note">Beenden: Leer heisst, die Position gilt wieder bis auf Weiteres.</p>
+  <div class="zf-stapel">
+    <div class="form-grid form-breit form-zeilen zeilenfluss" id="lpoWegFeld">
+      <div class="f zf-neu"><label for="lpoWeg">Was soll geschehen?</label><select class="inp" id="lpoWeg" onchange="lohnPositionWegUmschalten()" style="--zf-b:345px"></select></div>
+    </div>
+    <div class="zf-block" id="lpoGrpVoll">
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpoLohnart">Lohnart</label><select class="inp" id="lpoLohnart" onchange="lohnPositionEinheit()" style="--zf-b:345px"></select><span class="zone-note zf-zusatz" id="lpoLohnartHinweis"></span></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpoBetrag" id="lpoBetragLabel">Betrag in CHF</label><input class="inp" id="lpoBetrag" placeholder="z. B. 150.00" inputmode="decimal" style="--zf-b:104px"></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-feldspalte"><label class="check"><input type="checkbox" id="lpoEinmalig" onchange="lohnPositionEinmalig()"> einmalig, nur in einem Monat</label></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpoAb" id="lpoAbLabel">Ab Monat</label><input class="inp" type="month" id="lpoAb" style="--zf-b:150px"></div>
+      <div class="f" id="lpoBisFeld"><label for="lpoBis">Bis Monat</label><input class="inp" type="month" id="lpoBis" style="--zf-b:150px"></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpoBemerkung">Bemerkung</label><input class="inp" id="lpoBemerkung" style="--zf-b:712px"></div>
+    </div>
+    </div>
+    <div class="zf-block" id="lpoGrpAb">
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpoNeuBetrag" id="lpoNeuBetragLabel">Neuer Betrag in CHF</label><input class="inp" id="lpoNeuBetrag" inputmode="decimal" style="--zf-b:104px"></div>
+      <div class="f"><label for="lpoNeuAb">Gilt ab Monat</label><input class="inp" type="month" id="lpoNeuAb" style="--zf-b:150px"></div>
+    </div>
+    </div>
+    <div class="zf-block" id="lpoGrpEnde">
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lpoEnde">Letzter Monat</label><input class="inp" type="month" id="lpoEnde" style="--zf-b:150px"></div>
+    </div>
+    </div>
+  </div>
+</div>
+        </div></div>
+      </div>
       </section>
 
       <!-- ─────────── KUNDEN ─────────── -->
@@ -8281,6 +8563,107 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
            finanzen_auslagen.php liest einsatz_auslagen wie auslagen_list.php.
            Eine gesperrte Zeile hat keinen Betrag und wird in der Zelle
            GENANNT, nicht als 0 mitgezaehlt. -->
+      <!-- ══════════════════════ LOHNART ERFASSEN (ENT-451) ══════════════════════
+     Die sechs Kennzeichen stehen ausgeschrieben und nicht als Kürzelreihe:
+     Wer eine Lohnart anlegt, soll lesen, was er entscheidet. Sie sind der
+     Unterschied zwischen einer nachvollziehbaren Abrechnung und einer
+     Blackbox — Art. 12 Ziff. 5 GAV verlangt Ersteres. -->
+      <section class="view lohn-form" id="view-lohnartform">
+        <div class="bar-tools">
+          <button class="btn btn-plain btn-sm" id="laZurueck" onclick="lohnFormSchliessen()">Zurück zu den Lohnarten</button>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-quiet btn-sm" id="laLoeschKnopf" onclick="lohnartLoeschen()">Löschen</button>
+          <button class="btn btn-primary btn-sm" onclick="lohnartSpeichern()">Speichern</button>
+        </div>
+        <div class="card"><div class="card-bd">
+          <h2 id="laDlgTitel" style="display:none">Lohnart erfassen</h2>
+          <input type="hidden" id="laId">
+          <p class="err" id="laFehler" style="display:none"></p>
+
+<div class="abschnitt">
+  <h3>Lohnart</h3>
+  <p class="note">Eine Zeile, wie sie später auf der Abrechnung erscheint. Die Kennzeichen unten bestimmen, in welche Bemessungsgrundlage der Betrag zählt.</p>
+  <p class="note">Schlüssel: die stabile Kennung, unter der eine Abrechnungszeile wiedergefunden wird. Einmal vergeben, bleibt sie — eine Umbenennung träfe alte Abrechnungen.</p>
+  <p class="note">Satz in Prozent: Nur bei prozentualen Lohnarten. Die Ferienentschädigung braucht keinen — sie wird nach Art. 20 Ziff. 2 aus dem Alter abgeleitet.</p>
+  <p class="note">GAV-Grundlage: Leer ist hier eine Aussage, keine Lücke. Der 13. Monatslohn etwa steht in keinem GAV-Artikel.</p>
+  <div class="zf-stapel">
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="laBezeichnung">Bezeichnung</label><input class="inp" id="laBezeichnung" placeholder="z. B. Pikettzulage" style="--zf-b:345px"></div>
+      <div class="f"><label for="laSchluessel">Schlüssel</label><input class="inp" id="laSchluessel" placeholder="wird aus der Bezeichnung gebildet" style="--zf-b:280px"></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="laArt">Art</label><select class="inp" id="laArt" style="--zf-b:345px"></select></div>
+      <div class="f"><label for="laSatz">Satz in Prozent</label><input class="inp" id="laSatz" placeholder="leer lassen, wenn der Satz aus dem GAV kommt" style="--zf-b:330px"></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="laGav">GAV-Grundlage</label><input class="inp" id="laGav" placeholder="leer = betrieblich vereinbart, keine GAV-Pflicht" style="--zf-b:345px"></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-feldspalte"><label class="check"><input type="checkbox" id="laAktiv"> aktiv</label></div>
+    </div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Zählt in welche Bemessungsgrundlage?</h3>
+  <div class="zf-stapel">
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-feldspalte"><div id="laKennzeichen"></div></div>
+    </div>
+  </div>
+</div>
+        </div></div>
+      </section>
+
+      <!-- ══════════════════════ ABZUGSSATZ ERFASSEN (ENT-451) ═══════════════════
+     Ohne Quelle wird nicht gespeichert. An dieser Zahl hängt Geld — da darf
+     später niemand raten müssen, ob sie jemand eingetippt oder aus einer
+     Verfügung übernommen hat. Gleiche Haltung wie bei der Wegstrecke
+     (objekt_distanz.quelle, ENT-116). -->
+      <section class="view lohn-form" id="view-lohnsatzform">
+        <div class="bar-tools">
+          <button class="btn btn-plain btn-sm" id="lsZurueck" onclick="lohnFormSchliessen()">Zurück zu den Sätzen</button>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-quiet btn-sm" id="lsLoeschKnopf" onclick="lohnSatzLoeschen()">Löschen</button>
+          <button class="btn btn-primary btn-sm" onclick="lohnSatzSpeichern()">Speichern</button>
+        </div>
+        <div class="card"><div class="card-bd">
+          <h2 id="lsDlgTitel" style="display:none">Satz erfassen</h2>
+          <input type="hidden" id="lsId">
+          <p class="err" id="lsFehler" style="display:none"></p>
+
+<div class="abschnitt">
+  <h3>Satz</h3>
+  <p class="note">Gilt ab dem angegebenen Datum. Ein späterer Satz wird <b>zusätzlich</b> erfasst — der alte bleibt stehen, damit abgeschlossene Abrechnungen sich nicht rückwirkend ändern.</p>
+  <p class="note">Gültig bis: leer lassen, solange kein Ende feststeht.</p>
+  <p class="note">Satz in Prozent: Der Anteil, der der mitarbeitenden Person abgezogen wird — nicht der Gesamtbeitrag. Beim Krankentaggeld verlangt Art. 17 Ziff. 3, dass der Betrieb mindestens die Hälfte trägt.</p>
+  <p class="note">Quelle: Erforderlich. Woher stammt dieser Satz?</p>
+  <div class="zf-stapel">
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lsSchluessel">Abzug</label><select class="inp" id="lsSchluessel" style="--zf-b:345px"></select></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lsAb">Gültig ab</label><input class="inp" type="date" id="lsAb" style="--zf-b:117px"></div>
+      <div class="f"><label for="lsBis">Gültig bis</label><input class="inp" type="date" id="lsBis" style="--zf-b:117px"></div>
+    </div>
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lsSatz">Satz in Prozent</label><input class="inp" id="lsSatz" placeholder="z. B. 5.3" style="--zf-b:80px"></div>
+      <div class="f"><label for="lsFix">Oder fester Betrag in Franken</label><input class="inp" id="lsFix" placeholder="statt eines Prozentsatzes" style="--zf-b:200px"></div>
+    </div>
+    <!-- KEIN Feld "Höchstlohn" mehr (entfernt 2026-09-09). Es stand hier
+         mit dem Versprechen "über diesem Jahresbetrag wird nichts mehr
+         abgezogen" und hielt es nicht: hoechstlohn_rappen wurde
+         gespeichert, angezeigt und von keiner Rechnung gelesen. Die
+         UVG-Obergrenze kommt aus LOHN_UVG (Merkblatt 6.05 Ziff. 5), die
+         der ALV aus LOHN_ALV -- beide je Jahr, nicht je Betrieb. -->
+    <div class="form-grid form-breit form-zeilen zeilenfluss">
+      <div class="f zf-neu"><label for="lsQuelle">Quelle *</label><input class="inp" id="lsQuelle" placeholder="z. B. Beitragsverfügung Ausgleichskasse 2026" style="--zf-b:345px"></div>
+    </div>
+  </div>
+</div>
+        </div></div>
+      </section>
+
       <section class="view" id="view-lohnauslagen">
         <div class="rdkr-reiter fin-lohn-reiter"></div>
         <div class="bar-tools">
@@ -10705,235 +11088,6 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
   </div>
 </div>
 
-<!-- ══════════════════════ LOHNANSATZ JE PERSON (ENT-451) ══════════════════
-     Ein neuer Ansatz wird ZUSÄTZLICH erfasst, nie überschreibend: Eine
-     Lohnerhöhung darf abgeschlossene Abrechnungen nicht rückwirkend
-     verändern. Ein zweites Speichern zum selben Datum korrigiert die
-     bestehende Zeile — das ist die Tippfehlerkorrektur. -->
-<div class="dlg-scrim" id="dlgLohnAnsatz">
-  <div class="dlg">
-    <div class="dlg-hd">
-      <h2 id="lpaTitel">Lohnansatz erfassen</h2>
-      <p>Der Grundlohn <b>ohne</b> Ferienentschädigung — der Zuschlag nach Art. 20 Ziff. 2 kommt
-         obendrauf und wird aus dem Alter abgeleitet, nicht hier eingetragen.</p>
-    </div>
-    <div class="dlg-bd">
-      <input type="hidden" id="lpaId">
-      <div class="feld"><label for="lpaAb">Gültig ab</label>
-        <input class="inp" type="date" id="lpaAb"></div>
-      <div class="feld"><label for="lpaAnsatz">Ansatz</label>
-        <input class="inp" id="lpaAnsatz" placeholder="z. B. 25.00">
-        <div class="zone-note" id="lpaEinheit"></div></div>
-      <div class="feld"><label for="lpaMl13">Anteil 13. Monatslohn in Prozent</label>
-        <input class="inp" id="lpaMl13" placeholder="leer = kein 13. Monatslohn vereinbart">
-        <div class="zone-note">Keine GAV-Pflicht — der Vertrag kennt ihn nur in Art. 25 Ziff. 2 als
-          Bestandteil der BVG-Bemessung. Leer heisst „nicht vereinbart“, nicht „null Prozent“.</div></div>
-      <div class="feld">
-        <label class="check" style="min-height:24px"><input type="checkbox" id="lpaFerienLaufend"> Ferienlohn laufend auszahlen</label>
-        <div class="zone-note">Nach Art. 20 Ziff. 2 nur zulässig bei unregelmässiger Teilzeit oder
-          kurzen Einsätzen, wenn es <b>schriftlich im Vertrag</b> steht und in <b>jeder</b> Abrechnung
-          separat ausgewiesen wird. Ohne diesen Haken wird der Anspruch als Guthaben geführt und beim
-          Bezug ausbezahlt.</div></div>
-      <h3 style="margin:22px 0 4px">Zuschläge nach Art. 19</h3>
-      <p class="zone-note" style="margin:0 0 10px">Der GAV nennt je Zuschlag eine Monatspauschale
-        <b>oder</b> eine Stundenentschädigung und lässt offen, wer wählt (GAV-AUS-014). Erfasst wird
-        darum, was im Vertrag steht. Der Zuschlag entsteht aus dem <b>angeordneten</b> Einsatz, nicht
-        aus der Berechtigung in der Akte.</p>
-      <div class="feld"><label for="lpaZFach">Fachausweis (mind. 200.– / Monat oder 1.20 / Stunde)</label>
-        <div style="display:flex;gap:8px"><input class="inp" id="lpaZFach" placeholder="Betrag" style="flex:1">
-          <select class="inp" id="lpaZFachArt" style="width:auto"><option value="stunde">pro Stunde</option><option value="monat">pro Monat</option></select></div></div>
-      <div class="feld"><label for="lpaZHund">Diensthund (mind. 150.– / Monat oder 1.50 / Stunde)</label>
-        <div style="display:flex;gap:8px"><input class="inp" id="lpaZHund" placeholder="Betrag" style="flex:1">
-          <select class="inp" id="lpaZHundArt" style="width:auto"><option value="stunde">pro Stunde</option><option value="monat">pro Monat</option></select></div></div>
-      <div class="feld"><label for="lpaZWaffe">Schusswaffe (2.– / Stunde bzw. max. 150.– / Monat)</label>
-        <div style="display:flex;gap:8px"><input class="inp" id="lpaZWaffe" placeholder="Betrag" style="flex:1">
-          <select class="inp" id="lpaZWaffeArt" style="width:auto"><option value="stunde">pro Stunde</option><option value="monat">pro Monat</option></select></div></div>
-      <div class="feld"><label for="lpaBemerkung">Bemerkung</label>
-        <textarea class="inp" id="lpaBemerkung" rows="2"></textarea></div>
-      <p class="err" id="lpaFehler" style="display:none"></p>
-    </div>
-    <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgLohnAnsatz')">Abbrechen</button>
-      <button class="btn btn-quiet" id="lpaLoeschKnopf" onclick="lohnAkteLoeschen('ansatz', Number($('lpaId').value), 'dlgLohnAnsatz', 'lpaFehler')">Löschen</button>
-      <button class="btn btn-primary" onclick="lohnAnsatzSpeichern()">Speichern</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════ ABZÜGE JE PERSON (ENT-451) ══════════════════════
-     Was hier NICHT steht: die Sätze. Die sind betriebsweit und stehen unter
-     Lohn → Sätze. Hier steht nur, WER wovon betroffen ist. -->
-<div class="dlg-scrim" id="dlgLohnAbzug">
-  <div class="dlg">
-    <div class="dlg-hd">
-      <h2 id="lpbTitel">Abzüge erfassen</h2>
-      <p>Wovon diese Person betroffen ist. Die <b>Sätze</b> gelten betriebsweit und stehen unter
-         Lohn → Sätze und Regelwerk.</p>
-    </div>
-    <div class="dlg-bd">
-      <input type="hidden" id="lpbId">
-      <div class="feld"><label for="lpbAb">Gültig ab</label>
-        <input class="inp" type="date" id="lpbAb"></div>
-      <!-- Die NBU-Unterstellung ist KEIN Haken mehr.
-           Bis Etappe 4 stand hier ein Ja/Nein je Person. Genau dieses Denken
-           verwirft BGer 8C_644/2025: Nicht die vertragliche Vereinbarung
-           zaehlt, sondern die konkret geleisteten Stunden. Das Werkzeug
-           rechnet sie nach Empfehlung 7/87 aus der Zeiterfassung -- und
-           "automatisch" ist darum die Vorgabe, nicht eine von drei
-           gleichrangigen Wahlen.
-           Ein Haken mit Vorgabewert "gesetzt" haette die Rechnung bei JEDER
-           Person still ueberstimmt, und zwar in Richtung Abzug. -->
-      <div class="feld">
-        <label for="lpbNbu">Nichtberufsunfall — Unterstellung</label>
-        <select class="inp" id="lpbNbu" onchange="lohnNbuUmschalten()">
-          <option value="automatisch">Automatisch aus den geleisteten Stunden (empfohlen)</option>
-          <option value="versichert">Von Hand: versichert</option>
-          <option value="nicht">Von Hand: nicht versichert</option>
-        </select>
-        <div class="zone-note">Automatisch heisst: nach Empfehlung 7/87 aus der Zeiterfassung —
-          Durchschnitt über die letzten drei oder zwölf Monate, günstigere Variante,
-          Schwelle 8 Wochenstunden (Merkblatt 6.05 Ziff. 4). Das vertragliche Pensum ist
-          <b>nicht</b> massgebend (BGer 8C_644/2025).</div>
-        <div id="lpbNbuStand" class="zone-note" style="margin-top:6px"></div>
-      </div>
-      <!-- Der Grund ist Pflicht, sobald von Hand entschieden wird. Eine
-           Uebersteuerung ohne Begruendung ist spaeter nicht nachvollziehbar,
-           und Art. 12 Ziff. 5 GAV verlangt eine nachvollziehbare Abrechnung. -->
-      <div class="feld" id="lpbNbuGrundFeld" style="display:none">
-        <label for="lpbNbuGrund">Begründung der Übersteuerung</label>
-        <input class="inp" id="lpbNbuGrund" placeholder="z. B. vom Versicherer schriftlich bestätigt">
-        <div class="zone-note">Pflicht: Wer die gerechnete Unterstellung von Hand ändert, schuldet
-          den Grund. Er steht später auf der Abrechnung, zusammen mit Person und Zeitpunkt.</div></div>
-      <div class="feld">
-        <label class="check" style="min-height:24px"><input type="checkbox" id="lpbKtg"> Krankentaggeld-Beitrag</label>
-        <div class="zone-note">Art. 17 Ziff. 3: Der Betrieb übernimmt mindestens die Hälfte der Prämie.</div></div>
-      <div class="feld">
-        <label class="check" style="min-height:24px"><input type="checkbox" id="lpbBvg"> Bei der Pensionskasse angeschlossen</label></div>
-      <div class="feld"><label for="lpbBvgBetrag">BVG-Beitrag der Person, CHF pro Monat</label>
-        <input class="inp" id="lpbBvgBetrag" placeholder="aus der Meldung der Pensionskasse">
-        <div class="zone-note">Wird <b>übernommen</b>, nicht gerechnet: Die Skala der Kasse ist deren
-          Vertragswerk. Art. 25 Ziff. 3 gibt nur die Untergrenze — mindestens 9 % des koordinierten
-          Lohnes, höchstens die Hälfte davon zulasten der Person.</div></div>
-      <div class="feld">
-        <label class="check" style="min-height:24px"><input type="checkbox" id="lpbQst" onchange="lohnQstUmschalten()"> Quellensteuerpflichtig</label></div>
-      <div id="lpbQstFelder">
-        <div class="feld"><label for="lpbQstKanton">Kanton</label>
-          <input class="inp" id="lpbQstKanton" maxlength="2" placeholder="z. B. SO"></div>
-        <div class="feld"><label for="lpbQstTarif">Tarifcode</label>
-          <input class="inp" id="lpbQstTarif" placeholder="z. B. A0N"></div>
-        <div class="feld"><label for="lpbQstKinder">Anzahl Kinder</label>
-          <input class="inp" id="lpbQstKinder" placeholder="0"></div>
-        <div class="zone-note">Kanton und Tarifcode sind erforderlich. Ohne sie lässt sich die
-          Quellensteuer nicht berechnen — und ein fehlender Abzug sähe aus wie kein Abzug.</div>
-      </div>
-      <div class="feld"><label for="lpbBemerkung">Bemerkung</label>
-        <textarea class="inp" id="lpbBemerkung" rows="2"></textarea></div>
-      <p class="err" id="lpbFehler" style="display:none"></p>
-    </div>
-    <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgLohnAbzug')">Abbrechen</button>
-      <button class="btn btn-quiet" id="lpbLoeschKnopf" onclick="lohnAkteLoeschen('abzug', Number($('lpbId').value), 'dlgLohnAbzug', 'lpbFehler')">Löschen</button>
-      <button class="btn btn-primary" onclick="lohnAbzugSpeichern()">Speichern</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════ ZAHLUNGSEMPFÄNGER (ENT-451) ═════════════════════
-     Mehrere Empfänger je Person, weil der Auszahlungsbetrag aufteilbar sein
-     muss. Genau einer bekommt den Rest — zwei Rest-Zeilen liessen offen,
-     wohin das Geld geht, und das fiele erst beim Zahlungslauf auf. -->
-<div class="dlg-scrim" id="dlgLohnZahlung">
-  <div class="dlg">
-    <div class="dlg-hd">
-      <h2 id="lpzTitel">Empfänger erfassen</h2>
-      <p>Wohin der Lohn überwiesen wird. Die IBAN wird auf ihre Prüfsumme geprüft.</p>
-    </div>
-    <div class="dlg-bd">
-      <input type="hidden" id="lpzId">
-      <div class="feld"><label for="lpzReihenfolge">Reihenfolge</label>
-        <input class="inp" id="lpzReihenfolge" placeholder="1"></div>
-      <div class="feld"><label for="lpzArt">Anteil</label>
-        <select class="inp" id="lpzArt" onchange="lohnZahlArtUmschalten()">
-          <option value="rest">Restbetrag</option>
-          <option value="fix">fester Betrag</option>
-        </select></div>
-      <div class="feld" id="lpzBetragFeld"><label for="lpzBetrag">Fester Betrag in CHF</label>
-        <input class="inp" id="lpzBetrag" placeholder="z. B. 50.00">
-        <div class="zone-note">Wird vom Auszahlungsbetrag vorweg abgezogen; der Rest geht an den
-          Empfänger mit „Restbetrag“.</div></div>
-      <div class="feld"><label for="lpzIban">IBAN</label>
-        <input class="inp" id="lpzIban" placeholder="CH.. .... .... .... .... ."></div>
-      <div class="feld"><label for="lpzEmpfaenger">Empfänger</label>
-        <input class="inp" id="lpzEmpfaenger" placeholder="leer = die mitarbeitende Person selbst"></div>
-      <div class="feld"><label for="lpzBank">Bank</label>
-        <input class="inp" id="lpzBank"></div>
-      <div class="feld"><label class="check" style="min-height:24px"><input type="checkbox" id="lpzAktiv"> aktiv</label>
-        <div class="zone-note">Ein nicht mehr genutzter Empfänger wird deaktiviert statt gelöscht —
-          sonst fehlte er in älteren Abrechnungen.</div></div>
-      <p class="err" id="lpzFehler" style="display:none"></p>
-    </div>
-    <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgLohnZahlung')">Abbrechen</button>
-      <button class="btn btn-quiet" id="lpzLoeschKnopf" onclick="lohnAkteLoeschen('zahlung', Number($('lpzId').value), 'dlgLohnZahlung', 'lpzFehler')">Löschen</button>
-      <button class="btn btn-primary" onclick="lohnZahlungSpeichern()">Speichern</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════ PERSÖNLICHE ZULAGEN UND ABZÜGE (ENT-713) ═════════════
-     Neu erfassen und Korrigieren teilen sich die vollen Felder. Eine
-     bestehende Position bietet dagegen die Wege an, die ihre Geschichte
-     erhalten: „Betrag ändern ab" und „Beenden". Korrigieren und Löschen
-     gibt es nur, solange kein abgeschlossener Lohnlauf sie verwendet hat —
-     das entscheidet der Server, der Dialog bietet es nur nicht erst an. -->
-<div class="dlg-scrim" id="dlgLohnPosition">
-  <div class="dlg">
-    <div class="dlg-hd">
-      <h2 id="lpoTitel">Zulage oder Abzug erfassen</h2>
-      <p id="lpoUnter">Gilt je ganzen Monat. Wie gerechnet wird, sagt die Lohnart.</p>
-    </div>
-    <div class="dlg-bd">
-      <input type="hidden" id="lpoId">
-      <div class="feld" id="lpoWegFeld"><label for="lpoWeg">Was soll geschehen?</label>
-        <select class="inp" id="lpoWeg" onchange="lohnPositionWegUmschalten()"></select></div>
-      <div id="lpoGrpVoll">
-        <div class="feld"><label for="lpoLohnart">Lohnart</label>
-          <select class="inp" id="lpoLohnart" onchange="lohnPositionEinheit()"></select>
-          <div class="zone-note" id="lpoLohnartHinweis"></div></div>
-        <div class="feld"><label for="lpoBetrag" id="lpoBetragLabel">Betrag in CHF</label>
-          <input class="inp" id="lpoBetrag" inputmode="decimal" placeholder="z. B. 150.00"></div>
-        <div class="feld"><label class="check" style="min-height:24px"><input type="checkbox" id="lpoEinmalig" onchange="lohnPositionEinmalig()"> einmalig, nur in einem Monat</label></div>
-        <div class="feld"><label for="lpoAb" id="lpoAbLabel">Ab Monat</label>
-          <input class="inp" type="month" id="lpoAb"></div>
-        <div class="feld" id="lpoBisFeld"><label for="lpoBis">Bis Monat</label>
-          <input class="inp" type="month" id="lpoBis">
-          <div class="zone-note">Leer lassen, wenn die Position bis auf Weiteres gilt.</div></div>
-        <div class="feld"><label for="lpoBemerkung">Bemerkung</label>
-          <input class="inp" id="lpoBemerkung"></div>
-      </div>
-      <div id="lpoGrpAb">
-        <div class="feld"><label for="lpoNeuBetrag" id="lpoNeuBetragLabel">Neuer Betrag in CHF</label>
-          <input class="inp" id="lpoNeuBetrag" inputmode="decimal"></div>
-        <div class="feld"><label for="lpoNeuAb">Gilt ab Monat</label>
-          <input class="inp" type="month" id="lpoNeuAb">
-          <div class="zone-note">Die bisherige Position endet im Monat davor und bleibt stehen.</div></div>
-      </div>
-      <div id="lpoGrpEnde">
-        <div class="feld"><label for="lpoEnde">Letzter Monat</label>
-          <input class="inp" type="month" id="lpoEnde">
-          <div class="zone-note">Leer heisst: gilt wieder bis auf Weiteres.</div></div>
-      </div>
-      <p class="zone-note" id="lpoSperrHinweis" style="display:none"></p>
-      <p class="err" id="lpoFehler" style="display:none"></p>
-    </div>
-    <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgLohnPosition')">Abbrechen</button>
-      <button class="btn btn-quiet" id="lpoLoeschKnopf" onclick="lohnPositionLoeschen()">Löschen</button>
-      <button class="btn btn-primary" onclick="lohnPositionSpeichern()">Speichern</button>
-    </div>
-  </div>
-</div>
-
 <!-- ══════════════════════ LOHNLAUF ANSEHEN (ENT-451) ══════════════════════
      Die Knöpfe folgen dem Status: Was nicht geht, steht gar nicht erst da.
      Die Grenze ist die Auszahlung — davor stornieren, danach nachtragen. -->
@@ -10946,98 +11100,6 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
       <button class="btn btn-quiet" id="llBtnStornieren" onclick="lohnLaufStornieren()">Stornieren</button>
       <button class="btn btn-quiet" id="llBtnAusbezahlt" onclick="lohnLaufAktion('ausbezahlt')">Als ausbezahlt vermerken</button>
       <button class="btn btn-primary" id="llBtnFreigeben" onclick="lohnLaufAktion('freigeben')">Freigeben</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════ LOHNART ERFASSEN (ENT-451) ══════════════════════
-     Die sechs Kennzeichen stehen ausgeschrieben und nicht als Kürzelreihe:
-     Wer eine Lohnart anlegt, soll lesen, was er entscheidet. Sie sind der
-     Unterschied zwischen einer nachvollziehbaren Abrechnung und einer
-     Blackbox — Art. 12 Ziff. 5 GAV verlangt Ersteres. -->
-<div class="dlg-scrim" id="dlgLohnart">
-  <div class="dlg">
-    <div class="dlg-hd">
-      <h2 id="laDlgTitel">Lohnart erfassen</h2>
-      <p>Eine Zeile, wie sie später auf der Abrechnung erscheint. Die Kennzeichen unten bestimmen,
-         in welche Bemessungsgrundlage der Betrag zählt.</p>
-    </div>
-    <div class="dlg-bd">
-      <input type="hidden" id="laId">
-      <div class="feld"><label for="laBezeichnung">Bezeichnung</label>
-        <input class="inp" id="laBezeichnung" placeholder="z. B. Pikettzulage"></div>
-      <div class="feld"><label for="laSchluessel">Schlüssel</label>
-        <input class="inp" id="laSchluessel" placeholder="wird aus der Bezeichnung gebildet">
-        <div class="zone-note">Die stabile Kennung, unter der eine Abrechnungszeile wiedergefunden wird.
-          Einmal vergeben, bleibt sie — eine Umbenennung träfe alte Abrechnungen.</div></div>
-      <div class="feld"><label for="laArt">Art</label>
-        <select class="inp" id="laArt"></select></div>
-      <div class="feld"><label for="laSatz">Satz in Prozent</label>
-        <input class="inp" id="laSatz" placeholder="leer lassen, wenn der Satz aus dem GAV kommt">
-        <div class="zone-note">Nur bei prozentualen Lohnarten. Die Ferienentschädigung braucht keinen —
-          sie wird nach Art. 20 Ziff. 2 aus dem Alter abgeleitet.</div></div>
-      <div class="feld"><label for="laGav">GAV-Grundlage</label>
-        <input class="inp" id="laGav" placeholder="leer = betrieblich vereinbart, keine GAV-Pflicht">
-        <div class="zone-note">Leer ist hier eine Aussage, keine Lücke: Der 13. Monatslohn etwa steht
-          in keinem GAV-Artikel.</div></div>
-      <h3 style="margin:22px 0 4px">Zählt in welche Bemessungsgrundlage?</h3>
-      <div id="laKennzeichen"></div>
-      <div class="feld"><label class="check" style="min-height:24px"><input type="checkbox" id="laAktiv"> aktiv</label></div>
-      <p class="err" id="laFehler" style="display:none"></p>
-    </div>
-    <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgLohnart')">Abbrechen</button>
-      <button class="btn btn-quiet" id="laLoeschKnopf" onclick="lohnartLoeschen()">Löschen</button>
-      <button class="btn btn-primary" onclick="lohnartSpeichern()">Speichern</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════ ABZUGSSATZ ERFASSEN (ENT-451) ═══════════════════
-     Ohne Quelle wird nicht gespeichert. An dieser Zahl hängt Geld — da darf
-     später niemand raten müssen, ob sie jemand eingetippt oder aus einer
-     Verfügung übernommen hat. Gleiche Haltung wie bei der Wegstrecke
-     (objekt_distanz.quelle, ENT-116). -->
-<div class="dlg-scrim" id="dlgLohnsatz">
-  <div class="dlg">
-    <div class="dlg-hd">
-      <h2 id="lsDlgTitel">Satz erfassen</h2>
-      <p>Gilt ab dem angegebenen Datum. Ein späterer Satz wird <b>zusätzlich</b> erfasst — der alte
-         bleibt stehen, damit abgeschlossene Abrechnungen sich nicht rückwirkend ändern.</p>
-    </div>
-    <div class="dlg-bd">
-      <input type="hidden" id="lsId">
-      <div class="feld"><label for="lsSchluessel">Abzug</label>
-        <select class="inp" id="lsSchluessel"></select></div>
-      <div class="feld"><label for="lsAb">Gültig ab</label>
-        <input class="inp" type="date" id="lsAb"></div>
-      <div class="feld"><label for="lsBis">Gültig bis</label>
-        <input class="inp" type="date" id="lsBis">
-        <div class="zone-note">Leer lassen, solange kein Ende feststeht.</div></div>
-      <div class="feld"><label for="lsSatz">Satz in Prozent</label>
-        <input class="inp" id="lsSatz" placeholder="z. B. 5.3">
-        <div class="zone-note">Der Anteil, der der mitarbeitenden Person abgezogen wird — nicht der
-          Gesamtbeitrag. Beim Krankentaggeld verlangt Art. 17 Ziff. 3, dass der Betrieb mindestens die
-          Hälfte trägt.</div></div>
-      <div class="feld"><label for="lsFix">Oder fester Betrag in Franken</label>
-        <input class="inp" id="lsFix" placeholder="statt eines Prozentsatzes"></div>
-      <!-- KEIN Feld "Höchstlohn" mehr (entfernt 2026-09-09). Es stand hier
-           mit dem Versprechen "über diesem Jahresbetrag wird nichts mehr
-           abgezogen" und hielt es nicht: hoechstlohn_rappen wurde
-           gespeichert, angezeigt und von keiner Rechnung gelesen. Die
-           UVG-Obergrenze kommt aus LOHN_UVG (Merkblatt 6.05 Ziff. 5), die
-           der ALV aus LOHN_ALV -- beide je Jahr, nicht je Betrieb. Wer hier
-           eine tiefere Grenze eintrug, bekam sie nie angewendet.
-           Dieselbe Falle wie beim AHV-Satz: erfasst sieht aus wie wirksam. -->
-      <div class="feld"><label for="lsQuelle">Quelle</label>
-        <input class="inp" id="lsQuelle" placeholder="z. B. Beitragsverfügung Ausgleichskasse 2026">
-        <div class="zone-note">Erforderlich. Woher stammt dieser Satz?</div></div>
-      <p class="err" id="lsFehler" style="display:none"></p>
-    </div>
-    <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgLohnsatz')">Abbrechen</button>
-      <button class="btn btn-quiet" id="lsLoeschKnopf" onclick="lohnSatzLoeschen()">Löschen</button>
-      <button class="btn btn-primary" onclick="lohnSatzSpeichern()">Speichern</button>
     </div>
   </div>
 </div>
@@ -12341,6 +12403,8 @@ const TITLES = {
   lohnlaeufe:  ['Lohnläufe', 'Aus abgeglichenen Ist-Zeiten wird der Bruttolohn'],
   lohnarten:   ['Lohnarten', 'Woraus eine Abrechnung besteht — und was in welche Bemessungsgrundlage zählt'],
   lohnsaetze:  ['Sätze und Regelwerk', 'Abzugssätze mit Gültigkeitszeitraum, GAV-Mindestlöhne'],
+  lohnartform: ['Lohnart erfassen', 'Eine Zeile der Abrechnung'],
+  lohnsatzform: ['Satz erfassen', 'Abzugssatz mit Gültigkeitszeitraum'],
   abwesenheiten: ['Abwesenheiten', 'Ferien, Krankheit und weitere Abwesenheiten im Überblick'],
   auslagen:    ['Auslagenersatz', 'Chronologisches Protokoll je Mitarbeitendem — Art. 18 Ziff. 10'],
   arbeitsergebnisse: ['Arbeitsergebnisse', 'Wachbuch, Kontrollpunktscans, Ereignisse, Rundgänge und Fahrzeugübernahmen im Zeitraum'],
@@ -13479,14 +13543,14 @@ function dichteInfoBauen() {
 // die Bearbeitungsmaske dort ist ein Formular und bleibt auf Lesebreite.
 // 'arbeitsergebnisse' bleibt ebenfalls draussen: Es zeichnet seit ENT-243
 // Karten statt Tabellen, und eine 1900 px breite Karte gewinnt nichts.
-const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'revierdienst', 'einsatzplan', 'einsatzneu', 'kundeform', 'objektform', 'msform', 'offerte', 'objekt',
+const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'revierdienst', 'einsatzplan', 'einsatzneu', 'kundeform', 'objektform', 'msform', 'lohnartform', 'lohnsatzform', 'offerte', 'objekt',
                         'kunden', 'mitarbeiter', 'produkte', 'abwesenheiten',
                         'finanzen', 'rechnungen', 'lohnauslagen'];
 const PLANUNG_WEIT   = ['uebersicht', 'einsaetze', 'objektplan', 'tag'];
 // Dieselbe Nachentscheidung je Reiter wie PLANUNG_WEIT, hier fuer die
 // Mitarbeitenden: Liste und Personalakte sind Tabellen, "bearbeiten" ist ein
 // Formular.
-const MITARBEITER_WEIT = ['liste', 'detail'];
+const MITARBEITER_WEIT = ['liste', 'detail', 'lohnansatz', 'lohnabzug', 'lohnzahlung', 'lohnposition'];
 
 function weiteAnsicht(an) {
   const c = document.querySelector('.content');
@@ -23541,7 +23605,7 @@ function lohnartOeffnen(id) {
      </label>`).join('');
   $('laLoeschKnopf').style.display = l && !l.system ? '' : 'none';
   $('laFehler').style.display = 'none';
-  openDlg('dlgLohnart');
+  lohnFormZeigen('lohnartform');
 }
 
 function lohnartSpeichern() {
@@ -23562,7 +23626,7 @@ function lohnartSpeichern() {
       return;
     }
     laDaten.lohnarten = data.lohnarten;
-    closeDlg('dlgLohnart');
+    lohnFormSchliessen();
     lohnartenZeichnen();
     toast('Lohnart gespeichert.');
   });
@@ -23578,7 +23642,7 @@ function lohnartLoeschen() {
       return;
     }
     laDaten.lohnarten = data.lohnarten;
-    closeDlg('dlgLohnart');
+    lohnFormSchliessen();
     lohnartenZeichnen();
     toast('Lohnart gelöscht.');
   });
@@ -23780,7 +23844,7 @@ function lohnSatzOeffnen(id, vorauswahl) {
   $('lsQuelle').value = a ? (a.quelle || '') : '';
   $('lsLoeschKnopf').style.display = a ? '' : 'none';
   $('lsFehler').style.display = 'none';
-  openDlg('dlgLohnsatz');
+  lohnFormZeigen('lohnsatzform');
 }
 
 function lohnSatzSpeichern() {
@@ -23801,7 +23865,7 @@ function lohnSatzSpeichern() {
     }
     lsDaten.abzuege = data.abzuege; lsDaten.fehlend = data.fehlend;
     lsDaten.wirkungslos = data.wirkungslos || [];
-    closeDlg('dlgLohnsatz');
+    lohnFormSchliessen();
     lohnSaetzeZeichnen();
     toast('Satz gespeichert.');
   });
@@ -23818,7 +23882,7 @@ function lohnSatzLoeschen() {
     }
     lsDaten.abzuege = data.abzuege; lsDaten.fehlend = data.fehlend;
     lsDaten.wirkungslos = data.wirkungslos || [];
-    closeDlg('dlgLohnsatz');
+    lohnFormSchliessen();
     lohnSaetzeZeichnen();
     toast('Satz gelöscht.');
   });
@@ -24098,6 +24162,48 @@ function lohnPositionKarte(heute) {
       so bleibt nachvollziehbar, was in welchem Monat galt.</p>${gavHinweis}</div></div>`;
 }
 
+// ── Lohnformulare als Seiten (16.10.2026) ──────────────────────────────
+// Vorher sechs Dialoge. Wie "Neues Objekt" eigene Seiten im Zeilenfluss:
+// Zurueck links, Loeschen und Speichern rechts. Die vier Formulare der
+// Lohnakte stehen als Reiter in den Mitarbeitenden (wie "Angaben
+// bearbeiten") -- go('mitarbeiter') fiele auf die Liste zurueck, und die
+// geoeffnete Person waere weg. Lohnart und Satz sind Ansichten neben ihren
+// Listen. Feldkennungen unveraendert; die Oeffnen- und Speichern-Wege
+// arbeiten damit weiter.
+const LOHN_FORMEN = {
+  lohnansatz:   { titel: 'lpaTitel',   zurueck: 'ma' },
+  lohnabzug:    { titel: 'lpbTitel',   zurueck: 'ma' },
+  lohnzahlung:  { titel: 'lpzTitel',   zurueck: 'ma' },
+  lohnposition: { titel: 'lpoTitel',   zurueck: 'ma' },
+  lohnartform:  { titel: 'laDlgTitel', zurueck: 'lohnarten' },
+  lohnsatzform: { titel: 'lsDlgTitel', zurueck: 'lohnsaetze' },
+};
+let lohnFormOffen = null;
+function lohnFormZeigen(form) {
+  lohnFormOffen = form;
+  if (LOHN_FORMEN[form].zurueck === 'ma') {
+    maGoTab(form);
+    $('pgCrumb').textContent = $('mdName').textContent;
+  } else {
+    go(form);
+  }
+  $('pgTitle').textContent = $(LOHN_FORMEN[form].titel).textContent;
+  window.scrollTo(0, 0);
+}
+function lohnFormSchliessen() {
+  const form = lohnFormOffen;
+  lohnFormOffen = null;
+  if (!form) { return; }
+  const z = LOHN_FORMEN[form].zurueck;
+  if (z === 'ma') {
+    if (!$('mv-' + form).classList.contains('on')) { return; }
+    maGoTab('detail');
+    $('pgTitle').textContent = TITLES.mitarbeiter[0];
+  } else if ($('view-' + form).classList.contains('on')) {
+    go(z);
+  }
+}
+
 // ── Dialog: persönliche Position ─────────────────────────────────────────
 function lohnPositionOeffnen(id) {
   const p = id ? (lohnAkte.positionen || []).find(x => x.id === id) : null;
@@ -24144,7 +24250,7 @@ function lohnPositionOeffnen(id) {
   lohnPositionWegUmschalten();
   lohnPositionEinheit();
   lohnPositionEinmalig();
-  openDlg('dlgLohnPosition');
+  lohnFormZeigen('lohnposition');
 }
 
 function lohnPositionWeg() {
@@ -24203,7 +24309,7 @@ function lohnPositionSpeichern() {
   } else {
     body.bis = $('lpoEnde').value;
   }
-  lohnAkteSchreiben(body, 'dlgLohnPosition', 'lpoFehler',
+  lohnAkteSchreiben(body, 'lpoFehler',
     w === 'neu' ? 'Position erfasst.' : 'Position geändert.');
 }
 
@@ -24211,7 +24317,7 @@ function lohnPositionLoeschen() {
   const id = Number($('lpoId').value);
   if (!id) { return; }
   lohnAkteSchreiben({ id: lohnAkte.person.id, was: 'position', aktion: 'loeschen', eintrag_id: id },
-    'dlgLohnPosition', 'lpoFehler', 'Position gelöscht.');
+    'lpoFehler', 'Position gelöscht.');
 }
 
 // ── Dialog: Lohnansatz ───────────────────────────────────────────────────
@@ -24236,7 +24342,7 @@ function lohnAnsatzOeffnen(id) {
   $('lpaEinheit').textContent = form === 'monat' ? 'CHF pro Monat'
     : (form === 'stunde' ? 'CHF pro Stunde' : 'Einheit unbekannt — ohne Anstellungskategorie');
   $('lpaFehler').style.display = 'none';
-  openDlg('dlgLohnAnsatz');
+  lohnFormZeigen('lohnansatz');
 }
 
 function lohnAnsatzSpeichern() {
@@ -24252,7 +24358,7 @@ function lohnAnsatzSpeichern() {
     zuschlag_waffe: $('lpaZWaffe').value.trim(), zuschlag_waffe_art: $('lpaZWaffeArt').value,
     bemerkung: $('lpaBemerkung').value.trim(),
   };
-  lohnAkteSchreiben(body, 'dlgLohnAnsatz', 'lpaFehler', 'Lohnansatz gespeichert.');
+  lohnAkteSchreiben(body, 'lpaFehler', 'Lohnansatz gespeichert.');
 }
 
 // ── Dialog: Abzüge der Person ────────────────────────────────────────────
@@ -24277,7 +24383,7 @@ function lohnAbzugOeffnen(id) {
   $('lpbLoeschKnopf').style.display = a ? '' : 'none';
   $('lpbFehler').style.display = 'none';
   lohnQstUmschalten();
-  openDlg('dlgLohnAbzug');
+  lohnFormZeigen('lohnabzug');
 }
 
 // Quellensteuerfelder nur zeigen, wenn sie gebraucht werden. Ein leeres
@@ -24330,7 +24436,7 @@ function lohnAbzugSpeichern() {
     qst_kinder: $('lpbQstKinder').value.trim(),
     bemerkung: $('lpbBemerkung').value.trim(),
   };
-  lohnAkteSchreiben(body, 'dlgLohnAbzug', 'lpbFehler', 'Abzüge gespeichert.');
+  lohnAkteSchreiben(body, 'lpbFehler', 'Abzüge gespeichert.');
 }
 
 // ── Dialog: Zahlungsempfänger ────────────────────────────────────────────
@@ -24348,7 +24454,7 @@ function lohnZahlungOeffnen(id) {
   $('lpzLoeschKnopf').style.display = z ? '' : 'none';
   $('lpzFehler').style.display = 'none';
   lohnZahlArtUmschalten();
-  openDlg('dlgLohnZahlung');
+  lohnFormZeigen('lohnzahlung');
 }
 
 function lohnZahlArtUmschalten() {
@@ -24367,12 +24473,12 @@ function lohnZahlungSpeichern() {
     bank: $('lpzBank').value.trim(),
     aktiv: $('lpzAktiv').checked,
   };
-  lohnAkteSchreiben(body, 'dlgLohnZahlung', 'lpzFehler', 'Empfänger gespeichert.');
+  lohnAkteSchreiben(body, 'lpzFehler', 'Empfänger gespeichert.');
 }
 
-// EIN Schreibweg fuer alle drei Dialoge. Drei Kopien waeren drei Stellen,
-// an denen die Fehlerbehandlung auseinanderlaufen kann.
-function lohnAkteSchreiben(body, dialog, fehlerId, meldung) {
+// EIN Schreibweg fuer alle vier Formulare der Lohnakte. Vier Kopien waeren
+// vier Stellen, an denen die Fehlerbehandlung auseinanderlaufen kann.
+function lohnAkteSchreiben(body, fehlerId, meldung) {
   api('lohn_person.php', { method: 'POST', body }).then(({ ok, data }) => {
     if (!ok) {
       $(fehlerId).textContent = data?.message || 'Speichern fehlgeschlagen.';
@@ -24380,16 +24486,16 @@ function lohnAkteSchreiben(body, dialog, fehlerId, meldung) {
       return;
     }
     lohnAkte = data;
-    closeDlg(dialog);
+    lohnFormSchliessen();
     lohnAkteZeichnen();
     toast(meldung);
   });
 }
 
-function lohnAkteLoeschen(was, eintragId, dialog, fehlerId) {
+function lohnAkteLoeschen(was, eintragId, fehlerId) {
   if (!eintragId) { return; }
   lohnAkteSchreiben({ id: lohnAkte.person.id, was, eintrag_id: eintragId, loeschen: true },
-    dialog, fehlerId, 'Eintrag entfernt.');
+    fehlerId, 'Eintrag entfernt.');
 }
 
 // ══════════════════════ AUSWERTUNG: ARBEITSERGEBNISSE (ENT-243) ══════════
