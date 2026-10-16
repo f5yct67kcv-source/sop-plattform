@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 38,
+            'datum' => '2026-10-16',
+            'art'   => 'fehlerbehebung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Kompakte Darstellung: Texte wieder sauber, Tagesplan weiter vorn',
+            'text'  => 'In der kompakten Darstellung lief der Text in Suchfeldern unter die Lupe und in Auswahlfeldern unter den Pfeil. Das ist behoben, auf allen Seiten. Tabellen stehen wieder bündig im Rahmen. In der Planung folgt der Tagesplan jetzt direkt auf die Übersicht.',
+        ],
+        [
             'nr'    => 37,
             'datum' => '2026-10-16',
             'art'   => 'verbesserung',
