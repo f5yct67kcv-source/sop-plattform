@@ -239,7 +239,9 @@ const reiterD = await d.evaluate(() => [...document.querySelectorAll('#navg-plan
   .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left)
   .map(b => b.textContent.trim()));
 check('Desktop: Reiterreihenfolge unveraendert (Übersicht zuerst)', reiterD[0] === 'Übersicht');
-check('Desktop: Tagesplan bleibt der letzte Reiter', reiterD[reiterD.length - 1] === 'Tagesplan');
+// Seit 2026-10-16 (Wunsch Projektinhaber) folgt der Tagesplan direkt auf die
+// Uebersicht, statt hinten zu stehen.
+check('Desktop: Tagesplan direkt nach der Uebersicht', reiterD[1] === 'Tagesplan', reiterD.join(' / '));
 
 check('Desktop: die Titelschrift bleibt bei 16px',
   await d.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.topbar h1')).fontSize)) === 16);
