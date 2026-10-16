@@ -58,6 +58,24 @@ try {
   check('und das Gespeicherte bleibt unangetastet',
     JSON.stringify(json(d.pruefung.ich)) === JSON.stringify({ thema: 'dunkel', glas: 'aus' }));
 
+  // Benachrichtigungen: die schaltbaren Arten kommen durch, Vorfall und
+  // Supportantwort nicht -- sie sind immer an, auch wenn ein Browser
+  // etwas anderes schickt.
+  const g = aufruf('POST', 'leer', { einstellungen: { glocke_rapport: 'aus', glocke_zusage: 'an',
+    glocke_vorfall: 'aus', glocke_support_antwort: 'aus', glocke_sperrtag: 'vielleicht' } });
+  check('Glocke: eine ausgeschaltete Art wird gespeichert',
+    JSON.stringify(json(g.pruefung.ich)) === JSON.stringify({ glocke_rapport: 'aus', glocke_zusage: 'an' }));
+  check('KRITISCH Glocke: Vorfall und Supportantwort lassen sich nicht ausschalten, auch nicht am Browser vorbei',
+    !('glocke_vorfall' in json(g.pruefung.ich)) && !('glocke_support_antwort' in json(g.pruefung.ich)));
+  const liste = JSON.parse(execFileSync('php', ['-r',
+    `require '${WURZEL}/backend/ereignisse.php'; echo json_encode(GLOCKE_SCHALTBAR);`], { encoding: 'utf8' }));
+  const alle = aufruf('POST', 'leer', { einstellungen: Object.fromEntries(
+    ['rapport', 'sperrtag', 'zusage', 'offerte', 'rundgang_spontan', 'vorfall', 'support_antwort', 'abwesenheit']
+      .map(a => ['glocke_' + a, 'aus'])) });
+  check('KRITISCH Glocke: die weisse Liste kennt genau die Arten, die der Server wegfiltern darf',
+    JSON.stringify(Object.keys(json(alle.pruefung.ich)).map(k => k.replace('glocke_', '')).sort())
+      === JSON.stringify([...liste].sort()));
+
   const e = aufruf('GET', 'ohne_spalte');
   check('KRITISCH: fehlt die Spalte, sagt der Endpunkt "unbekannt" -- nicht "nichts gespeichert"',
     e.status === 'ok' && e.stand_unbekannt === true);
@@ -174,7 +192,7 @@ const standText = page => page.evaluate(() => $('esStand').textContent.trim());
   // Platzhalter: klickbar, mit einem eigenen Satz -- "in Arbeit" darf
   // nicht aussehen wie "hier gibt es nichts".
   const platz = {};
-  for (const r of ['farben', 'benachrichtigungen', 'maildesigner', 'system']) {
+  for (const r of ['farben', 'maildesigner', 'system']) {
     await page.click(`.es-nav-knopf[data-reiter="${r}"]`); await page.waitForTimeout(80);
     platz[r] = await page.evaluate(k => {
       const t = document.querySelector(`.es-teil[data-reiter="${k}"]`);
@@ -186,13 +204,13 @@ const standText = page => page.evaluate(() => $('esStand').textContent.trim());
     Object.values(platz).every(p => p.sichtbar && p.darstellungWeg));
   check('KRITISCH: jeder sagt, dass er in Arbeit ist',
     Object.values(platz).every(p => /in arbeit/i.test(p.text)));
-  check('Und jeder sagt, WAS dort entsteht -- vier verschiedene Saetze',
-    new Set(Object.values(platz).map(p => p.text)).size === 4);
+  check('Und jeder sagt, WAS dort entsteht -- drei verschiedene Saetze',
+    new Set(Object.values(platz).map(p => p.text)).size === 3);
   check('Der E-Mail-Designer sagt, dass er fuer den ganzen Betrieb gilt',
     /betrieb/i.test(platz.maildesigner.text));
   check('Die Reiter in Arbeit tragen den Hinweis auch in der linken Spalte',
     await page.evaluate(() => [...document.querySelectorAll('.es-nav-knopf')]
-      .every(k => (k.dataset.reiter === 'darstellung') === !k.querySelector('.es-inarbeit'))));
+      .every(k => ['darstellung', 'benachrichtigungen'].includes(k.dataset.reiter) === !k.querySelector('.es-inarbeit'))));
   await page.screenshot({ path: `${OUT}/einstellungen-desktop.png` });
   check('Auf einer gespeicherten Wahl wird beim Oeffnen nichts hochgeladen', posts.length === 0);
   check('Keine JavaScript-Fehler', fehler.length === 0);

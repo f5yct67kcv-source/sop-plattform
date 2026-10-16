@@ -106,7 +106,22 @@ try {
     $svStamm = null;
 }
 
-$ereignisse = ereignisse_sammeln(db(), 12, $svStamm, $svMandant);
+// Was die angemeldete Person fuer ihre Glocke ausgeschaltet hat
+// (Einstellungsseite). Laesst sich das nicht lesen -- Spalte fehlt, Fehler --,
+// bleibt alles an: eine Art zu viel in der Glocke, nie eine zu wenig.
+$glockeAus = [];
+try {
+    if (hat_spalte(db(), 'mitarbeiter', 'einstellungen')) {
+        $glS = db()->prepare('SELECT einstellungen FROM mitarbeiter WHERE id = ?');
+        $glS->execute([(int)$user['id']]);
+        $wert = $glS->fetchColumn();
+        $glockeAus = glocke_ausgeschaltet($wert === false || $wert === null ? null : (string)$wert);
+    }
+} catch (Throwable $e) {
+    $glockeAus = [];
+}
+
+$ereignisse = ereignisse_sammeln(db(), 12, $svStamm, $svMandant, $glockeAus);
 
 // ── Letzte Rapporte
 $letzte = db()->query(
@@ -136,6 +151,9 @@ json_response([
     'ereignisse_gesamt'     => $ereignisse['gesamt'],
     'ereignisse_gekuerzt'   => $ereignisse['gekuerzt'],
     'ereignisse_je_art'     => $ereignisse['je_art'],
+    // Die eigene Liste der Glocke, ohne die ausgeschalteten Arten. Die
+    // Uebersicht zeigt weiterhin alles (Entscheid 16.10.2026).
+    'glocke'                => $ereignisse['glocke'],
     // Welche Arten sich nicht abfragen liessen -- meist eine Spalte, die die
     // Einrichtung noch nicht angelegt hat. Die Oberflaeche muss den
     // Unterschied hinschreiben koennen: "nichts passiert" und "hier fehlt

@@ -47,6 +47,15 @@ const EINSTELLUNGEN_ERLAUBT = [
     // Hell/Dunkel-Wahl (dort dunkel als Vorgabe, weil sie nachts im Revier
     // laeuft). Zwei Entscheidungen, zwei Schluessel -- auch am Konto.
     'app_thema' => ['hell', 'dunkel'],
+    // Benachrichtigungen: welche Arten die eigene Glocke zeigt. Dieselben
+    // Arten wie GLOCKE_SCHALTBAR in backend/ereignisse.php -- Vorfall und
+    // Supportantwort fehlen absichtlich, sie lassen sich nicht ausschalten.
+    // pruef_meine_einstellungen.php haelt beide Listen gleich.
+    'glocke_rapport'          => ['an', 'aus'],
+    'glocke_sperrtag'         => ['an', 'aus'],
+    'glocke_zusage'           => ['an', 'aus'],
+    'glocke_offerte'          => ['an', 'aus'],
+    'glocke_rundgang_spontan' => ['an', 'aus'],
 ];
 
 // Nimmt, was aus der Anfrage kommt, und gibt nur zurueck, was erlaubt ist.

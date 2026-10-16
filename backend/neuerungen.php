@@ -30,12 +30,20 @@ function neuerungen_katalog(): array
 {
     return [
         [
-            'nr'    => 38,
+            'nr'    => 39,
             'datum' => '2026-10-16',
             'art'   => 'fehlerbehebung',
             'fuer'  => ['cockpit'],
             'titel' => 'Kompakte Darstellung: Texte wieder sauber, Tagesplan weiter vorn',
             'text'  => 'In der kompakten Darstellung lief der Text in Suchfeldern unter die Lupe und in Auswahlfeldern unter den Pfeil. Das ist behoben, auf allen Seiten. Tabellen stehen wieder bündig im Rahmen. In der Planung folgt der Tagesplan jetzt direkt auf die Übersicht.',
+        ],
+        [
+            'nr'    => 38,
+            'datum' => '2026-10-16',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Glocke: selbst wählen, worüber sie dich informiert',
+            'text'  => 'Unter Einstellungen › Benachrichtigungen schaltest du für deine Glocke einzeln ein oder aus: eingegangene Rapporte, gesperrte Tage, Antworten auf Schichten, entschiedene Offerten und spontane Rundgänge. Was du ausschaltest, erscheint nicht mehr in deiner Glocke und zählt nicht zur Zahl daran. In der Übersicht steht es weiterhin, und für andere Konten ändert sich nichts. Gemeldete Vorfälle und Antworten vom Support erscheinen immer.',
         ],
         [
             'nr'    => 37,

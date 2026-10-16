@@ -996,6 +996,31 @@ html[data-desktop="an"] .desktop-zurueck { display: inline-flex; }
   border-top: 1px solid var(--line-soft); }
 .es-stand.warn { color: var(--warn); }
 .es-platz { font-size: 13px; color: var(--ink-2); line-height: 1.55; max-width: 60ch; margin: 0; }
+/* Benachrichtigungen: ein Schalter je Art der Glocke. Bauart wie die
+   Schalter der Darstellung (Kugel mit Symbol, an = Akzentfarbe), nur haengt
+   der Zustand hier am Knopf selbst (aria-checked), nicht an einem Attribut
+   des Dokuments -- es sind sieben, nicht einer. Die beiden Arten, die immer
+   an sind, zeigen den Schalter eingeschaltet und gedaempft. */
+.es-einleitung { font-size: 12.5px; color: var(--ink-3); line-height: 1.45; margin: 0; padding-bottom: 14px;
+  border-bottom: 1px solid var(--line-soft); }
+#esGlockeArten .es-zeile:first-child { padding-top: 14px; }
+.es-rechts { display: flex; align-items: center; gap: 10px; flex: none; }
+.glocke-schalter { flex: none; width: 52px; height: 30px; border-radius: 999px; padding: 0;
+  border: 1px solid var(--line); background: var(--bg); cursor: pointer; position: relative;
+  transition: background .18s, border-color .18s; }
+.glocke-schalter:hover:not(:disabled) { border-color: var(--line-hi); }
+.glocke-schalter .knopf { position: absolute; top: 2px; left: 2px; width: 24px; height: 24px;
+  border-radius: 50%; background: var(--surface); box-shadow: var(--sh-1);
+  display: flex; align-items: center; justify-content: center; transition: transform .2s; }
+.glocke-schalter svg { width: 14px; height: 14px; fill: none; stroke-width: 2.1;
+  stroke-linecap: round; stroke-linejoin: round; stroke: var(--ink-3); transition: stroke .16s; }
+.glocke-schalter[aria-checked="true"] { background: var(--accent-soft); border-color: var(--accent-line); }
+.glocke-schalter[aria-checked="true"] .knopf { transform: translateX(22px); }
+.glocke-schalter[aria-checked="true"] svg { stroke: var(--accent); }
+.glocke-schalter:disabled { cursor: default; opacity: .55; }
+@media (prefers-reduced-motion: reduce) {
+  .glocke-schalter, .glocke-schalter .knopf, .glocke-schalter svg { transition: none; }
+}
 /* Arbeitsergebnisse (ENT-325). Die Kachelreihe ist dieselbe wie bei
    "Kontrollrunde ändern", die Ausrichtung nicht: Dort steht darunter eine
    mittige Karte, hier eine linksbündige Liste. Eine mittige Reiterreihe über
@@ -9960,7 +9985,6 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
           <button type="button" class="es-nav-knopf" data-reiter="benachrichtigungen" onclick="esReiterZeigen('benachrichtigungen')">
             <span class="es-nav-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
             <span class="es-nav-lbl">Benachrichtigungen</span>
-            <span class="chip chip-n es-inarbeit">in Arbeit</span>
           </button>
           <div class="es-betrieb" id="esBetriebNav">
           <div class="es-gruppe">Für den Betrieb</div>
@@ -10025,8 +10049,16 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
             <div class="card-bd"><p class="es-platz">Hier wählst du die Farben deiner Oberfläche, zum Beispiel die Akzentfarbe für Knöpfe und Markierungen. In Arbeit.</p></div>
           </div>
           <div class="card es-teil" data-reiter="benachrichtigungen" hidden>
-            <div class="card-hd"><h2>Benachrichtigungen</h2><span class="sp"></span><span class="chip chip-n">in Arbeit</span></div>
-            <div class="card-bd"><p class="es-platz">Hier legst du fest, worüber dich die Glocke informiert und worüber nicht. In Arbeit.</p></div>
+            <div class="card-hd"><h2>Benachrichtigungen</h2></div>
+            <div class="card-bd">
+              <p class="es-einleitung">Worüber dich die Glocke informiert. Was du ausschaltest, erscheint nicht mehr in deiner Glocke und zählt nicht zur Zahl daran. In der Übersicht steht es weiterhin, und für andere Konten ändert sich nichts.</p>
+              <!-- Die Zeilen baut glockeSchalterZeichnen() aus GLOCKE_ARTEN. -->
+              <div id="esGlockeArten"></div>
+              <!-- Wo die Wahl gespeichert ist (esStandZeigen). Eigene Saetze:
+                   Die Glocke filtert der Server nach dem Konto -- "nur in
+                   diesem Browser" gibt es hier nicht. -->
+              <p class="es-stand" id="esStandGlocke"></p>
+            </div>
           </div>
           <div class="card es-teil" data-reiter="maildesigner" hidden>
             <div class="card-hd"><h2>E-Mail-Designer</h2><span class="sp"></span><span class="chip chip-n">in Arbeit</span></div>
@@ -15557,10 +15589,19 @@ function esAnwenden(e) {
   if (e.thema) { themaSetzen(e.thema, false); }
   if (e.glas)  { glasSetzen(e.glas === 'an', false); }
   if (e.dichte && typeof dichteSetzen === 'function') { dichteSetzen(e.dichte === 'kompakt', false); }
+  let glocke = false;
+  GLOCKE_ARTEN.forEach(a => {
+    const w = e['glocke_' + a.art];
+    if (!a.fix && (w === 'an' || w === 'aus')) { esGlocke[a.art] = w; glocke = true; }
+  });
+  if (glocke) { glockeSchalterZeichnen(); }
 }
 
 function einstellungenLaden() {
   esLage = 'laedt';
+  // Neu anmelden heisst neues Konto: Die Glocken-Wahl der vorigen Person
+  // gilt hier nicht.
+  esGlocke = {};
   esStandZeigen();
   return api('meine_einstellungen.php').then(({ ok, data }) => {
     // Eine Antwort ohne das Feld "einstellungen" ist keine Auskunft ueber
@@ -15597,12 +15638,93 @@ const ES_STAND = {
   nur_browser: ['Nur in diesem Browser gespeichert: Die Einrichtung ist noch nicht auf dem neusten Stand. Danach folgt die Wahl deinem Konto.', true],
   fehler:      ['Konnte nicht mit dem Konto abgeglichen werden. Die Wahl gilt vorerst nur in diesem Browser.', true],
 };
+// Fuer die Glocke andere Saetze: Sie filtert der Server nach dem Konto. Ist
+// es nicht erreichbar, gibt es keine Wahl "nur in diesem Browser" -- dann
+// zeigt die Glocke eben alles, und genau das muss hier stehen.
+const ES_STAND_GLOCKE = {
+  laedt:       ['Wird vom Konto geladen.', false],
+  konto:       ['Gespeichert an deinem Konto. Gilt für deine Glocke auf jedem Gerät.', false],
+  nur_browser: ['Lässt sich noch nicht speichern: Die Einrichtung ist noch nicht auf dem neusten Stand. Bis dahin zeigt die Glocke alles.', true],
+  fehler:      ['Konnte nicht mit dem Konto abgeglichen werden. Die Glocke filtert weiter nach dem, was zuletzt am Konto gespeichert war.', true],
+};
 function esStandZeigen() {
   const el = $('esStand');
-  if (!el) { return; }
-  const [text, warn] = ES_STAND[esLage] || ES_STAND.fehler;
-  el.textContent = text;
-  el.classList.toggle('warn', warn);
+  if (el) {
+    const [text, warn] = ES_STAND[esLage] || ES_STAND.fehler;
+    el.textContent = text;
+    el.classList.toggle('warn', warn);
+  }
+  const gl = $('esStandGlocke');
+  if (gl) {
+    const [text, warn] = ES_STAND_GLOCKE[esLage] || ES_STAND_GLOCKE.fehler;
+    gl.textContent = text;
+    gl.classList.toggle('warn', warn);
+  }
+  // Schalten laesst sich nur, was am Konto landet: Der Server liest die
+  // Wahl von dort. Ein Schalter, der umspringt, ohne dass die Glocke folgt,
+  // waere schlimmer als einer, der kurz gesperrt ist.
+  glockeSchalterZeichnen();
+}
+
+// ══════════════════════════════════════════ BENACHRICHTIGUNGEN (Einstellungen)
+// Welche Arten die eigene Glocke zeigt (16.10.2026). Entscheid des
+// Projektinhabers: Ausgeschaltet heisst ausgeblendet und nicht gezaehlt --
+// nicht als gelesen markiert, und die Uebersicht zeigt weiterhin alles.
+// Gefiltert wird auf dem Server (glocke_ausgeschaltet in ereignisse.php),
+// hier wird nur geschaltet und gespeichert. Vorfall und Supportantwort sind
+// immer an; GLOCKE_SCHALTBAR auf dem Server ist dieselbe Liste ohne "fix".
+const GLOCKE_ARTEN = [
+  { art: 'rapport',          titel: 'Rapport eingegangen',      erkl: 'Jemand hat einen Rapport gesendet.' },
+  { art: 'sperrtag',         titel: 'Tag gesperrt',             erkl: 'Jemand hat sich für einen Tag als nicht verfügbar gemeldet.' },
+  { art: 'zusage',           titel: 'Antwort auf eine Schicht', erkl: 'Jemand hat eine zugeteilte Schicht angenommen oder abgelehnt.' },
+  { art: 'offerte',          titel: 'Offerte entschieden',      erkl: 'Eine Kundin oder ein Kunde hat eine Offerte angenommen oder abgelehnt.' },
+  { art: 'rundgang_spontan', titel: 'Spontaner Rundgang',       erkl: 'Jemand hat ausserhalb des Plans einen Rundgang gestartet.' },
+  { art: 'vorfall',          titel: 'Vorfall gemeldet',         erkl: 'Eine Meldung aus dem Revierdienst, etwa eine Brandgefahr.', fix: true },
+  { art: 'support_antwort',  titel: 'Antwort vom Support',      erkl: 'Die Antwort auf deine Supportanfrage.', fix: true },
+];
+// Was am Konto steht. Fehlt eine Art, ist sie an.
+let esGlocke = {};
+
+function glockeSchalterZeichnen() {
+  const ziel = $('esGlockeArten');
+  if (!ziel) { return; }
+  const schaltbar = esLage === 'konto';
+  ziel.innerHTML = GLOCKE_ARTEN.map(a => {
+    const an = a.fix || esGlocke[a.art] !== 'aus';
+    const gesperrt = a.fix || !schaltbar;
+    const titel = a.fix ? 'Immer an' : (an ? a.titel + ' ausschalten' : a.titel + ' einschalten');
+    return `
+      <div class="es-zeile">
+        <div class="es-text">
+          <div class="es-titel">${esc(a.titel)}</div>
+          <div class="es-erkl">${esc(a.erkl)}</div>
+        </div>
+        <div class="es-rechts">
+          ${a.fix ? '<span class="chip chip-n">immer an</span>' : ''}
+          <button type="button" class="glocke-schalter" role="switch" data-art="${a.art}"
+            aria-checked="${an ? 'true' : 'false'}" aria-label="${esc(a.titel)} in der Glocke"
+            title="${esc(titel)}"${gesperrt ? ' disabled' : ''} onclick="glockeArtUm('${a.art}')">
+            <span class="knopf"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Umschalten, speichern, dann die Glocke neu holen -- der Server filtert.
+// Scheitert das Speichern, springt der Schalter zurueck: Er soll zeigen, was
+// die Glocke tut, nicht was jemand gewollt hat.
+function glockeArtUm(art) {
+  const a = GLOCKE_ARTEN.find(x => x.art === art);
+  if (!a || a.fix || esLage !== 'konto') { return; }
+  const alt = esGlocke[art] === 'aus' ? 'aus' : 'an';
+  const neu = alt === 'aus' ? 'an' : 'aus';
+  esGlocke[art] = neu;
+  glockeSchalterZeichnen();
+  esSenden({ ['glocke_' + art]: neu }).then(() => {
+    if (esLage !== 'konto') { esGlocke[art] = alt; glockeSchalterZeichnen(); return; }
+    if (stats) { ereignisseNachladen(); }
+  });
 }
 
 // Reiter "Fuer den Betrieb" nur mit dem Recht "betrieb" (Lesen genuegt zum
@@ -16995,17 +17117,41 @@ function ereignisZumTag(datum) {
 // loadStats() zurueck.
 function ereignisErledigt(i) {
   const x = (stats.ereignisse || [])[i];
-  if (!x) { return; }
-  stats.ereignisse = (stats.ereignisse || []).filter((y, k) => k !== i);
+  if (x) { ereignisAbhaken(x); }
+}
+
+// Seit die Glocke eine eigene Liste hat (Einstellungen, 16.10.2026), steht
+// dasselbe Ereignis womoeglich in ZWEI Listen: in der Uebersicht und in der
+// Glocke. Erkannt wird es an Art, Kennung und Person -- die Zusage hat die
+// Schicht als Kennung, erst mit der Person ist sie eindeutig.
+function ereignisGleich(a, b) {
+  return a.typ === b.typ && String(a.id) === String(b.id)
+    && Number(a.mitarbeiter_id || 0) === Number(b.mitarbeiter_id || 0);
+}
+
+// Nimmt einen Eintrag aus dem Feed, ohne den Datensatz selbst zu aendern --
+// Rapport, Sperre und Zusage bleiben gueltig (ENT-033/ENT-090). Optimistisch:
+// die Zeile verschwindet sofort, ein Fehlschlag holt sie beim naechsten
+// loadStats() zurueck.
+function ereignisAbhaken(x) {
+  stats.ereignisse = (stats.ereignisse || []).filter(y => !ereignisGleich(x, y));
   // Ohne das haette die "X von Y"-Notiz (bei gekuerzter Liste) und seit
   // ENT-197 auch der Glocke-Zaehler nach dem Abhaken weiter die alte,
   // servergelieferte Gesamtzahl gezeigt -- eine Zahl, die nicht mehr stimmt.
+  // Gezaehlt wird auch dann herunter, wenn die Zeile nur in der Glocke
+  // stand: Auf dem Server ist sie so oder so abgehakt.
   if (typeof stats.ereignisse_gesamt === 'number' && stats.ereignisse_gesamt > 0) {
     stats.ereignisse_gesamt--;
   }
   const je = stats.ereignisse_je_art;
   if (je && typeof je === 'object' && Number(je[x.typ]) > 0) {
     je[x.typ] = Number(je[x.typ]) - 1;
+  }
+  const gl = stats.glocke;
+  if (gl && typeof gl === 'object') {
+    gl.ereignisse = (gl.ereignisse || []).filter(y => !ereignisGleich(x, y));
+    if (typeof gl.gesamt === 'number' && gl.gesamt > 0) { gl.gesamt--; }
+    if (gl.je_art && Number(gl.je_art[x.typ]) > 0) { gl.je_art[x.typ] = Number(gl.je_art[x.typ]) - 1; }
   }
   // NEU ZEICHNEN, nicht bloss die Zeile entfernen. Die Zeilen verweisen ueber
   // ihren Platz in der Liste auf das Ereignis; faellt einer weg, zeigen alle
@@ -17017,10 +17163,12 @@ function ereignisErledigt(i) {
     // Hat der Server NICHT abgehakt, kommt die Zeile sofort zurueck -- nicht
     // erst beim naechsten Neuladen. Sonst sieht ein gescheiterter Haken aus
     // wie ein gelungener und taucht beim Aktualisieren wieder auf.
-    // Ist die sichtbare Liste leer, aber auf dem Server noch etwas offen
-    // (die Liste zeigt nur die neuesten 12), wird die naechste Tranche
+    // Ist eine sichtbare Liste leer, aber auf dem Server noch etwas offen
+    // (die Listen zeigen nur die neuesten 12), wird die naechste Tranche
     // geholt: Eine leere Glocke mit einer Zahl daran ist ein Widerspruch.
-    if (!ok || (!(stats.ereignisse || []).length && ereignisseOffen() > 0)) {
+    if (!ok
+      || (!(stats.ereignisse || []).length && ereignisseOffen() > 0)
+      || (!glockeEintraege().length && glockeOffen() > 0)) {
       ereignisseNachladen();
     }
   }).catch(() => ereignisseNachladen());
@@ -17036,6 +17184,7 @@ function ereignisseNachladen() {
     stats.ereignisse_je_art = data.ereignisse_je_art;
     stats.ereignisse_gekuerzt = data.ereignisse_gekuerzt;
     stats.ereignisse_unvollstaendig = data.ereignisse_unvollstaendig;
+    stats.glocke = data.glocke;
     stats.stand = data.stand;
     renderEreignisse();
   });
@@ -17048,11 +17197,32 @@ function ereignisseNachladen() {
 // eigener "gesehen"-Mechanismus: Abhaken laeuft ueber denselben Endpunkt und
 // denselben Zeitstempel wie in der vollen Liste (Festlegung 2 in
 // ereignisse.php).
-function glockeAktualisieren(f, fehlt) {
+// Die Liste der Glocke. Seit den Einstellungen (16.10.2026) liefert der
+// Server sie eigens, ohne die Arten, die jemand fuer seine Glocke
+// ausgeschaltet hat. Ein aelterer Server liefert sie nicht -- dann zeigt die
+// Glocke dieselben Zeilen wie die Uebersicht, wie bisher.
+function glockeEintraege() {
+  const gl = stats && stats.glocke;
+  if (gl && Array.isArray(gl.ereignisse)) { return gl.ereignisse.filter(x => EREIGNIS_ART[x.typ]); }
+  return ((stats && stats.ereignisse) || []).filter(x => EREIGNIS_ART[x.typ]);
+}
+
+// Dieselbe Zaehlung wie ereignisseOffen(), nur ueber die Arten der Glocke.
+function glockeOffen() {
+  const je = stats && stats.glocke && stats.glocke.je_art;
+  if (je && typeof je === 'object') {
+    return Object.keys(je).filter(t => EREIGNIS_ART[t])
+      .reduce((n, t) => n + (Number(je[t]) || 0), 0);
+  }
+  return ereignisseOffen();
+}
+
+function glockeAktualisieren(_uebersicht, fehlt) {
+  const f = glockeEintraege();
   const badge = $('glockeBadge');
   // Die Zahl am Abzeichen ist die der offenen Ereignisse auf dem Server --
   // nie kleiner als die Zeilen, die tatsaechlich darunter stehen.
-  const anzahl = Math.max(ereignisseOffen(), f.length);
+  const anzahl = Math.max(glockeOffen(), f.length);
   if (badge) {
     badge.style.display = anzahl ? '' : 'none';
     badge.textContent = anzahl > 99 ? '99+' : String(anzahl);
@@ -17077,9 +17247,14 @@ function glockeAktualisieren(f, fehlt) {
     // "Nichts Neues" nur, wenn auch der Server nichts mehr offen hat. Sonst
     // ist die naechste Tranche unterwegs (ereignisseNachladen) -- und eine
     // Zahl am Abzeichen ueber "Nichts Neues" waere ein Widerspruch.
+    // Und "Nichts Neues" nie dort, wo nur der eigene Filter alles
+    // ausblendet: Dann steht dabei, dass in der Uebersicht mehr wartet.
+    const ausgeblendet = Math.max(0, ereignisseOffen() - glockeOffen());
     liste.innerHTML = anzahl
       ? `<div class="glocke-leer">Weitere werden geladen …</div>`
-      : `<div class="glocke-leer">Nichts Neues.</div>`;
+      : (ausgeblendet
+        ? `<div class="glocke-leer">Nichts Neues zu den Arten, die du eingeschaltet hast. ${ausgeblendet} weitere ${ausgeblendet === 1 ? 'steht' : 'stehen'} in der Übersicht.</div>`
+        : `<div class="glocke-leer">Nichts Neues.</div>`);
     return;
   }
   liste.innerHTML = f.map((x, i) => {
@@ -17091,11 +17266,18 @@ function glockeAktualisieren(f, fehlt) {
         <b>${esc(wer)}</b>
         <span>${esc(ereignisZeile(x))}</span>
       </div>
-      ${ereignisAbhakbar(x.typ) ? `<button class="rank-erledigt" title="Als erledigt markieren" aria-label="Als erledigt markieren" onclick="event.stopPropagation(); ereignisErledigt(${i})">
+      ${ereignisAbhakbar(x.typ) ? `<button class="rank-erledigt" title="Als erledigt markieren" aria-label="Als erledigt markieren" onclick="event.stopPropagation(); glockeErledigt(${i})">
         <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
       </button>` : ''}
     </div>`;
   }).join('');
+}
+
+// Der Haken in der Glocke. Der Platz verweist auf die Liste der Glocke,
+// nicht auf die der Uebersicht -- die beiden sind nicht mehr dieselbe.
+function glockeErledigt(i) {
+  const x = glockeEintraege()[i];
+  if (x) { ereignisAbhaken(x); }
 }
 
 // Alle abhakbaren Ereignisse auf einmal (14.10.2026). NICHT optimistisch
@@ -17163,7 +17345,7 @@ function glockeZeileGeklickt(i) {
   /* Eine Supportantwort fuehrt dorthin, wo sie steht (ENT-685) -- nicht in
      die Uebersicht, wo nur dieselbe Zeile noch einmal stuende. Erst dort
      gilt sie als gelesen; der Endpunkt setzt den Stempel beim Oeffnen. */
-  const e = (stats.ereignisse || [])[i];
+  const e = glockeEintraege()[i];
   if (e && e.typ === 'support_antwort') {
     /* Derselbe Weg, den der Support-Eintrag der Seitenleiste nimmt. Seit
        ENT-682 ist das eine eigene Ansicht, und go() holt die Vorgaenge
@@ -17174,9 +17356,17 @@ function glockeZeileGeklickt(i) {
     return;
   }
   go('uebersicht');
-  const zeile = document.querySelectorAll('#ereignisFeed .rank.erg')[i];
-  if (!zeile) { return; }
-  ereignisAufklappen(i, zeile);
+  // Dieselbe Zeile in der Uebersicht suchen. Fehlt sie dort (die Uebersicht
+  // zeigt die neuesten 12 aller Arten, die Glocke die neuesten 12 der
+  // eingeschalteten), bleibt es beim Sprung zur Liste.
+  const j = e ? (stats.ereignisse || []).findIndex(y => ereignisGleich(e, y)) : -1;
+  const zeile = j < 0 ? null : document.querySelectorAll('#ereignisFeed .rank.erg')[j];
+  if (!zeile) {
+    const feed = $('ereignisFeed');
+    if (feed) { feed.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    return;
+  }
+  ereignisAufklappen(j, zeile);
   // Das Ereignis-Widget steht je nach eigener Anordnung der Uebersicht weit
   // unten, unterhalb der Kennzahlen -- ohne Hinscrollen sieht man das
   // aufgeklappte Detail nie und der Klick wirkt wirkungslos.

@@ -211,5 +211,56 @@ pruef('Eine noch nicht entschiedene Offerte bekommt keinen Stempel',
     $pdo4->query('SELECT entscheidung_gesehen_am FROM belege WHERE id = 2')->fetchColumn() === null);
 pruef('Die Zahl stimmt: 6 Zeilen markiert', $r4['geaendert'] === 6);
 
+// ══════════════ DIE EIGENE GLOCKE (Einstellungen, 16.10.2026)
+//
+// Ausgeschaltete Arten fehlen in der Liste der Glocke und in ihrer Zahl. Die
+// Uebersicht zeigt weiterhin alles, und nichts wird als gelesen markiert.
+pruef('Glocke: ohne Gespeichertes ist alles an',          glocke_ausgeschaltet(null) === []);
+pruef('Glocke: kaputtes JSON heisst alles an, nicht alles aus', glocke_ausgeschaltet('{kaputt') === []);
+pruef('Glocke: nur "aus" schaltet aus',
+    glocke_ausgeschaltet('{"glocke_rapport":"aus","glocke_zusage":"an","glocke_sperrtag":"nein"}') === ['rapport']);
+pruef('KRITISCH Glocke: Vorfall und Supportantwort lassen sich auch am Konto nicht ausschalten',
+    glocke_ausgeschaltet('{"glocke_vorfall":"aus","glocke_support_antwort":"aus"}') === []);
+
+$pdo5 = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                                                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+$pdo5->sqliteCreateFunction('CURDATE', fn() => date('Y-m-d'), 0);
+foreach ([
+    'CREATE TABLE mitarbeiter (id INTEGER PRIMARY KEY, name TEXT, vorname TEXT, nachname TEXT)',
+    'CREATE TABLE rapporte (id INTEGER PRIMARY KEY, mitarbeiter_id INTEGER, datum TEXT, kunde TEXT, ort TEXT,
+        einsatzart TEXT, netto_h REAL, erfasst_am TEXT, gesehen_am TEXT)',
+    'CREATE TABLE verfuegbarkeiten (id INTEGER PRIMARY KEY, mitarbeiter_id INTEGER, datum TEXT, bemerkung TEXT,
+        erfasst_am TEXT, gesehen_am TEXT)',
+] as $sql) { $pdo5->exec($sql); }
+$pdo5->exec("INSERT INTO mitarbeiter VALUES (1, 'anna', 'Anna', 'Muster')");
+// Fuenfzehn Rapporte, alle NEUER als die beiden Sperrtage: Die zwoelf
+// neuesten Ereignisse insgesamt sind lauter Rapporte. Schneidet der Server
+// zuerst ab und filtert danach, bleibt die Glocke leer, obwohl zwei
+// Sperrtage offen sind.
+for ($i = 1; $i <= 15; $i++) {
+    $pdo5->exec(sprintf("INSERT INTO rapporte (id, mitarbeiter_id, datum, kunde, erfasst_am)
+        VALUES (%d, 1, '2026-09-02', 'Muster AG', '2026-09-02 %02d:00:00')", $i, $i + 5));
+}
+$pdo5->exec("INSERT INTO verfuegbarkeiten (id, mitarbeiter_id, datum, erfasst_am) VALUES
+    (1, 1, '2999-01-01', '2026-09-01 08:00:00'), (2, 1, '2999-01-02', '2026-09-01 09:00:00')");
+$m = ereignisse_sammeln($pdo5, 12, null, null, ['rapport']);
+$typen = fn(array $l) => array_values(array_unique(array_map(fn($x) => $x['typ'], $l)));
+pruef('Vorbedingung: die Uebersicht zeigt zwoelf Rapporte', $typen($m['ereignisse']) === ['rapport']
+    && count($m['ereignisse']) === 12);
+pruef('KRITISCH Glocke: Rapporte aus -- die Glocke zeigt die beiden Sperrtage, gefiltert VOR dem Abschneiden',
+    $typen($m['glocke']['ereignisse']) === ['sperrtag'] && count($m['glocke']['ereignisse']) === 2);
+pruef('KRITISCH Glocke: die Zahl der Glocke zaehlt die ausgeschaltete Art nicht',
+    $m['glocke']['gesamt'] === 2 && !isset($m['glocke']['je_art']['rapport']));
+pruef('Die Uebersicht zaehlt weiterhin alles', $m['gesamt'] === 17);
+pruef('Die Glocke nennt, was ausgeschaltet ist', $m['glocke']['aus'] === ['rapport']);
+pruef('KRITISCH Glocke: Ausschalten markiert nichts als gelesen',
+    (int)$pdo5->query('SELECT COUNT(*) FROM rapporte WHERE gesehen_am IS NULL')->fetchColumn() === 15);
+$n = ereignisse_sammeln($pdo5, 12, null, null, ['vorfall', 'support_antwort', 'irgendwas']);
+pruef('KRITISCH Glocke: eine Art ausserhalb der schaltbaren laesst sich nicht wegfiltern',
+    $n['glocke']['aus'] === [] && $n['glocke']['gesamt'] === $n['gesamt']);
+$o = ereignisse_sammeln($pdo5);
+pruef('Ohne Wahl ist die Glocke dieselbe Liste wie die Uebersicht',
+    $o['glocke']['ereignisse'] === $o['ereignisse'] && $o['glocke']['gesamt'] === $o['gesamt']);
+
 echo $ok . " Pruefungen bestanden\n";
 if ($bad) { echo count($bad) . " FEHLGESCHLAGEN:\n - " . implode("\n - ", $bad) . "\n"; exit(1); }
