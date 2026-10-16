@@ -107,7 +107,7 @@ const ZIELE = [
   // Planung -- der Seitentitel heisst darum jetzt "Neuer Einsatz".
   ['Einsatz erstellen',       'Neuer Einsatz',        '#view-einsatzneu'],
   ['Schichten abgleichen',    'Schichten abgleichen', null],
-  ['Kunde erfassen',          'Kunden',               '#dlgKunde'],
+  ['Kunde erfassen',          'Neuer Kunde',          '#view-kundeform'],
   ['Tagesplan öffnen',        'Planung',              null],
   ['Objekt erfassen',         'Kunden',               '#dlgObNeu'],
   ['Objektplanung öffnen',    'Planung',              null],

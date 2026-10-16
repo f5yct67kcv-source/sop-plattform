@@ -158,7 +158,7 @@ await page.click('#btnSprechen');
 await page.fill('#gsText', 'Neuer Kunde für die Firma');
 await page.click('#gsBtn');
 await page.waitForTimeout(400);
-check('„kunde“ öffnet den Kunden-Neu-Dialog', await page.evaluate(() => document.getElementById('dlgKunde').classList.contains('on')));
+check('„kunde“ öffnet den Kunden-Neu-Dialog', await page.evaluate(() => document.getElementById('view-kundeform').classList.contains('on')));
 check('Kundenname vorbefüllt', (await page.inputValue('#ku_name')) === 'Neue Firma AG');
 await page.keyboard.press('Escape');
 await page.waitForTimeout(200);
