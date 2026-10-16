@@ -25,6 +25,7 @@ require_once __DIR__ . '/../rechte.php';
 require_once __DIR__ . '/../demo_daten.php';   // Bausteine des Demo-Musterbetriebs, Lohnlauf
 require_once __DIR__ . '/../auslagen.php';     // auslagen_zeile()
 require_once __DIR__ . '/../belege.php';       // beleg_*()
+require_once __DIR__ . '/../planung.php';      // planung_bedarf(): dieselbe Bedarfsregel wie die Objektplanung
 
 // ══════════════════════════════════════════════════════════════════════
 // TESTDATEN DER TESTSEITE (ENT-714)
@@ -58,7 +59,8 @@ require_once __DIR__ . '/../belege.php';       // beleg_*()
 // heilt sich damit selbst.
 
 const TD_MONATE = 15;          // Monate Geschichte einschliesslich des laufenden
-const TD_ZUKUNFT_TAGE = 21;    // Planung nach vorne
+const TD_ZUKUNFT_TAGE = 42;    // Planung nach vorne (sechs Wochen, Projektinhaber 2026-10-16)
+const TD_OFFEN_JEDER = 4;      // ab morgen bleibt jeder vierte Platz unbesetzt
 const TD_OFFEN_TAGE = 3;       // die letzten Tage bleiben unabgeglichen
 const TD_BESTAETIGUNG = 'TESTDATEN';
 
@@ -294,7 +296,50 @@ function td_leistungen(): array
     ];
 }
 
-function td_stammdaten(PDO $pdo): array
+// ── Masterschichten (ENT-723) ─────────────────────────────────────────
+// Ein Objekt mit festem Rhythmus bekommt EINE Masterschicht, und jede seiner
+// Schichten haengt daran -- so, wie sie im Betrieb entsteht. Ohne Vorlage
+// blieb die Objektplanung leer (sie zeigt, was aus Masterschichten kommt),
+// und die Einsatzliste unter "Nur Einsätze" ebenfalls (jede Schicht hatte
+// ein Objekt). Anlaesse bekommen keine Vorlage: Sie sind einzelne Einsaetze
+// ausserhalb der Objektplanung (ENT-106) und entstehen ohne Objekt.
+//
+// Welcher Tag eine Schicht bekommt, entscheidet danach planung_bedarf() --
+// dieselbe Regel wie "Schichten setzen" in der Objektplanung, Feiertage
+// eingeschlossen. Darum findet "Schichten setzen" auf der Testseite nichts
+// doppelt anzulegen.
+const TD_RHYTHMUS = ['taeglich', 'werktags', 'wochenende'];
+
+function td_masterschicht_name(string $leistung): array
+{
+    return match ($leistung) {
+        'baustelle' => ['Nachtbewachung', 'NB'],
+        'revier'    => ['Nachtrunde', 'NR'],
+        'empfang'   => ['Empfang', 'EM'],
+        default     => ['Verkehrsdienst', 'VD'],
+    };
+}
+
+function td_masterschicht_anlegen(PDO $pdo, int $objektId, string $leistung, string $muster, ?string $heute = null): bool
+{
+    if (!in_array($muster, TD_RHYTHMUS, true)) { return false; }
+    [$von, $bis, $pause] = td_schicht($leistung, $muster);
+    [$name, $kuerzel] = td_masterschicht_name($leistung);
+    $werk = $muster === 'werktags' ? 1 : ($muster === 'taeglich' ? 1 : 0);
+    $we   = $muster === 'werktags' ? 0 : 1;
+    // Gueltig ab dem ersten Monat der Geschichte, damit auch die alten
+    // Schichten aus dieser Vorlage stammen.
+    $ab = td_monate($heute)[0] . '-01';
+    $pdo->prepare('INSERT INTO masterschichten (objekt_id, name, kuerzel, art, sparte, von, bis, pause_min, arbeitszeit_h,
+                       rhythmus, bedarf_mo, bedarf_di, bedarf_mi, bedarf_do, bedarf_fr, bedarf_sa, bedarf_so, bedarf_feiertag, gueltig_ab)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$objektId, $name, $kuerzel, 'arbeit', 'sicherheit', $von, $bis, $pause,
+                   round((gavzeit_roh_min($von, $bis) - $pause) / 60, 2), 'woche',
+                   $werk, $werk, $werk, $werk, $werk, $we, $we, $muster === 'taeglich' ? 1 : 0, $ab]);
+    return true;
+}
+
+function td_stammdaten(PDO $pdo, ?string $heute = null): array
 {
     $funktionen = demo_funktionen_abteilungen($pdo);
     $ma = td_mitarbeitende_erzeugen($pdo, $funktionen);
@@ -337,12 +382,15 @@ function td_stammdaten(PDO $pdo): array
 
     // Objekte
     $einO = $pdo->prepare('INSERT INTO objekte (kunde_id, kunde_name, name, strasse, ort, kanton, einsatzart, sparte) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-    foreach (td_objektliste() as [$kIdx, $name, $art]) {
+    $vorlagen = 0;
+    foreach (td_objektliste() as [$kIdx, $name, $art, , $leistung, $muster]) {
         $k = $kunden[$kIdx];
         $roh = td_kundenliste()[$kIdx];
         $einO->execute([$k['id'], $k['name'], $name, $roh[1], $roh[2], DEMO_KANTON, $art, 'sicherheit']);
+        if (td_masterschicht_anlegen($pdo, (int)$pdo->lastInsertId(), $leistung, $muster, $heute)) { $vorlagen++; }
     }
-    return ['mitarbeitende' => count($ma), 'kunden' => count($kunden), 'objekte' => count(td_objektliste())];
+    return ['mitarbeitende' => count($ma), 'kunden' => count($kunden), 'objekte' => count(td_objektliste()),
+            'masterschichten' => $vorlagen];
 }
 
 // ── Zustand, der in jedem Schritt aus der Datenbank gelesen wird ─────
@@ -450,8 +498,16 @@ function td_monat(PDO $pdo, string $monat, ?string $heute = null): array
     $letzterTag = min($bis, (new DateTimeImmutable($heute))->modify('+' . TD_ZUKUNFT_TAGE . ' days')->format('Y-m-d'));
 
     $wegSpalte = hat_spalte($pdo, 'einsaetze', 'weg_km');
-    $einE = $pdo->prepare('INSERT INTO einsaetze (kunde_id, kunde_name, objekt_id, titel, strasse, ort, einsatzart, sparte, datum, von, bis, bedarf, status'
-        . ($wegSpalte ? ', weg_km' : '') . ') VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 1, ?' . ($wegSpalte ? ', ?' : '') . ')');
+    $einE = $pdo->prepare('INSERT INTO einsaetze (kunde_id, kunde_name, objekt_id, masterschicht_id, titel, strasse, ort, einsatzart, sparte, datum, von, bis, bedarf, status'
+        . ($wegSpalte ? ', weg_km' : '') . ') VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?' . ($wegSpalte ? ', ?' : '') . ')');
+    // Je Objekt mit Vorlage: welche Tage die Bedarfsregel verlangt.
+    $ausVorlage = [];
+    foreach ($z['objekte'] as $oi => $o) {
+        if (!in_array($o['muster'], TD_RHYTHMUS, true) || $letzterTag < $von) { continue; }
+        $b = planung_bedarf((int)$o['id'], $von, $letzterTag, $pdo);
+        foreach ($b['bedarf'] ?? [] as $s) { $ausVorlage[$oi][$s['datum']] = $s; }
+        $ausVorlage[$oi] ??= [];
+    }
     $oevSpalte = hat_spalte($pdo, 'einsatz_zuteilung', 'oev_rappen');
     $einZ = $pdo->prepare('INSERT INTO einsatz_zuteilung (einsatz_id, mitarbeiter_id, zusage' . ($oevSpalte ? ', oev_rappen' : '') . ') VALUES (?, ?, ?' . ($oevSpalte ? ', ?' : '') . ')');
     $istE = $pdo->prepare("UPDATE einsaetze SET ist_status = 'anwesend', ist_von = ?, ist_bis = ?, ist_pause_min = ?, ist_pause_bezahlt_ma = 0, abgeglichen_von = ?, abgeglichen_am = ? WHERE id = ?");
@@ -461,22 +517,36 @@ function td_monat(PDO $pdo, string $monat, ?string $heute = null): array
 
     $stundenJeObjekt = [];   // abgeglichene Stunden je Objekt fuer die Rechnung
     $anlaesse = [];          // einzeln verrechnete Anlaesse
-    $zaehler = ['einsaetze' => 0, 'abgeglichen' => 0, 'auslagen' => 0];
+    $zaehler = ['einsaetze' => 0, 'offen' => 0, 'abgeglichen' => 0, 'auslagen' => 0];
     $tag = new DateTimeImmutable($von);
     $ende = new DateTimeImmutable($letzterTag);
     while ($tag <= $ende) {
         $datum = $tag->format('Y-m-d');
         foreach ($z['objekte'] as $oi => $o) {
-            if (!td_tag_aktiv($o['muster'], $datum, $oi)) { continue; }
+            $vorlage = isset($ausVorlage[$oi]) ? ($ausVorlage[$oi][$datum] ?? null) : null;
+            if (isset($ausVorlage[$oi]) ? !$vorlage : !td_tag_aktiv($o['muster'], $datum, $oi)) { continue; }
             $team = $teams[$o['id']];
             $p = $team[((int)$tag->format('z')) % count($team)];
             [$sv, $sb, $pause] = td_schicht($o['leistung'], $o['muster']);
-            $einE->execute(array_merge([$o['kunde_id'], $o['kunde_name'], $o['id'], $o['strasse'], $o['ort'], $o['einsatzart'],
-                'sicherheit', $datum, $sv, $sb, 'geplant'], $wegSpalte ? [$o['km']] : []));
+            // Aus der Vorlage: Objekt, Vorlage, Name, Bedarf und Status wie
+            // schichten_anlegen(). Ein Anlass: freier Einsatz ohne Objekt,
+            // der Anlass als Bezeichnung.
+            $einE->execute(array_merge($vorlage
+                ? [$o['kunde_id'], $o['kunde_name'], $o['id'], $vorlage['masterschicht_id'], $vorlage['name'], $o['strasse'], $o['ort'],
+                   $o['einsatzart'], 'sicherheit', $datum, $vorlage['von'], $vorlage['bis'], $vorlage['bedarf'], $vorlage['status']]
+                : [$o['kunde_id'], $o['kunde_name'], null, null, $o['name'], $o['strasse'], $o['ort'],
+                   $o['einsatzart'], 'sicherheit', $datum, $sv, $sb, 1, 'geplant'],
+                $wegSpalte ? [$o['km']] : []));
             $eid = (int)$pdo->lastInsertId();
+            $zaehler['einsaetze']++;
+            // Ab morgen bleibt jeder vierte Platz offen -- verteilt ueber Tage
+            // und Objekte, damit Planung und Kennzahlen offene Schichten zeigen.
+            if ($datum > $heute && ((int)$tag->format('z') + $oi) % TD_OFFEN_JEDER === 0) {
+                $zaehler['offen']++;
+                continue;
+            }
             $oev = $p['verkehrsmittel'] === 'Oeffentlicher Verkehr' ? 640 + (int)round($o['km'] * 42) : null;
             $einZ->execute(array_merge([$eid, $p['id'], 'bestätigt'], $oevSpalte ? [$oev] : []));
-            $zaehler['einsaetze']++;
             if ($datum > $abgleichBis) { continue; }
 
             $am = (new DateTimeImmutable($datum))->modify('+1 day 8 hours')->format('Y-m-d H:i:s');
@@ -594,16 +664,20 @@ function td_rechnung(PDO $pdo, int $kundeId, string $titel, string $datum, array
     return $id;
 }
 
-// ── Abschluss: Planung nach vorne ist schon in td_monat() (bis +21 Tage);
+// ── Abschluss: Planung nach vorne ist schon in td_monat() (bis +TD_ZUKUNFT_TAGE, ENT-723);
 // hier die Offerten und die gezielten Sonderfaelle (ENT-714, Punkt 7).
 function td_abschluss(PDO $pdo, ?string $heute = null): array
 {
     $heute = $heute ?? date('Y-m-d');
     $z = td_zustand($pdo);
-    // Der Monat nach dem laufenden, falls die Planung ueber das Monatsende reicht.
-    $naechster = (new DateTimeImmutable($heute))->modify('first day of next month')->format('Y-m');
+    // Die Monate nach dem laufenden, soweit die Planung ueber das Monatsende
+    // reicht. Bei sechs Wochen koennen das zwei sein (ab Mitte Dezember).
+    $naechster = (new DateTimeImmutable($heute))->modify('first day of next month');
     $zukunftBis = (new DateTimeImmutable($heute))->modify('+' . TD_ZUKUNFT_TAGE . ' days')->format('Y-m');
-    if ($zukunftBis >= $naechster) { td_monat($pdo, $naechster, $heute); }
+    while ($naechster->format('Y-m') <= $zukunftBis) {
+        td_monat($pdo, $naechster->format('Y-m'), $heute);
+        $naechster = $naechster->modify('+1 month');
+    }
 
     $k = $pdo->query('SELECT id FROM kunden ORDER BY id')->fetchAll(PDO::FETCH_COLUMN);
     $pr = $z['produkte'];

@@ -149,7 +149,7 @@ $HEUTE = $H->format('Y-m-d');
 $M = fn(int $v) => $H->modify('first day of this month')->modify(($v >= 0 ? '+' : '') . $v . ' months')->format('Y-m');
 $T = fn(int $v) => $H->modify(($v >= 0 ? '+' : '') . $v . ' days')->format('Y-m-d');
 $pdo->beginTransaction();
-$st = td_stammdaten($pdo);
+$st = td_stammdaten($pdo, $HEUTE);
 $pdo->commit();
 pruef('30 Mitarbeitende', $st['mitarbeitende'] === 30);
 pruef('12 Kunden', $st['kunden'] === 12);
@@ -178,7 +178,53 @@ pruef('Vergangene Schichten sind abgeglichen', (int)$n("SELECT COUNT(*) FROM ein
 pruef('KRITISCH: die letzten Tage bleiben offen (Hinweis "nicht abgeglichen")',
     (int)$n("SELECT COUNT(*) FROM einsaetze WHERE datum BETWEEN ? AND ? AND ist_status = 'offen'", [$T(-2), $T(-1)]) > 0);
 pruef('KRITISCH: keine Zukunft ist abgeglichen', (int)$n("SELECT COUNT(*) FROM einsaetze WHERE datum >= ? AND ist_status <> 'offen'", [$HEUTE]) === 0);
-pruef('Planung reicht drei Wochen nach vorne', (string)$n('SELECT MAX(datum) FROM einsaetze') >= $T(20));
+pruef('Planung reicht sechs Wochen nach vorne', (string)$n('SELECT MAX(datum) FROM einsaetze') >= $T(40));
+
+// ── Masterschichten, Objektplanung, freie Einsaetze, offene Plaetze ──
+// Gemessen an dem, was die Oberflaeche liest: Die Objektplanung zeigt
+// Schichten mit masterschicht_id, die Einsatzliste unter "Nur Einsätze"
+// solche ohne objekt_id, offen ist ein Platz ohne Zuteilung.
+$regel = array_values(array_filter(td_objektliste(), fn($o) => in_array($o[5], TD_RHYTHMUS, true)));
+pruef('Es gibt Objekte mit festem Rhythmus und Anlaesse (sonst prueft das Folgende nichts)',
+    count($regel) > 5 && count($regel) < count(td_objektliste()));
+pruef('KRITISCH: jedes Objekt mit festem Rhythmus hat eine Masterschicht', $st['masterschichten'] === count($regel)
+    && (int)$n('SELECT COUNT(DISTINCT objekt_id) FROM masterschichten') === count($regel));
+pruef('KRITISCH: jede Schicht an einem Objekt stammt aus seiner Masterschicht (sonst zeigt die Objektplanung sie nicht)',
+    (int)$n('SELECT COUNT(*) FROM einsaetze e LEFT JOIN masterschichten m ON m.id = e.masterschicht_id
+             WHERE e.objekt_id IS NOT NULL AND (m.id IS NULL OR m.objekt_id <> e.objekt_id)') === 0);
+pruef('KRITISCH: Anlaesse stehen als einzelne Einsaetze ohne Objekt in der Liste ("Nur Einsätze")',
+    (int)$n('SELECT COUNT(*) FROM einsaetze WHERE objekt_id IS NULL AND masterschicht_id IS NULL AND titel IS NOT NULL') > 50);
+pruef('... auch in den kommenden sechs Wochen',
+    (int)$n('SELECT COUNT(*) FROM einsaetze WHERE objekt_id IS NULL AND datum BETWEEN ? AND ?', [$HEUTE, $T(41)]) > 0);
+// Dieselbe Bedarfsregel wie "Schichten setzen": Ueber den ganzen Zeitraum
+// verlangt sie genau die Schichten, die da sind -- keine fehlt
+// (planung_vorschlag() fände sonst etwas anzulegen), keine ist zu viel.
+$ab = $monate[0] . '-01'; $bisPlan = (string)$n('SELECT MAX(datum) FROM einsaetze');
+$fehlt = 0; $soll = 0;
+foreach ($pdo->query('SELECT DISTINCT objekt_id FROM masterschichten')->fetchAll(PDO::FETCH_COLUMN) as $oid) {
+    $fehlt += count(planung_vorschlag((int)$oid, $ab, $bisPlan, $pdo)['neu']);
+    $soll += count(planung_bedarf((int)$oid, $ab, $bisPlan, $pdo)['bedarf']);
+}
+pruef('KRITISCH: "Schichten setzen" faende nichts mehr anzulegen', $fehlt === 0);
+pruef('KRITISCH: und es gibt keine Schicht, die die Masterschicht nicht verlangt',
+    $soll > 3000 && (int)$n('SELECT COUNT(*) FROM einsaetze WHERE masterschicht_id IS NOT NULL') === $soll);
+$feiertagWerktag = (string)$n("SELECT f.datum FROM feiertage f WHERE f.datum BETWEEN ? AND ?
+    AND CAST(strftime('%w', f.datum) AS INT) BETWEEN 1 AND 5 ORDER BY f.datum LIMIT 1", [$ab, $HEUTE]);
+pruef('Ein Feiertag an einem Werktag liegt in der Geschichte (sonst prueft das Folgende nichts)', $feiertagWerktag !== '');
+$amFeiertag = fn(string $muster) => (int)$n('SELECT COUNT(*) FROM einsaetze e JOIN objekte o ON o.id = e.objekt_id WHERE e.datum = ? AND o.name IN ('
+    . implode(',', array_map(fn($o) => $pdo->quote($o[1]), array_filter(td_objektliste(), fn($o) => $o[5] === $muster))) . ')', [$feiertagWerktag]);
+pruef('KRITISCH: an einem Feiertag haben werktags-Objekte frei', $amFeiertag('werktags') === 0);
+pruef('... die taeglichen laufen weiter', $amFeiertag('taeglich') > 0);
+$anlassNamen = array_map(fn($o) => $o[1], array_filter(td_objektliste(), fn($o) => !in_array($o[5], TD_RHYTHMUS, true)));
+pruef('KRITISCH: ohne Objekt stehen nur Anlaesse -- keine Objektschicht rutscht als freier Einsatz durch',
+    (int)$n('SELECT COUNT(*) FROM einsaetze WHERE objekt_id IS NULL AND titel NOT IN ('
+        . implode(',', array_map([$pdo, 'quote'], $anlassNamen)) . ')') === 0);
+$ohne = fn(string $bed, array $p) => (int)$n("SELECT COUNT(*) FROM einsaetze e WHERE $bed
+    AND NOT EXISTS (SELECT 1 FROM einsatz_zuteilung z WHERE z.einsatz_id = e.id)", $p);
+$zukunft = (int)$n('SELECT COUNT(*) FROM einsaetze WHERE datum > ?', [$HEUTE]);
+$anteil = $zukunft ? $ohne('e.datum > ?', [$HEUTE]) / $zukunft : 0;
+pruef('KRITISCH: ab morgen ist etwa jeder vierte Platz offen', $anteil > 0.15 && $anteil < 0.35);
+pruef('KRITISCH: bis heute ist jeder Platz besetzt (Abgleich und Lohn brauchen eine Person)', $ohne('e.datum <= ?', [$HEUTE]) === 0);
 
 // Stundenlast bleibt unter dem Zeitzuschlag (210 h), sonst waere jeder Lauf voller Zuschlaege.
 $maxMin = (int)$n("SELECT MAX(s) FROM (SELECT z.mitarbeiter_id, substr(e.datum,1,7) AS m, COUNT(*) * 540 AS s

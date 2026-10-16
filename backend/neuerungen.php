@@ -30,20 +30,36 @@ function neuerungen_katalog(): array
 {
     return [
         [
-            'nr'    => 33,
-            'datum' => '2026-10-15',
+            'nr'    => 37,
+            'datum' => '2026-10-16',
             'art'   => 'verbesserung',
             'fuer'  => ['app', 'betreiber'],
             'titel' => 'Darstellung folgt deinem Konto',
             'text'  => 'Hell oder dunkel gilt jetzt für dein Konto, auf jedem Gerät, an dem du dich anmeldest. In der App bleibt die Wahl eine eigene, getrennt vom Cockpit. Im Betreiberbereich stehen hell/dunkel und die durchscheinende Oberfläche neu im Kontomenü unter „Einstellungen“, nicht mehr in der Kopfleiste.',
         ],
         [
-            'nr'    => 32,
-            'datum' => '2026-10-15',
+            'nr'    => 36,
+            'datum' => '2026-10-16',
             'art'   => 'neu',
             'fuer'  => ['cockpit'],
             'titel' => 'Einstellungen im Kontomenü',
-            'text'  => 'Oben rechts im Kontomenü gibt es neu „Einstellungen“. Hell oder dunkel und die durchscheinende Oberfläche findest du jetzt dort, nicht mehr in der Kopfleiste. Deine Wahl gilt neu für dein Konto, also auf jedem Gerät, an dem du dich anmeldest. Beim ersten Öffnen wird übernommen, was du bisher eingestellt hattest. Farben, Benachrichtigungen und der E-Mail-Designer sind schon als Reiter da und folgen.',
+            'text'  => 'Oben rechts im Kontomenü gibt es neu „Einstellungen“. Hell oder dunkel, die durchscheinende Oberfläche und die kompakte Darstellung findest du jetzt dort, nicht mehr in der Kopfleiste. Deine Wahl gilt neu für dein Konto, also auf jedem Gerät, an dem du dich anmeldest. Beim ersten Öffnen wird übernommen, was du bisher eingestellt hattest. Farben, Benachrichtigungen und der E-Mail-Designer sind schon als Reiter da und folgen.',
+        ],
+        [
+            'nr'    => 35,
+            'datum' => '2026-10-16',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Planung: übersichtlicher Monatsplan',
+            'text'  => 'Die Übersicht der Planung beginnt weiter oben: Die Zeile mit „Feiertage“ ist weg, die Feiertage erreichst du jetzt über das Kalender-Icon links neben der Suche, in allen vier Planungsreitern. Die Objektspalte ist schmaler. Eine Woche oder ein einzelner Tag steht direkt neben den Objekten statt am rechten Rand. Wochenenden und Feiertage sind auch in besetzten Zeilen deutlich zu erkennen. Der Hinweis über dem Monatsplan erscheint nur noch, wenn ein Filter oder die Suche greift.',
+        ],
+        [
+            'nr'    => 34,
+            'datum' => '2026-10-16',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Kompakte Darstellung',
+            'text'  => 'Oben rechts gibt es einen neuen Schalter für eine kompakte Darstellung. Sie rückt Felder enger zusammen und blendet Erklärtexte aus; ein ⓘ an der Überschrift zeigt sie bei Bedarf wieder an. Das Formular „Neuer Einsatz“ ist darin so angeordnet, dass zusammengehörige Felder in einer Zeile stehen. Die Wahl merkt sich dein Browser. Am Handy gibt es den Schalter nicht.',
         ],
         [
             'nr'    => 31,
