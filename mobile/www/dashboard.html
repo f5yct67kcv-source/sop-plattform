@@ -5708,12 +5708,21 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
    sichtbar ist es nur kompakt -- normal stehen die Texte ohnehin da. */
 .abs-info { display: none; }
 @media (min-width: 901px) {
-  html[data-dichte="kompakt"] .content { padding: 16px 20px; }
-  html[data-dichte="kompakt"] .card-bd { padding: 14px 16px; }
-  html[data-dichte="kompakt"] .bar-tools { margin-bottom: 10px; }
-  html[data-dichte="kompakt"] .inp { padding: 5px 9px; font-size: 13px; }
-  html[data-dichte="kompakt"] .f { margin-bottom: 8px; }
-  html[data-dichte="kompakt"] .f label { margin-bottom: 4px; }
+  /* Die Grundwerte stehen hinter :where(...) und tragen darum nicht mehr
+     Gewicht als die Grundregel selbst (.inp, .card-bd ...). Vorher schlug
+     das Attribut am html jede genauere Regel: ".search .inp" verlor die
+     34 px Platz fuer die Lupe (Text lief unter das Icon), "select.inp" die
+     30 px fuer den Pfeil (Text lief unter den Pfeil), ".card-bd.flush" sein
+     padding:0 (Tabellen rueckten ein). Jetzt gilt kompakt als neuer
+     Grundwert, und was ein Baustein eigens festlegt, bleibt stehen.
+     Auch die senkrechten Werte bleiben kompakt, weil z.B. select.inp nur
+     padding-right setzt -- die Kaskade laeuft je Einzelwert. */
+  :where(html[data-dichte="kompakt"]) .content { padding: 16px 20px; }
+  :where(html[data-dichte="kompakt"]) .card-bd { padding: 14px 16px; }
+  :where(html[data-dichte="kompakt"]) .bar-tools { margin-bottom: 10px; }
+  :where(html[data-dichte="kompakt"]) .inp { padding: 5px 9px; font-size: 13px; }
+  :where(html[data-dichte="kompakt"]) .f { margin-bottom: 8px; }
+  :where(html[data-dichte="kompakt"]) .f label { margin-bottom: 4px; }
   html[data-dichte="kompakt"] .form-zeilen .f { margin-bottom: 5px; }
   html[data-dichte="kompakt"] .form-zeilen .f > label { margin: 0; }
   html[data-dichte="kompakt"] .abschnitt { margin: 14px 0 4px; padding-top: 16px; }
@@ -6293,9 +6302,9 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
         </button>
         <div class="nav-kinder nur-desktop">
           <button class="nav-kind on" id="nav-planung-uebersicht" onclick="go('planung'); goTab('uebersicht')">Übersicht</button>
+          <button class="nav-kind" id="nav-planung-tag" onclick="go('planung'); goTab('tag')">Tagesplan</button>
           <button class="nav-kind" id="nav-planung-einsaetze" onclick="go('planung'); goTab('einsaetze')">Einsätze</button>
           <button class="nav-kind" id="nav-planung-objektplan" onclick="go('planung'); goTab('objektplan')">Objektplanung</button>
-          <button class="nav-kind" id="nav-planung-tag" onclick="go('planung'); goTab('tag')">Tagesplan</button>
         </div>
       </div>
       <!-- Eigener Punkt statt eines Reiters unter Planung: der Abgleich ist ein

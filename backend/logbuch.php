@@ -64,7 +64,7 @@ const LOGBUCH_BEREICHE = ['mitarbeiter', 'fahrzeug', 'beleg'];
 // Eintrag mit bereich 'mandant' schreiben, weil dieser Name in seinem Satz
 // nicht vorkommt. Eine geschlossene Menge, die nur fuer den einen Satz gilt,
 // faengt genau den Fall, den eine gemeinsame Liste durchliesse.
-const LOGBUCH_BEREICHE_BE = ['konto', 'mandant', 'adresse', 'beleg', 'produkt', 'briefkopf'];
+const LOGBUCH_BEREICHE_BE = ['konto', 'mandant', 'adresse', 'beleg', 'produkt', 'briefkopf', 'ausgabe', 'ausgabevorlage', 'ausgabekategorie'];
 const LOGBUCH_TABELLENSAETZE = ['', 'be_'];
 
 function logbuch_tabelle(string $praefix): string

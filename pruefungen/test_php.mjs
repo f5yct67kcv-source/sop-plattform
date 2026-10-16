@@ -596,6 +596,7 @@ for (const [datei, titel] of [
   ['pruef_testdaten.php', 'KRITISCH: die Testdaten (ENT-714) laufen nur auf Staging, lassen Cockpit-Konten stehen, rechnen Lohn und Auslagen ueber die echten Rechenwege und bauen keinen Lauf ohne Regelwerk'],
   ['pruef_finanzen.php', 'KRITISCH: die Finanz-Kostenseite zaehlt nur freigegebene Laeufe, laesst fehlende Monate fehlen statt 0 und gibt Lohn- und Auslagenbetraege nur mit ihrem Recht heraus (ENT-712)'],
   ['pruef_lohn_position.php', 'KRITISCH: persoenliche Zulagen zaehlen im AHV-Lohn mit, und ein abgeschlossener Monat aendert sich nicht mehr (ENT-713)'],
+  ['pruef_betreiber_finanzen.php', 'KRITISCH: die Finanzen der Betreiberin buchen Vorlagen genau einmal, zaehlen einen fehlenden CHF-Betrag nie als 0 und rechnen den wiederkehrenden Umsatz exkl. MWST (ENT-725)'],
   ['pruef_finanzen.php', 'KRITISCH: die Finanz-Kostenseite zaehlt nur freigegebene Laeufe, laesst fehlende Monate fehlen statt 0 und gibt Lohn- und Auslagenbetraege nur mit ihrem Recht heraus (ENT-712)'],
   ['pruef_logbuch.php', 'KRITISCH: das Logbuch haelt fest, wer was geaendert hat'],
   ['pruef_einsatz_abgeschlossen.php', 'KRITISCH: "abgeschlossen" verlangt ALLE zugesagten Rapporte (ENT-128)'],
