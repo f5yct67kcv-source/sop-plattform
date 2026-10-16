@@ -312,7 +312,7 @@ check('CSV-Export ist auf der Objekt-Detailseite erreichbar', await page.isVisib
 
 // Ändern ab Stichtag
 await page.click('#msListe .ms-zeile:first-child button:has-text("Ändern ab")');
-await page.waitForSelector('#dlgMs.on');
+await page.waitForSelector('#view-msform.on');
 await page.waitForTimeout(200);
 check('Stichtag auf heute vorbelegt', (await page.inputValue('#msGueltigAb')) === HEUTE);
 check('Stichtag-Hinweis sichtbar', await page.isVisible('#msStichtagHint'));
@@ -332,12 +332,12 @@ check('Aenderung sendet Modus aenderung', mss && mss.body.modus === 'aenderung')
 check('Aenderung sendet den Stichtag', mss && mss.body.gueltig_ab === HEUTE);
 check('Aenderung sendet die id der alten Fassung', mss && mss.body.id === 10);
 check('Geaenderter Bedarf wird mitgesendet', mss && mss.body.bedarf_sa === 1);
-check('Dialog schliesst nach Speichern', !(await page.isVisible('#dlgMs.on')));
+check('Nach dem Speichern zurück auf den Masterschichten', !(await page.isVisible('#view-msform.on')) && await page.isVisible('#ob-masterschichten.on'));
 
 // Korrektur sperrt alles ausser der Beschriftung
 await page.waitForTimeout(300);
 await page.click('#msListe .ms-zeile:first-child button:has-text("Beschriftung")');
-await page.waitForSelector('#dlgMs.on');
+await page.waitForSelector('#view-msform.on');
 await page.waitForTimeout(200);
 check('Korrektur sperrt die Zeiten', await page.isDisabled('#msVon'));
 check('Korrektur sperrt den Bedarf', await page.isDisabled('#msBedarf_mo'));
@@ -355,7 +355,7 @@ check('Korrektur sendet keine Zeiten', kor && !('von' in kor.body));
 // Neue Masterschicht: Rhythmus umschalten und Arbeitszeit rechnen
 await page.waitForTimeout(300);
 await page.click('#msListe ~ div button:has-text("Masterschicht hinzufügen")');
-await page.waitForSelector('#dlgMs.on');
+await page.waitForSelector('#view-msform.on');
 await page.waitForTimeout(200);
 check('Neu zeigt das Wochenmuster', await page.isVisible('#msWoche') && !(await page.isVisible('#msIntervall')));
 await page.selectOption('#msRhythmus', 'intervall');

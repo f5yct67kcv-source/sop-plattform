@@ -2917,6 +2917,19 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .ms-tage span { font-size: 10px; font-weight: 700; width: 26px; height: 22px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; background: var(--line-soft); color: var(--ink-3); }
 .ms-tage span.hat { background: var(--accent-soft); color: var(--accent); }
 .ms-tage span.fei { background: var(--warn-soft); color: var(--warn); }
+/* Bedarf je Tag auf der Masterschicht-Seite: acht kleine Zahlenfelder. Im
+   Raster vier je Zeile wie im frueheren Dialog, kompakt alle in einer Zeile
+   (siehe Zeilenfluss). */
+.ms-bedarf { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ms-bedarf > .f { margin: 0; }
+/* Auf der Seite (Beschriftung links) acht Paare in einer Zeile, soweit Platz
+   ist; die Tagesbeschriftung braucht keine 168-px-Spalte. */
+.form-zeilen .ms-bedarf { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); column-gap: 24px; }
+.form-zeilen .ms-bedarf > .f { grid-template-columns: 64px minmax(0, 1fr); gap: 8px; }
+.form-zeilen .f.wide:has(> .ms-bedarf) { align-items: start; }
+.form-zeilen .f.wide:has(> .ms-bedarf) > label { padding-top: 9px; }
+/* Ein Haekchen ohne eigene Beschriftung steht in der Feldspalte. */
+.form-zeilen .f.zf-feldspalte > label.check { grid-column: 2; }
 
 /* Kontrollpunkte in der Objekt-Schublade (ENT-180/ENT-183) */
 .kp-zeile { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 11px 13px; margin-bottom: 8px; }
@@ -5679,9 +5692,19 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
        1001 px ab der Feldspalte); die Zone beginnt an der Feldspalte. */
     html[data-dichte="kompakt"] #obBemerkung { width: 1001px; }
     html[data-dichte="kompakt"] #obZoneHint { margin-left: 182px; max-width: 1001px; }
+    /* Masterschicht: Mo bis Feiertag als Paare in einer Zeile, Abstand und
+       Kante wie alle anderen Paare. Die Gruppenbeschriftung steht in der
+       Beschriftungsspalte. */
+    html[data-dichte="kompakt"] .zeilenfluss .ms-bedarf { display: flex; align-items: center; column-gap: 44px; }
+    html[data-dichte="kompakt"] .zeilenfluss .ms-bedarf > .f { display: flex; align-items: center; gap: 14px; margin: 0; }
+    html[data-dichte="kompakt"] .zeilenfluss .ms-bedarf > .f > label { margin: 0; white-space: nowrap; }
+    /* Ein Haekchen ohne eigene Beschriftung beginnt in der Feldspalte
+       (168 + 14 px), buendig mit den Feldern darueber. */
+    html[data-dichte="kompakt"] .zeilenfluss > .f.zf-feldspalte { flex: none; margin-left: 182px; }
+    html[data-dichte="kompakt"] .zeilenfluss > .f.zf-feldspalte > label { width: auto; min-width: 0; white-space: nowrap; }
     /* Ein Haekchen in der Zeile steht auf Feldhoehe, Kaestchen und Text auf
        einer Linie. */
-    html[data-dichte="kompakt"] .zeilenfluss > .f > label.check { height: 32px; margin: 0; }
+    html[data-dichte="kompakt"] .zeilenfluss > .f > label.check { height: 32px; margin: 0; display: flex; align-items: center; }
     /* Beschriftung mit fester Mindestbreite (style="--zf-l:..."): "PLZ *" und
        "PLZ" stehen in zwei Abschnitten untereinander und sollen ihre Felder
        auf dieselbe Kante setzen. */
@@ -7608,6 +7631,90 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
   <h3>Weitere Angaben</h3>
   <div class="form-grid form-breit form-zeilen zeilenfluss">
     <div class="f wide zf-neu zf-text"><label for="obBemerkung">Bemerkung</label><textarea class="inp" id="obBemerkung" rows="2" style="min-height:56px"></textarea></div>
+  </div>
+</div>
+        </div></div>
+      </section>
+
+      <!-- ══════════════════ MASTERSCHICHT ANLEGEN / AENDERN (16.10.2026) ══════
+           Vorher ein Dialog ueber der Objektseite. Wie "Neues Objekt" eine
+           eigene Seite im Zeilenfluss (Variante 2). Feldkennungen
+           unveraendert -- openMs(), msRechne(), msStichtagPruefen() und
+           saveMs() arbeiten damit weiter. Zurueck fuehrt auf den Reiter
+           "Masterschichten" des Objekts, von dem man kam. -->
+      <section class="view" id="view-msform">
+        <div class="bar-tools">
+          <button class="btn btn-plain btn-sm" id="msZurueck" onclick="msFormSchliessen()">Zurück zum Objekt</button>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-primary btn-sm" id="msBtn" onclick="saveMs()">Speichern</button>
+        </div>
+        <div class="card"><div class="card-bd">
+          <div class="ki-hint web" id="msStichtagHint" style="display:none">
+            <svg class="i i-sm" viewBox="0 0 24 24" style="margin-top:1px;flex:none"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+            <span id="msStichtagText"></span>
+          </div>
+          <div class="msg-err" id="msErr" style="display:none"></div>
+          <p class="note" id="msText">Eine Vorlage, aus der die einzelnen Schichten entstehen.</p>
+          <h2 id="msTitel" style="display:none">Neue Masterschicht</h2>
+
+<div class="abschnitt">
+  <h3>Vorlage</h3>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f zf-neu"><label for="msName">Bezeichnung *</label><input class="inp" id="msName" placeholder="z. B. Schliessrunde" style="--zf-b:345px"></div>
+    <div class="f"><label for="msKuerzel">Kürzel</label><input class="inp" id="msKuerzel" maxlength="10" placeholder="SR" style="--zf-b:80px"></div>
+    <div class="f"><label for="msArt">Art</label><select class="inp" id="msArt" style="--zf-b:140px"><option value="arbeit">Arbeit</option><option value="fahrtzeit">Fahrtzeit</option></select></div>
+    <div class="f" data-sparte-feld><label for="msSparte">Sparte</label><select class="inp" id="msSparte" style="--zf-b:171px"><option value="sicherheit">Sicherheit</option><option value="reinigung" data-sparte="reinigung">Reinigung</option></select></div>
+  </div>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f zf-neu"><label for="msVon">Von *</label><input class="inp" id="msVon" type="time" onchange="msRechne()" style="--zf-b:104px"></div>
+    <div class="f"><label for="msBis">Bis *</label><input class="inp" id="msBis" type="time" onchange="msRechne()" style="--zf-b:104px"></div>
+    <div class="f"><label for="msPauseMin">Pause (Minuten)</label><input class="inp" id="msPauseMin" type="number" min="0" max="1440" value="0" oninput="msRechne()" style="--zf-b:64px"></div>
+    <div class="f"><label for="msArbeitszeit">Effektive Arbeitszeit (h)</label><input class="inp" id="msArbeitszeit" type="number" step="0.01" min="0" style="--zf-b:80px"></div>
+  </div>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f wide zf-feldspalte"><label class="check"><input type="checkbox" id="msAufAbruf"> Nur auf Abruf (z. B. wetterabhängig) — erzeugte Schichten sind provisorisch</label></div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Bedarf</h3>
+  <p class="note" id="msWocheNote">An einem Feiertag gilt der Feiertagswert <b>statt</b> des Wochentagswerts. Das ist eine Bedarfsangabe — keine Aussage über Zuschläge.</p>
+  <p class="note" id="msIntervallNote" style="display:none">Gerechnet wird strikt jeder n-te Tag ab dem ersten Tag — ohne Rücksicht auf Wochentage und Feiertage.</p>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f wide zf-neu"><label for="msRhythmus">Rhythmus</label>
+      <select class="inp" id="msRhythmus" onchange="msRhythmusUm()" style="--zf-b:345px">
+        <option value="woche">Wochenmuster — Anzahl je Wochentag</option>
+        <option value="intervall">Intervall — jeden n-ten Tag</option>
+      </select>
+    </div>
+  </div>
+  <div class="form-grid form-breit form-zeilen zeilenfluss" id="msWoche">
+    <div class="f wide zf-neu"><label>Benötigte Mitarbeitende je Tag</label>
+      <div class="ms-bedarf">
+        <div class="f"><label for="msBedarf_mo">Mo</label><input class="inp" id="msBedarf_mo" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+        <div class="f"><label for="msBedarf_di">Di</label><input class="inp" id="msBedarf_di" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+        <div class="f"><label for="msBedarf_mi">Mi</label><input class="inp" id="msBedarf_mi" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+        <div class="f"><label for="msBedarf_do">Do</label><input class="inp" id="msBedarf_do" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+        <div class="f"><label for="msBedarf_fr">Fr</label><input class="inp" id="msBedarf_fr" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+        <div class="f"><label for="msBedarf_sa">Sa</label><input class="inp" id="msBedarf_sa" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+        <div class="f"><label for="msBedarf_so">So</label><input class="inp" id="msBedarf_so" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+        <div class="f"><label for="msBedarf_feiertag" style="color:var(--warn)">Feiertag</label><input class="inp" id="msBedarf_feiertag" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+      </div>
+    </div>
+  </div>
+  <div class="form-grid form-breit form-zeilen zeilenfluss" id="msIntervall" style="display:none">
+    <div class="f zf-neu"><label for="msIntervallTage">Alle wie viele Tage?</label><input class="inp" id="msIntervallTage" type="number" min="1" max="365" value="2" style="--zf-b:64px"></div>
+    <div class="f"><label for="msIntervallStart">Erster Tag</label><input class="inp" id="msIntervallStart" type="date" style="--zf-b:117px"></div>
+    <div class="f"><label for="msBedarf_intervall">Benötigte Mitarbeitende</label><input class="inp" id="msBedarf_intervall" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Gültigkeit</h3>
+  <p class="note">Für saisonale Muster hier den Zeitraum eingrenzen, z. B. April bis Oktober.</p>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f zf-neu"><label for="msGueltigAb" id="msGueltigAbLbl">Gültig ab *</label><input class="inp" id="msGueltigAb" type="date" onchange="msStichtagPruefen()" style="--zf-b:117px"></div>
+    <div class="f"><label for="msGueltigBis">Gültig bis (leer = offen)</label><input class="inp" id="msGueltigBis" type="date" style="--zf-b:117px"></div>
   </div>
 </div>
         </div></div>
@@ -10233,74 +10340,6 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
   </div>
 </div>
 
-<!-- Masterschicht anlegen oder ändern -->
-<div class="dlg-scrim" id="dlgMs">
-  <div class="dlg wide">
-    <div class="dlg-hd">
-      <h2 id="msTitel">Neue Masterschicht</h2>
-      <p id="msText">Eine Vorlage, aus der die einzelnen Schichten entstehen.</p>
-    </div>
-    <div class="dlg-bd">
-      <div class="ki-hint web" id="msStichtagHint" style="display:none">
-        <svg class="i i-sm" viewBox="0 0 24 24" style="margin-top:1px;flex:none"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
-        <span id="msStichtagText"></span>
-      </div>
-      <div class="msg-err" id="msErr" style="display:none"></div>
-      <div class="form-grid">
-        <div class="f wide"><label for="msName">Bezeichnung *</label><input class="inp" id="msName" placeholder="z. B. Schliessrunde"></div>
-        <div class="f"><label for="msKuerzel">Kürzel</label><input class="inp" id="msKuerzel" maxlength="10" placeholder="SR"></div>
-        <div class="f"><label for="msArt">Art</label><select class="inp" id="msArt"><option value="arbeit">Arbeit</option><option value="fahrtzeit">Fahrtzeit</option></select></div>
-        <div class="f" data-sparte-feld><label for="msSparte">Sparte</label><select class="inp" id="msSparte"><option value="sicherheit">Sicherheit</option><option value="reinigung" data-sparte="reinigung">Reinigung</option></select></div>
-        <div class="f"><label for="msVon">Von *</label><input class="inp" id="msVon" type="time" onchange="msRechne()"></div>
-        <div class="f"><label for="msBis">Bis *</label><input class="inp" id="msBis" type="time" onchange="msRechne()"></div>
-        <div class="f"><label for="msPauseMin">Pause (Minuten)</label><input class="inp" id="msPauseMin" type="number" min="0" max="1440" value="0" oninput="msRechne()"></div>
-        <div class="f"><label for="msArbeitszeit">Effektive Arbeitszeit (h)</label><input class="inp" id="msArbeitszeit" type="number" step="0.01" min="0"></div>
-        <div class="f wide"><label class="check"><input type="checkbox" id="msAufAbruf"> Nur auf Abruf (z. B. wetterabhängig) — erzeugte Schichten sind provisorisch</label></div>
-        <div class="f wide"><label for="msRhythmus">Rhythmus</label>
-          <select class="inp" id="msRhythmus" onchange="msRhythmusUm()">
-            <option value="woche">Wochenmuster — Anzahl je Wochentag</option>
-            <option value="intervall">Intervall — jeden n-ten Tag</option>
-          </select>
-        </div>
-      </div>
-
-      <div id="msWoche">
-        <label style="display:block;font-size:11px;font-weight:650;color:var(--ink-2);letter-spacing:.4px;text-transform:uppercase;margin-bottom:6px">Benötigte Mitarbeitende je Tag</label>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
-          <div class="f" style="margin:0"><label for="msBedarf_mo">Mo</label><input class="inp" id="msBedarf_mo" type="number" min="0" max="99" value="1"></div>
-          <div class="f" style="margin:0"><label for="msBedarf_di">Di</label><input class="inp" id="msBedarf_di" type="number" min="0" max="99" value="1"></div>
-          <div class="f" style="margin:0"><label for="msBedarf_mi">Mi</label><input class="inp" id="msBedarf_mi" type="number" min="0" max="99" value="1"></div>
-          <div class="f" style="margin:0"><label for="msBedarf_do">Do</label><input class="inp" id="msBedarf_do" type="number" min="0" max="99" value="1"></div>
-          <div class="f" style="margin:0"><label for="msBedarf_fr">Fr</label><input class="inp" id="msBedarf_fr" type="number" min="0" max="99" value="1"></div>
-          <div class="f" style="margin:0"><label for="msBedarf_sa">Sa</label><input class="inp" id="msBedarf_sa" type="number" min="0" max="99" value="1"></div>
-          <div class="f" style="margin:0"><label for="msBedarf_so">So</label><input class="inp" id="msBedarf_so" type="number" min="0" max="99" value="1"></div>
-          <div class="f" style="margin:0"><label for="msBedarf_feiertag" style="color:var(--warn)">Feiertag</label><input class="inp" id="msBedarf_feiertag" type="number" min="0" max="99" value="1"></div>
-        </div>
-        <p class="zone-note" style="margin-top:8px">An einem Feiertag gilt der Feiertagswert <b>statt</b> des Wochentagswerts. Das ist eine Bedarfsangabe — keine Aussage über Zuschläge.</p>
-      </div>
-
-      <div id="msIntervall" style="display:none">
-        <div class="form-grid">
-          <div class="f"><label for="msIntervallTage">Alle wie viele Tage?</label><input class="inp" id="msIntervallTage" type="number" min="1" max="365" value="2"></div>
-          <div class="f"><label for="msIntervallStart">Erster Tag</label><input class="inp" id="msIntervallStart" type="date"></div>
-          <div class="f wide"><label for="msBedarf_intervall">Benötigte Mitarbeitende</label><input class="inp" id="msBedarf_intervall" type="number" min="0" max="99" value="1"></div>
-        </div>
-        <p class="zone-note">Gerechnet wird strikt jeder n-te Tag ab dem ersten Tag — ohne Rücksicht auf Wochentage und Feiertage.</p>
-      </div>
-
-      <div class="form-grid" style="margin-top:16px">
-        <div class="f"><label for="msGueltigAb" id="msGueltigAbLbl">Gültig ab *</label><input class="inp" id="msGueltigAb" type="date" onchange="msStichtagPruefen()"></div>
-        <div class="f"><label for="msGueltigBis">Gültig bis (leer = offen)</label><input class="inp" id="msGueltigBis" type="date"></div>
-      </div>
-      <p class="zone-note" style="margin-top:-6px">Für saisonale Muster hier den Zeitraum eingrenzen, z. B. April bis Oktober.</p>
-    </div>
-    <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgMs')">Abbrechen</button>
-      <button class="btn btn-primary" id="msBtn" onclick="saveMs()">Speichern</button>
-    </div>
-  </div>
-</div>
-
 <!-- Kontrollpunkt anlegen/ändern (ENT-180/ENT-183) -->
 <div class="dlg-scrim" id="dlgKp">
   <div class="dlg">
@@ -12306,6 +12345,7 @@ const TITLES = {
   einsatzneu:  ['Neuer Einsatz', 'Kunde, Ort, Zeit und Zuteilung'],
   kundeform:   ['Neuer Kunde', 'Stammdaten, Adresse und Kontakt'],
   objektform:  ['Neues Objekt', 'Einsatzort eines Dauerauftrags'],
+  msform:      ['Neue Masterschicht', 'Vorlage, aus der die Schichten entstehen'],
   einsatzplan: ['Einsatz planen', 'Positionen und Zeiten im Detail'],
   objekt:      ['Objekt', 'Stammdaten, Masterschichten und Kontrollpunkte'],
   mitteilungen: ['Mitteilungen', 'Was die Belegschaft in der App zu sehen bekommt'],
@@ -13435,7 +13475,7 @@ function dichteInfoBauen() {
 // die Bearbeitungsmaske dort ist ein Formular und bleibt auf Lesebreite.
 // 'arbeitsergebnisse' bleibt ebenfalls draussen: Es zeichnet seit ENT-243
 // Karten statt Tabellen, und eine 1900 px breite Karte gewinnt nichts.
-const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'revierdienst', 'einsatzplan', 'einsatzneu', 'kundeform', 'objektform', 'offerte', 'objekt',
+const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'revierdienst', 'einsatzplan', 'einsatzneu', 'kundeform', 'objektform', 'msform', 'offerte', 'objekt',
                         'kunden', 'mitarbeiter', 'produkte', 'abwesenheiten',
                         'finanzen', 'rechnungen', 'lohnauslagen'];
 const PLANUNG_WEIT   = ['uebersicht', 'einsaetze', 'objektplan', 'tag'];
@@ -29958,14 +29998,38 @@ function openMs(modus, id) {
 
   msRhythmusUm();
   $('msErr').style.display = 'none';
-  openDlg('dlgMs');
+  $('msBtn').textContent = modus === 'neu' ? 'Masterschicht anlegen' : 'Speichern';
+  msFormZeigen();
   $('msName').focus();
+}
+
+// Seite statt Dialog (16.10.2026), dieselbe Bauart wie obFormZeigen().
+// Zurueck fuehrt immer auf das Objekt, zu dem die Vorlage gehoert. Der
+// Reiter "Masterschichten", von dem aus sie geoeffnet wurde, bleibt dort
+// stehen -- go() setzt ihn nicht zurueck, erst openObjekt() taete das.
+function msFormZeigen() {
+  go('msform');
+  $('pgTitle').textContent = $('msTitel').textContent;
+  const o = objekte.find(x => Number(x.id) === Number(obTarget));
+  if (o) { $('pgCrumb').textContent = o.name; }
+  window.scrollTo(0, 0);
+}
+function msFormSchliessen() {
+  if (!$('view-msform').classList.contains('on')) { return; }
+  go('objekt');
+  const o = objekte.find(x => Number(x.id) === Number(obTarget));
+  if (o) {
+    $('pgCrumb').textContent = o.kunde_name;
+    history.replaceState(null, '', '#objekt/' + obTarget);
+  }
 }
 
 function msRhythmusUm() {
   const ist = $('msRhythmus').value;
   $('msWoche').style.display = ist === 'woche' ? '' : 'none';
   $('msIntervall').style.display = ist === 'intervall' ? '' : 'none';
+  $('msWocheNote').style.display = ist === 'woche' ? '' : 'none';
+  $('msIntervallNote').style.display = ist === 'intervall' ? '' : 'none';
 }
 
 // Vorschlag für die effektive Arbeitszeit. Übersteuerbar — es ist ein
@@ -30025,7 +30089,7 @@ function saveMs() {
   api('masterschicht_save.php', { method: 'POST', body }).then(({ ok, data }) => {
     b.disabled = false;
     if (!ok || data.status !== 'ok') { err.textContent = data.message || 'Speichern fehlgeschlagen.'; err.style.display = ''; return; }
-    closeDlg('dlgMs');
+    msFormSchliessen();
     Promise.all([loadMasterschichten(), loadObjekte()]).then(() => {
       toast(data.art === 'neue Fassung'
         ? `Neue Fassung gespeichert — die bisherige gilt bis ${dmy(data.alt_bis)}.`
