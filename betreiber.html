@@ -41,6 +41,15 @@
     if (m) { m.setAttribute('content', '#0B0D11'); }
   }
 })();
+/* Kompakte Darstellung (16.10.2026): derselbe Schluessel wie im Cockpit,
+   ohne eigenen Schalter. Offerten und Rechnungen sollen hier eins zu eins
+   aussehen wie dort (ENT-607/608) -- das tun sie nur, wenn beide Seiten
+   dieselbe Dichte zeigen. Ohne Wahl: kompakt, wie im Cockpit. */
+(function () {
+  var d = 'kompakt';
+  try { d = localStorage.getItem('rv3_dichte_wahl') === 'normal' ? 'normal' : 'kompakt'; } catch (e) { /* egal */ }
+  document.documentElement.setAttribute('data-dichte', d);
+})();
 /* Liquid Glass (ENT-418, Voreinstellung nach ENT-419). Aus demselben Grund
    vor dem ersten Zeichnen: Sonst steht die deckende Fassung einen
    Wimpernschlag lang da und springt dann um. Eigener Block mit eigenem try,
@@ -1432,6 +1441,16 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 @media print {
   body > *:not(#druckflaeche) { display: none !important; }
   #druckflaeche { display: block !important; }
+}
+/* Kompakte Darstellung -- dieselben Masse wie in dashboard.html, soweit
+   diese Seite die Bausteine fuehrt. test_offerten_gleich.mjs misst beide
+   gegeneinander. */
+@media (min-width: 901px) {
+  html[data-dichte="kompakt"] :where(.inp) { padding: 5px 9px; font-size: 13px; }
+  html[data-dichte="kompakt"] select:where(.inp) { padding-right: 30px; }
+  html[data-dichte="kompakt"] .card-bd:not(.flush) { padding: 14px 16px; }
+  html[data-dichte="kompakt"] .f { margin-bottom: 8px; }
+  html[data-dichte="kompakt"] .f label { margin-bottom: 4px; }
 }
 </style>
 <!-- Das Zeichenfeld fuer die eigene Unterschrift (ENT-704), dieselbe Datei
