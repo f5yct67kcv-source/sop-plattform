@@ -30,7 +30,7 @@ function neuerungen_katalog(): array
 {
     return [
         [
-            'nr'    => 38,
+            'nr'    => 39,
             'datum' => '2026-10-16',
             'art'   => 'fehlerbehebung',
             'fuer'  => ['cockpit'],
