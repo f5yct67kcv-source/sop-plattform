@@ -80,6 +80,10 @@
   --shell:#16181D; --shell-hi:#1E2128; --shell-line:#272B33;
   --shell-txt:#9298A5; --shell-txt-hi:#F3F5F8;
   --nix:#D8DCE2;
+  /* Finanzen (ENT-725): bezahlt, Kategorien 1-4, Weitere, Ladeschimmer */
+  --fin-bezahlt:#1B2B52;
+  --fin-k1:#eb6834; --fin-k2:#1baf7a; --fin-k3:#eda100; --fin-k4:#e87ba4; --fin-kw:#A6ADB9;
+  --sk-hi:#E4E7EC;
   /* Dieselben zwei Flaechen noch einmal in Kanaelen. Das Glas (ENT-418)
      mischt seine Durchsicht daraus -- rgba(var(--surface-rgb), a) --, und
      zwar ausdruecklich NICHT ueber color-mix(): Das rechnet in Chrome zu
@@ -116,6 +120,9 @@ html[data-thema="dunkel"] {
   --shell:#0B0D11; --shell-hi:#14171C; --shell-line:#23272F;
   --shell-txt:#8A919E; --shell-txt-hi:#F2F4F8;
   --nix:#3B4560;
+  --fin-bezahlt:#E4EAF8;
+  --fin-k1:#d95926; --fin-k2:#199e70; --fin-k3:#c98500; --fin-k4:#d55181; --fin-kw:#5A6378;
+  --sk-hi:#2E3750;
   --surface-rgb:22,27,39; --shell-rgb:11,13,17;
   --surface-3:#242C3E;
   --sh-1:none;
@@ -347,6 +354,10 @@ body {
 .zahl .wert { font-size: 25px; font-weight: 640; letter-spacing: -.02em; margin-top: 5px; }
 .zahl .wert.leer { color: var(--nix); }
 .zahl .bezug { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+/* Fuehrt zu Finanzen (ENT-725). Nur der Zeiger und die Beschriftung
+   verraten es -- die Kennzahl selbst sieht aus wie ihre Nachbarn. */
+.zahl.springt { cursor: pointer; }
+.zahl.springt:hover .lab, .zahl.springt:focus-visible .lab { color: var(--accent); }
 
 /* ── Tabellen ─────────────────────────────────────────────────────── */
 .tab-huelle { overflow-x: auto; }
@@ -981,6 +992,134 @@ tbody tr.aus td { opacity: .55; }
   min-height: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-3); cursor: pointer; }
 .seg2 button + button { border-left: 1px solid var(--line); }
 .seg2 button.on { background: var(--accent); color: #fff; }
+/* ── Finanzen (ENT-725) ─────────────────────────────────────────────
+   Aufbau und Bausteine wie Finanzen -> Uebersicht im Cockpit (ENT-712):
+   Kennzahlenreihe, Hauptgrafik ueber die volle Breite, darunter zwei
+   Spalten. Die Regeln sind von dort uebernommen, nicht nachempfunden --
+   gleiche Klassen, gleiche Masse. Dazu kommen die Ausgaben als gestapelte
+   Balken je Kategorie.
+
+   KATEGORIEFARBEN: die Plaetze 2 bis 5 der geprueften Kategorienfolge
+   (Orange, Aqua, Gelb, Magenta) -- Platz 1 (Blau) traegt hier schon die
+   Einnahmen. Hell und dunkel je eigene Stufe, beide mit dem Farbpruefer
+   gemessen (benachbarte Paare auch bei Farbsehschwaeche unterscheidbar).
+   Eine fuenfte und jede weitere Kategorie faellt in "Weitere" (grau) --
+   es wird nie eine Farbe erfunden. Die Farbe haengt an der Kategorie,
+   nicht am Rang. Weil drei der hellen Stufen unter 3:1 liegen, stehen
+   Name und Betrag immer daneben (Legende, Tipp, "Ausgaben nach Kategorie").
+   Die Farbwerte stehen bei den uebrigen Farben oben (--fin-*). */
+.grid { display: grid; gap: 16px; margin-bottom: 16px; }
+.grid > * { min-width: 0; }
+/* Fuenf Kennzahlen statt vier: Wo das Cockpit den Lohn zeigt, stehen hier
+   Ausgaben UND wiederkehrender Umsatz (ENT-725, Punkt 3). Der Bereich gibt
+   es nur am Desktop (ENT-701). */
+.g-kpi { grid-template-columns: repeat(5, 1fr); }
+.g-1-1 { grid-template-columns: 1fr 1fr; align-items: start; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px; box-shadow: var(--sh-1); }
+.kpi-top { display: flex; align-items: center; gap: 8px; color: var(--ink-3); margin-bottom: 11px; }
+.kpi-top span { font-size: 11px; font-weight: 650; letter-spacing: .6px; text-transform: uppercase; }
+.kpi-top .i { width: 15px; height: 15px; }
+.kpi-val { font-size: 28px; font-weight: 700; letter-spacing: -.9px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.kpi-val .waehrung { font-size: 15px; font-weight: 600; color: var(--ink-3); letter-spacing: 0; margin-right: 3px; }
+.kpi-foot { margin-top: 9px; display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--ink-3); }
+.kpi-foot .delta { white-space: nowrap; flex: none; }
+.delta { display: inline-flex; align-items: center; gap: 3px; font-weight: 650; border-radius: 20px; padding: 1.5px 7px; font-size: 11px; }
+.delta.up   { color: var(--pos); background: var(--pos-soft); }
+.delta.down { color: var(--neg); background: var(--neg-soft); }
+.delta.flat { color: var(--ink-3); background: var(--line-soft); }
+.sk { background: linear-gradient(90deg, var(--line-soft) 25%, var(--sk-hi) 50%, var(--line-soft) 75%); background-size: 200% 100%; animation: sh 1.3s infinite; border-radius: var(--r-xs); }
+@keyframes sh { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.bars { display: flex; align-items: flex-end; gap: 8px; height: 152px; padding-top: 6px; }
+.bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 7px; min-width: 0; height: 100%; }
+.bar-val { font-size: 10px; font-weight: 650; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.bar-fill { width: 100%; max-width: 46px; flex: 0 0 auto; background: var(--accent-soft); border: 1px solid var(--accent-line); border-bottom: none; border-radius: var(--r-xs) var(--r-xs) 0 0; min-height: 4px; opacity: 0.85; }
+.bar-fill.leer { height: 4px; flex-basis: 4px !important; background: var(--nix); border-color: var(--nix); opacity: 1; }
+.bar-fill.warn { background: var(--warn-soft); border-color: var(--warn); opacity: 1; }
+.bar-fill.neg  { background: var(--neg-soft);  border-color: var(--neg);  opacity: 1; }
+.bar-fill.unbekannt { background: var(--nix); border-color: var(--nix); opacity: 1; }
+.bar-lbl { font-size: 10.5px; color: var(--ink-3); white-space: nowrap; letter-spacing: .2px; }
+.bars-axis { border-top: 1px solid var(--line); margin-top: -25px; }
+.fin-titel { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.fin-titel h2 { margin: 0; }
+.fin-unter { font-size: 11.5px; color: var(--ink-3); line-height: 1.3; }
+.fin-chart { position: relative; height: 290px; }
+.fin-chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.fin-gitter { stroke: var(--line-soft); stroke-width: 1; }
+.fin-gitter.null { stroke: var(--line); }
+.fin-achse { fill: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+.fin-monat.jetzt { fill: var(--ink); font-weight: 650; }
+.fin-jahr { font-size: 10px; }
+.fin-laufend { fill: var(--accent-soft); opacity: .7; }
+.fin-laufend-lbl { fill: var(--accent); font-size: 10.5px; font-weight: 650; letter-spacing: .3px; }
+.fin-l-verrechnet, .fin-l-bezahlt { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.fin-l-verrechnet { stroke: var(--accent); stroke-width: 2.5; }
+.fin-l-bezahlt { stroke: var(--fin-bezahlt); stroke-width: 2; }
+.fin-l-verrechnet.gestrichelt, .fin-l-bezahlt.gestrichelt { stroke-dasharray: 4 5; }
+.fin-l-verrechnet-pkt { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.fin-l-bezahlt-pkt { fill: var(--fin-bezahlt); stroke: var(--surface); stroke-width: 2; }
+.fin-chart circle.laufend { fill: var(--surface); stroke-width: 2; }
+.fin-l-verrechnet-pkt.laufend { stroke: var(--accent); }
+.fin-l-bezahlt-pkt.laufend { stroke: var(--fin-bezahlt); }
+.fin-chart circle.hervor { r: 5.5; }
+/* Die Ausgabenbalken liegen HINTER den Kurven, schmal und mit 2 px
+   Abstand zwischen den Segmenten (Oberflaechenfarbe als Fuge). */
+.fin-seg { stroke: var(--surface); stroke-width: 2; }
+.fin-seg.k1 { fill: var(--fin-k1); } .fin-seg.k2 { fill: var(--fin-k2); }
+.fin-seg.k3 { fill: var(--fin-k3); } .fin-seg.k4 { fill: var(--fin-k4); }
+.fin-seg.kw { fill: var(--fin-kw); }
+.fin-geschaetzt { fill: url(#finSchraffur); stroke: none; pointer-events: none; }
+.fin-schraffur-linie { stroke: var(--surface); stroke-width: 2; opacity: .75; }
+.fin-hilfslinie { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 3 4; }
+.fin-treffer { fill: transparent; cursor: crosshair; outline: none; }
+.fin-treffer:focus-visible { fill: var(--accent-soft); fill-opacity: .5; }
+.fin-tip { position: absolute; z-index: 3; pointer-events: none; min-width: 240px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: var(--sh-2); padding: 11px 13px; font-size: 12px; }
+.fin-tip[hidden] { display: none; }
+.fin-tip-kopf { font-weight: 700; font-size: 13px; margin-bottom: 7px; display: flex; align-items: center; gap: 7px; }
+.fin-tip-z { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; padding: 2px 0; }
+.fin-tip-z b { font-variant-numeric: tabular-nums; font-weight: 650; text-align: right; }
+.fin-tip-z.fein { color: var(--ink-3); }
+.fin-tip-z.fein b { font-weight: 550; }
+.fin-tip-z.ohne b { color: var(--ink-3); font-weight: 550; font-style: italic; }
+.fin-tip-trenner { border-top: 1px solid var(--line-soft); margin: 7px 0 5px; }
+.fin-tip-hinweis { color: var(--ink-3); font-size: 11px; margin-top: 3px; }
+.fin-sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; box-sizing: border-box; }
+.fin-sw.verrechnet { background: var(--accent); }
+.fin-sw.bezahlt { background: var(--fin-bezahlt); }
+.fin-sw.k1, .fin-sw.k2, .fin-sw.k3, .fin-sw.k4, .fin-sw.kw { border-radius: 3px; }
+.fin-sw.k1 { background: var(--fin-k1); } .fin-sw.k2 { background: var(--fin-k2); }
+.fin-sw.k3 { background: var(--fin-k3); } .fin-sw.k4 { background: var(--fin-k4); }
+.fin-sw.kw { background: var(--fin-kw); }
+.fin-sw.geschaetzt { border-radius: 3px; background: repeating-linear-gradient(135deg, var(--ink-3) 0 2px, transparent 2px 4px); }
+.fin-legende { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; font-size: 12px; color: var(--ink-2); }
+.fin-leg { display: inline-flex; align-items: center; gap: 7px; padding: 4px 0; }
+.fin-leg-ohne { color: var(--ink-3); font-style: italic; }
+.fin-leg-trenner { width: 1px; align-self: stretch; background: var(--line); margin: 2px 2px; }
+.fin-ohne { color: var(--ink-3); font-weight: 600; }
+/* Feste Breite fuer den Betrag: Jede Zeile ist ein eigenes Raster, und mit
+   "auto" fingen die Balken je nach Laenge des Betrags an einer anderen
+   Stelle an (gemessen, 2026-10-16). */
+.fin-zeile { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(80px, 2fr) 116px 52px;
+  gap: 14px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 13px; }
+.fin-zeile:last-child { border-bottom: 0; }
+.fin-zeile.weitere .fin-name { color: var(--ink-3); }
+.fin-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+.fin-zeile b { font-variant-numeric: tabular-nums; font-weight: 650; text-align: right; }
+.fin-anteil { color: var(--ink-3); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.fin-balken { display: block; height: 8px; border-radius: 6px; background: var(--line-soft); overflow: hidden; }
+.fin-balken i { display: block; height: 100%; border-radius: 6px; background: var(--accent); }
+.fin-balken.k1 i { background: var(--fin-k1); } .fin-balken.k2 i { background: var(--fin-k2); }
+.fin-balken.k3 i { background: var(--fin-k3); } .fin-balken.k4 i { background: var(--fin-k4); }
+.fin-balken.kw i { background: var(--fin-kw); }
+.fin-fuss { color: var(--ink-3); font-size: 12px; margin: 10px 2px 0; }
+.tw tfoot td { padding: 11px 18px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--ink-2); }
+/* Ein Betrag, der fehlt, ist kein Betrag von null: eigener Merker. */
+.aus-fehlt { color: var(--warn); font-weight: 600; white-space: nowrap; }
+.aus-schaetzung { color: var(--ink-3); font-size: 11.5px; white-space: nowrap; }
+.aus-datei { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: 12.5px; }
+.aus-rechnung { font-size: 12.5px; color: var(--ink-3); margin: -4px 0 14px; line-height: 1.5; }
+.aus-rechnung b { color: var(--ink); font-variant-numeric: tabular-nums; }
 /* Eine Positionszeile. Raster statt Tabelle: Die Beschreibung ist
    mehrzeilig und braucht die volle Breite unter den schmalen Zahlenfeldern. */
 .of-pos { padding: 12px 18px; border-bottom: 1px solid var(--line-soft); }
@@ -1312,6 +1451,7 @@ html[data-glas="an"] body::before {
    eigene .karte. Nur eine von beiden glasig zu machen hiesse, dass die
    Offerten aussehen wie Glas und die Mandantenliste daneben nicht. */
 html[data-glas="an"] .card,
+html[data-glas="an"] .kpi,
 html[data-glas="an"] .karte {
   background: rgba(var(--surface-rgb), var(--glas-kachel));
   border-color: var(--glas-linie);
@@ -1665,9 +1805,12 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
              Abzeichen am Support. -->
         <span class="abz" id="nav-of-abz" hidden>0</span>
       </button>
-      <button type="button" class="nav-item" data-bereich="rechnungen" aria-current="false">
-        <svg viewBox="0 0 24 24"><path d="M4 3h16v18l-2.5-1.5L15 21l-2.5-1.5L10 21l-2.5-1.5L5 21 4 21z"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h4"/></svg>
-        <span class="lbl">Rechnungen</span>
+      <!-- Finanzen (ENT-725) ersetzt den Hauptreiter Rechnungen an dessen
+           Stelle, wie im Cockpit (ENT-712). Das Abzeichen zaehlt weiter die
+           Aenderungswuensche an Rechnungen -- sie liegen jetzt hier. -->
+      <button type="button" class="nav-item" data-bereich="finanzen" aria-current="false">
+        <svg viewBox="0 0 24 24"><line x1="4" y1="21" x2="20" y2="21"/><rect x="5" y="13" width="3" height="6" rx="0.8"/><rect x="10.5" y="10" width="3" height="9" rx="0.8"/><rect x="16" y="7" width="3" height="12" rx="0.8"/><polyline points="4 10 9.5 5.5 13 8 20 2.5"/></svg>
+        <span class="lbl">Finanzen</span>
         <span class="abz" id="nav-re-abz" hidden>0</span>
       </button>
       <button type="button" class="nav-item" data-bereich="support" aria-current="false">
@@ -1855,6 +1998,7 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
         <div class="karte-leib">
           <div class="knopfzeile" style="margin-top:0">
             <button type="button" class="haupt" data-springe="mandanten">Mandanten verwalten</button>
+            <button type="button" data-springe="finanzen">Finanzen</button>
             <button type="button" data-springe="konten">Betreiber-Konten</button>
           </div>
         </div>
@@ -2542,38 +2686,141 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
 
     </section>
 
-    <!-- ══ Rechnungen ═════════════════════════════════════════════ -->
-    <!-- ══ Rechnungen (ENT-608) ═══════════════════════════════════
-         Aufbau wie die Rechnungsliste im Cockpit: drei Reiter statt zwei --
-         "Erledigt" zeigt bezahlte, noch nicht archivierte Rechnungen. Eine
-         bezahlte Rechnung ist erledigt, aber deswegen nicht automatisch
-         archiviert; das bleibt eine eigene, bewusste Handlung.
+    <!-- ══ Finanzen (ENT-725) ══════════════════════════════════════
+         Drei Unterreiter wie im Cockpit (ENT-712): Uebersicht, Rechnungen,
+         Ausgaben. Die Rechnungen sind ganz hierher gezogen; ihr Inhalt ist
+         unveraendert (Kommentar zu ENT-608 unten). Offerten bleiben fuer
+         sich -- sie sind Verkauf, nicht Geld. -->
+    <section class="bereich versteckt" id="b-finanzen">
+      <div class="tabs haupt" id="finHauptTabs">
+        <button type="button" class="tab on" id="fintab-uebersicht" onclick="finGo('uebersicht')">Übersicht</button>
+        <button type="button" class="tab" id="fintab-rechnungen" onclick="finGo('rechnungen')">Rechnungen</button>
+        <button type="button" class="tab" id="fintab-ausgaben" onclick="finGo('ausgaben')">Ausgaben</button>
+      </div>
 
-         Keine Unterreiter fuer Leistungen und Briefkopf: Beide gelten fuer
-         Offerten UND Rechnungen und stehen darum weiterhin genau einmal,
-         drueben unter "Offerten". Zweimal dasselbe Formular waere zweimal
-         derselbe Briefkopf, und einer davon irgendwann veraltet. -->
-    <section class="bereich versteckt" id="b-rechnungen">
-      <div class="tabs" id="reArchivTabs" style="margin-bottom:10px">
-        <button type="button" class="tab on" id="reatab-alle" onclick="reArchivGo('alle')">Alle</button>
-        <button type="button" class="tab" id="reatab-erledigt" onclick="reArchivGo('erledigt')">Erledigt</button>
-        <button type="button" class="tab" id="reatab-archiv" onclick="reArchivGo('archiv')">Archiviert</button>
-      </div>
-      <div class="bar-tools">
-        <div class="search">
-          <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input class="inp" type="search" id="reQ" placeholder="Nummer, Titel, Empfänger oder Referenz …" oninput="renderRechnungen()">
+      <!-- ── Reiter: Übersicht ──
+           JEDER BLOCK SAGT SELBST, WAS ER WEISS. Fehlt eine Quelle, steht an
+           ihrer Stelle "nicht eingerichtet" oder "nicht geladen" -- nie eine
+           0, und das Raster springt nicht.
+           KEIN ERGEBNIS: Einnahmen minus Ausgaben ist ohne Abschreibungen
+           und Steuern kein Gewinn (ENT-725, Punkt 4). -->
+      <div id="finv-uebersicht">
+        <div class="grid g-kpi" id="finKpi"></div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-hd">
+            <div class="fin-titel">
+              <h2>Einnahmen und Ausgaben</h2>
+              <div class="fin-unter" id="finChartUnter">exkl. MWST</div>
+            </div>
+            <div class="sp"></div>
+            <div class="seg2" id="finZeitraum" role="group" aria-label="Zeitraum">
+              <button type="button" data-zr="6" onclick="finZeitraumSetzen('6')">6 M</button>
+              <button type="button" data-zr="12" class="on" onclick="finZeitraumSetzen('12')">12 M</button>
+              <button type="button" data-zr="jahr" onclick="finZeitraumSetzen('jahr')">Jahr</button>
+            </div>
+          </div>
+          <div class="card-bd">
+            <div class="fin-chart" id="finChart"></div>
+            <div class="fin-legende" id="finLegende"></div>
+          </div>
         </div>
-        <select class="inp" id="reStatus" style="width:auto" onchange="renderRechnungen()">
-          <option value="">Alle Status</option>
-        </select>
-        <div class="sp"></div>
-        <button type="button" class="btn btn-primary" onclick="ofNeuStarten('rechnung')">
-          <svg class="i" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Rechnung erstellen
-        </button>
+        <div class="grid g-1-1">
+          <div class="card">
+            <div class="card-hd">
+              <div class="fin-titel"><h2>Offene Rechnungen nach Alter</h2><div class="fin-unter" id="finAlterUnter"></div></div>
+            </div>
+            <div class="card-bd" id="finAlter" style="padding-bottom:26px"></div>
+            <div class="card-bd flush"><div class="tw" id="finMahn"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-hd">
+              <div class="fin-titel"><h2>Wiederkehrender Umsatz</h2><div class="fin-unter" id="finMrrUnter">pro Monat, exkl. MWST</div></div>
+            </div>
+            <div class="card-bd flush"><div class="tw" id="finMrr"></div></div>
+          </div>
+        </div>
+        <div class="grid g-1-1">
+          <div class="card">
+            <div class="card-hd">
+              <div class="fin-titel"><h2>Ausgaben nach Kategorie</h2><div class="fin-unter" id="finKatUnter"></div></div>
+            </div>
+            <div class="card-bd" id="finKat"></div>
+          </div>
+          <div class="card">
+            <div class="card-hd">
+              <div class="fin-titel"><h2>Letzte Ausgaben</h2><div class="fin-unter">inkl. MWST, wie abgerechnet</div></div>
+            </div>
+            <div class="card-bd flush"><div class="tw" id="finLetzte"></div></div>
+          </div>
+        </div>
       </div>
-      <div class="card"><div class="card-bd flush"><div class="tw" id="reTable"></div></div></div>
+
+      <!-- ── Reiter: Rechnungen (ENT-608, seit ENT-725 unter Finanzen) ──
+           Aufbau wie die Rechnungsliste im Cockpit: drei Reiter statt zwei --
+           "Erledigt" zeigt bezahlte, noch nicht archivierte Rechnungen. Eine
+           bezahlte Rechnung ist erledigt, aber deswegen nicht automatisch
+           archiviert; das bleibt eine eigene, bewusste Handlung.
+
+           Keine Unterreiter fuer Leistungen und Briefkopf: Beide gelten fuer
+           Offerten UND Rechnungen und stehen darum weiterhin genau einmal,
+           drueben unter "Offerten". Zweimal dasselbe Formular waere zweimal
+           derselbe Briefkopf, und einer davon irgendwann veraltet. -->
+      <div id="finv-rechnungen" class="versteckt">
+        <div class="tabs" id="reArchivTabs" style="margin-bottom:10px">
+          <button type="button" class="tab on" id="reatab-alle" onclick="reArchivGo('alle')">Alle</button>
+          <button type="button" class="tab" id="reatab-erledigt" onclick="reArchivGo('erledigt')">Erledigt</button>
+          <button type="button" class="tab" id="reatab-archiv" onclick="reArchivGo('archiv')">Archiviert</button>
+        </div>
+        <div class="bar-tools">
+          <div class="search">
+            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="inp" type="search" id="reQ" placeholder="Nummer, Titel, Empfänger oder Referenz …" oninput="renderRechnungen()">
+          </div>
+          <select class="inp" id="reStatus" style="width:auto" onchange="renderRechnungen()">
+            <option value="">Alle Status</option>
+          </select>
+          <div class="sp"></div>
+          <button type="button" class="btn btn-primary" onclick="ofNeuStarten('rechnung')">
+            <svg class="i" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Rechnung erstellen
+          </button>
+        </div>
+        <div class="card"><div class="card-bd flush"><div class="tw" id="reTable"></div></div></div>
+      </div>
+
+      <!-- ── Reiter: Ausgaben (ENT-725, Punkte 6 bis 12) ──
+           Von Hand erfasst, weil die Plattform von der Betreiberin keine
+           Kosten kennt. Vier kleine Reiter wie bei den Rechnungen: die
+           Buchungen, die Vorlagen fuer wiederkehrende Kosten, die Kategorien
+           und das Archiv. -->
+      <div id="finv-ausgaben" class="versteckt">
+        <div class="tabs" id="ausTabs" style="margin-bottom:10px">
+          <button type="button" class="tab on" id="austab-alle" onclick="ausTabGo('alle')">Alle</button>
+          <button type="button" class="tab" id="austab-vorlagen" onclick="ausTabGo('vorlagen')">Wiederkehrend</button>
+          <button type="button" class="tab" id="austab-kategorien" onclick="ausTabGo('kategorien')">Kategorien</button>
+          <button type="button" class="tab" id="austab-archiv" onclick="ausTabGo('archiv')">Archiviert</button>
+        </div>
+        <div class="bar-tools">
+          <div class="search">
+            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="inp" type="search" id="ausQ" placeholder="Text, Lieferant oder Kategorie …" oninput="ausZeichnen()">
+          </div>
+          <select class="inp" id="ausKat" style="width:auto" onchange="ausZeichnen()" aria-label="Kategorie">
+            <option value="">Alle Kategorien</option>
+          </select>
+          <select class="inp" id="ausFilter" style="width:auto" onchange="ausZeichnen()" aria-label="Betrag">
+            <option value="">Alle Beträge</option>
+            <option value="fehlt">CHF-Betrag fehlt</option>
+          </select>
+          <div class="sp"></div>
+          <button type="button" class="btn btn-primary" id="ausNeuBtn" onclick="ausNeuKlick()">
+            <svg class="i" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span id="ausNeuText">Ausgabe erfassen</span>
+          </button>
+        </div>
+        <div id="ausHinweis" class="meldung warn versteckt"></div>
+        <div class="card"><div class="card-bd flush"><div class="tw" id="ausTable"></div></div></div>
+      </div>
     </section>
 
     <!-- ══ Offerte erfassen ══
@@ -3129,6 +3376,121 @@ html[data-glas="an"] .glas-schalter .i-glas { stroke: var(--accent); }
   </div>
 </div>
 
+<!-- Ausgabe erfassen oder ändern (ENT-725, Punkt 7). Gleiche Bauart wie
+     der Dialog "Leistung". Bei Fremdwaehrung zwei Betraege: der Original-
+     betrag und der CHF-Betrag laut Kreditkartenabrechnung. Der Kurs wird
+     daraus nur angezeigt, nie eingetippt (Punkt 9). -->
+<div class="of-dlg-huelle" id="dlgAusgabe">
+  <div class="of-dlg">
+    <div class="of-dlg-hd">
+      <h2 id="ausDlgTitel">Ausgabe erfassen</h2>
+      <p id="ausDlgUnter">Gilt als bezahlt, sobald sie erfasst ist. Jede Änderung steht im Logbuch.</p>
+    </div>
+    <div class="of-dlg-bd">
+      <div class="meldung fehler versteckt" id="ausErr"></div>
+      <div class="raster2">
+        <div class="f"><label for="aus_datum">Datum *</label>
+          <input class="inp" type="date" id="aus_datum"></div>
+        <div class="f"><label for="aus_kategorie">Kategorie *</label>
+          <select class="inp" id="aus_kategorie"></select></div>
+      </div>
+      <div class="f"><label for="aus_text">Wofür *</label>
+        <input class="inp" id="aus_text" maxlength="200" placeholder="z. B. Server März, Domainverlängerung"></div>
+      <div class="f"><label for="aus_lieferant">Lieferant</label>
+        <input class="inp" id="aus_lieferant" maxlength="200"></div>
+      <div class="raster2">
+        <div class="f"><label for="aus_waehrung">Währung</label>
+          <input class="inp" id="aus_waehrung" list="dlWaehrungen" maxlength="3" value="CHF"
+                 style="text-transform:uppercase" oninput="ausDlgBetragFelder()"></div>
+        <div class="f" id="aus_fremd_feld"><label for="aus_fremd" id="aus_fremd_lbl">Betrag in USD *</label>
+          <input class="inp num" id="aus_fremd" inputmode="decimal" oninput="ausDlgRechnen()"></div>
+        <div class="f"><label for="aus_chf" id="aus_chf_lbl">Betrag CHF inkl. MWST *</label>
+          <input class="inp num" id="aus_chf" inputmode="decimal" oninput="ausDlgRechnen()"></div>
+        <div class="f"><label for="aus_mwst">MWST</label>
+          <select class="inp" id="aus_mwst" onchange="ausDlgRechnen()"></select></div>
+      </div>
+      <div class="aus-rechnung" id="aus_rechnung"></div>
+      <div class="f"><label>Beleg</label>
+        <div id="aus_datei_stand" class="aus-rechnung" style="margin:0 0 8px"></div>
+        <input class="inp" type="file" id="aus_datei" accept="application/pdf,image/png,image/jpeg,image/webp"></div>
+    </div>
+    <div class="of-dlg-ft">
+      <button type="button" class="btn btn-plain" onclick="dlgZu('dlgAusgabe')">Abbrechen</button>
+      <button type="button" class="btn btn-primary" id="ausSaveBtn" onclick="ausSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+<datalist id="dlWaehrungen"><option value="CHF"><option value="EUR"><option value="USD"><option value="GBP"></datalist>
+
+<!-- Vorlage fuer wiederkehrende Kosten (ENT-725, Punkt 10). Jeder faellige
+     Monat wird daraus als gewoehnliche Ausgabe gebucht. Eine Aenderung gilt
+     ab einem Monat; fruehere Monate und von Hand geaenderte bleiben. -->
+<div class="of-dlg-huelle" id="dlgVorlage">
+  <div class="of-dlg">
+    <div class="of-dlg-hd">
+      <h2 id="vlDlgTitel">Wiederkehrende Kosten anlegen</h2>
+      <p>Jeder fällige Monat wird als Ausgabe gebucht. Bei Fremdwährung fehlt der CHF-Betrag, bis du ihn von der Abrechnung einträgst.</p>
+    </div>
+    <div class="of-dlg-bd">
+      <div class="meldung fehler versteckt" id="vlErr"></div>
+      <div class="f"><label for="vl_text">Wofür *</label>
+        <input class="inp" id="vl_text" maxlength="200" placeholder="z. B. Hosting, KI-Abo"></div>
+      <div class="raster2">
+        <div class="f"><label for="vl_lieferant">Lieferant</label>
+          <input class="inp" id="vl_lieferant" maxlength="200"></div>
+        <div class="f"><label for="vl_kategorie">Kategorie *</label>
+          <select class="inp" id="vl_kategorie"></select></div>
+        <div class="f"><label for="vl_intervall">Wiederholung</label>
+          <select class="inp" id="vl_intervall">
+            <option value="monatlich">monatlich</option>
+            <option value="jaehrlich">jährlich</option>
+          </select></div>
+        <div class="f"><label for="vl_ab">Beginn *</label>
+          <input class="inp" type="date" id="vl_ab"></div>
+        <div class="f"><label for="vl_bis">Ende</label>
+          <input class="inp" type="date" id="vl_bis"></div>
+      </div>
+      <div class="raster2">
+        <div class="f"><label for="vl_waehrung">Währung</label>
+          <input class="inp" id="vl_waehrung" list="dlWaehrungen" maxlength="3" value="CHF"
+                 style="text-transform:uppercase" oninput="vlDlgBetragFelder()"></div>
+        <div class="f" id="vl_fremd_feld"><label for="vl_fremd" id="vl_fremd_lbl">Betrag in USD *</label>
+          <input class="inp num" id="vl_fremd" inputmode="decimal"></div>
+        <div class="f"><label for="vl_chf" id="vl_chf_lbl">Betrag CHF inkl. MWST *</label>
+          <input class="inp num" id="vl_chf" inputmode="decimal"></div>
+        <div class="f"><label for="vl_mwst">MWST</label>
+          <select class="inp" id="vl_mwst"></select></div>
+      </div>
+      <div class="f" id="vl_wirksam_feld"><label for="vl_wirksam">Änderung gilt ab Monat *</label>
+        <input class="inp" type="month" id="vl_wirksam">
+        <div class="aus-rechnung" style="margin:6px 0 0">Frühere Monate bleiben, wie sie gebucht sind. Ein Monat, den jemand von Hand geändert hat, bleibt auch.</div></div>
+    </div>
+    <div class="of-dlg-ft">
+      <button type="button" class="btn btn-plain" onclick="dlgZu('dlgVorlage')">Abbrechen</button>
+      <button type="button" class="btn btn-primary" id="vlSaveBtn" onclick="vlSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Kategorie anlegen oder umbenennen (ENT-725, Punkt 11). -->
+<div class="of-dlg-huelle" id="dlgKategorie">
+  <div class="of-dlg">
+    <div class="of-dlg-hd">
+      <h2 id="katDlgTitel">Kategorie anlegen</h2>
+      <p>Eine Kategorie wird nie gelöscht, nur archiviert. Bestehende Ausgaben behalten sie.</p>
+    </div>
+    <div class="of-dlg-bd">
+      <div class="meldung fehler versteckt" id="katErr"></div>
+      <div class="f"><label for="kat_name">Name *</label>
+        <input class="inp" id="kat_name" maxlength="100"></div>
+    </div>
+    <div class="of-dlg-ft">
+      <button type="button" class="btn btn-plain" onclick="dlgZu('dlgKategorie')">Abbrechen</button>
+      <button type="button" class="btn btn-primary" id="katSaveBtn" onclick="katSpeichern()">Speichern</button>
+    </div>
+  </div>
+</div>
+
 <!-- Vorschau: dasselbe Blatt wie beim Drucken, nur in einem Dialog statt
      im Druckdialog. Diese Ansicht IST das Dokument. -->
 <div class="of-dlg-huelle" id="dlgOfVorschau">
@@ -3220,12 +3582,15 @@ const BEREICHE = {
   mandanten:  ['Mandanten',  'Betriebe, die diese Plattform nutzen'],
   adressen:   ['Adressen',   'Betriebe, an die eine Offerte geht — künftige Mandanten'],
   offerten:   ['Offerten',   'Angebote an künftige Mandanten'],
-  rechnungen: ['Rechnungen', 'Was die Mandanten für die Nutzung zahlen'],
+  finanzen:   ['Finanzen',   'Einnahmen, Ausgaben und wiederkehrender Umsatz'],
   support:    ['Support',    'Anfragen der Mandanten, die auf eine Antwort warten'],
   konten:     ['Konten',     'Wer diesen Bereich öffnen darf'],
 };
 
 function bereichZeigen(welcher) {
+  /* "rechnungen" war bis ENT-725 ein eigener Hauptreiter. Alte Einstiege
+     (Zurueck aus einer Rechnung, Spruenge) landen unter Finanzen. */
+  if (welcher === 'rechnungen') { finTab = 'rechnungen'; welcher = 'finanzen'; }
   if (!BEREICHE[welcher]) { welcher = 'uebersicht'; }
   Object.keys(BEREICHE).forEach(k => {
     const el = $('b-' + k);
@@ -3264,7 +3629,9 @@ function bereichZeigen(welcher) {
   if (welcher === 'konten')   { ladeKonten(); }
   if (welcher === 'adressen') { ladeAdressen(); }
   if (welcher === 'offerten') { ladeBelege(); ladeProdukte(); }
-  if (welcher === 'rechnungen') { ladeRechnungen(); ladeProdukte(); }
+  /* Der Unterreiter ueberlebt den Bereichswechsel, wie bei Mandanten.
+     finGo() schreibt die Unterzeile und laedt, was der Reiter braucht. */
+  if (welcher === 'finanzen') { finGo(finTab); }
   if (welcher !== 'mandanten') {
     zeig($('m-form-karte'), false);
     zeig($('sup-karte'), false);
@@ -5491,6 +5858,7 @@ async function pwSpeichern() {
 const K_BEREICH_NAMEN = {
   konto: 'Konto', mandant: 'Mandant', adresse: 'Adresse',
   beleg: 'Beleg', produkt: 'Leistung', briefkopf: 'Briefkopf',
+  ausgabe: 'Ausgabe', ausgabevorlage: 'Wiederkehrende Kosten', ausgabekategorie: 'Ausgabenkategorie',
 };
 /* Nur die Felder, deren Spaltenname sich nicht von selbst liest. Was hier
    fehlt, erscheint als Spaltenname -- das ist ehrlicher als eine erfundene
@@ -5505,6 +5873,10 @@ const K_FELD_NAMEN = {
   gav_unterstellt: 'GAV-Unterstellung', secret_name: 'Secret', subdomain: 'Kurzname des Betriebs',
   db_host: 'Datenbank-Host', db_name: 'Datenbank', db_user: 'Datenbank-Benutzer',
   einzelpreis_rappen: 'Einzelpreis', mwst_satz_bp: 'MWST-Satz',
+  betrag_rappen: 'Betrag CHF', betrag_fremd_rappen: 'Originalbetrag', waehrung: 'Währung',
+  kategorie_id: 'Kategorie', lieferant: 'Lieferant', datum: 'Datum', periode: 'Monat', text: 'Wofür',
+  datei: 'Datei', von_hand: 'Herkunft', vorlage: 'Vorlage', intervall: 'Wiederholung',
+  gueltig_ab: 'Beginn', gueltig_bis: 'Ende', name: 'Name',
 };
 const kFeldName    = f => K_FELD_NAMEN[f] || String(f || '');
 const kBereichName = b => K_BEREICH_NAMEN[b] || String(b || '');
@@ -5524,6 +5896,9 @@ function kLogObjekt(z) {
   if (z.bereich === 'adresse') { name = suche(adressen, 'name'); }
   if (z.bereich === 'produkt') { name = suche(produkte, 'name'); }
   if (z.bereich === 'beleg')   { name = suche(belege, 'nummer') || suche(rechnungen, 'nummer'); }
+  if (z.bereich === 'ausgabe' && ausDaten) { name = suche(ausDaten.ausgaben, 'text'); }
+  if (z.bereich === 'ausgabevorlage' && ausDaten) { name = suche(ausDaten.vorlagen, 'text'); }
+  if (z.bereich === 'ausgabekategorie' && ausDaten) { name = suche(ausDaten.kategorien, 'name'); }
   return name ? esc(name) : '<span style="color:var(--ink-3)">#' + id + '</span>';
 }
 
@@ -6887,10 +7262,12 @@ async function ladeVertragsnummer() {
 async function ladeRechnungenRoh() {
   const a = await ruf('betreiber_beleg_list.php?art=rechnung');
   if (a.status !== 'ok') {
+    reStand = 'fehler';
     $('reTable').innerHTML = LEER('Nicht abrufbar', a.message || 'Unbekannter Fehler.');
     return;
   }
-  if (a.eingerichtet === false) { nichtEingerichtet('reTable', 'Die Rechnungen'); return; }
+  if (a.eingerichtet === false) { reStand = 'nicht_eingerichtet'; nichtEingerichtet('reTable', 'Die Rechnungen'); return; }
+  reStand = 'ok';
   rechnungen = a.belege || [];
   reNaechsteNummer = a.naechste_nummer || '';
   awSetzen('rechnungen', a);
@@ -6908,8 +7285,9 @@ function kassenstandZeichnen() {
   /* Archivierte zählen nicht mit: Sie sind aus dem Verkehr gezogen, und
      eine archivierte Rechnung im offenen Betrag wäre eine Forderung, die
      niemand mehr stellt. */
-  const offen = (rechnungen || []).filter(b =>
-    Number(b.aktiv ?? 1) === 1 && !Number(b.bezahlt));
+  /* Seit ENT-725 gerechnet wie unter Finanzen: Ein Entwurf ist nicht beim
+     Kunden und zaehlt nicht als offen (finIstVerrechnet). */
+  const offen = (rechnungen || []).filter(b => finIstVerrechnet(b) && !Number(b.bezahlt));
   const ueber = offen.filter(b => {
     const t = reFaelligTage(b);
     return t !== null && t < 0;
@@ -6921,12 +7299,1180 @@ function kassenstandZeichnen() {
      nicht vermischen (Hausregel). Und "überfällig" bekommt seinen eigenen
      Block statt einer Klammer hinter der ersten Zahl: Es ist eine andere
      Aussage, keine Verfeinerung derselben. */
+  /* Ein Klick auf die beiden Zahlen fuehrt zu Finanzen (ENT-725, Punkt 2)
+     -- dort stehen sie mit Alter und Mahnliste. */
+  const springt = h => h.replace('<div class="zahl">',
+    '<div class="zahl springt" role="link" tabindex="0" data-zu-finanzen="1" title="Zu Finanzen">');
   uebersichtSetzen('rechnungen',
-      zahlBlock('Offene Rechnungen', offen.length,
-        offen.length ? chf(summe) + ' CHF' : 'nichts offen')
-    + zahlBlock('Davon überfällig', ueber.length,
-        ueber.length ? chf(summeUeber) + ' CHF' : 'nichts überfällig'));
+      springt(zahlBlock('Offene Rechnungen', offen.length,
+        offen.length ? chf(summe) + ' CHF' : 'nichts offen'))
+    + springt(zahlBlock('Davon überfällig', ueber.length,
+        ueber.length ? chf(summeUeber) + ' CHF' : 'nichts überfällig')));
 }
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-zu-finanzen]')) { finTab = 'uebersicht'; bereichZeigen('finanzen'); }
+});
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('[data-zu-finanzen]')) {
+    e.preventDefault(); finTab = 'uebersicht'; bereichZeigen('finanzen');
+  }
+});
+
+/* ══ Finanzen (ENT-725) ═══════════════════════════════════════════════
+   Übersicht, Rechnungen und Ausgaben unter einem Hauptreiter, wie im
+   Cockpit (ENT-712). Die EINNAHMEN rechnet die Seite aus derselben
+   Rechnungsliste wie der Reiter Rechnungen und die Startseite -- eine
+   zweite Definition von "offen" liefe irgendwann auseinander. Ausgaben und
+   wiederkehrender Umsatz kommen vom Server (betreiber_finanzen_uebersicht).
+
+   Was als verrechnet gilt, ist dieselbe Regel wie im Cockpit (Entscheid
+   des Projektinhabers, 24.09.2026): jede aktive Rechnung AUSSER einem
+   Entwurf. Ein Entwurf ist nicht beim Kunden. Er wird genannt, nicht
+   mitgezählt. */
+const FIN_REITER = {
+  uebersicht: 'Einnahmen, Ausgaben und wiederkehrender Umsatz',
+  rechnungen: 'Was die Mandanten für die Nutzung zahlen',
+  ausgaben:   'Was der Betrieb der Plattform kostet',
+};
+let finTab = 'uebersicht';
+let finZr = '12';
+let finLaedt = 0;
+let finDaten = null;        // Antwort von betreiber_finanzen_uebersicht.php
+let finFehler = '';
+let finChartDaten = [];
+/* Stand der Rechnungsliste: 'ok', 'nicht_eingerichtet', 'fehler' oder
+   'unbekannt' (noch nie geladen). Vier Aussagen, vier Texte. */
+let reStand = 'unbekannt';
+
+function finGo(t) {
+  if (!FIN_REITER[t]) { t = 'uebersicht'; }
+  finTab = t;
+  Object.keys(FIN_REITER).forEach(k => {
+    zeig($('finv-' + k), k === t);
+    $('fintab-' + k).classList.toggle('on', k === t);
+  });
+  $('leiste-unter').textContent = FIN_REITER[t];
+  if (t === 'uebersicht') { finLaden(); }
+  if (t === 'rechnungen') { ladeRechnungen(); ladeProdukte(); }
+  if (t === 'ausgaben')   { ausLaden(); }
+  unterreiterZeichnen();
+}
+
+const finIstVerrechnet = b => Number(b.aktiv ?? 1) === 1 && b.status !== 'entwurf';
+const finNetto = b => (Number(b.zwischensumme_rappen) || 0) - (Number(b.rabatt_rappen) || 0);
+const finEntwuerfe = () => (rechnungen || []).filter(b => Number(b.aktiv ?? 1) === 1 && b.status === 'entwurf').length;
+const finEntwurfHinweis = () => {
+  const n = finEntwuerfe();
+  return n ? ` · ${nf(n)} ${n === 1 ? 'Entwurf' : 'Entwürfe'} nicht mitgezählt` : '';
+};
+const finSumme = l => l.reduce((s, b) => s + (Number(b.total_rappen) || 0), 0);
+// Lokales Datum, nicht UTC: Kurz nach Mitternacht waere toISOString()
+// noch gestern.
+const finTag = d => { const x = d || new Date(); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
+function finMonat(versatz, basis) {
+  const h = basis || new Date();
+  const d = new Date(h.getFullYear(), h.getMonth() + versatz, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+const FIN_MONAT_KURZ = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+const FIN_MONAT_LANG = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August',
+                        'September', 'Oktober', 'November', 'Dezember'];
+const finMonatKurz = m => FIN_MONAT_KURZ[Number(m.slice(5, 7)) - 1];
+const finMonatLang = m => `${FIN_MONAT_LANG[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
+function finMonate(zr) {
+  const jetzt = new Date();
+  const n = zr === '6' ? 6 : zr === 'jahr' ? jetzt.getMonth() + 1 : 12;
+  return Array.from({ length: n }, (_, i) => finMonat(i - n + 1));
+}
+function finZeitraumText(monate) {
+  if (!monate.length) { return ''; }
+  const a = monate[0], b = monate[monate.length - 1];
+  return finZr === 'jahr' ? `Jahr ${b.slice(0, 4)} bis ${finMonatKurz(b)}`
+    : `${finMonatKurz(a)} ${a.slice(0, 4)} – ${finMonatKurz(b)} ${b.slice(0, 4)}`;
+}
+const finFr0 = rappen => 'CHF ' + nf(Math.round((Number(rappen) || 0) / 100));
+const finChfHtml = rappen => `<span class="waehrung">CHF</span>${chf(rappen)}`;
+
+function finZeitraumSetzen(zr) {
+  finZr = zr;
+  document.querySelectorAll('#finZeitraum button').forEach(b => {
+    const ist = b.dataset.zr === zr;
+    b.classList.toggle('on', ist);
+    b.setAttribute('aria-pressed', ist ? 'true' : 'false');
+  });
+  finLaden();
+}
+
+/* Die Ausgaben je Monat holen -- fuer den Zeitraum UND die letzten 13
+   Monate: Die Kennzahl braucht den laufenden Monat und den Vormonat, auch
+   wenn der Zeitraum kuerzer ist. */
+function finLaden() {
+  const lauf = ++finLaedt;
+  finSkelett();
+  const monate = finMonate(finZr);
+  const von = [monate[0], finMonat(-12)].sort()[0];
+  const bis = finMonat(0);
+  const reDa = ladeRechnungen();
+  const ausDa = ausLadenRoh();
+  const uebDa = ruf(`betreiber_finanzen_uebersicht.php?von=${von}&bis=${bis}`).then(a => {
+    if (a.status !== 'ok' || !a.ausgaben || !a.mrr) {
+      finDaten = null; finFehler = a.message || 'Die Finanzzahlen konnten nicht geladen werden.';
+      return;
+    }
+    finDaten = a; finFehler = '';
+  }).catch(() => { finDaten = null; finFehler = 'Die Finanzzahlen konnten nicht geladen werden.'; });
+  Promise.allSettled([reDa, ausDa, uebDa]).then(() => {
+    if (lauf !== finLaedt || finTab !== 'uebersicht' || $('b-finanzen').classList.contains('versteckt')) { return; }
+    finZeichnen();
+  });
+}
+
+function finSkelett() {
+  $('finKpi').innerHTML = Array.from({ length: 5 }, () =>
+    `<div class="kpi"><div class="sk" style="height:12px;width:52%"></div>
+     <div class="sk" style="height:28px;width:46%;margin-top:14px"></div>
+     <div class="sk" style="height:11px;width:64%;margin-top:12px"></div></div>`).join('');
+  $('finChart').innerHTML = '<div class="sk" style="height:100%"></div>';
+  $('finLegende').innerHTML = '';
+  ['finAlter', 'finKat'].forEach(id => { $(id).innerHTML = '<div class="sk" style="height:120px"></div>'; });
+  ['finMahn', 'finMrr', 'finLetzte'].forEach(id => {
+    $(id).innerHTML = `<div style="padding:18px">${Array.from({ length: 3 },
+      () => '<div class="sk" style="height:14px;margin-bottom:12px"></div>').join('')}</div>`;
+  });
+}
+
+const FIN_RE_OHNE = () => reStand === 'nicht_eingerichtet'
+  ? LEER('Rechnungen nicht eingerichtet', 'Der Offertenteil ist auf diesem Server noch nicht eingerichtet. Einrichtung ausführen.')
+  : LEER('Rechnungen nicht geladen', 'Die Rechnungsliste kam nicht an. Seite neu öffnen oder später erneut versuchen.');
+const finAusgaben = () => finDaten && finDaten.ausgaben;
+const finAusDa = () => !!(finAusgaben() && finAusgaben().eingerichtet);
+
+/* Farbe einer Kategorie: ihr Platz in der GANZEN Liste (nach Reihenfolge,
+   archivierte eingeschlossen) -- nicht ihr Rang im Zeitraum. Ein Filter
+   oder ein anderer Zeitraum faerbt nichts um. Ab der fuenften: "Weitere". */
+function finKatKlasse(id) {
+  const liste = (finAusgaben() && finAusgaben().kategorien) || (ausDaten && ausDaten.kategorien) || [];
+  const i = liste.findIndex(k => Number(k.id) === Number(id));
+  return i >= 0 && i < 4 ? 'k' + (i + 1) : 'kw';
+}
+function finKatName(id) {
+  const liste = (finAusgaben() && finAusgaben().kategorien) || (ausDaten && ausDaten.kategorien) || [];
+  const k = liste.find(x => Number(x.id) === Number(id));
+  return k ? k.name : 'Kategorie #' + id;
+}
+
+// Ein Monat vor der ersten erfassten Ausgabe ist "noch nicht erfasst" --
+// nicht "keine Ausgaben".
+const finAusVorBeginn = m => {
+  const a = finAusgaben();
+  return !a || !a.erste_periode || m < a.erste_periode;
+};
+
+function finMonatsDaten(monate) {
+  const aktiv = reStand === 'ok' ? rechnungen.filter(finIstVerrechnet) : [];
+  const am = finAusDa() ? (finAusgaben().monate || {}) : {};
+  return monate.map(m => {
+    const imMonat = aktiv.filter(b => String(b.datum || '').slice(0, 7) === m);
+    const bezahlt = aktiv.filter(b => Number(b.bezahlt) && !leeresDatum(b.bezahlt_am)
+                                   && String(b.bezahlt_am).slice(0, 7) === m);
+    const a = am[m] || null;
+    // Weitere Kategorien zusammengefasst, damit die Farben nicht ausgehen.
+    const segmente = [];
+    if (a) {
+      const je = {};
+      Object.entries(a.kategorien || {}).forEach(([id, v]) => {
+        const k = finKatKlasse(id);
+        const schluessel = k === 'kw' ? 'kw' : id;
+        je[schluessel] = je[schluessel] || { klasse: k, name: k === 'kw' ? 'Weitere' : finKatName(id), rappen: 0 };
+        je[schluessel].rappen += Number(v) || 0;
+      });
+      // Feste Reihenfolge von unten nach oben: k1..k4, dann Weitere.
+      Object.values(je).sort((x, y) => x.klasse.localeCompare(y.klasse)).forEach(s => segmente.push(s));
+    }
+    return {
+      m,
+      verrechnet: imMonat.reduce((s, b) => s + finNetto(b), 0),
+      bezahlt: bezahlt.reduce((s, b) => s + finNetto(b), 0),
+      offen: imMonat.filter(b => !Number(b.bezahlt)).reduce((s, b) => s + finNetto(b), 0),
+      // null: keine Aussage moeglich (nicht eingerichtet, vor Beginn der
+      // Erfassung oder in diesem Monat nichts erfasst). Nie 0.
+      ausgaben: a ? Number(a.netto_rappen) || 0 : null,
+      geschaetzt: a ? Number(a.geschaetzt_rappen) || 0 : 0,
+      fehlt: a ? Number(a.fehlt) || 0 : 0,
+      vorBeginn: finAusVorBeginn(m),
+      segmente,
+    };
+  });
+}
+
+function finZeichnen() {
+  const monate = finMonate(finZr);
+  const daten = finMonatsDaten(monate);
+  const zr = finZeitraumText(monate);
+  $('finChartUnter').textContent = `exkl. MWST · ${zr}${reStand === 'ok' ? finEntwurfHinweis() : ''}`;
+  $('finKatUnter').textContent = `netto, exkl. MWST · ${zr}`;
+  finKpiZeichnen();
+  finChartZeichnen(daten);
+  finAlterZeichnen();
+  finMrrZeichnen();
+  finKatZeichnen(monate);
+  finLetzteZeichnen();
+}
+
+// Vergleich mit Richtung: Bei offenen Betraegen ist "mehr" schlecht, bei
+// Ausgaben weder gut noch schlecht -- neutral.
+function finDelta(jetzt, vorher, richtung) {
+  if (!vorher) { return jetzt ? '<span class="delta flat">neu</span>' : '<span class="delta flat">–</span>'; }
+  const p = Math.round(((jetzt - vorher) / vorher) * 100);
+  if (p === 0) { return '<span class="delta flat">±0 %</span>'; }
+  const hoch = p > 0;
+  const klasse = richtung === 'neutral' ? 'flat' : (hoch === (richtung === 'hoch_gut') ? 'up' : 'down');
+  return `<span class="delta ${klasse}">${hoch ? '▲' : '▼'} ${Math.abs(p)} %</span>`;
+}
+function finOffenAm(aktiv, stichtag) {
+  return aktiv.filter(b => {
+    if (leeresDatum(b.datum) || String(b.datum).slice(0, 10) > stichtag) { return false; }
+    if (!Number(b.bezahlt)) { return true; }
+    return !leeresDatum(b.bezahlt_am) && String(b.bezahlt_am).slice(0, 10) > stichtag;
+  });
+}
+function finUeberAm(offen, stichtag) {
+  return offen.filter(b => !leeresDatum(b.faellig_bis) && String(b.faellig_bis).slice(0, 10) < stichtag);
+}
+// Tage UEBER die Faelligkeit hinaus. null: kein Faelligkeitsdatum --
+// unbekannt, nicht "nicht faellig".
+function finUeberTage(b) {
+  if (leeresDatum(b.faellig_bis)) { return null; }
+  const heute = new Date(); heute.setHours(0, 0, 0, 0);
+  const f = new Date(String(b.faellig_bis).slice(0, 10) + 'T00:00:00');
+  if (Number.isNaN(f.getTime())) { return null; }
+  return Math.round((heute - f) / 864e5);
+}
+
+function finKpiZeichnen() {
+  const ic = {
+    geld:  '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+    uhr:   '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
+    haken: '<path d="M22 11.1V12a10 10 0 1 1-5.9-9.1"/><polyline points="22 4 12 14.01 9 11.01"/>',
+    aus:   '<path d="M4 3h16v18l-2.5-1.5L15 21l-2.5-1.5L10 21l-2.5-1.5L5 21 4 21z"/><path d="M8 9h8M8 13h5"/>',
+    wied:  '<path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/>',
+  };
+  const karte = c => `
+    <div class="kpi">
+      <div class="kpi-top"><svg class="i" viewBox="0 0 24 24">${c.i}</svg><span>${c.l}</span></div>
+      <div class="kpi-val">${c.v}</div>
+      <div class="kpi-foot">${c.f}</div>
+    </div>`;
+  const ohne = (i, l, t) => karte({ i, l, v: '<span class="fin-ohne">–</span>', f: `<span>${t}</span>` });
+  const anz = (n, ein, viele) => `${nf(n)} ${n === 1 ? ein : viele}`;
+  const karten = [];
+
+  if (reStand !== 'ok') {
+    const t = reStand === 'nicht_eingerichtet' ? 'Rechnungen nicht eingerichtet' : 'Rechnungen nicht geladen';
+    karten.push(ohne(ic.geld, 'Offener Betrag', t), ohne(ic.uhr, 'Davon überfällig', t), ohne(ic.haken, 'Bezahlt im Monat', t));
+  } else {
+    const aktiv = rechnungen.filter(finIstVerrechnet);
+    const heute = finTag();
+    const jetzt = new Date();
+    const endeVor = finTag(new Date(jetzt.getFullYear(), jetzt.getMonth(), 0));
+    const offen = aktiv.filter(b => !Number(b.bezahlt));
+    const ueber = finUeberAm(offen, heute);
+    const offenVor = finOffenAm(aktiv, endeVor);
+    const ueberVor = finUeberAm(offenVor, endeVor);
+    const ohneZahltag = aktiv.filter(b => Number(b.bezahlt) && leeresDatum(b.bezahlt_am)).length;
+    const hinweis = ohneZahltag ? ` · ${nf(ohneZahltag)} bezahlt ohne Zahldatum` : '';
+    const bezIm = m => aktiv.filter(b => Number(b.bezahlt) && !leeresDatum(b.bezahlt_am)
+                                      && String(b.bezahlt_am).slice(0, 7) === m);
+    const sJ = finSumme(bezIm(finMonat(0))), sV = finSumme(bezIm(finMonat(-1)));
+    karten.push(karte({
+      i: ic.geld, l: 'Offener Betrag', v: finChfHtml(finSumme(offen)),
+      f: `${finDelta(finSumme(offen), finSumme(offenVor), 'tief_gut')} <span>inkl. MWST · ${offen.length
+        ? 'aus ' + anz(offen.length, 'Rechnung', 'Rechnungen') : 'keine offene Rechnung'}${hinweis}${finEntwurfHinweis()}</span>`,
+    }));
+    karten.push(karte({
+      i: ic.uhr, l: 'Davon überfällig', v: finChfHtml(finSumme(ueber)),
+      f: `${finDelta(finSumme(ueber), finSumme(ueberVor), 'tief_gut')} <span>${ueber.length
+        ? anz(ueber.length, 'Rechnung', 'Rechnungen') + ' · älteste seit ' + anz(Math.max(...ueber.map(finUeberTage)), 'Tag', 'Tagen')
+        : 'keine überfällige Rechnung'}</span>`,
+    }));
+    karten.push(karte({
+      i: ic.haken, l: 'Bezahlt im Monat', v: finChfHtml(sJ),
+      f: `${finDelta(sJ, sV, 'hoch_gut')} <span>inkl. MWST · Vormonat CHF ${chf(sV)}${hinweis}</span>`,
+    }));
+  }
+
+  // Ausgaben im laufenden Monat, netto, gegen den Vormonat.
+  if (!finDaten) {
+    karten.push(ohne(ic.aus, 'Ausgaben im Monat', esc(finFehler || 'nicht geladen')));
+  } else if (!finAusDa()) {
+    karten.push(ohne(ic.aus, 'Ausgaben im Monat', 'Ausgaben noch nicht eingerichtet'));
+  } else {
+    const am = finAusgaben().monate || {};
+    const mJ = finMonat(0), mV = finMonat(-1);
+    const a = am[mJ], v = am[mV];
+    if (!a) {
+      karten.push(ohne(ic.aus, 'Ausgaben im Monat', finAusVorBeginn(mJ)
+        ? 'noch keine Ausgabe erfasst' : 'in diesem Monat noch nichts erfasst'));
+    } else {
+      const zus = [];
+      if (a.geschaetzt_rappen) { zus.push('davon geschätzt CHF ' + chf(a.geschaetzt_rappen)); }
+      if (a.fehlt) { zus.push(anz(a.fehlt, 'Ausgabe', 'Ausgaben') + ' ohne CHF-Betrag'); }
+      karten.push(karte({
+        i: ic.aus, l: 'Ausgaben im Monat', v: finChfHtml(a.netto_rappen),
+        f: `${v ? finDelta(Number(a.netto_rappen), Number(v.netto_rappen), 'neutral') : '<span class="delta flat">–</span>'}
+            <span>exkl. MWST · ${v ? 'Vormonat CHF ' + chf(v.netto_rappen) : 'Vormonat: nichts erfasst'}${zus.length ? ' · ' + zus.join(' · ') : ''}</span>`,
+      }));
+    }
+  }
+
+  // Wiederkehrender Umsatz: heute laufende Vertraege. Kein Vormonats-
+  // vergleich -- wie der Mandantenstatus frueher war, steht nirgends.
+  const mrr = finDaten && finDaten.mrr;
+  if (!finDaten) {
+    karten.push(ohne(ic.wied, 'Wiederkehrend / Monat', esc(finFehler || 'nicht geladen')));
+  } else if (!mrr.eingerichtet) {
+    karten.push(ohne(ic.wied, 'Wiederkehrend / Monat', 'Verträge noch nicht eingerichtet'));
+  } else if (!mrr.vertraege) {
+    karten.push(ohne(ic.wied, 'Wiederkehrend / Monat', 'kein laufender Vertrag mit einem aktiven Mandanten'));
+  } else {
+    const aus = (mrr.auslaufend || []).length;
+    karten.push(karte({
+      i: ic.wied, l: 'Wiederkehrend / Monat', v: finChfHtml(mrr.rappen),
+      f: `<span>exkl. MWST · aus ${anz(mrr.vertraege, 'Vertrag', 'Verträgen')}${aus ? ' · ' + anz(aus, 'endet', 'enden') + ' in 90 Tagen' : ''}</span>`,
+    }));
+  }
+  $('finKpi').innerHTML = karten.join('');
+}
+
+// ── Hauptgrafik: Einnahmen als zwei weiche Kurven (wie im Cockpit),
+// Ausgaben als schmale gestapelte Balken je Kategorie dahinter. EINE Achse,
+// eine Einheit (CHF exkl. MWST). Monoton interpoliert, damit keine Kurve
+// unter null oder ueber den hoechsten Wert hinaus schwingt.
+function finMonotonPfad(pkte) {
+  const n = pkte.length;
+  if (!n) { return ''; }
+  if (n === 1) { return `M${pkte[0][0]},${pkte[0][1]}`; }
+  const dx = [], dy = [], m = [];
+  for (let i = 0; i < n - 1; i++) {
+    dx.push(pkte[i + 1][0] - pkte[i][0]);
+    dy.push(pkte[i + 1][1] - pkte[i][1]);
+    m.push(dy[i] / dx[i]);
+  }
+  const t = [m[0]];
+  for (let i = 1; i < n - 1; i++) { t.push(m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2); }
+  t.push(m[n - 2]);
+  for (let i = 0; i < n - 1; i++) {
+    if (m[i] === 0) { t[i] = 0; t[i + 1] = 0; continue; }
+    const a = t[i] / m[i], b = t[i + 1] / m[i], h = a * a + b * b;
+    if (h > 9) { const k = 3 / Math.sqrt(h); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; }
+  }
+  let d = `M${pkte[0][0]},${pkte[0][1]}`;
+  for (let i = 0; i < n - 1; i++) {
+    const h = dx[i] / 3;
+    d += ` C${pkte[i][0] + h},${pkte[i][1] + t[i] * h} ${pkte[i + 1][0] - h},${pkte[i + 1][1] - t[i + 1] * h} ${pkte[i + 1][0]},${pkte[i + 1][1]}`;
+  }
+  return d;
+}
+function finRundeGrenze(wert) {
+  if (wert <= 0) { return 100000; }
+  const p = Math.pow(10, Math.floor(Math.log10(wert)));
+  for (const f of [1, 1.2, 1.6, 2, 2.4, 3, 4, 6, 8, 10]) { if (f * p >= wert) { return f * p; } }
+  return 10 * p;
+}
+
+function finChartZeichnen(daten) {
+  finChartDaten = daten;
+  const box = $('finChart');
+  const reOk = reStand === 'ok';
+  const ausDa = finAusDa();
+  if (!reOk && !ausDa) {
+    box.innerHTML = FIN_RE_OHNE();
+    $('finLegende').innerHTML = '';
+    return;
+  }
+  const reIrgend = reOk && rechnungen.some(finIstVerrechnet);
+  const ausIrgend = ausDa && !!finAusgaben().erste_periode;
+  // Ohne Rechnung und ohne Ausgabe waere die Grafik eine Nulllinie -- sie
+  // saehe aus wie Monate ohne Umsatz und ohne Kosten.
+  if (!reIrgend && !ausIrgend) {
+    const n = finEntwuerfe();
+    box.innerHTML = n
+      ? LEER('Noch nichts verrechnet', `${nf(n)} ${n === 1 ? 'Rechnungsentwurf zählt' : 'Rechnungsentwürfe zählen'} erst, wenn ${n === 1 ? 'er versendet ist' : 'sie versendet sind'}. Ausgaben sind noch keine erfasst.`)
+      : LEER('Noch nichts erfasst', 'Sobald eine Rechnung verrechnet oder eine Ausgabe erfasst ist, erscheint sie hier.');
+    $('finLegende').innerHTML = '';
+    return;
+  }
+  const breite = Math.max(320, box.clientWidth || 800);
+  const hoehe = box.clientHeight || 290;
+  const L = 78, R = 18, O = 26, U = 34;
+  const n = daten.length;
+  const schritt = (breite - L - R) / n;
+  const x = i => L + schritt * (i + 0.5);
+  const werte = [];
+  if (reOk) { daten.forEach(d => werte.push(d.verrechnet, d.bezahlt)); }
+  if (ausDa) { daten.forEach(d => { if (d.ausgaben !== null) { werte.push(d.ausgaben); } }); }
+  const max = finRundeGrenze(Math.max(0, ...werte) * 1.08);
+  const y = v => O + (hoehe - O - U) * (1 - v / max);
+  const laufend = n - 1;
+  const bb = Math.min(28, Math.max(8, schritt * 0.36));
+
+  let svg = `<svg viewBox="0 0 ${breite} ${hoehe}" role="img" aria-label="Einnahmen und Ausgaben je Monat">
+    <defs>
+      <linearGradient id="finVerlaufV" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="var(--accent)" stop-opacity=".22"/>
+        <stop offset="1" stop-color="var(--accent)" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="finVerlaufB" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="var(--fin-bezahlt)" stop-opacity=".10"/>
+        <stop offset="1" stop-color="var(--fin-bezahlt)" stop-opacity="0"/>
+      </linearGradient>
+      <pattern id="finSchraffur" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <line class="fin-schraffur-linie" x1="0" y1="0" x2="0" y2="6"/>
+      </pattern>
+    </defs>`;
+  svg += `<rect class="fin-laufend" x="${x(laufend) - schritt / 2}" y="${O - 8}" width="${schritt}" height="${hoehe - O - U + 8}" rx="8"/>`;
+  svg += `<text class="fin-laufend-lbl" x="${x(laufend)}" y="${O - 12}" text-anchor="middle">laufend</text>`;
+  for (let k = 0; k <= 4; k++) {
+    const v = max * k / 4;
+    svg += `<line class="fin-gitter${k === 0 ? ' null' : ''}" x1="${L}" x2="${breite - R}" y1="${y(v)}" y2="${y(v)}"/>`;
+    svg += `<text class="fin-achse" x="${L - 10}" y="${y(v) + 4}" text-anchor="end">${esc(finFr0(v))}</text>`;
+  }
+  daten.forEach((d, i) => {
+    svg += `<text class="fin-achse fin-monat${i === laufend ? ' jetzt' : ''}" x="${x(i)}" y="${hoehe - U + 18}" text-anchor="middle">${finMonatKurz(d.m)}</text>`;
+    if (i === 0 || d.m.endsWith('-01')) {
+      svg += `<text class="fin-achse fin-jahr" x="${x(i)}" y="${hoehe - U + 31}" text-anchor="middle">${d.m.slice(0, 4)}</text>`;
+    }
+  });
+
+  // Ausgabenbalken: von unten nach oben je Kategorie, oben abgerundet.
+  // Der geschaetzte Anteil liegt schraffiert ueber der Spitze des Balkens.
+  if (ausDa) {
+    daten.forEach((d, i) => {
+      if (d.ausgaben === null || !d.ausgaben) { return; }
+      let unten = y(0);
+      d.segmente.forEach((s, j) => {
+        const h = (hoehe - O - U) * (s.rappen / max);
+        if (h <= 0) { return; }
+        const oben = unten - h;
+        const letzte = j === d.segmente.length - 1;
+        const r = letzte ? Math.min(4, h / 2, bb / 2) : 0;
+        const x0 = x(i) - bb / 2, x1 = x(i) + bb / 2;
+        const pfad = r
+          ? `M${x0},${unten} L${x0},${oben + r} Q${x0},${oben} ${x0 + r},${oben} L${x1 - r},${oben} Q${x1},${oben} ${x1},${oben + r} L${x1},${unten} Z`
+          : `M${x0},${unten} L${x0},${oben} L${x1},${oben} L${x1},${unten} Z`;
+        svg += `<path class="fin-seg ${s.klasse}" d="${pfad}"/>`;
+        unten = oben;
+      });
+      if (d.geschaetzt) {
+        const h = (hoehe - O - U) * (Math.min(d.geschaetzt, d.ausgaben) / max);
+        svg += `<rect class="fin-geschaetzt" x="${x(i) - bb / 2}" y="${unten}" width="${bb}" height="${h}"/>`;
+      }
+    });
+  }
+
+  const kurve = (feld, klasse, verlauf) => {
+    const p = daten.map((d, i) => [x(i), y(d[feld])]);
+    const fest = p.slice(0, Math.max(1, n - 1));
+    const pfad = finMonotonPfad(fest);
+    let s = '';
+    if (p.length > 1) {
+      const bisEnde = n > 1 ? `${pfad} L${p[n - 1][0]},${p[n - 1][1]}` : pfad;
+      s += `<path d="${bisEnde} L${p[n - 1][0]},${y(0)} L${p[0][0]},${y(0)} Z" fill="url(#${verlauf})"/>`;
+    }
+    s += `<path class="${klasse}" d="${pfad}"/>`;
+    if (n > 1) { s += `<path class="${klasse} gestrichelt" d="M${p[n - 2][0]},${p[n - 2][1]} L${p[n - 1][0]},${p[n - 1][1]}"/>`; }
+    s += p.map(([px, py], i) => `<circle class="${klasse}-pkt${i === laufend ? ' laufend' : ''}" data-i="${i}" cx="${px}" cy="${py}" r="3.5"/>`).join('');
+    return s;
+  };
+  if (reOk) {
+    svg += kurve('verrechnet', 'fin-l-verrechnet', 'finVerlaufV');
+    svg += kurve('bezahlt', 'fin-l-bezahlt', 'finVerlaufB');
+  }
+  svg += `<line class="fin-hilfslinie" id="finHilfslinie" x1="0" x2="0" y1="${O - 8}" y2="${hoehe - U}" style="display:none"/>`;
+  daten.forEach((d, i) => {
+    svg += `<rect class="fin-treffer" x="${x(i) - schritt / 2}" y="${O - 8}" width="${schritt}" height="${hoehe - O - U + 8}"
+      tabindex="0" aria-label="${esc(finMonatLang(d.m))}" onmouseenter="finTipZeigen(${i})" onfocus="finTipZeigen(${i})"
+      onmouseleave="finTipWeg()" onblur="finTipWeg()"/>`;
+  });
+  svg += '</svg><div class="fin-tip" id="finTip" hidden></div>';
+  box.innerHTML = svg;
+  box.dataset.schritt = String(schritt);
+  box.dataset.links = String(L);
+
+  // Legende: immer da (mehr als eine Reihe), jede Reihe mit Namen.
+  const leg = [];
+  if (reOk) {
+    leg.push('<span class="fin-leg"><i class="fin-sw verrechnet"></i>verrechnet</span>');
+    leg.push('<span class="fin-leg"><i class="fin-sw bezahlt"></i>bezahlt</span>');
+  } else {
+    leg.push(`<span class="fin-leg fin-leg-ohne">Einnahmen: ${reStand === 'nicht_eingerichtet' ? 'nicht eingerichtet' : 'nicht geladen'}</span>`);
+  }
+  leg.push('<span class="fin-leg-trenner" aria-hidden="true"></span>');
+  if (!ausDa) {
+    leg.push(`<span class="fin-leg fin-leg-ohne">Ausgaben: ${finDaten ? 'nicht eingerichtet' : 'nicht geladen'}</span>`);
+  } else if (!ausIrgend) {
+    leg.push('<span class="fin-leg fin-leg-ohne">Ausgaben: noch keine erfasst</span>');
+  } else {
+    const gesehen = new Map();
+    daten.forEach(d => d.segmente.forEach(s => { if (!gesehen.has(s.klasse)) { gesehen.set(s.klasse, s.name); } }));
+    const klassen = [...gesehen.keys()].sort();
+    if (!klassen.length) { leg.push('<span class="fin-leg fin-leg-ohne">Ausgaben: im Zeitraum keine</span>'); }
+    klassen.forEach(k => leg.push(`<span class="fin-leg"><i class="fin-sw ${k}"></i>${esc(gesehen.get(k))}</span>`));
+    if (daten.some(d => d.geschaetzt)) { leg.push('<span class="fin-leg"><i class="fin-sw geschaetzt"></i>geschätzt</span>'); }
+  }
+  $('finLegende').innerHTML = leg.join('');
+}
+
+function finTipZeigen(i) {
+  const d = finChartDaten[i];
+  const tip = $('finTip');
+  const box = $('finChart');
+  if (!d || !tip || !box) { return; }
+  const schritt = Number(box.dataset.schritt), links = Number(box.dataset.links);
+  const svg = box.querySelector('svg');
+  const faktor = svg ? svg.getBoundingClientRect().width / svg.viewBox.baseVal.width : 1;
+  const xPx = (links + schritt * (i + 0.5)) * faktor;
+  const linie = $('finHilfslinie');
+  if (linie) {
+    linie.setAttribute('x1', links + schritt * (i + 0.5));
+    linie.setAttribute('x2', links + schritt * (i + 0.5));
+    linie.style.display = '';
+  }
+  box.querySelectorAll('circle[data-i]').forEach(c => c.classList.toggle('hervor', Number(c.dataset.i) === i));
+  const zeile = (sw, t, wert, klasse) =>
+    `<div class="fin-tip-z${klasse ? ' ' + klasse : ''}">${sw ? `<i class="fin-sw ${sw}"></i>` : '<i></i>'}<span>${t}</span><b>${wert}</b></div>`;
+  let html = `<div class="fin-tip-kopf">${esc(finMonatLang(d.m))}${i === finChartDaten.length - 1 ? ' <span class="chip chip-a">laufend</span>' : ''}</div>`;
+  if (reStand === 'ok') {
+    html += zeile('verrechnet', 'verrechnet', 'CHF ' + chf(d.verrechnet));
+    html += zeile('bezahlt', 'bezahlt', 'CHF ' + chf(d.bezahlt));
+    html += zeile('', 'davon heute noch offen', 'CHF ' + chf(d.offen), 'fein');
+  }
+  if (finAusDa()) {
+    html += '<div class="fin-tip-trenner"></div>';
+    if (d.ausgaben === null) {
+      html += zeile('', 'Ausgaben', d.vorBeginn ? 'noch nicht erfasst' : 'nichts erfasst', 'ohne');
+    } else {
+      html += zeile('', 'Ausgaben', 'CHF ' + chf(d.ausgaben));
+      d.segmente.forEach(s => { html += zeile(s.klasse, esc(s.name), 'CHF ' + chf(s.rappen), 'fein'); });
+      if (d.geschaetzt) { html += `<div class="fin-tip-hinweis">davon geschätzt CHF ${chf(d.geschaetzt)} (CHF-Betrag laut Abrechnung fehlt)</div>`; }
+      if (d.fehlt) { html += `<div class="fin-tip-hinweis">${nf(d.fehlt)} ${d.fehlt === 1 ? 'Ausgabe' : 'Ausgaben'} ohne CHF-Betrag und ohne Schätzung, nicht mitgezählt</div>`; }
+    }
+  }
+  tip.innerHTML = html;
+  tip.hidden = false;
+  const bw = box.clientWidth, tw = tip.offsetWidth;
+  let links2 = xPx + 16;
+  if (links2 + tw > bw) { links2 = xPx - tw - 16; }
+  tip.style.left = Math.max(0, links2) + 'px';
+  tip.style.top = '8px';
+}
+function finTipWeg() {
+  const tip = $('finTip'); if (tip) { tip.hidden = true; }
+  const linie = $('finHilfslinie'); if (linie) { linie.style.display = 'none'; }
+  document.querySelectorAll('#finChart circle.hervor').forEach(c => c.classList.remove('hervor'));
+}
+
+// ── Offene Rechnungen nach Alter und Mahnliste: dieselben Baender wie im
+// Cockpit (KU_LAGE_BAENDER), Stichtag heute, Betraege inkl. MWST.
+const FIN_BAENDER = [
+  { titel: 'Noch nicht fällig', stil: '',          trifft: t => t !== null && t <= 0 },
+  { titel: '1–30 Tage',         stil: 'warn',      trifft: t => t !== null && t >= 1  && t <= 30 },
+  { titel: '31–60 Tage',        stil: 'warn',      trifft: t => t !== null && t >= 31 && t <= 60 },
+  { titel: 'über 60 Tage',      stil: 'neg',       trifft: t => t !== null && t >  60 },
+  { titel: 'Ohne Datum',        stil: 'unbekannt', trifft: t => t === null },
+];
+const FIN_ZEILEN = 6;
+
+function finAlterZeichnen() {
+  if (reStand !== 'ok') {
+    $('finAlterUnter').textContent = '';
+    $('finAlter').innerHTML = FIN_RE_OHNE();
+    $('finMahn').innerHTML = '';
+    return;
+  }
+  const aktiv = rechnungen.filter(finIstVerrechnet);
+  const offen = aktiv.filter(b => !Number(b.bezahlt));
+  const mitTagen = offen.map(b => ({ b, t: finUeberTage(b) }));
+  const ueber = mitTagen.filter(x => x.t !== null && x.t >= 1).sort((a, b) => b.t - a.t);
+  $('finAlterUnter').textContent = (offen.length
+    ? `inkl. MWST · Stand heute · ${nf(offen.length)} offene ${offen.length === 1 ? 'Rechnung' : 'Rechnungen'}`
+    : 'inkl. MWST · Stand heute') + finEntwurfHinweis();
+  if (!offen.length) {
+    $('finAlter').innerHTML = aktiv.length
+      ? LEER('Alles bezahlt', 'Zurzeit ist keine Rechnung offen.')
+      : LEER('Noch keine verrechnete Rechnung', 'Sobald eine Rechnung versendet ist, erscheint sie hier.');
+    $('finMahn').innerHTML = '';
+    return;
+  }
+  const baender = FIN_BAENDER.map(band => {
+    const treffer = mitTagen.filter(x => band.trifft(x.t));
+    return { titel: band.titel, stil: band.stil, rappen: finSumme(treffer.map(x => x.b)), anzahl: treffer.length };
+  });
+  const max = Math.max(1, ...baender.map(b => b.rappen));
+  $('finAlter').innerHTML = '<div class="bars">' + baender.map(b => {
+    // Ein Band ohne Betrag bekommt die Stummel-Marke und KEINE Farbe.
+    const leer = !b.rappen;
+    const h = Math.round((b.rappen / max) * 710) / 10;
+    const titel = `${b.titel}: CHF ${chf(b.rappen)} aus ${nf(b.anzahl)} ` + (b.anzahl === 1 ? 'Rechnung' : 'Rechnungen');
+    return `<div class="bar" title="${esc(titel)}">
+      <div class="bar-val">${b.rappen ? chf(b.rappen) : ''}</div>
+      <div class="bar-fill${leer ? ' leer' : (b.stil ? ' ' + b.stil : '')}" style="flex-basis:${leer ? '4px' : h + '%'}"></div>
+      <div class="bar-lbl">${esc(b.titel)}</div>
+    </div>`;
+  }).join('') + '</div><div class="bars-axis"></div>';
+  if (!ueber.length) {
+    $('finMahn').innerHTML = LEER('Nichts überfällig', 'Alle offenen Rechnungen sind noch innerhalb ihrer Frist.');
+    return;
+  }
+  const zeigen = ueber.slice(0, FIN_ZEILEN);
+  const bezug = ueber.length > zeigen.length ? `die ältesten ${nf(zeigen.length)} von ${nf(ueber.length)}` : '';
+  $('finMahn').innerHTML = `<table><thead><tr>
+      <th>Am längsten überfällig${bezug ? ` <span class="sec">· ${bezug}</span>` : ''}</th><th>Empfänger</th><th class="num">Überfällig</th><th class="num">Betrag</th>
+    </tr></thead><tbody>` + zeigen.map(x => `
+      <tr class="click" onclick="ofOeffnen(${Number(x.b.id)})">
+        <td class="nowrap strong">${esc(x.b.nummer)}</td>
+        <td>${esc(reEmpfaenger(x.b) || '–')}<div class="sec">${esc(x.b.titel || '')}</div></td>
+        <td class="num nowrap" style="color:var(--neg)">${nf(x.t)} ${x.t === 1 ? 'Tag' : 'Tage'}</td>
+        <td class="num nowrap strong">CHF ${chf(x.b.total_rappen)}</td>
+      </tr>`).join('') + '</tbody></table>';
+}
+
+// ── Wiederkehrender Umsatz je Mandant (ENT-725, Punkt 5).
+function finMrrZeichnen() {
+  const el = $('finMrr');
+  const mrr = finDaten && finDaten.mrr;
+  if (!finDaten) { el.innerHTML = LEER('Nicht geladen', finFehler || 'Bitte später erneut versuchen.'); return; }
+  if (!mrr.eingerichtet) { el.innerHTML = LEER('Verträge nicht eingerichtet', 'Die Tabellen für Verträge fehlen noch. Einrichtung ausführen.'); return; }
+  const hinweise = [];
+  if (mrr.ruhend) { hinweise.push(`${nf(mrr.ruhend)} ${mrr.ruhend === 1 ? 'Vertrag zählt' : 'Verträge zählen'} nicht: Mandant gesperrt, beendet oder nicht mehr im Stamm`); }
+  if (mrr.ohne_mandant) { hinweise.push(`${nf(mrr.ohne_mandant)} angenommene${mrr.ohne_mandant === 1 ? 'r Vertrag' : ' Verträge'} ohne aufgeschalteten Mandanten`); }
+  const fuss = hinweise.length ? `<div class="fin-fuss" style="padding:0 18px 14px">${esc(hinweise.join(' · '))}</div>` : '';
+  if (!mrr.zeilen.length) {
+    el.innerHTML = LEER('Kein laufender Vertrag', 'Es zählen angenommene Verträge von aktiven Mandanten. Verträge stehen unter Mandanten → Verträge.') + fuss;
+    return;
+  }
+  const lage = z => {
+    if (z.lage === 'gekuendigt') { return `<span class="chip chip-w">gekündigt per ${dmy(z.ende)}</span>`; }
+    if (z.lage === 'laeuft_aus') { return `<span class="chip chip-w">endet ${dmy(z.ende)}</span>`; }
+    if (z.lage === 'laeuft') { return `<span class="chip chip-p">läuft</span>`; }
+    if (z.lage === 'ohne_ende') { return `<span class="chip chip-n">unbefristet</span>`; }
+    return '<span class="chip chip-n">Laufzeit nicht erfasst</span>';
+  };
+  el.innerHTML = `<table><thead><tr><th>Mandant</th><th>Laufzeit</th><th class="num">pro Monat</th></tr></thead><tbody>`
+    + mrr.zeilen.map(z => `<tr>
+        <td class="strong">${esc(z.mandant || '–')}<div class="sec">${esc(z.nummer)}${z.jahr_rappen ? ' · davon jährlich CHF ' + chf(z.jahr_rappen) + ' ÷ 12' : ''}</div></td>
+        <td>${lage(z)}</td>
+        <td class="num nowrap strong">CHF ${chf(z.beitrag_rappen)}</td>
+      </tr>`).join('')
+    + `</tbody><tfoot><tr><td colspan="2">Total aus ${nf(mrr.vertraege)} ${mrr.vertraege === 1 ? 'Vertrag' : 'Verträgen'}</td><td class="num nowrap strong">CHF ${chf(mrr.rappen)}</td></tr></tfoot></table>` + fuss;
+}
+
+// ── Ausgaben nach Kategorie im Zeitraum.
+function finKatZeichnen(monate) {
+  const el = $('finKat');
+  if (!finDaten) { el.innerHTML = LEER('Nicht geladen', finFehler || 'Bitte später erneut versuchen.'); return; }
+  if (!finAusDa()) { el.innerHTML = LEER('Ausgaben nicht eingerichtet', 'Die Tabellen für Ausgaben fehlen noch. Einrichtung ausführen.'); return; }
+  const a = finAusgaben();
+  if (!a.erste_periode) { el.innerHTML = LEER('Noch keine Ausgabe erfasst', 'Ausgaben erfasst du unter Finanzen → Ausgaben.'); return; }
+  const je = {};
+  let geschaetzt = 0, fehlt = 0;
+  monate.forEach(m => {
+    const x = (a.monate || {})[m];
+    if (!x) { return; }
+    geschaetzt += Number(x.geschaetzt_rappen) || 0;
+    fehlt += Number(x.fehlt) || 0;
+    Object.entries(x.kategorien || {}).forEach(([id, v]) => { je[id] = (je[id] || 0) + (Number(v) || 0); });
+  });
+  const liste = Object.entries(je).map(([id, v]) => ({ id, name: finKatName(id), klasse: finKatKlasse(id), v }))
+    .sort((p, q) => q.v - p.v);
+  if (!liste.length) {
+    el.innerHTML = LEER('Im Zeitraum nichts erfasst', 'In diesem Zeitraum steht keine Ausgabe. Die erste erfasste stammt aus ' + finMonatLang(a.erste_periode) + '.');
+    return;
+  }
+  const total = liste.reduce((s, z) => s + z.v, 0);
+  const max = Math.max(1, ...liste.map(z => z.v));
+  const zus = [];
+  if (geschaetzt) { zus.push('davon geschätzt CHF ' + chf(geschaetzt)); }
+  if (fehlt) { zus.push(`${nf(fehlt)} ${fehlt === 1 ? 'Ausgabe' : 'Ausgaben'} ohne CHF-Betrag nicht mitgezählt`); }
+  el.innerHTML = liste.map(z => `
+    <div class="fin-zeile">
+      <span class="fin-name" title="${esc(z.name)}"><i class="fin-sw ${z.klasse}"></i>${esc(z.name)}</span>
+      <span class="fin-balken ${z.klasse}"><i style="width:${Math.max(0, Math.round(z.v / max * 1000) / 10)}%"></i></span>
+      <b class="num">CHF ${chf(z.v)}</b>
+      <span class="num fin-anteil">${total ? nf(z.v / total * 100, 1) : '0.0'} %</span>
+    </div>`).join('')
+    + `<div class="fin-fuss">Total CHF ${chf(total)}${zus.length ? ' · ' + esc(zus.join(' · ')) : ''}</div>`;
+}
+
+// ── Letzte Ausgaben: die sechs juengsten aktiven, wie abgerechnet.
+function finLetzteZeichnen() {
+  const el = $('finLetzte');
+  if (!ausDaten) { el.innerHTML = LEER('Nicht geladen', ausFehler || 'Bitte später erneut versuchen.'); return; }
+  if (!ausDaten.eingerichtet) { el.innerHTML = LEER('Ausgaben nicht eingerichtet', 'Die Tabellen für Ausgaben fehlen noch. Einrichtung ausführen.'); return; }
+  const l = (ausDaten.ausgaben || []).filter(z => z.aktiv).slice(0, 6);
+  if (!l.length) { el.innerHTML = LEER('Noch keine Ausgabe erfasst', 'Ausgaben erfasst du unter Finanzen → Ausgaben.'); return; }
+  el.innerHTML = `<table><thead><tr><th>Datum</th><th>Wofür</th><th class="num">Betrag</th></tr></thead><tbody>`
+    + l.map(z => `<tr class="click" onclick="finGo('ausgaben'); ausDlgOeffnen(${Number(z.id)})">
+        <td class="nowrap">${dmy(z.datum)}</td>
+        <td class="strong">${esc(z.text)}<div class="sec">${esc(z.kategorie_name || '')}${z.lieferant ? ' · ' + esc(z.lieferant) : ''}</div></td>
+        <td class="num nowrap">${ausBetragHtml(z)}</td>
+      </tr>`).join('') + '</tbody></table>';
+}
+
+/* ── Ausgaben (ENT-725, Punkte 6 bis 12) ──────────────────────────────
+   Die Liste kommt vom Server samt Schaetzung fuer fehlende CHF-Betraege.
+   Der Server bucht beim Laden die faelligen Monate der Vorlagen. */
+let ausDaten = null;
+let ausFehler = '';
+let ausTab = 'alle';
+let ausId = null;
+let ausVorlageVon = null;   // vorlage_id der offenen Ausgabe, sonst null
+let vlId = null;
+let katId = null;
+
+async function ausLadenRoh() {
+  try {
+    const a = await ruf('betreiber_ausgabe_list.php');
+    if (a.status !== 'ok') { ausDaten = null; ausFehler = a.message || 'Die Ausgaben konnten nicht geladen werden.'; return; }
+    ausDaten = a; ausFehler = '';
+  } catch (e) {
+    ausDaten = null; ausFehler = 'Die Ausgaben konnten nicht geladen werden.';
+  }
+}
+async function ausLaden() {
+  await ausLadenRoh();
+  ausZeichnen();
+}
+
+function ausTabGo(t) {
+  ausTab = t;
+  document.querySelectorAll('#ausTabs .tab').forEach(b => b.classList.remove('on'));
+  $('austab-' + t).classList.add('on');
+  ausZeichnen();
+}
+
+// Betrag in Rappen aus einer Eingabe: null fuer leer, NaN fuer Unlesbares.
+// Anders als chfZuRappen(): Ein leeres Feld ist hier "fehlt", nicht 0.
+function ausEingabeRappen(wert) {
+  const t = String(wert == null ? '' : wert).replace(/['\s]/g, '').replace(',', '.');
+  if (t === '') { return null; }
+  if (!/^\d+(\.\d{0,2})?$/.test(t)) { return NaN; }
+  return Math.round(parseFloat(t) * 100);
+}
+const ausFremdText = (w, r) => `${esc(w)} ${chf(r)}`;
+function ausKurs(z) {
+  if (z.waehrung === 'CHF' || z.betrag_rappen === null || !z.betrag_fremd_rappen) { return null; }
+  return z.betrag_rappen / z.betrag_fremd_rappen;
+}
+// "fehlt" ist eine eigene Aussage, keine 0. Mit Schaetzung steht sie als
+// "≈" daneben -- sichtbar geschaetzt, nie wie ein echter Betrag.
+function ausBetragHtml(z) {
+  if (z.betrag_rappen !== null) { return `CHF ${chf(z.betrag_rappen)}`; }
+  return `<span class="aus-fehlt">CHF-Betrag fehlt</span>`
+    + (z.schaetzung_rappen !== null ? `<div class="aus-schaetzung">≈ CHF ${chf(z.schaetzung_rappen)} geschätzt</div>` : '');
+}
+const ausNettoRappen = z => {
+  const b = z.betrag_rappen !== null ? z.betrag_rappen : z.schaetzung_rappen;
+  if (b === null) { return null; }
+  return z.mwst_satz_bp > 0 ? Math.round(b * 10000 / (10000 + z.mwst_satz_bp)) : b;
+};
+
+function ausKatOptionen(sel, aktuell) {
+  const liste = (ausDaten && ausDaten.kategorien) || [];
+  // Archivierte nur, wenn die Buchung sie schon traegt.
+  sel.innerHTML = '<option value="">Bitte wählen …</option>' + liste
+    .filter(k => k.aktiv || Number(k.id) === Number(aktuell))
+    .map(k => `<option value="${Number(k.id)}"${Number(k.id) === Number(aktuell) ? ' selected' : ''}>${esc(k.name)}${k.aktiv ? '' : ' (archiviert)'}</option>`).join('');
+}
+function ausMwstOptionen(sel, aktuell) {
+  const saetze = (ausDaten && ausDaten.mwst_saetze) || [];
+  sel.innerHTML = saetze.map(s =>
+    `<option value="${Number(s.bp)}"${Number(s.bp) === Number(aktuell) ? ' selected' : ''}>${esc(s.titel)}${s.bp ? '' : ' (ohne MWST)'}</option>`).join('');
+}
+
+function ausZeichnen() {
+  const el = $('ausTable');
+  if (!el) { return; }
+  const neuText = { alle: 'Ausgabe erfassen', archiv: 'Ausgabe erfassen', vorlagen: 'Wiederkehrende Kosten anlegen', kategorien: 'Kategorie anlegen' };
+  $('ausNeuText').textContent = neuText[ausTab];
+  const nurBuchungen = ausTab === 'alle' || ausTab === 'archiv';
+  zeig($('ausFilter'), nurBuchungen);
+  zeig($('ausKat'), ausTab !== 'kategorien');
+  zeig($('ausHinweis'), false);
+  if (!ausDaten) { el.innerHTML = LEER('Nicht abrufbar', ausFehler || 'Unbekannter Fehler.'); return; }
+  if (!ausDaten.eingerichtet) { nichtEingerichtet('ausTable', 'Die Ausgaben'); return; }
+  // Filter der Kategorien nachfuehren, Auswahl behalten.
+  const katSel = $('ausKat'), katWert = katSel.value;
+  katSel.innerHTML = '<option value="">Alle Kategorien</option>' + ausDaten.kategorien
+    .map(k => `<option value="${Number(k.id)}">${esc(k.name)}${k.aktiv ? '' : ' (archiviert)'}</option>`).join('');
+  katSel.value = ausDaten.kategorien.some(k => String(k.id) === katWert) ? katWert : '';
+  if (ausTab === 'vorlagen') { vlZeichnen(); return; }
+  if (ausTab === 'kategorien') { katZeichnen(); return; }
+
+  const q = ($('ausQ').value || '').toLowerCase().trim();
+  const kat = $('ausKat').value;
+  const filter = $('ausFilter').value;
+  const basis = ausDaten.ausgaben.filter(z => ausTab === 'archiv' ? !z.aktiv : !!z.aktiv);
+  const d = basis.filter(z =>
+    (!kat || String(z.kategorie_id) === kat)
+    && (filter !== 'fehlt' || z.betrag_rappen === null)
+    && (!q || [z.text, z.lieferant, z.kategorie_name].some(f => String(f || '').toLowerCase().includes(q))));
+
+  // Fehlende CHF-Betraege sind Arbeit, die ansteht -- oben genannt, mit
+  // dem Weg dorthin.
+  const fehlen = ausDaten.ausgaben.filter(z => z.aktiv && z.betrag_rappen === null).length;
+  if (ausTab === 'alle' && fehlen && filter !== 'fehlt') {
+    const h = $('ausHinweis');
+    h.innerHTML = `${nf(fehlen)} ${fehlen === 1 ? 'Ausgabe wartet' : 'Ausgaben warten'} auf den CHF-Betrag von der Kreditkartenabrechnung. `
+      + '<button type="button" class="btn btn-plain btn-sm" onclick="$(\'ausFilter\').value=\'fehlt\'; ausZeichnen()">Anzeigen</button>';
+    h.className = 'meldung warn';
+  }
+
+  if (!d.length) {
+    el.innerHTML = basis.length
+      ? LEER('Keine Treffer', 'Für diese Suche oder diesen Filter gibt es keine Ausgabe.')
+      : (ausTab === 'archiv'
+        ? LEER('Nichts archiviert', 'Archivierte Ausgaben zählen nirgends mit und stehen hier.')
+        : LEER('Noch keine Ausgabe erfasst', 'Erfasse Ausgaben einzeln oder lege wiederkehrende Kosten an — die werden dann jeden Monat gebucht.'));
+    return;
+  }
+  const netto = d.map(ausNettoRappen);
+  const summe = netto.reduce((s, v) => s + (v || 0), 0);
+  const ohne = netto.filter(v => v === null).length;
+  const geschaetzt = d.reduce((s2, z, i) => s2 + (z.betrag_rappen === null && netto[i] !== null ? netto[i] : 0), 0);
+  const bezug = d.length === basis.length ? `${nf(d.length)} ${d.length === 1 ? 'Ausgabe' : 'Ausgaben'}`
+    : `${nf(d.length)} von ${nf(basis.length)} Ausgaben`;
+  el.innerHTML = `<table><thead><tr>
+      <th>Datum</th><th>Wofür</th><th>Kategorie</th><th class="num">Betrag inkl. MWST</th>
+      <th class="num">Original</th><th class="num">MWST</th><th class="num">Netto</th><th>Beleg</th><th class="num">Aktion</th>
+    </tr></thead><tbody>` + d.map((z, i) => {
+      const k = ausKurs(z);
+      return `<tr class="click" onclick="ausDlgOeffnen(${Number(z.id)})">
+        <td class="nowrap">${dmy(z.datum)}</td>
+        <td class="strong">${esc(z.text)}<div class="sec">${z.lieferant ? esc(z.lieferant) : ''}${z.vorlage_id ? (z.lieferant ? ' · ' : '') + (z.von_hand ? 'aus Vorlage, von Hand geändert' : 'aus Vorlage') : ''}</div></td>
+        <td>${esc(z.kategorie_name || '–')}</td>
+        <td class="num nowrap">${ausBetragHtml(z)}</td>
+        <td class="num nowrap">${z.waehrung === 'CHF' ? '<span style="color:var(--ink-3)">–</span>'
+          : ausFremdText(z.waehrung, z.betrag_fremd_rappen) + (k ? `<div class="sec">Kurs ${nf(k, 4)}</div>` : '')}</td>
+        <td class="num nowrap">${bpText(z.mwst_satz_bp)} %</td>
+        <td class="num nowrap">${netto[i] === null ? '<span style="color:var(--ink-3)">unbekannt</span>'
+          : (z.betrag_rappen === null ? '<span class="aus-schaetzung">≈ CHF ' + chf(netto[i]) + '</span>' : 'CHF ' + chf(netto[i]))}</td>
+        <td onclick="event.stopPropagation()">${z.hat_datei
+          ? `<button type="button" class="btn btn-quiet btn-sm" title="${esc(z.datei_name || 'Beleg')}" onclick="ausDateiZeigen(${Number(z.id)})">Anzeigen</button>`
+          : '<span style="color:var(--ink-3)">–</span>'}</td>
+        <td class="num" onclick="event.stopPropagation()">
+          <button type="button" class="btn btn-quiet btn-sm" onclick="ausArchivKlick(${Number(z.id)}, ${z.aktiv ? 0 : 1})">${z.aktiv ? 'Archivieren' : 'Zurückholen'}</button>
+        </td>
+      </tr>`;
+    }).join('') + `</tbody><tfoot><tr><td colspan="6">${bezug} · Netto${geschaetzt ? `, davon geschätzt CHF ${chf(geschaetzt)}` : ''}${ohne ? ` · ${nf(ohne)} ohne Betrag, nicht mitgezählt` : ''}</td>
+      <td class="num nowrap strong">CHF ${chf(summe)}</td><td colspan="2"></td></tr></tfoot></table>`;
+}
+
+function ausNeuKlick() {
+  if (ausTab === 'vorlagen') { vlDlgOeffnen(null); return; }
+  if (ausTab === 'kategorien') { katDlgOeffnen(null); return; }
+  ausDlgOeffnen(null);
+}
+
+// Fremdwaehrung: zwei Betraege, der CHF-Betrag darf fehlen. Beschriftung
+// und Pflicht wechseln mit der Waehrung.
+function ausDlgBetragFelder() {
+  const w = ($('aus_waehrung').value || '').trim().toUpperCase() || 'CHF';
+  const fremd = w !== 'CHF';
+  zeig($('aus_fremd_feld'), fremd);
+  $('aus_fremd_lbl').textContent = `Betrag in ${w} *`;
+  $('aus_chf_lbl').textContent = fremd ? 'CHF laut Abrechnung, inkl. MWST' : 'Betrag CHF inkl. MWST *';
+  $('aus_chf').placeholder = fremd ? 'noch nicht abgerechnet' : '';
+  ausDlgRechnen();
+}
+function ausDlgRechnen() {
+  const w = ($('aus_waehrung').value || '').trim().toUpperCase() || 'CHF';
+  const chfR = ausEingabeRappen($('aus_chf').value);
+  const fremdR = ausEingabeRappen($('aus_fremd').value);
+  const bp = Number($('aus_mwst').value) || 0;
+  const teile = [];
+  if (Number.isFinite(chfR) && chfR !== null) {
+    const netto = bp > 0 ? Math.round(chfR * 10000 / (10000 + bp)) : chfR;
+    teile.push(`Netto <b>CHF ${chf(netto)}</b>` + (bp ? `, MWST CHF ${chf(chfR - netto)}` : ''));
+    if (w !== 'CHF' && Number.isFinite(fremdR) && fremdR > 0) { teile.push(`Kurs <b>${nf(chfR / fremdR, 4)}</b>`); }
+  } else if (w !== 'CHF') {
+    teile.push('Ohne CHF-Betrag steht die Ausgabe als „CHF-Betrag fehlt“ da und zählt nur geschätzt oder gar nicht.');
+  }
+  $('aus_rechnung').innerHTML = teile.join(' · ');
+}
+
+function ausDlgOeffnen(id) {
+  const z = id && ausDaten ? ausDaten.ausgaben.find(x => Number(x.id) === Number(id)) : null;
+  if (id && !z) { kurzmeldung('Die Ausgabe ist nicht mehr da. Liste neu geladen.'); ausLaden(); return; }
+  ausId = z ? Number(z.id) : null;
+  ausVorlageVon = z && z.vorlage_id ? z.vorlage_id : null;
+  $('ausDlgTitel').textContent = z ? 'Ausgabe ändern' : 'Ausgabe erfassen';
+  $('ausDlgUnter').textContent = z && z.vorlage_id
+    ? 'Aus einer Vorlage gebucht. Nach einer Änderung lässt eine spätere Vorlagenänderung diesen Monat in Ruhe.'
+    : 'Gilt als bezahlt, sobald sie erfasst ist. Jede Änderung steht im Logbuch.';
+  zeig($('ausErr'), false);
+  $('aus_datum').value = z ? z.datum : finTag();
+  ausKatOptionen($('aus_kategorie'), z ? z.kategorie_id : null);
+  $('aus_text').value = z ? z.text : '';
+  $('aus_lieferant').value = z ? (z.lieferant || '') : '';
+  $('aus_waehrung').value = z ? z.waehrung : 'CHF';
+  $('aus_fremd').value = z && z.betrag_fremd_rappen !== null ? rappenZuChf(z.betrag_fremd_rappen) : '';
+  $('aus_chf').value = z && z.betrag_rappen !== null ? rappenZuChf(z.betrag_rappen) : '';
+  ausMwstOptionen($('aus_mwst'), z ? z.mwst_satz_bp : 810);
+  $('aus_datei').value = '';
+  $('aus_datei_stand').innerHTML = z && z.hat_datei
+    ? `<span class="aus-datei">${esc(z.datei_name || 'Beleg')}</span>
+       <button type="button" class="btn btn-plain btn-sm" onclick="ausDateiZeigen(${Number(z.id)})">Anzeigen</button>
+       <button type="button" class="btn btn-plain btn-sm" onclick="ausDateiEntfernen(${Number(z.id)})">Entfernen</button>
+       <div>Eine neue Datei ersetzt diese.</div>`
+    : 'Noch keine Datei. PDF oder Bild, höchstens 5 MB.';
+  ausDlgBetragFelder();
+  dlgAuf('dlgAusgabe');
+  setTimeout(() => $(z ? 'aus_chf' : 'aus_text').focus(), 60);
+}
+
+// Datei lesen als base64 ohne den "data:"-Vorspann.
+function ausDateiLesen(datei) {
+  return new Promise((ja, nein) => {
+    const r = new FileReader();
+    r.onload = () => ja(String(r.result).replace(/^data:[^,]*,/, ''));
+    r.onerror = () => nein(new Error('Die Datei liess sich nicht lesen.'));
+    r.readAsDataURL(datei);
+  });
+}
+
+async function ausSpeichern() {
+  const err = $('ausErr');
+  const w = ($('aus_waehrung').value || '').trim().toUpperCase() || 'CHF';
+  const chfR = ausEingabeRappen($('aus_chf').value);
+  const fremdR = ausEingabeRappen($('aus_fremd').value);
+  if (Number.isNaN(chfR) || Number.isNaN(fremdR)) { melde(err, 'fehler', 'Bitte Beträge als Zahl erfassen, etwa 129.90.'); return; }
+  const datei = $('aus_datei').files && $('aus_datei').files[0];
+  if (datei && datei.size > 5 * 1024 * 1024) { melde(err, 'fehler', 'Die Datei ist grösser als 5 MB.'); return; }
+  const koerper = {
+    id: ausId || 0,
+    datum: $('aus_datum').value,
+    kategorie_id: Number($('aus_kategorie').value) || 0,
+    text: ($('aus_text').value || '').trim(),
+    lieferant: ($('aus_lieferant').value || '').trim(),
+    waehrung: w,
+    betrag_rappen: chfR,
+    betrag_fremd_rappen: w === 'CHF' ? null : fremdR,
+    mwst_satz_bp: Number($('aus_mwst').value),
+  };
+  $('ausSaveBtn').disabled = true;
+  try {
+    const a = await ruf('betreiber_ausgabe_speichern.php', koerper);
+    if (a.status !== 'ok') { melde(err, 'fehler', a.message || 'Speichern fehlgeschlagen.'); return; }
+    if (datei) {
+      const d = await ruf('betreiber_ausgabe_datei.php', { id: a.id, name: datei.name, inhalt: await ausDateiLesen(datei) });
+      if (d.status !== 'ok') {
+        // Die Ausgabe steht -- nur die Datei nicht. Das muss man sehen.
+        ausId = a.id;
+        melde(err, 'fehler', 'Die Ausgabe ist gespeichert, die Datei nicht: ' + (d.message || 'Hochladen fehlgeschlagen.'));
+        await ausLadenRoh(); ausZeichnen();
+        return;
+      }
+    }
+    dlgZu('dlgAusgabe');
+    kurzmeldung(ausId ? 'Ausgabe geändert.' : 'Ausgabe erfasst.');
+    await ausLaden();
+  } catch (e) {
+    melde(err, 'fehler', e.message || 'Speichern fehlgeschlagen.');
+  } finally {
+    $('ausSaveBtn').disabled = false;
+  }
+}
+
+async function ausArchivKlick(id, aktiv) {
+  const a = await ruf('betreiber_ausgabe_archivieren.php', { id, aktiv });
+  if (a.status !== 'ok') { kurzmeldung(a.message || 'Fehlgeschlagen.'); return; }
+  kurzmeldung(aktiv ? 'Ausgabe zurückgeholt.' : 'Ausgabe archiviert. Sie zählt nicht mehr mit.');
+  await ausLaden();
+}
+
+// Die Datei kommt als JSON (der Ausweis steht im Kopf, nicht im Cookie)
+// und wird hier zur Datei, die der Browser in einem neuen Fenster zeigt.
+async function ausDateiZeigen(id) {
+  const fenster = window.open('', '_blank');
+  const a = await ruf('betreiber_ausgabe_datei.php?id=' + Number(id));
+  if (a.status !== 'ok') { if (fenster) { fenster.close(); } kurzmeldung(a.message || 'Die Datei konnte nicht geladen werden.'); return; }
+  const bytes = Uint8Array.from(atob(a.inhalt), c => c.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes], { type: a.typ }));
+  if (fenster) { fenster.location = url; } else { window.location.href = url; }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+async function ausDateiEntfernen(id) {
+  const a = await ruf('betreiber_ausgabe_datei.php', { id, entfernen: true });
+  if (a.status !== 'ok') { kurzmeldung(a.message || 'Fehlgeschlagen.'); return; }
+  kurzmeldung('Datei entfernt.');
+  await ausLadenRoh();
+  ausZeichnen();
+  ausDlgOeffnen(id);
+}
+
+// ── Vorlagen (Wiederkehrend)
+function vlZeichnen() {
+  const el = $('ausTable');
+  const q = ($('ausQ').value || '').toLowerCase().trim();
+  const kat = $('ausKat').value;
+  const alle = ausDaten.vorlagen || [];
+  const d = alle.filter(v => (!kat || String(v.kategorie_id) === kat)
+    && (!q || [v.text, v.lieferant, v.kategorie_name].some(f => String(f || '').toLowerCase().includes(q))));
+  if (!d.length) {
+    el.innerHTML = alle.length
+      ? LEER('Keine Treffer', 'Für diese Suche gibt es keine wiederkehrenden Kosten.')
+      : LEER('Noch keine wiederkehrenden Kosten', 'Hosting, Abos, Miete: einmal anlegen, jeder fällige Monat wird als Ausgabe gebucht.');
+    return;
+  }
+  const heute = finTag();
+  el.innerHTML = `<table><thead><tr>
+      <th>Wofür</th><th>Kategorie</th><th>Wiederholung</th><th class="num">Betrag</th><th>Laufzeit</th><th>Stand</th><th class="num">Aktion</th>
+    </tr></thead><tbody>` + d.map(v => {
+      const beendet = v.gueltig_bis && v.gueltig_bis < heute;
+      const stand = !v.aktiv ? '<span class="chip chip-n">stillgelegt</span>'
+        : beendet ? '<span class="chip chip-n">beendet</span>' : '<span class="chip chip-p">läuft</span>';
+      const betrag = v.waehrung === 'CHF' ? `CHF ${chf(v.betrag_rappen)}`
+        : ausFremdText(v.waehrung, v.betrag_fremd_rappen) + `<div class="sec">${v.betrag_rappen !== null ? 'Schätzung CHF ' + chf(v.betrag_rappen) : 'ohne Schätzung'}</div>`;
+      return `<tr class="click${v.aktiv ? '' : ' aus'}" onclick="vlDlgOeffnen(${Number(v.id)})">
+        <td class="strong">${esc(v.text)}<div class="sec">${esc(v.lieferant || '')}</div></td>
+        <td>${esc(v.kategorie_name || '–')}</td>
+        <td>${v.intervall === 'jaehrlich' ? 'jährlich' : 'monatlich'}</td>
+        <td class="num nowrap">${betrag}<div class="sec">${bpText(v.mwst_satz_bp)} % MWST</div></td>
+        <td class="nowrap">ab ${dmy(v.gueltig_ab)}${v.gueltig_bis ? '<div class="sec">bis ' + dmy(v.gueltig_bis) + '</div>' : ''}</td>
+        <td>${stand}</td>
+        <td class="num" onclick="event.stopPropagation()">
+          <button type="button" class="btn btn-quiet btn-sm" onclick="vlAktivKlick(${Number(v.id)}, ${v.aktiv ? 0 : 1})">${v.aktiv ? 'Stilllegen' : 'Wieder aufnehmen'}</button>
+        </td>
+      </tr>`;
+    }).join('') + `</tbody><tfoot><tr><td colspan="7">${d.length === alle.length ? nf(alle.length) : nf(d.length) + ' von ' + nf(alle.length)} · Gebucht wird jeder fällige Monat bis heute. Stilllegen bucht keine neuen Monate, gebuchte bleiben.</td></tr></tfoot></table>`;
+}
+
+function vlDlgBetragFelder() {
+  const w = ($('vl_waehrung').value || '').trim().toUpperCase() || 'CHF';
+  const fremd = w !== 'CHF';
+  zeig($('vl_fremd_feld'), fremd);
+  $('vl_fremd_lbl').textContent = `Betrag in ${w} *`;
+  $('vl_chf_lbl').textContent = fremd ? 'Schätzung CHF für den ersten Monat' : 'Betrag CHF inkl. MWST *';
+  $('vl_chf').placeholder = fremd ? 'optional' : '';
+}
+
+function vlDlgOeffnen(id) {
+  const v = id && ausDaten ? (ausDaten.vorlagen || []).find(x => Number(x.id) === Number(id)) : null;
+  vlId = v ? Number(v.id) : null;
+  $('vlDlgTitel').textContent = v ? 'Wiederkehrende Kosten ändern' : 'Wiederkehrende Kosten anlegen';
+  zeig($('vlErr'), false);
+  $('vl_text').value = v ? v.text : '';
+  $('vl_lieferant').value = v ? (v.lieferant || '') : '';
+  ausKatOptionen($('vl_kategorie'), v ? v.kategorie_id : null);
+  $('vl_intervall').value = v ? v.intervall : 'monatlich';
+  $('vl_ab').value = v ? v.gueltig_ab : finTag();
+  // Den Beginn verschiebt man nicht -- dafuer wird beendet und neu angelegt.
+  $('vl_ab').disabled = !!v;
+  $('vl_bis').value = v && v.gueltig_bis ? v.gueltig_bis : '';
+  $('vl_waehrung').value = v ? v.waehrung : 'CHF';
+  $('vl_fremd').value = v && v.betrag_fremd_rappen !== null ? rappenZuChf(v.betrag_fremd_rappen) : '';
+  $('vl_chf').value = v && v.betrag_rappen !== null ? rappenZuChf(v.betrag_rappen) : '';
+  ausMwstOptionen($('vl_mwst'), v ? v.mwst_satz_bp : 810);
+  zeig($('vl_wirksam_feld'), !!v);
+  $('vl_wirksam').value = finMonat(0);
+  vlDlgBetragFelder();
+  dlgAuf('dlgVorlage');
+  setTimeout(() => $('vl_text').focus(), 60);
+}
+
+async function vlSpeichern() {
+  const err = $('vlErr');
+  const w = ($('vl_waehrung').value || '').trim().toUpperCase() || 'CHF';
+  const chfR = ausEingabeRappen($('vl_chf').value);
+  const fremdR = ausEingabeRappen($('vl_fremd').value);
+  if (Number.isNaN(chfR) || Number.isNaN(fremdR)) { melde(err, 'fehler', 'Bitte Beträge als Zahl erfassen, etwa 129.90.'); return; }
+  const koerper = {
+    id: vlId || 0,
+    text: ($('vl_text').value || '').trim(),
+    lieferant: ($('vl_lieferant').value || '').trim(),
+    kategorie_id: Number($('vl_kategorie').value) || 0,
+    intervall: $('vl_intervall').value,
+    gueltig_ab: $('vl_ab').value,
+    gueltig_bis: $('vl_bis').value || '',
+    waehrung: w,
+    betrag_rappen: chfR,
+    betrag_fremd_rappen: w === 'CHF' ? null : fremdR,
+    mwst_satz_bp: Number($('vl_mwst').value),
+  };
+  if (vlId) { koerper.wirksam_ab = $('vl_wirksam').value; }
+  $('vlSaveBtn').disabled = true;
+  try {
+    const a = await ruf('betreiber_ausgabe_vorlage_speichern.php', koerper);
+    if (a.status !== 'ok') { melde(err, 'fehler', a.message || 'Speichern fehlgeschlagen.'); return; }
+    dlgZu('dlgVorlage');
+    const gebucht = Number(a.gebucht) || 0;
+    kurzmeldung((vlId ? 'Gespeichert.' : 'Angelegt.') + (gebucht ? ` ${gebucht} ${gebucht === 1 ? 'Monat' : 'Monate'} gebucht.` : ''));
+    await ausLaden();
+  } finally {
+    $('vlSaveBtn').disabled = false;
+  }
+}
+
+async function vlAktivKlick(id, aktiv) {
+  const a = await ruf('betreiber_ausgabe_vorlage_speichern.php', { id, aktiv });
+  if (a.status !== 'ok') { kurzmeldung(a.message || 'Fehlgeschlagen.'); return; }
+  kurzmeldung(aktiv ? 'Wieder aufgenommen.' : 'Stillgelegt. Es werden keine neuen Monate mehr gebucht.');
+  await ausLaden();
+}
+
+// ── Kategorien
+function katZeichnen() {
+  const el = $('ausTable');
+  const q = ($('ausQ').value || '').toLowerCase().trim();
+  const alle = ausDaten.kategorien || [];
+  const d = alle.filter(k => !q || k.name.toLowerCase().includes(q));
+  if (!d.length) {
+    el.innerHTML = alle.length ? LEER('Keine Treffer', 'Für diese Suche gibt es keine Kategorie.')
+      : LEER('Noch keine Kategorie', 'Die Startkategorien entstehen mit der Einrichtung. Weitere legst du hier an.');
+    return;
+  }
+  const zahl = id => ausDaten.ausgaben.filter(z => z.aktiv && Number(z.kategorie_id) === Number(id)).length;
+  el.innerHTML = `<table><thead><tr><th>Kategorie</th><th class="num">Ausgaben</th><th>Stand</th><th class="num">Aktion</th></tr></thead><tbody>`
+    + d.map(k => `<tr class="click${k.aktiv ? '' : ' aus'}" onclick="katDlgOeffnen(${Number(k.id)})">
+        <td class="strong"><span class="fin-name"><i class="fin-sw ${finKatKlasse(k.id)}"></i>${esc(k.name)}</span></td>
+        <td class="num">${nf(zahl(k.id))}</td>
+        <td>${k.aktiv ? '<span class="chip chip-p">aktiv</span>' : '<span class="chip chip-n">archiviert</span>'}</td>
+        <td class="num" onclick="event.stopPropagation()">
+          <button type="button" class="btn btn-quiet btn-sm" onclick="katAktivKlick(${Number(k.id)}, ${k.aktiv ? 0 : 1})">${k.aktiv ? 'Archivieren' : 'Zurückholen'}</button>
+        </td>
+      </tr>`).join('') + `</tbody><tfoot><tr><td colspan="4">Die ersten vier Kategorien haben in der Grafik eine eigene Farbe, alle weiteren erscheinen dort als „Weitere“.</td></tr></tfoot></table>`;
+}
+function katDlgOeffnen(id) {
+  const k = id && ausDaten ? ausDaten.kategorien.find(x => Number(x.id) === Number(id)) : null;
+  katId = k ? Number(k.id) : null;
+  $('katDlgTitel').textContent = k ? 'Kategorie umbenennen' : 'Kategorie anlegen';
+  zeig($('katErr'), false);
+  $('kat_name').value = k ? k.name : '';
+  dlgAuf('dlgKategorie');
+  setTimeout(() => $('kat_name').focus(), 60);
+}
+async function katSpeichern() {
+  const name = ($('kat_name').value || '').trim();
+  if (!name) { melde($('katErr'), 'fehler', 'Bitte einen Namen erfassen.'); return; }
+  $('katSaveBtn').disabled = true;
+  try {
+    const a = await ruf('betreiber_ausgabe_kategorie_speichern.php', { id: katId || 0, name });
+    if (a.status !== 'ok') { melde($('katErr'), 'fehler', a.message || 'Speichern fehlgeschlagen.'); return; }
+    dlgZu('dlgKategorie');
+    kurzmeldung(katId ? 'Kategorie umbenannt.' : 'Kategorie angelegt.');
+    await ausLaden();
+  } finally {
+    $('katSaveBtn').disabled = false;
+  }
+}
+async function katAktivKlick(id, aktiv) {
+  const a = await ruf('betreiber_ausgabe_kategorie_speichern.php', { id, aktiv });
+  if (a.status !== 'ok') { kurzmeldung(a.message || 'Fehlgeschlagen.'); return; }
+  kurzmeldung(aktiv ? 'Kategorie zurückgeholt.' : 'Kategorie archiviert. Bestehende Ausgaben behalten sie.');
+  await ausLaden();
+}
+
 
 async function ladeBriefkopfRoh() {
   const a = await ruf('betreiber_briefkopf.php');

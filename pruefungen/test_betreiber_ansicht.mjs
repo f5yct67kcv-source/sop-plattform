@@ -81,7 +81,8 @@ const AUFBAU = () => {
      Ansicht NEBEN den Bereichen -- ofNeu() blendet sie darum aus. Fuer diese
      Suite sollen sie alle gleichzeitig dastehen, damit in einem Durchgang
      gemessen werden kann, was sonst auf fuenf Bildschirmen liegt. */
-  ['b-uebersicht', 'b-mandanten', 'b-adressen', 'b-offerten', 'b-rechnungen']
+  // Seit ENT-725 liegen die Rechnungen unter Finanzen, als eigener Reiter.
+  ['b-uebersicht', 'b-mandanten', 'b-adressen', 'b-offerten', 'b-finanzen', 'finv-rechnungen']
     .forEach(id => document.getElementById(id).classList.remove('versteckt'));
 };
 
@@ -430,7 +431,7 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
   // Jeden Reiter anklicken, nicht nur einen: Ein vergessener Bereich
   // faellt sonst erst auf, wenn jemand ihn braucht.
   const titel = {};
-  for (const k of ['mandanten', 'adressen', 'offerten', 'rechnungen', 'konten', 'uebersicht']) {
+  for (const k of ['mandanten', 'adressen', 'offerten', 'finanzen', 'konten', 'uebersicht']) {
     await seite.click(`#kopf-nav .nav-item[data-bereich="${k}"]`);
     const l = await lage();
     titel[k] = l.titel;
