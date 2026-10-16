@@ -5780,6 +5780,15 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
      kompakte Raster von oben. Gefragt wird die Breite des Abschnitts, nicht
      des Fensters: Die Seitenleiste nimmt je nach Stellung 0 bis 232 px. */
   html[data-dichte="kompakt"] .abschnitt { container: abschnitt / inline-size; }
+  /* Mitarbeitende bearbeiten: Jeder Bereich (Person, Anstellung, ...) fragt
+     seine eigene Breite, wie ein Abschnitt. */
+  html[data-dichte="kompakt"] #mbKarten .mb-bereich { container: abschnitt / inline-size; }
+  /* Abschnittstitel wie in den uebrigen Formularen: klein, versal, grau --
+     auch das Pflichtband "Zugang anlegen", das ausserhalb der Bereiche steht
+     und dieselbe Ueberschriftform tragen muss (test_mabearbeiten.mjs). */
+  html[data-dichte="kompakt"] #mbKarten .ma-block > h3,
+  html[data-dichte="kompakt"] #mbNeuKonto .card-hd h3 { font-size: 11px; letter-spacing: .6px; text-transform: uppercase;
+    color: var(--ink-3); font-weight: 600; border: 0; padding: 0; margin: 0 0 12px; }
   @container abschnitt (min-width: 1220px) {
     /* ── Zeilenfluss "Neuer Einsatz" (Skizze des Projektinhabers, 2026-10-15).
        Statt eines Rasters, das jedes Feld auf die Spaltenbreite zieht, steht
@@ -5849,6 +5858,23 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
        ihren 38 px Mindesthoehe sass die Zeile 3 px tiefer (gemessen 49 statt
        46 px Abstand). */
     html[data-dichte="kompakt"] .zeilenfluss .wahl-reihe { min-height: 32px; }
+    /* Die Beschriftung steht neben dem Feld: ohne den Abstand nach unten, den
+       sie ueber einem Feld braucht -- sonst sitzt sie 4 px zu hoch. */
+    html[data-dichte="kompakt"] .zeilenfluss > .f > label { margin: 0; }
+    /* Ein Datum in 117 px: Platzhalter und Kalenderzeichen brauchen die
+       Breite fast ganz (wie beim Zeitraum in "Neuer Einsatz"). */
+    html[data-dichte="kompakt"] .zeilenfluss input[type="date"].inp { padding-right: 6px; }
+    /* Mitarbeitende bearbeiten: eine Spalte statt zwei, jede Zeile hat Platz
+       fuer ihre Felder. Die Abschnitte bekommen die Trennlinie und die
+       Abstaende der uebrigen Formulare. */
+    html[data-dichte="kompakt"] #mbKarten .ma-spalten { display: block; }
+    /* Ja/Nein-Haekchen in der Feldspalte, mit dem Zeilenabstand darueber. */
+    html[data-dichte="kompakt"] #mbKarten .ma-janein { margin: 14px 0 0 182px; }
+    html[data-dichte="kompakt"] #mbKarten .ma-janein:first-child,
+    html[data-dichte="kompakt"] #mbKarten h3 + .ma-janein { margin-top: 0; }
+    html[data-dichte="kompakt"] #mbKarten .ma-block { margin: 0 0 18px; padding: 0 0 4px; }
+    html[data-dichte="kompakt"] #mbKarten .ma-block + .ma-block,
+    html[data-dichte="kompakt"] #mbKarten .ma-spalte + .ma-spalte > .ma-block:first-child { border-top: 1px solid var(--line-soft); padding-top: 16px; }
     /* Kundenseite: Kommunikation und Kontaktpersonen folgen dem Zeilenfluss.
        Die Art (E-Mail, Telefon) steht in der Beschriftungsspalte, der Wert in
        Feldbreite -- statt einer Zeile ueber die ganze Seite. */
@@ -37749,6 +37775,51 @@ function darf(recht) {
   return !!me.ist_admin;   // Antwort ohne Rechteliste: alter Stand
 }
 
+// Zeilen und Breiten fuer die kompakte Darstellung (16.10.2026). Dieselbe
+// Anordnung wie "Neuer Einsatz", "Neuer Kunde" und "Neues Objekt": Jede Zeile
+// ist ein eigenes Raster, die erste Beschriftung steht in der 168-px-Spalte,
+// jedes Feld traegt seine eigene Breite. Ausserhalb des Zeilenflusses
+// (grosse Darstellung, schmaler Bildschirm) wird daraus wieder das
+// zweispaltige Raster mit der Beschriftung oben (ENT-074).
+// Ein Feld, das hier in keiner Zeile steht, kommt als eigene Zeile ans Ende
+// -- es darf nie fehlen, sonst speicherte "Angaben speichern" es leer.
+const MB_ZEILEN = {
+  person:        [['anrede', 'vorname', 'nachname'], ['geschlecht'],
+                  ['strasse', 'hausnummer', 'plz', 'ort'], ['adresszusatz', 'land']],
+  kontakt:       [['email', 'telefon_geschaeft', 'mobil_geschaeft'], ['email_privat', 'telefon', 'mobil'],
+                  ['notfallkontakt', 'notfallkontakt_tel'], ['sprache']],
+  betrieb:       [['personalnummer', 'kurzzeichen'], ['funktion_id', 'abteilung_id', 'anstellungsort_id'],
+                  ['beruf'], ['eintritt', 'austritt'], ['verkehrsmittel']],
+  personendaten: [['ahv_nr'], ['geburtsdatum', 'nationalitaet', 'heimatort', 'geburtsort'],
+                  ['zivilstand', 'heiratsdatum'],
+                  ['aufenthaltsbewilligung', 'aufenthalt_gueltig_bis', 'arbeitsbewilligung', 'arbeit_gueltig_bis'],
+                  ['zemis_nr'], ['strafregister_datum', 'betreibung_datum']],
+  dienstausweis: [['dienstausweis_nr', 'dienstausweis_gueltig_bis']],
+  qualifikation: [['fachausweis', 'fachausweis_am'], ['basisausbildung_am'],
+                  ['diensthund_bewilligung_bis'], ['waffe_bewilligung_bis']],
+  anstellung:    [['anstellungskategorie', 'pensum_stunden']],
+  zugang:        [['zugang_bis']],
+};
+const MB_BREITE = {
+  anrede: 104, geschlecht: 171, vorname: 204, nachname: 204, strasse: 345, hausnummer: 64,
+  plz: 80, ort: 218, adresszusatz: 345, land: 104,
+  email: 260, email_privat: 260, telefon: 171, telefon_geschaeft: 171, mobil: 171, mobil_geschaeft: 171,
+  notfallkontakt: 345, notfallkontakt_tel: 171, sprache: 104,
+  personalnummer: 104, kurzzeichen: 64, funktion_id: 218, abteilung_id: 218, anstellungsort_id: 218,
+  beruf: 218, eintritt: 117, austritt: 117, verkehrsmittel: 218,
+  ahv_nr: 345, geburtsdatum: 117, nationalitaet: 171, heimatort: 171, geburtsort: 171,
+  zivilstand: 218, heiratsdatum: 117, aufenthaltsbewilligung: 104, aufenthalt_gueltig_bis: 117,
+  arbeitsbewilligung: 218, arbeit_gueltig_bis: 117, zemis_nr: 204,
+  strafregister_datum: 117, betreibung_datum: 117,
+  dienstausweis_nr: 171, dienstausweis_gueltig_bis: 117,
+  fachausweis: 218, fachausweis_am: 117, basisausbildung_am: 117,
+  diensthund_bewilligung_bis: 117, waffe_bewilligung_bis: 117,
+  anstellungskategorie: 64, pensum_stunden: 104, zugang_bis: 117,
+};
+// Feste Beschriftungsbreite, wo zwei Zeilen dieselbe Spalte teilen: Telefon
+// und Mobil, privat wie geschaeftlich, stehen genau untereinander.
+const MB_LABEL = { telefon: 126, telefon_geschaeft: 126, mobil: 110, mobil_geschaeft: 110 };
+
 let mbAend  = {};        // aus dem Diktat uebernommen, noch nicht gespeichert
 let mbListen = {};       // pflegbare Listen aus der Antwort
 let mbNeuModus = false;  // legt die Flaeche eine Person an statt sie zu aendern?
@@ -37980,14 +38051,26 @@ function mbZeichnen() {
              + (hinweis ? ` placeholder="${esc(hinweis)}"` : '') + (gesperrt ? ' disabled' : '')
              + horcher + '>';
     }
-    return `<div class="f${breit ? ' wide' : ''}"><label for="${id}">${esc(label)}</label>${steuer}</div>`;
+    // Breite fuer den Zeilenfluss am Feld selbst (--zf-b), siehe MB_BREITE.
+    if (MB_BREITE[f]) { steuer = steuer.replace(/^<(input|select) /, `<$1 style="--zf-b:${MB_BREITE[f]}px" `); }
+    const lst = MB_LABEL[f] ? ` style="--zf-l:${MB_LABEL[f]}px"` : '';
+    return `<div class="f${breit ? ' wide' : ''}"><label for="${id}"${lst}>${esc(label)}</label>${steuer}</div>`;
   };
 
   // Ein Abschnitt mit `feldRahmen` stellt seine Felder in eine gerahmte Zone
   // statt in ein blankes Raster (ENT-289) -- gebraucht dort, wo daneben
   // ohnehin gerahmte Zonen stehen.
   const raster = a => {
-    const felder = `<div class="form-grid">${(a.felder || []).map(feld).join('')}</div>`;
+    // Zeilen nach MB_ZEILEN, je ein Raster; was keine Zeile hat, kommt einzeln
+    // ans Ende. "wide" nur fuer ein Feld allein in seiner Zeile -- im
+    // Zeilenfluss zoege es sonst ueber die ganze Breite.
+    const alleF = a.felder || [];
+    const zeilen = (MB_ZEILEN[a.id] || []).map(z => z.map(f => alleF.find(x => x[0] === f)).filter(Boolean));
+    const gesetzt = new Set(zeilen.flat().map(x => x[0]));
+    alleF.filter(x => !gesetzt.has(x[0])).forEach(x => zeilen.push([x]));
+    const felder = zeilen.filter(z => z.length).map(z =>
+      `<div class="form-grid zeilenfluss">${z.map(x => feld(z.length === 1 ? x : [x[0], x[1], x[2], x[3], x[4], false, x[6]])).join('')}</div>`
+    ).join('');
     if (!a.feldRahmen || !(a.felder || []).length) { return felder; }
     return `<div class="zone">
       <div class="zone-hd">${esc(a.feldRahmen.titel)}</div>
