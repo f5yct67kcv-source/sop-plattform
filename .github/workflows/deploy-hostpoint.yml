@@ -663,10 +663,9 @@ jobs:
           # eingebunden, nie direkt aufgerufen -- steht darum auch in
           # der Sperrliste der .htaccess.
           cp backend/betreiber.php dist/betreiber.php
-          # Rechenkern der Demo-Zugaenge (ENT-600) -- betreiber.php bindet
-          # ihn per require_once ein. Fehlt er, stirbt jeder Aufruf, der
-          # betreiber.php laedt, nicht erst die Demo-Freigabe.
+          # Pflicht fuer betreiber.php (require_once, ENT-600 und ENT-725).
           cp backend/demo_zugang.php dist/demo_zugang.php
+          cp backend/betreiber_finanzen.php dist/betreiber_finanzen.php
           cp backend/mail_vorlage.php dist/mail_vorlage.php
           cp backend/demo_bestaetigung.php dist/demo_bestaetigung.php
           cp backend/guardops-signatur.png dist/guardops-signatur.png
@@ -1337,6 +1336,7 @@ jobs:
           cp backend/gavzeit.php       dist-betreiber/gavzeit.php
           cp backend/lohnlauf.php      dist-betreiber/lohnlauf.php
           cp backend/logbuch.php       dist-betreiber/logbuch.php
+          cp backend/betreiber_finanzen.php dist-betreiber/betreiber_finanzen.php
           cp backend/lohn.php          dist-betreiber/lohn.php
           # Rechenkern der zentralen Mandanten-Einrichtung (ENT-612):
           # api/betreiber_schema_pruefen.php richtet ueber
@@ -1874,6 +1874,7 @@ jobs:
           cp backend/rechte.php dist-cupi24/rechte.php
           cp backend/neuerungen.php dist-cupi24/neuerungen.php
           cp backend/logbuch.php dist-cupi24/logbuch.php
+          cp backend/betreiber_finanzen.php dist-cupi24/betreiber_finanzen.php
           cp backend/ereignisse.php dist-cupi24/ereignisse.php
           cp backend/auslagen.php dist-cupi24/auslagen.php
           cp backend/rundgang.php dist-cupi24/rundgang.php

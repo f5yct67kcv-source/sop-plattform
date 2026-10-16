@@ -22,8 +22,18 @@
 # erzeugt mit staging-htaccess-bauen.py; Passwortschutz oberhalb
 # unveraendert). Damit sind die bis dahin offenen Nachtraege (a) bis (q)
 # auf einmal erledigt. Geprueft: ohne Anmeldung 401, neuerungen.php nach
-# der Anmeldung 403. Kein Hash eilt mehr einem Nachtrag voraus.
+# der Anmeldung 403.
+#
+# ── Seither vorausgeeilt ───────────────────────────────────────────────
+#  (r) betreiber_finanzen.php in die FilesMatch-Sperre aufgenommen (ENT-725,
+#      2026-10-16). Die Finanzen der Betreiberin; wird nur per require_once
+#      aus backend/betreiber.php gezogen und nie direkt aufgerufen. Der Hash
+#      ist dem manuellen Nachtrag vorausgeeilt. STEHT AUS. Die Datei enthaelt
+#      ausschliesslich Definitionen und gibt bei direktem Aufruf nichts aus;
+#      Staging liegt zusaetzlich hinter der Basic-Auth-Schicht (ENT-384).
+#      Nach dem Nachtrag bei Hostpoint (staging-htaccess-bauen.py) diesen
+#      Vermerk loeschen.
 
-htaccess-hostpoint:0d22426bb0ee1c25ed40a39569371f498704c85d926864dc4352cff66c1dbf6e
+htaccess-hostpoint:538e1aa0cfbcf768f682f0ffd63d4a6c8ae4e8620e2e8687da4113e5e63d2adf
 htaccess-staging-zusatz:7b6df04b9fd9decbeb68442a6080b3e39c384e31d59273e53f938549c8e26208
 robots-staging.txt:e120f27381f482e2de05b11355c7d1818e8266d282cec8cf04bc8b33916e7583
