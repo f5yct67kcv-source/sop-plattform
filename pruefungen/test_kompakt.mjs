@@ -131,7 +131,7 @@ const fl = await pb.evaluate(() => {
     enNBedarf: 52, enNKontakt_vorname: 204, enNKontakt_nachname: 197, enNKontakt_telefon: 171 };
   const breiten = Object.entries(SOLL).filter(([id, w]) => Math.abs(r(id).width - w) > 0.5)
     .map(([id, w]) => `${id} ${r(id).width} statt ${w}`);
-  const zeit = [...document.querySelectorAll('.zeilenfluss .zeitwahl select')].map(e => e.getBoundingClientRect().width);
+  const zeit = [...document.querySelectorAll('#view-einsatzneu .zeilenfluss .zeitwahl select')].map(e => e.getBoundingClientRect().width);
   const links = ['enNKunde_name', 'enNVeranstaltung', 'enNDatum', 'enNStrasse', 'enNBedarf', 'enNWeg_km', 'enNKontakt_vorname'].map(id => r(id).x);
   const mitte = [];
   // Textfelder und die Personenliste tragen ihre Beschriftung oben (wie
