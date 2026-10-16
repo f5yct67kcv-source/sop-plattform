@@ -2767,6 +2767,9 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .inp[readonly] { background: var(--surface-2); color: var(--ink-3); cursor: default; }
 .wahl-reihe { display: flex; gap: 18px; align-items: center; min-height: 38px; }
 .wahl-reihe label { display: flex; align-items: center; gap: 7px; cursor: pointer; font-size: 13.5px; font-weight: 500; }
+/* Die Wahlmoeglichkeiten sind Werte, keine Beschriftungen: ohne die Versalien
+   und den Sperrsatz, die ".f label" einer Feldbeschriftung gibt. */
+.f .wahl-reihe label { text-transform: none; letter-spacing: 0; color: var(--ink); margin-bottom: 0; }
 .wahl-reihe input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
 .kw-reihe { display: grid; grid-template-columns: 170px 1fr auto; gap: 8px; align-items: center; margin-bottom: 8px; }
 .kw-weg { border: none; background: transparent; color: var(--ink-3); cursor: pointer; padding: 7px; border-radius: var(--r-xs); display: inline-flex; }
@@ -5614,6 +5617,41 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
     /* Alle Felder gleich hoch. Das Datumsfeld bringt sonst 2 px mehr mit
        (Kalenderzeichen des Browsers) und versetzt seine Zeile. */
     html[data-dichte="kompakt"] .zeilenfluss .inp { flex: none; height: 32px; }
+    /* Breite aus dem Feld selbst (style="--zf-b:..."): So braucht nicht jedes
+       weitere Formular eine eigene Liste von IDs hier oben. */
+    html[data-dichte="kompakt"] .zeilenfluss .inp[style*="--zf-b"] { width: var(--zf-b); min-width: 0; }
+    /* Zwei Raster untereinander im selben Abschnitt (Kunde: Firma oder
+       Privatperson, darunter UID) halten denselben Zeilenabstand wie zwei
+       Zeilen in einem: Die -7 px der Raster heben sich sonst mit den 7 px
+       der Felder auf, und die Zeilen kleben aneinander. */
+    html[data-dichte="kompakt"] .zeilenfluss + .zeilenfluss { margin-top: 7px; }
+    /* Eine Wahl (Unternehmen/Privatperson) ist so hoch wie ein Feld -- mit
+       ihren 38 px Mindesthoehe sass die Zeile 3 px tiefer (gemessen 49 statt
+       46 px Abstand). */
+    html[data-dichte="kompakt"] .zeilenfluss .wahl-reihe { min-height: 32px; }
+    /* Kundenseite: Kommunikation und Kontaktpersonen folgen dem Zeilenfluss.
+       Die Art (E-Mail, Telefon) steht in der Beschriftungsspalte, der Wert in
+       Feldbreite -- statt einer Zeile ueber die ganze Seite. */
+    html[data-dichte="kompakt"] #view-kundeform .kw-reihe { grid-template-columns: 168px 345px auto; column-gap: 14px; row-gap: 0; justify-content: start; margin-bottom: 14px; }
+    html[data-dichte="kompakt"] #view-kundeform .kw-reihe .inp { height: 32px; }
+    html[data-dichte="kompakt"] #view-kundeform .kdlg-tab > .btn-quiet { margin-left: 168px; padding-left: 14px; }
+    /* Kontaktperson ohne eigenen Kasten: Ein Rahmen mit Innenabstand
+       verschob die Spalten um 15 px gegen den Rest der Seite. Eine Linie
+       trennt die Personen. */
+    html[data-dichte="kompakt"] #view-kundeform .ku-person { border: 0; border-radius: 0; padding: 0; margin: 0 0 14px; }
+    html[data-dichte="kompakt"] #view-kundeform .ku-person + .ku-person { border-top: 1px solid var(--line-soft); padding-top: 14px; }
+    html[data-dichte="kompakt"] #view-kundeform .ku-person > .zeilenfluss { margin-bottom: 7px; }
+    html[data-dichte="kompakt"] #view-kundeform .ku-person-ft { justify-content: flex-start; margin: 0; padding-left: 168px; }
+    html[data-dichte="kompakt"] #view-kundeform .ku-person-ft > .btn-quiet:first-child { padding-left: 14px; }
+    /* Notiz buendig mit dem rechten Rand von "Ort" in der Adresszeile:
+       345 + 44 + 24 + 14 + 64 + 44 + 34 + 14 + 80 + 44 + 34 + 14 + 218 =
+       973 px ab der Feldspalte. Darum tragen Nr., PLZ und Ort feste
+       Beschriftungsbreiten. */
+    html[data-dichte="kompakt"] #ku_notiz { width: 973px; }
+    /* Beschriftung mit fester Mindestbreite (style="--zf-l:..."): "PLZ *" und
+       "PLZ" stehen in zwei Abschnitten untereinander und sollen ihre Felder
+       auf dieselbe Kante setzen. */
+    html[data-dichte="kompakt"] .zeilenfluss > .f > label[style*="--zf-l"] { min-width: var(--zf-l); }
     html[data-dichte="kompakt"] #enNKunde_name       { width: 345px; }
     html[data-dichte="kompakt"] #enNEinsatzart       { width: 179px; }
     html[data-dichte="kompakt"] #enNSparte           { width: 171px; }
@@ -7473,6 +7511,127 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
         </div>
         <div class="ob-tab on" id="ob-uebersicht"></div>
         <div class="ob-tab" id="ob-masterschichten"></div>
+      </section>
+
+      <!-- ══════════════════ KUNDE ANLEGEN / BEARBEITEN (16.10.2026) ══════════
+           Vorher ein Dialog ueber der Kundenliste. Seit kompakt der Standard
+           ist, eine eigene Seite wie "Neuer Einsatz": Zurueck links, Anlegen
+           rechts, darunter Abschnitte im Zeilenfluss (Entscheid des
+           Projektinhabers, Variante 2). Die Feldkennungen sind unveraendert --
+           kuDlgOeffnen(), Diktat, Recherche und kuSpeichern() arbeiten damit
+           weiter. Woher man kam, merkt sich kuFormHer: Aus einer Offerte
+           ("Neue Adresse") fuehrt Zurueck wieder dorthin. -->
+      <section class="view" id="view-kundeform">
+        <div class="bar-tools">
+          <button class="btn btn-plain btn-sm" id="kuZurueck" onclick="kuFormSchliessen()">Zurück zu den Kunden</button>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-primary btn-sm" id="kuBtn" onclick="kuSpeichern()">Kunden anlegen</button>
+        </div>
+        <div class="card"><div class="card-bd">
+          <div class="ki-hint" id="kuKiHint">
+        <svg class="i i-sm" viewBox="0 0 24 24" style="margin-top:1px;flex:none"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+        <span id="kuKiText"></span>
+      </div>
+          <div class="msg-err" id="kuErr" style="display:none"></div>
+          <p class="note" id="kuText">Name, PLZ und Ort sind Pflicht.</p>
+          <h2 id="kuTitel" style="display:none">Neuer Kunde</h2>
+
+<div class="abschnitt">
+  <h3>Stammdaten</h3>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <!-- Die Nummer vergibt das System (ENT-040). Beim Anlegen steht hier
+         die Vorschau der naechsten freien, ausgegraut; beim Bearbeiten die
+         bereits vergebene. Beides ist nicht aenderbar. -->
+    <div class="f zf-neu"><label for="ku_kundennummer">Kundennummer</label>
+      <input class="inp" id="ku_kundennummer" readonly tabindex="-1" style="--zf-b:250px"></div>
+    <div class="f"><label>Art</label>
+      <div class="wahl-reihe">
+        <label><input type="radio" name="kuArt" id="kuArtUnternehmen" value="unternehmen" onchange="kuArtUm()">Unternehmen</label>
+        <label><input type="radio" name="kuArt" id="kuArtPrivat" value="privat" onchange="kuArtUm()">Privatperson</label>
+      </div>
+    </div>
+  </div>
+  <div class="form-grid form-breit form-zeilen zeilenfluss" id="kuFirmaFelder">
+    <div class="f zf-neu"><label for="ku_name">Unternehmensname *</label><input class="inp" id="ku_name" style="--zf-b:345px"></div>
+    <!-- Ersetzt seit ENT-042 das fruehere Recherche-Haekchen im Diktat-Dialog.
+         Ergaenzt nur leere Felder, bereits eingetragene bleiben unangetastet. -->
+    <div class="f zf-knopf">
+      <button class="btn btn-plain btn-sm" type="button" id="kuRechercheBtn" onclick="kuRecherche()" title="Fehlende Angaben im Handelsregister und im Netz suchen">
+        <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Im Web nachschlagen
+      </button>
+    </div>
+  </div>
+  <div class="form-grid form-breit form-zeilen zeilenfluss" id="kuPrivatFelder" style="display:none">
+    <div class="f zf-neu"><label for="ku_anrede">Anrede</label>
+      <select class="inp" id="ku_anrede" style="--zf-b:104px">
+        <option value=""></option><option>Herr</option><option>Frau</option>
+      </select></div>
+    <div class="f"><label for="ku_vorname">Vorname *</label><input class="inp" id="ku_vorname" style="--zf-b:204px"></div>
+    <div class="f"><label for="ku_nachname">Nachname *</label><input class="inp" id="ku_nachname" style="--zf-b:204px"></div>
+  </div>
+  <div class="form-grid form-breit form-zeilen zeilenfluss" id="kuUidFelder">
+    <div class="f zf-neu"><label for="ku_uid">CHE-UID</label><input class="inp" id="ku_uid" placeholder="CHE-123.456.789" style="--zf-b:250px"></div>
+    <div class="f"><label for="ku_mwst_nr">MWST-Nr.</label><input class="inp" id="ku_mwst_nr" style="--zf-b:205px"></div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Adresse</h3>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f zf-neu"><label for="ku_strasse">Strasse</label><input class="inp" id="ku_strasse" style="--zf-b:345px"></div>
+    <div class="f"><label for="ku_hausnummer" style="--zf-l:24px">Nr.</label><input class="inp" id="ku_hausnummer" style="--zf-b:64px"></div>
+    <div class="f"><label for="ku_plz" style="--zf-l:34px">PLZ *</label><input class="inp" id="ku_plz" style="--zf-b:80px"></div>
+    <div class="f"><label for="ku_ort" style="--zf-l:34px">Ort *</label><input class="inp" id="ku_ort" style="--zf-b:218px"></div>
+    <div class="f zf-neu zf-umbruch"><label for="ku_zusatzfeld">Zusatzfeld</label><input class="inp" id="ku_zusatzfeld" style="--zf-b:345px"></div>
+    <div class="f"><label for="ku_adresszusatz" style="--zf-l:94px">Adresszusatz</label><input class="inp" id="ku_adresszusatz" style="--zf-b:345px"></div>
+  </div>
+</div>
+
+<!-- Abweichende Rechnungsadresse (ENT-155). Ohne Schalter "abweichend
+     ja/nein": leer heisst gleich wie oben, gefuellt heisst abweichend. -->
+<div class="abschnitt">
+  <h3>Rechnungsadresse</h3>
+  <p class="note">Nur ausfüllen, wenn die Rechnung an eine andere Adresse geht als oben. Leer lassen heisst: gleiche Adresse.</p>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f zf-neu"><label for="ku_re_name">Firma / Name</label><input class="inp" id="ku_re_name" style="--zf-b:345px"></div>
+    <div class="f"><label for="ku_re_zusatz" style="--zf-l:94px">Zusatz</label><input class="inp" id="ku_re_zusatz" placeholder="z. B. Buchhaltung, Postfach" style="--zf-b:345px"></div>
+    <div class="f zf-neu zf-umbruch"><label for="ku_re_strasse">Strasse</label><input class="inp" id="ku_re_strasse" style="--zf-b:345px"></div>
+    <div class="f"><label for="ku_re_hausnummer" style="--zf-l:24px">Nr.</label><input class="inp" id="ku_re_hausnummer" style="--zf-b:64px"></div>
+    <div class="f"><label for="ku_re_plz" style="--zf-l:34px">PLZ</label><input class="inp" id="ku_re_plz" style="--zf-b:80px"></div>
+    <div class="f"><label for="ku_re_ort" style="--zf-l:34px">Ort</label><input class="inp" id="ku_re_ort" style="--zf-b:218px"></div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Kontakt</h3>
+  <div class="tabs" id="kuDlgTabs">
+    <button class="tab on" type="button" id="kudtab-kommunikation" onclick="kuDlgTab('kommunikation')">Kommunikation</button>
+    <button class="tab" type="button" id="kudtab-personen" onclick="kuDlgTab('personen')">Kontaktpersonen</button>
+  </div>
+  <div class="kdlg-tab on" id="kudlg-kommunikation">
+    <div id="kuWegeListe"></div>
+    <button class="btn btn-quiet btn-sm" type="button" onclick="kuWegHinzu()">Weitere Kontaktmöglichkeit hinzufügen</button>
+  </div>
+  <div class="kdlg-tab" id="kudlg-personen">
+    <div id="kuPersonenListe"></div>
+    <button class="btn btn-quiet btn-sm" type="button" onclick="kuPersonHinzu()">Weitere Kontaktperson hinzufügen</button>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Weitere Angaben</h3>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f wide zf-neu zf-text"><label for="ku_notiz">Notiz</label><textarea class="inp" id="ku_notiz" rows="2" style="min-height:56px"></textarea></div>
+  </div>
+</div>
+
+          <div class="zone" id="kuArchivZone" style="display:none">
+            <div class="zone-hd" id="kuArchivHd"></div>
+            <div class="zone-note" id="kuArchivNote"></div>
+            <button class="btn btn-plain btn-sm" type="button" id="kuArchivBtn2"></button>
+          </div>
+        </div></div>
       </section>
 
       <!-- ══════════════════ REVIERDIENST: EINRICHTUNG (ENT-224) ══════════
@@ -9835,120 +9994,6 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
   </div>
 </div>
 
-<div class="dlg-scrim" id="dlgKunde">
-  <div class="dlg breit">
-    <div class="dlg-hd">
-      <h2 id="kuTitel">Neuer Kunde</h2>
-      <p id="kuText">Name, PLZ und Ort sind Pflicht.</p>
-    </div>
-    <div class="dlg-bd">
-      <div class="ki-hint" id="kuKiHint">
-        <svg class="i i-sm" viewBox="0 0 24 24" style="margin-top:1px;flex:none"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
-        <span id="kuKiText"></span>
-      </div>
-      <div class="msg-err" id="kuErr" style="display:none"></div>
-
-      <div class="form-grid">
-        <!-- Die Nummer vergibt das System (ENT-040). Beim Anlegen steht hier
-             die Vorschau der nächsten freien, ausgegraut; beim Bearbeiten die
-             bereits vergebene. Beides ist nicht änderbar. -->
-        <div class="f"><label for="ku_kundennummer">Kundennummer</label>
-          <input class="inp" id="ku_kundennummer" readonly tabindex="-1"></div>
-        <div class="f"><label>Art</label>
-          <div class="wahl-reihe">
-            <label><input type="radio" name="kuArt" id="kuArtUnternehmen" value="unternehmen" onchange="kuArtUm()">Unternehmen</label>
-            <label><input type="radio" name="kuArt" id="kuArtPrivat" value="privat" onchange="kuArtUm()">Privatperson</label>
-          </div>
-        </div>
-      </div>
-
-      <div class="form-grid" id="kuFirmaFelder">
-        <div class="f wide"><label for="ku_name">Unternehmensname *</label><input class="inp" id="ku_name"></div>
-        <div class="f wide" style="margin-top:-8px">
-          <!-- Ersetzt seit ENT-042 das frühere Recherche-Häkchen im
-               Diktat-Dialog: funktioniert so unabhängig davon, ob der
-               Dialog per Hand, per Diktat oder über den globalen
-               Sprechen-Knopf geöffnet wurde. Ergänzt nur leere Felder,
-               bereits eingetragene bleiben unangetastet. -->
-          <button class="btn btn-plain btn-sm" type="button" id="kuRechercheBtn" onclick="kuRecherche()" title="Fehlende Angaben im Handelsregister und im Netz suchen">
-            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            Im Web nachschlagen
-          </button>
-        </div>
-      </div>
-
-      <div class="form-grid" id="kuPrivatFelder" style="display:none">
-        <div class="f"><label for="ku_anrede">Anrede</label>
-          <select class="inp" id="ku_anrede">
-            <option value=""></option><option>Herr</option><option>Frau</option>
-          </select></div>
-        <div class="f"><label for="ku_vorname">Vorname *</label><input class="inp" id="ku_vorname"></div>
-        <div class="f wide"><label for="ku_nachname">Nachname *</label><input class="inp" id="ku_nachname"></div>
-      </div>
-
-      <div class="form-grid">
-        <div class="f wide"><label for="ku_zusatzfeld">Zusatzfeld</label><input class="inp" id="ku_zusatzfeld"></div>
-        <div class="f"><label for="ku_strasse">Strasse</label><input class="inp" id="ku_strasse"></div>
-        <div class="f"><label for="ku_hausnummer">Nr.</label><input class="inp" id="ku_hausnummer"></div>
-        <div class="f wide"><label for="ku_adresszusatz">Adresszusatz</label><input class="inp" id="ku_adresszusatz"></div>
-        <div class="f"><label for="ku_plz">PLZ *</label><input class="inp" id="ku_plz"></div>
-        <div class="f"><label for="ku_ort">Ort *</label><input class="inp" id="ku_ort"></div>
-      </div>
-
-      <div class="form-grid" id="kuUidFelder">
-        <div class="f"><label for="ku_uid">CHE- Unternehmens-Id</label><input class="inp" id="ku_uid" placeholder="CHE-123.456.789"></div>
-        <div class="f"><label for="ku_mwst_nr">CHE- MWST-Nr.</label><input class="inp" id="ku_mwst_nr"></div>
-      </div>
-
-      <!-- Abweichende Rechnungsadresse (ENT-155). Ohne Schalter „abweichend
-           ja/nein": leer heisst gleich wie oben, gefuellt heisst abweichend.
-           Ein Schalter koennte auf „ja" stehen, waehrend die Felder leer
-           sind -- und dann stuende auf dem Beleg eine leere Adresse. -->
-      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--line-soft)">
-        <div class="ep-dok-kopf">Rechnungsadresse</div>
-        <div class="note" style="margin:-2px 0 10px">Nur ausfüllen, wenn die Rechnung an eine
-          andere Adresse geht als oben. Leer lassen heisst: gleiche Adresse.</div>
-        <div class="form-grid">
-          <div class="f wide"><label for="ku_re_name">Firma / Name</label><input class="inp" id="ku_re_name"></div>
-          <div class="f wide"><label for="ku_re_zusatz">Zusatz</label><input class="inp" id="ku_re_zusatz" placeholder="z. B. Buchhaltung, Postfach"></div>
-          <div class="f"><label for="ku_re_strasse">Strasse</label><input class="inp" id="ku_re_strasse"></div>
-          <div class="f"><label for="ku_re_hausnummer">Nr.</label><input class="inp" id="ku_re_hausnummer"></div>
-          <div class="f"><label for="ku_re_plz">PLZ</label><input class="inp" id="ku_re_plz"></div>
-          <div class="f"><label for="ku_re_ort">Ort</label><input class="inp" id="ku_re_ort"></div>
-        </div>
-      </div>
-
-      <div class="tabs" id="kuDlgTabs" style="margin-top:22px">
-        <button class="tab on" type="button" id="kudtab-kommunikation" onclick="kuDlgTab('kommunikation')">Kommunikation</button>
-        <button class="tab" type="button" id="kudtab-personen" onclick="kuDlgTab('personen')">Kontaktpersonen</button>
-      </div>
-
-      <div class="kdlg-tab on" id="kudlg-kommunikation">
-        <div id="kuWegeListe"></div>
-        <button class="btn btn-quiet btn-sm" type="button" onclick="kuWegHinzu()">Weitere Kontaktmöglichkeit hinzufügen</button>
-      </div>
-
-      <div class="kdlg-tab" id="kudlg-personen">
-        <div id="kuPersonenListe"></div>
-        <button class="btn btn-quiet btn-sm" type="button" onclick="kuPersonHinzu()">Weitere Kontaktperson hinzufügen</button>
-      </div>
-
-      <div class="form-grid" style="margin-top:22px">
-        <div class="f wide"><label for="ku_notiz">Notiz</label><textarea class="inp" id="ku_notiz" rows="2" style="min-height:56px"></textarea></div>
-      </div>
-
-      <div class="zone" id="kuArchivZone" style="display:none">
-        <div class="zone-hd" id="kuArchivHd"></div>
-        <div class="zone-note" id="kuArchivNote"></div>
-        <button class="btn btn-plain btn-sm" type="button" id="kuArchivBtn2"></button>
-      </div>
-    </div>
-    <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgKunde')">Abbrechen</button>
-      <button class="btn btn-primary" id="kuBtn" onclick="kuSpeichern()">Kunden anlegen</button>
-    </div>
-  </div>
-</div>
 
 <!-- Neuer Einsatz. Auch das Ziel des Planungs-Diktats — gespeichert wird erst
      durch den Knopf unten. -->
@@ -12205,6 +12250,7 @@ const TITLES = {
   rundgaenge:  ['Übersicht', 'Rundgänge, GPS, Aufgaben und Auswertungen auf einen Blick'],
   revierdienst: ['Revierdienst', 'Kontrollpunkte und Kontrollrunden je Objekt einrichten'],
   einsatzneu:  ['Neuer Einsatz', 'Kunde, Ort, Zeit und Zuteilung'],
+  kundeform:   ['Neuer Kunde', 'Stammdaten, Adresse und Kontakt'],
   einsatzplan: ['Einsatz planen', 'Positionen und Zeiten im Detail'],
   objekt:      ['Objekt', 'Stammdaten, Masterschichten und Kontrollpunkte'],
   mitteilungen: ['Mitteilungen', 'Was die Belegschaft in der App zu sehen bekommt'],
@@ -13334,7 +13380,7 @@ function dichteInfoBauen() {
 // die Bearbeitungsmaske dort ist ein Formular und bleibt auf Lesebreite.
 // 'arbeitsergebnisse' bleibt ebenfalls draussen: Es zeichnet seit ENT-243
 // Karten statt Tabellen, und eine 1900 px breite Karte gewinnt nichts.
-const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'revierdienst', 'einsatzplan', 'einsatzneu', 'offerte', 'objekt',
+const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'revierdienst', 'einsatzplan', 'einsatzneu', 'kundeform', 'offerte', 'objekt',
                         'kunden', 'mitarbeiter', 'produkte', 'abwesenheiten',
                         'finanzen', 'rechnungen', 'lohnauslagen'];
 const PLANUNG_WEIT   = ['uebersicht', 'einsaetze', 'objektplan', 'tag'];
@@ -18565,9 +18611,10 @@ function kuMenuSchliessen() {
 function toggleArchivKunde(id, aktiv) {
   api('kunden_archivieren.php', { method: 'POST', body: { id, aktiv } }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
-    // Erreichbar aus dem Zeilenmenü und aus dem offenen Kundendialog --
-    // beide Wege schliessen sauber (ENT-044).
-    closeDlg('dlgKunde');
+    // Erreichbar aus dem Zeilenmenü und aus der offenen Kundenseite --
+    // beide Wege schliessen sauber (ENT-044). Aus dem Zeilenmenü ist die
+    // Seite zu, dann bleibt man, wo man ist.
+    kuFormSchliessen();
     Promise.all([loadKunden(), loadStats()]).then(() => {
       toast(aktiv ? 'Kunde wiederhergestellt.' : 'Kunde archiviert.');
       // Auf der Detailseite bleibt man -- Status und Knopf zeigen den neuen
@@ -33808,12 +33855,6 @@ function dlgZurueckschieben(scrim) {
 function closeDlg(id) {
   // Ein geschlossener Dialog darf nicht weiterhoeren.
   if (sprach && id === 'dlgPlanDiktat') sprachStop();
-  // Ein abgebrochener "Neue Adresse"-Dialog darf keinen Rueckruf hinterlassen,
-  // der spaeter bei einer voellig unabhaengigen Kundenanlage ungefragt feuert
-  // (ENT-187). Der Erfolgsfall in kuSpeichern() sichert sich den Rueckruf in
-  // eine eigene lokale Variable, BEVOR er closeDlg() aufruft -- das Loeschen
-  // hier trifft also nur den abgebrochenen Fall.
-  if (id === 'dlgKunde') { kuNeuRueckkehr = null; }
   $(id).classList.remove('on');
 }
 
@@ -35816,8 +35857,35 @@ function kuDlgOeffnen(id, felder, meta) {
   }
 
   $('kuErr').style.display = 'none';
-  openDlg('dlgKunde');
+  kuFormZeigen();
   (art === 'privat' ? $('ku_vorname') : $('ku_name')).focus();
+}
+
+// Seite statt Dialog (16.10.2026). Woher man kam, damit "Zurueck" nicht blind
+// in die Kundenliste springt: "Neue Adresse" startet aus einer Offerte, das
+// Diktat aus der Uebersicht. Dieselbe Bauart wie enNeuHer beim Einsatz.
+let kuFormHer = 'kunden';
+const KU_ZURUECK = {
+  kunden: 'Zurück zu den Kunden', offerte: 'Zurück zur Offerte',
+  uebersicht: 'Zurück zur Übersicht', planung: 'Zurück zur Planung',
+};
+function kuFormZeigen() {
+  const an = document.querySelector('.view.on');
+  const her = an ? an.id.replace('view-', '') : 'kunden';
+  if (her !== 'kundeform') { kuFormHer = her; }
+  go('kundeform');
+  // Der Kopf sagt, was offen ist: "Neuer Kunde", "Kunde bearbeiten" oder
+  // "Erkannt -- bitte pruefen" -- derselbe Text, den der Dialog trug.
+  $('pgTitle').textContent = $('kuTitel').textContent;
+  $('kuZurueck').textContent = KU_ZURUECK[kuFormHer] || 'Zurück';
+  window.scrollTo(0, 0);
+}
+// Abbrechen: Ein offener "Neue Adresse"-Rueckruf darf nicht spaeter bei einer
+// voellig unabhaengigen Kundenanlage feuern (ENT-187). Der Erfolgsfall in
+// kuSpeichern() sichert ihn vorher in eine eigene Variable.
+function kuFormSchliessen() {
+  kuNeuRueckkehr = null;
+  if ($('view-kundeform').classList.contains('on')) { go(kuFormHer || 'kunden'); }
 }
 
 function kuQuellenZeilen(quellen) {
@@ -35837,13 +35905,13 @@ function kuArtUm() {
 function kuDlgTab(t) {
   kuDlgTabAktiv = t;
   document.querySelectorAll('#kuDlgTabs .tab').forEach(b => b.classList.remove('on'));
-  document.querySelectorAll('#dlgKunde .kdlg-tab').forEach(v => v.classList.remove('on'));
+  document.querySelectorAll('#view-kundeform .kdlg-tab').forEach(v => v.classList.remove('on'));
   $('kudtab-' + t).classList.add('on');
   $('kudlg-' + t).classList.add('on');
   // Die Reiterleiste sitzt unterhalb der Adressfelder. Wer sie anklickt, will
   // den Inhalt sehen -- ohne das hier bleibt der Blick auf der Adresse stehen.
-  // Beim Öffnen des Dialogs greift das nicht: da ist er noch nicht sichtbar.
-  if ($('dlgKunde').classList.contains('on')) {
+  // Beim Öffnen greift das nicht: da ist die Seite noch nicht sichtbar.
+  if ($('view-kundeform').classList.contains('on')) {
     $('kuDlgTabs').scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
 }
@@ -35926,17 +35994,17 @@ function kuPersonLeer() {
 function kuPersonenRender() {
   $('kuPersonenListe').innerHTML = kuPersonen.map((p, pi) => `
     <div class="ku-person">
-      <div class="form-grid">
-        <div class="f"><label for="kup_anrede_${pi}">Anrede</label>
-          <select class="inp" id="kup_anrede_${pi}" data-kp="anrede" data-pi="${pi}">
+      <div class="form-grid form-breit form-zeilen zeilenfluss">
+        <div class="f zf-neu"><label for="kup_anrede_${pi}">Anrede</label>
+          <select class="inp" id="kup_anrede_${pi}" data-kp="anrede" data-pi="${pi}" style="--zf-b:104px">
             <option value=""></option>
             <option${p.anrede === 'Herr' ? ' selected' : ''}>Herr</option>
             <option${p.anrede === 'Frau' ? ' selected' : ''}>Frau</option>
           </select></div>
         <div class="f"><label for="kup_vorname_${pi}">Vorname</label>
-          <input class="inp" id="kup_vorname_${pi}" data-kp="vorname" data-pi="${pi}" value="${esc(p.vorname)}"></div>
+          <input class="inp" id="kup_vorname_${pi}" data-kp="vorname" data-pi="${pi}" value="${esc(p.vorname)}" style="--zf-b:204px"></div>
         <div class="f"><label for="kup_nachname_${pi}">Nachname</label>
-          <input class="inp" id="kup_nachname_${pi}" data-kp="nachname" data-pi="${pi}" value="${esc(p.nachname)}"></div>
+          <input class="inp" id="kup_nachname_${pi}" data-kp="nachname" data-pi="${pi}" value="${esc(p.nachname)}" style="--zf-b:204px"></div>
       </div>
       ${p.kontaktwege.map((w, wi) => `
         <div class="kw-reihe">
@@ -36173,7 +36241,7 @@ function kuSpeichern() {
     // Vor closeDlg() sichern: das raeumt kuNeuRueckkehr fuer den
     // Abbruch-Fall weg (ENT-187), der Erfolgsfall braucht ihn aber noch.
     const rueckkehr = neu ? kuNeuRueckkehr : null;
-    closeDlg('dlgKunde');
+    kuFormSchliessen();
     Promise.all([loadKunden(), loadStats()]).then(() => {
       toast(neu ? 'Kunde angelegt.' : 'Kunde gespeichert.');
       if (kuTab === 'detail') renderKundeDetail();

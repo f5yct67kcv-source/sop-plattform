@@ -297,9 +297,9 @@ await page.screenshot({ path: `${OUT}/k-04-offerten.png` });
 await page.click('#kdtab-uebersicht');
 await page.waitForTimeout(150);
 await page.click('#kv-detail button:has-text("Bearbeiten")');
-await page.waitForSelector('#dlgKunde.on');
+await page.waitForSelector('#view-kundeform.on');
 check('Bearbeiten nutzt denselben Dialog wie das Anlegen (ENT-044)',
-  await page.evaluate(() => document.getElementById('dlgKunde').classList.contains('on')));
+  await page.evaluate(() => document.getElementById('view-kundeform').classList.contains('on')));
 check('Dialog zeigt die aktuellen Werte', (await page.inputValue('#ku_name')) === 'Muster Immobilien AG');
 await page.click('#kudtab-personen');
 await page.waitForTimeout(150);
@@ -340,7 +340,7 @@ check('Zurück-Pfeil führt auf die Liste', await page.evaluate(() => document.g
 // ══════════════════════════════════════════ NEUER KUNDE (ENT-044)
 calls = [];
 await page.click('button:has-text("Neuer Kunde")');
-await page.waitForSelector('#dlgKunde.on');
+await page.waitForSelector('#view-kundeform.on');
 check('Kundennummer steht als Vorschau im Dialog', (await page.inputValue('#ku_kundennummer')) === 'K0004');
 check('Kundennummer ist ausgegraut und nicht eingebbar',
   (await page.getAttribute('#ku_kundennummer', 'readonly')) !== null);
@@ -379,7 +379,7 @@ check('Privatperson wird mit art=privat angelegt', privat && privat.body.art ===
 // Unternehmen mit Kommunikationszeilen und Ansprechperson
 calls = [];
 await page.click('button:has-text("Neuer Kunde")');
-await page.waitForSelector('#dlgKunde.on');
+await page.waitForSelector('#view-kundeform.on');
 check('Drei leere Kommunikationszeilen als Startpunkt', (await page.$$('#kuWegeListe .kw-reihe')).length === 3);
 await page.fill('#ku_name', 'Test GmbH');
 await page.fill('#ku_strasse', 'Teststrasse');

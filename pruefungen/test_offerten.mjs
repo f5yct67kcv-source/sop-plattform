@@ -771,7 +771,7 @@ const kundenVorher = await page.evaluate(() => kunden.length);
 await page.click('button:has-text("Neue Adresse erstellen")');
 await page.waitForTimeout(200);
 check('Der Kunden-Dialog öffnet sich direkt aus dem Offert-Formular',
-  await page.evaluate(() => document.getElementById('dlgKunde').classList.contains('on')));
+  await page.evaluate(() => document.getElementById('view-kundeform').classList.contains('on')));
 await page.fill('#ku_name', 'Frisch AG');
 await page.fill('#ku_plz', '4000');
 await page.fill('#ku_ort', 'Basel');
@@ -788,7 +788,7 @@ check('kunden[] ist tatsächlich gewachsen -- der Rückruf griff auf echte, neu 
 // mehrstufigen Klickpfad simuliert.
 await page.evaluate(() => ofNeueAdresse());
 await page.waitForTimeout(100);
-await page.click('#dlgKunde button:has-text("Abbrechen")');
+await page.click('#kuZurueck');
 await page.waitForTimeout(100);
 check('KRITISCH: ein abgebrochener "Neue Adresse"-Dialog löscht den Rückruf wieder',
   await page.evaluate(() => kuNeuRueckkehr === null));
