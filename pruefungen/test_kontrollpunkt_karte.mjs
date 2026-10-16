@@ -71,7 +71,7 @@ async function setup(page) {
 }
 
 const ok = [], bad = [];
-const check = (n, c) => (c ? ok : bad).push(n);
+const check = (n, c, x) => (c ? ok : bad).push(n + (c || x === undefined ? '' : ' -- ' + x));
 
 const browser = await chromium.launch({ executablePath: EXE });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
@@ -184,6 +184,56 @@ check('KRITISCH: die Karte ueberragt den Dialog auf dem Handy nicht (gemessen, n
 check('Marker bleibt nach dem Grössenwechsel sichtbar', (await page.$$('#kpKarte .gm-mock-marker')).length === 1);
 await page.screenshot({ path: `${OUT}/kp-karte-02-mobil.png` });
 await page.setViewportSize({ width: 1440, height: 1000 });
+
+// ══════════ KOMPAKT (Standard): DAS FENSTER IST AUFGERAEUMT (16.10.2026)
+// Es bleibt ein Fenster ueber der Kontrollrunde, innen aber dieselbe
+// Ordnung wie die Formularseiten: Beschriftung links in 168 px, alle Felder
+// an einer Kante, 46 px Zeilenabstand, "Aktiv" in der Feldspalte. Das
+// Fenster ist breiter, die Karte nutzt seine Breite.
+const kpMass = () => page.evaluate(() => {
+  const r = id => document.getElementById(id).getBoundingClientRect();
+  const lab = id => document.querySelector(`label[for="${id}"]`).getBoundingClientRect();
+  const sicht = ['kpBezeichnung', 'kpReihenfolge', 'kpTyp', 'kpChipId', 'kpLat', 'kpLng', 'kpRadius']
+    .filter(id => document.getElementById(id).offsetParent);
+  const aktiv = document.getElementById('kpAktiv');
+  return {
+    fenster: document.querySelector('#dlgKp .dlg').getBoundingClientRect().width,
+    links: sicht.map(id => r(id).left), labs: sicht.map(id => lab(id).width),
+    oben: sicht.map(id => r(id).top), ids: sicht,
+    aktivLinks: r('kpAktiv').left, aktivOben: aktiv.closest('label').getBoundingClientRect().top,
+    aktivMitte: [r('kpAktiv').top + r('kpAktiv').height / 2,
+      aktiv.closest('label').getBoundingClientRect().top + aktiv.closest('label').getBoundingClientRect().height / 2],
+    karte: document.getElementById('kpKarte').offsetParent ? r('kpKarte').width : null,
+    koerper: document.querySelector('#dlgKp .dlg-bd').clientWidth,
+  };
+});
+const kpPruefen = async (wie) => {
+  const m = await kpMass();
+  check(`Kontrollpunkt (${wie}): Felder an einer Kante`, Math.max(...m.links) - Math.min(...m.links) < 0.5
+    && Math.abs(m.aktivLinks - m.links[0]) < 0.5);
+  check(`Kontrollpunkt (${wie}): Beschriftung 168 px`, m.labs.every(b => Math.abs(b - 168) < 0.5));
+  // Reihenfolge -> Aktiv -> Typ: Aktiv sitzt als eigene Zeile dazwischen.
+  const zeilen = [m.oben[0], m.oben[1], m.aktivOben].concat(m.oben.slice(2));
+  const d = zeilen.slice(1).map((y, k) => Math.round(y - zeilen[k]));
+  // Die Karte steht zwischen Typ und Breitengrad -- dort kein 46er-Abstand.
+  const ohneKarte = wie === 'Geofence' ? d.slice(0, 3).concat(d.slice(4)) : d;
+  check(`Kontrollpunkt (${wie}): 46 px Zeilenabstand`, ohneKarte.every(x => Math.abs(x - 46) < 1), d.join(','));
+  check(`Kontrollpunkt (${wie}): Kästchen und Text mittig auf Feldhöhe`, Math.abs(m.aktivMitte[0] - m.aktivMitte[1]) < 1);
+  return m;
+};
+await page.click('#dlgKp .dlg-ft .btn-plain');
+await page.waitForTimeout(200);
+await page.click('#kpListe ~ div button:has-text("Kontrollpunkt hinzufügen")');
+await page.waitForSelector('#dlgKp.on');
+await page.waitForTimeout(200);
+let km = await kpPruefen('NFC');
+check('Kontrollpunkt: das Fenster ist breiter (720 px)', Math.abs(km.fenster - 720) < 1, km.fenster);
+await page.selectOption('#kpTyp', 'geofence');
+await page.waitForTimeout(300);
+km = await kpPruefen('Geofence');
+check('Kontrollpunkt: die Karte nutzt die Breite des Fensters', km.karte && Math.abs(km.karte - (km.koerper - 44)) < 1,
+  `${km.karte} / ${km.koerper}`);
+await page.screenshot({ path: `${OUT}/kp-03-kompakt.png` });
 
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
