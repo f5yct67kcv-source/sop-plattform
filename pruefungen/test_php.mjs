@@ -598,6 +598,7 @@ for (const [datei, titel] of [
   ['pruef_lohn_position.php', 'KRITISCH: persoenliche Zulagen zaehlen im AHV-Lohn mit, und ein abgeschlossener Monat aendert sich nicht mehr (ENT-713)'],
   ['pruef_lohnlauf_leistung.php', 'KRITISCH: die Zulage je Leistungsart zaehlt nur die Stunden mit dieser Leistungsart, der eigene Satz schlaegt den Standard, und Schichten ohne Leistungsart fallen auf (ENT-721)'],
   ['pruef_lohn_mutation.php', 'KRITISCH: ein spaeterer Lohnansatz braucht einen Mutationsgrund, und der Nebenanstellungsort ist ein anderer Ort als der Standort (ENT-721)'],
+  ['pruef_betreiber_finanzen.php', 'KRITISCH: die Finanzen der Betreiberin buchen Vorlagen genau einmal, zaehlen einen fehlenden CHF-Betrag nie als 0 und rechnen den wiederkehrenden Umsatz exkl. MWST (ENT-725)'],
   ['pruef_finanzen.php', 'KRITISCH: die Finanz-Kostenseite zaehlt nur freigegebene Laeufe, laesst fehlende Monate fehlen statt 0 und gibt Lohn- und Auslagenbetraege nur mit ihrem Recht heraus (ENT-712)'],
   ['pruef_logbuch.php', 'KRITISCH: das Logbuch haelt fest, wer was geaendert hat'],
   ['pruef_einsatz_abgeschlossen.php', 'KRITISCH: "abgeschlossen" verlangt ALLE zugesagten Rapporte (ENT-128)'],

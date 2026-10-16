@@ -5806,6 +5806,27 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
   html[data-dichte="kompakt"] #mbKarten .ma-block > h3,
   html[data-dichte="kompakt"] #mbNeuKonto .card-hd h3 { font-size: 11px; letter-spacing: .6px; text-transform: uppercase;
     color: var(--ink-3); font-weight: 600; border: 0; padding: 0; margin: 0 0 12px; }
+  /* Kontrollpunkt (16.10.2026): bleibt ein Fenster, weil es aus einer
+     laufenden, oft ungespeicherten Kontrollrunde aufgeht (Entscheid des
+     Projektinhabers). Innen dieselbe Ordnung wie die Formularseiten:
+     Beschriftung links in 168 px, alle Felder an einer Kante, 46 px
+     Zeilenabstand; Haekchen in der Feldspalte. Das Fenster ist breiter,
+     damit die Karte Platz hat. */
+  html[data-dichte="kompakt"] #dlgKp .dlg { max-width: 720px; }
+  html[data-dichte="kompakt"] #dlgKp .form-grid { display: block; }
+  html[data-dichte="kompakt"] #dlgKp .f { display: grid; grid-template-columns: 168px auto minmax(0, 1fr);
+    align-items: center; column-gap: 14px; margin: 0 0 14px; }
+  html[data-dichte="kompakt"] #dlgKp .f > label { margin: 0; line-height: 15px; }
+  html[data-dichte="kompakt"] #dlgKp .f > .inp { height: 32px; }
+  html[data-dichte="kompakt"] #dlgKp .f > label.check { grid-column: 2 / -1; height: 32px; margin: 0 !important;
+    display: flex; align-items: center; gap: 8px; }
+  html[data-dichte="kompakt"] #dlgKp .kp-zusatz { margin: 0; line-height: 15px; }
+  html[data-dichte="kompakt"] #kpBezeichnung, html[data-dichte="kompakt"] #kpChipId { width: 345px; }
+  html[data-dichte="kompakt"] #kpReihenfolge, html[data-dichte="kompakt"] #kpRadius { width: 80px; }
+  html[data-dichte="kompakt"] #kpTyp { width: 220px; }
+  html[data-dichte="kompakt"] #kpLat, html[data-dichte="kompakt"] #kpLng { width: 160px; }
+  html[data-dichte="kompakt"] #kpKarte { height: 300px !important; margin-bottom: 8px !important; }
+  html[data-dichte="kompakt"] #kpKarteHinweis { margin: 0 0 14px !important; }
   @container abschnitt (min-width: 1220px) {
     /* ── Zeilenfluss "Neuer Einsatz" (Skizze des Projektinhabers, 2026-10-15).
        Statt eines Rasters, das jedes Feld auf die Spaltenbreite zieht, steht
@@ -10760,9 +10781,8 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
         <div class="form-grid">
           <div class="f"><label for="kpLat">Breitengrad</label><input class="inp" id="kpLat" type="number" step="0.0000001" placeholder="z. B. 47.3769000" onchange="kpFeldGeaendert()"></div>
           <div class="f"><label for="kpLng">Längengrad</label><input class="inp" id="kpLng" type="number" step="0.0000001" placeholder="z. B. 8.5417000" onchange="kpFeldGeaendert()"></div>
-          <div class="f"><label for="kpRadius">Radius (Meter)</label><input class="inp" id="kpRadius" type="number" min="1" max="1000" value="20" onchange="kpFeldGeaendert()"></div>
+          <div class="f"><label for="kpRadius">Radius (Meter)</label><input class="inp" id="kpRadius" type="number" min="1" max="1000" value="20" onchange="kpFeldGeaendert()"><span class="zone-note kp-zusatz">Default 20 m — bei einer grossen Fläche (z. B. Parkplatz) übersteuerbar.</span></div>
         </div>
-        <p class="zone-note">Default 20 m — bei einer grossen Fläche (z. B. Parkplatz) übersteuerbar.</p>
       </div>
     </div>
     <div class="dlg-ft">

@@ -30,12 +30,20 @@ function neuerungen_katalog(): array
 {
     return [
         [
-            'nr'    => 39,
+            'nr'    => 41,
             'datum' => '2026-10-16',
             'art'   => 'fehlerbehebung',
             'fuer'  => ['cockpit'],
             'titel' => 'Kompakte Darstellung: Texte wieder sauber, Tagesplan weiter vorn',
             'text'  => 'In der kompakten Darstellung lief der Text in Suchfeldern unter die Lupe und in Auswahlfeldern unter den Pfeil. Das ist behoben, auf allen Seiten. Tabellen stehen wieder bündig im Rahmen. In der Planung folgt der Tagesplan jetzt direkt auf die Übersicht.',
+        ],
+        [
+            'nr'    => 40,
+            'datum' => '2026-10-16',
+            'art'   => 'neu',
+            'fuer'  => ['betreiber'],
+            'titel' => 'Neuer Bereich „Finanzen“',
+            'text'  => 'Finanzen ersetzt in der Kopfleiste den Bereich „Rechnungen“ und hat drei Reiter: Übersicht, Rechnungen und Ausgaben. Die Übersicht zeigt den offenen und den überfälligen Betrag, was im Monat bezahlt wurde, die Ausgaben im Monat und den wiederkehrenden Umsatz aus den laufenden Verträgen. Dazu eine Grafik mit Einnahmen und Ausgaben über die letzten Monate. Ausgaben erfasst du von Hand, mit Kategorie, MWST-Satz und auf Wunsch mit einem Beleg als PDF oder Bild. Wiederkehrende Kosten wie Hosting oder Abos legst du einmal an, dann wird jeder Monat gebucht. Bei Ausgaben in Fremdwährung trägst du den CHF-Betrag von der Kreditkartenabrechnung nach; bis dahin steht die Ausgabe als „CHF-Betrag fehlt“ da. Rechnungsentwürfe zählen nicht als offen, auch nicht auf der Startseite. Einnahmen minus Ausgaben ist kein Gewinn: Abschreibungen und Steuern fehlen.',
         ],
         [
             'nr'    => 38,
