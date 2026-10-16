@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 38,
+            'datum' => '2026-10-16',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Glocke: selbst wählen, worüber sie dich informiert',
+            'text'  => 'Unter Einstellungen › Benachrichtigungen schaltest du für deine Glocke einzeln ein oder aus: eingegangene Rapporte, gesperrte Tage, Antworten auf Schichten, entschiedene Offerten und spontane Rundgänge. Was du ausschaltest, erscheint nicht mehr in deiner Glocke und zählt nicht zur Zahl daran. In der Übersicht steht es weiterhin, und für andere Konten ändert sich nichts. Gemeldete Vorfälle und Antworten vom Support erscheinen immer.',
+        ],
+        [
             'nr'    => 37,
             'datum' => '2026-10-16',
             'art'   => 'verbesserung',
