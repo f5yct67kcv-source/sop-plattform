@@ -136,7 +136,7 @@ check('KRITISCH: die Warnung im Objektdialog nennt GAV-AUS-010',
 await page.fill('#obKm10', '6');
 await page.waitForTimeout(250);
 check('Unter 10 km keine GAV-AUS-010-Warnung', !/GAV-AUS-010/.test(await page.textContent('#obZoneHint')));
-await page.evaluate(() => closeDlg('dlgObNeu'));
+await page.evaluate(() => obFormSchliessen());
 
 // ══════════════════════════════════════════════════════════════════════════
 // TEIL 4 — Neue Schicht: Warnung samt konkret genannter Person

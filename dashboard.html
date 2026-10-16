@@ -2769,7 +2769,7 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .wahl-reihe label { display: flex; align-items: center; gap: 7px; cursor: pointer; font-size: 13.5px; font-weight: 500; }
 /* Die Wahlmoeglichkeiten sind Werte, keine Beschriftungen: ohne die Versalien
    und den Sperrsatz, die ".f label" einer Feldbeschriftung gibt. */
-.f .wahl-reihe label { text-transform: none; letter-spacing: 0; color: var(--ink); margin-bottom: 0; }
+.f .wahl-reihe label, .f label.check { text-transform: none; letter-spacing: 0; color: var(--ink); margin-bottom: 0; font-size: 13.5px; font-weight: 500; }
 .wahl-reihe input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
 .kw-reihe { display: grid; grid-template-columns: 170px 1fr auto; gap: 8px; align-items: center; margin-bottom: 8px; }
 .kw-weg { border: none; background: transparent; color: var(--ink-3); cursor: pointer; padding: 7px; border-radius: var(--r-xs); display: inline-flex; }
@@ -5648,6 +5648,14 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
        973 px ab der Feldspalte. Darum tragen Nr., PLZ und Ort feste
        Beschriftungsbreiten. */
     html[data-dichte="kompakt"] #ku_notiz { width: 973px; }
+    /* Objektseite: Bemerkung und Zonenanzeige enden buendig mit "Kanton"
+       (345 + 44 + 34 + 14 + 80 + 44 + 34 + 14 + 218 + 44 + 52 + 14 + 64 =
+       1001 px ab der Feldspalte); die Zone beginnt an der Feldspalte. */
+    html[data-dichte="kompakt"] #obBemerkung { width: 1001px; }
+    html[data-dichte="kompakt"] #obZoneHint { margin-left: 182px; max-width: 1001px; }
+    /* Ein Haekchen in der Zeile steht auf Feldhoehe, Kaestchen und Text auf
+       einer Linie. */
+    html[data-dichte="kompakt"] .zeilenfluss > .f > label.check { height: 32px; margin: 0; }
     /* Beschriftung mit fester Mindestbreite (style="--zf-l:..."): "PLZ *" und
        "PLZ" stehen in zwei Abschnitten untereinander und sollen ihre Felder
        auf dieselbe Kante setzen. */
@@ -7511,6 +7519,72 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
         </div>
         <div class="ob-tab on" id="ob-uebersicht"></div>
         <div class="ob-tab" id="ob-masterschichten"></div>
+      </section>
+
+      <!-- ══════════════════ OBJEKT ANLEGEN / AENDERN (16.10.2026) ═══════════
+           Vorher ein schmaler Dialog. Wie "Neuer Kunde" eine eigene Seite im
+           Zeilenfluss (Variante 2). Feldkennungen unveraendert --
+           openObjektNeu(), saveObjekt(), die Wegstrecken und die Zone
+           arbeiten damit weiter. -->
+      <section class="view" id="view-objektform">
+        <div class="bar-tools">
+          <button class="btn btn-plain btn-sm" id="obZurueck" onclick="obFormSchliessen()">Zurück zu den Objekten</button>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-primary btn-sm" id="obNeuBtn" onclick="saveObjekt()">Objekt anlegen</button>
+        </div>
+        <div class="card"><div class="card-bd">
+          <div class="msg-err" id="obNeuErr" style="display:none"></div>
+          <p class="note">Ein Objekt ist der feste Einsatzort eines Dauerauftrags. Bezeichnung, Kunde und Ort sind Pflicht.</p>
+          <h2 id="obNeuTitel" style="display:none">Neues Objekt</h2>
+
+<div class="abschnitt">
+  <h3>Stammdaten</h3>
+  <p class="note">Die Sparte ist die Vorgabe für neue Schichten — eine einzelne Vorlage kann davon abweichen, etwa eine Endreinigung an einem bewachten Objekt.</p>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f zf-neu"><label for="obName">Bezeichnung *</label><input class="inp" id="obName" placeholder="z. B. Einkaufszentrum Nord" style="--zf-b:345px"></div>
+    <div class="f"><label for="obKunde_name" style="--zf-l:94px">Kunde *</label><input class="inp" id="obKunde_name" list="dlKunden" autocomplete="off" style="--zf-b:345px"></div>
+    <div class="f zf-neu zf-umbruch"><label for="obEinsatzart">Einsatzart</label><input class="inp" id="obEinsatzart" value="Revierdienst" list="dlEinsatzarten" oninput="artSparteKoppeln('ob')" style="--zf-b:345px"></div>
+    <div class="f" data-sparte-feld><label for="obSparte" style="--zf-l:94px">Sparte</label>
+      <select class="inp" id="obSparte" onchange="obZoneAktualisieren(); spartenKonflikt('ob')" style="--zf-b:171px">
+        <option value="sicherheit">Sicherheit</option>
+        <option value="reinigung" data-sparte="reinigung">Reinigung</option>
+      </select>
+      <div id="obSparteHint"></div>
+    </div>
+    <div class="f"><label class="check"><input type="checkbox" id="obAktiv" checked> Objekt ist in Betrieb</label></div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Ort</h3>
+  <p class="note">Der Kanton bestimmt, welche Feiertage für dieses Objekt gelten.</p>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f zf-neu"><label for="obStrasse">Strasse und Nummer</label><input class="inp" id="obStrasse" style="--zf-b:345px"></div>
+    <div class="f"><label for="obPlz" style="--zf-l:34px">PLZ</label><input class="inp" id="obPlz" inputmode="numeric" maxlength="10" style="--zf-b:80px"></div>
+    <div class="f"><label for="obOrt" style="--zf-l:34px">Ort *</label><input class="inp" id="obOrt" style="--zf-b:218px"></div>
+    <div class="f"><label for="obKanton" style="--zf-l:52px">Kanton</label><input class="inp" id="obKanton" value="SO" maxlength="2" style="text-transform:uppercase;--zf-b:64px"></div>
+  </div>
+</div>
+
+<!-- Wegstrecke und Zone nach Art. 18 (ENT-054). Steht bewusst beim Objekt
+     und nicht beim Einsatz: Gemessen wird ab Hauptanstellungsort zum
+     Einsatzort, und der Einsatzort IST das Objekt. Eine Zahl je Objekt.
+     Der Messhinweis bleibt auch kompakt sichtbar: Wer die Zahl eintippt,
+     soll VORHER wissen, welche Route gilt -- kein (i). -->
+<div class="abschnitt" id="obDistanzBlock">
+  <h3>Wegstrecke ab Anstellungsort <span class="note" style="text-transform:none;letter-spacing:0;font-weight:400;margin-left:8px">Art. 18 GAV</span></h3>
+  <p class="zone-note" id="obMessHinweis" style="margin:0 0 10px"></p>
+  <div id="obDistanzFelder"></div>
+  <div id="obZoneHint"></div>
+</div>
+
+<div class="abschnitt">
+  <h3>Weitere Angaben</h3>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f wide zf-neu zf-text"><label for="obBemerkung">Bemerkung</label><textarea class="inp" id="obBemerkung" rows="2" style="min-height:56px"></textarea></div>
+  </div>
+</div>
+        </div></div>
       </section>
 
       <!-- ══════════════════ KUNDE ANLEGEN / BEARBEITEN (16.10.2026) ══════════
@@ -9997,52 +10071,6 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
 
 <!-- Neuer Einsatz. Auch das Ziel des Planungs-Diktats — gespeichert wird erst
      durch den Knopf unten. -->
-<!-- Objekt anlegen oder ändern -->
-<div class="dlg-scrim" id="dlgObNeu">
-  <div class="dlg">
-    <div class="dlg-hd">
-      <h2 id="obNeuTitel">Neues Objekt</h2>
-      <p>Ein Objekt ist der feste Einsatzort eines Dauerauftrags. Bezeichnung, Kunde und Ort sind Pflicht.</p>
-    </div>
-    <div class="dlg-bd">
-      <div class="msg-err" id="obNeuErr" style="display:none"></div>
-      <div class="form-grid">
-        <div class="f wide"><label for="obName">Bezeichnung *</label><input class="inp" id="obName" placeholder="z. B. Einkaufszentrum Nord"></div>
-        <div class="f wide"><label for="obKunde_name">Kunde *</label><input class="inp" id="obKunde_name" list="dlKunden" autocomplete="off"></div>
-        <div class="f wide"><label for="obStrasse">Strasse und Nummer</label><input class="inp" id="obStrasse"></div>
-        <div class="f"><label for="obPlz">PLZ</label><input class="inp" id="obPlz" inputmode="numeric" maxlength="10"></div>
-        <div class="f"><label for="obOrt">Ort *</label><input class="inp" id="obOrt"></div>
-        <div class="f"><label for="obKanton">Kanton</label><input class="inp" id="obKanton" value="SO" maxlength="2" style="text-transform:uppercase"></div>
-        <div class="f" data-sparte-feld><label for="obSparte">Sparte</label>
-          <select class="inp" id="obSparte" onchange="obZoneAktualisieren(); spartenKonflikt('ob')">
-            <option value="sicherheit">Sicherheit</option>
-            <option value="reinigung" data-sparte="reinigung">Reinigung</option>
-          </select>
-          <div id="obSparteHint"></div>
-        </div>
-        <div class="f"><label for="obEinsatzart">Einsatzart</label><input class="inp" id="obEinsatzart" value="Revierdienst" list="dlEinsatzarten" oninput="artSparteKoppeln('ob')"></div>
-        <div class="f wide"><label for="obBemerkung">Bemerkung</label><textarea class="inp" id="obBemerkung" rows="2" style="min-height:56px"></textarea></div>
-        <div class="f wide"><label class="check"><input type="checkbox" id="obAktiv" checked> Objekt ist in Betrieb</label></div>
-      </div>
-
-      <!-- Wegstrecke und Zone nach Art. 18 (ENT-054). Steht bewusst im
-           Objektdialog und nicht beim Einsatz: Gemessen wird ab
-           Hauptanstellungsort zum Einsatzort, und der Einsatzort IST das
-           Objekt. Eine Zahl je Objekt, nicht eine je Schicht. -->
-      <div id="obDistanzBlock" style="margin-top:18px">
-        <div class="feld-titel">Wegstrecke ab Anstellungsort (Art. 18 GAV)</div>
-        <p class="zone-note" id="obMessHinweis" style="margin:2px 0 10px"></p>
-        <div id="obDistanzFelder"></div>
-        <div id="obZoneHint"></div>
-      </div>
-      <p class="zone-note" style="margin-top:4px">Der Kanton bestimmt, welche Feiertage für dieses Objekt gelten. Die Sparte ist die Vorgabe für neue Schichten — eine einzelne Vorlage kann davon abweichen, etwa eine Endreinigung an einem bewachten Objekt.</p>
-    </div>
-    <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgObNeu')">Abbrechen</button>
-      <button class="btn btn-primary" id="obNeuBtn" onclick="saveObjekt()">Speichern</button>
-    </div>
-  </div>
-</div>
 
 <!-- Produkt anlegen oder ändern (ENT-181). Preis-Stammdaten für Offerten.
      Was hier steht, sind Vorschläge: Beim Übernehmen in einen Beleg werden
@@ -12251,6 +12279,7 @@ const TITLES = {
   revierdienst: ['Revierdienst', 'Kontrollpunkte und Kontrollrunden je Objekt einrichten'],
   einsatzneu:  ['Neuer Einsatz', 'Kunde, Ort, Zeit und Zuteilung'],
   kundeform:   ['Neuer Kunde', 'Stammdaten, Adresse und Kontakt'],
+  objektform:  ['Neues Objekt', 'Einsatzort eines Dauerauftrags'],
   einsatzplan: ['Einsatz planen', 'Positionen und Zeiten im Detail'],
   objekt:      ['Objekt', 'Stammdaten, Masterschichten und Kontrollpunkte'],
   mitteilungen: ['Mitteilungen', 'Was die Belegschaft in der App zu sehen bekommt'],
@@ -13380,7 +13409,7 @@ function dichteInfoBauen() {
 // die Bearbeitungsmaske dort ist ein Formular und bleibt auf Lesebreite.
 // 'arbeitsergebnisse' bleibt ebenfalls draussen: Es zeichnet seit ENT-243
 // Karten statt Tabellen, und eine 1900 px breite Karte gewinnt nichts.
-const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'revierdienst', 'einsatzplan', 'einsatzneu', 'kundeform', 'offerte', 'objekt',
+const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'revierdienst', 'einsatzplan', 'einsatzneu', 'kundeform', 'objektform', 'offerte', 'objekt',
                         'kunden', 'mitarbeiter', 'produkte', 'abwesenheiten',
                         'finanzen', 'rechnungen', 'lohnauslagen'];
 const PLANUNG_WEIT   = ['uebersicht', 'einsaetze', 'objektplan', 'tag'];
@@ -21910,10 +21939,10 @@ function obDistanzZeichnen(o) {
     return;
   }
   const d = (o && o.distanzen) || {};
-  feld.innerHTML = `<div class="form-grid">` + anstellungsorte.map(a => `
+  feld.innerHTML = `<div class="form-grid form-breit form-zeilen zeilenfluss">` + anstellungsorte.map(a => `
     <div class="f">
       <label for="obKm${a.id}">${esc(a.bezeichnung)} <span style="color:var(--ink-3);font-weight:500">(${a.rolle === 'hao' ? 'HAO' : 'NAO'})</span></label>
-      <input class="inp" id="obKm${a.id}" inputmode="decimal" placeholder="km"
+      <input class="inp" id="obKm${a.id}" inputmode="decimal" placeholder="km" style="--zf-b:104px"
              value="${d[a.id] !== undefined ? d[a.id].km : ''}" oninput="obZoneAktualisieren()">
     </div>`).join('') + `</div>`;
   obZoneAktualisieren();
@@ -21972,10 +22001,28 @@ function openObjektNeu(o) {
   });
   $('obAktiv').checked = o ? !!o.aktiv : true;
   $('obNeuErr').style.display = 'none';
+  $('obNeuBtn').textContent = o ? 'Speichern' : 'Objekt anlegen';
   obDistanzZeichnen(o);
   spartenKonflikt('ob');
-  openDlg('dlgObNeu');
+  obFormZeigen();
   $('obName').focus();
+}
+
+// Seite statt Dialog (16.10.2026), dieselbe Bauart wie kuFormZeigen().
+let obFormHer = 'kunden';
+const OB_ZURUECK = { kunden: 'Zurück zu den Objekten', objekt: 'Zurück zum Objekt',
+  uebersicht: 'Zurück zur Übersicht', planung: 'Zurück zur Planung' };
+function obFormZeigen() {
+  const an = document.querySelector('.view.on');
+  const her = an ? an.id.replace('view-', '') : 'kunden';
+  if (her !== 'objektform') { obFormHer = her; }
+  go('objektform');
+  $('pgTitle').textContent = $('obNeuTitel').textContent;
+  $('obZurueck').textContent = OB_ZURUECK[obFormHer] || 'Zurück';
+  window.scrollTo(0, 0);
+}
+function obFormSchliessen() {
+  if ($('view-objektform').classList.contains('on')) { go(obFormHer || 'kunden'); }
 }
 
 function saveObjekt() {
@@ -21995,7 +22042,7 @@ function saveObjekt() {
   api('objekt_save.php', { method: 'POST', body }).then(({ ok, data }) => {
     b.disabled = false;
     if (!ok || data.status !== 'ok') { err.textContent = data.message || 'Speichern fehlgeschlagen.'; err.style.display = ''; return; }
-    closeDlg('dlgObNeu');
+    obFormSchliessen();
     const neu = !obTarget;
     const objektId = Number(data.id || obTarget);
     obDistanzenSpeichern(objektId).then(() => loadObjekte()).then(() => {
