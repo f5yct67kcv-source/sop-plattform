@@ -434,8 +434,8 @@ await page.waitForTimeout(200);
 await page.click('#nav-planung-uebersicht');
 await page.waitForTimeout(200);
 calls = [];
-// Seit ENT-038 auf der Reiter-Trennlinie, reiterübergreifend statt nur hier.
-await page.click('.tabs button:has-text("Feiertage")');
+// Seit 15.10.2026 als Icon vor der Suche, in jedem Planungsreiter.
+await page.click('#pv-uebersicht [aria-label="Feiertage verwalten"]');
 await page.waitForSelector('#dlgFeiertage.on');
 await page.waitForTimeout(400);
 check('Feiertagsdialog laedt die Liste', calls.some(c => c.path.includes('feiertage_list')));
