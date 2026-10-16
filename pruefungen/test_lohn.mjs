@@ -21,7 +21,7 @@ import { chromium } from 'playwright';
 
 const EXE = browserPfad();
 const ok = [], bad = [];
-const check = (n, c, x) => (c ? ok : bad).push(n + (c || x === undefined ? '' : ' -- ' + x));
+const check = (n, c) => (c ? ok : bad).push(n);
 
 // Datum bewusst weit weg von heute (CLAUDE.md / test_datumsfest.mjs): ein
 // Datum nahe am heutigen Tag kippt beim Datumswechsel.
@@ -399,11 +399,11 @@ check('Die Vorauswahl im Dialog trifft einen Schluessel, den es gibt',
 // wurde gespeichert und von keiner Rechnung gelesen. Dieselbe Falle wie
 // beim AHV-Satz. Geprueft wird der Dialog, nicht der Quelltext.
 const dlgFelder = await page.evaluate(() =>
-  [...document.querySelectorAll('#view-lohnsatzform input, #view-lohnsatzform select')].map(e => e.id));
+  [...document.querySelectorAll('#dlgLohnsatz input, #dlgLohnsatz select')].map(e => e.id));
 check('KRITISCH: kein Eingabefeld fuer eine Obergrenze, die nicht gerechnet wird',
   !dlgFelder.includes('lsHoechst')
-  && !/Höchstlohn/.test(await page.textContent('#view-lohnsatzform')));
-await page.evaluate(() => lohnFormSchliessen());
+  && !/Höchstlohn/.test(await page.textContent('#dlgLohnsatz')));
+await page.evaluate(() => closeDlg('dlgLohnsatz'));
 
 // Eine alte AHV-Zeile bleibt sichtbar und wird als wirkungslos benannt.
 // Stilles Loeschen waere schlimmer: Wer sie eingetragen hat, glaubte, sie
@@ -511,7 +511,7 @@ await page.waitForTimeout(300);
 check('Eine noch nicht abgerechnete Position lässt sich korrigieren und löschen',
   (await page.$$eval('#lpoWeg option', os => os.map(o => o.value))).includes('korrigieren')
   && (await sichtbar('lpoLoeschKnopf')));
-await page.evaluate(() => lohnFormSchliessen());
+await page.evaluate(() => closeDlg('dlgLohnPosition'));
 
 // Der Dialog fuer eine neue Position: Einheit folgt der Lohnart.
 await page.evaluate(() => lohnPositionOeffnen(null));
@@ -633,7 +633,7 @@ await page.selectOption('#lpbNbu', 'versichert');
 await page.waitForTimeout(200);
 check('Stimmt die Wahl mit der Rechnung ueberein, steht kein Widerspruch da',
   !/widersprechen/.test((await page.textContent('#lpbNbuStand')).replace(/\s+/g, ' ')));
-await page.evaluate(() => lohnFormSchliessen());
+await page.evaluate(() => closeDlg('dlgLohnAbzug'));
 await page.waitForTimeout(200);
 
 // ── 5b. Der Lohnlauf: Stunden und Franken getrennt, Gesperrtes benannt ───
@@ -766,116 +766,6 @@ await page.evaluate(() => go('lohnarten'));
 await page.waitForTimeout(500);
 check('KRITISCH: mit Schreibrecht ist der Knopf wieder da -- die Prüfung oben misst also etwas',
   await sichtbar('laNeuKnopf'));
-
-// ── 5d. Die Formulare sind Seiten im Zeilenfluss (16.10.2026) ────────────
-// Vorher sechs Dialoge. Gemessen am gerenderten Zustand (kompakt ist der
-// Standard): "Zurueck" fuehrt dorthin, woher man kam -- bei der Lohnakte
-// auf den Reiter "Lohn" DERSELBEN Person, nicht in die Liste. Die Felder
-// setzen an einer Kante an, die erste Beschriftung jeder Zeile ist 168 px
-// breit, Zeilen liegen 46 px auseinander. Ausgeblendete Zeilen
-// (Begruendung, Wege einer Position) hinterlassen keine Luecke. Alle
-// Hinweise liegen hinter dem (i) (Entscheid des Projektinhabers).
-lohnAntwort = LOHN_VOLL;
-await page.setViewportSize({ width: 1728, height: 1009 });
-// Eine Zeile: Feld (bei Haekchen die Beschriftung) und erste Beschriftung.
-const zeilen = ids => page.evaluate(ids => ids.map(i => {
-  const e = document.getElementById(i);
-  const f = e.closest('.f');
-  const haken = e.type === 'checkbox';
-  const feld = haken ? e.closest('label') : (f.querySelector(':scope > .zf-gruppe') || e);
-  const lab = haken ? null : f.querySelector(':scope > label');
-  return { i, links: (haken ? e : feld).getBoundingClientRect().left, oben: feld.getBoundingClientRect().top,
-    unten: feld.getBoundingClientRect().bottom, lab: lab ? lab.getBoundingClientRect().width : null };
-}), ids);
-const kante = z => Math.max(...z.map(x => x.links)) - Math.min(...z.map(x => x.links)) < 0.5;
-const abstaende = z => z.slice(1).map((x, k) => Math.round((x.oben - z[k].oben) * 10) / 10);
-const je46 = z => abstaende(z).every(d => Math.abs(d - 46) < 0.5);
-const labs168 = z => z.filter(x => x.lab !== null).every(x => Math.abs(x.lab - 168) < 0.5);
-
-await page.evaluate(() => { go('mitarbeiter'); openMaDetail('muster.person'); });
-await page.waitForTimeout(500);
-await page.evaluate(() => mdGoTab('lohn'));
-await page.waitForTimeout(500);
-
-// Lohnansatz
-await page.evaluate(() => lohnAnsatzOeffnen(null));
-await page.waitForTimeout(300);
-check('Lohnansatz öffnet eine Seite statt eines Dialogs',
-  await sichtbar('mv-lohnansatz') && !(await sichtbar('mv-detail')) && !(await page.$('.dlg-scrim.on #lpaAb')));
-check('Der Kopf nennt Formular und Person',
-  (await page.textContent('#pgTitle')).trim() === 'Lohnansatz erfassen'
-  && (await page.textContent('#pgCrumb')).trim() === (await page.textContent('#mdName')).trim());
-let z = await zeilen(['lpaAb', 'lpaMl13', 'lpaFerienLaufend']);
-check('Lohnansatz: Felder an einer Kante, 46 px Zeilenabstand, 168-px-Beschriftung',
-  kante(z) && je46(z) && labs168(z));
-const zz = await zeilen(['lpaZFach', 'lpaZHund', 'lpaZWaffe']);
-check('Zuschläge: Betrag und Einheit untereinander, 46 px', kante(zz.concat(z)) && je46(zz) && labs168(zz));
-check('Kompakt: die GAV-Hinweise liegen hinter dem (i)',
-  await page.evaluate(() => [...document.querySelectorAll('#mv-lohnansatz .abschnitt > .note')]
-    .every(n => getComputedStyle(n).display === 'none')));
-await page.click('#mv-lohnansatz .abschnitt .abs-info');
-check('… und das (i) zeigt sie', await page.evaluate(() =>
-  getComputedStyle(document.querySelector('#mv-lohnansatz .abschnitt > .note')).display !== 'none'));
-await page.click('#lpaZurueck');
-await page.waitForTimeout(300);
-check('„Zurück“ führt auf den Reiter Lohn derselben Person',
-  await sichtbar('mv-detail') && await sichtbar('md-lohn') && !(await sichtbar('mv-lohnansatz'))
-  && (await page.textContent('#pgTitle')).trim() === 'Mitarbeitende');
-
-// Abzuege: der Stand der Rechnung steht in einer eigenen Zeile, die
-// Begruendung erscheint ohne Luecke darueber oder darunter.
-await page.evaluate(() => lohnAbzugOeffnen(null));
-await page.waitForTimeout(300);
-z = await zeilen(['lpbAb', 'lpbNbu', 'lpbKtg', 'lpbBvg', 'lpbBvgBetrag']);
-const stand = await page.evaluate(() => document.getElementById('lpbNbuStand').getBoundingClientRect());
-check('Abzüge: Felder an einer Kante, 168-px-Beschriftung', kante(z) && labs168(z));
-check('Abzüge: Gültig ab → NBU 46 px, Krankentaggeld → BVG → Beitrag 46 px',
-  Math.abs(z[1].oben - z[0].oben - 46) < 0.5 && je46(z.slice(2)), abstaende(z).join(','));
-check('Der Stand der NBU-Rechnung steht unter der Auswahl in der Feldspalte, 14 px Abstand',
-  Math.abs(stand.left - z[0].links) < 0.5 && Math.abs(stand.top - z[1].unten - 14) < 0.5
-  && Math.abs(z[2].oben - stand.bottom - 14) < 0.5);
-const vorher = z[2].oben;
-await page.selectOption('#lpbNbu', 'versichert');
-await page.waitForTimeout(150);
-z = await zeilen(['lpbNbuGrund', 'lpbKtg']);
-check('Die Begründung schiebt sich als ganze Zeile dazwischen (46 px)',
-  Math.abs(z[1].oben - vorher - 46) < 0.5 && Math.abs(z[1].oben - z[0].oben - 46) < 0.5);
-await page.click('#lpbZurueck');
-await page.waitForTimeout(200);
-
-// Position: ausgeblendete Wege hinterlassen keine Luecke
-await page.evaluate(() => lohnPositionOeffnen(null));
-await page.waitForTimeout(300);
-z = await zeilen(['lpoLohnart', 'lpoBetrag', 'lpoEinmalig', 'lpoAb', 'lpoBemerkung']);
-check('Position: alle Zeilen an einer Kante, je 46 px', kante(z) && je46(z), abstaende(z).join(','));
-await page.evaluate(() => { lohnFormSchliessen(); lohnPositionOeffnen(21); });
-await page.waitForTimeout(300);
-z = await zeilen(['lpoWeg', 'lpoNeuBetrag']);
-check('„Betrag ändern ab“: die ausgeblendeten Felder lassen keine Lücke (46 px)', je46(z) && kante(z), abstaende(z).join(','));
-await page.click('#lpoZurueck');
-await page.waitForTimeout(200);
-
-// Lohnart und Satz: eigene Seiten neben ihren Listen
-await page.evaluate(() => go('lohnarten'));
-await page.waitForTimeout(400);
-await page.click('#laNeuKnopf');
-await page.waitForTimeout(300);
-check('Lohnart erfassen öffnet eine Seite', await sichtbar('view-lohnartform') && !(await sichtbar('view-lohnarten')));
-z = await zeilen(['laBezeichnung', 'laArt', 'laGav', 'laAktiv']);
-check('Lohnart: Felder an einer Kante, je 46 px', kante(z) && je46(z) && labs168(z), abstaende(z).join(','));
-await page.click('#laZurueck');
-await page.waitForTimeout(300);
-check('„Zurück“ führt zu den Lohnarten', await sichtbar('view-lohnarten'));
-await page.evaluate(() => go('lohnsaetze'));
-await page.waitForTimeout(400);
-await page.click('#lsNeuKnopf');
-await page.waitForTimeout(300);
-z = await zeilen(['lsSchluessel', 'lsAb', 'lsSatz', 'lsQuelle']);
-check('Satz: eigene Seite, Felder an einer Kante, je 46 px',
-  await sichtbar('view-lohnsatzform') && kante(z) && je46(z) && labs168(z), abstaende(z).join(','));
-await page.click('#lsZurueck');
-await page.waitForTimeout(300);
-check('„Zurück“ führt zu den Sätzen', await sichtbar('view-lohnsaetze'));
 
 // ── 6. Ohne das Recht ist nichts davon da ────────────────────────────────
 rechte = ['personal_lesen'];
