@@ -30,6 +30,22 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 35,
+            'datum' => '2026-10-16',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Planung: übersichtlicher Monatsplan',
+            'text'  => 'Die Übersicht der Planung beginnt weiter oben: Die Zeile mit „Feiertage“ ist weg, die Feiertage erreichst du jetzt über das Kalender-Icon links neben der Suche, in allen vier Planungsreitern. Die Objektspalte ist schmaler. Eine Woche oder ein einzelner Tag steht direkt neben den Objekten statt am rechten Rand. Wochenenden und Feiertage sind auch in besetzten Zeilen deutlich zu erkennen. Der Hinweis über dem Monatsplan erscheint nur noch, wenn ein Filter oder die Suche greift.',
+        ],
+        [
+            'nr'    => 34,
+            'datum' => '2026-10-16',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Kompakte Darstellung',
+            'text'  => 'Oben rechts gibt es einen neuen Schalter für eine kompakte Darstellung. Sie rückt Felder enger zusammen und blendet Erklärtexte aus; ein ⓘ an der Überschrift zeigt sie bei Bedarf wieder an. Das Formular „Neuer Einsatz“ ist darin so angeordnet, dass zusammengehörige Felder in einer Zeile stehen. Die Wahl merkt sich dein Browser. Am Handy gibt es den Schalter nicht.',
+        ],
+        [
             'nr'    => 28,
             'datum' => '2026-10-14',
             'art'   => 'fehlerbehebung',
