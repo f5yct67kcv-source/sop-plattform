@@ -2157,6 +2157,8 @@ html:not(.hat-reinigung) [data-sparte-feld] { display: none !important; }
   /* Monatsuebersicht nach Skizze 15.10.2026: Felder 40 px hoch, 32 px unter
      der Kopfzeile (26 Innenabstand + 6), 47 px bis zur Tabelle. */
   #pv-uebersicht > .bar-tools { padding: 6px 0 0; margin-bottom: 0; }
+  /* Kompakt hat 10 px weniger Innenabstand oben -- die 32 px bleiben. */
+  html[data-dichte="kompakt"] #pv-uebersicht > .bar-tools { padding-top: 16px; }
   #pv-uebersicht > .bar-tools .inp { height: 40px; box-sizing: border-box; }
   /* "September" ist der laengste Monat: 73 px Text + 12 links + 30 fuer
      den Pfeil + Rand. Mit 91 px stand "Oktobe" da. */
@@ -3421,6 +3423,11 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
    gezogen, nimmt das Feld die gewonnene Hoehe (so seit jeher, gemessen von
    test_containergroesse.mjs). */
 .dash-item:not(.dh) .begr-karte #rtText { height: 64px; min-height: 64px; }
+/* Kompakt: dieselbe Rechnung mit 13 px Schrift und 5 px Innenabstand --
+   2 x 20.15 + 2 x 5 + 2 = 52.3 px. */
+@media (min-width: 901px) {
+  html[data-dichte="kompakt"] .dash-item:not(.dh) .begr-karte #rtText { height: calc(2 * 1.55 * 13px + 12px); min-height: 0; }
+}
 /* Der Erklaersatz entfaellt hier. NUR er: Dieselbe Flaeche zeigt weiter
    "Das Mikrofon liefert kein Signal", "Die Aufnahme liess sich nicht
    starten" und "Aufnahme laeuft". Ein leeres Feld soll dabei keinen
@@ -5723,9 +5730,14 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
 .abs-info { display: none; }
 @media (min-width: 901px) {
   html[data-dichte="kompakt"] .content { padding: 16px 20px; }
-  html[data-dichte="kompakt"] .card-bd { padding: 14px 16px; }
+  /* Nicht auf .flush: Diese Karten tragen Tabellen bis an den Rand. */
+  html[data-dichte="kompakt"] .card-bd:not(.flush) { padding: 14px 16px; }
   html[data-dichte="kompakt"] .bar-tools { margin-bottom: 10px; }
-  html[data-dichte="kompakt"] .inp { padding: 5px 9px; font-size: 13px; }
+  /* :where() haelt die Regel so schwach wie ".inp" selbst. Sonst ueberschrieb
+     sie jeden eigenen Innenabstand: Die Suche schob ihr Text unter die Lupe,
+     das Passwortfeld unter das Auge, die Auswahl unter den Pfeil. */
+  html[data-dichte="kompakt"] :where(.inp) { padding: 5px 9px; font-size: 13px; }
+  html[data-dichte="kompakt"] select:where(.inp) { padding-right: 30px; }
   html[data-dichte="kompakt"] .f { margin-bottom: 8px; }
   html[data-dichte="kompakt"] .f label { margin-bottom: 4px; }
   html[data-dichte="kompakt"] .form-zeilen .f { margin-bottom: 5px; }
@@ -5945,11 +5957,16 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
   try { g = localStorage.getItem('rv3_glas') === 'aus' ? 'aus' : 'an'; } catch (e) {}
   document.documentElement.setAttribute('data-glas', g);
 })();
-/* Kompakte Darstellung (Versuch 2026-10-14). Ohne gespeicherte Wahl: normal.
-   Eigener Block mit eigenem try -- wie beim Glas oben. */
+/* Kompakte Darstellung (seit 2026-10-14, Standard seit 2026-10-16). Ohne
+   gespeicherte Wahl: kompakt. Eigener Block mit eigenem try -- wie beim
+   Glas oben. */
 (function () {
-  var d = 'normal';
-  try { d = localStorage.getItem('rv3_dichte') === 'kompakt' ? 'kompakt' : 'normal'; } catch (e) {}
+  var d = 'kompakt';
+  // Kompakt ist seit 16.10.2026 der Standard. Gelesen wird ein eigener
+  // Schluessel, den nur eine Wahl schreibt (Schalter oder Konto): Der alte (rv3_dichte) wurde
+  // bei jedem Laden mit "normal" beschrieben und sagt darum nicht, ob
+  // jemand die grosse Darstellung bewusst gewaehlt hat.
+  try { d = localStorage.getItem('rv3_dichte_wahl') === 'normal' ? 'normal' : 'kompakt'; } catch (e) {}
   document.documentElement.setAttribute('data-dichte', d);
 })();
 /* Anmeldemaske gar nicht erst zeigen, wenn schon eine Anmeldung im
@@ -12366,7 +12383,7 @@ function enter() {
   // Wert ueberschreiben, den ein anderes Geraet gespeichert hat.
   themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell', false);
   glasSetzen(document.documentElement.getAttribute('data-glas') === 'an', false);
-  dichteSetzen(document.documentElement.getAttribute('data-dichte') === 'kompakt', false);
+  dichteSetzen(document.documentElement.getAttribute('data-dichte') === 'kompakt', false, false);
   dichteInfoBauen();
   // Im Buendel liegen app.html und index.html unter anderen Namen
   // (index.html bzw. rapport-tool.html, siehe mobile-buendel-erstellen.py)
@@ -15360,9 +15377,13 @@ function glasUm() {
 // Handy gibt es die Wahl bewusst nicht (siehe CSS-Block .dichte-schalter).
 // Der Schalter steht seit ENT-722 auf der Einstellungsseite, und die Wahl
 // gehoert dem Konto wie hell/dunkel und Glas.
-function dichteSetzen(kompakt, merken = true) {
+// Kompakt ist seit 16.10.2026 der Standard. Der Browser haelt eine Kopie
+// (rv3_dichte_wahl) nur von einem Wert, der von einer Wahl stammt -- vom
+// Schalter oder vom Konto --, nie vom Standard beim Laden (zwischenspeichern
+// = false). Sonst saehe der Standard beim naechsten Laden aus wie eine Wahl.
+function dichteSetzen(kompakt, merken = true, zwischenspeichern = true) {
   document.documentElement.setAttribute('data-dichte', kompakt ? 'kompakt' : 'normal');
-  try { localStorage.setItem('rv3_dichte', kompakt ? 'kompakt' : 'normal'); } catch (e) {}
+  if (zwischenspeichern) { try { localStorage.setItem('rv3_dichte_wahl', kompakt ? 'kompakt' : 'normal'); } catch (e) {} }
   const b = $('btnDichte');
   if (b) {
     b.setAttribute('aria-checked', kompakt ? 'true' : 'false');
@@ -15372,7 +15393,7 @@ function dichteSetzen(kompakt, merken = true) {
 }
 
 function dichteUm() {
-  dichteSetzen(document.documentElement.getAttribute('data-dichte') !== 'kompakt');
+  dichteSetzen(document.documentElement.getAttribute('data-dichte') !== 'kompakt', true);
 }
 
 // Ein (i) an jede Abschnittsueberschrift, unter der ein Erklaertext steht.
