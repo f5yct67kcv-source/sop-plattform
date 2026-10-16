@@ -236,7 +236,7 @@ await page.uncheck('#oInaktiv');
 // Anlegen
 calls = [];
 await page.click('#kv-objekte button:has-text("Neues Objekt")');
-await page.waitForSelector('#dlgObNeu.on');
+await page.waitForSelector('#view-objektform.on');
 check('Kanton vorbelegt', (await page.inputValue('#obKanton')) === 'SO');
 check('Einsatzart vorbelegt', (await page.inputValue('#obEinsatzart')) === 'Revierdienst');
 await page.click('#obNeuBtn');

@@ -109,7 +109,7 @@ const ZIELE = [
   ['Schichten abgleichen',    'Schichten abgleichen', null],
   ['Kunde erfassen',          'Neuer Kunde',          '#view-kundeform'],
   ['Tagesplan öffnen',        'Planung',              null],
-  ['Objekt erfassen',         'Kunden',               '#dlgObNeu'],
+  ['Objekt erfassen',         'Neues Objekt',         '#view-objektform'],
   ['Objektplanung öffnen',    'Planung',              null],
   ['Mitarbeitenden erfassen', 'Mitarbeitende',        null],
   ['Rapporte ansehen',        'Kunden',               null],
