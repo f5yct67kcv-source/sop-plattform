@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 42,
+            'datum' => '2026-10-16',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Farbthemen: Graphit, Marine oder Hell',
+            'text'  => 'Unter Einstellungen › Farben wählst du das Farbthema deiner Oberfläche: Graphit wie bisher, Marine mit nachtblauer Kopfleiste oder Hell mit heller Kopfleiste. Jedes Thema gibt es hell und dunkel, das stellst du wie gewohnt unter Darstellung ein. Die Farben für zugesagt, Warnung oder gesperrt bleiben in jedem Thema gleich. Die Wahl gilt für dein Konto und vorerst nur am Computer, am Handy bleibt die Oberfläche wie bisher.',
+        ],
+        [
             'nr'    => 38,
             'datum' => '2026-10-16',
             'art'   => 'neu',

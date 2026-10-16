@@ -47,6 +47,9 @@ const EINSTELLUNGEN_ERLAUBT = [
     // Hell/Dunkel-Wahl (dort dunkel als Vorgabe, weil sie nachts im Revier
     // laeuft). Zwei Entscheidungen, zwei Schluessel -- auch am Konto.
     'app_thema' => ['hell', 'dunkel'],
+    // Farbthema des Cockpits (ENT-726). Gilt nur am Desktop; hell/dunkel
+    // bleibt der eigene Schluessel "thema".
+    'farbe' => ['graphit', 'marine', 'hell'],
     // Benachrichtigungen: welche Arten die eigene Glocke zeigt. Dieselben
     // Arten wie GLOCKE_SCHALTBAR in backend/ereignisse.php -- Vorfall und
     // Supportantwort fehlen absichtlich, sie lassen sich nicht ausschalten.

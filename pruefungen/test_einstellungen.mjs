@@ -58,6 +58,16 @@ try {
   check('und das Gespeicherte bleibt unangetastet',
     JSON.stringify(json(d.pruefung.ich)) === JSON.stringify({ thema: 'dunkel', glas: 'aus' }));
 
+  // Farbthema (ENT-726): die drei Themen kommen durch, die verworfenen
+  // Entwuerfe (Wald, Sand) nicht -- auch nicht am Browser vorbei.
+  const fa = aufruf('POST', 'leer', { einstellungen: { farbe: 'marine' } });
+  check('Farben: ein gewaehltes Thema wird am Konto gespeichert',
+    fa.status === 'ok' && JSON.stringify(json(fa.pruefung.ich)) === JSON.stringify({ farbe: 'marine' }));
+  const fw = ['graphit', 'marine', 'hell', 'wald', 'sand'].filter(w =>
+    aufruf('POST', 'leer', { einstellungen: { farbe: w } }).status === 'ok');
+  check(`KRITISCH Farben: genau Graphit, Marine und Hell sind erlaubt (${fw.join(', ')})`,
+    fw.join() === 'graphit,marine,hell');
+
   // Benachrichtigungen: die schaltbaren Arten kommen durch, Vorfall und
   // Supportantwort nicht -- sie sind immer an, auch wenn ein Browser
   // etwas anderes schickt.
@@ -145,7 +155,7 @@ const standText = page => page.evaluate(() => $('esStand').textContent.trim());
 // richtigerweise einmal aus dem Browser uebernommen.
 // ── 1) Weg dorthin, Kopfleiste, Aufbau ─────────────────────────────────────
 {
-  const { browser, page, fehler, posts } = await starte({ konto: { thema: 'dunkel', glas: 'an', dichte: 'normal' } });
+  const { browser, page, fehler, posts } = await starte({ konto: { thema: 'dunkel', glas: 'an', dichte: 'normal', farbe: 'graphit' } });
   check('KRITISCH: in der Werkzeugleiste steht kein Thema- oder Glas-Schalter mehr',
     await page.evaluate(() => !document.querySelector('.tb-rechts .thema-schalter, .tb-rechts .glas-schalter')));
   await page.click('#btnMarke'); await page.waitForTimeout(250);
@@ -192,7 +202,7 @@ const standText = page => page.evaluate(() => $('esStand').textContent.trim());
   // Platzhalter: klickbar, mit einem eigenen Satz -- "in Arbeit" darf
   // nicht aussehen wie "hier gibt es nichts".
   const platz = {};
-  for (const r of ['farben', 'maildesigner', 'system']) {
+  for (const r of ['maildesigner', 'system']) {
     await page.click(`.es-nav-knopf[data-reiter="${r}"]`); await page.waitForTimeout(80);
     platz[r] = await page.evaluate(k => {
       const t = document.querySelector(`.es-teil[data-reiter="${k}"]`);
@@ -204,13 +214,13 @@ const standText = page => page.evaluate(() => $('esStand').textContent.trim());
     Object.values(platz).every(p => p.sichtbar && p.darstellungWeg));
   check('KRITISCH: jeder sagt, dass er in Arbeit ist',
     Object.values(platz).every(p => /in arbeit/i.test(p.text)));
-  check('Und jeder sagt, WAS dort entsteht -- drei verschiedene Saetze',
-    new Set(Object.values(platz).map(p => p.text)).size === 3);
+  check('Und jeder sagt, WAS dort entsteht -- zwei verschiedene Saetze',
+    new Set(Object.values(platz).map(p => p.text)).size === 2);
   check('Der E-Mail-Designer sagt, dass er fuer den ganzen Betrieb gilt',
     /betrieb/i.test(platz.maildesigner.text));
   check('Die Reiter in Arbeit tragen den Hinweis auch in der linken Spalte',
     await page.evaluate(() => [...document.querySelectorAll('.es-nav-knopf')]
-      .every(k => ['darstellung', 'benachrichtigungen'].includes(k.dataset.reiter) === !k.querySelector('.es-inarbeit'))));
+      .every(k => ['darstellung', 'farben', 'benachrichtigungen'].includes(k.dataset.reiter) === !k.querySelector('.es-inarbeit'))));
   await page.screenshot({ path: `${OUT}/einstellungen-desktop.png` });
   check('Auf einer gespeicherten Wahl wird beim Oeffnen nichts hochgeladen', posts.length === 0);
   check('Keine JavaScript-Fehler', fehler.length === 0);
@@ -256,7 +266,7 @@ const standText = page => page.evaluate(() => $('esStand').textContent.trim());
 
 // ── 4) Das Konto gewinnt ───────────────────────────────────────────────────
 {
-  const { browser, page, posts } = await starte({ thema: 'dunkel', glas: 'an', konto: { thema: 'hell', glas: 'aus', dichte: 'normal' } });
+  const { browser, page, posts } = await starte({ thema: 'dunkel', glas: 'an', konto: { thema: 'hell', glas: 'aus', dichte: 'normal', farbe: 'graphit' } });
   await page.waitForTimeout(300);
   check('KRITISCH: ein anderes Geraet hat hell gespeichert -- hier gilt jetzt auch hell',
     await attr(page, 'data-thema') === 'hell' && await attr(page, 'data-glas') === 'aus');
@@ -294,7 +304,7 @@ const standText = page => page.evaluate(() => $('esStand').textContent.trim());
 
 // ── 6) Handy: der Schalter in der Schublade schreibt ebenfalls ans Konto ───
 {
-  const { browser, page, posts } = await starte({ breite: 390, thema: 'dunkel', konto: { thema: 'dunkel', glas: 'an', dichte: 'normal' } });
+  const { browser, page, posts } = await starte({ breite: 390, thema: 'dunkel', konto: { thema: 'dunkel', glas: 'an', dichte: 'normal', farbe: 'graphit' } });
   check('Am Handy steht "Einstellungen" nicht im Menue (mobiler Zuschnitt steht noch aus)',
     await page.evaluate(() => !$('nav-einstellungen').getClientRects().length));
   await page.click('.btn-burger'); await page.waitForTimeout(400);

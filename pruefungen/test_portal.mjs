@@ -353,7 +353,10 @@ async function setup(page) {
 // und man sieht es erst beim Kunden. Verglichen werden die WERTE, nicht der
 // Wortlaut: Wo dashboard.html sie hinschreibt, ist ihm ueberlassen.
 {
-  const dash = readFileSync(`${WURZEL}/dashboard.html`, 'utf8');
+  // Ohne die Farbthemen (ENT-726): Sie sind die persoenliche Wahl eines
+  // Kontos im Cockpit. Das Portal folgt den Grundwerten (Graphit).
+  const dash = readFileSync(`${WURZEL}/dashboard.html`, 'utf8')
+    .replace(/FARBTHEMEN \(ENT-\d+\)[\s\S]*?ENDE FARBTHEMEN/, '');
   const portal = readFileSync(`${WURZEL}/portal.html`, 'utf8');
   const werte = (text, name) => {
     const treffer = [...text.matchAll(new RegExp('--' + name + ':\\s*([^;]+);', 'g'))]
