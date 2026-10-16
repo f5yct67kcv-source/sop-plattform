@@ -236,6 +236,72 @@ html[data-thema="dunkel"] {
 
   color-scheme: dark;
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   FARBTHEMEN (ENT-726)
+   Drei Themen, jedes in hell und dunkel: Graphit (das bisherige, hier
+   NICHT wiederholt -- es sind die Werte darueber), Marine und Hell. Die
+   Wahl gehoert dem Konto (Schluessel "farbe") und steht als data-farbe am
+   Dokument. Hell/dunkel bleibt ein eigener Schalter.
+
+   NUR OBERFLAECHE UND AKZENT. Gruen, Gelb, Rot, Violett, Teal und
+   Indigo-Grau tragen im Haus eine Bedeutung (zugesagt, Warnung, gesperrt,
+   Reihe, Ferien, Abwesenheit) und werden hier nie angefasst. Darum ist
+   der Akzent jedes Themas ein Blau: Ein gruener oder kupferner Akzent
+   haette jeden Knopf wie "zugesagt" oder "Warnung" aussehen lassen
+   (Entwuerfe Wald und Sand, vom Projektinhaber verworfen).
+
+   NUR AM DESKTOP (min-width 901px). Der mobile Zuschnitt ist eine eigene
+   Entscheidung; am Handy bleibt Graphit, auch wenn am Konto etwas anderes
+   steht. Die Uhr-Kacheln und die Anmeldeseite haben eigene, feste Farben
+   und folgen dem Thema absichtlich nicht.
+
+   Spezifitaet: hell (0,2,1) schlaegt :root, dunkel (0,2,1) schlaegt
+   html[data-thema="dunkel"] (0,1,1). test_farben.mjs misst jede der sechs
+   Fassungen am gerenderten Zustand.
+   ══════════════════════════════════════════════════════════════════════ */
+@media (min-width: 901px) {
+  html[data-farbe="marine"]:not([data-thema="dunkel"]) {
+    --shell: #0E1A30;  --shell-rgb: 14,26,48;  --shell-hi: #16264A;  --shell-line: #1F3159;
+    --shell-txt: #93A3C2;
+    --bg: #F3F6FB;  --surface-2: #F8FAFD;  --line: #E1E7F0;  --line-soft: #ECF0F6;
+    --accent: #1D64E0;  --accent-hi: #164FB5;  --accent-soft: #E8F0FD;  --accent-line: #C4D7F7;
+  }
+  html[data-farbe="marine"][data-thema="dunkel"] {
+    --shell: #07101F;  --shell-rgb: 7,16,31;  --shell-hi: #0E1A31;  --shell-line: #18264A;
+    --shell-txt: #8796B5;
+    --bg: #0A1222;  --surface: #101B31;  --surface-rgb: 16,27,49;
+    --surface-2: #16233E;  --surface-3: #1B2A49;
+    --line: #22314F;  --line-soft: #1B2843;  --line-hi: #33466F;
+    --accent: #6490F5;  --accent-hi: #8DB2FF;  --accent-soft: #15254A;  --accent-line: #2A4170;
+  }
+  /* Hell: die Kopfleiste weiss statt graphit. Darum auch ihre Schrift dunkel
+     -- --shell-txt-hi ist sonst fast weiss und waere auf Weiss unsichtbar. */
+  html[data-farbe="hell"]:not([data-thema="dunkel"]) {
+    --shell: #FFFFFF;  --shell-rgb: 255,255,255;  --shell-hi: #F1F3F6;  --shell-line: #E5E8EC;
+    --shell-txt: #5A6170;  --shell-txt-hi: #14161A;
+    --bg: #F4F5F7;
+    --accent: #3D4FD1;  --accent-hi: #2F3EAE;  --accent-soft: #EEF0FD;  --accent-line: #CDD3F7;
+  }
+  /* Was sonst auf --shell steht und weisse Schrift traegt, braucht hier
+     einen eigenen dunklen Grund: die Meldung unten (Toast). Und eine weisse
+     Leiste neben einer fast weissen Flaeche braucht eine Kante. */
+  html[data-farbe="hell"]:not([data-thema="dunkel"]) .toast { background: #14161A; }
+  html[data-farbe="hell"]:not([data-thema="dunkel"]) .shell:not(.aus) .side { box-shadow: inset -1px 0 0 var(--shell-line); }
+  /* Im Dunkeln wird "hell" zur ruhigen grauen Leiste: neutrales Grau ohne
+     den Blaustich von Graphit, die Leiste etwas heller als die Flaeche. */
+  html[data-farbe="hell"][data-thema="dunkel"] {
+    --shell: #22252B;  --shell-rgb: 34,37,43;  --shell-hi: #2B2F36;  --shell-line: #33373F;
+    --shell-txt: #A3A8B2;
+    --bg: #131417;  --surface: #1B1D21;  --surface-rgb: 27,29,33;
+    --surface-2: #22252A;  --surface-3: #282B31;
+    --line: #2E3137;  --line-soft: #26292E;  --line-hi: #3D4148;
+    --accent: #7E89F2;  --accent-hi: #A6AFFA;  --accent-soft: #22264A;  --accent-line: #363D73;
+  }
+}
+/* ENDE FARBTHEMEN -- test_portal.mjs vergleicht die Grundwerte des Cockpits
+   mit dem Kundenportal und laesst den Block bis hierher aus: Das Portal folgt
+   Graphit, nicht der persoenlichen Wahl eines Kontos. */
 /* Eigene Randfaelle, die sich nicht ueber einen Wert loesen lassen. */
 html[data-thema="dunkel"] .card,
 html[data-thema="dunkel"] .kpi { border-color: var(--line); }
@@ -1004,6 +1070,31 @@ html[data-desktop="an"] .desktop-zurueck { display: inline-flex; }
 .es-einleitung { font-size: 12.5px; color: var(--ink-3); line-height: 1.45; margin: 0; padding-bottom: 14px;
   border-bottom: 1px solid var(--line-soft); }
 #esGlockeArten .es-zeile:first-child { padding-top: 14px; }
+/* Farbthemen (ENT-726): drei Kacheln nebeneinander, jede mit einer kleinen
+   Skizze (Kopfleiste, Karte, Knopf im Akzent). Die gewaehlte traegt den
+   Rahmen und das Haekchen im Akzent -- im Akzent der GELTENDEN Oberflaeche,
+   nicht dem der Kachel, damit die Auswahl wie jede andere aussieht. */
+.farb-kacheln { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 16px 0 4px; }
+.farb-kachel { display: flex; flex-direction: column; gap: 8px; padding: 10px; text-align: left; cursor: pointer;
+  font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r); transition: border-color .15s, box-shadow .15s; }
+.farb-kachel:hover { border-color: var(--line-hi); }
+.farb-kachel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.farb-kachel[aria-checked="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.farb-vorschau { display: flex; flex-direction: column; height: 92px; border: 1px solid; border-radius: 8px; overflow: hidden; }
+.fv-leiste { flex: none; height: 16px; }
+.fv-karte { display: flex; flex-direction: column; gap: 6px; margin: 10px; padding: 9px 10px; border: 1px solid;
+  border-radius: 6px; flex: 1; }
+.fv-zeile { display: block; height: 5px; width: 72%; border-radius: 3px; }
+.fv-zeile.kurz { width: 46%; }
+.fv-knopf { display: block; height: 10px; width: 34px; border-radius: 3px; margin-top: auto; }
+.farb-kopf { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.farb-name { font-size: 13.5px; font-weight: 600; }
+.farb-haken { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center;
+  justify-content: center; background: var(--accent); visibility: hidden; flex: none; }
+.farb-haken svg { width: 13px; height: 13px; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.farb-kachel[aria-checked="true"] .farb-haken { visibility: visible; }
+.farb-erkl { font-size: 12px; color: var(--ink-3); line-height: 1.4; }
 .es-rechts { display: flex; align-items: center; gap: 10px; flex: none; }
 .glocke-schalter { flex: none; width: 52px; height: 30px; border-radius: 999px; padding: 0;
   border: 1px solid var(--line); background: var(--bg); cursor: pointer; position: relative;
@@ -6114,6 +6205,14 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
   try { d = localStorage.getItem('rv3_dichte_wahl') === 'normal' ? 'normal' : 'kompakt'; } catch (e) {}
   document.documentElement.setAttribute('data-dichte', d);
 })();
+/* Farbthema (ENT-726). Ohne gespeicherte Wahl oder bei einem unbekannten
+   Wert: Graphit. Eigener Block mit eigenem try -- wie beim Glas oben. */
+(function () {
+  var f = 'graphit';
+  try { f = localStorage.getItem('rv3_farbe') || 'graphit'; } catch (e) {}
+  if (f !== 'marine' && f !== 'hell') { f = 'graphit'; }
+  document.documentElement.setAttribute('data-farbe', f);
+})();
 /* Anmeldemaske gar nicht erst zeigen, wenn schon eine Anmeldung im
    Speicher liegt (siehe die Regel "html.vorangemeldet #gate" oben).
    Geprueft wird dasselbe Paar, an dem auch der Start am Dateiende haengt:
@@ -10134,7 +10233,6 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
           <button type="button" class="es-nav-knopf" data-reiter="farben" onclick="esReiterZeigen('farben')">
             <span class="es-nav-ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.4 0z"/></svg></span>
             <span class="es-nav-lbl">Farben</span>
-            <span class="chip chip-n es-inarbeit">in Arbeit</span>
           </button>
           <button type="button" class="es-nav-knopf" data-reiter="benachrichtigungen" onclick="esReiterZeigen('benachrichtigungen')">
             <span class="es-nav-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
@@ -10199,8 +10297,13 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
             </div>
           </div>
           <div class="card es-teil" data-reiter="farben" hidden>
-            <div class="card-hd"><h2>Farben</h2><span class="sp"></span><span class="chip chip-n">in Arbeit</span></div>
-            <div class="card-bd"><p class="es-platz">Hier wählst du die Farben deiner Oberfläche, zum Beispiel die Akzentfarbe für Knöpfe und Markierungen. In Arbeit.</p></div>
+            <div class="card-hd"><h2>Farben</h2></div>
+            <div class="card-bd">
+              <p class="es-einleitung">Das Farbthema deiner Oberfläche: Kopfleiste, Flächen und Akzent. Hell oder dunkel stellst du unter Darstellung ein, jedes Thema hat beide Fassungen. Die Farben für Status wie zugesagt, Warnung oder gesperrt bleiben in jedem Thema gleich. Gilt am Computer, am Handy bleibt die Oberfläche wie bisher.</p>
+              <!-- Die Kacheln baut farbKachelnZeichnen() aus FARBTHEMEN. -->
+              <div class="farb-kacheln" id="esFarbKacheln" role="radiogroup" aria-label="Farbthema" onkeydown="farbKachelTaste(event)"></div>
+              <p class="es-stand" id="esStandFarben"></p>
+            </div>
           </div>
           <div class="card es-teil" data-reiter="benachrichtigungen" hidden>
             <div class="card-hd"><h2>Benachrichtigungen</h2></div>
@@ -15540,6 +15643,8 @@ function themaSetzen(w, merken = true) {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', dunkel ? '#0B0D11' : '#16181D');
   if (merken) { einstellungMerken('thema', dunkel ? 'dunkel' : 'hell'); }
+  // Die Vorschau der Farbthemen zeigt die Fassung, die gerade gilt.
+  if (typeof farbKachelnZeichnen === 'function') { farbKachelnZeichnen(); }
 }
 
 function themaUm() {
@@ -15647,6 +15752,7 @@ function esBrowserWerte() {
   if (typeof dichteSetzen === 'function') {
     w.dichte = h.getAttribute('data-dichte') === 'kompakt' ? 'kompakt' : 'normal';
   }
+  w.farbe = farbeGueltig(h.getAttribute('data-farbe'));
   return w;
 }
 
@@ -15675,6 +15781,9 @@ function esAnwenden(e) {
   if (e.thema) { themaSetzen(e.thema, false); }
   if (e.glas)  { glasSetzen(e.glas === 'an', false); }
   if (e.dichte && typeof dichteSetzen === 'function') { dichteSetzen(e.dichte === 'kompakt', false); }
+  // Ein unbekannter Wert am Konto (aelter oder neuer als diese Fassung)
+  // fuehrt zu Graphit, nicht zu einem halben Thema.
+  if (e.farbe) { farbeSetzen(e.farbe, false); }
   let glocke = false;
   GLOCKE_ARTEN.forEach(a => {
     const w = e['glocke_' + a.art];
@@ -15739,6 +15848,14 @@ function esStandZeigen() {
     const [text, warn] = ES_STAND[esLage] || ES_STAND.fehler;
     el.textContent = text;
     el.classList.toggle('warn', warn);
+  }
+  // Farben: dieselbe Lage wie die Darstellung -- auch das Thema wirkt
+  // sofort in diesem Browser, und das Konto zieht nach.
+  const fa = $('esStandFarben');
+  if (fa) {
+    const [text, warn] = ES_STAND[esLage] || ES_STAND.fehler;
+    fa.textContent = text;
+    fa.classList.toggle('warn', warn);
   }
   const gl = $('esStandGlocke');
   if (gl) {
@@ -15836,7 +15953,79 @@ function esOeffnen() {
   const nav = $('esBetriebNav');
   if (nav) { nav.style.display = esDarfBetrieb() ? '' : 'none'; }
   esStandZeigen();
+  farbKachelnZeichnen();
   esReiterZeigen('darstellung');
+}
+
+// ══════════════════════════════════════════ FARBTHEMEN (ENT-726)
+// Dieselbe Bauart wie Glas und Dichte: Der Wert steht schon im Kopf der Seite
+// am Dokument (data-farbe), hier wird umgeschaltet und gespeichert. Die Werte
+// selbst stehen im CSS-Block FARBTHEMEN; hier nur die Farben der kleinen
+// Vorschau auf den Kacheln. Sie zeigen die Fassung, die gerade gilt (hell
+// oder dunkel) -- eine Vorschau in der anderen Fassung waere eine Vorschau
+// auf etwas, das man nach dem Klick nicht sieht.
+// Werte gleich wie im CSS-Block; test_farben.mjs vergleicht beide.
+const FARBTHEMEN = [
+  { id: 'graphit', name: 'Graphit', erkl: 'Dunkle Kopfleiste, blauer Akzent. Wie bisher.',
+    hell:   { shell: '#16181D', bg: '#F7F8FA', surface: '#FFFFFF', line: '#E5E8EC', accent: '#2F5BD7' },
+    dunkel: { shell: '#0B0D11', bg: '#0F1117', surface: '#161B27', line: '#2A3147', accent: '#7098F7' } },
+  { id: 'marine', name: 'Marine', erkl: 'Kopfleiste in Nachtblau, kräftigeres Blau.',
+    hell:   { shell: '#0E1A30', bg: '#F3F6FB', surface: '#FFFFFF', line: '#E1E7F0', accent: '#1D64E0' },
+    dunkel: { shell: '#07101F', bg: '#0A1222', surface: '#101B31', line: '#22314F', accent: '#6490F5' } },
+  { id: 'hell', name: 'Hell', erkl: 'Helle Kopfleiste, Akzent in Indigo. Im Dunkeln neutrales Grau.',
+    hell:   { shell: '#FFFFFF', bg: '#F4F5F7', surface: '#FFFFFF', line: '#E5E8EC', accent: '#3D4FD1' },
+    dunkel: { shell: '#22252B', bg: '#131417', surface: '#1B1D21', line: '#2E3137', accent: '#7E89F2' } },
+];
+
+function farbeGueltig(f) { return FARBTHEMEN.some(t => t.id === f) ? f : 'graphit'; }
+
+function farbeSetzen(f, merken = true) {
+  f = farbeGueltig(f);
+  document.documentElement.setAttribute('data-farbe', f);
+  try { localStorage.setItem('rv3_farbe', f); } catch (e) {}
+  farbKachelnZeichnen();
+  if (merken) { einstellungMerken('farbe', f); }
+}
+
+function farbKachelnZeichnen() {
+  const ziel = $('esFarbKacheln');
+  if (!ziel) { return; }
+  const h = document.documentElement;
+  const aktiv = farbeGueltig(h.getAttribute('data-farbe'));
+  const fassung = h.getAttribute('data-thema') === 'dunkel' ? 'dunkel' : 'hell';
+  ziel.innerHTML = FARBTHEMEN.map(t => {
+    const c = t[fassung];
+    const an = t.id === aktiv;
+    return `
+      <button type="button" class="farb-kachel" role="radio" data-farbe="${t.id}"
+        aria-checked="${an ? 'true' : 'false'}" tabindex="${an ? '0' : '-1'}" onclick="farbeSetzen('${t.id}')">
+        <span class="farb-vorschau" style="background:${c.bg};border-color:${c.line}" aria-hidden="true">
+          <span class="fv-leiste" style="background:${c.shell}"></span>
+          <span class="fv-karte" style="background:${c.surface};border-color:${c.line}">
+            <span class="fv-zeile" style="background:${c.line}"></span>
+            <span class="fv-zeile kurz" style="background:${c.line}"></span>
+            <span class="fv-knopf" style="background:${c.accent}"></span>
+          </span>
+        </span>
+        <span class="farb-kopf">
+          <span class="farb-name">${esc(t.name)}</span>
+          <span class="farb-haken" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="5 12.5 10 17.5 19 7"/></svg></span>
+        </span>
+        <span class="farb-erkl">${esc(t.erkl)}</span>
+      </button>`;
+  }).join('');
+}
+
+// Pfeiltasten in der Gruppe, wie bei Optionsfeldern ueblich.
+function farbKachelTaste(ev) {
+  const i = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[ev.key];
+  if (!i) { return; }
+  ev.preventDefault();
+  const ids = FARBTHEMEN.map(t => t.id);
+  const jetzt = ids.indexOf(farbeGueltig(document.documentElement.getAttribute('data-farbe')));
+  farbeSetzen(ids[(jetzt + i + ids.length) % ids.length]);
+  const k = document.querySelector('#esFarbKacheln .farb-kachel[aria-checked="true"]');
+  if (k) { k.focus(); }
 }
 
 // Welche Ansichten die volle Breite wollen -- EINE Liste statt verstreuter

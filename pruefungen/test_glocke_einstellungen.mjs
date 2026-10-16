@@ -55,7 +55,7 @@ async function starte({ konto = {}, ereignisse = ALLE, speichern = 'ok' } = {}) 
         return send({ status: 'ok', einstellungen: amKonto });
       }
       if (konto === 'unbekannt') return send({ status: 'ok', einstellungen: null, stand_unbekannt: true });
-      return send({ status: 'ok', einstellungen: { thema: 'dunkel', glas: 'aus', dichte: 'normal', ...amKonto } });
+      return send({ status: 'ok', einstellungen: { thema: 'dunkel', glas: 'aus', dichte: 'normal', farbe: 'graphit', ...amKonto } });
     }
     if (u.includes('ereignis_erledigt')) {
       haken.push(JSON.parse(route.request().postData()));
