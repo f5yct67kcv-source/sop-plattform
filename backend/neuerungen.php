@@ -30,6 +30,22 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 44,
+            'datum' => '2026-10-17',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'E-Mail-Designer jetzt unter Betrieb',
+            'text'  => 'Der E-Mail-Designer steht neu unter Administration › Betrieb, neben dem Briefkopf, und nicht mehr in den Einstellungen. Er gilt für alle Konten des Betriebs und ist noch in Arbeit. In den Einstellungen findest du nur noch, was dein eigenes Konto betrifft.',
+        ],
+        [
+            'nr'    => 43,
+            'datum' => '2026-10-17',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Einstellungen: Reiter „System“ entfällt',
+            'text'  => 'Der Reiter „System“ in den Einstellungen ist weg. Was für den ganzen Betrieb gilt, findest du wie bisher unter Administration › Betrieb.',
+        ],
+        [
             'nr'    => 42,
             'datum' => '2026-10-16',
             'art'   => 'neu',

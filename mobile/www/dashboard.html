@@ -1036,7 +1036,6 @@ html[data-desktop="an"] .desktop-zurueck { display: inline-flex; }
 .es-nav { display: flex; flex-direction: column; gap: 3px; position: sticky; top: 12px; }
 .es-gruppe { font-size: 10.5px; font-weight: 650; letter-spacing: .7px; text-transform: uppercase;
   color: var(--ink-3); padding: 0 10px 6px; }
-.es-betrieb { display: flex; flex-direction: column; gap: 3px; margin-top: 18px; }
 .es-nav-knopf { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 10px;
   border: 1px solid transparent; border-radius: var(--r-sm); background: none; cursor: pointer;
   font: inherit; color: var(--ink-2); text-align: left; }
@@ -9643,6 +9642,17 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></span>
               <span class="bk-kachel-lbl">Briefkopf für Rapporte</span>
             </button>
+            <!-- E-Mail-Designer (ENT-728): stand zuerst als Reiter in den
+                 Einstellungen. Er gilt fuer alle Konten des Betriebs und
+                 gehoert darum hierher, neben den Briefkopf -- beides geht an
+                 Kundinnen und Kunden hinaus. Noch ohne Inhalt: Die Kachel
+                 sagt "in Arbeit", damit sie nicht wie eine fertige
+                 Einstellung aussieht. -->
+            <button type="button" class="bk-kachel" id="bkKachelMd" onclick="bkAbschnittZeigen('md')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="2"/><polyline points="3 6 12 13 21 6"/></svg></span>
+              <span class="bk-kachel-lbl">E-Mail-Designer</span>
+              <span class="chip chip-n">in Arbeit</span>
+            </button>
             <button type="button" class="bk-kachel" onclick="bkAbschnittZeigen('zf')">
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
               <span class="bk-kachel-lbl">Mein Zugang: Zwei-Faktor-Anmeldung</span>
@@ -10058,6 +10068,21 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
         </div>
         </div>
 
+        <div class="bk-abschnitt" id="bkAb-md" style="display:none">
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
+        <div class="grid">
+        <div class="card" id="mdKarte">
+          <div class="card-hd">
+            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="2"/><polyline points="3 6 12 13 21 6"/></svg></span>
+            <h3>E-Mail-Designer</h3><span class="sp"></span><span class="chip chip-n">in Arbeit</span>
+          </div>
+          <div class="card-bd">
+            <p class="zone-note">Hier gestaltest du die Mails, die dein Betrieb an Kundinnen und Kunden verschickt: Offerten, Rechnungen und Rapporte. Die Einstellung gilt für alle Konten des Betriebs. In Arbeit.</p>
+          </div>
+        </div>
+        </div>
+        </div>
+
         <div class="bk-abschnitt" id="bkAb-fz" style="display:none">
         <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
         <div class="grid">
@@ -10213,11 +10238,10 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
              FUER MICH         gilt nur fuer das eigene Konto, auf jedem
                                Geraet (gespeichert am Konto, siehe
                                api/meine_einstellungen.php)
-             FUER DEN BETRIEB  gilt fuer alle Konten dieses Betriebs, nur
-                               mit dem Recht "betrieb" sichtbar
-           Die Trennung steht sichtbar da, weil eine Mail-Gestaltung etwas
-           ganz anderes ist als hell/dunkel: Das eine betrifft nur mich, das
-           andere jede Kundin des Betriebs.
+           Die Gruppe "Fuer den Betrieb" gibt es nicht mehr: "System" ist
+           gestrichen (ENT-727), der E-Mail-Designer steht unter
+           Administration > Betrieb (ENT-728). Was alle Konten des Betriebs
+           betrifft, hat dort seinen einen Ort.
            Reiter, die noch nicht gebaut sind, sind klickbar und sagen, was
            dort entsteht ("in Arbeit"). Ein leerer Reiter saehe sonst aus
            wie "hier gibt es nichts einzustellen" -- unbekannt darf nie wie
@@ -10238,19 +10262,6 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
             <span class="es-nav-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
             <span class="es-nav-lbl">Benachrichtigungen</span>
           </button>
-          <div class="es-betrieb" id="esBetriebNav">
-          <div class="es-gruppe">Für den Betrieb</div>
-          <button type="button" class="es-nav-knopf" data-reiter="maildesigner" onclick="esReiterZeigen('maildesigner')">
-            <span class="es-nav-ic"><svg class="i" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="2"/><polyline points="3 6 12 13 21 6"/></svg></span>
-            <span class="es-nav-lbl">E-Mail-Designer</span>
-            <span class="chip chip-n es-inarbeit">in Arbeit</span>
-          </button>
-          <button type="button" class="es-nav-knopf" data-reiter="system" onclick="esReiterZeigen('system')">
-            <span class="es-nav-ic"><svg class="i" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>
-            <span class="es-nav-lbl">System</span>
-            <span class="chip chip-n es-inarbeit">in Arbeit</span>
-          </button>
-          </div>
         </nav>
         <div class="es-inhalt">
           <div class="card es-teil" data-reiter="darstellung">
@@ -10316,14 +10327,6 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
                    diesem Browser" gibt es hier nicht. -->
               <p class="es-stand" id="esStandGlocke"></p>
             </div>
-          </div>
-          <div class="card es-teil" data-reiter="maildesigner" hidden>
-            <div class="card-hd"><h2>E-Mail-Designer</h2><span class="sp"></span><span class="chip chip-n">in Arbeit</span></div>
-            <div class="card-bd"><p class="es-platz">Hier gestaltest du die Mails, die dein Betrieb an Kundinnen und Kunden verschickt: Offerten, Rechnungen und Rapporte. Die Einstellung gilt für alle Konten des Betriebs. In Arbeit.</p></div>
-          </div>
-          <div class="card es-teil" data-reiter="system" hidden>
-            <div class="card-hd"><h2>System</h2><span class="sp"></span><span class="chip chip-n">in Arbeit</span></div>
-            <div class="card-bd"><p class="es-platz">Hier entstehen Einstellungen, die für den ganzen Betrieb gelten. In Arbeit.</p></div>
           </div>
         </div>
         </div>
@@ -12913,7 +12916,7 @@ const TITLES = {
   kunden:      ['Kunden', 'Stammdaten'],
   produkte:    ['Leistungen', 'Preise und Standardtexte für Offerten'],
   offerte:     ['Offerte', 'Positionen, Preise und Summen'],
-  betrieb:     ['Betrieb', 'Anstellungsorte, Briefkopf, Zugang, Rollen und Dienstfahrzeuge'],
+  betrieb:     ['Betrieb', 'Anstellungsorte, Briefkopf, E-Mails, Zugang, Rollen und Dienstfahrzeuge'],
   support:     ['Support', 'Anliegen an den Betreiber und befristete Support-Freigabe'],
   einstellungen: ['Einstellungen', 'Darstellung für dich und Einstellungen für den Betrieb'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
@@ -15930,15 +15933,11 @@ function glockeArtUm(art) {
   });
 }
 
-// Reiter "Fuer den Betrieb" nur mit dem Recht "betrieb" (Lesen genuegt zum
-// Sehen). Heute stehen dort nur Platzhalter ohne Daten -- das Ausblenden ist
-// darum Bequemlichkeit. Sobald dort etwas gespeichert wird, prueft der
-// Endpunkt das Recht selbst (CLAUDE.md: Sperren gehoeren in den Server).
-const ES_BETRIEB = ['maildesigner', 'system'];
-function esDarfBetrieb() { return darf('betrieb_lesen'); }
-
+// Die Einstellungen sind nur noch "fuer mich" (ENT-727, ENT-728): Den
+// Reiter "System" gibt es nicht mehr, der E-Mail-Designer steht unter
+// Administration > Betrieb. Betriebsweites hat dort seinen einen Ort.
 function esReiterZeigen(reiter) {
-  if (ES_BETRIEB.includes(reiter) && !esDarfBetrieb()) { reiter = 'darstellung'; }
+  if (!document.querySelector(`#view-einstellungen .es-teil[data-reiter="${reiter}"]`)) { reiter = 'darstellung'; }
   document.querySelectorAll('#view-einstellungen .es-nav-knopf').forEach(b => {
     const an = b.dataset.reiter === reiter;
     b.classList.toggle('aktiv', an);
@@ -15950,8 +15949,6 @@ function esReiterZeigen(reiter) {
 }
 
 function esOeffnen() {
-  const nav = $('esBetriebNav');
-  if (nav) { nav.style.display = esDarfBetrieb() ? '' : 'none'; }
   esStandZeigen();
   farbKachelnZeichnen();
   esReiterZeigen('darstellung');

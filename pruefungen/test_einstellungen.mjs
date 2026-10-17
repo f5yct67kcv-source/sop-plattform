@@ -199,45 +199,53 @@ const standText = page => page.evaluate(() => $('esStand').textContent.trim());
   check('und am rechten Rand ihrer Karte, nicht irgendwo in der Mitte', mass.amRand <= 24);
   check('Die Reiter sind gut zu treffen (mindestens 40 px hoch)', mass.knopfH >= 40);
 
-  // Platzhalter: klickbar, mit einem eigenen Satz -- "in Arbeit" darf
-  // nicht aussehen wie "hier gibt es nichts".
-  const platz = {};
-  for (const r of ['maildesigner', 'system']) {
-    await page.click(`.es-nav-knopf[data-reiter="${r}"]`); await page.waitForTimeout(80);
-    platz[r] = await page.evaluate(k => {
-      const t = document.querySelector(`.es-teil[data-reiter="${k}"]`);
-      return { sichtbar: !t.hidden && !!t.offsetParent, text: t.querySelector('.es-platz').textContent.trim(),
-               darstellungWeg: document.querySelector('.es-teil[data-reiter="darstellung"]').hidden };
-    }, r);
-  }
-  check('Jeder Reiter in Arbeit laesst sich oeffnen und verdraengt die Darstellung',
-    Object.values(platz).every(p => p.sichtbar && p.darstellungWeg));
-  check('KRITISCH: jeder sagt, dass er in Arbeit ist',
-    Object.values(platz).every(p => /in arbeit/i.test(p.text)));
-  check('Und jeder sagt, WAS dort entsteht -- zwei verschiedene Saetze',
-    new Set(Object.values(platz).map(p => p.text)).size === 2);
-  check('Der E-Mail-Designer sagt, dass er fuer den ganzen Betrieb gilt',
-    /betrieb/i.test(platz.maildesigner.text));
-  check('Die Reiter in Arbeit tragen den Hinweis auch in der linken Spalte',
-    await page.evaluate(() => [...document.querySelectorAll('.es-nav-knopf')]
-      .every(k => ['darstellung', 'farben', 'benachrichtigungen'].includes(k.dataset.reiter) === !k.querySelector('.es-inarbeit'))));
+  // Die Einstellungen sind nur noch "fuer mich": Den Reiter "System" gibt es
+  // nicht mehr (ENT-727), der E-Mail-Designer steht unter Administration >
+  // Betrieb (ENT-728). Betriebsweites hat dort seinen einen Ort.
+  check('KRITISCH: die Einstellungen zeigen nur Reiter fuer das eigene Konto',
+    await page.evaluate(() => [...document.querySelectorAll('#view-einstellungen .es-nav-knopf')]
+      .map(k => k.querySelector('.es-nav-lbl').textContent.trim()).join() === 'Darstellung,Farben,Benachrichtigungen'));
+  check('Keine Gruppe "Fuer den Betrieb" mehr und kein Reiter "in Arbeit"',
+    await page.evaluate(() => !/f(ü|ue)r den betrieb/i.test(document.querySelector('#view-einstellungen .es-nav').textContent)
+      && !document.querySelector('#view-einstellungen .es-inarbeit')));
+  await page.evaluate(() => esReiterZeigen('maildesigner')); await page.waitForTimeout(80);
+  check('Ein alter Aufruf des Mail-Reiters fuehrt zur Darstellung, nicht auf eine leere Seite',
+    await page.evaluate(() => !document.querySelector('.es-teil[data-reiter="darstellung"]').hidden));
+  await page.evaluate(() => esReiterZeigen('darstellung')); await page.waitForTimeout(80);
   await page.screenshot({ path: `${OUT}/einstellungen-desktop.png` });
   check('Auf einer gespeicherten Wahl wird beim Oeffnen nichts hochgeladen', posts.length === 0);
   check('Keine JavaScript-Fehler', fehler.length === 0);
   await browser.close();
 }
 
-// ── 2) Wer sieht "Fuer den Betrieb" ────────────────────────────────────────
+// ── 2) Der E-Mail-Designer steht unter Administration > Betrieb ───────────
+// Als Kachel neben dem Briefkopf, mit "in Arbeit" -- noch ohne Inhalt darf
+// er nicht aussehen wie eine fertige Einstellung (unbekannt != keine).
 {
-  const { browser, page } = await starte({ konto: { thema: 'dunkel' }, rechte: ['planung_lesen'] });
-  await page.evaluate(() => go('einstellungen')); await page.waitForTimeout(200);
-  check('Ohne das Recht "betrieb" fehlt die Gruppe "Fuer den Betrieb"',
-    await page.evaluate(() => !$('esBetriebNav').offsetParent));
-  check('"Fuer mich" bleibt da', await page.isVisible('.es-nav-knopf[data-reiter="farben"]'));
-  await page.evaluate(() => esReiterZeigen('maildesigner')); await page.waitForTimeout(80);
-  check('Auch ein Aufruf am Menue vorbei oeffnet den Betriebsreiter nicht',
-    await page.evaluate(() => document.querySelector('.es-teil[data-reiter="maildesigner"]').hidden
-      && !document.querySelector('.es-teil[data-reiter="darstellung"]').hidden));
+  const { browser, page, fehler } = await starte({ konto: { thema: 'dunkel', glas: 'an', dichte: 'normal', farbe: 'graphit' } });
+  await page.evaluate(() => { go('betrieb'); bkUebersichtZeigen(); }); await page.waitForTimeout(200);
+  const kachel = await page.evaluate(() => {
+    const k = [...document.querySelectorAll('#bkUebersicht .bk-kachel')].find(x => /e-mail-designer/i.test(x.textContent));
+    const alle = [...document.querySelectorAll('#bkUebersicht .bk-kachel')].filter(x => x.offsetParent);
+    return k ? { sichtbar: !!k.offsetParent, inArbeit: /in arbeit/i.test(k.textContent),
+                 nachBriefkopf: alle.indexOf(k) === alle.findIndex(x => /briefkopf/i.test(x.textContent)) + 1,
+                 hoehe: Math.round(k.getBoundingClientRect().height),
+                 hoehen: new Set(alle.map(x => Math.round(x.getBoundingClientRect().height))).size } : null;
+  });
+  check('Unter Betrieb gibt es die Kachel "E-Mail-Designer"', kachel && kachel.sichtbar);
+  check('KRITISCH: sie sagt, dass er in Arbeit ist', kachel && kachel.inArbeit);
+  check('Sie steht neben dem Briefkopf -- beides geht an Kundinnen und Kunden', kachel && kachel.nachBriefkopf);
+  check('und ist so hoch wie die Kacheln daneben (der Hinweis drueckt sie nicht auf)', kachel && kachel.hoehen === 1);
+  if (await page.$('#bkKachelMd')) { await page.click('#bkKachelMd'); await page.waitForTimeout(150); }
+  const ab = await page.evaluate(() => { const a = $('bkAb-md');
+    if (!a) { return { offen: false, text: '', uebersichtWeg: false }; }
+    return { offen: !!a.offsetParent, text: a.textContent, uebersichtWeg: $('bkUebersicht').style.display === 'none' }; });
+  check('Die Kachel oeffnet ihre eigene Seite', ab.offen && ab.uebersichtWeg);
+  check('und die sagt, was dort entsteht, dass es fuer den ganzen Betrieb gilt und dass es in Arbeit ist',
+    /mails/i.test(ab.text) && /betrieb/i.test(ab.text) && /in arbeit/i.test(ab.text));
+  await page.evaluate(() => bkUebersichtZeigen()); await page.waitForTimeout(100);
+  await page.screenshot({ path: `${OUT}/betrieb-maildesigner.png` });
+  check('Keine JavaScript-Fehler', fehler.length === 0);
   await browser.close();
 }
 
