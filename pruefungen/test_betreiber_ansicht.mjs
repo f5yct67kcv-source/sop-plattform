@@ -149,7 +149,10 @@ const MESSEN = () => {
     })(),
     bandUeberlauf: getComputedStyle(document.getElementById('kopf-nav')).overflowX,
     // Der Katalog der Seite selbst -- nicht eine hier nachgefuehrte Zahl.
-    katalog: Object.keys(BEREICHE),
+    // Bereiche aus dem Kontomenue (ENT-722) stehen bewusst nicht im Band.
+    katalog: Object.keys(BEREICHE).filter(k => !BEREICHE_KONTOMENUE.includes(k)),
+    imMenue: BEREICHE_KONTOMENUE.map(k => ({ k, im: !!BEREICHE[k],
+      knopf: !!document.querySelector(`#kontoMenue [data-bereich="${k}"]`) })),
     reiterSchluessel: [...document.querySelectorAll('#kopf-nav .nav-item')]
       .map(b => b.dataset.bereich),
     reiter: [...document.querySelectorAll('#kopf-nav .nav-item')].map(b => ({
@@ -265,6 +268,8 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
   check(`${wie}: jeder Reiter fuehrt in einen Bereich, den es gibt`,
     m.reiterSchluessel.length === m.katalog.length
     && m.reiterSchluessel.every(k => m.katalog.includes(k)));
+  check(`${wie}: jeder Bereich ohne Reiter steht im Kontomenue (ENT-722)`,
+    m.imMenue.length >= 1 && m.imMenue.every(x => x.im && x.knopf));
   check(`KRITISCH ${wie}: jeder Reiter ist mindestens 44px hoch`,
     m.reiter.every(r => r.h >= 44));
   if (m.reiter.some(r => r.h < 44)) {
@@ -365,6 +370,8 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
     });
     await seite.goto(ADRESSE);
     await seite.evaluate(AUFBAU);
+    // Seit ENT-722 steht der Schalter unter Kontomenue > Einstellungen.
+    await seite.evaluate(() => bereichZeigen('einstellungen'));
     await seite.waitForTimeout(80);
     const vorher = await seite.evaluate(() => ({
       thema: document.documentElement.getAttribute('data-thema'),

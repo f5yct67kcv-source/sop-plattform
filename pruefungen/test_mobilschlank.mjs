@@ -246,8 +246,10 @@ check('Kunden sind am Desktop da', menueD.includes('Kunden'));
 check('Die Administration ist am Desktop da', menueD.includes('Administration'));
 check('Den Desktop-Hinweis gibt es seit ENT-067 nirgends mehr',
   await d.evaluate(() => !document.querySelector('.mobil-hinweis')));
-check('KRITISCH: am Desktop bleibt der Hell-Dunkel-Schalter in der Kopfzeile',
-  await d.isVisible('#btnThema'));
+// Seit der Einstellungsseite (ENT-722) unter Einstellungen > Darstellung.
+check('KRITISCH: am Desktop bleibt der Hell-Dunkel-Schalter erreichbar (Einstellungsseite)',
+  await d.evaluate(() => { go('einstellungen'); return !!$('btnThema').offsetParent; }));
+await d.evaluate(() => go('uebersicht'));
 check('Und liegt dort nicht doppelt im Menue',
   await d.evaluate(() => {
     const b = document.getElementById('btnThemaMob');

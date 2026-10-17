@@ -99,6 +99,10 @@
      die Lohnlinie ist eine dritte, klar andere Farbe. */
   --fin-bezahlt:  #1B2B52;
   --fin-lohn:     #7C4DDB;
+  /* Testseite (ENT-714), derselbe Ton wie das Band in testumgebung.js. */
+  --test-violett:         #7a4fae;
+  --test-violett-linie:   #d7c6ec;
+  --test-violett-flaeche: #f3edfa;
 
   /* Semantik */
   --pos:      #0E7C55;  --pos-soft:  #E6F6EF;
@@ -210,6 +214,9 @@ html[data-thema="dunkel"] {
   --accent-line:  #2D3D63;
   --fin-bezahlt:  #E4EAF8;
   --fin-lohn:     #B69BFA;
+  --test-violett:         #b99be6;
+  --test-violett-linie:   #4a3a66;
+  --test-violett-flaeche: #2a2140;
 
   --pos:      #4FCE96;  --pos-soft:  #10281E;
   --neg:      #F27F70;  --neg-soft:  #2E1A18;
@@ -229,6 +236,72 @@ html[data-thema="dunkel"] {
 
   color-scheme: dark;
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   FARBTHEMEN (ENT-726)
+   Drei Themen, jedes in hell und dunkel: Graphit (das bisherige, hier
+   NICHT wiederholt -- es sind die Werte darueber), Marine und Hell. Die
+   Wahl gehoert dem Konto (Schluessel "farbe") und steht als data-farbe am
+   Dokument. Hell/dunkel bleibt ein eigener Schalter.
+
+   NUR OBERFLAECHE UND AKZENT. Gruen, Gelb, Rot, Violett, Teal und
+   Indigo-Grau tragen im Haus eine Bedeutung (zugesagt, Warnung, gesperrt,
+   Reihe, Ferien, Abwesenheit) und werden hier nie angefasst. Darum ist
+   der Akzent jedes Themas ein Blau: Ein gruener oder kupferner Akzent
+   haette jeden Knopf wie "zugesagt" oder "Warnung" aussehen lassen
+   (Entwuerfe Wald und Sand, vom Projektinhaber verworfen).
+
+   NUR AM DESKTOP (min-width 901px). Der mobile Zuschnitt ist eine eigene
+   Entscheidung; am Handy bleibt Graphit, auch wenn am Konto etwas anderes
+   steht. Die Uhr-Kacheln und die Anmeldeseite haben eigene, feste Farben
+   und folgen dem Thema absichtlich nicht.
+
+   Spezifitaet: hell (0,2,1) schlaegt :root, dunkel (0,2,1) schlaegt
+   html[data-thema="dunkel"] (0,1,1). test_farben.mjs misst jede der sechs
+   Fassungen am gerenderten Zustand.
+   ══════════════════════════════════════════════════════════════════════ */
+@media (min-width: 901px) {
+  html[data-farbe="marine"]:not([data-thema="dunkel"]) {
+    --shell: #0E1A30;  --shell-rgb: 14,26,48;  --shell-hi: #16264A;  --shell-line: #1F3159;
+    --shell-txt: #93A3C2;
+    --bg: #F3F6FB;  --surface-2: #F8FAFD;  --line: #E1E7F0;  --line-soft: #ECF0F6;
+    --accent: #1D64E0;  --accent-hi: #164FB5;  --accent-soft: #E8F0FD;  --accent-line: #C4D7F7;
+  }
+  html[data-farbe="marine"][data-thema="dunkel"] {
+    --shell: #07101F;  --shell-rgb: 7,16,31;  --shell-hi: #0E1A31;  --shell-line: #18264A;
+    --shell-txt: #8796B5;
+    --bg: #0A1222;  --surface: #101B31;  --surface-rgb: 16,27,49;
+    --surface-2: #16233E;  --surface-3: #1B2A49;
+    --line: #22314F;  --line-soft: #1B2843;  --line-hi: #33466F;
+    --accent: #6490F5;  --accent-hi: #8DB2FF;  --accent-soft: #15254A;  --accent-line: #2A4170;
+  }
+  /* Hell: die Kopfleiste weiss statt graphit. Darum auch ihre Schrift dunkel
+     -- --shell-txt-hi ist sonst fast weiss und waere auf Weiss unsichtbar. */
+  html[data-farbe="hell"]:not([data-thema="dunkel"]) {
+    --shell: #FFFFFF;  --shell-rgb: 255,255,255;  --shell-hi: #F1F3F6;  --shell-line: #E5E8EC;
+    --shell-txt: #5A6170;  --shell-txt-hi: #14161A;
+    --bg: #F4F5F7;
+    --accent: #3D4FD1;  --accent-hi: #2F3EAE;  --accent-soft: #EEF0FD;  --accent-line: #CDD3F7;
+  }
+  /* Was sonst auf --shell steht und weisse Schrift traegt, braucht hier
+     einen eigenen dunklen Grund: die Meldung unten (Toast). Und eine weisse
+     Leiste neben einer fast weissen Flaeche braucht eine Kante. */
+  html[data-farbe="hell"]:not([data-thema="dunkel"]) .toast { background: #14161A; }
+  html[data-farbe="hell"]:not([data-thema="dunkel"]) .shell:not(.aus) .side { box-shadow: inset -1px 0 0 var(--shell-line); }
+  /* Im Dunkeln wird "hell" zur ruhigen grauen Leiste: neutrales Grau ohne
+     den Blaustich von Graphit, die Leiste etwas heller als die Flaeche. */
+  html[data-farbe="hell"][data-thema="dunkel"] {
+    --shell: #22252B;  --shell-rgb: 34,37,43;  --shell-hi: #2B2F36;  --shell-line: #33373F;
+    --shell-txt: #A3A8B2;
+    --bg: #131417;  --surface: #1B1D21;  --surface-rgb: 27,29,33;
+    --surface-2: #22252A;  --surface-3: #282B31;
+    --line: #2E3137;  --line-soft: #26292E;  --line-hi: #3D4148;
+    --accent: #7E89F2;  --accent-hi: #A6AFFA;  --accent-soft: #22264A;  --accent-line: #363D73;
+  }
+}
+/* ENDE FARBTHEMEN -- test_portal.mjs vergleicht die Grundwerte des Cockpits
+   mit dem Kundenportal und laesst den Block bis hierher aus: Das Portal folgt
+   Graphit, nicht der persoenlichen Wahl eines Kontos. */
 /* Eigene Randfaelle, die sich nicht ueber einen Wert loesen lassen. */
 html[data-thema="dunkel"] .card,
 html[data-thema="dunkel"] .kpi { border-color: var(--line); }
@@ -951,6 +1024,93 @@ html[data-desktop="an"] .desktop-zurueck { display: inline-flex; }
   color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .rdkr-tab-ic svg.i { width: 15px; height: 15px; }
 .rdkr-tab-lbl { font-size: 13px; font-weight: 600; line-height: 1.2; }
+/* ── Einstellungen (ENT-722). Links eine schmale Spalte mit den
+   Reitern, rechts der Inhalt -- wie die Einstellungen eines Betriebssystems.
+   Die Reiterknoepfe tragen dieselben Symbolkacheln wie .rdkr-tab, damit die
+   Seite zur Familie gehoert, stehen aber untereinander statt in einer Reihe:
+   Die zwei Gruppen "Fuer mich" und "Fuer den Betrieb" brauchen je eine
+   Zwischenueberschrift, und die hat in einer waagrechten Leiste keinen Platz.
+   Die Inhaltsspalte ist auf 760 px begrenzt: Ein Schalter am rechten Rand
+   eines Breitbilds liegt zu weit von seiner Beschriftung weg. */
+.es-raster { display: grid; grid-template-columns: 268px minmax(0, 760px); gap: 22px; align-items: start; }
+.es-nav { display: flex; flex-direction: column; gap: 3px; position: sticky; top: 12px; }
+.es-gruppe { font-size: 10.5px; font-weight: 650; letter-spacing: .7px; text-transform: uppercase;
+  color: var(--ink-3); padding: 0 10px 6px; }
+.es-nav-knopf { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 10px;
+  border: 1px solid transparent; border-radius: var(--r-sm); background: none; cursor: pointer;
+  font: inherit; color: var(--ink-2); text-align: left; }
+.es-nav-knopf:hover { background: var(--surface); border-color: var(--line); }
+.es-nav-knopf:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.es-nav-knopf.aktiv { background: var(--accent-soft); border-color: var(--accent-line); color: var(--ink); }
+.es-nav-ic { width: 26px; height: 26px; border-radius: 8px; background: var(--accent-soft); color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.es-nav-ic svg.i { width: 15px; height: 15px; }
+.es-nav-knopf.aktiv .es-nav-ic { background: var(--accent); color: #fff; }
+.es-nav-lbl { flex: 1; font-size: 13px; font-weight: 600; line-height: 1.2; white-space: nowrap; }
+.es-inarbeit { flex: none; }
+/* Eine Zeile je Einstellung: Titel oben, Erklaerung darunter, der Schalter
+   rechts auf halber Hoehe. Die Trennlinie steht zwischen den Zeilen, nicht
+   ueber der ersten. */
+.es-zeile { display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  padding: 14px 0; }
+.es-zeile + .es-zeile { border-top: 1px solid var(--line-soft); }
+.es-zeile:first-child { padding-top: 2px; }
+.es-titel { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.es-erkl { font-size: 12.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.4; }
+.es-stand { font-size: 12px; color: var(--ink-3); margin: 10px 0 0; padding-top: 12px;
+  border-top: 1px solid var(--line-soft); }
+.es-stand.warn { color: var(--warn); }
+.es-platz { font-size: 13px; color: var(--ink-2); line-height: 1.55; max-width: 60ch; margin: 0; }
+/* Benachrichtigungen: ein Schalter je Art der Glocke. Bauart wie die
+   Schalter der Darstellung (Kugel mit Symbol, an = Akzentfarbe), nur haengt
+   der Zustand hier am Knopf selbst (aria-checked), nicht an einem Attribut
+   des Dokuments -- es sind sieben, nicht einer. Die beiden Arten, die immer
+   an sind, zeigen den Schalter eingeschaltet und gedaempft. */
+.es-einleitung { font-size: 12.5px; color: var(--ink-3); line-height: 1.45; margin: 0; padding-bottom: 14px;
+  border-bottom: 1px solid var(--line-soft); }
+#esGlockeArten .es-zeile:first-child { padding-top: 14px; }
+/* Farbthemen (ENT-726): drei Kacheln nebeneinander, jede mit einer kleinen
+   Skizze (Kopfleiste, Karte, Knopf im Akzent). Die gewaehlte traegt den
+   Rahmen und das Haekchen im Akzent -- im Akzent der GELTENDEN Oberflaeche,
+   nicht dem der Kachel, damit die Auswahl wie jede andere aussieht. */
+.farb-kacheln { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 16px 0 4px; }
+.farb-kachel { display: flex; flex-direction: column; gap: 8px; padding: 10px; text-align: left; cursor: pointer;
+  font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r); transition: border-color .15s, box-shadow .15s; }
+.farb-kachel:hover { border-color: var(--line-hi); }
+.farb-kachel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.farb-kachel[aria-checked="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.farb-vorschau { display: flex; flex-direction: column; height: 92px; border: 1px solid; border-radius: 8px; overflow: hidden; }
+.fv-leiste { flex: none; height: 16px; }
+.fv-karte { display: flex; flex-direction: column; gap: 6px; margin: 10px; padding: 9px 10px; border: 1px solid;
+  border-radius: 6px; flex: 1; }
+.fv-zeile { display: block; height: 5px; width: 72%; border-radius: 3px; }
+.fv-zeile.kurz { width: 46%; }
+.fv-knopf { display: block; height: 10px; width: 34px; border-radius: 3px; margin-top: auto; }
+.farb-kopf { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.farb-name { font-size: 13.5px; font-weight: 600; }
+.farb-haken { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center;
+  justify-content: center; background: var(--accent); visibility: hidden; flex: none; }
+.farb-haken svg { width: 13px; height: 13px; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.farb-kachel[aria-checked="true"] .farb-haken { visibility: visible; }
+.farb-erkl { font-size: 12px; color: var(--ink-3); line-height: 1.4; }
+.es-rechts { display: flex; align-items: center; gap: 10px; flex: none; }
+.glocke-schalter { flex: none; width: 52px; height: 30px; border-radius: 999px; padding: 0;
+  border: 1px solid var(--line); background: var(--bg); cursor: pointer; position: relative;
+  transition: background .18s, border-color .18s; }
+.glocke-schalter:hover:not(:disabled) { border-color: var(--line-hi); }
+.glocke-schalter .knopf { position: absolute; top: 2px; left: 2px; width: 24px; height: 24px;
+  border-radius: 50%; background: var(--surface); box-shadow: var(--sh-1);
+  display: flex; align-items: center; justify-content: center; transition: transform .2s; }
+.glocke-schalter svg { width: 14px; height: 14px; fill: none; stroke-width: 2.1;
+  stroke-linecap: round; stroke-linejoin: round; stroke: var(--ink-3); transition: stroke .16s; }
+.glocke-schalter[aria-checked="true"] { background: var(--accent-soft); border-color: var(--accent-line); }
+.glocke-schalter[aria-checked="true"] .knopf { transform: translateX(22px); }
+.glocke-schalter[aria-checked="true"] svg { stroke: var(--accent); }
+.glocke-schalter:disabled { cursor: default; opacity: .55; }
+@media (prefers-reduced-motion: reduce) {
+  .glocke-schalter, .glocke-schalter .knopf, .glocke-schalter svg { transition: none; }
+}
 /* Arbeitsergebnisse (ENT-325). Die Kachelreihe ist dieselbe wie bei
    "Kontrollrunde ändern", die Ausrichtung nicht: Dort steht darunter eine
    mittige Karte, hier eine linksbündige Liste. Eine mittige Reiterreihe über
@@ -1218,6 +1378,68 @@ tr.klickbar.gewaehlt td { background: var(--accent-soft); }
   color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .bk-kachel-ic svg.i { width: 28px; height: 28px; }
 .bk-kachel-lbl { font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+.bk-kachel-zusatz { font-size: 11px; font-weight: 600; color: var(--test-violett); margin-top: -6px; }
+/* E-Mail-Designer (ENT-729): Vorschau links, Gestaltung rechts -- wie im
+   Vorbild des Projektinhabers. Die rechte Spalte hat eine feste Breite,
+   damit die Vorschau die Breite einer echten Mail behaelt. */
+.emd-kopf { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin: 6px 0 6px; }
+.emd-titel h2 { margin: 0 0 4px; font-size: 20px; }
+.emd-titel .zone-note { margin: 0; }
+.emd-werkzeug { display: flex; align-items: flex-end; gap: 10px; }
+.emd-wahl { display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 650; color: var(--ink-2);
+  letter-spacing: .4px; text-transform: uppercase; }
+.emd-wahl select { min-width: 220px; text-transform: none; letter-spacing: 0; }
+.emd-stand { font-size: 12px; color: var(--ink-3); margin: 0 0 14px; min-height: 18px; }
+.emd-stand.warn { color: var(--warn); }
+.emd-stand.ok { color: var(--pos); }
+.emd-raster { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
+.emd-links { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.emd-rechts { display: flex; flex-direction: column; gap: 12px; }
+.emd-vorschau-karte { overflow: hidden; }
+.emd-betreff { display: flex; gap: 10px; align-items: baseline; padding: 12px 16px; border-bottom: 1px solid var(--line-soft); font-size: 13px; }
+.emd-betreff span { font-size: 11px; font-weight: 650; color: var(--ink-3); text-transform: uppercase; letter-spacing: .4px; }
+#emdVorschau { display: block; width: 100%; height: 560px; border: 0; background: #F2F4F8; }
+.emd-platz button { margin: 0; }
+.emd-gruppe .card-hd { padding-top: 12px; padding-bottom: 10px; }
+.emd-gruppe .card-bd { padding-top: 12px; padding-bottom: 12px; }
+.emd-zeile { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; font-size: 13px; }
+.emd-check input { width: 18px; height: 18px; accent-color: var(--accent); }
+.emd-farbe { display: inline-flex; align-items: center; gap: 8px; }
+.emd-farbe code { font-size: 12px; color: var(--ink-3); min-width: 62px; text-align: right; }
+.emd-farbe input[type=color] { width: 34px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; cursor: pointer; }
+.emd-masse { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
+.emd-masse .f { margin-bottom: 6px; }
+.emd-erkl { margin: 6px 0 0; }
+.emd-hinweis { margin: 8px 0 0; }
+.emd-hinweis.warn, .emd-warn { color: var(--warn); }
+.emd-warn { font-size: 12px; line-height: 1.45; margin: 6px 0 0; }
+.emd-warn:empty, .emd-hinweis:empty { display: none; }
+.emd-platz { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.emd-platz-lbl { font-size: 11px; font-weight: 650; color: var(--ink-3); text-transform: uppercase; letter-spacing: .4px; margin-right: 4px; }
+.emd-platz button { border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--accent);
+  border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.emd-platz button:hover { border-color: var(--accent); }
+.emd-fest { margin: 12px 0 0; }
+#bkAb-md .seg2 button { padding: 6px 11px; font-size: 12px; }
+#bkAb-md :disabled { cursor: not-allowed; }
+/* Testdaten (ENT-714): der violette Ton des Testumgebungs-Bands
+   (testumgebung.js), damit die Kachel nicht wie eine echte Einstellung
+   aussieht. */
+.bk-kachel-test { border-color: var(--test-violett-linie); }
+.bk-kachel-test:hover { border-color: var(--test-violett); }
+.bk-kachel-test .bk-kachel-ic, .card-hd .card-ic.td-ic, html[data-thema="dunkel"] .card-hd .card-ic.td-ic { background: var(--test-violett-flaeche); color: var(--test-violett); }
+.td-note { color: var(--test-violett) !important; border-color: var(--test-violett-linie) !important; }
+.td-text { margin: 0 0 12px; line-height: 1.55; max-width: 72ch; }
+.td-liste { margin: 0 0 18px; padding-left: 18px; line-height: 1.55; max-width: 72ch; color: var(--ink-2); }
+.td-liste li { margin-bottom: 5px; }
+.td-aktion { margin-top: 12px; }
+.td-stand { margin-top: 14px; font-size: 13px; line-height: 1.5; }
+.td-stand .td-fehler { color: var(--neg); }
+.td-stand .td-balken { height: 6px; border-radius: 4px; background: var(--line-soft); overflow: hidden; max-width: 420px; margin: 8px 0; }
+.td-stand .td-balken i { display: block; height: 100%; background: var(--test-violett); transition: width .2s; }
+.td-stand dl { display: grid; grid-template-columns: max-content max-content; gap: 4px 18px; margin: 8px 0 12px; }
+.td-stand dt { color: var(--ink-3); }
+.td-stand dd { margin: 0; font-weight: 650; font-variant-numeric: tabular-nums; }
 /* Verkleinerte Kachel-Variante -- Revision aus ENT-274, siehe ENT-275/276:
    der Projektinhaber fand die kleine Variante nach dem Ausliefern zu klein
    -- die Navigations-Kacheln sind die Hauptreiter dieser Seite und gingen
@@ -4499,6 +4721,7 @@ html[data-desktop="an"] { touch-action: auto; }
   .shell.aus .side-foot .nav-item .lbl { display: block; }
   .shell.aus .side-foot .nav-item svg.i { flex: none; }
   .shell.aus .side-foot #nav-einrichtung { order: 2; }
+  .shell.aus .side-foot #nav-einstellungen { order: 2; }
   .shell.aus .side-foot #nav-zurapp      { order: 3; }
   /* Der Benutzerblock steht oben und traegt wieder Namen und Rolle: Das
      Menue soll zuerst beantworten, WER angemeldet ist -- danach erst, was
@@ -5921,6 +6144,14 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
   try { d = localStorage.getItem('rv3_dichte_wahl') === 'normal' ? 'normal' : 'kompakt'; } catch (e) {}
   document.documentElement.setAttribute('data-dichte', d);
 })();
+/* Farbthema (ENT-726). Ohne gespeicherte Wahl oder bei einem unbekannten
+   Wert: Graphit. Eigener Block mit eigenem try -- wie beim Glas oben. */
+(function () {
+  var f = 'graphit';
+  try { f = localStorage.getItem('rv3_farbe') || 'graphit'; } catch (e) {}
+  if (f !== 'marine' && f !== 'hell') { f = 'graphit'; }
+  document.documentElement.setAttribute('data-farbe', f);
+})();
 /* Anmeldemaske gar nicht erst zeigen, wenn schon eine Anmeldung im
    Speicher liegt (siehe die Regel "html.vorangemeldet #gate" oben).
    Geprueft wird dasselbe Paar, an dem auch der Start am Dateiende haengt:
@@ -6461,6 +6692,15 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
         </span>
         <span class="lbl" id="navEinrichtungLbl">Einrichtung</span>
       </button>
+      <!-- Einstellungen (ENT-722). Gleich unter "Einrichtung", aber mit
+           anderem Zeichen: Schieberegler statt Zahnrad -- zwei Zahnraeder
+           untereinander waeren nicht zu unterscheiden. Nur Desktop wie die
+           Einrichtung: Der mobile Zuschnitt ist eine eigene Entscheidung
+           (CLAUDE.md, Gestaltung). -->
+      <button class="nav-item nur-desktop" id="nav-einstellungen" title="Einstellungen" onclick="go('einstellungen')">
+        <svg class="i" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+        <span class="lbl">Einstellungen</span>
+      </button>
       <!-- Nachschlagewerk fuers Cockpit (Entscheid des Projektinhabers):
            rollenunabhaengig fuer jeden Cockpit-Zugang, nur am Desktop, nie
            in der mobilen App -- "nur-desktop" wie bei "Einrichtung" darueber.
@@ -6635,36 +6875,14 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
         <svg class="i i-sm" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
         <span class="lbl">Sprechen</span>
       </button>
-      <!-- Liquid Glass (ENT-418). Direkt neben hell/dunkel, weil es dieselbe
-           Art von Wahl ist: Wie die Oberflaeche aussieht, nicht was sie tut.
-           Das Zeichen sind zwei versetzte Scheiben -- eine Flaeche, durch die
-           man eine zweite sieht.
-           LINKS davon, nicht rechts: Der Hell/Dunkel-Schalter ist seit
-           ENT-067 das aeusserste Element rechts, und test_menue.mjs misst
-           genau das ("er sitzt rechts", Abstand zum Rand < 30 px). Ein
-           neuer Schalter rechts daneben haette ihn um rund 56 px nach
-           innen geschoben -- gemessen, nicht vermutet. -->
-      <!-- Kompakte Darstellung (Versuch 2026-10-14). Dieselbe Art Wahl wie
-           Glas und hell/dunkel, darum dieselbe Bauart und derselbe Ort --
-           links davon, aus demselben Grund wie beim Glas (hell/dunkel bleibt
-           aussen rechts). Nur Desktop (ohne-schublade). Das Zeichen: zwei
-           Zeilen, die von oben und unten zusammengeschoben werden. -->
-      <button class="dichte-schalter ohne-schublade" id="btnDichte" onclick="dichteUm()" role="switch" aria-checked="false" title="Kompakte Darstellung" aria-label="Kompakte Darstellung ein- oder ausschalten">
-        <span class="knopf">
-          <svg viewBox="0 0 24 24"><line x1="4" y1="10.5" x2="20" y2="10.5"/><line x1="4" y1="14.5" x2="20" y2="14.5"/><polyline points="9,2.5 12,5.5 15,2.5"/><polyline points="9,21.5 12,18.5 15,21.5"/></svg>
-        </span>
-      </button>
-      <button class="glas-schalter ohne-schublade" id="btnGlas" onclick="glasUm()" role="switch" aria-checked="false" title="Durchscheinende Oberfläche" aria-label="Durchscheinende Oberfläche ein- oder ausschalten">
-        <span class="knopf">
-          <svg class="i-glas" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="12" height="12" rx="3.4"/><path d="M8.5 20.5h8a4 4 0 0 0 4-4v-8"/></svg>
-        </span>
-      </button>
-      <button class="thema-schalter ohne-schublade" id="btnThema" onclick="themaUm()" role="switch" aria-checked="false" title="Hell oder dunkel" aria-label="Zwischen heller und dunkler Darstellung wechseln">
-        <span class="knopf">
-          <svg class="i-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></svg>
-          <svg class="i-mond" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
-        </span>
-      </button>
+      <!-- Hier standen bis zur Einstellungsseite die Schalter fuer Glas,
+           hell/dunkel und die kompakte Darstellung (ENT-418, ENT-067,
+           Versuch 2026-10-14). Auf Wunsch des Projektinhabers
+           sind sie auf die Seite "Einstellungen" umgezogen (Kontomenue):
+           Jede Einstellung hat einen Ort, und die Kopfleiste wird ruhiger.
+           Am Handy bleiben die Schalter im Kopf der Schublade
+           (btnGlasMob/btnThemaMob) -- der mobile Zuschnitt ist eine eigene
+           Entscheidung und steht noch aus. -->
       <button class="btn btn-plain btn-sm" onclick="ordBearbeitenStart('uebersicht')" id="btnDashBearbeiten" title="Übersicht anpassen">
         <svg class="i i-sm" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
         <span class="lbl">Bearbeiten</span>
@@ -9364,6 +9582,14 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></span>
               <span class="bk-kachel-lbl">Briefkopf für Rapporte</span>
             </button>
+            <!-- E-Mail-Designer (ENT-728, gebaut mit ENT-729): stand zuerst
+                 als Reiter in den Einstellungen. Er gilt fuer alle Konten des
+                 Betriebs und gehoert darum hierher, neben den Briefkopf --
+                 beides geht an Kundinnen und Kunden hinaus. -->
+            <button type="button" class="bk-kachel" id="bkKachelMd" onclick="bkAbschnittZeigen('md')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="2"/><polyline points="3 6 12 13 21 6"/></svg></span>
+              <span class="bk-kachel-lbl">E-Mail-Designer</span>
+            </button>
             <button type="button" class="bk-kachel" onclick="bkAbschnittZeigen('zf')">
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
               <span class="bk-kachel-lbl">Mein Zugang: Zwei-Faktor-Anmeldung</span>
@@ -9380,6 +9606,15 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
             <button type="button" class="bk-kachel" onclick="bkAbschnittZeigen('fz')">
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M3 13l2-5.5A2 2 0 0 1 6.9 6h10.2a2 2 0 0 1 1.9 1.5L21 13"/><path d="M3 13h18v4a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/></svg></span>
               <span class="bk-kachel-lbl">Dienstfahrzeuge</span>
+            </button>
+            <!-- Testdaten (ENT-714). NUR auf der Testseite und nur mit dem
+                 Recht, Rollen zu vergeben -- siehe tdKachelSetzen(). Im
+                 violetten Ton des Testumgebungs-Bands, damit sie sich von
+                 den echten Einstellungen daneben unterscheidet. -->
+            <button type="button" class="bk-kachel bk-kachel-test" id="bkKachelTd" style="display:none" onclick="bkAbschnittZeigen('td')">
+              <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg></span>
+              <span class="bk-kachel-lbl">Testdaten</span>
+              <span class="bk-kachel-zusatz">nur Testseite</span>
             </button>
           </div>
 
@@ -9727,6 +9962,131 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
              weggelassen: "Es gibt noch keine Fahrzeuge zum Auswaehlen; ein
              leeres Auswahlfeld auf Vorrat waere Attrappe") wird erst gebaut,
              wenn hier Fahrzeuge stehen -- also nach diesem Schritt. -->
+        <!-- Testdaten (ENT-714): leeren und neu befuellen. Die Sperre
+             sitzt im Server (api/testdaten.php: nur Staging, nur mit dem
+             Recht rechte_schreiben); diese Karte erspart nur den Umweg. -->
+        <div class="bk-abschnitt" id="bkAb-td" style="display:none">
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
+        <div class="grid">
+        <div class="card td-karte">
+          <div class="card-hd">
+            <span class="card-ic td-ic"><svg class="i" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg></span>
+            <h3>Testdaten</h3>
+            <div class="sp"></div>
+            <span class="note td-note">nur Testseite</span>
+          </div>
+          <div class="card-bd">
+            <p class="td-text">Leert die Testseite und füllt sie mit einem <b>erfundenen Bewachungsbetrieb</b>:
+              rund 30 Mitarbeitende, 12 Kunden, 18 Objekte und 15 Monate Geschichte mit
+              Einsätzen, Abgleich, Auslagenersatz, Rechnungen, Offerten und Lohnläufen, dazu
+              sechs Wochen Planung nach vorne. Feste Objekte tragen eine Masterschicht und erscheinen
+              in der Objektplanung, Anlässe stehen als einzelne Einsätze ohne Objekt in der Einsatzliste.
+              Ab morgen ist etwa jeder vierte Platz noch offen. Lohn und Auslagenersatz rechnen die echten
+              Rechenwege. Absichtlich eingebaut sind Sonderfälle wie überfällige Rechnungen,
+              Entwürfe und ein stornierter Lohnlauf.</p>
+            <ul class="td-liste">
+              <li><b>Gelöscht wird:</b> alles Fachliche, also Personen ohne Cockpit-Zugang, Kunden, Objekte,
+                Planung, Rapporte, Belege, Lohn und Revierdienst.</li>
+              <li><b>Bleibt stehen:</b> jedes Konto mit Cockpit-Zugang samt Rollen und Anmeldung, die
+                Angaben zum Betrieb und die Kataloge der Einrichtung.</li>
+              <li>Für Monate vor dem GAV-Regelwerk 2026 entsteht <b>kein Lohnlauf</b>. Dort rechnet der
+                Lohn nichts, und das bleibt sichtbar so.</li>
+            </ul>
+            <div class="f" style="max-width:360px">
+              <label for="tdWort">Zum Bestätigen <b>TESTDATEN</b> eintippen</label>
+              <input class="inp" id="tdWort" autocomplete="off" spellcheck="false" oninput="tdWortPruefen()">
+            </div>
+            <div class="td-aktion">
+              <button type="button" class="btn btn-danger" id="tdKnopf" disabled onclick="tdStarten()">Leeren und neu befüllen</button>
+            </div>
+            <div class="td-stand" id="tdStand" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+        </div>
+        </div>
+
+        <!-- E-Mail-Designer (ENT-729). Aufbau wie in AbaNinja, vom
+             Projektinhaber als Vorbild gezeigt: links die Vorschau der
+             gewaehlten Mail, darunter ihre Texte, rechts die Gestaltung in
+             Gruppen. Die Vorschau rechnet der SERVER (api/mail_designer.php,
+             aktion=vorschau) mit derselben Funktion, die auch die echte Mail
+             baut -- eine im Browser nachgebaute Vorschau saehe beim naechsten
+             Umbau anders aus als die Mail, die ankommt. -->
+        <div class="bk-abschnitt" id="bkAb-md" style="display:none">
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="emdZurueck()">Zurück</button>
+        <div class="emd-kopf">
+          <div class="emd-titel">
+            <h2>E-Mail-Designer</h2>
+            <p class="zone-note">So sehen die Mails aus, die dein Betrieb an Kundinnen und Kunden schickt. Gilt für alle Konten des Betriebs.</p>
+          </div>
+          <div class="emd-werkzeug">
+            <label class="emd-wahl"><span>Vorschau</span>
+              <select class="inp" id="emdArt" onchange="emdArtWechseln()"></select></label>
+            <button type="button" class="btn btn-plain" id="emdTest" onclick="emdTestmail()">Testmail an mich</button>
+            <button type="button" class="btn btn-primary" id="emdSpeichern" onclick="emdSpeichern()" disabled>Speichern</button>
+          </div>
+        </div>
+        <p class="emd-stand" id="emdStand" role="status" aria-live="polite"></p>
+        <div class="emd-raster">
+          <div class="emd-links">
+            <div class="card emd-vorschau-karte">
+              <div class="emd-betreff"><span>Betreff</span><b id="emdBetreff">–</b></div>
+              <iframe id="emdVorschau" title="Vorschau der Mail" sandbox="allow-same-origin" tabindex="-1"></iframe>
+            </div>
+            <div class="card">
+              <div class="card-hd"><h3 id="emdTexteTitel">Texte</h3><span class="sp"></span>
+                <button type="button" class="btn btn-plain btn-sm" id="emdStandardtext" onclick="emdStandardtext()">Standardtext</button></div>
+              <div class="card-bd">
+                <div class="f"><label for="emdT_betreff">Betreff</label><input class="inp emd-feld" id="emdT_betreff" maxlength="150" data-feld="betreff"></div>
+                <div class="f"><label for="emdT_kopf">Kopfband</label><input class="inp emd-feld" id="emdT_kopf" maxlength="120" data-feld="kopf"></div>
+                <div class="f"><label for="emdT_text">Text</label><textarea class="inp emd-feld" id="emdT_text" rows="7" maxlength="3000" data-feld="text"></textarea></div>
+                <div class="f" id="emdKnopfFeld"><label for="emdT_knopf">Beschriftung des Knopfs</label><input class="inp emd-feld" id="emdT_knopf" maxlength="60" data-feld="knopf"></div>
+                <div class="emd-platz"><span class="emd-platz-lbl">Platzhalter einfügen</span><span id="emdPlatzhalter"></span></div>
+                <p class="zone-note emd-fest" id="emdFest"></p>
+              </div>
+            </div>
+          </div>
+          <div class="emd-rechts">
+            <div class="card emd-gruppe"><div class="card-hd"><h3>Schema</h3></div><div class="card-bd">
+              <div class="emd-zeile"><span>Primärfarbe</span><span class="emd-farbe"><input type="color" id="emdF_primaer" data-farbe="primaer"><code></code></span></div>
+              <p class="zone-note emd-erkl">Färbt Kopfband, Knopf und Links. Einzeln anpassen kannst du sie darunter.</p>
+            </div></div>
+            <div class="card emd-gruppe"><div class="card-hd"><h3>Logo</h3></div><div class="card-bd">
+              <label class="emd-zeile emd-check"><span>Logo anzeigen</span><input type="checkbox" id="emdLogoAn"></label>
+              <div class="emd-masse">
+                <div class="f"><label for="emdLogoBreite">Breite (px)</label><input class="inp" type="number" id="emdLogoBreite" min="0" max="400" step="1"></div>
+                <div class="f"><label for="emdLogoHoehe">Höhe (px)</label><input class="inp" type="number" id="emdLogoHoehe" min="0" max="400" step="1" placeholder="automatisch"></div>
+              </div>
+              <div class="emd-zeile"><span>Ausrichtung</span>
+                <div class="seg2" id="emdLogoAusr" role="group" aria-label="Ausrichtung des Logos">
+                  <button type="button" data-w="links">Links</button><button type="button" data-w="mitte">Mitte</button><button type="button" data-w="rechts">Rechts</button>
+                </div></div>
+              <p class="zone-note emd-hinweis" id="emdLogoHinweis"></p>
+            </div></div>
+            <div class="card emd-gruppe"><div class="card-hd"><h3>Kopfband</h3></div><div class="card-bd">
+              <div class="emd-zeile"><span>Hintergrund</span><span class="emd-farbe"><input type="color" id="emdF_kopf_hg" data-farbe="kopf_hg"><code></code></span></div>
+              <div class="emd-zeile"><span>Text</span><span class="emd-farbe"><input type="color" id="emdF_kopf_text" data-farbe="kopf_text"><code></code></span></div>
+              <p class="emd-warn" id="emdWarnKopf"></p>
+            </div></div>
+            <div class="card emd-gruppe"><div class="card-hd"><h3>Inhalt</h3></div><div class="card-bd">
+              <div class="emd-zeile"><span>Links</span><span class="emd-farbe"><input type="color" id="emdF_link" data-farbe="link"><code></code></span></div>
+              <div class="emd-zeile"><span>Knopf</span><span class="emd-farbe"><input type="color" id="emdF_knopf" data-farbe="knopf"><code></code></span></div>
+              <div class="emd-zeile"><span>Knopftext</span><span class="emd-farbe"><input type="color" id="emdF_knopf_text" data-farbe="knopf_text"><code></code></span></div>
+              <p class="emd-warn" id="emdWarnInhalt"></p>
+            </div></div>
+            <div class="card emd-gruppe"><div class="card-hd"><h3>Gruss</h3></div><div class="card-bd">
+              <div class="f"><label for="emdGruss">Am Schluss jeder Mail</label><textarea class="inp" id="emdGruss" rows="3" maxlength="300"></textarea></div>
+              <div class="emd-platz"><span class="emd-platz-lbl">Platzhalter</span><span id="emdGrussPlatz"></span></div>
+            </div></div>
+            <div class="card emd-gruppe"><div class="card-hd"><h3>Fusszeile und Antworten</h3></div><div class="card-bd">
+              <p class="zone-note emd-erkl">Adresse, Telefon und E-Mail kommen aus den Angaben unter Betrieb.</p>
+              <label class="emd-zeile emd-check"><span>Hinweis „Versendet mit GuardOpS“</span><input type="checkbox" id="emdHinweis"></label>
+              <p class="zone-note emd-hinweis" id="emdAntwort"></p>
+            </div></div>
+          </div>
+        </div>
+        </div>
+
         <div class="bk-abschnitt" id="bkAb-fz" style="display:none">
         <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
         <div class="grid">
@@ -9875,6 +10235,107 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
            entfaellt auch der Sonderweg, den saZurueck bis ENT-682
            gehen musste, um am Handy nicht in die Kachelübersicht der
            Administration zu fuehren. -->
+      <!-- EINSTELLUNGEN (ENT-722).
+           Eigene Seite, erreichbar nur ueber das Kontomenue -- sie steht
+           nicht in der Hauptnavigation. Links eine Spalte mit zwei Gruppen,
+           rechts der Inhalt:
+             FUER MICH         gilt nur fuer das eigene Konto, auf jedem
+                               Geraet (gespeichert am Konto, siehe
+                               api/meine_einstellungen.php)
+           Die Gruppe "Fuer den Betrieb" gibt es nicht mehr: "System" ist
+           gestrichen (ENT-727), der E-Mail-Designer steht unter
+           Administration > Betrieb (ENT-728). Was alle Konten des Betriebs
+           betrifft, hat dort seinen einen Ort.
+           Reiter, die noch nicht gebaut sind, sind klickbar und sagen, was
+           dort entsteht ("in Arbeit"). Ein leerer Reiter saehe sonst aus
+           wie "hier gibt es nichts einzustellen" -- unbekannt darf nie wie
+           keine aussehen. -->
+      <section class="view" id="view-einstellungen">
+        <div class="es-raster">
+        <nav class="es-nav" aria-label="Einstellungen">
+          <div class="es-gruppe">Für mich</div>
+          <button type="button" class="es-nav-knopf" data-reiter="darstellung" onclick="esReiterZeigen('darstellung')">
+            <span class="es-nav-ic"><svg class="i" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2"/><line x1="8.5" y1="20.5" x2="15.5" y2="20.5"/><line x1="12" y1="17" x2="12" y2="20.5"/></svg></span>
+            <span class="es-nav-lbl">Darstellung</span>
+          </button>
+          <button type="button" class="es-nav-knopf" data-reiter="farben" onclick="esReiterZeigen('farben')">
+            <span class="es-nav-ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.4 0z"/></svg></span>
+            <span class="es-nav-lbl">Farben</span>
+          </button>
+          <button type="button" class="es-nav-knopf" data-reiter="benachrichtigungen" onclick="esReiterZeigen('benachrichtigungen')">
+            <span class="es-nav-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
+            <span class="es-nav-lbl">Benachrichtigungen</span>
+          </button>
+        </nav>
+        <div class="es-inhalt">
+          <div class="card es-teil" data-reiter="darstellung">
+            <div class="card-hd"><h2>Darstellung</h2></div>
+            <div class="card-bd">
+              <div class="es-zeile">
+                <div class="es-text">
+                  <div class="es-titel">Dunkle Darstellung</div>
+                  <div class="es-erkl">Heller oder dunkler Hintergrund.</div>
+                </div>
+              <button class="thema-schalter" id="btnThema" onclick="themaUm()" role="switch" aria-checked="false" title="Hell oder dunkel" aria-label="Zwischen heller und dunkler Darstellung wechseln">
+                <span class="knopf">
+                  <svg class="i-sonne" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="4.2" y1="4.2" x2="5.9" y2="5.9"/><line x1="18.1" y1="18.1" x2="19.8" y2="19.8"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.2" y1="19.8" x2="5.9" y2="18.1"/><line x1="18.1" y1="5.9" x2="19.8" y2="4.2"/></svg>
+                  <svg class="i-mond" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
+                </span>
+              </button>
+              </div>
+              <div class="es-zeile">
+                <div class="es-text">
+                  <div class="es-titel">Durchscheinende Oberfläche</div>
+                  <div class="es-erkl">Karten und Leisten wie aus Glas, mit farbigem Grund dahinter.</div>
+                </div>
+              <button class="glas-schalter" id="btnGlas" onclick="glasUm()" role="switch" aria-checked="false" title="Durchscheinende Oberfläche" aria-label="Durchscheinende Oberfläche ein- oder ausschalten">
+                <span class="knopf">
+                  <svg class="i-glas" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="12" height="12" rx="3.4"/><path d="M8.5 20.5h8a4 4 0 0 0 4-4v-8"/></svg>
+                </span>
+              </button>
+              </div>
+              <div class="es-zeile">
+                <div class="es-text">
+                  <div class="es-titel">Kompakte Darstellung</div>
+                  <div class="es-erkl">Weniger Abstand in Formularen, Erklärtexte hinter dem (i). Versuch.</div>
+                </div>
+              <button class="dichte-schalter" id="btnDichte" onclick="dichteUm()" role="switch" aria-checked="false" title="Kompakte Darstellung" aria-label="Kompakte Darstellung ein- oder ausschalten">
+                <span class="knopf">
+                  <svg viewBox="0 0 24 24"><line x1="4" y1="10.5" x2="20" y2="10.5"/><line x1="4" y1="14.5" x2="20" y2="14.5"/><polyline points="9,2.5 12,5.5 15,2.5"/><polyline points="9,21.5 12,18.5 15,21.5"/></svg>
+                </span>
+              </button>
+              </div>
+              <!-- Wo die Wahl gespeichert ist. Vier verschiedene Lagen, vier
+                   verschiedene Saetze (esStandZeigen): am Konto, noch nicht
+                   geladen, Einrichtung fehlt, Speichern fehlgeschlagen. -->
+              <p class="es-stand" id="esStand"></p>
+            </div>
+          </div>
+          <div class="card es-teil" data-reiter="farben" hidden>
+            <div class="card-hd"><h2>Farben</h2></div>
+            <div class="card-bd">
+              <p class="es-einleitung">Das Farbthema deiner Oberfläche: Kopfleiste, Flächen und Akzent. Hell oder dunkel stellst du unter Darstellung ein, jedes Thema hat beide Fassungen. Die Farben für Status wie zugesagt, Warnung oder gesperrt bleiben in jedem Thema gleich. Gilt am Computer, am Handy bleibt die Oberfläche wie bisher.</p>
+              <!-- Die Kacheln baut farbKachelnZeichnen() aus FARBTHEMEN. -->
+              <div class="farb-kacheln" id="esFarbKacheln" role="radiogroup" aria-label="Farbthema" onkeydown="farbKachelTaste(event)"></div>
+              <p class="es-stand" id="esStandFarben"></p>
+            </div>
+          </div>
+          <div class="card es-teil" data-reiter="benachrichtigungen" hidden>
+            <div class="card-hd"><h2>Benachrichtigungen</h2></div>
+            <div class="card-bd">
+              <p class="es-einleitung">Worüber dich die Glocke informiert. Was du ausschaltest, erscheint nicht mehr in deiner Glocke und zählt nicht zur Zahl daran. In der Übersicht steht es weiterhin, und für andere Konten ändert sich nichts.</p>
+              <!-- Die Zeilen baut glockeSchalterZeichnen() aus GLOCKE_ARTEN. -->
+              <div id="esGlockeArten"></div>
+              <!-- Wo die Wahl gespeichert ist (esStandZeigen). Eigene Saetze:
+                   Die Glocke filtert der Server nach dem Konto -- "nur in
+                   diesem Browser" gibt es hier nicht. -->
+              <p class="es-stand" id="esStandGlocke"></p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+
       <section class="view" id="view-support">
         <!-- Reiterleiste (ENT-687). Dasselbe Muster wie "Kontrollrunde
              ändern" im Revierdienst (.rdkr-reiter/.rdkr-tab, ENT-261) --
@@ -12149,9 +12610,12 @@ function enter() {
   spartenAnwenden(me && me.sparten, false);
   // Der Wert steht schon am Dokument -- hier nur Schalter und Systemleiste
   // nachziehen.
-  themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell');
-  glasSetzen(document.documentElement.getAttribute('data-glas') === 'an');
-  dichteSetzen(document.documentElement.getAttribute('data-dichte') === 'kompakt');
+  // "false": Das ist kein Umschalten, nur das Nachziehen eines bekannten
+  // Werts -- er darf nicht als neue Wahl ans Konto gehen und dort einen
+  // Wert ueberschreiben, den ein anderes Geraet gespeichert hat.
+  themaSetzen(document.documentElement.getAttribute('data-thema') || 'hell', false);
+  glasSetzen(document.documentElement.getAttribute('data-glas') === 'an', false);
+  dichteSetzen(document.documentElement.getAttribute('data-dichte') === 'kompakt', false, false);
   dichteInfoBauen();
   // Im Buendel liegen app.html und index.html unter anderen Namen
   // (index.html bzw. rapport-tool.html, siehe mobile-buendel-erstellen.py)
@@ -12229,6 +12693,9 @@ function enter() {
     rechteAnwenden();
     tutorialAutostartPruefen(data);
   }).catch(() => {});
+  // Die Darstellung vom Konto holen (Einstellungsseite). Bis die Antwort
+  // da ist, gilt, was dieser Browser zuletzt wusste -- darum blitzt nichts.
+  einstellungenLaden();
   ordLaden('uebersicht');
   sprachBereit('rt');
   // Der Briefkopf wird schon hier geholt, nicht erst beim Drucken (ENT-155):
@@ -12379,8 +12846,9 @@ const TITLES = {
   kunden:      ['Kunden', 'Stammdaten'],
   produkte:    ['Leistungen', 'Preise und Standardtexte für Offerten'],
   offerte:     ['Offerte', 'Positionen, Preise und Summen'],
-  betrieb:     ['Betrieb', 'Anstellungsorte, Briefkopf, Zugang, Rollen und Dienstfahrzeuge'],
+  betrieb:     ['Betrieb', 'Anstellungsorte, Briefkopf, E-Mails, Zugang, Rollen und Dienstfahrzeuge'],
   support:     ['Support', 'Anliegen an den Betreiber und befristete Support-Freigabe'],
+  einstellungen: ['Einstellungen', 'Darstellung für dich und Einstellungen für den Betrieb'],
   pensen:      ['Pensen', 'Jahresstunden gegen die Anstellungskategorie'],
   finanzen:    ['Finanzen', 'Übersicht und Kennzahlen'],
   rechnungen:  ['Rechnungen', 'Rechnungen an Kunden'],
@@ -13397,7 +13865,7 @@ function bildVerkleinern(datei) {
 // ══════════════════════════════════════════ HELL ODER DUNKEL (ENT-029)
 // Die Wahl gilt fuer dieses Geraet und bleibt gespeichert. Der Wert wird
 // schon im Kopf der Seite gesetzt, hier wird nur noch umgeschaltet.
-function themaSetzen(w) {
+function themaSetzen(w, merken = true) {
   const dunkel = w === 'dunkel';
   document.documentElement.setAttribute('data-thema', dunkel ? 'dunkel' : 'hell');
   localStorage.setItem('rv3_thema', dunkel ? 'dunkel' : 'hell');
@@ -13413,6 +13881,9 @@ function themaSetzen(w) {
   // Die Farbe der Systemleiste am Telefon mitziehen.
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', dunkel ? '#0B0D11' : '#16181D');
+  if (merken) { einstellungMerken('thema', dunkel ? 'dunkel' : 'hell'); }
+  // Die Vorschau der Farbthemen zeigt die Fassung, die gerade gilt.
+  if (typeof farbKachelnZeichnen === 'function') { farbKachelnZeichnen(); }
 }
 
 function themaUm() {
@@ -13427,7 +13898,7 @@ function themaUm() {
 //
 // Kein Eingriff in die Systemleistenfarbe (anders als themaSetzen): Glas
 // aendert nicht, ob es hell oder dunkel ist, nur wie dicht die Flaechen sind.
-function glasSetzen(an) {
+function glasSetzen(an, merken = true) {
   document.documentElement.setAttribute('data-glas', an ? 'an' : 'aus');
   try { localStorage.setItem('rv3_glas', an ? 'an' : 'aus'); } catch (e) {}
   ['btnGlas', 'btnGlasMob'].forEach(id => {
@@ -13436,30 +13907,333 @@ function glasSetzen(an) {
     b.setAttribute('aria-checked', an ? 'true' : 'false');
     b.title = an ? 'Durchscheinende Oberfläche ausschalten' : 'Durchscheinende Oberfläche einschalten';
   });
+  if (merken) { einstellungMerken('glas', an ? 'an' : 'aus'); }
 }
 
 function glasUm() {
   glasSetzen(document.documentElement.getAttribute('data-glas') !== 'an');
 }
 
+// ══════════════════════════════════════════ EINSTELLUNGEN AM KONTO
+// ENT-722: Hell/dunkel und Glas gehoeren
+// dem Konto, nicht mehr dem Browser. Der Browser behaelt seine Kopie
+// (rv3_thema, rv3_glas) als Zwischenspeicher, damit beim Laden nichts in
+// der falschen Fassung aufblitzt -- massgeblich ist, was am Konto steht.
+//
+// Vier Lagen, und jede hat ihren eigenen Satz auf der Seite (esStandZeigen):
+//   'laedt'       -- Antwort vom Konto steht noch aus
+//   'konto'       -- am Konto gespeichert, gilt auf jedem Geraet
+//   'nur_browser' -- die Einrichtung hat die Spalte noch nicht gebracht
+//   'fehler'      -- Laden oder Speichern ist fehlgeschlagen
+let esLage = 'laedt';
+let esAusstehend = {};          // gewaehlt, bevor das Konto geantwortet hat
+let esKette = Promise.resolve(); // Speichern nacheinander, nie ueberholend
+
+// Was dieser Browser gerade zeigt. Gebraucht fuer die einmalige Uebernahme:
+// Hat das Konto noch nichts gespeichert, wird daraus der Kontowert --
+// niemand soll nach dem Update ploetzlich eine andere Oberflaeche vorfinden.
+function esBrowserWerte() {
+  const h = document.documentElement;
+  const w = { thema: h.getAttribute('data-thema') === 'dunkel' ? 'dunkel' : 'hell',
+              glas: h.getAttribute('data-glas') === 'an' ? 'an' : 'aus' };
+  // Kompakte Darstellung (Versuch auf dem Branch test): nur, wenn es sie
+  // in dieser Fassung ueberhaupt gibt.
+  if (typeof dichteSetzen === 'function') {
+    w.dichte = h.getAttribute('data-dichte') === 'kompakt' ? 'kompakt' : 'normal';
+  }
+  w.farbe = farbeGueltig(h.getAttribute('data-farbe'));
+  return w;
+}
+
+function esSenden(werte) {
+  esKette = esKette.then(() => api('meine_einstellungen.php', { method: 'POST', body: { einstellungen: werte } }))
+    .then(antwort => {
+      if (!antwort || !antwort.ok || !antwort.data || antwort.data.status !== 'ok') {
+        esLage = antwort && antwort.data && antwort.data.stand_unbekannt ? 'nur_browser' : 'fehler';
+      }
+      esStandZeigen();
+    })
+    .catch(() => { esLage = 'fehler'; esStandZeigen(); });
+  return esKette;
+}
+
+// Jede Wahl ueber die Setter (Seite, Handy-Schublade) landet hier.
+function einstellungMerken(schluessel, wert) {
+  if (esLage === 'laedt') { esAusstehend[schluessel] = wert; return; }
+  if (esLage === 'nur_browser') { esStandZeigen(); return; }
+  esSenden({ [schluessel]: wert });
+}
+
+function esAnwenden(e) {
+  // Die Setter legen den Wert auch im Browser ab -- der Zwischenspeicher
+  // fuer das naechste Laden zieht so von selbst nach.
+  if (e.thema) { themaSetzen(e.thema, false); }
+  if (e.glas)  { glasSetzen(e.glas === 'an', false); }
+  if (e.dichte && typeof dichteSetzen === 'function') { dichteSetzen(e.dichte === 'kompakt', false); }
+  // Ein unbekannter Wert am Konto (aelter oder neuer als diese Fassung)
+  // fuehrt zu Graphit, nicht zu einem halben Thema.
+  if (e.farbe) { farbeSetzen(e.farbe, false); }
+  let glocke = false;
+  GLOCKE_ARTEN.forEach(a => {
+    const w = e['glocke_' + a.art];
+    if (!a.fix && (w === 'an' || w === 'aus')) { esGlocke[a.art] = w; glocke = true; }
+  });
+  if (glocke) { glockeSchalterZeichnen(); }
+}
+
+function einstellungenLaden() {
+  esLage = 'laedt';
+  // Neu anmelden heisst neues Konto: Die Glocken-Wahl der vorigen Person
+  // gilt hier nicht.
+  esGlocke = {};
+  esStandZeigen();
+  return api('meine_einstellungen.php').then(({ ok, data }) => {
+    // Eine Antwort ohne das Feld "einstellungen" ist keine Auskunft ueber
+    // das Konto -- weder "nichts gespeichert" noch ein Wert. Dann bleibt
+    // es beim Browser, und es wird auch nichts hochgeladen.
+    if (!ok || !data || data.status !== 'ok' || !('einstellungen' in data)) {
+      esLage = 'fehler'; esAusstehend = {}; esStandZeigen(); return;
+    }
+    if (data.stand_unbekannt) {
+      esLage = 'nur_browser'; esAusstehend = {}; esStandZeigen(); return;
+    }
+    esLage = 'konto';
+    // Pro Schluessel uebernehmen, nicht nur bei einem ganz leeren Konto:
+    // Hat zuerst die App ihre eigene Wahl gespeichert (app_thema), ist das
+    // Konto nicht mehr leer -- die Wahl des Cockpits fehlt trotzdem. Was am
+    // Konto steht, gilt; was fehlt, kommt einmal aus diesem Browser.
+    const gespeichert = data.einstellungen || {};
+    esAnwenden(gespeichert);
+    const browser = esBrowserWerte();
+    const fehlend = {};
+    Object.keys(browser).forEach(k => { if (!(k in gespeichert)) { fehlend[k] = browser[k]; } });
+    // Was waehrend des Ladens gewaehlt wurde, ist juenger als alles andere.
+    if (Object.keys(esAusstehend).length) { esAnwenden(esAusstehend); }
+    const senden = Object.assign(fehlend, esAusstehend);
+    if (Object.keys(senden).length) { esSenden(senden); }
+    esAusstehend = {};
+    esStandZeigen();
+  }).catch(() => { esLage = 'fehler'; esAusstehend = {}; esStandZeigen(); });
+}
+
+const ES_STAND = {
+  laedt:       ['Wird vom Konto geladen. Bis dahin gilt, was dieser Browser gespeichert hat.', false],
+  konto:       ['Gespeichert an deinem Konto. Gilt auf jedem Gerät, an dem du dich anmeldest.', false],
+  nur_browser: ['Nur in diesem Browser gespeichert: Die Einrichtung ist noch nicht auf dem neusten Stand. Danach folgt die Wahl deinem Konto.', true],
+  fehler:      ['Konnte nicht mit dem Konto abgeglichen werden. Die Wahl gilt vorerst nur in diesem Browser.', true],
+};
+// Fuer die Glocke andere Saetze: Sie filtert der Server nach dem Konto. Ist
+// es nicht erreichbar, gibt es keine Wahl "nur in diesem Browser" -- dann
+// zeigt die Glocke eben alles, und genau das muss hier stehen.
+const ES_STAND_GLOCKE = {
+  laedt:       ['Wird vom Konto geladen.', false],
+  konto:       ['Gespeichert an deinem Konto. Gilt für deine Glocke auf jedem Gerät.', false],
+  nur_browser: ['Lässt sich noch nicht speichern: Die Einrichtung ist noch nicht auf dem neusten Stand. Bis dahin zeigt die Glocke alles.', true],
+  fehler:      ['Konnte nicht mit dem Konto abgeglichen werden. Die Glocke filtert weiter nach dem, was zuletzt am Konto gespeichert war.', true],
+};
+function esStandZeigen() {
+  const el = $('esStand');
+  if (el) {
+    const [text, warn] = ES_STAND[esLage] || ES_STAND.fehler;
+    el.textContent = text;
+    el.classList.toggle('warn', warn);
+  }
+  // Farben: dieselbe Lage wie die Darstellung -- auch das Thema wirkt
+  // sofort in diesem Browser, und das Konto zieht nach.
+  const fa = $('esStandFarben');
+  if (fa) {
+    const [text, warn] = ES_STAND[esLage] || ES_STAND.fehler;
+    fa.textContent = text;
+    fa.classList.toggle('warn', warn);
+  }
+  const gl = $('esStandGlocke');
+  if (gl) {
+    const [text, warn] = ES_STAND_GLOCKE[esLage] || ES_STAND_GLOCKE.fehler;
+    gl.textContent = text;
+    gl.classList.toggle('warn', warn);
+  }
+  // Schalten laesst sich nur, was am Konto landet: Der Server liest die
+  // Wahl von dort. Ein Schalter, der umspringt, ohne dass die Glocke folgt,
+  // waere schlimmer als einer, der kurz gesperrt ist.
+  glockeSchalterZeichnen();
+}
+
+// ══════════════════════════════════════════ BENACHRICHTIGUNGEN (Einstellungen)
+// Welche Arten die eigene Glocke zeigt (16.10.2026). Entscheid des
+// Projektinhabers: Ausgeschaltet heisst ausgeblendet und nicht gezaehlt --
+// nicht als gelesen markiert, und die Uebersicht zeigt weiterhin alles.
+// Gefiltert wird auf dem Server (glocke_ausgeschaltet in ereignisse.php),
+// hier wird nur geschaltet und gespeichert. Vorfall und Supportantwort sind
+// immer an; GLOCKE_SCHALTBAR auf dem Server ist dieselbe Liste ohne "fix".
+const GLOCKE_ARTEN = [
+  { art: 'rapport',          titel: 'Rapport eingegangen',      erkl: 'Jemand hat einen Rapport gesendet.' },
+  { art: 'sperrtag',         titel: 'Tag gesperrt',             erkl: 'Jemand hat sich für einen Tag als nicht verfügbar gemeldet.' },
+  { art: 'zusage',           titel: 'Antwort auf eine Schicht', erkl: 'Jemand hat eine zugeteilte Schicht angenommen oder abgelehnt.' },
+  { art: 'offerte',          titel: 'Offerte entschieden',      erkl: 'Eine Kundin oder ein Kunde hat eine Offerte angenommen oder abgelehnt.' },
+  { art: 'rundgang_spontan', titel: 'Spontaner Rundgang',       erkl: 'Jemand hat ausserhalb des Plans einen Rundgang gestartet.' },
+  { art: 'vorfall',          titel: 'Vorfall gemeldet',         erkl: 'Eine Meldung aus dem Revierdienst, etwa eine Brandgefahr.', fix: true },
+  { art: 'support_antwort',  titel: 'Antwort vom Support',      erkl: 'Die Antwort auf deine Supportanfrage.', fix: true },
+];
+// Was am Konto steht. Fehlt eine Art, ist sie an.
+let esGlocke = {};
+
+function glockeSchalterZeichnen() {
+  const ziel = $('esGlockeArten');
+  if (!ziel) { return; }
+  const schaltbar = esLage === 'konto';
+  ziel.innerHTML = GLOCKE_ARTEN.map(a => {
+    const an = a.fix || esGlocke[a.art] !== 'aus';
+    const gesperrt = a.fix || !schaltbar;
+    const titel = a.fix ? 'Immer an' : (an ? a.titel + ' ausschalten' : a.titel + ' einschalten');
+    return `
+      <div class="es-zeile">
+        <div class="es-text">
+          <div class="es-titel">${esc(a.titel)}</div>
+          <div class="es-erkl">${esc(a.erkl)}</div>
+        </div>
+        <div class="es-rechts">
+          ${a.fix ? '<span class="chip chip-n">immer an</span>' : ''}
+          <button type="button" class="glocke-schalter" role="switch" data-art="${a.art}"
+            aria-checked="${an ? 'true' : 'false'}" aria-label="${esc(a.titel)} in der Glocke"
+            title="${esc(titel)}"${gesperrt ? ' disabled' : ''} onclick="glockeArtUm('${a.art}')">
+            <span class="knopf"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Umschalten, speichern, dann die Glocke neu holen -- der Server filtert.
+// Scheitert das Speichern, springt der Schalter zurueck: Er soll zeigen, was
+// die Glocke tut, nicht was jemand gewollt hat.
+function glockeArtUm(art) {
+  const a = GLOCKE_ARTEN.find(x => x.art === art);
+  if (!a || a.fix || esLage !== 'konto') { return; }
+  const alt = esGlocke[art] === 'aus' ? 'aus' : 'an';
+  const neu = alt === 'aus' ? 'an' : 'aus';
+  esGlocke[art] = neu;
+  glockeSchalterZeichnen();
+  esSenden({ ['glocke_' + art]: neu }).then(() => {
+    if (esLage !== 'konto') { esGlocke[art] = alt; glockeSchalterZeichnen(); return; }
+    if (stats) { ereignisseNachladen(); }
+  });
+}
+
+// Die Einstellungen sind nur noch "fuer mich" (ENT-727, ENT-728): Den
+// Reiter "System" gibt es nicht mehr, der E-Mail-Designer steht unter
+// Administration > Betrieb. Betriebsweites hat dort seinen einen Ort.
+function esReiterZeigen(reiter) {
+  if (!document.querySelector(`#view-einstellungen .es-teil[data-reiter="${reiter}"]`)) { reiter = 'darstellung'; }
+  document.querySelectorAll('#view-einstellungen .es-nav-knopf').forEach(b => {
+    const an = b.dataset.reiter === reiter;
+    b.classList.toggle('aktiv', an);
+    if (an) { b.setAttribute('aria-current', 'page'); } else { b.removeAttribute('aria-current'); }
+  });
+  document.querySelectorAll('#view-einstellungen .es-teil').forEach(t => {
+    t.hidden = t.dataset.reiter !== reiter;
+  });
+}
+
+function esOeffnen() {
+  esStandZeigen();
+  farbKachelnZeichnen();
+  esReiterZeigen('darstellung');
+}
+
 // ══════════════════════════════════════════ KOMPAKTE DARSTELLUNG (Versuch)
 // Dieselbe Bauart wie Glas: Der Wert steht schon im Kopf der Seite am
 // Dokument, hier wird umgeschaltet und gespeichert. Nur ein Schalter -- am
 // Handy gibt es die Wahl bewusst nicht (siehe CSS-Block .dichte-schalter).
-// Gespeichert wird nur, was jemand am Schalter waehlt (merken), nicht der
-// Zustand beim Laden -- sonst saehe der Standard aus wie eine Wahl.
-function dichteSetzen(kompakt, merken = false) {
+// Der Schalter steht seit ENT-722 auf der Einstellungsseite, und die Wahl
+// gehoert dem Konto wie hell/dunkel und Glas.
+// Kompakt ist seit 16.10.2026 der Standard. Der Browser haelt eine Kopie
+// (rv3_dichte_wahl) nur von einem Wert, der von einer Wahl stammt -- vom
+// Schalter oder vom Konto --, nie vom Standard beim Laden (zwischenspeichern
+// = false). Sonst saehe der Standard beim naechsten Laden aus wie eine Wahl.
+function dichteSetzen(kompakt, merken = true, zwischenspeichern = true) {
   document.documentElement.setAttribute('data-dichte', kompakt ? 'kompakt' : 'normal');
-  if (merken) { try { localStorage.setItem('rv3_dichte_wahl', kompakt ? 'kompakt' : 'normal'); } catch (e) {} }
+  if (zwischenspeichern) { try { localStorage.setItem('rv3_dichte_wahl', kompakt ? 'kompakt' : 'normal'); } catch (e) {} }
   const b = $('btnDichte');
   if (b) {
     b.setAttribute('aria-checked', kompakt ? 'true' : 'false');
     b.title = kompakt ? 'Normale Darstellung' : 'Kompakte Darstellung';
   }
+  if (merken) { einstellungMerken('dichte', kompakt ? 'kompakt' : 'normal'); }
 }
 
 function dichteUm() {
   dichteSetzen(document.documentElement.getAttribute('data-dichte') !== 'kompakt', true);
+}
+
+// ══════════════════════════════════════════ FARBTHEMEN (ENT-726)
+// Dieselbe Bauart wie Glas und Dichte: Der Wert steht schon im Kopf der Seite
+// am Dokument (data-farbe), hier wird umgeschaltet und gespeichert. Die Werte
+// selbst stehen im CSS-Block FARBTHEMEN; hier nur die Farben der kleinen
+// Vorschau auf den Kacheln. Sie zeigen die Fassung, die gerade gilt (hell
+// oder dunkel) -- eine Vorschau in der anderen Fassung waere eine Vorschau
+// auf etwas, das man nach dem Klick nicht sieht.
+// Werte gleich wie im CSS-Block; test_farben.mjs vergleicht beide.
+const FARBTHEMEN = [
+  { id: 'graphit', name: 'Graphit', erkl: 'Dunkle Kopfleiste, blauer Akzent. Wie bisher.',
+    hell:   { shell: '#16181D', bg: '#F7F8FA', surface: '#FFFFFF', line: '#E5E8EC', accent: '#2F5BD7' },
+    dunkel: { shell: '#0B0D11', bg: '#0F1117', surface: '#161B27', line: '#2A3147', accent: '#7098F7' } },
+  { id: 'marine', name: 'Marine', erkl: 'Kopfleiste in Nachtblau, kräftigeres Blau.',
+    hell:   { shell: '#0E1A30', bg: '#F3F6FB', surface: '#FFFFFF', line: '#E1E7F0', accent: '#1D64E0' },
+    dunkel: { shell: '#07101F', bg: '#0A1222', surface: '#101B31', line: '#22314F', accent: '#6490F5' } },
+  { id: 'hell', name: 'Hell', erkl: 'Helle Kopfleiste, Akzent in Indigo. Im Dunkeln neutrales Grau.',
+    hell:   { shell: '#FFFFFF', bg: '#F4F5F7', surface: '#FFFFFF', line: '#E5E8EC', accent: '#3D4FD1' },
+    dunkel: { shell: '#22252B', bg: '#131417', surface: '#1B1D21', line: '#2E3137', accent: '#7E89F2' } },
+];
+
+function farbeGueltig(f) { return FARBTHEMEN.some(t => t.id === f) ? f : 'graphit'; }
+
+function farbeSetzen(f, merken = true) {
+  f = farbeGueltig(f);
+  document.documentElement.setAttribute('data-farbe', f);
+  try { localStorage.setItem('rv3_farbe', f); } catch (e) {}
+  farbKachelnZeichnen();
+  if (merken) { einstellungMerken('farbe', f); }
+}
+
+function farbKachelnZeichnen() {
+  const ziel = $('esFarbKacheln');
+  if (!ziel) { return; }
+  const h = document.documentElement;
+  const aktiv = farbeGueltig(h.getAttribute('data-farbe'));
+  const fassung = h.getAttribute('data-thema') === 'dunkel' ? 'dunkel' : 'hell';
+  ziel.innerHTML = FARBTHEMEN.map(t => {
+    const c = t[fassung];
+    const an = t.id === aktiv;
+    return `
+      <button type="button" class="farb-kachel" role="radio" data-farbe="${t.id}"
+        aria-checked="${an ? 'true' : 'false'}" tabindex="${an ? '0' : '-1'}" onclick="farbeSetzen('${t.id}')">
+        <span class="farb-vorschau" style="background:${c.bg};border-color:${c.line}" aria-hidden="true">
+          <span class="fv-leiste" style="background:${c.shell}"></span>
+          <span class="fv-karte" style="background:${c.surface};border-color:${c.line}">
+            <span class="fv-zeile" style="background:${c.line}"></span>
+            <span class="fv-zeile kurz" style="background:${c.line}"></span>
+            <span class="fv-knopf" style="background:${c.accent}"></span>
+          </span>
+        </span>
+        <span class="farb-kopf">
+          <span class="farb-name">${esc(t.name)}</span>
+          <span class="farb-haken" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="5 12.5 10 17.5 19 7"/></svg></span>
+        </span>
+        <span class="farb-erkl">${esc(t.erkl)}</span>
+      </button>`;
+  }).join('');
+}
+
+// Pfeiltasten in der Gruppe, wie bei Optionsfeldern ueblich.
+function farbKachelTaste(ev) {
+  const i = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[ev.key];
+  if (!i) { return; }
+  ev.preventDefault();
+  const ids = FARBTHEMEN.map(t => t.id);
+  const jetzt = ids.indexOf(farbeGueltig(document.documentElement.getAttribute('data-farbe')));
+  farbeSetzen(ids[(jetzt + i + ids.length) % ids.length]);
+  const k = document.querySelector('#esFarbKacheln .farb-kachel[aria-checked="true"]');
+  if (k) { k.focus(); }
 }
 
 // Ein (i) an jede Abschnittsueberschrift, unter der ein Erklaertext steht.
@@ -13602,7 +14376,8 @@ function go(view) {
   if (view !== 'planung' && view !== 'mitarbeiter') { weiteAnsicht(ANSICHT_WEIT.includes(view)); }
   if (view === 'planung' && MOBIL() && pTab === 'uebersicht') goTab('einsaetze');
   if (view === 'mitarbeiter' && !mitarbeiter.length) loadMitarbeiter();
-  if (view === 'betrieb') { ladeBetrieb(); zfLaden(); rvLaden(); lmSichtbarkeit(); }
+  if (view === 'betrieb') { ladeBetrieb(); zfLaden(); rvLaden(); lmSichtbarkeit(); tdKachelSetzen(); }
+  if (view === 'einstellungen') { esOeffnen(); }
   // Die Administrationsgruppe klappt auf, wenn eine ihrer Seiten offen ist --
   // und der Elternpunkt wird mitmarkiert, sonst sieht die Seitenleiste aus,
   // als waere man nirgends (dasselbe Muster wie bei den Kunden, ENT-039).
@@ -14846,17 +15621,41 @@ function ereignisZumTag(datum) {
 // loadStats() zurueck.
 function ereignisErledigt(i) {
   const x = (stats.ereignisse || [])[i];
-  if (!x) { return; }
-  stats.ereignisse = (stats.ereignisse || []).filter((y, k) => k !== i);
+  if (x) { ereignisAbhaken(x); }
+}
+
+// Seit die Glocke eine eigene Liste hat (Einstellungen, 16.10.2026), steht
+// dasselbe Ereignis womoeglich in ZWEI Listen: in der Uebersicht und in der
+// Glocke. Erkannt wird es an Art, Kennung und Person -- die Zusage hat die
+// Schicht als Kennung, erst mit der Person ist sie eindeutig.
+function ereignisGleich(a, b) {
+  return a.typ === b.typ && String(a.id) === String(b.id)
+    && Number(a.mitarbeiter_id || 0) === Number(b.mitarbeiter_id || 0);
+}
+
+// Nimmt einen Eintrag aus dem Feed, ohne den Datensatz selbst zu aendern --
+// Rapport, Sperre und Zusage bleiben gueltig (ENT-033/ENT-090). Optimistisch:
+// die Zeile verschwindet sofort, ein Fehlschlag holt sie beim naechsten
+// loadStats() zurueck.
+function ereignisAbhaken(x) {
+  stats.ereignisse = (stats.ereignisse || []).filter(y => !ereignisGleich(x, y));
   // Ohne das haette die "X von Y"-Notiz (bei gekuerzter Liste) und seit
   // ENT-197 auch der Glocke-Zaehler nach dem Abhaken weiter die alte,
   // servergelieferte Gesamtzahl gezeigt -- eine Zahl, die nicht mehr stimmt.
+  // Gezaehlt wird auch dann herunter, wenn die Zeile nur in der Glocke
+  // stand: Auf dem Server ist sie so oder so abgehakt.
   if (typeof stats.ereignisse_gesamt === 'number' && stats.ereignisse_gesamt > 0) {
     stats.ereignisse_gesamt--;
   }
   const je = stats.ereignisse_je_art;
   if (je && typeof je === 'object' && Number(je[x.typ]) > 0) {
     je[x.typ] = Number(je[x.typ]) - 1;
+  }
+  const gl = stats.glocke;
+  if (gl && typeof gl === 'object') {
+    gl.ereignisse = (gl.ereignisse || []).filter(y => !ereignisGleich(x, y));
+    if (typeof gl.gesamt === 'number' && gl.gesamt > 0) { gl.gesamt--; }
+    if (gl.je_art && Number(gl.je_art[x.typ]) > 0) { gl.je_art[x.typ] = Number(gl.je_art[x.typ]) - 1; }
   }
   // NEU ZEICHNEN, nicht bloss die Zeile entfernen. Die Zeilen verweisen ueber
   // ihren Platz in der Liste auf das Ereignis; faellt einer weg, zeigen alle
@@ -14868,10 +15667,12 @@ function ereignisErledigt(i) {
     // Hat der Server NICHT abgehakt, kommt die Zeile sofort zurueck -- nicht
     // erst beim naechsten Neuladen. Sonst sieht ein gescheiterter Haken aus
     // wie ein gelungener und taucht beim Aktualisieren wieder auf.
-    // Ist die sichtbare Liste leer, aber auf dem Server noch etwas offen
-    // (die Liste zeigt nur die neuesten 12), wird die naechste Tranche
+    // Ist eine sichtbare Liste leer, aber auf dem Server noch etwas offen
+    // (die Listen zeigen nur die neuesten 12), wird die naechste Tranche
     // geholt: Eine leere Glocke mit einer Zahl daran ist ein Widerspruch.
-    if (!ok || (!(stats.ereignisse || []).length && ereignisseOffen() > 0)) {
+    if (!ok
+      || (!(stats.ereignisse || []).length && ereignisseOffen() > 0)
+      || (!glockeEintraege().length && glockeOffen() > 0)) {
       ereignisseNachladen();
     }
   }).catch(() => ereignisseNachladen());
@@ -14887,6 +15688,7 @@ function ereignisseNachladen() {
     stats.ereignisse_je_art = data.ereignisse_je_art;
     stats.ereignisse_gekuerzt = data.ereignisse_gekuerzt;
     stats.ereignisse_unvollstaendig = data.ereignisse_unvollstaendig;
+    stats.glocke = data.glocke;
     stats.stand = data.stand;
     renderEreignisse();
   });
@@ -14899,11 +15701,32 @@ function ereignisseNachladen() {
 // eigener "gesehen"-Mechanismus: Abhaken laeuft ueber denselben Endpunkt und
 // denselben Zeitstempel wie in der vollen Liste (Festlegung 2 in
 // ereignisse.php).
-function glockeAktualisieren(f, fehlt) {
+// Die Liste der Glocke. Seit den Einstellungen (16.10.2026) liefert der
+// Server sie eigens, ohne die Arten, die jemand fuer seine Glocke
+// ausgeschaltet hat. Ein aelterer Server liefert sie nicht -- dann zeigt die
+// Glocke dieselben Zeilen wie die Uebersicht, wie bisher.
+function glockeEintraege() {
+  const gl = stats && stats.glocke;
+  if (gl && Array.isArray(gl.ereignisse)) { return gl.ereignisse.filter(x => EREIGNIS_ART[x.typ]); }
+  return ((stats && stats.ereignisse) || []).filter(x => EREIGNIS_ART[x.typ]);
+}
+
+// Dieselbe Zaehlung wie ereignisseOffen(), nur ueber die Arten der Glocke.
+function glockeOffen() {
+  const je = stats && stats.glocke && stats.glocke.je_art;
+  if (je && typeof je === 'object') {
+    return Object.keys(je).filter(t => EREIGNIS_ART[t])
+      .reduce((n, t) => n + (Number(je[t]) || 0), 0);
+  }
+  return ereignisseOffen();
+}
+
+function glockeAktualisieren(_uebersicht, fehlt) {
+  const f = glockeEintraege();
   const badge = $('glockeBadge');
   // Die Zahl am Abzeichen ist die der offenen Ereignisse auf dem Server --
   // nie kleiner als die Zeilen, die tatsaechlich darunter stehen.
-  const anzahl = Math.max(ereignisseOffen(), f.length);
+  const anzahl = Math.max(glockeOffen(), f.length);
   if (badge) {
     badge.style.display = anzahl ? '' : 'none';
     badge.textContent = anzahl > 99 ? '99+' : String(anzahl);
@@ -14928,9 +15751,14 @@ function glockeAktualisieren(f, fehlt) {
     // "Nichts Neues" nur, wenn auch der Server nichts mehr offen hat. Sonst
     // ist die naechste Tranche unterwegs (ereignisseNachladen) -- und eine
     // Zahl am Abzeichen ueber "Nichts Neues" waere ein Widerspruch.
+    // Und "Nichts Neues" nie dort, wo nur der eigene Filter alles
+    // ausblendet: Dann steht dabei, dass in der Uebersicht mehr wartet.
+    const ausgeblendet = Math.max(0, ereignisseOffen() - glockeOffen());
     liste.innerHTML = anzahl
       ? `<div class="glocke-leer">Weitere werden geladen …</div>`
-      : `<div class="glocke-leer">Nichts Neues.</div>`;
+      : (ausgeblendet
+        ? `<div class="glocke-leer">Nichts Neues zu den Arten, die du eingeschaltet hast. ${ausgeblendet} weitere ${ausgeblendet === 1 ? 'steht' : 'stehen'} in der Übersicht.</div>`
+        : `<div class="glocke-leer">Nichts Neues.</div>`);
     return;
   }
   liste.innerHTML = f.map((x, i) => {
@@ -14942,11 +15770,18 @@ function glockeAktualisieren(f, fehlt) {
         <b>${esc(wer)}</b>
         <span>${esc(ereignisZeile(x))}</span>
       </div>
-      ${ereignisAbhakbar(x.typ) ? `<button class="rank-erledigt" title="Als erledigt markieren" aria-label="Als erledigt markieren" onclick="event.stopPropagation(); ereignisErledigt(${i})">
+      ${ereignisAbhakbar(x.typ) ? `<button class="rank-erledigt" title="Als erledigt markieren" aria-label="Als erledigt markieren" onclick="event.stopPropagation(); glockeErledigt(${i})">
         <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
       </button>` : ''}
     </div>`;
   }).join('');
+}
+
+// Der Haken in der Glocke. Der Platz verweist auf die Liste der Glocke,
+// nicht auf die der Uebersicht -- die beiden sind nicht mehr dieselbe.
+function glockeErledigt(i) {
+  const x = glockeEintraege()[i];
+  if (x) { ereignisAbhaken(x); }
 }
 
 // Alle abhakbaren Ereignisse auf einmal (14.10.2026). NICHT optimistisch
@@ -15014,7 +15849,7 @@ function glockeZeileGeklickt(i) {
   /* Eine Supportantwort fuehrt dorthin, wo sie steht (ENT-685) -- nicht in
      die Uebersicht, wo nur dieselbe Zeile noch einmal stuende. Erst dort
      gilt sie als gelesen; der Endpunkt setzt den Stempel beim Oeffnen. */
-  const e = (stats.ereignisse || [])[i];
+  const e = glockeEintraege()[i];
   if (e && e.typ === 'support_antwort') {
     /* Derselbe Weg, den der Support-Eintrag der Seitenleiste nimmt. Seit
        ENT-682 ist das eine eigene Ansicht, und go() holt die Vorgaenge
@@ -15025,9 +15860,17 @@ function glockeZeileGeklickt(i) {
     return;
   }
   go('uebersicht');
-  const zeile = document.querySelectorAll('#ereignisFeed .rank.erg')[i];
-  if (!zeile) { return; }
-  ereignisAufklappen(i, zeile);
+  // Dieselbe Zeile in der Uebersicht suchen. Fehlt sie dort (die Uebersicht
+  // zeigt die neuesten 12 aller Arten, die Glocke die neuesten 12 der
+  // eingeschalteten), bleibt es beim Sprung zur Liste.
+  const j = e ? (stats.ereignisse || []).findIndex(y => ereignisGleich(e, y)) : -1;
+  const zeile = j < 0 ? null : document.querySelectorAll('#ereignisFeed .rank.erg')[j];
+  if (!zeile) {
+    const feed = $('ereignisFeed');
+    if (feed) { feed.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    return;
+  }
+  ereignisAufklappen(j, zeile);
   // Das Ereignis-Widget steht je nach eigener Anordnung der Uebersicht weit
   // unten, unterhalb der Kennzahlen -- ohne Hinscrollen sieht man das
   // aufgeklappte Detail nie und der Klick wirkt wirkungslos.
@@ -26980,11 +27823,295 @@ function sfProtokollLaden() {
     }).join('');
   }).catch(() => { $('sfProtokoll').innerHTML = '<div style="color:var(--ink-3)">Nicht abrufbar.</div>'; });
 }
+// ══════════════════════════════════════════ TESTDATEN (ENT-714)
+// Nur auf der Testseite und nur mit dem Recht, Rollen zu vergeben. Die
+// Sperre sitzt im Server; hier wird nur nicht angeboten, was dort ohnehin
+// abgewiesen wuerde.
+function tdKachelSetzen() {
+  const k = $('bkKachelTd');
+  if (k) { k.style.display = window.APP_UMGEBUNG_STAGING && darf('rechte_schreiben') ? '' : 'none'; }
+}
+function tdWortPruefen() {
+  $('tdKnopf').disabled = $('tdWort').value.trim() !== 'TESTDATEN';
+}
+const TD_MONAT = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+const tdMonatText = m => `${TD_MONAT[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
+
+// Schritt fuer Schritt: leeren und Stammdaten, dann jeder Monat einzeln,
+// dann der Abschluss. Eine einzige Anfrage fuer 15 Monate koennte auf dem
+// Hosting an der Laufzeitgrenze abbrechen.
+async function tdStarten() {
+  const stand = $('tdStand');
+  const knopf = $('tdKnopf');
+  const post = body => api('testdaten.php', { method: 'POST', body });
+  const zeigen = (text, anteil) => {
+    stand.innerHTML = `<div>${esc(text)}</div>`
+      + (anteil === undefined ? '' : `<div class="td-balken"><i style="width:${Math.round(anteil * 100)}%"></i></div>`);
+  };
+  const abbruch = (wo, antwort) => {
+    const msg = (antwort && antwort.data && antwort.data.message) || 'Keine Antwort vom Server.';
+    stand.innerHTML = `<div class="td-fehler">Abgebrochen bei „${esc(wo)}“: ${esc(msg)}</div>
+      <div>Ein erneuter Klick beginnt wieder mit dem Leeren.</div>`;
+    knopf.disabled = false;
+  };
+  knopf.disabled = true;
+  $('tdWort').value = '';
+  zeigen('Leere die Testseite und lege die Stammdaten an …', 0);
+  let a = await post({ schritt: 'start', bestaetigung: 'TESTDATEN' });
+  if (a.status === 401) { doLogout(); return; }
+  if (!a.ok || a.data.status !== 'ok') { abbruch('Leeren', a); return; }
+  const monate = a.data.monate || [];
+  const gesamt = monate.length + 2;
+  for (let i = 0; i < monate.length; i++) {
+    zeigen(`Monat ${i + 1} von ${monate.length}: ${tdMonatText(monate[i])} …`, (i + 1) / gesamt);
+    a = await post({ schritt: 'monat', monat: monate[i] });
+    if (!a.ok || a.data.status !== 'ok') { abbruch(tdMonatText(monate[i]), a); return; }
+  }
+  zeigen('Offerten und Sonderfälle …', (gesamt - 1) / gesamt);
+  a = await post({ schritt: 'abschluss' });
+  if (!a.ok || a.data.status !== 'ok') { abbruch('Abschluss', a); return; }
+  const z = a.data.zusammenfassung || {};
+  stand.innerHTML = `<div><b>Fertig.</b> Die Testseite ist neu befüllt.</div>
+    <dl>
+      <dt>Mitarbeitende</dt><dd>${nf(z.mitarbeitende)}</dd>
+      <dt>Kunden</dt><dd>${nf(z.kunden)}</dd>
+      <dt>Objekte</dt><dd>${nf(z.objekte)}</dd>
+      <dt>Einsätze</dt><dd>${nf(z.einsaetze)}</dd>
+      <dt>Rechnungen</dt><dd>${nf(z.rechnungen)}</dd>
+      <dt>Offerten</dt><dd>${nf(z.offerten)}</dd>
+      <dt>Lohnläufe</dt><dd>${nf(z.lohnlaeufe)}</dd>
+    </dl>
+    <button type="button" class="btn btn-primary btn-sm" onclick="location.reload()">Seite neu laden</button>
+    <span style="color:var(--ink-3);margin-left:8px">Bereits geladene Listen zeigen sonst noch den alten Stand.</span>`;
+}
+
 function bkAbschnittZeigen(id) {
   $('bkUebersicht').style.display = 'none';
   document.querySelectorAll('#view-betrieb .bk-abschnitt').forEach(a => { a.style.display = 'none'; });
   $('bkAb-' + id).style.display = '';
+  if (id === 'md') { emdOeffnen(); }
 }
+
+// ══════════════════════════════════════════ E-MAIL-DESIGNER (ENT-729)
+// Gestaltung der Mails an Kundinnen und Kunden. emd.g ist der Entwurf, den
+// die Seite zeigt; emd.gespeichert der Stand am Server. Jede Aenderung holt
+// eine neue Vorschau vom Server -- dieselbe Funktion, die die echte Mail
+// baut. Der Server prueft beim Speichern alles noch einmal (Farben,
+// Platzhalter); was hier geprueft wird, erspart nur den Umweg.
+const emd = { g: null, gespeichert: '', vorgabe: null, arten: [], betrieb: {}, darf: false,
+             unbekannt: false, art: 'offerte', feld: null, vorschauNr: 0, zeit: null };
+
+function emdOeffnen() {
+  emdStand('Wird geladen …');
+  api('mail_designer.php').then(({ ok, data }) => {
+    if (!ok || !data || data.status !== 'ok') {
+      emdStand(data && data.message ? data.message : 'Die Gestaltung liess sich nicht laden.', 'warn');
+      return;
+    }
+    emd.g = data.gestaltung; emd.vorgabe = data.vorgabe; emd.arten = data.arten || [];
+    emd.betrieb = data.betrieb || {}; emd.darf = !!data.darf_aendern; emd.unbekannt = !!data.stand_unbekannt;
+    emd.gespeichert = JSON.stringify(emd.g);
+    if (!emd.arten.some(a => a.art === emd.art)) { emd.art = (emd.arten[0] || {}).art || 'offerte'; }
+    $('emdArt').innerHTML = emd.arten.map(a => `<option value="${a.art}">${esc(a.name)}</option>`).join('');
+    $('emdArt').value = emd.art;
+    emdZeichnen();
+    emdStandZeigen();
+    emdVorschau(true);
+  }).catch(() => emdStand('Die Gestaltung liess sich nicht laden.', 'warn'));
+}
+
+function emdStand(text, art) {
+  const el = $('emdStand'); if (!el) { return; }
+  el.textContent = text || '';
+  el.classList.toggle('warn', art === 'warn');
+  el.classList.toggle('ok', art === 'ok');
+}
+function emdGeaendert() { return emd.g && JSON.stringify(emd.g) !== emd.gespeichert; }
+function emdStandZeigen() {
+  if (!emd.darf) { emdStand('Ansehen ist möglich. Ändern darf, wer die Betriebseinstellungen bearbeiten darf.'); }
+  else if (emd.unbekannt) { emdStand('Speichern geht noch nicht: Die Einrichtung ist noch nicht auf dem neusten Stand. Die Vorschau zeigt trotzdem, wie es aussehen wird.', 'warn'); }
+  else if (emdGeaendert()) { emdStand('Ungespeicherte Änderungen.', 'warn'); }
+  else { emdStand('Gespeichert. Gilt für alle Mails, die dein Betrieb an Kundinnen und Kunden schickt.'); }
+  $('emdSpeichern').disabled = !emd.darf || emd.unbekannt || !emdGeaendert();
+  $('emdSpeichern').hidden = !emd.darf;
+  $('emdTest').hidden = !emd.darf;
+}
+
+function emdArtAngabe() { return emd.arten.find(a => a.art === emd.art) || { platzhalter: [], knopf: false, fest: '' }; }
+
+// Alle Felder aus emd.g fuellen. Nur hier wird geschrieben -- die Eingaben
+// schreiben zurueck in emd.g (emdEingabe).
+function emdZeichnen() {
+  const g = emd.g, a = emdArtAngabe(), t = g.texte[emd.art] || {};
+  const sperren = !emd.darf;
+  document.querySelectorAll('#bkAb-md input, #bkAb-md textarea').forEach(el => { el.disabled = sperren; });
+  document.querySelectorAll('#bkAb-md .seg2 button, #emdStandardtext').forEach(el => { el.disabled = sperren; });
+  $('emdTexteTitel').textContent = 'Texte: ' + (a.name || '');
+  ['betreff', 'kopf', 'text', 'knopf'].forEach(k => { $('emdT_' + k).value = t[k] || ''; });
+  $('emdKnopfFeld').hidden = !a.knopf;
+  $('emdFest').textContent = a.fest ? 'Fest in dieser Mail: ' + a.fest : '';
+  $('emdPlatzhalter').innerHTML = a.platzhalter.map(p =>
+    `<button type="button" onclick="emdPlatzEinfuegen('${p}')"${sperren ? ' disabled' : ''}>{${esc(p)}}</button>`).join('');
+  $('emdGrussPlatz').innerHTML = ['Firma', 'Telefon', 'E-Mail'].map(p =>
+    `<button type="button" onclick="emdPlatzEinfuegen('${p}', 'emdGruss')"${sperren ? ' disabled' : ''}>{${esc(p)}}</button>`).join('');
+  Object.keys(g.farben).forEach(k => { const el = $('emdF_' + k); if (el) { el.value = g.farben[k].toLowerCase(); el.nextElementSibling.textContent = g.farben[k]; } });
+  $('emdLogoAn').checked = !!g.logo.an;
+  $('emdLogoBreite').value = g.logo.breite || '';
+  $('emdLogoHoehe').value = g.logo.hoehe || '';
+  document.querySelectorAll('#emdLogoAusr button').forEach(b => b.classList.toggle('on', b.dataset.w === g.logo.ausrichtung));
+  $('emdGruss').value = g.gruss;
+  $('emdHinweis').checked = !!g.hinweis;
+  // "Unbekannt" ist nicht "keins": kein Logo, ein Logo in einem Format,
+  // das Mailprogramme nicht zeigen, und ein Logo, das da ist.
+  const lh = $('emdLogoHinweis');
+  if (emd.betrieb.logo_webp) {
+    lh.innerHTML = 'Dein Logo ist im Format WebP. Viele Mailprogramme zeigen das nicht, darum steht es nicht in der Mail. Lade unter <a href="#" onclick="bkAbschnittZeigen(\'be\');return false">Betrieb</a> ein PNG oder JPG hoch.';
+    lh.classList.add('warn');
+  } else if (!emd.betrieb.hat_logo) {
+    lh.innerHTML = 'Noch kein Logo hinterlegt. Du lädst es unter <a href="#" onclick="bkAbschnittZeigen(\'be\');return false">Betrieb</a> hoch.';
+    lh.classList.remove('warn');
+  } else { lh.textContent = ''; }
+  const an = $('emdAntwort');
+  if (emd.betrieb.email) {
+    an.textContent = 'Antworten deiner Kundinnen und Kunden gehen an ' + emd.betrieb.email + '.';
+    an.classList.remove('warn');
+  } else {
+    an.innerHTML = 'Beim Betrieb ist keine E-Mail-Adresse hinterlegt. Antworten landen darum im Nichts. Trag sie unter <a href="#" onclick="bkAbschnittZeigen(\'be\');return false">Betrieb</a> ein.';
+    an.classList.add('warn');
+  }
+  emdKontrastPruefen();
+}
+
+// Lesbarkeit: Text auf seiner Farbe soll mindestens 4.5 : 1 erreichen.
+// Eine Warnung, kein Verbot -- ein CI kann eine Farbe vorschreiben.
+function emdKontrast(a, b) {
+  const lum = h => { const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255)
+    .map(v => v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4);
+    return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]; };
+  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+  return (x + .05) / (y + .05);
+}
+function emdKontrastPruefen() {
+  const f = emd.g.farben, z = k => k.toFixed(1).replace('.', '.');
+  const kk = emdKontrast(f.kopf_text, f.kopf_hg), kn = emdKontrast(f.knopf_text, f.knopf), kl = emdKontrast(f.link, '#FFFFFF');
+  $('emdWarnKopf').textContent = kk < 4.5 ? `Der Text im Kopfband ist schlecht lesbar (Kontrast ${z(kk)} : 1, empfohlen ab 4.5).` : '';
+  const w = [];
+  if (kn < 4.5) { w.push(`Die Knopfbeschriftung ist schlecht lesbar (Kontrast ${z(kn)} : 1).`); }
+  if (kl < 4.5) { w.push(`Links sind auf Weiss schlecht lesbar (Kontrast ${z(kl)} : 1).`); }
+  $('emdWarnInhalt').textContent = w.length ? w.join(' ') + ' Empfohlen ab 4.5.' : '';
+}
+
+function emdGeaendertMelden() {
+  emdKontrastPruefen();
+  emdStandZeigen();
+  clearTimeout(emd.zeit);
+  emd.zeit = setTimeout(() => emdVorschau(), 250);
+}
+
+function emdVorschau(sofort) {
+  if (!emd.g) { return; }
+  const nr = ++emd.vorschauNr;
+  api('mail_designer.php', { method: 'POST', body: { aktion: 'vorschau', art: emd.art, gestaltung: emd.g } })
+    .then(({ ok, data }) => {
+      if (nr !== emd.vorschauNr) { return; }   // eine neuere ist schon unterwegs
+      if (!ok || !data || data.status !== 'ok') { return; }
+      $('emdBetreff').textContent = data.betreff;
+      $('emdVorschau').srcdoc = data.html;
+    }).catch(() => {});
+}
+
+function emdArtWechseln() { emd.art = $('emdArt').value; emdZeichnen(); emdVorschau(); }
+
+function emdPlatzEinfuegen(p, ziel) {
+  const el = $(ziel || emd.feld || 'emdT_text');
+  if (!el || el.disabled) { return; }
+  const t = '{' + p + '}', a = el.selectionStart ?? el.value.length, e = el.selectionEnd ?? a;
+  el.value = el.value.slice(0, a) + t + el.value.slice(e);
+  el.focus(); el.setSelectionRange(a + t.length, a + t.length);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function emdStandardtext() {
+  if (!emd.darf) { return; }
+  emd.g.texte[emd.art] = JSON.parse(JSON.stringify(emd.vorgabe.texte[emd.art]));
+  emdZeichnen(); emdGeaendertMelden();
+}
+
+function emdSpeichern() {
+  if (!emd.darf || emd.unbekannt) { return; }
+  $('emdSpeichern').disabled = true;
+  emdStand('Wird gespeichert …');
+  api('mail_designer.php', { method: 'POST', body: { aktion: 'speichern', gestaltung: emd.g } })
+    .then(({ ok, data }) => {
+      if (ok && data && data.status === 'ok') {
+        emd.g = data.gestaltung; emd.gespeichert = JSON.stringify(emd.g);
+        emdZeichnen(); emdStandZeigen(); toast('Gestaltung gespeichert');
+        return;
+      }
+      if (data && data.stand_unbekannt) { emd.unbekannt = true; emdStandZeigen(); return; }
+      emdStand((data && data.message) || 'Speichern fehlgeschlagen.', 'warn');
+      $('emdSpeichern').disabled = false;
+    }).catch(() => { emdStand('Speichern fehlgeschlagen. Keine Verbindung.', 'warn'); $('emdSpeichern').disabled = false; });
+}
+
+function emdTestmail() {
+  if (!emd.darf) { return; }
+  emdStand('Testmail wird verschickt …');
+  api('mail_designer.php', { method: 'POST', body: { aktion: 'testmail', art: emd.art, gestaltung: emd.g } })
+    .then(({ ok, data }) => {
+      if (ok && data && data.status === 'ok') { emdStand('Testmail an ' + data.an + ' verschickt. Es ist der Stand, den du gerade siehst, auch wenn er noch nicht gespeichert ist.', 'ok'); return; }
+      emdStand((data && data.message) || 'Testmail fehlgeschlagen.', 'warn');
+    }).catch(() => emdStand('Testmail fehlgeschlagen. Keine Verbindung.', 'warn'));
+}
+
+function emdZurueck() {
+  if (emdGeaendert() && !confirm('Deine Änderungen am E-Mail-Designer sind nicht gespeichert. Trotzdem verlassen?')) { return; }
+  if (emd.g) { emd.g = JSON.parse(emd.gespeichert); }
+  bkUebersichtZeigen();
+}
+
+// Eingaben: einmal am Abschnitt, nicht an jedem Feld.
+(function emdEingabenBinden() {
+  const ab = $('bkAb-md'); if (!ab) { return; }
+  ab.addEventListener('focusin', e => { if (e.target.classList && e.target.classList.contains('emd-feld')) { emd.feld = e.target.id; } });
+  ab.addEventListener('input', e => {
+    const el = e.target; if (!emd.g || !emd.darf) { return; }
+    if (el.classList.contains('emd-feld')) { emd.g.texte[emd.art][el.dataset.feld] = el.value; }
+    else if (el.dataset.farbe) {
+      const w = el.value.toUpperCase();
+      emd.g.farben[el.dataset.farbe] = w;
+      // Primaerfarbe faerbt Kopfband, Knopf und Links mit (wie im Vorbild).
+      if (el.dataset.farbe === 'primaer') { ['kopf_hg', 'knopf', 'link'].forEach(k => { emd.g.farben[k] = w; }); }
+      Object.keys(emd.g.farben).forEach(k => { const f = $('emdF_' + k); if (f) { f.value = emd.g.farben[k].toLowerCase(); f.nextElementSibling.textContent = emd.g.farben[k]; } });
+    }
+    else if (el.id === 'emdLogoBreite' || el.id === 'emdLogoHoehe') {
+      emd.g.logo[el.id === 'emdLogoBreite' ? 'breite' : 'hoehe'] = Math.max(0, Math.min(400, parseInt(el.value, 10) || 0));
+    }
+    else if (el.id === 'emdGruss') { emd.g.gruss = el.value; }
+    else { return; }
+    emdGeaendertMelden();
+  });
+  ab.addEventListener('change', e => {
+    const el = e.target; if (!emd.g || !emd.darf) { return; }
+    if (el.id === 'emdLogoAn') { emd.g.logo.an = el.checked; }
+    else if (el.id === 'emdHinweis') { emd.g.hinweis = el.checked; }
+    else { return; }
+    emdGeaendertMelden();
+  });
+  $('emdLogoAusr').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || !emd.g || !emd.darf) { return; }
+    emd.g.logo.ausrichtung = b.dataset.w;
+    document.querySelectorAll('#emdLogoAusr button').forEach(x => x.classList.toggle('on', x === b));
+    emdGeaendertMelden();
+  });
+  window.addEventListener('beforeunload', e => { if (emdGeaendert()) { e.preventDefault(); e.returnValue = ''; } });
+  // Die Vorschau so hoch wie die Mail: Ein festes Fenster mit Bildlauf
+  // schnitte den Gruss und die Fusszeile ab -- gerade das, was man prueft.
+  $('emdVorschau').addEventListener('load', () => {
+    const f = $('emdVorschau'), d = f.contentDocument;
+    if (d && d.documentElement) { f.style.height = Math.max(300, d.documentElement.scrollHeight) + 'px'; }
+  });
+})();
 
 function bkQrIbanPruefen() {
   const el = $('bkQrIbanHinweis'); if (!el) { return; }

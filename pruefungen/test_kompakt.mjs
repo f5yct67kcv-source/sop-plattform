@@ -81,7 +81,10 @@ check('Zonenanzeige ueber die volle Zeilenbreite', n.zoneAnteil > 0.95, n.zoneAn
 check('normal: Schalter steht auf aus', n.schalter === 'false', n.schalter);
 
 // Umschalten ueber den Knopf
-await pn.click('#btnDichte'); await pn.waitForTimeout(150);
+// Seit ENT-722 steht der Schalter auf der Einstellungsseite, nicht mehr in
+// der Kopfleiste. Geklickt wird er hier direkt -- gemessen wird die Wirkung
+// auf das offene Formular.
+await pn.evaluate(() => $('btnDichte').click()); await pn.waitForTimeout(150);
 const k1 = await mass(pn);
 check('Schalter setzt kompakt', k1.attr === 'kompakt' && k1.schalter === 'true', k1.attr + '/' + k1.schalter);
 check('Wahl wird gespeichert', (await pn.evaluate(() => localStorage.getItem('rv3_dichte_wahl'))) === 'kompakt');

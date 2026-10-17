@@ -84,9 +84,13 @@ check('Base64 wird streng dekodiert, nicht stillschweigend zu Müll',
   /base64_decode\(\$pdfRoh, true\)/.test(VERSAND));
 // Sonst waere dieser Endpunkt ein Weg, ueber die Firmenadresse beliebige
 // Nachrichten zu verschicken.
+// Seit ENT-729 kommen Betreff und Text aus dem E-Mail-Designer des
+// Betriebs (mail_betrieb), die Werte darin aus dem Rundgang ($r) -- nie aus
+// der Anfrage.
 check('KRITISCH: Betreff und Text kommen NICHT aus der Anfrage',
   !/\$in\['betreff'\]/.test(VERSAND) && !/\$in\['text'\]/.test(VERSAND)
-  && /\$betreff = 'Rundgang-Rapport '/.test(VERSAND));
+  && /mail_betrieb\(\$pdo, 'rundgang', \[[^\]]*\$r\['objekt_name'\]/.test(VERSAND)
+  && !/mail_betrieb\([^;]*\$in\[/.test(VERSAND));
 check('Ein unbekannter Rundgang wird abgewiesen', /'Rundgang nicht gefunden'/.test(VERSAND));
 check('Fehlt die SMTP-Einrichtung, sagt der Endpunkt das, statt still zu scheitern',
   /!smtp_konfiguriert\(\)/.test(VERSAND));

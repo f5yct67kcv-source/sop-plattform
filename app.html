@@ -3635,6 +3635,9 @@ function starten() {
   // der keine Leiste passt, sieht aus wie ein Fehler.
   if (amSchreibtisch()) zeigeTisch('plan'); else tischMarkeSetzen();
   allesLaden();
+  // Hell/dunkel vom Konto (ENT-722). Bis zur Antwort gilt der Wert dieses
+  // Geraets -- darum blitzt nichts.
+  appThemaLaden();
   pushNativEinrichten();
   // Ueberlebt einen Geraeteneustart oder App-Neuinstallation zwischen den
   // Sitzungen: liegen aus einer frueheren, offline gebliebenen Rundgang-
@@ -7868,8 +7871,9 @@ function einstSeiteZu() {
 
 // Hell oder dunkel. Der Wert steht schon vor dem ersten Zeichnen am
 // Dokument (siehe Startskript im Kopf der Seite); hier wird nur noch
-// umgeschaltet und gespeichert. Die Wahl gilt fuer dieses Geraet.
-function themaSetzen(wahl) {
+// umgeschaltet und gespeichert. Die Wahl gilt seit ENT-722 fuer das Konto
+// (siehe appThemaLaden).
+function themaSetzen(wahl, merken = true) {
   const dunkel = wahl !== 'hell';
   document.documentElement.setAttribute('data-thema', dunkel ? 'dunkel' : 'hell');
   try { localStorage.setItem('rv3_app_thema', dunkel ? 'dunkel' : 'hell'); } catch (e) {}
@@ -7878,6 +7882,46 @@ function themaSetzen(wahl) {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) { meta.setAttribute('content', dunkel ? '#161B27' : '#16181D'); }
   themaSchalterStellen();
+  if (merken) { appThemaMerken(dunkel ? 'dunkel' : 'hell'); }
+}
+
+// Die Wahl gehoert seit ENT-722 dem Konto: Sie folgt der Person auf jedes
+// Telefon. Eigener Schluessel 'app_thema' (ENT-398: App und Cockpit sind
+// zwei Entscheidungen). rv3_app_thema bleibt der Zwischenspeicher, damit
+// beim Start nichts in der falschen Fassung aufblitzt.
+//   'laedt'  -- Antwort steht aus; eine Wahl wird vorgemerkt
+//   'konto'  -- Kontowert gilt, jede Wahl geht ans Konto
+//   'aus'    -- Spalte fehlt oder keine Auskunft: nur dieses Geraet
+let appThemaLage = 'laedt';
+let appThemaVorgemerkt = null;
+
+function appThemaMerken(wert) {
+  if (appThemaLage === 'laedt') { appThemaVorgemerkt = wert; return; }
+  if (appThemaLage !== 'konto') { return; }
+  api('meine_einstellungen.php', { method: 'POST', body: { einstellungen: { app_thema: wert } } });
+}
+
+function appThemaLaden() {
+  appThemaLage = 'laedt';
+  return api('meine_einstellungen.php').then(({ ok, data }) => {
+    // Eine Antwort ohne das Feld ist keine Auskunft -- weder "nichts
+    // gespeichert" noch ein Wert. Dann bleibt es beim Geraet.
+    if (!ok || !data || data.status !== 'ok' || !('einstellungen' in data) || data.stand_unbekannt) {
+      appThemaLage = 'aus'; appThemaVorgemerkt = null; return;
+    }
+    appThemaLage = 'konto';
+    const amKonto = (data.einstellungen || {}).app_thema;
+    if (appThemaVorgemerkt) {
+      // Waehrend des Ladens gewaehlt: juenger als der Kontowert.
+      appThemaMerken(appThemaVorgemerkt);
+    } else if (amKonto === 'hell' || amKonto === 'dunkel') {
+      themaSetzen(amKonto, false);
+    } else {
+      // Einmal uebernehmen, was dieses Geraet bisher wusste.
+      appThemaMerken(document.documentElement.getAttribute('data-thema') === 'hell' ? 'hell' : 'dunkel');
+    }
+    appThemaVorgemerkt = null;
+  });
 }
 
 function themaUm() {

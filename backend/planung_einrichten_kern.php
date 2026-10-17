@@ -2604,6 +2604,10 @@ function kern_spalten(): array {
     // erscheint in der App gar keine Zentrale, statt einer Nummer, an der
     // nachts niemand abnimmt.
     ['betrieb', 'pikett_telefon', 'ALTER TABLE betrieb ADD COLUMN pikett_telefon VARCHAR(50) NULL AFTER email'],
+    // E-Mail-Designer (ENT-729): Logo, Farben, Gruss und Texte der Mails an
+    // Kundinnen und Kunden, als JSON. NULL heisst "noch nichts gestaltet" --
+    // dann gelten die Vorgaben aus mail_gestaltung.php.
+    ['betrieb', 'mail_gestaltung', 'ALTER TABLE betrieb ADD COLUMN mail_gestaltung MEDIUMTEXT NULL AFTER pikett_telefon'],
     // TINYINT NULL, nicht NOT NULL DEFAULT 0: NULL heisst 'noch nicht
     // entschieden', 0 heisst 'geprueft und nein'. Der Unterschied ist bei
     // GAV-AUS-004 wesentlich -- eine Vorbelegung waere eine Auslegung.
@@ -2891,6 +2895,12 @@ function kern_spalten(): array {
     // Altes. Die Konten, die es beim Einfuehren schon gibt, setzt Abschnitt
     // 2a1b einmalig auf 0: Sie sehen die erste Ankuendigung.
     ['mitarbeiter', 'neuerungen_gesehen_bis', 'ALTER TABLE mitarbeiter ADD COLUMN neuerungen_gesehen_bis INT UNSIGNED NULL DEFAULT NULL'],
+    // Persoenliche Einstellungen (Einstellungsseite, ENT-722): hell/dunkel, Glas und
+    // weitere Darstellungswahlen, die der Person auf jedes Geraet folgen.
+    // JSON mit fester weisser Liste, siehe api/meine_einstellungen.php.
+    // NULL heisst "noch nie gespeichert" -- die Oberflaeche uebernimmt dann
+    // einmal, was ihr Browser bisher wusste.
+    ['mitarbeiter', 'einstellungen', 'ALTER TABLE mitarbeiter ADD COLUMN einstellungen TEXT NULL'],
     ];
 }
 }
