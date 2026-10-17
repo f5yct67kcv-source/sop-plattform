@@ -1657,10 +1657,22 @@ function beleg_unterschrift_ablauf(string $was, PDO $pdo, string $tabPraefix, ar
         $u = beleg_unterschrift_anlegen($pdo, $tabPraefix, $id, $fassungNr, $angaben['werte'],
                                         $empfaenger, $ip, $browser);
         anmeld_fehlversuch(db(), $name, $adresse);
-        $mail = beleg_code_mail($b, $firma, $u['code']);
+        // Im Cockpit schreibt der Betrieb an SEINE Kundin: Gestaltung und
+        // Texte aus seinem E-Mail-Designer (ENT-729). Die Betreiberin
+        // zeichnet weiter mit ihrer eigenen Vorlage.
+        if ($tabPraefix === '') {
+            require_once __DIR__ . '/mail_gestaltung.php';
+            $mail = mail_betrieb($pdo, 'code', [
+                'Titel' => (string)(BELEG_ARTEN[(string)$b['art']]['titel'] ?? 'Offerte'),
+                'Nummer' => (string)$b['nummer'], 'Code' => (string)$u['code'],
+                'Minuten' => (string)BELEG_CODE_GUELTIG_MIN,
+            ], ['code' => (string)$u['code']]);
+        } else {
+            $mail = beleg_code_mail($b, $firma, $u['code']);
+        }
         try {
             smtp_senden($angaben['werte']['email'], $angaben['werte']['name'], $mail['betreff'],
-                        $mail['html'], $mail['text'], [], $mail['bilder']);
+                        $mail['html'], $mail['text'], [], $mail['bilder'], (string)($mail['antwort_an'] ?? ''));
         } catch (Throwable $e) {
             json_response(['status' => 'error', 'lage' => 'mail',
                 'message' => 'Der Code liess sich nicht verschicken. Bitte prüfen Sie die Adresse oder versuchen Sie es später erneut.'], 502);
