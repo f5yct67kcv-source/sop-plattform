@@ -725,6 +725,7 @@ jobs:
           cp backend/qrrechnung.php dist/qrrechnung.php
           cp backend/produkte.php dist/produkte.php
           cp backend/mailer.php dist/mailer.php
+          cp backend/mail_gestaltung.php dist/mail_gestaltung.php
           cp backend/ferien.php dist/ferien.php
           cp backend/lohn.php dist/lohn.php
           cp backend/gavzeit.php dist/gavzeit.php
@@ -1307,6 +1308,7 @@ jobs:
           cp backend/demo_zugang.php   dist-betreiber/demo_zugang.php
           # Die gemeinsame Mailgestaltung -- demo_zugang.php bindet sie selbst ein.
           cp backend/mail_vorlage.php  dist-betreiber/mail_vorlage.php
+          cp backend/mail_gestaltung.php dist-betreiber/mail_gestaltung.php
           cp backend/demo_bestaetigung.php dist-betreiber/demo_bestaetigung.php
           # Das Logo der Signatur -- flach neben die Vorlage, die es von dort liest.
           cp backend/guardops-signatur.png     dist-betreiber/guardops-signatur.png
@@ -1690,6 +1692,7 @@ jobs:
           cp backend/anmeldung.php     dist-portal/anmeldung.php
           cp backend/rundgang.php      dist-portal/rundgang.php
           cp backend/mailer.php        dist-portal/mailer.php
+          cp backend/mail_gestaltung.php dist-portal/mail_gestaltung.php
           cp backend/api/portal_*.php  dist-portal/api/
           cp htaccess-portal           dist-portal/.htaccess
           cat htaccess-leistung >>     dist-portal/.htaccess
@@ -1852,6 +1855,7 @@ jobs:
           # Siehe dist/: betreiber.php braucht diesen Rechenkern (ENT-600).
           cp backend/demo_zugang.php dist-cupi24/demo_zugang.php
           cp backend/mail_vorlage.php dist-cupi24/mail_vorlage.php
+          cp backend/mail_gestaltung.php dist-cupi24/mail_gestaltung.php
           cp backend/demo_bestaetigung.php dist-cupi24/demo_bestaetigung.php
           cp backend/guardops-signatur.png dist-cupi24/guardops-signatur.png
           cp backend/guardops-signatur-hell.png dist-cupi24/guardops-signatur-hell.png

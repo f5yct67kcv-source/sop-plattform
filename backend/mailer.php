@@ -195,7 +195,7 @@ function smtp_befehl($fp, string $befehl, array $erwarteteCodes): string
 // sich ausfuehren (pruefungen/pruef_mail_aufbau.php).
 function smtp_nachricht_bauen(string $von, string $an, string $betreff, string $html,
                               string $text, array $anhaenge = [], array $bilder = [],
-                              ?string $grenze = null): string
+                              ?string $grenze = null, string $antwortAn = ''): string
 {
     // Die Grenze ist normalerweise zufaellig; als Parameter nur, damit eine
     // Pruefung den Aufbau mit einem festen Wert vergleichen kann.
@@ -264,6 +264,14 @@ function smtp_nachricht_bauen(string $von, string $an, string $betreff, string $
         'Subject: ' . smtp_kopf_kodieren($betreff),
         'MIME-Version: 1.0',
     ];
+    // Antwortadresse (ENT-729): Absender bleibt die Plattform-Adresse
+    // (noreply@...), eine Antwort der Kundin soll aber beim Betrieb landen.
+    // Geprueft wird sie in smtp_senden(); eine ungueltige faellt hier
+    // trotzdem weg, statt eine Kopfzeile zu verbiegen.
+    if ($antwortAn !== '' && !preg_match('/[\r\n]/', $antwortAn)
+        && filter_var($antwortAn, FILTER_VALIDATE_EMAIL)) {
+        $kopf[] = 'Reply-To: ' . $antwortAn;
+    }
 
     if (!$anhaenge) {
         $kopf[] = 'Content-Type: ' . $rumpfTyp;
@@ -323,7 +331,7 @@ function smtp_nachricht_bauen(string $von, string $an, string $betreff, string $
    der Bauart bei der Zusammensetzung weiter unten. Auch hier gilt: Ohne
    Bilder aendert sich am Aufbau nichts. */
 function smtp_senden(string $anEmail, string $anName, string $betreff, string $html, string $text,
-                     array $anhaenge = [], array $bilder = []): void
+                     array $anhaenge = [], array $bilder = [], string $antwortAn = ''): void
 {
     if (!smtp_konfiguriert()) {
         throw new RuntimeException('Der E-Mail-Versand ist noch nicht eingerichtet (SMTP-Zugangsdaten fehlen).');
@@ -446,7 +454,7 @@ function smtp_senden(string $anEmail, string $anName, string $betreff, string $h
             ? smtp_kopf_kodieren($anName) . ' <' . $anEmail . '>'
             : $anEmail;
         $nachricht = smtp_nachricht_bauen($von, $an, $betreff, $html, $text,
-            $anhaenge, $bilder);
+            $anhaenge, $bilder, null, $antwortAn);
 
         fwrite($fp, $nachricht . "\r\n.\r\n");
         $antwort = smtp_lesen($fp);

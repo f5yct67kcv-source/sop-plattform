@@ -320,21 +320,31 @@ if (ohneRegel.length) { bad.push('ohne Passwortregel: ' + ohneRegel.join(', '));
 check('KRITISCH: beim Anmelden wird die Laenge NICHT geprueft',
   !/passwort_pruefen\s*\(/.test(ohneKommentar('login.php')));
 
-// ── Versand-Mail: einheitliche Schrift je Element, CTA im Firmenblau
+// ── Kundenmails: einheitliche Schrift je Element, Knopf in der Akzentfarbe
 // (ENT-206) -- Outlook Desktop vererbt font-family in HTML-Mails nicht
 // zuverlaessig an verschachtelte Elemente, darum muss JEDES <p>/<a> sein
 // eigenes font-family tragen, nicht nur der aeusserste Rahmen.
-// Quelltext-Pruefung, kein gerendertes HTML: das style-Attribut entsteht aus
-// PHP-Verkettung (u. a. der gemeinsamen $schrift-Variable), darum wird pro
-// p/a-Tag auf den Bezug zu dieser Variable geprueft, nicht auf einen fertig
-// zusammengesetzten style-Text.
-const versendenQuelle = ohneKommentar('beleg_versenden.php');
-const mailTags = [...versendenQuelle.matchAll(/<(p|a)\s[^>]*>/g)].map(m => m[0]);
-check('KRITISCH: die Versand-Mail hat ueberhaupt gestaltete p/a-Elemente', mailTags.length >= 4);
-check('KRITISCH: JEDES p/a-Element im Mailtext traegt sein eigenes font-family',
-  mailTags.every(t => /\$schrift|font-family/.test(t)));
-check('KRITISCH: der CTA-Knopf ist im Firmenblau, nicht schwarz',
-  /background:#2F5BD7/.test(versendenQuelle) && !/background:#14161A/.test(versendenQuelle));
+// Seit ENT-729 baut EINE Huelle alle Mails des Betriebs an seine Kunden
+// (mail_betrieb_bauen in mail_gestaltung.php). Geprueft wird darum die
+// gerenderte Mail jeder Art mit der Vorgabe -- nicht mehr der Quelltext
+// eines einzelnen Endpunkts.
+const kundenMails = JSON.parse(execFileSync('php', ['-r', `
+  require '${WURZEL}/backend/mailer.php'; require '${WURZEL}/backend/mail_gestaltung.php';
+  $b = ['firma' => 'Muster AG', 'strasse' => 'Weg 1', 'ort' => '9999 Ort', 'telefon' => '000', 'email' => 'a@b.ch', 'logo' => null, 'logo_webp' => false];
+  $raus = [];
+  foreach (array_keys(MAIL_ARTEN) as $art) {
+    $raus[$art] = mail_betrieb_bauen(mail_g_vorgabe(), $b, $art, mail_g_muster($art), ['link' => 'https://x.ch/l', 'code' => '1'])['html'];
+  }
+  echo json_encode($raus);`], { encoding: 'utf8' }));
+const mailTags = Object.values(kundenMails).flatMap(h => [...h.matchAll(/<(p|a)\s[^>]*>/g)].map(m => m[0]));
+check('KRITISCH: die Kundenmails haben ueberhaupt gestaltete p/a-Elemente', mailTags.length >= 20);
+check('KRITISCH: JEDES p/a-Element in jeder Kundenmail traegt sein eigenes font-family',
+  mailTags.every(t => /font-family/.test(t)));
+check('KRITISCH: der Knopf ist ohne eigene Gestaltung in der Akzentfarbe, nicht schwarz',
+  /background:#2F5BD7/.test(kundenMails.offerte) && !/background:#14161A/.test(kundenMails.offerte));
+check('KRITISCH: die alten Versandstellen bauen kein eigenes HTML mehr, sondern nehmen die Huelle',
+  ['beleg_versenden.php', 'portal_link_anfordern.php', 'rundgang_rapport_versenden.php']
+    .every(f => /mail_betrieb\s*\(/.test(ohneKommentar(f)) && !/<p\s/.test(ohneKommentar(f))));
 
 // ── Schutzeinstellungen des Web-Verzeichnisses (ENT-075) ────────────────
 // Eine .htaccess laesst sich hier nicht ausfuehren -- geprueft wird darum,
@@ -593,6 +603,8 @@ for (const [datei, titel] of [
   ['pruef_neuerungen.php', 'KRITISCH: Neuerungsliste und Etappen der Einrichtung stimmen (ENT-698)'],
   ['pruef_lohn.php', 'KRITISCH: Lohnform, Mindestlohn, Ferienentschaedigung und PaKo-Beitrag stimmen mit dem GAV ueberein (ENT-451)'],
   ['pruef_lohnlauf.php', 'KRITISCH: der Lohnlauf zaehlt nur abgeglichene Schichten, sperrt Reinigung und rechnet nichts auf fehlender Grundlage (ENT-451)'],
+  ['pruef_testdaten.php', 'KRITISCH: die Testdaten (ENT-714) laufen nur auf Staging, lassen Cockpit-Konten stehen, rechnen Lohn und Auslagen ueber die echten Rechenwege und bauen keinen Lauf ohne Regelwerk'],
+  ['pruef_finanzen.php', 'KRITISCH: die Finanz-Kostenseite zaehlt nur freigegebene Laeufe, laesst fehlende Monate fehlen statt 0 und gibt Lohn- und Auslagenbetraege nur mit ihrem Recht heraus (ENT-712)'],
   ['pruef_lohn_position.php', 'KRITISCH: persoenliche Zulagen zaehlen im AHV-Lohn mit, und ein abgeschlossener Monat aendert sich nicht mehr (ENT-713)'],
   ['pruef_betreiber_finanzen.php', 'KRITISCH: die Finanzen der Betreiberin buchen Vorlagen genau einmal, zaehlen einen fehlenden CHF-Betrag nie als 0 und rechnen den wiederkehrenden Umsatz exkl. MWST (ENT-725)'],
   ['pruef_finanzen.php', 'KRITISCH: die Finanz-Kostenseite zaehlt nur freigegebene Laeufe, laesst fehlende Monate fehlen statt 0 und gibt Lohn- und Auslagenbetraege nur mit ihrem Recht heraus (ENT-712)'],
@@ -708,6 +720,10 @@ if (ohneEinbindung.length) { bad.push('ohne rechte.php: ' + ohneEinbindung.join(
     // festgeschriebene Schicht darf angesehen werden -- der Vermerk beruehrt
     // weder den Plan noch die Ist-Zeiten, auf denen die Feststellung beruht.
     'meine_gesehen.php': 'haelt nur fest, dass die eigene Schicht angesehen wurde',
+    // Testdaten der Testseite (ENT-714): leert zuerst alle Schichten und
+    // legt danach nur NEUE an -- eine neue Schicht kann nicht abgeglichen
+    // sein, gleicher Grund wie schichten_erzeugen.php. Nur auf Staging.
+    'testdaten.php': 'leert zuerst und legt nur neue Schichten an (ENT-714, nur Staging)',
   };
   const luecken = apiDateien.filter(f => {
     const q = ohneKommentar(f);
@@ -872,6 +888,7 @@ const NUR_EIGENE_DATEN = [
   'mein_passwort.php',         // eigenes Passwort aendern
   'mein_profil.php',           // eigene Stammdaten ansehen
   'mein_profil_speichern.php',  // eigene Kontaktangaben selbst pflegen (ENT-460)
+  'meine_einstellungen.php',   // eigene Darstellung (hell/dunkel, Glas) am Konto
   'meine_schichten.php',       // eigene Einsaetze
   'meine_verfuegbarkeit.php',  // eigene Sperrtage
   'meine_zusage.php',          // eigene Zu-/Absage

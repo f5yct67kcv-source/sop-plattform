@@ -587,9 +587,19 @@ function beleg_annahme_abschliessen(PDO $pdo, string $tabPraefix, int $belegId, 
         // siehe oben
     }
     try {
-        $m = beleg_bestaetigung_mail($beleg, $u, (int)$f['nummer'], $firma, false, $signaturZeilen,
-                                     $tabPraefix === 'be_');
-        smtp_senden((string)$u['email'], (string)$u['name'], $m['betreff'], $m['html'], $m['text'], $anhang, $m['bilder']);
+        if ($tabPraefix === '') {
+            // Cockpit: der Betrieb an seine Kundin, mit seiner Gestaltung
+            // aus dem E-Mail-Designer (ENT-729, loest OP-675).
+            require_once __DIR__ . '/mail_gestaltung.php';
+            $m = mail_betrieb($pdo, 'annahme', [
+                'Titel' => $titel, 'Nummer' => (string)$beleg['nummer'], 'Name' => trim((string)$u['name']),
+                'Datum' => beleg_zeitpunkt($u['bestaetigt_am'] ?? null), 'Fassung' => (string)(int)$f['nummer'],
+            ]);
+        } else {
+            $m = beleg_bestaetigung_mail($beleg, $u, (int)$f['nummer'], $firma, false, $signaturZeilen, true);
+        }
+        smtp_senden((string)$u['email'], (string)$u['name'], $m['betreff'], $m['html'], $m['text'], $anhang,
+                    $m['bilder'], (string)($m['antwort_an'] ?? ''));
         $raus['kunde'] = true;
     } catch (Throwable $e) {
         // Angenommen ist angenommen -- siehe Kopf.
