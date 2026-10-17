@@ -74,7 +74,7 @@ async function starte({ darf = true, schluessel = true, versand = GUARDOPS, anme
     if (u.includes('mail_absender')) {
       if (route.request().method() === 'GET') {
         return send({ status: 'ok', versand: amServer, schluessel_da: schluessel, stand_unbekannt: false,
-                      darf_aendern: darf, ports: [25, 465, 587, 2525] });
+                      darf_aendern: darf, ports: [25, 465, 587, 2525], testmail_an: '' });
       }
       const body = JSON.parse(route.request().postData());
       posts.push(body);
@@ -89,7 +89,7 @@ async function starte({ darf = true, schluessel = true, versand = GUARDOPS, anme
           : { typ: 'guardops', passwort_hinterlegt: false };
         return send({ status: 'ok', versand: amServer });
       }
-      if (body.aktion === 'testmail') return send({ status: 'ok', an: 'ich@beispiel.ch' });
+      if (body.aktion === 'testmail') return send({ status: 'ok', an: body.an });
     }
     if (u.includes('mail_designer')) return send({ status: 'error', message: 'nicht Teil dieser Pruefung' }, 500);
     if (u.includes('dashboard_stats')) {
@@ -217,9 +217,19 @@ const absender = async page => { await page.click('.emv-tabs .tab[data-reiter="a
   await page.click('#emvSpeichern'); await page.waitForTimeout(300);
   const p = posts.find(x => x.aktion === 'speichern');
   check('Ohne neues Passwort geht ein leeres Feld mit (der Server behaelt das alte)', p && p.versand.passwort === '' && p.versand.port === 2525);
-  // Testmail
+  // Testmail: Ohne Adresse am Konto steht die Absenderadresse im Feld
+  check('Testmail: ohne Adresse am Konto ist die Absenderadresse vorgeschlagen',
+    await page.inputValue('#emvTestAn') === EIGEN.absender);
+  await page.fill('#emvTestAn', '');
+  const vorher = posts.length;
   await page.click('#emvTest'); await page.waitForTimeout(200);
-  check('Testmail an mich: die Seite nennt die Adresse', /ich@beispiel\.ch/.test(await page.textContent('#emvStand')));
+  check('Testmail: ein leeres Feld schickt nichts und sagt es', posts.length === vorher
+    && /Adresse/.test(await page.textContent('#emvStand')));
+  await page.fill('#emvTestAn', 'fremd@beispiel.org');
+  await page.click('#emvTest'); await page.waitForTimeout(200);
+  const t = posts.filter(x => x.aktion === 'testmail').pop();
+  check('Testmail: geht an die eingetippte Adresse', t && t.an === 'fremd@beispiel.org');
+  check('Testmail: die Seite nennt die Adresse', /fremd@beispiel\.org/.test(await page.textContent('#emvStand')));
   check(`Keine JavaScript-Fehler (${fehler.join(' | ')})`, fehler.length === 0);
   await browser.close();
 }
@@ -240,7 +250,7 @@ const absender = async page => { await page.click('.emv-tabs .tab[data-reiter="a
   const { browser, page, fehler } = await starte({ darf: false, versand: EIGEN });
   await absender(page);
   check('Ohne Recht zum Aendern: Felder gesperrt, Speichern und Testmail weg',
-    await page.evaluate(() => $('emvServer').disabled && $('emvTyp').disabled && $('emvSpeichern').hidden && $('emvTest').hidden));
+    await page.evaluate(() => $('emvServer').disabled && $('emvTyp').disabled && $('emvSpeichern').hidden && $('emvTestKarte').hidden));
   check('und die Seite sagt warum', /Ändern darf/.test(await page.textContent('#emvStand')));
   check(`Keine JavaScript-Fehler (${fehler.join(' | ')})`, fehler.length === 0);
   await browser.close();

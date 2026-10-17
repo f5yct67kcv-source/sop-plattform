@@ -1406,6 +1406,8 @@ tr.klickbar.gewaehlt td { background: var(--accent-soft); }
 .emv-info:empty, .emv-letzt:empty { display: none; }
 .emv-letzt { font-size: 12.5px; color: var(--ink-3); margin: 0; }
 .emv-letzt.warn { color: var(--warn); }
+.emv-test-zeile { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+.emv-test-zeile .f { margin-bottom: 0; }
 .emd-raster { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
 .emd-links { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .emd-rechts { display: flex; flex-direction: column; gap: 12px; }
@@ -10164,7 +10166,6 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
             <p class="zone-note">Wie die Mails an deine Kundinnen und Kunden aussehen und über welchen Server sie hinausgehen. Gilt für alle Konten des Betriebs.</p>
           </div>
           <div class="emd-werkzeug" id="emvWerkzeugAbsender" hidden>
-            <button type="button" class="btn btn-plain" id="emvTest" onclick="emvTestmail()">Testmail an mich</button>
             <button type="button" class="btn btn-primary" id="emvSpeichern" onclick="emvSpeichern()" disabled>Speichern</button>
           </div>
           <div class="emd-werkzeug" id="emvWerkzeugGestaltung">
@@ -10279,6 +10280,15 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
                   <option value="starttls">STARTTLS (meist Port 587)</option>
                 </select></div>
               <p class="zone-note emd-erkl">Ist am Postfach die Zwei-Faktor-Anmeldung eingeschaltet, brauchst du ein App-Passwort deines Anbieters. Beim Speichern meldet sich GuardOpS einmal an deinem Server an, ohne etwas zu versenden.</p>
+            </div></div>
+            <div class="card" id="emvTestKarte"><div class="card-hd"><h3>Testmail</h3></div><div class="card-bd">
+              <div class="emv-test-zeile">
+                <div class="f"><label for="emvTestAn">An</label>
+                  <input class="inp" id="emvTestAn" type="email" maxlength="254" autocomplete="email" placeholder="name@beispiel.ch"
+                         onkeydown="if (event.key === 'Enter') { emvTestmail(); }"></div>
+                <button type="button" class="btn btn-plain" id="emvTest" onclick="emvTestmail()">Senden</button>
+              </div>
+              <p class="zone-note emd-erkl">Geht über den oben gewählten Weg, auch wenn die Angaben noch nicht gespeichert sind.</p>
             </div></div>
             <p class="emv-letzt" id="emvLetzt"></p>
           </div>
@@ -30312,6 +30322,9 @@ function emvOeffnen() {
     emv.schluessel = !!data.schluessel_da; emv.ports = data.ports || [];
     emv.v = data.versand; emv.pw = '';
     emv.gespeichert = JSON.stringify(emv.v);
+    // Vorschlag fuer die Testmail: die Adresse am Konto, sonst der Absender.
+    // Was schon im Feld steht, bleibt.
+    if (!$('emvTestAn').value) { $('emvTestAn').value = data.testmail_an || (emv.v && emv.v.absender) || ''; }
     $('emvPort').innerHTML = emv.ports.map(p => `<option value="${p}">${p}</option>`).join('');
     emvZeichnen();
   }).catch(() => emvStand('Der Absender liess sich nicht laden.', 'warn'));
@@ -30372,7 +30385,7 @@ function emvAnzeigen() {
   else { emvStand(eigen ? 'Gespeichert. Die Kundenmails gehen über deinen eigenen Mailserver.' : 'Gespeichert. Die Kundenmails gehen über GuardOpS.'); }
   $('emvSpeichern').disabled = !emv.darf || emv.unbekannt || !emvGeaendert() || (eigen && !emv.schluessel);
   $('emvSpeichern').hidden = !emv.darf;
-  $('emvTest').hidden = !emv.darf;
+  $('emvTestKarte').hidden = !emv.darf;
   $('emvTest').disabled = eigen && !emv.schluessel;
 }
 
@@ -30427,9 +30440,11 @@ function emvSpeichern() {
 }
 
 function emvTestmail() {
-  if (!emv.darf || !emv.v) { return; }
+  if (!emv.darf || !emv.v || $('emvTest').disabled) { return; }
+  const an = $('emvTestAn').value.trim();
+  if (!an) { emvStand('Bitte eine Adresse für die Testmail eingeben.', 'warn'); $('emvTestAn').focus(); return; }
   emvStand('Testmail wird verschickt …');
-  api('mail_absender.php', { method: 'POST', body: { aktion: 'testmail', versand: emvNutzlast() } })
+  api('mail_absender.php', { method: 'POST', body: { aktion: 'testmail', versand: emvNutzlast(), an } })
     .then(({ ok, data }) => {
       if (ok && data && data.status === 'ok') {
         emvStand(`Testmail an ${data.an} verschickt.` + (emvGeaendert() ? ' Die Angaben sind noch nicht gespeichert.' : ''), 'ok');
