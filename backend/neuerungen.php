@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 43,
+            'datum' => '2026-10-17',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Einstellungen: Reiter „System“ entfällt',
+            'text'  => 'Der Reiter „System“ in den Einstellungen ist weg. Was für den ganzen Betrieb gilt, findest du wie bisher unter Administration › Betrieb.',
+        ],
+        [
             'nr'    => 42,
             'datum' => '2026-10-16',
             'art'   => 'neu',

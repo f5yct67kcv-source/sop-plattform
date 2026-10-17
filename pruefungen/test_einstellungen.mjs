@@ -202,7 +202,7 @@ const standText = page => page.evaluate(() => $('esStand').textContent.trim());
   // Platzhalter: klickbar, mit einem eigenen Satz -- "in Arbeit" darf
   // nicht aussehen wie "hier gibt es nichts".
   const platz = {};
-  for (const r of ['maildesigner', 'system']) {
+  for (const r of ['maildesigner']) {
     await page.click(`.es-nav-knopf[data-reiter="${r}"]`); await page.waitForTimeout(80);
     platz[r] = await page.evaluate(k => {
       const t = document.querySelector(`.es-teil[data-reiter="${k}"]`);
@@ -214,8 +214,11 @@ const standText = page => page.evaluate(() => $('esStand').textContent.trim());
     Object.values(platz).every(p => p.sichtbar && p.darstellungWeg));
   check('KRITISCH: jeder sagt, dass er in Arbeit ist',
     Object.values(platz).every(p => /in arbeit/i.test(p.text)));
-  check('Und jeder sagt, WAS dort entsteht -- zwei verschiedene Saetze',
-    new Set(Object.values(platz).map(p => p.text)).size === 2);
+  // Den Reiter "System" gibt es nicht mehr (ENT-727): Betriebsweites steht
+  // unter Administration > Betrieb, nicht an einem zweiten Ort.
+  check('Kein Reiter "System" -- Betriebsweites hat seinen Ort unter Administration',
+    await page.evaluate(() => ![...document.querySelectorAll('.es-nav-knopf, .es-teil')]
+      .some(k => k.dataset.reiter === 'system' || /^\s*system\s*$/i.test(k.querySelector('.es-nav-lbl, h2')?.textContent || ''))));
   check('Der E-Mail-Designer sagt, dass er fuer den ganzen Betrieb gilt',
     /betrieb/i.test(platz.maildesigner.text));
   check('Die Reiter in Arbeit tragen den Hinweis auch in der linken Spalte',

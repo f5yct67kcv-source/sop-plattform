@@ -9716,11 +9716,6 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
             <span class="es-nav-lbl">E-Mail-Designer</span>
             <span class="chip chip-n es-inarbeit">in Arbeit</span>
           </button>
-          <button type="button" class="es-nav-knopf" data-reiter="system" onclick="esReiterZeigen('system')">
-            <span class="es-nav-ic"><svg class="i" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>
-            <span class="es-nav-lbl">System</span>
-            <span class="chip chip-n es-inarbeit">in Arbeit</span>
-          </button>
           </div>
         </nav>
         <div class="es-inhalt">
@@ -9791,10 +9786,6 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
           <div class="card es-teil" data-reiter="maildesigner" hidden>
             <div class="card-hd"><h2>E-Mail-Designer</h2><span class="sp"></span><span class="chip chip-n">in Arbeit</span></div>
             <div class="card-bd"><p class="es-platz">Hier gestaltest du die Mails, die dein Betrieb an Kundinnen und Kunden verschickt: Offerten, Rechnungen und Rapporte. Die Einstellung gilt für alle Konten des Betriebs. In Arbeit.</p></div>
-          </div>
-          <div class="card es-teil" data-reiter="system" hidden>
-            <div class="card-hd"><h2>System</h2><span class="sp"></span><span class="chip chip-n">in Arbeit</span></div>
-            <div class="card-bd"><p class="es-platz">Hier entstehen Einstellungen, die für den ganzen Betrieb gelten. In Arbeit.</p></div>
           </div>
         </div>
         </div>
@@ -13813,7 +13804,9 @@ function glockeArtUm(art) {
 // Sehen). Heute stehen dort nur Platzhalter ohne Daten -- das Ausblenden ist
 // darum Bequemlichkeit. Sobald dort etwas gespeichert wird, prueft der
 // Endpunkt das Recht selbst (CLAUDE.md: Sperren gehoeren in den Server).
-const ES_BETRIEB = ['maildesigner', 'system'];
+// Den Reiter "System" gibt es nicht mehr (ENT-727): Betriebsweites steht
+// unter Administration > Betrieb, ein zweiter Ort dafuer waere einer zu viel.
+const ES_BETRIEB = ['maildesigner'];
 function esDarfBetrieb() { return darf('betrieb_lesen'); }
 
 function esReiterZeigen(reiter) {
