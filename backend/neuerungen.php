@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 44,
+            'datum' => '2026-10-17',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit'],
+            'titel' => 'E-Mail-Designer jetzt unter Betrieb',
+            'text'  => 'Der E-Mail-Designer steht neu unter Administration › Betrieb, neben dem Briefkopf, und nicht mehr in den Einstellungen. Er gilt für alle Konten des Betriebs und ist noch in Arbeit. In den Einstellungen findest du nur noch, was dein eigenes Konto betrifft.',
+        ],
+        [
             'nr'    => 43,
             'datum' => '2026-10-17',
             'art'   => 'verbesserung',
