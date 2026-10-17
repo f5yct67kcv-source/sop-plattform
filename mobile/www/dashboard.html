@@ -5917,6 +5917,33 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
   html[data-dichte="kompakt"] #kpLat, html[data-dichte="kompakt"] #kpLng { width: 160px; }
   html[data-dichte="kompakt"] #kpKarte { height: 300px !important; margin-bottom: 8px !important; }
   html[data-dichte="kompakt"] #kpKarteHinweis { margin: 0 0 14px !important; }
+  /* Schicht bearbeiten (17.10.2026): bleibt ein Fenster ueber der
+     Schichtliste, Variante "Paare auf einer Zeile" (Entscheid des
+     Projektinhabers nach Bildvergleich). Von/Bis und Stundenansatz/Pauschal
+     stehen je auf einer Zeile, der zweite Wert mit kleiner Beschriftung
+     davor. Die .f-Huellen treten zurueck (display: contents), damit
+     Beschriftung und Felder direkt im Raster des Fensters stehen. */
+  html[data-dichte="kompakt"] #dlgSchicht .dlg { max-width: 720px; }
+  html[data-dichte="kompakt"] #dlgSchicht .form-grid { display: grid;
+    grid-template-columns: 168px 164px max-content 164px minmax(0, 1fr);
+    align-items: center; justify-items: start; column-gap: 14px; row-gap: 14px; }
+  html[data-dichte="kompakt"] #dlgSchicht .form-grid > .f { display: contents; }
+  html[data-dichte="kompakt"] #dlgSchicht .f > label { grid-column: 1; margin: 0; line-height: 15px; }
+  html[data-dichte="kompakt"] #dlgSchicht .f > .inp,
+  html[data-dichte="kompakt"] #dlgSchicht .f > .zeitwahl { grid-column: 2; height: 32px; }
+  html[data-dichte="kompakt"] #dlgSchicht .zeitwahl { width: auto; }
+  html[data-dichte="kompakt"] #dlgSchicht .zeitwahl select { flex: none; width: 76px; min-width: 0; }
+  html[data-dichte="kompakt"] #dlgSchicht label[for="eps_von"]::after { content: " / Bis"; }
+  html[data-dichte="kompakt"] #dlgSchicht label[for="eps_bis"],
+  html[data-dichte="kompakt"] #dlgSchicht label[for="eps_pauschal"] { grid-column: 3; text-transform: none;
+    letter-spacing: 0; font-size: 12px; color: var(--ink-3); }
+  html[data-dichte="kompakt"] #dlgSchicht .zeitwahl[data-zeitwahl-fuer="eps_bis"],
+  html[data-dichte="kompakt"] #dlgSchicht .f > #eps_pauschal { grid-column: 4; }
+  /* So breit wie die Zeitwahl darueber (2 x 76 + Trenner): Die zweite
+     Beschriftung und das zweite Feld stehen in beiden Paaren buendig. */
+  html[data-dichte="kompakt"] #dlgSchicht .f > #eps_std, html[data-dichte="kompakt"] #dlgSchicht .f > #eps_pauschal { width: 164px; }
+  html[data-dichte="kompakt"] #dlgSchicht .f > #eps_funktion, html[data-dichte="kompakt"] #dlgSchicht .f > #eps_position,
+  html[data-dichte="kompakt"] #dlgSchicht .f > #eps_qualifikation { grid-column: 2 / 5; justify-self: stretch; width: auto; }
   @container abschnitt (min-width: 1220px) {
     /* ── Zeilenfluss "Neuer Einsatz" (Skizze des Projektinhabers, 2026-10-15).
        Statt eines Rasters, das jedes Feld auf die Spaltenbreite zieht, steht
