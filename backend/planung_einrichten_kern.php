@@ -2608,6 +2608,10 @@ function kern_spalten(): array {
     // Kundinnen und Kunden, als JSON. NULL heisst "noch nichts gestaltet" --
     // dann gelten die Vorgaben aus mail_gestaltung.php.
     ['betrieb', 'mail_gestaltung', 'ALTER TABLE betrieb ADD COLUMN mail_gestaltung MEDIUMTEXT NULL AFTER pikett_telefon'],
+    // Absender der Kundenmails (ENT-730): GuardOpS oder der eigene
+    // Mailserver des Betriebs, als JSON. Das Passwort steht darin nur
+    // verschluesselt (mail_v_verschluesseln() in mail_gestaltung.php).
+    ['betrieb', 'mail_versand', 'ALTER TABLE betrieb ADD COLUMN mail_versand MEDIUMTEXT NULL AFTER mail_gestaltung'],
     // TINYINT NULL, nicht NOT NULL DEFAULT 0: NULL heisst 'noch nicht
     // entschieden', 0 heisst 'geprueft und nein'. Der Unterschied ist bei
     // GAV-AUS-004 wesentlich -- eine Vorbelegung waere eine Auslegung.

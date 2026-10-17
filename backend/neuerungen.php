@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 47,
+            'datum' => '2026-10-17',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit'],
+            'titel' => 'Kundenmails über deinen eigenen Mailserver',
+            'text'  => 'Unter Administration › Betrieb heisst die Kachel neu „E-Mail-Versand“. Darin findest du zwei Reiter: „Gestaltung“ ist der bisherige E-Mail-Designer, unter „Absender“ trägst du auf Wunsch deinen eigenen Mailserver ein. Dann gehen Offerten, Rechnungen und die übrigen Kundenmails mit deiner Absenderadresse über deinen Server hinaus. Beim Speichern meldet sich GuardOpS einmal an deinem Server an und speichert nur, wenn das klappt. Das Passwort wird verschlüsselt abgelegt und nie wieder angezeigt. Schlägt ein Versand fehl, siehst du das unter „Absender“.',
+        ],
+        [
             'nr'    => 45,
             'datum' => '2026-10-17',
             'art'   => 'neu',

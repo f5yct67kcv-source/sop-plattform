@@ -218,20 +218,21 @@ const standText = page => page.evaluate(() => $('esStand').textContent.trim());
   await browser.close();
 }
 
-// ── 2) Der E-Mail-Designer steht unter Administration > Betrieb ───────────
-// Als Kachel neben dem Briefkopf (ENT-728). Was er kann, prueft
-// test_mail_designer.mjs.
+// ── 2) Der E-Mail-Versand steht unter Administration > Betrieb ────────────
+// Als Kachel neben dem Briefkopf (ENT-728), seit ENT-730 mit Gestaltung und
+// Absender in einer Kachel. Was sie kann, pruefen test_mail_designer.mjs
+// und test_mail_versand.mjs.
 {
   const { browser, page, fehler } = await starte({ konto: { thema: 'dunkel', glas: 'an', dichte: 'normal', farbe: 'graphit' } });
   await page.evaluate(() => { go('betrieb'); bkUebersichtZeigen(); }); await page.waitForTimeout(200);
   const kachel = await page.evaluate(() => {
     const alle = [...document.querySelectorAll('#bkUebersicht .bk-kachel')].filter(x => x.offsetParent);
-    const k = alle.find(x => /e-mail-designer/i.test(x.textContent));
+    const k = alle.find(x => /e-mail-versand/i.test(x.textContent));
     return k ? { nachBriefkopf: alle.indexOf(k) === alle.findIndex(x => /briefkopf/i.test(x.textContent)) + 1,
                  inArbeit: /in arbeit/i.test(k.textContent),
                  hoehen: new Set(alle.map(x => Math.round(x.getBoundingClientRect().height))).size } : null;
   });
-  check('Unter Betrieb gibt es die Kachel "E-Mail-Designer"', !!kachel);
+  check('Unter Betrieb gibt es die Kachel "E-Mail-Versand"', !!kachel);
   check('Sie steht neben dem Briefkopf -- beides geht an Kundinnen und Kunden', kachel && kachel.nachBriefkopf);
   check('Sie ist gebaut und sagt nicht mehr "in Arbeit"', kachel && !kachel.inArbeit);
   check('und ist so hoch wie die Kacheln daneben', kachel && kachel.hoehen === 1);

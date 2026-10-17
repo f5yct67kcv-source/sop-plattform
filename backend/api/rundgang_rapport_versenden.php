@@ -99,7 +99,7 @@ $mail = mail_betrieb($pdo, 'rundgang', ['Objekt' => (string)$r['objekt_name'], '
 
 try {
     smtp_senden($empfaenger, '', $mail['betreff'], $mail['html'], $mail['text'],
-        [['name' => $dateiname, 'mime' => 'application/pdf', 'inhalt' => $pdf]], $mail['bilder'], $mail['antwort_an']);
+        [['name' => $dateiname, 'mime' => 'application/pdf', 'inhalt' => $pdf]], $mail['bilder'], $mail['antwort_an'], $mail['server']);
 } catch (Throwable $ex) {
     json_response(['status' => 'error', 'message' => 'Versand fehlgeschlagen: ' . $ex->getMessage()], 502);
 }

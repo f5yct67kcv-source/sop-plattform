@@ -127,7 +127,7 @@ $mail = mail_betrieb($pdo, (string)$beleg['art'], [
 
 try {
     smtp_senden($anEmail, (string)$kunde['name'], $mail['betreff'], $mail['html'], $mail['text'],
-        [], $mail['bilder'], $mail['antwort_an']);
+        [], $mail['bilder'], $mail['antwort_an'], $mail['server']);
 } catch (Throwable $e) {
     json_response(['status' => 'error', 'message' => 'Versand fehlgeschlagen: ' . $e->getMessage()], 502);
 }
