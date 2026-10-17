@@ -2604,6 +2604,10 @@ function kern_spalten(): array {
     // erscheint in der App gar keine Zentrale, statt einer Nummer, an der
     // nachts niemand abnimmt.
     ['betrieb', 'pikett_telefon', 'ALTER TABLE betrieb ADD COLUMN pikett_telefon VARCHAR(50) NULL AFTER email'],
+    // E-Mail-Designer (ENT-729): Logo, Farben, Gruss und Texte der Mails an
+    // Kundinnen und Kunden, als JSON. NULL heisst "noch nichts gestaltet" --
+    // dann gelten die Vorgaben aus mail_gestaltung.php.
+    ['betrieb', 'mail_gestaltung', 'ALTER TABLE betrieb ADD COLUMN mail_gestaltung MEDIUMTEXT NULL AFTER pikett_telefon'],
     // TINYINT NULL, nicht NOT NULL DEFAULT 0: NULL heisst 'noch nicht
     // entschieden', 0 heisst 'geprueft und nein'. Der Unterschied ist bei
     // GAV-AUS-004 wesentlich -- eine Vorbelegung waere eine Auslegung.

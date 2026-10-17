@@ -24,7 +24,7 @@ DirectoryIndex index.html
 # tatsaechlich mitbringt (siehe deploy-hostpoint.yml, Schritt
 # "Portal-Buendel fuer portal.guardops.ch bauen"); test_deploy.mjs
 # gleicht beides ab.
-<FilesMatch "^(db|anmeldung|kundenportal|rundgang|mailer)\.php$">
+<FilesMatch "^(db|anmeldung|kundenportal|rundgang|mailer|mail_gestaltung)\.php$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>

@@ -219,33 +219,27 @@ const standText = page => page.evaluate(() => $('esStand').textContent.trim());
 }
 
 // ── 2) Der E-Mail-Designer steht unter Administration > Betrieb ───────────
-// Als Kachel neben dem Briefkopf, mit "in Arbeit" -- noch ohne Inhalt darf
-// er nicht aussehen wie eine fertige Einstellung (unbekannt != keine).
+// Als Kachel neben dem Briefkopf (ENT-728). Was er kann, prueft
+// test_mail_designer.mjs.
 {
   const { browser, page, fehler } = await starte({ konto: { thema: 'dunkel', glas: 'an', dichte: 'normal', farbe: 'graphit' } });
   await page.evaluate(() => { go('betrieb'); bkUebersichtZeigen(); }); await page.waitForTimeout(200);
   const kachel = await page.evaluate(() => {
-    const k = [...document.querySelectorAll('#bkUebersicht .bk-kachel')].find(x => /e-mail-designer/i.test(x.textContent));
     const alle = [...document.querySelectorAll('#bkUebersicht .bk-kachel')].filter(x => x.offsetParent);
-    return k ? { sichtbar: !!k.offsetParent, inArbeit: /in arbeit/i.test(k.textContent),
-                 nachBriefkopf: alle.indexOf(k) === alle.findIndex(x => /briefkopf/i.test(x.textContent)) + 1,
-                 hoehe: Math.round(k.getBoundingClientRect().height),
+    const k = alle.find(x => /e-mail-designer/i.test(x.textContent));
+    return k ? { nachBriefkopf: alle.indexOf(k) === alle.findIndex(x => /briefkopf/i.test(x.textContent)) + 1,
+                 inArbeit: /in arbeit/i.test(k.textContent),
                  hoehen: new Set(alle.map(x => Math.round(x.getBoundingClientRect().height))).size } : null;
   });
-  check('Unter Betrieb gibt es die Kachel "E-Mail-Designer"', kachel && kachel.sichtbar);
-  check('KRITISCH: sie sagt, dass er in Arbeit ist', kachel && kachel.inArbeit);
+  check('Unter Betrieb gibt es die Kachel "E-Mail-Designer"', !!kachel);
   check('Sie steht neben dem Briefkopf -- beides geht an Kundinnen und Kunden', kachel && kachel.nachBriefkopf);
-  check('und ist so hoch wie die Kacheln daneben (der Hinweis drueckt sie nicht auf)', kachel && kachel.hoehen === 1);
-  if (await page.$('#bkKachelMd')) { await page.click('#bkKachelMd'); await page.waitForTimeout(150); }
-  const ab = await page.evaluate(() => { const a = $('bkAb-md');
-    if (!a) { return { offen: false, text: '', uebersichtWeg: false }; }
-    return { offen: !!a.offsetParent, text: a.textContent, uebersichtWeg: $('bkUebersicht').style.display === 'none' }; });
-  check('Die Kachel oeffnet ihre eigene Seite', ab.offen && ab.uebersichtWeg);
-  check('und die sagt, was dort entsteht, dass es fuer den ganzen Betrieb gilt und dass es in Arbeit ist',
-    /mails/i.test(ab.text) && /betrieb/i.test(ab.text) && /in arbeit/i.test(ab.text));
-  await page.evaluate(() => bkUebersichtZeigen()); await page.waitForTimeout(100);
+  check('Sie ist gebaut und sagt nicht mehr "in Arbeit"', kachel && !kachel.inArbeit);
+  check('und ist so hoch wie die Kacheln daneben', kachel && kachel.hoehen === 1);
+  if (await page.$('#bkKachelMd')) { await page.click('#bkKachelMd'); await page.waitForTimeout(300); }
+  check('Die Kachel oeffnet den Designer', await page.evaluate(() => !!$('bkAb-md') && !!$('bkAb-md').offsetParent
+    && $('bkUebersicht').style.display === 'none'));
   await page.screenshot({ path: `${OUT}/betrieb-maildesigner.png` });
-  check('Keine JavaScript-Fehler', fehler.length === 0);
+  check(`Keine JavaScript-Fehler (${fehler.join(' | ')})`, fehler.length === 0);
   await browser.close();
 }
 

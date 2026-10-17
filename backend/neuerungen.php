@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 45,
+            'datum' => '2026-10-17',
+            'art'   => 'neu',
+            'fuer'  => ['cockpit'],
+            'titel' => 'E-Mail-Designer: Kundenmails in deinem Erscheinungsbild',
+            'text'  => 'Unter Administration › Betrieb › E-Mail-Designer gestaltest du die Mails an deine Kundinnen und Kunden: Logo, Farben von Kopfband, Knopf und Links, den Gruss und die Texte jeder Mail. Links siehst du sofort, wie die Mail aussieht, und mit „Testmail an mich“ schickst du sie dir selbst. Das gilt für Offerten, Rechnungen, den Zugang zum Kundenportal, Rundgang-Rapporte, den Bestätigungscode und die Annahmebestätigung. Antworten deiner Kundinnen und Kunden gehen neu an die E-Mail-Adresse deines Betriebs.',
+        ],
+        [
             'nr'    => 44,
             'datum' => '2026-10-17',
             'art'   => 'verbesserung',

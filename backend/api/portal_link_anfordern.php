@@ -25,6 +25,7 @@ declare(strict_types=1);
 require __DIR__ . '/../db.php';
 require_once __DIR__ . '/../kundenportal.php';
 require __DIR__ . '/../mailer.php';
+require_once __DIR__ . '/../mail_gestaltung.php';
 require_once __DIR__ . '/../anmeldung.php';   // Bremse je Absender-Adresse (ENT-501)
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -119,10 +120,6 @@ if (!smtp_konfiguriert()) {
     $immerGleich();
 }
 
-$betrieb = $pdo->query('SELECT firma FROM betrieb WHERE id = 1')->fetch();
-$firma   = trim((string)($betrieb['firma'] ?? ''));
-$absender = $firma !== '' ? $firma : 'Ihr Ansprechpartner';
-
 // Die Basisadresse kommt aus dem DEPLOY und nicht mehr aus dem Host-Kopf
 // der Anfrage (ENT-501). Das Anliegen der urspruenglichen Fassung bleibt
 // erfuellt -- ein Test auf der Staging-Adresse schickt weiterhin Links auf
@@ -133,37 +130,14 @@ $link = $basis . '/portal.html?neu=' . urlencode($tokenRoh);
 
 // Betreff und Text formuliert der SERVER. Nichts aus der Anfrage geht in
 // die Nachricht ein -- sonst waere dieser Endpunkt ein Weg, ueber die
-// Firmenadresse beliebige Texte zu verschicken.
-$betreff = 'Ihr Zugang zum Kundenportal';
-$text = "Guten Tag\n\n"
-      . "Über diesen Link legen Sie Ihr Passwort für das Kundenportal fest:\n$link\n\n"
-      . "Der Link gilt " . KP_LINK_MINUTEN . " Minuten und nur einmal.\n\n"
-      . "Haben Sie ihn nicht angefordert, können Sie diese Nachricht ignorieren — "
-      . "ohne den Link geschieht nichts.\n\n"
-      . "Freundliche Grüsse\n$absender";
-
-$schrift = "font-family:-apple-system,'Segoe UI',Arial,sans-serif";
-$e = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
-$html = '<div style="' . $schrift . ';color:#14161A;max-width:520px">'
-      . '<p style="' . $schrift . ';margin:0 0 16px">Guten Tag</p>'
-      . '<p style="' . $schrift . ';margin:0 0 20px">Über diesen Link legen Sie Ihr Passwort '
-      . 'für das Kundenportal fest:</p>'
-      . '<p style="margin:0 0 20px"><a href="' . $e($link) . '" '
-      . 'style="' . $schrift . ';display:inline-block;background:#2F5BD7;color:#fff;'
-      . 'text-decoration:none;font-weight:700;padding:13px 26px;border-radius:8px">'
-      . 'Passwort festlegen</a></p>'
-      . '<p style="' . $schrift . ';color:#6B7280;font-size:12px;margin:0 0 16px">'
-      . 'Funktioniert der Knopf nicht? Diesen Link in den Browser kopieren:<br>'
-      . $e($link) . '</p>'
-      . '<p style="' . $schrift . ';margin:0 0 16px;color:#6B7280">Der Link gilt '
-      . KP_LINK_MINUTEN . ' Minuten und nur einmal.</p>'
-      . '<p style="' . $schrift . ';margin:0 0 16px;color:#6B7280">Haben Sie ihn nicht '
-      . 'angefordert, können Sie diese Nachricht ignorieren — ohne den Link geschieht nichts.</p>'
-      . '<p style="' . $schrift . ';margin:0">Freundliche Grüsse<br>' . $e($absender) . '</p>'
-      . '</div>';
+// Firmenadresse beliebige Texte zu verschicken. Die Texte stammen aus dem
+// E-Mail-Designer des Betriebs (ENT-729), also vom Betrieb selbst.
+$mail = mail_betrieb($pdo, 'portal', ['Kunde' => (string)$zugang['name'], 'Minuten' => (string)KP_LINK_MINUTEN],
+    ['link' => $link]);
 
 try {
-    smtp_senden($email, (string)$zugang['name'], $betreff, $html, $text);
+    smtp_senden($email, (string)$zugang['name'], $mail['betreff'], $mail['html'], $mail['text'],
+        [], $mail['bilder'], $mail['antwort_an']);
 } catch (Throwable $ex) {
     error_log('Kundenportal: Linkversand fehlgeschlagen — ' . $ex->getMessage());
 }

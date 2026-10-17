@@ -1379,6 +1379,49 @@ tr.klickbar.gewaehlt td { background: var(--accent-soft); }
 .bk-kachel-ic svg.i { width: 28px; height: 28px; }
 .bk-kachel-lbl { font-size: 13.5px; font-weight: 600; line-height: 1.35; }
 .bk-kachel-zusatz { font-size: 11px; font-weight: 600; color: var(--test-violett); margin-top: -6px; }
+/* E-Mail-Designer (ENT-729): Vorschau links, Gestaltung rechts -- wie im
+   Vorbild des Projektinhabers. Die rechte Spalte hat eine feste Breite,
+   damit die Vorschau die Breite einer echten Mail behaelt. */
+.emd-kopf { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin: 6px 0 6px; }
+.emd-titel h2 { margin: 0 0 4px; font-size: 20px; }
+.emd-titel .zone-note { margin: 0; }
+.emd-werkzeug { display: flex; align-items: flex-end; gap: 10px; }
+.emd-wahl { display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 650; color: var(--ink-2);
+  letter-spacing: .4px; text-transform: uppercase; }
+.emd-wahl select { min-width: 220px; text-transform: none; letter-spacing: 0; }
+.emd-stand { font-size: 12px; color: var(--ink-3); margin: 0 0 14px; min-height: 18px; }
+.emd-stand.warn { color: var(--warn); }
+.emd-stand.ok { color: var(--pos); }
+.emd-raster { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
+.emd-links { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.emd-rechts { display: flex; flex-direction: column; gap: 12px; }
+.emd-vorschau-karte { overflow: hidden; }
+.emd-betreff { display: flex; gap: 10px; align-items: baseline; padding: 12px 16px; border-bottom: 1px solid var(--line-soft); font-size: 13px; }
+.emd-betreff span { font-size: 11px; font-weight: 650; color: var(--ink-3); text-transform: uppercase; letter-spacing: .4px; }
+#emdVorschau { display: block; width: 100%; height: 560px; border: 0; background: #F2F4F8; }
+.emd-platz button { margin: 0; }
+.emd-gruppe .card-hd { padding-top: 12px; padding-bottom: 10px; }
+.emd-gruppe .card-bd { padding-top: 12px; padding-bottom: 12px; }
+.emd-zeile { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; font-size: 13px; }
+.emd-check input { width: 18px; height: 18px; accent-color: var(--accent); }
+.emd-farbe { display: inline-flex; align-items: center; gap: 8px; }
+.emd-farbe code { font-size: 12px; color: var(--ink-3); min-width: 62px; text-align: right; }
+.emd-farbe input[type=color] { width: 34px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; cursor: pointer; }
+.emd-masse { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
+.emd-masse .f { margin-bottom: 6px; }
+.emd-erkl { margin: 6px 0 0; }
+.emd-hinweis { margin: 8px 0 0; }
+.emd-hinweis.warn, .emd-warn { color: var(--warn); }
+.emd-warn { font-size: 12px; line-height: 1.45; margin: 6px 0 0; }
+.emd-warn:empty, .emd-hinweis:empty { display: none; }
+.emd-platz { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.emd-platz-lbl { font-size: 11px; font-weight: 650; color: var(--ink-3); text-transform: uppercase; letter-spacing: .4px; margin-right: 4px; }
+.emd-platz button { border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--accent);
+  border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.emd-platz button:hover { border-color: var(--accent); }
+.emd-fest { margin: 12px 0 0; }
+#bkAb-md .seg2 button { padding: 6px 11px; font-size: 12px; }
+#bkAb-md :disabled { cursor: not-allowed; }
 /* Testdaten (ENT-714): der violette Ton des Testumgebungs-Bands
    (testumgebung.js), damit die Kachel nicht wie eine echte Einstellung
    aussieht. */
@@ -9113,16 +9156,13 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></span>
               <span class="bk-kachel-lbl">Briefkopf für Rapporte</span>
             </button>
-            <!-- E-Mail-Designer (ENT-728): stand zuerst als Reiter in den
-                 Einstellungen. Er gilt fuer alle Konten des Betriebs und
-                 gehoert darum hierher, neben den Briefkopf -- beides geht an
-                 Kundinnen und Kunden hinaus. Noch ohne Inhalt: Die Kachel
-                 sagt "in Arbeit", damit sie nicht wie eine fertige
-                 Einstellung aussieht. -->
+            <!-- E-Mail-Designer (ENT-728, gebaut mit ENT-729): stand zuerst
+                 als Reiter in den Einstellungen. Er gilt fuer alle Konten des
+                 Betriebs und gehoert darum hierher, neben den Briefkopf --
+                 beides geht an Kundinnen und Kunden hinaus. -->
             <button type="button" class="bk-kachel" id="bkKachelMd" onclick="bkAbschnittZeigen('md')">
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="2"/><polyline points="3 6 12 13 21 6"/></svg></span>
               <span class="bk-kachel-lbl">E-Mail-Designer</span>
-              <span class="chip chip-n">in Arbeit</span>
             </button>
             <button type="button" class="bk-kachel" onclick="bkAbschnittZeigen('zf')">
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
@@ -9539,18 +9579,85 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
         </div>
         </div>
 
+        <!-- E-Mail-Designer (ENT-729). Aufbau wie in AbaNinja, vom
+             Projektinhaber als Vorbild gezeigt: links die Vorschau der
+             gewaehlten Mail, darunter ihre Texte, rechts die Gestaltung in
+             Gruppen. Die Vorschau rechnet der SERVER (api/mail_designer.php,
+             aktion=vorschau) mit derselben Funktion, die auch die echte Mail
+             baut -- eine im Browser nachgebaute Vorschau saehe beim naechsten
+             Umbau anders aus als die Mail, die ankommt. -->
         <div class="bk-abschnitt" id="bkAb-md" style="display:none">
-        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="bkUebersichtZeigen()">Zurück</button>
-        <div class="grid">
-        <div class="card" id="mdKarte">
-          <div class="card-hd">
-            <span class="card-ic"><svg class="i" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="2"/><polyline points="3 6 12 13 21 6"/></svg></span>
-            <h3>E-Mail-Designer</h3><span class="sp"></span><span class="chip chip-n">in Arbeit</span>
+        <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="emdZurueck()">Zurück</button>
+        <div class="emd-kopf">
+          <div class="emd-titel">
+            <h2>E-Mail-Designer</h2>
+            <p class="zone-note">So sehen die Mails aus, die dein Betrieb an Kundinnen und Kunden schickt. Gilt für alle Konten des Betriebs.</p>
           </div>
-          <div class="card-bd">
-            <p class="zone-note">Hier gestaltest du die Mails, die dein Betrieb an Kundinnen und Kunden verschickt: Offerten, Rechnungen und Rapporte. Die Einstellung gilt für alle Konten des Betriebs. In Arbeit.</p>
+          <div class="emd-werkzeug">
+            <label class="emd-wahl"><span>Vorschau</span>
+              <select class="inp" id="emdArt" onchange="emdArtWechseln()"></select></label>
+            <button type="button" class="btn btn-plain" id="emdTest" onclick="emdTestmail()">Testmail an mich</button>
+            <button type="button" class="btn btn-primary" id="emdSpeichern" onclick="emdSpeichern()" disabled>Speichern</button>
           </div>
         </div>
+        <p class="emd-stand" id="emdStand" role="status" aria-live="polite"></p>
+        <div class="emd-raster">
+          <div class="emd-links">
+            <div class="card emd-vorschau-karte">
+              <div class="emd-betreff"><span>Betreff</span><b id="emdBetreff">–</b></div>
+              <iframe id="emdVorschau" title="Vorschau der Mail" sandbox="allow-same-origin" tabindex="-1"></iframe>
+            </div>
+            <div class="card">
+              <div class="card-hd"><h3 id="emdTexteTitel">Texte</h3><span class="sp"></span>
+                <button type="button" class="btn btn-plain btn-sm" id="emdStandardtext" onclick="emdStandardtext()">Standardtext</button></div>
+              <div class="card-bd">
+                <div class="f"><label for="emdT_betreff">Betreff</label><input class="inp emd-feld" id="emdT_betreff" maxlength="150" data-feld="betreff"></div>
+                <div class="f"><label for="emdT_kopf">Kopfband</label><input class="inp emd-feld" id="emdT_kopf" maxlength="120" data-feld="kopf"></div>
+                <div class="f"><label for="emdT_text">Text</label><textarea class="inp emd-feld" id="emdT_text" rows="7" maxlength="3000" data-feld="text"></textarea></div>
+                <div class="f" id="emdKnopfFeld"><label for="emdT_knopf">Beschriftung des Knopfs</label><input class="inp emd-feld" id="emdT_knopf" maxlength="60" data-feld="knopf"></div>
+                <div class="emd-platz"><span class="emd-platz-lbl">Platzhalter einfügen</span><span id="emdPlatzhalter"></span></div>
+                <p class="zone-note emd-fest" id="emdFest"></p>
+              </div>
+            </div>
+          </div>
+          <div class="emd-rechts">
+            <div class="card emd-gruppe"><div class="card-hd"><h3>Schema</h3></div><div class="card-bd">
+              <div class="emd-zeile"><span>Primärfarbe</span><span class="emd-farbe"><input type="color" id="emdF_primaer" data-farbe="primaer"><code></code></span></div>
+              <p class="zone-note emd-erkl">Färbt Kopfband, Knopf und Links. Einzeln anpassen kannst du sie darunter.</p>
+            </div></div>
+            <div class="card emd-gruppe"><div class="card-hd"><h3>Logo</h3></div><div class="card-bd">
+              <label class="emd-zeile emd-check"><span>Logo anzeigen</span><input type="checkbox" id="emdLogoAn"></label>
+              <div class="emd-masse">
+                <div class="f"><label for="emdLogoBreite">Breite (px)</label><input class="inp" type="number" id="emdLogoBreite" min="0" max="400" step="1"></div>
+                <div class="f"><label for="emdLogoHoehe">Höhe (px)</label><input class="inp" type="number" id="emdLogoHoehe" min="0" max="400" step="1" placeholder="automatisch"></div>
+              </div>
+              <div class="emd-zeile"><span>Ausrichtung</span>
+                <div class="seg2" id="emdLogoAusr" role="group" aria-label="Ausrichtung des Logos">
+                  <button type="button" data-w="links">Links</button><button type="button" data-w="mitte">Mitte</button><button type="button" data-w="rechts">Rechts</button>
+                </div></div>
+              <p class="zone-note emd-hinweis" id="emdLogoHinweis"></p>
+            </div></div>
+            <div class="card emd-gruppe"><div class="card-hd"><h3>Kopfband</h3></div><div class="card-bd">
+              <div class="emd-zeile"><span>Hintergrund</span><span class="emd-farbe"><input type="color" id="emdF_kopf_hg" data-farbe="kopf_hg"><code></code></span></div>
+              <div class="emd-zeile"><span>Text</span><span class="emd-farbe"><input type="color" id="emdF_kopf_text" data-farbe="kopf_text"><code></code></span></div>
+              <p class="emd-warn" id="emdWarnKopf"></p>
+            </div></div>
+            <div class="card emd-gruppe"><div class="card-hd"><h3>Inhalt</h3></div><div class="card-bd">
+              <div class="emd-zeile"><span>Links</span><span class="emd-farbe"><input type="color" id="emdF_link" data-farbe="link"><code></code></span></div>
+              <div class="emd-zeile"><span>Knopf</span><span class="emd-farbe"><input type="color" id="emdF_knopf" data-farbe="knopf"><code></code></span></div>
+              <div class="emd-zeile"><span>Knopftext</span><span class="emd-farbe"><input type="color" id="emdF_knopf_text" data-farbe="knopf_text"><code></code></span></div>
+              <p class="emd-warn" id="emdWarnInhalt"></p>
+            </div></div>
+            <div class="card emd-gruppe"><div class="card-hd"><h3>Gruss</h3></div><div class="card-bd">
+              <div class="f"><label for="emdGruss">Am Schluss jeder Mail</label><textarea class="inp" id="emdGruss" rows="3" maxlength="300"></textarea></div>
+              <div class="emd-platz"><span class="emd-platz-lbl">Platzhalter</span><span id="emdGrussPlatz"></span></div>
+            </div></div>
+            <div class="card emd-gruppe"><div class="card-hd"><h3>Fusszeile und Antworten</h3></div><div class="card-bd">
+              <p class="zone-note emd-erkl">Adresse, Telefon und E-Mail kommen aus den Angaben unter Betrieb.</p>
+              <label class="emd-zeile emd-check"><span>Hinweis „Versendet mit GuardOpS“</span><input type="checkbox" id="emdHinweis"></label>
+              <p class="zone-note emd-hinweis" id="emdAntwort"></p>
+            </div></div>
+          </div>
         </div>
         </div>
 
@@ -27559,7 +27666,229 @@ function bkAbschnittZeigen(id) {
   $('bkUebersicht').style.display = 'none';
   document.querySelectorAll('#view-betrieb .bk-abschnitt').forEach(a => { a.style.display = 'none'; });
   $('bkAb-' + id).style.display = '';
+  if (id === 'md') { emdOeffnen(); }
 }
+
+// ══════════════════════════════════════════ E-MAIL-DESIGNER (ENT-729)
+// Gestaltung der Mails an Kundinnen und Kunden. emd.g ist der Entwurf, den
+// die Seite zeigt; emd.gespeichert der Stand am Server. Jede Aenderung holt
+// eine neue Vorschau vom Server -- dieselbe Funktion, die die echte Mail
+// baut. Der Server prueft beim Speichern alles noch einmal (Farben,
+// Platzhalter); was hier geprueft wird, erspart nur den Umweg.
+const emd = { g: null, gespeichert: '', vorgabe: null, arten: [], betrieb: {}, darf: false,
+             unbekannt: false, art: 'offerte', feld: null, vorschauNr: 0, zeit: null };
+
+function emdOeffnen() {
+  emdStand('Wird geladen …');
+  api('mail_designer.php').then(({ ok, data }) => {
+    if (!ok || !data || data.status !== 'ok') {
+      emdStand(data && data.message ? data.message : 'Die Gestaltung liess sich nicht laden.', 'warn');
+      return;
+    }
+    emd.g = data.gestaltung; emd.vorgabe = data.vorgabe; emd.arten = data.arten || [];
+    emd.betrieb = data.betrieb || {}; emd.darf = !!data.darf_aendern; emd.unbekannt = !!data.stand_unbekannt;
+    emd.gespeichert = JSON.stringify(emd.g);
+    if (!emd.arten.some(a => a.art === emd.art)) { emd.art = (emd.arten[0] || {}).art || 'offerte'; }
+    $('emdArt').innerHTML = emd.arten.map(a => `<option value="${a.art}">${esc(a.name)}</option>`).join('');
+    $('emdArt').value = emd.art;
+    emdZeichnen();
+    emdStandZeigen();
+    emdVorschau(true);
+  }).catch(() => emdStand('Die Gestaltung liess sich nicht laden.', 'warn'));
+}
+
+function emdStand(text, art) {
+  const el = $('emdStand'); if (!el) { return; }
+  el.textContent = text || '';
+  el.classList.toggle('warn', art === 'warn');
+  el.classList.toggle('ok', art === 'ok');
+}
+function emdGeaendert() { return emd.g && JSON.stringify(emd.g) !== emd.gespeichert; }
+function emdStandZeigen() {
+  if (!emd.darf) { emdStand('Ansehen ist möglich. Ändern darf, wer die Betriebseinstellungen bearbeiten darf.'); }
+  else if (emd.unbekannt) { emdStand('Speichern geht noch nicht: Die Einrichtung ist noch nicht auf dem neusten Stand. Die Vorschau zeigt trotzdem, wie es aussehen wird.', 'warn'); }
+  else if (emdGeaendert()) { emdStand('Ungespeicherte Änderungen.', 'warn'); }
+  else { emdStand('Gespeichert. Gilt für alle Mails, die dein Betrieb an Kundinnen und Kunden schickt.'); }
+  $('emdSpeichern').disabled = !emd.darf || emd.unbekannt || !emdGeaendert();
+  $('emdSpeichern').hidden = !emd.darf;
+  $('emdTest').hidden = !emd.darf;
+}
+
+function emdArtAngabe() { return emd.arten.find(a => a.art === emd.art) || { platzhalter: [], knopf: false, fest: '' }; }
+
+// Alle Felder aus emd.g fuellen. Nur hier wird geschrieben -- die Eingaben
+// schreiben zurueck in emd.g (emdEingabe).
+function emdZeichnen() {
+  const g = emd.g, a = emdArtAngabe(), t = g.texte[emd.art] || {};
+  const sperren = !emd.darf;
+  document.querySelectorAll('#bkAb-md input, #bkAb-md textarea').forEach(el => { el.disabled = sperren; });
+  document.querySelectorAll('#bkAb-md .seg2 button, #emdStandardtext').forEach(el => { el.disabled = sperren; });
+  $('emdTexteTitel').textContent = 'Texte: ' + (a.name || '');
+  ['betreff', 'kopf', 'text', 'knopf'].forEach(k => { $('emdT_' + k).value = t[k] || ''; });
+  $('emdKnopfFeld').hidden = !a.knopf;
+  $('emdFest').textContent = a.fest ? 'Fest in dieser Mail: ' + a.fest : '';
+  $('emdPlatzhalter').innerHTML = a.platzhalter.map(p =>
+    `<button type="button" onclick="emdPlatzEinfuegen('${p}')"${sperren ? ' disabled' : ''}>{${esc(p)}}</button>`).join('');
+  $('emdGrussPlatz').innerHTML = ['Firma', 'Telefon', 'E-Mail'].map(p =>
+    `<button type="button" onclick="emdPlatzEinfuegen('${p}', 'emdGruss')"${sperren ? ' disabled' : ''}>{${esc(p)}}</button>`).join('');
+  Object.keys(g.farben).forEach(k => { const el = $('emdF_' + k); if (el) { el.value = g.farben[k].toLowerCase(); el.nextElementSibling.textContent = g.farben[k]; } });
+  $('emdLogoAn').checked = !!g.logo.an;
+  $('emdLogoBreite').value = g.logo.breite || '';
+  $('emdLogoHoehe').value = g.logo.hoehe || '';
+  document.querySelectorAll('#emdLogoAusr button').forEach(b => b.classList.toggle('on', b.dataset.w === g.logo.ausrichtung));
+  $('emdGruss').value = g.gruss;
+  $('emdHinweis').checked = !!g.hinweis;
+  // "Unbekannt" ist nicht "keins": kein Logo, ein Logo in einem Format,
+  // das Mailprogramme nicht zeigen, und ein Logo, das da ist.
+  const lh = $('emdLogoHinweis');
+  if (emd.betrieb.logo_webp) {
+    lh.innerHTML = 'Dein Logo ist im Format WebP. Viele Mailprogramme zeigen das nicht, darum steht es nicht in der Mail. Lade unter <a href="#" onclick="bkAbschnittZeigen(\'be\');return false">Betrieb</a> ein PNG oder JPG hoch.';
+    lh.classList.add('warn');
+  } else if (!emd.betrieb.hat_logo) {
+    lh.innerHTML = 'Noch kein Logo hinterlegt. Du lädst es unter <a href="#" onclick="bkAbschnittZeigen(\'be\');return false">Betrieb</a> hoch.';
+    lh.classList.remove('warn');
+  } else { lh.textContent = ''; }
+  const an = $('emdAntwort');
+  if (emd.betrieb.email) {
+    an.textContent = 'Antworten deiner Kundinnen und Kunden gehen an ' + emd.betrieb.email + '.';
+    an.classList.remove('warn');
+  } else {
+    an.innerHTML = 'Beim Betrieb ist keine E-Mail-Adresse hinterlegt. Antworten landen darum im Nichts. Trag sie unter <a href="#" onclick="bkAbschnittZeigen(\'be\');return false">Betrieb</a> ein.';
+    an.classList.add('warn');
+  }
+  emdKontrastPruefen();
+}
+
+// Lesbarkeit: Text auf seiner Farbe soll mindestens 4.5 : 1 erreichen.
+// Eine Warnung, kein Verbot -- ein CI kann eine Farbe vorschreiben.
+function emdKontrast(a, b) {
+  const lum = h => { const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255)
+    .map(v => v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4);
+    return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]; };
+  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+  return (x + .05) / (y + .05);
+}
+function emdKontrastPruefen() {
+  const f = emd.g.farben, z = k => k.toFixed(1).replace('.', '.');
+  const kk = emdKontrast(f.kopf_text, f.kopf_hg), kn = emdKontrast(f.knopf_text, f.knopf), kl = emdKontrast(f.link, '#FFFFFF');
+  $('emdWarnKopf').textContent = kk < 4.5 ? `Der Text im Kopfband ist schlecht lesbar (Kontrast ${z(kk)} : 1, empfohlen ab 4.5).` : '';
+  const w = [];
+  if (kn < 4.5) { w.push(`Die Knopfbeschriftung ist schlecht lesbar (Kontrast ${z(kn)} : 1).`); }
+  if (kl < 4.5) { w.push(`Links sind auf Weiss schlecht lesbar (Kontrast ${z(kl)} : 1).`); }
+  $('emdWarnInhalt').textContent = w.length ? w.join(' ') + ' Empfohlen ab 4.5.' : '';
+}
+
+function emdGeaendertMelden() {
+  emdKontrastPruefen();
+  emdStandZeigen();
+  clearTimeout(emd.zeit);
+  emd.zeit = setTimeout(() => emdVorschau(), 250);
+}
+
+function emdVorschau(sofort) {
+  if (!emd.g) { return; }
+  const nr = ++emd.vorschauNr;
+  api('mail_designer.php', { method: 'POST', body: { aktion: 'vorschau', art: emd.art, gestaltung: emd.g } })
+    .then(({ ok, data }) => {
+      if (nr !== emd.vorschauNr) { return; }   // eine neuere ist schon unterwegs
+      if (!ok || !data || data.status !== 'ok') { return; }
+      $('emdBetreff').textContent = data.betreff;
+      $('emdVorschau').srcdoc = data.html;
+    }).catch(() => {});
+}
+
+function emdArtWechseln() { emd.art = $('emdArt').value; emdZeichnen(); emdVorschau(); }
+
+function emdPlatzEinfuegen(p, ziel) {
+  const el = $(ziel || emd.feld || 'emdT_text');
+  if (!el || el.disabled) { return; }
+  const t = '{' + p + '}', a = el.selectionStart ?? el.value.length, e = el.selectionEnd ?? a;
+  el.value = el.value.slice(0, a) + t + el.value.slice(e);
+  el.focus(); el.setSelectionRange(a + t.length, a + t.length);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function emdStandardtext() {
+  if (!emd.darf) { return; }
+  emd.g.texte[emd.art] = JSON.parse(JSON.stringify(emd.vorgabe.texte[emd.art]));
+  emdZeichnen(); emdGeaendertMelden();
+}
+
+function emdSpeichern() {
+  if (!emd.darf || emd.unbekannt) { return; }
+  $('emdSpeichern').disabled = true;
+  emdStand('Wird gespeichert …');
+  api('mail_designer.php', { method: 'POST', body: { aktion: 'speichern', gestaltung: emd.g } })
+    .then(({ ok, data }) => {
+      if (ok && data && data.status === 'ok') {
+        emd.g = data.gestaltung; emd.gespeichert = JSON.stringify(emd.g);
+        emdZeichnen(); emdStandZeigen(); toast('Gestaltung gespeichert');
+        return;
+      }
+      if (data && data.stand_unbekannt) { emd.unbekannt = true; emdStandZeigen(); return; }
+      emdStand((data && data.message) || 'Speichern fehlgeschlagen.', 'warn');
+      $('emdSpeichern').disabled = false;
+    }).catch(() => { emdStand('Speichern fehlgeschlagen. Keine Verbindung.', 'warn'); $('emdSpeichern').disabled = false; });
+}
+
+function emdTestmail() {
+  if (!emd.darf) { return; }
+  emdStand('Testmail wird verschickt …');
+  api('mail_designer.php', { method: 'POST', body: { aktion: 'testmail', art: emd.art, gestaltung: emd.g } })
+    .then(({ ok, data }) => {
+      if (ok && data && data.status === 'ok') { emdStand('Testmail an ' + data.an + ' verschickt. Es ist der Stand, den du gerade siehst, auch wenn er noch nicht gespeichert ist.', 'ok'); return; }
+      emdStand((data && data.message) || 'Testmail fehlgeschlagen.', 'warn');
+    }).catch(() => emdStand('Testmail fehlgeschlagen. Keine Verbindung.', 'warn'));
+}
+
+function emdZurueck() {
+  if (emdGeaendert() && !confirm('Deine Änderungen am E-Mail-Designer sind nicht gespeichert. Trotzdem verlassen?')) { return; }
+  if (emd.g) { emd.g = JSON.parse(emd.gespeichert); }
+  bkUebersichtZeigen();
+}
+
+// Eingaben: einmal am Abschnitt, nicht an jedem Feld.
+(function emdEingabenBinden() {
+  const ab = $('bkAb-md'); if (!ab) { return; }
+  ab.addEventListener('focusin', e => { if (e.target.classList && e.target.classList.contains('emd-feld')) { emd.feld = e.target.id; } });
+  ab.addEventListener('input', e => {
+    const el = e.target; if (!emd.g || !emd.darf) { return; }
+    if (el.classList.contains('emd-feld')) { emd.g.texte[emd.art][el.dataset.feld] = el.value; }
+    else if (el.dataset.farbe) {
+      const w = el.value.toUpperCase();
+      emd.g.farben[el.dataset.farbe] = w;
+      // Primaerfarbe faerbt Kopfband, Knopf und Links mit (wie im Vorbild).
+      if (el.dataset.farbe === 'primaer') { ['kopf_hg', 'knopf', 'link'].forEach(k => { emd.g.farben[k] = w; }); }
+      Object.keys(emd.g.farben).forEach(k => { const f = $('emdF_' + k); if (f) { f.value = emd.g.farben[k].toLowerCase(); f.nextElementSibling.textContent = emd.g.farben[k]; } });
+    }
+    else if (el.id === 'emdLogoBreite' || el.id === 'emdLogoHoehe') {
+      emd.g.logo[el.id === 'emdLogoBreite' ? 'breite' : 'hoehe'] = Math.max(0, Math.min(400, parseInt(el.value, 10) || 0));
+    }
+    else if (el.id === 'emdGruss') { emd.g.gruss = el.value; }
+    else { return; }
+    emdGeaendertMelden();
+  });
+  ab.addEventListener('change', e => {
+    const el = e.target; if (!emd.g || !emd.darf) { return; }
+    if (el.id === 'emdLogoAn') { emd.g.logo.an = el.checked; }
+    else if (el.id === 'emdHinweis') { emd.g.hinweis = el.checked; }
+    else { return; }
+    emdGeaendertMelden();
+  });
+  $('emdLogoAusr').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || !emd.g || !emd.darf) { return; }
+    emd.g.logo.ausrichtung = b.dataset.w;
+    document.querySelectorAll('#emdLogoAusr button').forEach(x => x.classList.toggle('on', x === b));
+    emdGeaendertMelden();
+  });
+  window.addEventListener('beforeunload', e => { if (emdGeaendert()) { e.preventDefault(); e.returnValue = ''; } });
+  // Die Vorschau so hoch wie die Mail: Ein festes Fenster mit Bildlauf
+  // schnitte den Gruss und die Fusszeile ab -- gerade das, was man prueft.
+  $('emdVorschau').addEventListener('load', () => {
+    const f = $('emdVorschau'), d = f.contentDocument;
+    if (d && d.documentElement) { f.style.height = Math.max(300, d.documentElement.scrollHeight) + 'px'; }
+  });
+})();
 
 function bkQrIbanPruefen() {
   const el = $('bkQrIbanHinweis'); if (!el) { return; }
