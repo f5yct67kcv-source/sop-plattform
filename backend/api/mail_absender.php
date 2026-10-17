@@ -3,9 +3,9 @@ declare(strict_types=1);
 // Absender der Kundenmails: GuardOpS oder der eigene Mailserver des
 // Betriebs (ENT-730). Reiter "Absender" unter Betrieb › E-Mail-Versand.
 //
-// GET  -> { status, versand, schluessel_da, stand_unbekannt, darf_aendern, ports }
-// POST {aktion: 'speichern', versand}  -> { status, versand } | 400 { fehler } | 422 { message }
-// POST {aktion: 'testmail', versand}   -> { status, an }
+// GET  -> { status, versand, schluessel_da, stand_unbekannt, darf_aendern, ports, testmail_an }
+// POST {aktion: 'speichern', versand}      -> { status, versand } | 400 { fehler } | 422 { message }
+// POST {aktion: 'testmail', versand, an}   -> { status, an }
 //
 // Rechte wie beim E-Mail-Designer: Ansehen mit "betrieb" lesen, Speichern
 // und Testmail mit "betrieb" schreiben.
@@ -26,6 +26,14 @@ $user = require_session();
 $pdo = db();
 $spalteDa = hat_spalte($pdo, 'betrieb', 'mail_versand');
 
+function mail_v_eigene_adresse(PDO $pdo, int $id): string
+{
+    $s = $pdo->prepare('SELECT email FROM mitarbeiter WHERE id = ?');
+    $s->execute([$id]);
+    $a = trim((string)$s->fetchColumn());
+    return filter_var($a, FILTER_VALIDATE_EMAIL) ? $a : '';
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     require_recht($user, 'betrieb_lesen');
     json_response([
@@ -35,6 +43,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
         'stand_unbekannt' => !$spalteDa,
         'darf_aendern' => darf($user, 'betrieb_schreiben'),
         'ports' => MAIL_V_PORTS,
+        // Vorschlag fuer das Adressfeld der Testmail: die Adresse am eigenen
+        // Konto. Leer, wenn keine hinterlegt ist -- die Seite nimmt dann die
+        // Absenderadresse.
+        'testmail_an' => mail_v_eigene_adresse($pdo, (int)$user['id']),
     ]);
 }
 
@@ -96,13 +108,13 @@ if ($aktion === 'speichern') {
 }
 
 if ($aktion === 'testmail') {
-    $s = $pdo->prepare('SELECT name, email FROM mitarbeiter WHERE id = ?');
-    $s->execute([(int)$user['id']]);
-    $ich = $s->fetch(PDO::FETCH_ASSOC) ?: [];
-    $an = trim((string)($ich['email'] ?? ''));
+    // Die Adresse kommt aus dem Feld neben dem Knopf (Entscheid des
+    // Projektinhabers): So laesst sich auch an ein fremdes Postfach testen,
+    // wie die Mail dort ankommt. Der Inhalt ist fest; frei ist nur, wohin.
+    $an = trim(preg_replace('/[\x00-\x1F\x7F]/', '', (string)($in['an'] ?? '')));
     if (!filter_var($an, FILTER_VALIDATE_EMAIL)) {
         json_response(['status' => 'error', 'ohne_adresse' => true,
-            'message' => 'An deinem Konto ist keine E-Mail-Adresse hinterlegt. Trage sie unter „Mein Profil“ ein.'], 400);
+            'message' => 'Bitte eine gültige E-Mail-Adresse für die Testmail eingeben.'], 400);
     }
     $server = $neu['typ'] === 'eigen' ? $zugang() : null;
     if ($server === null && !smtp_konfiguriert()) {
@@ -113,7 +125,7 @@ if ($aktion === 'testmail') {
     $html = '<p style="font-family:' . htmlspecialchars(MAIL_G_SCHRIFT, ENT_QUOTES) . ';font-size:15px;color:#1F2933;">'
           . htmlspecialchars($text) . '</p>';
     try {
-        smtp_senden($an, (string)($ich['name'] ?? ''), '[Testmail] Absender der Kundenmails', $html, $text,
+        smtp_senden($an, '', '[Testmail] Absender der Kundenmails', $html, $text,
             [], [], '', $server);
     } catch (Throwable $e) {
         json_response(['status' => 'error', 'message' => 'Versand fehlgeschlagen: ' . $e->getMessage()], 502);
