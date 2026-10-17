@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 46,
+            'datum' => '2026-10-17',
+            'art'   => 'verbesserung',
+            'fuer'  => ['cockpit', 'betreiber'],
+            'titel' => 'Kompakte Darstellung ist Standard, Formulare als ganze Seiten',
+            'text'  => 'Das Cockpit startet jetzt in der kompakten Darstellung. Wer lieber die grosse will, stellt sie oben rechts mit dem Schalter neben Hell/Dunkel um; die Wahl bleibt gespeichert. Der Betreiberbereich folgt derselben Wahl. „Neuer Kunde“, „Neues Objekt“ und „Neue Masterschicht“ öffnen sich als eigene Seite statt als Fenster, mit „Zurück“ links und dem Knopf zum Anlegen rechts. In diesen Seiten und beim Bearbeiten von Mitarbeitenden steht die Beschriftung links und alle Felder beginnen an derselben Kante; was zusammengehört, steht auf einer Zeile. Aufgeräumt sind auch die Fenster „Kontrollpunkt“ und „Schicht bearbeiten“: Von und Bis sowie Stundenansatz und Pauschal stehen jetzt je auf einer Zeile. Am Handy bleibt alles wie bisher.',
+        ],
+        [
             'nr'    => 41,
             'datum' => '2026-10-16',
             'art'   => 'fehlerbehebung',

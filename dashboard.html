@@ -2093,6 +2093,8 @@ html:not(.hat-reinigung) [data-sparte-feld] { display: none !important; }
   /* Monatsuebersicht nach Skizze 15.10.2026: Felder 40 px hoch, 32 px unter
      der Kopfzeile (26 Innenabstand + 6), 47 px bis zur Tabelle. */
   #pv-uebersicht > .bar-tools { padding: 6px 0 0; margin-bottom: 0; }
+  /* Kompakt hat 10 px weniger Innenabstand oben -- die 32 px bleiben. */
+  html[data-dichte="kompakt"] #pv-uebersicht > .bar-tools { padding-top: 16px; }
   #pv-uebersicht > .bar-tools .inp { height: 40px; box-sizing: border-box; }
   /* "September" ist der laengste Monat: 73 px Text + 12 links + 30 fuer
      den Pfeil + Rand. Mit 91 px stand "Oktobe" da. */
@@ -2765,6 +2767,9 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .inp[readonly] { background: var(--surface-2); color: var(--ink-3); cursor: default; }
 .wahl-reihe { display: flex; gap: 18px; align-items: center; min-height: 38px; }
 .wahl-reihe label { display: flex; align-items: center; gap: 7px; cursor: pointer; font-size: 13.5px; font-weight: 500; }
+/* Die Wahlmoeglichkeiten sind Werte, keine Beschriftungen: ohne die Versalien
+   und den Sperrsatz, die ".f label" einer Feldbeschriftung gibt. */
+.f .wahl-reihe label, .f label.check { text-transform: none; letter-spacing: 0; color: var(--ink); margin-bottom: 0; font-size: 13.5px; font-weight: 500; }
 .wahl-reihe input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
 .kw-reihe { display: grid; grid-template-columns: 170px 1fr auto; gap: 8px; align-items: center; margin-bottom: 8px; }
 .kw-weg { border: none; background: transparent; color: var(--ink-3); cursor: pointer; padding: 7px; border-radius: var(--r-xs); display: inline-flex; }
@@ -2912,6 +2917,19 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
 .ms-tage span { font-size: 10px; font-weight: 700; width: 26px; height: 22px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; background: var(--line-soft); color: var(--ink-3); }
 .ms-tage span.hat { background: var(--accent-soft); color: var(--accent); }
 .ms-tage span.fei { background: var(--warn-soft); color: var(--warn); }
+/* Bedarf je Tag auf der Masterschicht-Seite: acht kleine Zahlenfelder. Im
+   Raster vier je Zeile wie im frueheren Dialog, kompakt alle in einer Zeile
+   (siehe Zeilenfluss). */
+.ms-bedarf { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ms-bedarf > .f { margin: 0; }
+/* Auf der Seite (Beschriftung links) acht Paare in einer Zeile, soweit Platz
+   ist; die Tagesbeschriftung braucht keine 168-px-Spalte. */
+.form-zeilen .ms-bedarf { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); column-gap: 24px; }
+.form-zeilen .ms-bedarf > .f { grid-template-columns: 64px minmax(0, 1fr); gap: 8px; }
+.form-zeilen .f.wide:has(> .ms-bedarf) { align-items: start; }
+.form-zeilen .f.wide:has(> .ms-bedarf) > label { padding-top: 9px; }
+/* Ein Haekchen ohne eigene Beschriftung steht in der Feldspalte. */
+.form-zeilen .f.zf-feldspalte > label.check { grid-column: 2; }
 
 /* Kontrollpunkte in der Objekt-Schublade (ENT-180/ENT-183) */
 .kp-zeile { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 11px 13px; margin-bottom: 8px; }
@@ -3227,6 +3245,11 @@ table.pl-tab td .serie-kind-datum { display: block; margin: 0 0 3px; }
    gezogen, nimmt das Feld die gewonnene Hoehe (so seit jeher, gemessen von
    test_containergroesse.mjs). */
 .dash-item:not(.dh) .begr-karte #rtText { height: 64px; min-height: 64px; }
+/* Kompakt: dieselbe Rechnung mit 13 px Schrift und 5 px Innenabstand --
+   2 x 20.15 + 2 x 5 + 2 = 52.3 px. */
+@media (min-width: 901px) {
+  html[data-dichte="kompakt"] .dash-item:not(.dh) .begr-karte #rtText { height: calc(2 * 1.55 * 13px + 12px); min-height: 0; }
+}
 /* Der Erklaersatz entfaellt hier. NUR er: Dieselbe Flaeche zeigt weiter
    "Das Mikrofon liefert kein Signal", "Die Aufnahme liess sich nicht
    starten" und "Aufnahme laeuft". Ein leeres Feld soll dabei keinen
@@ -5554,6 +5577,63 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
      kompakte Raster von oben. Gefragt wird die Breite des Abschnitts, nicht
      des Fensters: Die Seitenleiste nimmt je nach Stellung 0 bis 232 px. */
   html[data-dichte="kompakt"] .abschnitt { container: abschnitt / inline-size; }
+  /* Mitarbeitende bearbeiten: Jeder Bereich (Person, Anstellung, ...) fragt
+     seine eigene Breite, wie ein Abschnitt. */
+  html[data-dichte="kompakt"] #mbKarten .mb-bereich { container: abschnitt / inline-size; }
+  /* Abschnittstitel wie in den uebrigen Formularen: klein, versal, grau --
+     auch das Pflichtband "Zugang anlegen", das ausserhalb der Bereiche steht
+     und dieselbe Ueberschriftform tragen muss (test_mabearbeiten.mjs). */
+  html[data-dichte="kompakt"] #mbKarten .ma-block > h3,
+  html[data-dichte="kompakt"] #mbNeuKonto .card-hd h3 { font-size: 11px; letter-spacing: .6px; text-transform: uppercase;
+    color: var(--ink-3); font-weight: 600; border: 0; padding: 0; margin: 0 0 12px; }
+  /* Kontrollpunkt (16.10.2026): bleibt ein Fenster, weil es aus einer
+     laufenden, oft ungespeicherten Kontrollrunde aufgeht (Entscheid des
+     Projektinhabers). Innen dieselbe Ordnung wie die Formularseiten:
+     Beschriftung links in 168 px, alle Felder an einer Kante, 46 px
+     Zeilenabstand; Haekchen in der Feldspalte. Das Fenster ist breiter,
+     damit die Karte Platz hat. */
+  html[data-dichte="kompakt"] #dlgKp .dlg { max-width: 720px; }
+  html[data-dichte="kompakt"] #dlgKp .form-grid { display: block; }
+  html[data-dichte="kompakt"] #dlgKp .f { display: grid; grid-template-columns: 168px auto minmax(0, 1fr);
+    align-items: center; column-gap: 14px; margin: 0 0 14px; }
+  html[data-dichte="kompakt"] #dlgKp .f > label { margin: 0; line-height: 15px; }
+  html[data-dichte="kompakt"] #dlgKp .f > .inp { height: 32px; }
+  html[data-dichte="kompakt"] #dlgKp .f > label.check { grid-column: 2 / -1; height: 32px; margin: 0 !important;
+    display: flex; align-items: center; gap: 8px; }
+  html[data-dichte="kompakt"] #dlgKp .kp-zusatz { margin: 0; line-height: 15px; }
+  html[data-dichte="kompakt"] #kpBezeichnung, html[data-dichte="kompakt"] #kpChipId { width: 345px; }
+  html[data-dichte="kompakt"] #kpReihenfolge, html[data-dichte="kompakt"] #kpRadius { width: 80px; }
+  html[data-dichte="kompakt"] #kpTyp { width: 220px; }
+  html[data-dichte="kompakt"] #kpLat, html[data-dichte="kompakt"] #kpLng { width: 160px; }
+  html[data-dichte="kompakt"] #kpKarte { height: 300px !important; margin-bottom: 8px !important; }
+  html[data-dichte="kompakt"] #kpKarteHinweis { margin: 0 0 14px !important; }
+  /* Schicht bearbeiten (17.10.2026): bleibt ein Fenster ueber der
+     Schichtliste, Variante "Paare auf einer Zeile" (Entscheid des
+     Projektinhabers nach Bildvergleich). Von/Bis und Stundenansatz/Pauschal
+     stehen je auf einer Zeile, der zweite Wert mit kleiner Beschriftung
+     davor. Die .f-Huellen treten zurueck (display: contents), damit
+     Beschriftung und Felder direkt im Raster des Fensters stehen. */
+  html[data-dichte="kompakt"] #dlgSchicht .dlg { max-width: 720px; }
+  html[data-dichte="kompakt"] #dlgSchicht .form-grid { display: grid;
+    grid-template-columns: 168px 164px max-content 164px minmax(0, 1fr);
+    align-items: center; justify-items: start; column-gap: 14px; row-gap: 14px; }
+  html[data-dichte="kompakt"] #dlgSchicht .form-grid > .f { display: contents; }
+  html[data-dichte="kompakt"] #dlgSchicht .f > label { grid-column: 1; margin: 0; line-height: 15px; }
+  html[data-dichte="kompakt"] #dlgSchicht .f > .inp,
+  html[data-dichte="kompakt"] #dlgSchicht .f > .zeitwahl { grid-column: 2; height: 32px; }
+  html[data-dichte="kompakt"] #dlgSchicht .zeitwahl { width: auto; }
+  html[data-dichte="kompakt"] #dlgSchicht .zeitwahl select { flex: none; width: 76px; min-width: 0; }
+  html[data-dichte="kompakt"] #dlgSchicht label[for="eps_von"]::after { content: " / Bis"; }
+  html[data-dichte="kompakt"] #dlgSchicht label[for="eps_bis"],
+  html[data-dichte="kompakt"] #dlgSchicht label[for="eps_pauschal"] { grid-column: 3; text-transform: none;
+    letter-spacing: 0; font-size: 12px; color: var(--ink-3); }
+  html[data-dichte="kompakt"] #dlgSchicht .zeitwahl[data-zeitwahl-fuer="eps_bis"],
+  html[data-dichte="kompakt"] #dlgSchicht .f > #eps_pauschal { grid-column: 4; }
+  /* So breit wie die Zeitwahl darueber (2 x 76 + Trenner): Die zweite
+     Beschriftung und das zweite Feld stehen in beiden Paaren buendig. */
+  html[data-dichte="kompakt"] #dlgSchicht .f > #eps_std, html[data-dichte="kompakt"] #dlgSchicht .f > #eps_pauschal { width: 164px; }
+  html[data-dichte="kompakt"] #dlgSchicht .f > #eps_funktion, html[data-dichte="kompakt"] #dlgSchicht .f > #eps_position,
+  html[data-dichte="kompakt"] #dlgSchicht .f > #eps_qualifikation { grid-column: 2 / 5; justify-self: stretch; width: auto; }
   @container abschnitt (min-width: 1220px) {
     /* ── Zeilenfluss "Neuer Einsatz" (Skizze des Projektinhabers, 2026-10-15).
        Statt eines Rasters, das jedes Feld auf die Spaltenbreite zieht, steht
@@ -5611,6 +5691,76 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
     /* Alle Felder gleich hoch. Das Datumsfeld bringt sonst 2 px mehr mit
        (Kalenderzeichen des Browsers) und versetzt seine Zeile. */
     html[data-dichte="kompakt"] .zeilenfluss .inp { flex: none; height: 32px; }
+    /* Breite aus dem Feld selbst (style="--zf-b:..."): So braucht nicht jedes
+       weitere Formular eine eigene Liste von IDs hier oben. */
+    html[data-dichte="kompakt"] .zeilenfluss .inp[style*="--zf-b"] { width: var(--zf-b); min-width: 0; }
+    /* Zwei Raster untereinander im selben Abschnitt (Kunde: Firma oder
+       Privatperson, darunter UID) halten denselben Zeilenabstand wie zwei
+       Zeilen in einem: Die -7 px der Raster heben sich sonst mit den 7 px
+       der Felder auf, und die Zeilen kleben aneinander. */
+    html[data-dichte="kompakt"] .zeilenfluss + .zeilenfluss { margin-top: 7px; }
+    /* Eine Wahl (Unternehmen/Privatperson) ist so hoch wie ein Feld -- mit
+       ihren 38 px Mindesthoehe sass die Zeile 3 px tiefer (gemessen 49 statt
+       46 px Abstand). */
+    html[data-dichte="kompakt"] .zeilenfluss .wahl-reihe { min-height: 32px; }
+    /* Die Beschriftung steht neben dem Feld: ohne den Abstand nach unten, den
+       sie ueber einem Feld braucht -- sonst sitzt sie 4 px zu hoch. */
+    html[data-dichte="kompakt"] .zeilenfluss > .f > label { margin: 0; }
+    /* Ein Datum in 117 px: Platzhalter und Kalenderzeichen brauchen die
+       Breite fast ganz (wie beim Zeitraum in "Neuer Einsatz"). */
+    html[data-dichte="kompakt"] .zeilenfluss input[type="date"].inp { padding-right: 6px; }
+    /* Mitarbeitende bearbeiten: eine Spalte statt zwei, jede Zeile hat Platz
+       fuer ihre Felder. Die Abschnitte bekommen die Trennlinie und die
+       Abstaende der uebrigen Formulare. */
+    html[data-dichte="kompakt"] #mbKarten .ma-spalten { display: block; }
+    /* Ja/Nein-Haekchen in der Feldspalte, mit dem Zeilenabstand darueber. */
+    html[data-dichte="kompakt"] #mbKarten .ma-janein { margin: 14px 0 0 182px; }
+    html[data-dichte="kompakt"] #mbKarten .ma-janein:first-child,
+    html[data-dichte="kompakt"] #mbKarten h3 + .ma-janein { margin-top: 0; }
+    html[data-dichte="kompakt"] #mbKarten .ma-block { margin: 0 0 18px; padding: 0 0 4px; }
+    html[data-dichte="kompakt"] #mbKarten .ma-block + .ma-block,
+    html[data-dichte="kompakt"] #mbKarten .ma-spalte + .ma-spalte > .ma-block:first-child { border-top: 1px solid var(--line-soft); padding-top: 16px; }
+    /* Kundenseite: Kommunikation und Kontaktpersonen folgen dem Zeilenfluss.
+       Die Art (E-Mail, Telefon) steht in der Beschriftungsspalte, der Wert in
+       Feldbreite -- statt einer Zeile ueber die ganze Seite. */
+    html[data-dichte="kompakt"] #view-kundeform .kw-reihe { grid-template-columns: 168px 345px auto; column-gap: 14px; row-gap: 0; justify-content: start; margin-bottom: 14px; }
+    html[data-dichte="kompakt"] #view-kundeform .kw-reihe .inp { height: 32px; }
+    html[data-dichte="kompakt"] #view-kundeform .kdlg-tab > .btn-quiet { margin-left: 168px; padding-left: 14px; }
+    /* Kontaktperson ohne eigenen Kasten: Ein Rahmen mit Innenabstand
+       verschob die Spalten um 15 px gegen den Rest der Seite. Eine Linie
+       trennt die Personen. */
+    html[data-dichte="kompakt"] #view-kundeform .ku-person { border: 0; border-radius: 0; padding: 0; margin: 0 0 14px; }
+    html[data-dichte="kompakt"] #view-kundeform .ku-person + .ku-person { border-top: 1px solid var(--line-soft); padding-top: 14px; }
+    html[data-dichte="kompakt"] #view-kundeform .ku-person > .zeilenfluss { margin-bottom: 7px; }
+    html[data-dichte="kompakt"] #view-kundeform .ku-person-ft { justify-content: flex-start; margin: 0; padding-left: 168px; }
+    html[data-dichte="kompakt"] #view-kundeform .ku-person-ft > .btn-quiet:first-child { padding-left: 14px; }
+    /* Notiz buendig mit dem rechten Rand von "Ort" in der Adresszeile:
+       345 + 44 + 24 + 14 + 64 + 44 + 34 + 14 + 80 + 44 + 34 + 14 + 218 =
+       973 px ab der Feldspalte. Darum tragen Nr., PLZ und Ort feste
+       Beschriftungsbreiten. */
+    html[data-dichte="kompakt"] #ku_notiz { width: 973px; }
+    /* Objektseite: Bemerkung und Zonenanzeige enden buendig mit "Kanton"
+       (345 + 44 + 34 + 14 + 80 + 44 + 34 + 14 + 218 + 44 + 52 + 14 + 64 =
+       1001 px ab der Feldspalte); die Zone beginnt an der Feldspalte. */
+    html[data-dichte="kompakt"] #obBemerkung { width: 1001px; }
+    html[data-dichte="kompakt"] #obZoneHint { margin-left: 182px; max-width: 1001px; }
+    /* Masterschicht: Mo bis Feiertag als Paare in einer Zeile, Abstand und
+       Kante wie alle anderen Paare. Die Gruppenbeschriftung steht in der
+       Beschriftungsspalte. */
+    html[data-dichte="kompakt"] .zeilenfluss .ms-bedarf { display: flex; align-items: center; column-gap: 44px; }
+    html[data-dichte="kompakt"] .zeilenfluss .ms-bedarf > .f { display: flex; align-items: center; gap: 14px; margin: 0; }
+    html[data-dichte="kompakt"] .zeilenfluss .ms-bedarf > .f > label { margin: 0; white-space: nowrap; }
+    /* Ein Haekchen ohne eigene Beschriftung beginnt in der Feldspalte
+       (168 + 14 px), buendig mit den Feldern darueber. */
+    html[data-dichte="kompakt"] .zeilenfluss > .f.zf-feldspalte { flex: none; margin-left: 182px; }
+    html[data-dichte="kompakt"] .zeilenfluss > .f.zf-feldspalte > label { width: auto; min-width: 0; white-space: nowrap; }
+    /* Ein Haekchen in der Zeile steht auf Feldhoehe, Kaestchen und Text auf
+       einer Linie. */
+    html[data-dichte="kompakt"] .zeilenfluss > .f > label.check { height: 32px; margin: 0; display: flex; align-items: center; }
+    /* Beschriftung mit fester Mindestbreite (style="--zf-l:..."): "PLZ *" und
+       "PLZ" stehen in zwei Abschnitten untereinander und sollen ihre Felder
+       auf dieselbe Kante setzen. */
+    html[data-dichte="kompakt"] .zeilenfluss > .f > label[style*="--zf-l"] { min-width: var(--zf-l); }
     html[data-dichte="kompakt"] #enNKunde_name       { width: 345px; }
     html[data-dichte="kompakt"] #enNEinsatzart       { width: 179px; }
     html[data-dichte="kompakt"] #enNSparte           { width: 171px; }
@@ -5759,11 +5909,16 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
   try { g = localStorage.getItem('rv3_glas') === 'aus' ? 'aus' : 'an'; } catch (e) {}
   document.documentElement.setAttribute('data-glas', g);
 })();
-/* Kompakte Darstellung (Versuch 2026-10-14). Ohne gespeicherte Wahl: normal.
-   Eigener Block mit eigenem try -- wie beim Glas oben. */
+/* Kompakte Darstellung (seit 2026-10-14, Standard seit 2026-10-16). Ohne
+   gespeicherte Wahl: kompakt. Eigener Block mit eigenem try -- wie beim
+   Glas oben. */
 (function () {
-  var d = 'normal';
-  try { d = localStorage.getItem('rv3_dichte') === 'kompakt' ? 'kompakt' : 'normal'; } catch (e) {}
+  var d = 'kompakt';
+  // Kompakt ist seit 16.10.2026 der Standard. Gelesen wird ein eigener
+  // Schluessel, den nur der Schalter schreibt: Der alte (rv3_dichte) wurde
+  // bei jedem Laden mit "normal" beschrieben und sagt darum nicht, ob
+  // jemand die grosse Darstellung bewusst gewaehlt hat.
+  try { d = localStorage.getItem('rv3_dichte_wahl') === 'normal' ? 'normal' : 'kompakt'; } catch (e) {}
   document.documentElement.setAttribute('data-dichte', d);
 })();
 /* Anmeldemaske gar nicht erst zeigen, wenn schon eine Anmeldung im
@@ -7465,6 +7620,277 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
         </div>
         <div class="ob-tab on" id="ob-uebersicht"></div>
         <div class="ob-tab" id="ob-masterschichten"></div>
+      </section>
+
+      <!-- ══════════════════ OBJEKT ANLEGEN / AENDERN (16.10.2026) ═══════════
+           Vorher ein schmaler Dialog. Wie "Neuer Kunde" eine eigene Seite im
+           Zeilenfluss (Variante 2). Feldkennungen unveraendert --
+           openObjektNeu(), saveObjekt(), die Wegstrecken und die Zone
+           arbeiten damit weiter. -->
+      <section class="view" id="view-objektform">
+        <div class="bar-tools">
+          <button class="btn btn-plain btn-sm" id="obZurueck" onclick="obFormSchliessen()">Zurück zu den Objekten</button>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-primary btn-sm" id="obNeuBtn" onclick="saveObjekt()">Objekt anlegen</button>
+        </div>
+        <div class="card"><div class="card-bd">
+          <div class="msg-err" id="obNeuErr" style="display:none"></div>
+          <p class="note">Ein Objekt ist der feste Einsatzort eines Dauerauftrags. Bezeichnung, Kunde und Ort sind Pflicht.</p>
+          <h2 id="obNeuTitel" style="display:none">Neues Objekt</h2>
+
+<div class="abschnitt">
+  <h3>Stammdaten</h3>
+  <p class="note">Die Sparte ist die Vorgabe für neue Schichten — eine einzelne Vorlage kann davon abweichen, etwa eine Endreinigung an einem bewachten Objekt.</p>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f zf-neu"><label for="obName">Bezeichnung *</label><input class="inp" id="obName" placeholder="z. B. Einkaufszentrum Nord" style="--zf-b:345px"></div>
+    <div class="f"><label for="obKunde_name" style="--zf-l:94px">Kunde *</label><input class="inp" id="obKunde_name" list="dlKunden" autocomplete="off" style="--zf-b:345px"></div>
+    <div class="f zf-neu zf-umbruch"><label for="obEinsatzart">Einsatzart</label><input class="inp" id="obEinsatzart" value="Revierdienst" list="dlEinsatzarten" oninput="artSparteKoppeln('ob')" style="--zf-b:345px"></div>
+    <div class="f" data-sparte-feld><label for="obSparte" style="--zf-l:94px">Sparte</label>
+      <select class="inp" id="obSparte" onchange="obZoneAktualisieren(); spartenKonflikt('ob')" style="--zf-b:171px">
+        <option value="sicherheit">Sicherheit</option>
+        <option value="reinigung" data-sparte="reinigung">Reinigung</option>
+      </select>
+      <div id="obSparteHint"></div>
+    </div>
+    <div class="f"><label class="check"><input type="checkbox" id="obAktiv" checked> Objekt ist in Betrieb</label></div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Ort</h3>
+  <p class="note">Der Kanton bestimmt, welche Feiertage für dieses Objekt gelten.</p>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f zf-neu"><label for="obStrasse">Strasse und Nummer</label><input class="inp" id="obStrasse" style="--zf-b:345px"></div>
+    <div class="f"><label for="obPlz" style="--zf-l:34px">PLZ</label><input class="inp" id="obPlz" inputmode="numeric" maxlength="10" style="--zf-b:80px"></div>
+    <div class="f"><label for="obOrt" style="--zf-l:34px">Ort *</label><input class="inp" id="obOrt" style="--zf-b:218px"></div>
+    <div class="f"><label for="obKanton" style="--zf-l:52px">Kanton</label><input class="inp" id="obKanton" value="SO" maxlength="2" style="text-transform:uppercase;--zf-b:64px"></div>
+  </div>
+</div>
+
+<!-- Wegstrecke und Zone nach Art. 18 (ENT-054). Steht bewusst beim Objekt
+     und nicht beim Einsatz: Gemessen wird ab Hauptanstellungsort zum
+     Einsatzort, und der Einsatzort IST das Objekt. Eine Zahl je Objekt.
+     Der Messhinweis bleibt auch kompakt sichtbar: Wer die Zahl eintippt,
+     soll VORHER wissen, welche Route gilt -- kein (i). -->
+<div class="abschnitt" id="obDistanzBlock">
+  <h3>Wegstrecke ab Anstellungsort <span class="note" style="text-transform:none;letter-spacing:0;font-weight:400;margin-left:8px">Art. 18 GAV</span></h3>
+  <p class="zone-note" id="obMessHinweis" style="margin:0 0 10px"></p>
+  <div id="obDistanzFelder"></div>
+  <div id="obZoneHint"></div>
+</div>
+
+<div class="abschnitt">
+  <h3>Weitere Angaben</h3>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f wide zf-neu zf-text"><label for="obBemerkung">Bemerkung</label><textarea class="inp" id="obBemerkung" rows="2" style="min-height:56px"></textarea></div>
+  </div>
+</div>
+        </div></div>
+      </section>
+
+      <!-- ══════════════════ MASTERSCHICHT ANLEGEN / AENDERN (16.10.2026) ══════
+           Vorher ein Dialog ueber der Objektseite. Wie "Neues Objekt" eine
+           eigene Seite im Zeilenfluss (Variante 2). Feldkennungen
+           unveraendert -- openMs(), msRechne(), msStichtagPruefen() und
+           saveMs() arbeiten damit weiter. Zurueck fuehrt auf den Reiter
+           "Masterschichten" des Objekts, von dem man kam. -->
+      <section class="view" id="view-msform">
+        <div class="bar-tools">
+          <button class="btn btn-plain btn-sm" id="msZurueck" onclick="msFormSchliessen()">Zurück zum Objekt</button>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-primary btn-sm" id="msBtn" onclick="saveMs()">Speichern</button>
+        </div>
+        <div class="card"><div class="card-bd">
+          <div class="ki-hint web" id="msStichtagHint" style="display:none">
+            <svg class="i i-sm" viewBox="0 0 24 24" style="margin-top:1px;flex:none"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+            <span id="msStichtagText"></span>
+          </div>
+          <div class="msg-err" id="msErr" style="display:none"></div>
+          <p class="note" id="msText">Eine Vorlage, aus der die einzelnen Schichten entstehen.</p>
+          <h2 id="msTitel" style="display:none">Neue Masterschicht</h2>
+
+<div class="abschnitt">
+  <h3>Vorlage</h3>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f zf-neu"><label for="msName">Bezeichnung *</label><input class="inp" id="msName" placeholder="z. B. Schliessrunde" style="--zf-b:345px"></div>
+    <div class="f"><label for="msKuerzel">Kürzel</label><input class="inp" id="msKuerzel" maxlength="10" placeholder="SR" style="--zf-b:80px"></div>
+    <div class="f"><label for="msArt">Art</label><select class="inp" id="msArt" style="--zf-b:140px"><option value="arbeit">Arbeit</option><option value="fahrtzeit">Fahrtzeit</option></select></div>
+    <div class="f" data-sparte-feld><label for="msSparte">Sparte</label><select class="inp" id="msSparte" style="--zf-b:171px"><option value="sicherheit">Sicherheit</option><option value="reinigung" data-sparte="reinigung">Reinigung</option></select></div>
+  </div>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f zf-neu"><label for="msVon">Von *</label><input class="inp" id="msVon" type="time" onchange="msRechne()" style="--zf-b:104px"></div>
+    <div class="f"><label for="msBis">Bis *</label><input class="inp" id="msBis" type="time" onchange="msRechne()" style="--zf-b:104px"></div>
+    <div class="f"><label for="msPauseMin">Pause (Minuten)</label><input class="inp" id="msPauseMin" type="number" min="0" max="1440" value="0" oninput="msRechne()" style="--zf-b:64px"></div>
+    <div class="f"><label for="msArbeitszeit">Effektive Arbeitszeit (h)</label><input class="inp" id="msArbeitszeit" type="number" step="0.01" min="0" style="--zf-b:80px"></div>
+  </div>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f wide zf-feldspalte"><label class="check"><input type="checkbox" id="msAufAbruf"> Nur auf Abruf (z. B. wetterabhängig) — erzeugte Schichten sind provisorisch</label></div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Bedarf</h3>
+  <p class="note" id="msWocheNote">An einem Feiertag gilt der Feiertagswert <b>statt</b> des Wochentagswerts. Das ist eine Bedarfsangabe — keine Aussage über Zuschläge.</p>
+  <p class="note" id="msIntervallNote" style="display:none">Gerechnet wird strikt jeder n-te Tag ab dem ersten Tag — ohne Rücksicht auf Wochentage und Feiertage.</p>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f wide zf-neu"><label for="msRhythmus">Rhythmus</label>
+      <select class="inp" id="msRhythmus" onchange="msRhythmusUm()" style="--zf-b:345px">
+        <option value="woche">Wochenmuster — Anzahl je Wochentag</option>
+        <option value="intervall">Intervall — jeden n-ten Tag</option>
+      </select>
+    </div>
+  </div>
+  <div class="form-grid form-breit form-zeilen zeilenfluss" id="msWoche">
+    <div class="f wide zf-neu"><label>Benötigte Mitarbeitende je Tag</label>
+      <div class="ms-bedarf">
+        <div class="f"><label for="msBedarf_mo">Mo</label><input class="inp" id="msBedarf_mo" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+        <div class="f"><label for="msBedarf_di">Di</label><input class="inp" id="msBedarf_di" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+        <div class="f"><label for="msBedarf_mi">Mi</label><input class="inp" id="msBedarf_mi" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+        <div class="f"><label for="msBedarf_do">Do</label><input class="inp" id="msBedarf_do" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+        <div class="f"><label for="msBedarf_fr">Fr</label><input class="inp" id="msBedarf_fr" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+        <div class="f"><label for="msBedarf_sa">Sa</label><input class="inp" id="msBedarf_sa" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+        <div class="f"><label for="msBedarf_so">So</label><input class="inp" id="msBedarf_so" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+        <div class="f"><label for="msBedarf_feiertag" style="color:var(--warn)">Feiertag</label><input class="inp" id="msBedarf_feiertag" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+      </div>
+    </div>
+  </div>
+  <div class="form-grid form-breit form-zeilen zeilenfluss" id="msIntervall" style="display:none">
+    <div class="f zf-neu"><label for="msIntervallTage">Alle wie viele Tage?</label><input class="inp" id="msIntervallTage" type="number" min="1" max="365" value="2" style="--zf-b:64px"></div>
+    <div class="f"><label for="msIntervallStart">Erster Tag</label><input class="inp" id="msIntervallStart" type="date" style="--zf-b:117px"></div>
+    <div class="f"><label for="msBedarf_intervall">Benötigte Mitarbeitende</label><input class="inp" id="msBedarf_intervall" type="number" min="0" max="99" value="1" style="--zf-b:52px"></div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Gültigkeit</h3>
+  <p class="note">Für saisonale Muster hier den Zeitraum eingrenzen, z. B. April bis Oktober.</p>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f zf-neu"><label for="msGueltigAb" id="msGueltigAbLbl">Gültig ab *</label><input class="inp" id="msGueltigAb" type="date" onchange="msStichtagPruefen()" style="--zf-b:117px"></div>
+    <div class="f"><label for="msGueltigBis">Gültig bis (leer = offen)</label><input class="inp" id="msGueltigBis" type="date" style="--zf-b:117px"></div>
+  </div>
+</div>
+        </div></div>
+      </section>
+
+      <!-- ══════════════════ KUNDE ANLEGEN / BEARBEITEN (16.10.2026) ══════════
+           Vorher ein Dialog ueber der Kundenliste. Seit kompakt der Standard
+           ist, eine eigene Seite wie "Neuer Einsatz": Zurueck links, Anlegen
+           rechts, darunter Abschnitte im Zeilenfluss (Entscheid des
+           Projektinhabers, Variante 2). Die Feldkennungen sind unveraendert --
+           kuDlgOeffnen(), Diktat, Recherche und kuSpeichern() arbeiten damit
+           weiter. Woher man kam, merkt sich kuFormHer: Aus einer Offerte
+           ("Neue Adresse") fuehrt Zurueck wieder dorthin. -->
+      <section class="view" id="view-kundeform">
+        <div class="bar-tools">
+          <button class="btn btn-plain btn-sm" id="kuZurueck" onclick="kuFormSchliessen()">Zurück zu den Kunden</button>
+          <div class="sp" style="flex:1"></div>
+          <button class="btn btn-primary btn-sm" id="kuBtn" onclick="kuSpeichern()">Kunden anlegen</button>
+        </div>
+        <div class="card"><div class="card-bd">
+          <div class="ki-hint" id="kuKiHint">
+        <svg class="i i-sm" viewBox="0 0 24 24" style="margin-top:1px;flex:none"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+        <span id="kuKiText"></span>
+      </div>
+          <div class="msg-err" id="kuErr" style="display:none"></div>
+          <p class="note" id="kuText">Name, PLZ und Ort sind Pflicht.</p>
+          <h2 id="kuTitel" style="display:none">Neuer Kunde</h2>
+
+<div class="abschnitt">
+  <h3>Stammdaten</h3>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <!-- Die Nummer vergibt das System (ENT-040). Beim Anlegen steht hier
+         die Vorschau der naechsten freien, ausgegraut; beim Bearbeiten die
+         bereits vergebene. Beides ist nicht aenderbar. -->
+    <div class="f zf-neu"><label for="ku_kundennummer">Kundennummer</label>
+      <input class="inp" id="ku_kundennummer" readonly tabindex="-1" style="--zf-b:250px"></div>
+    <div class="f"><label>Art</label>
+      <div class="wahl-reihe">
+        <label><input type="radio" name="kuArt" id="kuArtUnternehmen" value="unternehmen" onchange="kuArtUm()">Unternehmen</label>
+        <label><input type="radio" name="kuArt" id="kuArtPrivat" value="privat" onchange="kuArtUm()">Privatperson</label>
+      </div>
+    </div>
+  </div>
+  <div class="form-grid form-breit form-zeilen zeilenfluss" id="kuFirmaFelder">
+    <div class="f zf-neu"><label for="ku_name">Unternehmensname *</label><input class="inp" id="ku_name" style="--zf-b:345px"></div>
+    <!-- Ersetzt seit ENT-042 das fruehere Recherche-Haekchen im Diktat-Dialog.
+         Ergaenzt nur leere Felder, bereits eingetragene bleiben unangetastet. -->
+    <div class="f zf-knopf">
+      <button class="btn btn-plain btn-sm" type="button" id="kuRechercheBtn" onclick="kuRecherche()" title="Fehlende Angaben im Handelsregister und im Netz suchen">
+        <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Im Web nachschlagen
+      </button>
+    </div>
+  </div>
+  <div class="form-grid form-breit form-zeilen zeilenfluss" id="kuPrivatFelder" style="display:none">
+    <div class="f zf-neu"><label for="ku_anrede">Anrede</label>
+      <select class="inp" id="ku_anrede" style="--zf-b:104px">
+        <option value=""></option><option>Herr</option><option>Frau</option>
+      </select></div>
+    <div class="f"><label for="ku_vorname">Vorname *</label><input class="inp" id="ku_vorname" style="--zf-b:204px"></div>
+    <div class="f"><label for="ku_nachname">Nachname *</label><input class="inp" id="ku_nachname" style="--zf-b:204px"></div>
+  </div>
+  <div class="form-grid form-breit form-zeilen zeilenfluss" id="kuUidFelder">
+    <div class="f zf-neu"><label for="ku_uid">CHE-UID</label><input class="inp" id="ku_uid" placeholder="CHE-123.456.789" style="--zf-b:250px"></div>
+    <div class="f"><label for="ku_mwst_nr">MWST-Nr.</label><input class="inp" id="ku_mwst_nr" style="--zf-b:205px"></div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Adresse</h3>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f zf-neu"><label for="ku_strasse">Strasse</label><input class="inp" id="ku_strasse" style="--zf-b:345px"></div>
+    <div class="f"><label for="ku_hausnummer" style="--zf-l:24px">Nr.</label><input class="inp" id="ku_hausnummer" style="--zf-b:64px"></div>
+    <div class="f"><label for="ku_plz" style="--zf-l:34px">PLZ *</label><input class="inp" id="ku_plz" style="--zf-b:80px"></div>
+    <div class="f"><label for="ku_ort" style="--zf-l:34px">Ort *</label><input class="inp" id="ku_ort" style="--zf-b:218px"></div>
+    <div class="f zf-neu zf-umbruch"><label for="ku_zusatzfeld">Zusatzfeld</label><input class="inp" id="ku_zusatzfeld" style="--zf-b:345px"></div>
+    <div class="f"><label for="ku_adresszusatz" style="--zf-l:94px">Adresszusatz</label><input class="inp" id="ku_adresszusatz" style="--zf-b:345px"></div>
+  </div>
+</div>
+
+<!-- Abweichende Rechnungsadresse (ENT-155). Ohne Schalter "abweichend
+     ja/nein": leer heisst gleich wie oben, gefuellt heisst abweichend. -->
+<div class="abschnitt">
+  <h3>Rechnungsadresse</h3>
+  <p class="note">Nur ausfüllen, wenn die Rechnung an eine andere Adresse geht als oben. Leer lassen heisst: gleiche Adresse.</p>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f zf-neu"><label for="ku_re_name">Firma / Name</label><input class="inp" id="ku_re_name" style="--zf-b:345px"></div>
+    <div class="f"><label for="ku_re_zusatz" style="--zf-l:94px">Zusatz</label><input class="inp" id="ku_re_zusatz" placeholder="z. B. Buchhaltung, Postfach" style="--zf-b:345px"></div>
+    <div class="f zf-neu zf-umbruch"><label for="ku_re_strasse">Strasse</label><input class="inp" id="ku_re_strasse" style="--zf-b:345px"></div>
+    <div class="f"><label for="ku_re_hausnummer" style="--zf-l:24px">Nr.</label><input class="inp" id="ku_re_hausnummer" style="--zf-b:64px"></div>
+    <div class="f"><label for="ku_re_plz" style="--zf-l:34px">PLZ</label><input class="inp" id="ku_re_plz" style="--zf-b:80px"></div>
+    <div class="f"><label for="ku_re_ort" style="--zf-l:34px">Ort</label><input class="inp" id="ku_re_ort" style="--zf-b:218px"></div>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Kontakt</h3>
+  <div class="tabs" id="kuDlgTabs">
+    <button class="tab on" type="button" id="kudtab-kommunikation" onclick="kuDlgTab('kommunikation')">Kommunikation</button>
+    <button class="tab" type="button" id="kudtab-personen" onclick="kuDlgTab('personen')">Kontaktpersonen</button>
+  </div>
+  <div class="kdlg-tab on" id="kudlg-kommunikation">
+    <div id="kuWegeListe"></div>
+    <button class="btn btn-quiet btn-sm" type="button" onclick="kuWegHinzu()">Weitere Kontaktmöglichkeit hinzufügen</button>
+  </div>
+  <div class="kdlg-tab" id="kudlg-personen">
+    <div id="kuPersonenListe"></div>
+    <button class="btn btn-quiet btn-sm" type="button" onclick="kuPersonHinzu()">Weitere Kontaktperson hinzufügen</button>
+  </div>
+</div>
+
+<div class="abschnitt">
+  <h3>Weitere Angaben</h3>
+  <div class="form-grid form-breit form-zeilen zeilenfluss">
+    <div class="f wide zf-neu zf-text"><label for="ku_notiz">Notiz</label><textarea class="inp" id="ku_notiz" rows="2" style="min-height:56px"></textarea></div>
+  </div>
+</div>
+
+          <div class="zone" id="kuArchivZone" style="display:none">
+            <div class="zone-hd" id="kuArchivHd"></div>
+            <div class="zone-note" id="kuArchivNote"></div>
+            <button class="btn btn-plain btn-sm" type="button" id="kuArchivBtn2"></button>
+          </div>
+        </div></div>
       </section>
 
       <!-- ══════════════════ REVIERDIENST: EINRICHTUNG (ENT-224) ══════════
@@ -9827,169 +10253,9 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
   </div>
 </div>
 
-<div class="dlg-scrim" id="dlgKunde">
-  <div class="dlg breit">
-    <div class="dlg-hd">
-      <h2 id="kuTitel">Neuer Kunde</h2>
-      <p id="kuText">Name, PLZ und Ort sind Pflicht.</p>
-    </div>
-    <div class="dlg-bd">
-      <div class="ki-hint" id="kuKiHint">
-        <svg class="i i-sm" viewBox="0 0 24 24" style="margin-top:1px;flex:none"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
-        <span id="kuKiText"></span>
-      </div>
-      <div class="msg-err" id="kuErr" style="display:none"></div>
-
-      <div class="form-grid">
-        <!-- Die Nummer vergibt das System (ENT-040). Beim Anlegen steht hier
-             die Vorschau der nächsten freien, ausgegraut; beim Bearbeiten die
-             bereits vergebene. Beides ist nicht änderbar. -->
-        <div class="f"><label for="ku_kundennummer">Kundennummer</label>
-          <input class="inp" id="ku_kundennummer" readonly tabindex="-1"></div>
-        <div class="f"><label>Art</label>
-          <div class="wahl-reihe">
-            <label><input type="radio" name="kuArt" id="kuArtUnternehmen" value="unternehmen" onchange="kuArtUm()">Unternehmen</label>
-            <label><input type="radio" name="kuArt" id="kuArtPrivat" value="privat" onchange="kuArtUm()">Privatperson</label>
-          </div>
-        </div>
-      </div>
-
-      <div class="form-grid" id="kuFirmaFelder">
-        <div class="f wide"><label for="ku_name">Unternehmensname *</label><input class="inp" id="ku_name"></div>
-        <div class="f wide" style="margin-top:-8px">
-          <!-- Ersetzt seit ENT-042 das frühere Recherche-Häkchen im
-               Diktat-Dialog: funktioniert so unabhängig davon, ob der
-               Dialog per Hand, per Diktat oder über den globalen
-               Sprechen-Knopf geöffnet wurde. Ergänzt nur leere Felder,
-               bereits eingetragene bleiben unangetastet. -->
-          <button class="btn btn-plain btn-sm" type="button" id="kuRechercheBtn" onclick="kuRecherche()" title="Fehlende Angaben im Handelsregister und im Netz suchen">
-            <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            Im Web nachschlagen
-          </button>
-        </div>
-      </div>
-
-      <div class="form-grid" id="kuPrivatFelder" style="display:none">
-        <div class="f"><label for="ku_anrede">Anrede</label>
-          <select class="inp" id="ku_anrede">
-            <option value=""></option><option>Herr</option><option>Frau</option>
-          </select></div>
-        <div class="f"><label for="ku_vorname">Vorname *</label><input class="inp" id="ku_vorname"></div>
-        <div class="f wide"><label for="ku_nachname">Nachname *</label><input class="inp" id="ku_nachname"></div>
-      </div>
-
-      <div class="form-grid">
-        <div class="f wide"><label for="ku_zusatzfeld">Zusatzfeld</label><input class="inp" id="ku_zusatzfeld"></div>
-        <div class="f"><label for="ku_strasse">Strasse</label><input class="inp" id="ku_strasse"></div>
-        <div class="f"><label for="ku_hausnummer">Nr.</label><input class="inp" id="ku_hausnummer"></div>
-        <div class="f wide"><label for="ku_adresszusatz">Adresszusatz</label><input class="inp" id="ku_adresszusatz"></div>
-        <div class="f"><label for="ku_plz">PLZ *</label><input class="inp" id="ku_plz"></div>
-        <div class="f"><label for="ku_ort">Ort *</label><input class="inp" id="ku_ort"></div>
-      </div>
-
-      <div class="form-grid" id="kuUidFelder">
-        <div class="f"><label for="ku_uid">CHE- Unternehmens-Id</label><input class="inp" id="ku_uid" placeholder="CHE-123.456.789"></div>
-        <div class="f"><label for="ku_mwst_nr">CHE- MWST-Nr.</label><input class="inp" id="ku_mwst_nr"></div>
-      </div>
-
-      <!-- Abweichende Rechnungsadresse (ENT-155). Ohne Schalter „abweichend
-           ja/nein": leer heisst gleich wie oben, gefuellt heisst abweichend.
-           Ein Schalter koennte auf „ja" stehen, waehrend die Felder leer
-           sind -- und dann stuende auf dem Beleg eine leere Adresse. -->
-      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--line-soft)">
-        <div class="ep-dok-kopf">Rechnungsadresse</div>
-        <div class="note" style="margin:-2px 0 10px">Nur ausfüllen, wenn die Rechnung an eine
-          andere Adresse geht als oben. Leer lassen heisst: gleiche Adresse.</div>
-        <div class="form-grid">
-          <div class="f wide"><label for="ku_re_name">Firma / Name</label><input class="inp" id="ku_re_name"></div>
-          <div class="f wide"><label for="ku_re_zusatz">Zusatz</label><input class="inp" id="ku_re_zusatz" placeholder="z. B. Buchhaltung, Postfach"></div>
-          <div class="f"><label for="ku_re_strasse">Strasse</label><input class="inp" id="ku_re_strasse"></div>
-          <div class="f"><label for="ku_re_hausnummer">Nr.</label><input class="inp" id="ku_re_hausnummer"></div>
-          <div class="f"><label for="ku_re_plz">PLZ</label><input class="inp" id="ku_re_plz"></div>
-          <div class="f"><label for="ku_re_ort">Ort</label><input class="inp" id="ku_re_ort"></div>
-        </div>
-      </div>
-
-      <div class="tabs" id="kuDlgTabs" style="margin-top:22px">
-        <button class="tab on" type="button" id="kudtab-kommunikation" onclick="kuDlgTab('kommunikation')">Kommunikation</button>
-        <button class="tab" type="button" id="kudtab-personen" onclick="kuDlgTab('personen')">Kontaktpersonen</button>
-      </div>
-
-      <div class="kdlg-tab on" id="kudlg-kommunikation">
-        <div id="kuWegeListe"></div>
-        <button class="btn btn-quiet btn-sm" type="button" onclick="kuWegHinzu()">Weitere Kontaktmöglichkeit hinzufügen</button>
-      </div>
-
-      <div class="kdlg-tab" id="kudlg-personen">
-        <div id="kuPersonenListe"></div>
-        <button class="btn btn-quiet btn-sm" type="button" onclick="kuPersonHinzu()">Weitere Kontaktperson hinzufügen</button>
-      </div>
-
-      <div class="form-grid" style="margin-top:22px">
-        <div class="f wide"><label for="ku_notiz">Notiz</label><textarea class="inp" id="ku_notiz" rows="2" style="min-height:56px"></textarea></div>
-      </div>
-
-      <div class="zone" id="kuArchivZone" style="display:none">
-        <div class="zone-hd" id="kuArchivHd"></div>
-        <div class="zone-note" id="kuArchivNote"></div>
-        <button class="btn btn-plain btn-sm" type="button" id="kuArchivBtn2"></button>
-      </div>
-    </div>
-    <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgKunde')">Abbrechen</button>
-      <button class="btn btn-primary" id="kuBtn" onclick="kuSpeichern()">Kunden anlegen</button>
-    </div>
-  </div>
-</div>
 
 <!-- Neuer Einsatz. Auch das Ziel des Planungs-Diktats — gespeichert wird erst
      durch den Knopf unten. -->
-<!-- Objekt anlegen oder ändern -->
-<div class="dlg-scrim" id="dlgObNeu">
-  <div class="dlg">
-    <div class="dlg-hd">
-      <h2 id="obNeuTitel">Neues Objekt</h2>
-      <p>Ein Objekt ist der feste Einsatzort eines Dauerauftrags. Bezeichnung, Kunde und Ort sind Pflicht.</p>
-    </div>
-    <div class="dlg-bd">
-      <div class="msg-err" id="obNeuErr" style="display:none"></div>
-      <div class="form-grid">
-        <div class="f wide"><label for="obName">Bezeichnung *</label><input class="inp" id="obName" placeholder="z. B. Einkaufszentrum Nord"></div>
-        <div class="f wide"><label for="obKunde_name">Kunde *</label><input class="inp" id="obKunde_name" list="dlKunden" autocomplete="off"></div>
-        <div class="f wide"><label for="obStrasse">Strasse und Nummer</label><input class="inp" id="obStrasse"></div>
-        <div class="f"><label for="obPlz">PLZ</label><input class="inp" id="obPlz" inputmode="numeric" maxlength="10"></div>
-        <div class="f"><label for="obOrt">Ort *</label><input class="inp" id="obOrt"></div>
-        <div class="f"><label for="obKanton">Kanton</label><input class="inp" id="obKanton" value="SO" maxlength="2" style="text-transform:uppercase"></div>
-        <div class="f" data-sparte-feld><label for="obSparte">Sparte</label>
-          <select class="inp" id="obSparte" onchange="obZoneAktualisieren(); spartenKonflikt('ob')">
-            <option value="sicherheit">Sicherheit</option>
-            <option value="reinigung" data-sparte="reinigung">Reinigung</option>
-          </select>
-          <div id="obSparteHint"></div>
-        </div>
-        <div class="f"><label for="obEinsatzart">Einsatzart</label><input class="inp" id="obEinsatzart" value="Revierdienst" list="dlEinsatzarten" oninput="artSparteKoppeln('ob')"></div>
-        <div class="f wide"><label for="obBemerkung">Bemerkung</label><textarea class="inp" id="obBemerkung" rows="2" style="min-height:56px"></textarea></div>
-        <div class="f wide"><label class="check"><input type="checkbox" id="obAktiv" checked> Objekt ist in Betrieb</label></div>
-      </div>
-
-      <!-- Wegstrecke und Zone nach Art. 18 (ENT-054). Steht bewusst im
-           Objektdialog und nicht beim Einsatz: Gemessen wird ab
-           Hauptanstellungsort zum Einsatzort, und der Einsatzort IST das
-           Objekt. Eine Zahl je Objekt, nicht eine je Schicht. -->
-      <div id="obDistanzBlock" style="margin-top:18px">
-        <div class="feld-titel">Wegstrecke ab Anstellungsort (Art. 18 GAV)</div>
-        <p class="zone-note" id="obMessHinweis" style="margin:2px 0 10px"></p>
-        <div id="obDistanzFelder"></div>
-        <div id="obZoneHint"></div>
-      </div>
-      <p class="zone-note" style="margin-top:4px">Der Kanton bestimmt, welche Feiertage für dieses Objekt gelten. Die Sparte ist die Vorgabe für neue Schichten — eine einzelne Vorlage kann davon abweichen, etwa eine Endreinigung an einem bewachten Objekt.</p>
-    </div>
-    <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgObNeu')">Abbrechen</button>
-      <button class="btn btn-primary" id="obNeuBtn" onclick="saveObjekt()">Speichern</button>
-    </div>
-  </div>
-</div>
 
 <!-- Produkt anlegen oder ändern (ENT-181). Preis-Stammdaten für Offerten.
      Was hier steht, sind Vorschläge: Beim Übernehmen in einen Beleg werden
@@ -10126,74 +10392,6 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
   </div>
 </div>
 
-<!-- Masterschicht anlegen oder ändern -->
-<div class="dlg-scrim" id="dlgMs">
-  <div class="dlg wide">
-    <div class="dlg-hd">
-      <h2 id="msTitel">Neue Masterschicht</h2>
-      <p id="msText">Eine Vorlage, aus der die einzelnen Schichten entstehen.</p>
-    </div>
-    <div class="dlg-bd">
-      <div class="ki-hint web" id="msStichtagHint" style="display:none">
-        <svg class="i i-sm" viewBox="0 0 24 24" style="margin-top:1px;flex:none"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
-        <span id="msStichtagText"></span>
-      </div>
-      <div class="msg-err" id="msErr" style="display:none"></div>
-      <div class="form-grid">
-        <div class="f wide"><label for="msName">Bezeichnung *</label><input class="inp" id="msName" placeholder="z. B. Schliessrunde"></div>
-        <div class="f"><label for="msKuerzel">Kürzel</label><input class="inp" id="msKuerzel" maxlength="10" placeholder="SR"></div>
-        <div class="f"><label for="msArt">Art</label><select class="inp" id="msArt"><option value="arbeit">Arbeit</option><option value="fahrtzeit">Fahrtzeit</option></select></div>
-        <div class="f" data-sparte-feld><label for="msSparte">Sparte</label><select class="inp" id="msSparte"><option value="sicherheit">Sicherheit</option><option value="reinigung" data-sparte="reinigung">Reinigung</option></select></div>
-        <div class="f"><label for="msVon">Von *</label><input class="inp" id="msVon" type="time" onchange="msRechne()"></div>
-        <div class="f"><label for="msBis">Bis *</label><input class="inp" id="msBis" type="time" onchange="msRechne()"></div>
-        <div class="f"><label for="msPauseMin">Pause (Minuten)</label><input class="inp" id="msPauseMin" type="number" min="0" max="1440" value="0" oninput="msRechne()"></div>
-        <div class="f"><label for="msArbeitszeit">Effektive Arbeitszeit (h)</label><input class="inp" id="msArbeitszeit" type="number" step="0.01" min="0"></div>
-        <div class="f wide"><label class="check"><input type="checkbox" id="msAufAbruf"> Nur auf Abruf (z. B. wetterabhängig) — erzeugte Schichten sind provisorisch</label></div>
-        <div class="f wide"><label for="msRhythmus">Rhythmus</label>
-          <select class="inp" id="msRhythmus" onchange="msRhythmusUm()">
-            <option value="woche">Wochenmuster — Anzahl je Wochentag</option>
-            <option value="intervall">Intervall — jeden n-ten Tag</option>
-          </select>
-        </div>
-      </div>
-
-      <div id="msWoche">
-        <label style="display:block;font-size:11px;font-weight:650;color:var(--ink-2);letter-spacing:.4px;text-transform:uppercase;margin-bottom:6px">Benötigte Mitarbeitende je Tag</label>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
-          <div class="f" style="margin:0"><label for="msBedarf_mo">Mo</label><input class="inp" id="msBedarf_mo" type="number" min="0" max="99" value="1"></div>
-          <div class="f" style="margin:0"><label for="msBedarf_di">Di</label><input class="inp" id="msBedarf_di" type="number" min="0" max="99" value="1"></div>
-          <div class="f" style="margin:0"><label for="msBedarf_mi">Mi</label><input class="inp" id="msBedarf_mi" type="number" min="0" max="99" value="1"></div>
-          <div class="f" style="margin:0"><label for="msBedarf_do">Do</label><input class="inp" id="msBedarf_do" type="number" min="0" max="99" value="1"></div>
-          <div class="f" style="margin:0"><label for="msBedarf_fr">Fr</label><input class="inp" id="msBedarf_fr" type="number" min="0" max="99" value="1"></div>
-          <div class="f" style="margin:0"><label for="msBedarf_sa">Sa</label><input class="inp" id="msBedarf_sa" type="number" min="0" max="99" value="1"></div>
-          <div class="f" style="margin:0"><label for="msBedarf_so">So</label><input class="inp" id="msBedarf_so" type="number" min="0" max="99" value="1"></div>
-          <div class="f" style="margin:0"><label for="msBedarf_feiertag" style="color:var(--warn)">Feiertag</label><input class="inp" id="msBedarf_feiertag" type="number" min="0" max="99" value="1"></div>
-        </div>
-        <p class="zone-note" style="margin-top:8px">An einem Feiertag gilt der Feiertagswert <b>statt</b> des Wochentagswerts. Das ist eine Bedarfsangabe — keine Aussage über Zuschläge.</p>
-      </div>
-
-      <div id="msIntervall" style="display:none">
-        <div class="form-grid">
-          <div class="f"><label for="msIntervallTage">Alle wie viele Tage?</label><input class="inp" id="msIntervallTage" type="number" min="1" max="365" value="2"></div>
-          <div class="f"><label for="msIntervallStart">Erster Tag</label><input class="inp" id="msIntervallStart" type="date"></div>
-          <div class="f wide"><label for="msBedarf_intervall">Benötigte Mitarbeitende</label><input class="inp" id="msBedarf_intervall" type="number" min="0" max="99" value="1"></div>
-        </div>
-        <p class="zone-note">Gerechnet wird strikt jeder n-te Tag ab dem ersten Tag — ohne Rücksicht auf Wochentage und Feiertage.</p>
-      </div>
-
-      <div class="form-grid" style="margin-top:16px">
-        <div class="f"><label for="msGueltigAb" id="msGueltigAbLbl">Gültig ab *</label><input class="inp" id="msGueltigAb" type="date" onchange="msStichtagPruefen()"></div>
-        <div class="f"><label for="msGueltigBis">Gültig bis (leer = offen)</label><input class="inp" id="msGueltigBis" type="date"></div>
-      </div>
-      <p class="zone-note" style="margin-top:-6px">Für saisonale Muster hier den Zeitraum eingrenzen, z. B. April bis Oktober.</p>
-    </div>
-    <div class="dlg-ft">
-      <button class="btn btn-plain" onclick="closeDlg('dlgMs')">Abbrechen</button>
-      <button class="btn btn-primary" id="msBtn" onclick="saveMs()">Speichern</button>
-    </div>
-  </div>
-</div>
-
 <!-- Kontrollpunkt anlegen/ändern (ENT-180/ENT-183) -->
 <div class="dlg-scrim" id="dlgKp">
   <div class="dlg">
@@ -10232,9 +10430,8 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
         <div class="form-grid">
           <div class="f"><label for="kpLat">Breitengrad</label><input class="inp" id="kpLat" type="number" step="0.0000001" placeholder="z. B. 47.3769000" onchange="kpFeldGeaendert()"></div>
           <div class="f"><label for="kpLng">Längengrad</label><input class="inp" id="kpLng" type="number" step="0.0000001" placeholder="z. B. 8.5417000" onchange="kpFeldGeaendert()"></div>
-          <div class="f"><label for="kpRadius">Radius (Meter)</label><input class="inp" id="kpRadius" type="number" min="1" max="1000" value="20" onchange="kpFeldGeaendert()"></div>
+          <div class="f"><label for="kpRadius">Radius (Meter)</label><input class="inp" id="kpRadius" type="number" min="1" max="1000" value="20" onchange="kpFeldGeaendert()"><span class="zone-note kp-zusatz">Default 20 m — bei einer grossen Fläche (z. B. Parkplatz) übersteuerbar.</span></div>
         </div>
-        <p class="zone-note">Default 20 m — bei einer grossen Fläche (z. B. Parkplatz) übersteuerbar.</p>
       </div>
     </div>
     <div class="dlg-ft">
@@ -12197,6 +12394,9 @@ const TITLES = {
   rundgaenge:  ['Übersicht', 'Rundgänge, GPS, Aufgaben und Auswertungen auf einen Blick'],
   revierdienst: ['Revierdienst', 'Kontrollpunkte und Kontrollrunden je Objekt einrichten'],
   einsatzneu:  ['Neuer Einsatz', 'Kunde, Ort, Zeit und Zuteilung'],
+  kundeform:   ['Neuer Kunde', 'Stammdaten, Adresse und Kontakt'],
+  objektform:  ['Neues Objekt', 'Einsatzort eines Dauerauftrags'],
+  msform:      ['Neue Masterschicht', 'Vorlage, aus der die Schichten entstehen'],
   einsatzplan: ['Einsatz planen', 'Positionen und Zeiten im Detail'],
   objekt:      ['Objekt', 'Stammdaten, Masterschichten und Kontrollpunkte'],
   mitteilungen: ['Mitteilungen', 'Was die Belegschaft in der App zu sehen bekommt'],
@@ -13246,9 +13446,11 @@ function glasUm() {
 // Dieselbe Bauart wie Glas: Der Wert steht schon im Kopf der Seite am
 // Dokument, hier wird umgeschaltet und gespeichert. Nur ein Schalter -- am
 // Handy gibt es die Wahl bewusst nicht (siehe CSS-Block .dichte-schalter).
-function dichteSetzen(kompakt) {
+// Gespeichert wird nur, was jemand am Schalter waehlt (merken), nicht der
+// Zustand beim Laden -- sonst saehe der Standard aus wie eine Wahl.
+function dichteSetzen(kompakt, merken = false) {
   document.documentElement.setAttribute('data-dichte', kompakt ? 'kompakt' : 'normal');
-  try { localStorage.setItem('rv3_dichte', kompakt ? 'kompakt' : 'normal'); } catch (e) {}
+  if (merken) { try { localStorage.setItem('rv3_dichte_wahl', kompakt ? 'kompakt' : 'normal'); } catch (e) {} }
   const b = $('btnDichte');
   if (b) {
     b.setAttribute('aria-checked', kompakt ? 'true' : 'false');
@@ -13257,7 +13459,7 @@ function dichteSetzen(kompakt) {
 }
 
 function dichteUm() {
-  dichteSetzen(document.documentElement.getAttribute('data-dichte') !== 'kompakt');
+  dichteSetzen(document.documentElement.getAttribute('data-dichte') !== 'kompakt', true);
 }
 
 // Ein (i) an jede Abschnittsueberschrift, unter der ein Erklaertext steht.
@@ -13324,7 +13526,7 @@ function dichteInfoBauen() {
 // die Bearbeitungsmaske dort ist ein Formular und bleibt auf Lesebreite.
 // 'arbeitsergebnisse' bleibt ebenfalls draussen: Es zeichnet seit ENT-243
 // Karten statt Tabellen, und eine 1900 px breite Karte gewinnt nichts.
-const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'revierdienst', 'einsatzplan', 'einsatzneu', 'offerte', 'objekt',
+const ANSICHT_WEIT   = ['uebersicht', 'planung', 'abgleich', 'pensen', 'auslagen', 'rundgaenge', 'revierdienst', 'einsatzplan', 'einsatzneu', 'kundeform', 'objektform', 'msform', 'offerte', 'objekt',
                         'kunden', 'mitarbeiter', 'produkte', 'abwesenheiten',
                         'finanzen', 'rechnungen', 'lohnauslagen'];
 const PLANUNG_WEIT   = ['uebersicht', 'einsaetze', 'objektplan', 'tag'];
@@ -18555,9 +18757,10 @@ function kuMenuSchliessen() {
 function toggleArchivKunde(id, aktiv) {
   api('kunden_archivieren.php', { method: 'POST', body: { id, aktiv } }).then(({ ok, data }) => {
     if (!ok || data.status !== 'ok') { toast(data.message || 'Fehlgeschlagen.'); return; }
-    // Erreichbar aus dem Zeilenmenü und aus dem offenen Kundendialog --
-    // beide Wege schliessen sauber (ENT-044).
-    closeDlg('dlgKunde');
+    // Erreichbar aus dem Zeilenmenü und aus der offenen Kundenseite --
+    // beide Wege schliessen sauber (ENT-044). Aus dem Zeilenmenü ist die
+    // Seite zu, dann bleibt man, wo man ist.
+    kuFormSchliessen();
     Promise.all([loadKunden(), loadStats()]).then(() => {
       toast(aktiv ? 'Kunde wiederhergestellt.' : 'Kunde archiviert.');
       // Auf der Detailseite bleibt man -- Status und Knopf zeigen den neuen
@@ -21853,10 +22056,10 @@ function obDistanzZeichnen(o) {
     return;
   }
   const d = (o && o.distanzen) || {};
-  feld.innerHTML = `<div class="form-grid">` + anstellungsorte.map(a => `
+  feld.innerHTML = `<div class="form-grid form-breit form-zeilen zeilenfluss">` + anstellungsorte.map(a => `
     <div class="f">
       <label for="obKm${a.id}">${esc(a.bezeichnung)} <span style="color:var(--ink-3);font-weight:500">(${a.rolle === 'hao' ? 'HAO' : 'NAO'})</span></label>
-      <input class="inp" id="obKm${a.id}" inputmode="decimal" placeholder="km"
+      <input class="inp" id="obKm${a.id}" inputmode="decimal" placeholder="km" style="--zf-b:104px"
              value="${d[a.id] !== undefined ? d[a.id].km : ''}" oninput="obZoneAktualisieren()">
     </div>`).join('') + `</div>`;
   obZoneAktualisieren();
@@ -21915,10 +22118,28 @@ function openObjektNeu(o) {
   });
   $('obAktiv').checked = o ? !!o.aktiv : true;
   $('obNeuErr').style.display = 'none';
+  $('obNeuBtn').textContent = o ? 'Speichern' : 'Objekt anlegen';
   obDistanzZeichnen(o);
   spartenKonflikt('ob');
-  openDlg('dlgObNeu');
+  obFormZeigen();
   $('obName').focus();
+}
+
+// Seite statt Dialog (16.10.2026), dieselbe Bauart wie kuFormZeigen().
+let obFormHer = 'kunden';
+const OB_ZURUECK = { kunden: 'Zurück zu den Objekten', objekt: 'Zurück zum Objekt',
+  uebersicht: 'Zurück zur Übersicht', planung: 'Zurück zur Planung' };
+function obFormZeigen() {
+  const an = document.querySelector('.view.on');
+  const her = an ? an.id.replace('view-', '') : 'kunden';
+  if (her !== 'objektform') { obFormHer = her; }
+  go('objektform');
+  $('pgTitle').textContent = $('obNeuTitel').textContent;
+  $('obZurueck').textContent = OB_ZURUECK[obFormHer] || 'Zurück';
+  window.scrollTo(0, 0);
+}
+function obFormSchliessen() {
+  if ($('view-objektform').classList.contains('on')) { go(obFormHer || 'kunden'); }
 }
 
 function saveObjekt() {
@@ -21938,7 +22159,7 @@ function saveObjekt() {
   api('objekt_save.php', { method: 'POST', body }).then(({ ok, data }) => {
     b.disabled = false;
     if (!ok || data.status !== 'ok') { err.textContent = data.message || 'Speichern fehlgeschlagen.'; err.style.display = ''; return; }
-    closeDlg('dlgObNeu');
+    obFormSchliessen();
     const neu = !obTarget;
     const objektId = Number(data.id || obTarget);
     obDistanzenSpeichern(objektId).then(() => loadObjekte()).then(() => {
@@ -29828,14 +30049,38 @@ function openMs(modus, id) {
 
   msRhythmusUm();
   $('msErr').style.display = 'none';
-  openDlg('dlgMs');
+  $('msBtn').textContent = modus === 'neu' ? 'Masterschicht anlegen' : 'Speichern';
+  msFormZeigen();
   $('msName').focus();
+}
+
+// Seite statt Dialog (16.10.2026), dieselbe Bauart wie obFormZeigen().
+// Zurueck fuehrt immer auf das Objekt, zu dem die Vorlage gehoert. Der
+// Reiter "Masterschichten", von dem aus sie geoeffnet wurde, bleibt dort
+// stehen -- go() setzt ihn nicht zurueck, erst openObjekt() taete das.
+function msFormZeigen() {
+  go('msform');
+  $('pgTitle').textContent = $('msTitel').textContent;
+  const o = objekte.find(x => Number(x.id) === Number(obTarget));
+  if (o) { $('pgCrumb').textContent = o.name; }
+  window.scrollTo(0, 0);
+}
+function msFormSchliessen() {
+  if (!$('view-msform').classList.contains('on')) { return; }
+  go('objekt');
+  const o = objekte.find(x => Number(x.id) === Number(obTarget));
+  if (o) {
+    $('pgCrumb').textContent = o.kunde_name;
+    history.replaceState(null, '', '#objekt/' + obTarget);
+  }
 }
 
 function msRhythmusUm() {
   const ist = $('msRhythmus').value;
   $('msWoche').style.display = ist === 'woche' ? '' : 'none';
   $('msIntervall').style.display = ist === 'intervall' ? '' : 'none';
+  $('msWocheNote').style.display = ist === 'woche' ? '' : 'none';
+  $('msIntervallNote').style.display = ist === 'intervall' ? '' : 'none';
 }
 
 // Vorschlag für die effektive Arbeitszeit. Übersteuerbar — es ist ein
@@ -29895,7 +30140,7 @@ function saveMs() {
   api('masterschicht_save.php', { method: 'POST', body }).then(({ ok, data }) => {
     b.disabled = false;
     if (!ok || data.status !== 'ok') { err.textContent = data.message || 'Speichern fehlgeschlagen.'; err.style.display = ''; return; }
-    closeDlg('dlgMs');
+    msFormSchliessen();
     Promise.all([loadMasterschichten(), loadObjekte()]).then(() => {
       toast(data.art === 'neue Fassung'
         ? `Neue Fassung gespeichert — die bisherige gilt bis ${dmy(data.alt_bis)}.`
@@ -33798,12 +34043,6 @@ function dlgZurueckschieben(scrim) {
 function closeDlg(id) {
   // Ein geschlossener Dialog darf nicht weiterhoeren.
   if (sprach && id === 'dlgPlanDiktat') sprachStop();
-  // Ein abgebrochener "Neue Adresse"-Dialog darf keinen Rueckruf hinterlassen,
-  // der spaeter bei einer voellig unabhaengigen Kundenanlage ungefragt feuert
-  // (ENT-187). Der Erfolgsfall in kuSpeichern() sichert sich den Rueckruf in
-  // eine eigene lokale Variable, BEVOR er closeDlg() aufruft -- das Loeschen
-  // hier trifft also nur den abgebrochenen Fall.
-  if (id === 'dlgKunde') { kuNeuRueckkehr = null; }
   $(id).classList.remove('on');
 }
 
@@ -34875,6 +35114,51 @@ function darf(recht) {
   return !!me.ist_admin;   // Antwort ohne Rechteliste: alter Stand
 }
 
+// Zeilen und Breiten fuer die kompakte Darstellung (16.10.2026). Dieselbe
+// Anordnung wie "Neuer Einsatz", "Neuer Kunde" und "Neues Objekt": Jede Zeile
+// ist ein eigenes Raster, die erste Beschriftung steht in der 168-px-Spalte,
+// jedes Feld traegt seine eigene Breite. Ausserhalb des Zeilenflusses
+// (grosse Darstellung, schmaler Bildschirm) wird daraus wieder das
+// zweispaltige Raster mit der Beschriftung oben (ENT-074).
+// Ein Feld, das hier in keiner Zeile steht, kommt als eigene Zeile ans Ende
+// -- es darf nie fehlen, sonst speicherte "Angaben speichern" es leer.
+const MB_ZEILEN = {
+  person:        [['anrede', 'vorname', 'nachname'], ['geschlecht'],
+                  ['strasse', 'hausnummer', 'plz', 'ort'], ['adresszusatz', 'land']],
+  kontakt:       [['email', 'telefon_geschaeft', 'mobil_geschaeft'], ['email_privat', 'telefon', 'mobil'],
+                  ['notfallkontakt', 'notfallkontakt_tel'], ['sprache']],
+  betrieb:       [['personalnummer', 'kurzzeichen'], ['funktion_id', 'abteilung_id', 'anstellungsort_id'],
+                  ['beruf'], ['eintritt', 'austritt'], ['verkehrsmittel']],
+  personendaten: [['ahv_nr'], ['geburtsdatum', 'nationalitaet', 'heimatort', 'geburtsort'],
+                  ['zivilstand', 'heiratsdatum'],
+                  ['aufenthaltsbewilligung', 'aufenthalt_gueltig_bis', 'arbeitsbewilligung', 'arbeit_gueltig_bis'],
+                  ['zemis_nr'], ['strafregister_datum', 'betreibung_datum']],
+  dienstausweis: [['dienstausweis_nr', 'dienstausweis_gueltig_bis']],
+  qualifikation: [['fachausweis', 'fachausweis_am'], ['basisausbildung_am'],
+                  ['diensthund_bewilligung_bis'], ['waffe_bewilligung_bis']],
+  anstellung:    [['anstellungskategorie', 'pensum_stunden']],
+  zugang:        [['zugang_bis']],
+};
+const MB_BREITE = {
+  anrede: 104, geschlecht: 171, vorname: 204, nachname: 204, strasse: 345, hausnummer: 64,
+  plz: 80, ort: 218, adresszusatz: 345, land: 104,
+  email: 260, email_privat: 260, telefon: 171, telefon_geschaeft: 171, mobil: 171, mobil_geschaeft: 171,
+  notfallkontakt: 345, notfallkontakt_tel: 171, sprache: 104,
+  personalnummer: 104, kurzzeichen: 64, funktion_id: 218, abteilung_id: 218, anstellungsort_id: 218,
+  beruf: 218, eintritt: 117, austritt: 117, verkehrsmittel: 218,
+  ahv_nr: 345, geburtsdatum: 117, nationalitaet: 171, heimatort: 171, geburtsort: 171,
+  zivilstand: 218, heiratsdatum: 117, aufenthaltsbewilligung: 104, aufenthalt_gueltig_bis: 117,
+  arbeitsbewilligung: 218, arbeit_gueltig_bis: 117, zemis_nr: 204,
+  strafregister_datum: 117, betreibung_datum: 117,
+  dienstausweis_nr: 171, dienstausweis_gueltig_bis: 117,
+  fachausweis: 218, fachausweis_am: 117, basisausbildung_am: 117,
+  diensthund_bewilligung_bis: 117, waffe_bewilligung_bis: 117,
+  anstellungskategorie: 64, pensum_stunden: 104, zugang_bis: 117,
+};
+// Feste Beschriftungsbreite, wo zwei Zeilen dieselbe Spalte teilen: Telefon
+// und Mobil, privat wie geschaeftlich, stehen genau untereinander.
+const MB_LABEL = { telefon: 126, telefon_geschaeft: 126, mobil: 110, mobil_geschaeft: 110 };
+
 let mbAend  = {};        // aus dem Diktat uebernommen, noch nicht gespeichert
 let mbListen = {};       // pflegbare Listen aus der Antwort
 let mbNeuModus = false;  // legt die Flaeche eine Person an statt sie zu aendern?
@@ -35106,14 +35390,26 @@ function mbZeichnen() {
              + (hinweis ? ` placeholder="${esc(hinweis)}"` : '') + (gesperrt ? ' disabled' : '')
              + horcher + '>';
     }
-    return `<div class="f${breit ? ' wide' : ''}"><label for="${id}">${esc(label)}</label>${steuer}</div>`;
+    // Breite fuer den Zeilenfluss am Feld selbst (--zf-b), siehe MB_BREITE.
+    if (MB_BREITE[f]) { steuer = steuer.replace(/^<(input|select) /, `<$1 style="--zf-b:${MB_BREITE[f]}px" `); }
+    const lst = MB_LABEL[f] ? ` style="--zf-l:${MB_LABEL[f]}px"` : '';
+    return `<div class="f${breit ? ' wide' : ''}"><label for="${id}"${lst}>${esc(label)}</label>${steuer}</div>`;
   };
 
   // Ein Abschnitt mit `feldRahmen` stellt seine Felder in eine gerahmte Zone
   // statt in ein blankes Raster (ENT-289) -- gebraucht dort, wo daneben
   // ohnehin gerahmte Zonen stehen.
   const raster = a => {
-    const felder = `<div class="form-grid">${(a.felder || []).map(feld).join('')}</div>`;
+    // Zeilen nach MB_ZEILEN, je ein Raster; was keine Zeile hat, kommt einzeln
+    // ans Ende. "wide" nur fuer ein Feld allein in seiner Zeile -- im
+    // Zeilenfluss zoege es sonst ueber die ganze Breite.
+    const alleF = a.felder || [];
+    const zeilen = (MB_ZEILEN[a.id] || []).map(z => z.map(f => alleF.find(x => x[0] === f)).filter(Boolean));
+    const gesetzt = new Set(zeilen.flat().map(x => x[0]));
+    alleF.filter(x => !gesetzt.has(x[0])).forEach(x => zeilen.push([x]));
+    const felder = zeilen.filter(z => z.length).map(z =>
+      `<div class="form-grid zeilenfluss">${z.map(x => feld(z.length === 1 ? x : [x[0], x[1], x[2], x[3], x[4], false, x[6]])).join('')}</div>`
+    ).join('');
     if (!a.feldRahmen || !(a.felder || []).length) { return felder; }
     return `<div class="zone">
       <div class="zone-hd">${esc(a.feldRahmen.titel)}</div>
@@ -35806,8 +36102,35 @@ function kuDlgOeffnen(id, felder, meta) {
   }
 
   $('kuErr').style.display = 'none';
-  openDlg('dlgKunde');
+  kuFormZeigen();
   (art === 'privat' ? $('ku_vorname') : $('ku_name')).focus();
+}
+
+// Seite statt Dialog (16.10.2026). Woher man kam, damit "Zurueck" nicht blind
+// in die Kundenliste springt: "Neue Adresse" startet aus einer Offerte, das
+// Diktat aus der Uebersicht. Dieselbe Bauart wie enNeuHer beim Einsatz.
+let kuFormHer = 'kunden';
+const KU_ZURUECK = {
+  kunden: 'Zurück zu den Kunden', offerte: 'Zurück zur Offerte',
+  uebersicht: 'Zurück zur Übersicht', planung: 'Zurück zur Planung',
+};
+function kuFormZeigen() {
+  const an = document.querySelector('.view.on');
+  const her = an ? an.id.replace('view-', '') : 'kunden';
+  if (her !== 'kundeform') { kuFormHer = her; }
+  go('kundeform');
+  // Der Kopf sagt, was offen ist: "Neuer Kunde", "Kunde bearbeiten" oder
+  // "Erkannt -- bitte pruefen" -- derselbe Text, den der Dialog trug.
+  $('pgTitle').textContent = $('kuTitel').textContent;
+  $('kuZurueck').textContent = KU_ZURUECK[kuFormHer] || 'Zurück';
+  window.scrollTo(0, 0);
+}
+// Abbrechen: Ein offener "Neue Adresse"-Rueckruf darf nicht spaeter bei einer
+// voellig unabhaengigen Kundenanlage feuern (ENT-187). Der Erfolgsfall in
+// kuSpeichern() sichert ihn vorher in eine eigene Variable.
+function kuFormSchliessen() {
+  kuNeuRueckkehr = null;
+  if ($('view-kundeform').classList.contains('on')) { go(kuFormHer || 'kunden'); }
 }
 
 function kuQuellenZeilen(quellen) {
@@ -35827,13 +36150,13 @@ function kuArtUm() {
 function kuDlgTab(t) {
   kuDlgTabAktiv = t;
   document.querySelectorAll('#kuDlgTabs .tab').forEach(b => b.classList.remove('on'));
-  document.querySelectorAll('#dlgKunde .kdlg-tab').forEach(v => v.classList.remove('on'));
+  document.querySelectorAll('#view-kundeform .kdlg-tab').forEach(v => v.classList.remove('on'));
   $('kudtab-' + t).classList.add('on');
   $('kudlg-' + t).classList.add('on');
   // Die Reiterleiste sitzt unterhalb der Adressfelder. Wer sie anklickt, will
   // den Inhalt sehen -- ohne das hier bleibt der Blick auf der Adresse stehen.
-  // Beim Öffnen des Dialogs greift das nicht: da ist er noch nicht sichtbar.
-  if ($('dlgKunde').classList.contains('on')) {
+  // Beim Öffnen greift das nicht: da ist die Seite noch nicht sichtbar.
+  if ($('view-kundeform').classList.contains('on')) {
     $('kuDlgTabs').scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
 }
@@ -35916,17 +36239,17 @@ function kuPersonLeer() {
 function kuPersonenRender() {
   $('kuPersonenListe').innerHTML = kuPersonen.map((p, pi) => `
     <div class="ku-person">
-      <div class="form-grid">
-        <div class="f"><label for="kup_anrede_${pi}">Anrede</label>
-          <select class="inp" id="kup_anrede_${pi}" data-kp="anrede" data-pi="${pi}">
+      <div class="form-grid form-breit form-zeilen zeilenfluss">
+        <div class="f zf-neu"><label for="kup_anrede_${pi}">Anrede</label>
+          <select class="inp" id="kup_anrede_${pi}" data-kp="anrede" data-pi="${pi}" style="--zf-b:104px">
             <option value=""></option>
             <option${p.anrede === 'Herr' ? ' selected' : ''}>Herr</option>
             <option${p.anrede === 'Frau' ? ' selected' : ''}>Frau</option>
           </select></div>
         <div class="f"><label for="kup_vorname_${pi}">Vorname</label>
-          <input class="inp" id="kup_vorname_${pi}" data-kp="vorname" data-pi="${pi}" value="${esc(p.vorname)}"></div>
+          <input class="inp" id="kup_vorname_${pi}" data-kp="vorname" data-pi="${pi}" value="${esc(p.vorname)}" style="--zf-b:204px"></div>
         <div class="f"><label for="kup_nachname_${pi}">Nachname</label>
-          <input class="inp" id="kup_nachname_${pi}" data-kp="nachname" data-pi="${pi}" value="${esc(p.nachname)}"></div>
+          <input class="inp" id="kup_nachname_${pi}" data-kp="nachname" data-pi="${pi}" value="${esc(p.nachname)}" style="--zf-b:204px"></div>
       </div>
       ${p.kontaktwege.map((w, wi) => `
         <div class="kw-reihe">
@@ -36163,7 +36486,7 @@ function kuSpeichern() {
     // Vor closeDlg() sichern: das raeumt kuNeuRueckkehr fuer den
     // Abbruch-Fall weg (ENT-187), der Erfolgsfall braucht ihn aber noch.
     const rueckkehr = neu ? kuNeuRueckkehr : null;
-    closeDlg('dlgKunde');
+    kuFormSchliessen();
     Promise.all([loadKunden(), loadStats()]).then(() => {
       toast(neu ? 'Kunde angelegt.' : 'Kunde gespeichert.');
       if (kuTab === 'detail') renderKundeDetail();
