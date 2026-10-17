@@ -1392,6 +1392,20 @@ tr.klickbar.gewaehlt td { background: var(--accent-soft); }
 .emd-stand { font-size: 12px; color: var(--ink-3); margin: 0 0 14px; min-height: 18px; }
 .emd-stand.warn { color: var(--warn); }
 .emd-stand.ok { color: var(--pos); }
+/* E-Mail-Versand (ENT-730): zwei Reiter in einer Kachel; der Absender ist
+   ein schmales Formular wie im Vorbild, keine zweispaltige Seite. */
+.emv-tabs { margin: 14px 0 12px; }
+.emd-werkzeug[hidden] { display: none; }
+.emv-spalte { display: flex; flex-direction: column; gap: 18px; max-width: 720px; }
+.emv-paar { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.emv-typ { margin-bottom: 0; }
+.emv-typ select { max-width: 360px; }
+.emv-info { margin: 14px 0 0; padding: 12px 14px; border-radius: 8px; background: var(--accent-soft);
+  color: var(--ink-2); font-size: 13px; line-height: 1.5; }
+.emv-info.warn { background: transparent; border: 1px solid var(--warn); color: var(--warn); }
+.emv-info:empty, .emv-letzt:empty { display: none; }
+.emv-letzt { font-size: 12.5px; color: var(--ink-3); margin: 0; }
+.emv-letzt.warn { color: var(--warn); }
 .emd-raster { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
 .emd-links { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .emd-rechts { display: flex; flex-direction: column; gap: 12px; }
@@ -9718,7 +9732,7 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
                  beides geht an Kundinnen und Kunden hinaus. -->
             <button type="button" class="bk-kachel" id="bkKachelMd" onclick="bkAbschnittZeigen('md')">
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="2"/><polyline points="3 6 12 13 21 6"/></svg></span>
-              <span class="bk-kachel-lbl">E-Mail-Designer</span>
+              <span class="bk-kachel-lbl">E-Mail-Versand</span>
             </button>
             <button type="button" class="bk-kachel" onclick="bkAbschnittZeigen('zf')">
               <span class="bk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
@@ -10146,16 +10160,25 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
         <button type="button" class="btn btn-plain btn-sm bk-zurueck" onclick="emdZurueck()">Zurück</button>
         <div class="emd-kopf">
           <div class="emd-titel">
-            <h2>E-Mail-Designer</h2>
-            <p class="zone-note">So sehen die Mails aus, die dein Betrieb an Kundinnen und Kunden schickt. Gilt für alle Konten des Betriebs.</p>
+            <h2>E-Mail-Versand</h2>
+            <p class="zone-note">Wie die Mails an deine Kundinnen und Kunden aussehen und über welchen Server sie hinausgehen. Gilt für alle Konten des Betriebs.</p>
           </div>
-          <div class="emd-werkzeug">
+          <div class="emd-werkzeug" id="emvWerkzeugAbsender" hidden>
+            <button type="button" class="btn btn-plain" id="emvTest" onclick="emvTestmail()">Testmail an mich</button>
+            <button type="button" class="btn btn-primary" id="emvSpeichern" onclick="emvSpeichern()" disabled>Speichern</button>
+          </div>
+          <div class="emd-werkzeug" id="emvWerkzeugGestaltung">
             <label class="emd-wahl"><span>Vorschau</span>
               <select class="inp" id="emdArt" onchange="emdArtWechseln()"></select></label>
             <button type="button" class="btn btn-plain" id="emdTest" onclick="emdTestmail()">Testmail an mich</button>
             <button type="button" class="btn btn-primary" id="emdSpeichern" onclick="emdSpeichern()" disabled>Speichern</button>
           </div>
         </div>
+        <div class="tabs emv-tabs" role="tablist">
+          <button type="button" class="tab on" role="tab" data-reiter="gestaltung" onclick="emvReiter('gestaltung')">Gestaltung</button>
+          <button type="button" class="tab" role="tab" data-reiter="absender" onclick="emvReiter('absender')">Absender</button>
+        </div>
+        <div id="emvReiter-gestaltung">
         <p class="emd-stand" id="emdStand" role="status" aria-live="polite"></p>
         <div class="emd-raster">
           <div class="emd-links">
@@ -10213,6 +10236,51 @@ html[data-dichte="kompakt"] .dichte-schalter svg { stroke: var(--accent); }
               <label class="emd-zeile emd-check"><span>Hinweis „Versendet mit GuardOpS“</span><input type="checkbox" id="emdHinweis"></label>
               <p class="zone-note emd-hinweis" id="emdAntwort"></p>
             </div></div>
+          </div>
+        </div>
+        </div>
+        <!-- Absender (ENT-730): GuardOpS oder der eigene Mailserver des
+             Betriebs. Aufbau nach dem Vorbild des Projektinhabers: oben die
+             Wahl, darunter die Konfiguration. Das Passwort kommt nie zurueck
+             in dieses Feld. -->
+        <div id="emvReiter-absender" hidden>
+          <p class="emd-stand" id="emvStand" role="status" aria-live="polite"></p>
+          <div class="emv-spalte">
+            <div class="card"><div class="card-bd">
+              <div class="f emv-typ"><label for="emvTyp">Versand über</label>
+                <select class="inp" id="emvTyp" onchange="emvEingabe()">
+                  <option value="guardops">GuardOpS (Standard)</option>
+                  <option value="eigen">Eigener Mailserver (SMTP)</option>
+                </select></div>
+              <p class="emv-info" id="emvInfo"></p>
+            </div></div>
+            <div class="card" id="emvKonfig"><div class="card-hd"><h3>Konfiguration</h3></div><div class="card-bd">
+              <div class="f"><label for="emvAbsender">Absenderadresse</label>
+                <input class="inp emv-feld" id="emvAbsender" type="email" maxlength="254" autocomplete="off" placeholder="offerten@deinbetrieb.ch"></div>
+              <div class="emv-paar">
+                <div class="f"><label for="emvBenutzer">Benutzername</label>
+                  <input class="inp emv-feld" id="emvBenutzer" maxlength="254" autocomplete="off"></div>
+                <div class="f"><label for="emvPasswort">Passwort</label>
+                  <div class="pw-feld">
+                    <input class="inp emv-feld" id="emvPasswort" type="password" maxlength="500" autocomplete="new-password">
+                    <button type="button" class="pw-toggle" aria-label="Passwort anzeigen"
+                            onclick="togglePw('emvPasswort', this)">👁</button>
+                  </div></div>
+              </div>
+              <div class="emv-paar">
+                <div class="f"><label for="emvServer">Server</label>
+                  <input class="inp emv-feld" id="emvServer" maxlength="253" autocomplete="off" placeholder="mail.deinbetrieb.ch"></div>
+                <div class="f"><label for="emvPort">Port</label>
+                  <select class="inp emv-feld" id="emvPort"></select></div>
+              </div>
+              <div class="f"><label for="emvVersch">Verschlüsselung</label>
+                <select class="inp emv-feld" id="emvVersch">
+                  <option value="ssl">SSL/TLS (meist Port 465)</option>
+                  <option value="starttls">STARTTLS (meist Port 587)</option>
+                </select></div>
+              <p class="zone-note emd-erkl">Ist am Postfach die Zwei-Faktor-Anmeldung eingeschaltet, brauchst du ein App-Passwort deines Anbieters. Beim Speichern meldet sich GuardOpS einmal an deinem Server an, ohne etwas zu versenden.</p>
+            </div></div>
+            <p class="emv-letzt" id="emvLetzt"></p>
           </div>
         </div>
         </div>
@@ -29985,7 +30053,7 @@ function bkAbschnittZeigen(id) {
   $('bkUebersicht').style.display = 'none';
   document.querySelectorAll('#view-betrieb .bk-abschnitt').forEach(a => { a.style.display = 'none'; });
   $('bkAb-' + id).style.display = '';
-  if (id === 'md') { emdOeffnen(); }
+  if (id === 'md') { emdOeffnen(); emvOeffnen(); }
 }
 
 // ══════════════════════════════════════════ E-MAIL-DESIGNER (ENT-729)
@@ -30161,8 +30229,9 @@ function emdTestmail() {
 }
 
 function emdZurueck() {
-  if (emdGeaendert() && !confirm('Deine Änderungen am E-Mail-Designer sind nicht gespeichert. Trotzdem verlassen?')) { return; }
+  if ((emdGeaendert() || emvGeaendert()) && !confirm('Deine Änderungen am E-Mail-Versand sind nicht gespeichert. Trotzdem verlassen?')) { return; }
   if (emd.g) { emd.g = JSON.parse(emd.gespeichert); }
+  if (emv.v) { emv.v = JSON.parse(emv.gespeichert); }
   bkUebersichtZeigen();
 }
 
@@ -30200,13 +30269,180 @@ function emdZurueck() {
     document.querySelectorAll('#emdLogoAusr button').forEach(x => x.classList.toggle('on', x === b));
     emdGeaendertMelden();
   });
-  window.addEventListener('beforeunload', e => { if (emdGeaendert()) { e.preventDefault(); e.returnValue = ''; } });
+  window.addEventListener('beforeunload', e => { if (emdGeaendert() || emvGeaendert()) { e.preventDefault(); e.returnValue = ''; } });
   // Die Vorschau so hoch wie die Mail: Ein festes Fenster mit Bildlauf
   // schnitte den Gruss und die Fusszeile ab -- gerade das, was man prueft.
   $('emdVorschau').addEventListener('load', () => {
     const f = $('emdVorschau'), d = f.contentDocument;
     if (d && d.documentElement) { f.style.height = Math.max(300, d.documentElement.scrollHeight) + 'px'; }
   });
+})();
+
+// ══════════════════════════════════════════ ABSENDER (ENT-730)
+// Reiter "Absender" in der Kachel E-Mail-Versand: GuardOpS oder der eigene
+// Mailserver des Betriebs. emv.v ist der Entwurf, emv.gespeichert der
+// Stand am Server. Das Passwort steht nie im Entwurf, der vom Server kommt
+// -- nur, ob eines hinterlegt ist. Was hier eingetippt wird, geht beim
+// Speichern einmal an den Server und danach nie mehr zurueck. Speichern
+// meldet sich am Mailserver an; klappt das nicht, sagt der Server warum und
+// speichert nicht.
+const emv = { v: null, gespeichert: '', pw: '', darf: false, unbekannt: false, schluessel: true, ports: [], reiter: 'gestaltung' };
+
+function emvReiter(r) {
+  emv.reiter = r;
+  document.querySelectorAll('.emv-tabs .tab').forEach(t => {
+    const an = t.dataset.reiter === r;
+    t.classList.toggle('on', an); t.setAttribute('aria-selected', an ? 'true' : 'false');
+  });
+  $('emvReiter-gestaltung').hidden = r !== 'gestaltung';
+  $('emvReiter-absender').hidden = r !== 'absender';
+  $('emvWerkzeugGestaltung').hidden = r !== 'gestaltung';
+  $('emvWerkzeugAbsender').hidden = r !== 'absender';
+}
+
+function emvOeffnen() {
+  emvReiter(emv.reiter);
+  emvStand('Wird geladen …');
+  api('mail_absender.php').then(({ ok, data }) => {
+    if (!ok || !data || data.status !== 'ok') {
+      emvStand(data && data.message ? data.message : 'Der Absender liess sich nicht laden.', 'warn');
+      return;
+    }
+    emv.darf = !!data.darf_aendern; emv.unbekannt = !!data.stand_unbekannt;
+    emv.schluessel = !!data.schluessel_da; emv.ports = data.ports || [];
+    emv.v = data.versand; emv.pw = '';
+    emv.gespeichert = JSON.stringify(emv.v);
+    $('emvPort').innerHTML = emv.ports.map(p => `<option value="${p}">${p}</option>`).join('');
+    emvZeichnen();
+  }).catch(() => emvStand('Der Absender liess sich nicht laden.', 'warn'));
+}
+
+function emvStand(text, art) {
+  const el = $('emvStand'); if (!el) { return; }
+  el.textContent = text || '';
+  el.classList.toggle('warn', art === 'warn');
+  el.classList.toggle('ok', art === 'ok');
+}
+function emvGeaendert() { return !!emv.v && (JSON.stringify(emv.v) !== emv.gespeichert || emv.pw !== ''); }
+
+// Felder aus emv.v fuellen. Nur hier wird geschrieben; die Eingaben
+// schreiben zurueck (emvEingabe).
+function emvZeichnen() {
+  const v = emv.v || { typ: 'guardops' };
+  $('emvTyp').value = v.typ;
+  $('emvAbsender').value = v.absender || '';
+  $('emvBenutzer').value = v.benutzer || '';
+  $('emvServer').value = v.server || '';
+  $('emvVersch').value = v.verschluesselung || 'ssl';
+  $('emvPort').value = String(v.port || (v.verschluesselung === 'starttls' ? 587 : 465));
+  $('emvPasswort').value = emv.pw;
+  $('emvPasswort').placeholder = v.passwort_hinterlegt ? 'Hinterlegt. Leer lassen, um es zu behalten.' : '';
+  document.querySelectorAll('#emvReiter-absender select, #emvReiter-absender input').forEach(el => { el.disabled = !emv.darf; });
+  emvAnzeigen();
+}
+
+function emvAnzeigen() {
+  const v = emv.v || { typ: 'guardops' }, eigen = v.typ === 'eigen';
+  $('emvKonfig').hidden = !eigen;
+  const info = $('emvInfo');
+  info.classList.toggle('warn', eigen && !emv.schluessel);
+  if (eigen && !emv.schluessel) {
+    info.textContent = 'Auf dieser Anlage fehlt noch der Schlüssel, mit dem GuardOpS das Passwort verschlüsselt. Ein eigener Mailserver lässt sich erst danach einrichten. Bitte der Betreiberin melden.';
+  } else if (eigen) {
+    info.textContent = 'Die Mails an deine Kundinnen und Kunden gehen über deinen Server und mit deiner Absenderadresse hinaus. Mails an deine Mitarbeitenden laufen weiter über GuardOpS.';
+  } else {
+    info.textContent = 'Die Mails an deine Kundinnen und Kunden gehen über den Server von GuardOpS hinaus. Antworten gehen an die E-Mail-Adresse deines Betriebs.';
+  }
+  // Letzter Stand des Versands: Viele dieser Mails gehen ohne jemanden vor
+  // dem Bildschirm hinaus. Eine Stoerung soll hier auffallen.
+  const l = $('emvLetzt');
+  const gesp = JSON.parse(emv.gespeichert || '{}');
+  l.classList.remove('warn');
+  if (gesp.typ === 'eigen' && gesp.letzter_fehler) {
+    l.classList.add('warn');
+    l.textContent = `Letzter Versand über deinen Server fehlgeschlagen (${emvZeit(gesp.letzter_fehler.am)}): ${gesp.letzter_fehler.text}`;
+  } else if (gesp.typ === 'eigen' && gesp.zuletzt_ok) {
+    l.textContent = `Zuletzt erfolgreich verbunden: ${emvZeit(gesp.zuletzt_ok)}.`;
+  } else {
+    l.textContent = '';
+  }
+  if (!emv.darf) { emvStand('Ansehen ist möglich. Ändern darf, wer die Betriebseinstellungen bearbeiten darf.'); }
+  else if (emv.unbekannt) { emvStand('Speichern geht noch nicht: Die Einrichtung ist noch nicht auf dem neusten Stand.', 'warn'); }
+  else if (emvGeaendert()) { emvStand('Ungespeicherte Änderungen.', 'warn'); }
+  else { emvStand(eigen ? 'Gespeichert. Die Kundenmails gehen über deinen eigenen Mailserver.' : 'Gespeichert. Die Kundenmails gehen über GuardOpS.'); }
+  $('emvSpeichern').disabled = !emv.darf || emv.unbekannt || !emvGeaendert() || (eigen && !emv.schluessel);
+  $('emvSpeichern').hidden = !emv.darf;
+  $('emvTest').hidden = !emv.darf;
+  $('emvTest').disabled = eigen && !emv.schluessel;
+}
+
+function emvZeit(t) {
+  const m = String(t || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  return m ? `${m[3]}.${m[2]}.${m[1]}, ${m[4]}:${m[5]}` : String(t || '');
+}
+
+function emvEingabe(e) {
+  if (!emv.v || !emv.darf) { return; }
+  const vorher = emv.v.verschluesselung;
+  emv.v.typ = $('emvTyp').value;
+  if (emv.v.typ === 'eigen') {
+    emv.v.absender = $('emvAbsender').value.trim();
+    emv.v.benutzer = $('emvBenutzer').value.trim();
+    emv.v.server = $('emvServer').value.trim();
+    emv.v.verschluesselung = $('emvVersch').value;
+    emv.v.port = parseInt($('emvPort').value, 10) || 0;
+    // Den ueblichen Port vorschlagen, wenn die Verschluesselung wechselt.
+    if (e && e.target && e.target.id === 'emvVersch' && vorher !== emv.v.verschluesselung) {
+      emv.v.port = emv.v.verschluesselung === 'starttls' ? 587 : 465;
+      $('emvPort').value = String(emv.v.port);
+    }
+    emv.pw = $('emvPasswort').value;
+  }
+  emvAnzeigen();
+}
+
+function emvNutzlast() {
+  const v = emv.v || { typ: 'guardops' };
+  return { typ: v.typ, absender: v.absender || '', benutzer: v.benutzer || '', server: v.server || '',
+           port: v.port || 0, verschluesselung: v.verschluesselung || 'ssl', passwort: emv.pw };
+}
+
+function emvSpeichern() {
+  if (!emv.darf || !emvGeaendert()) { return; }
+  const knopf = $('emvSpeichern');
+  knopf.disabled = true;
+  emvStand(emv.v.typ === 'eigen' ? 'Melde mich an deinem Mailserver an …' : 'Wird gespeichert …');
+  api('mail_absender.php', { method: 'POST', body: { aktion: 'speichern', versand: emvNutzlast() } })
+    .then(({ ok, data }) => {
+      if (ok && data && data.status === 'ok') {
+        emv.v = data.versand; emv.pw = ''; emv.gespeichert = JSON.stringify(emv.v);
+        emvZeichnen();
+        emvStand(emv.v.typ === 'eigen' ? 'Gespeichert. Die Anmeldung an deinem Mailserver hat geklappt.' : 'Gespeichert. Die Kundenmails gehen über GuardOpS.', 'ok');
+        return;
+      }
+      if (data && data.stand_unbekannt) { emv.unbekannt = true; }
+      emvStand((data && data.message) || 'Nicht gespeichert.', 'warn');
+      knopf.disabled = false;
+    }).catch(() => { emvStand('Nicht gespeichert. Keine Verbindung.', 'warn'); knopf.disabled = false; });
+}
+
+function emvTestmail() {
+  if (!emv.darf || !emv.v) { return; }
+  emvStand('Testmail wird verschickt …');
+  api('mail_absender.php', { method: 'POST', body: { aktion: 'testmail', versand: emvNutzlast() } })
+    .then(({ ok, data }) => {
+      if (ok && data && data.status === 'ok') {
+        emvStand(`Testmail an ${data.an} verschickt.` + (emvGeaendert() ? ' Die Angaben sind noch nicht gespeichert.' : ''), 'ok');
+        return;
+      }
+      emvStand((data && data.message) || 'Testmail fehlgeschlagen.', 'warn');
+    }).catch(() => emvStand('Testmail fehlgeschlagen. Keine Verbindung.', 'warn'));
+}
+
+(function emvEingabenBinden() {
+  const ab = $('emvReiter-absender'); if (!ab) { return; }
+  ab.addEventListener('input', e => { if (e.target.classList.contains('emv-feld')) { emvEingabe(e); } });
+  ab.addEventListener('change', e => { if (e.target.classList.contains('emv-feld')) { emvEingabe(e); } });
 })();
 
 function bkQrIbanPruefen() {

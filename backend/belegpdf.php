@@ -599,7 +599,7 @@ function beleg_annahme_abschliessen(PDO $pdo, string $tabPraefix, int $belegId, 
             $m = beleg_bestaetigung_mail($beleg, $u, (int)$f['nummer'], $firma, false, $signaturZeilen, true);
         }
         smtp_senden((string)$u['email'], (string)$u['name'], $m['betreff'], $m['html'], $m['text'], $anhang,
-                    $m['bilder'], (string)($m['antwort_an'] ?? ''));
+                    $m['bilder'], (string)($m['antwort_an'] ?? ''), $m['server'] ?? null);
         $raus['kunde'] = true;
     } catch (Throwable $e) {
         // Angenommen ist angenommen -- siehe Kopf.

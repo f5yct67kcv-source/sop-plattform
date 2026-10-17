@@ -137,7 +137,7 @@ $mail = mail_betrieb($pdo, 'portal', ['Kunde' => (string)$zugang['name'], 'Minut
 
 try {
     smtp_senden($email, (string)$zugang['name'], $mail['betreff'], $mail['html'], $mail['text'],
-        [], $mail['bilder'], $mail['antwort_an']);
+        [], $mail['bilder'], $mail['antwort_an'], $mail['server']);
 } catch (Throwable $ex) {
     error_log('Kundenportal: Linkversand fehlgeschlagen — ' . $ex->getMessage());
 }

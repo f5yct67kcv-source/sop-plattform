@@ -1672,7 +1672,8 @@ function beleg_unterschrift_ablauf(string $was, PDO $pdo, string $tabPraefix, ar
         }
         try {
             smtp_senden($angaben['werte']['email'], $angaben['werte']['name'], $mail['betreff'],
-                        $mail['html'], $mail['text'], [], $mail['bilder'], (string)($mail['antwort_an'] ?? ''));
+                        $mail['html'], $mail['text'], [], $mail['bilder'], (string)($mail['antwort_an'] ?? ''),
+                        $mail['server'] ?? null);
         } catch (Throwable $e) {
             json_response(['status' => 'error', 'lage' => 'mail',
                 'message' => 'Der Code liess sich nicht verschicken. Bitte prüfen Sie die Adresse oder versuchen Sie es später erneut.'], 502);

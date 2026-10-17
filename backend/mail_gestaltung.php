@@ -406,9 +406,14 @@ function mail_betrieb_bauen(array $g, array $betrieb, string $art, array $werte,
 }
 
 // Kurzweg fuer die Versandstellen: laedt Gestaltung und Betrieb selbst.
+// 'server' ist der eigene Mailserver des Betriebs (ENT-730) oder null; die
+// Versandstelle reicht ihn an smtp_senden() weiter.
 function mail_betrieb(PDO $pdo, string $art, array $werte, array $extra = []): array
 {
-    return mail_betrieb_bauen(mail_g_laden($pdo), mail_g_betrieb($pdo), $art, $werte, $extra);
+    $b = mail_g_betrieb($pdo);
+    $m = mail_betrieb_bauen(mail_g_laden($pdo), $b, $art, $werte, $extra);
+    $m['server'] = mail_v_fuer_versand($pdo, $b['firma']);
+    return $m;
 }
 
 // Musterwerte einer Art fuer Vorschau und Testmail.
@@ -418,4 +423,173 @@ function mail_g_muster(string $art): array
     $w['Titel'] = MAIL_MUSTER_TITEL[$art] ?? 'Offerte';
     $w['Nummer'] = $art === 'rechnung' ? 'RE-0001' : 'OF-0001';
     return $w;
+}
+
+// ── Eigener Mailserver des Betriebs (ENT-730) ────────────────────────
+//
+// Statt ueber GuardOpS gehen die Kundenmails oben (MAIL_ARTEN) ueber den
+// Mailserver des Betriebs hinaus, mit seiner Absenderadresse. Mails an
+// Mitarbeitende bleiben bei GuardOpS: Ein falsches Passwort hier soll
+// niemanden aus dem eigenen Konto aussperren (Entscheid des
+// Projektinhabers).
+//
+// Gespeichert in betrieb.mail_versand als JSON. Das Passwort steht dort nur
+// verschluesselt; der Schluessel kommt aus dem Deploy (Secret
+// MAIL_SCHLUESSEL), nie aus der Datenbank. Wer nur die Datenbank hat, hat
+// kein Passwort. Fehlt der Schluessel, laesst sich kein eigener Server
+// einrichten, und ein gespeicherter wird nicht benutzt -- dann scheitert
+// der Versand mit einer Meldung statt still ueber GuardOpS zu gehen
+// (Entscheid: "Fehler melden, kein Ausweichen").
+
+// Nur die ueblichen Ports fuer Mailversand. Der Server verbindet sich auf
+// Zuruf des Betriebs -- ohne Grenze liesse sich damit von aussen
+// ausprobieren, welche Dienste im Rechenzentrum offen sind.
+const MAIL_V_PORTS = [25, 465, 587, 2525];
+
+// 32 Bytes, base64. null, solange der Deploy keinen gueltigen Wert
+// eingesetzt hat.
+function mail_v_schluessel(?string $roh = null): ?string
+{
+    $roh ??= '__MAIL_SCHLUESSEL__';
+    // Wie platzhalter_offen() in mailer.php, aber ohne mailer.php: Diese
+    // Datei wird auch dort geladen, wo mailer.php fehlt.
+    if ($roh === '' || str_contains($roh, '__MAIL_SCHLUESSEL')) { return null; }
+    $k = base64_decode(trim($roh), true);
+    return is_string($k) && strlen($k) === 32 ? $k : null;
+}
+
+function mail_v_verschluesseln(string $klar, string $schluessel): string
+{
+    $iv = random_bytes(12);
+    $tag = '';
+    $roh = openssl_encrypt($klar, 'aes-256-gcm', $schluessel, OPENSSL_RAW_DATA, $iv, $tag);
+    return 'v1:' . base64_encode($iv . $tag . $roh);
+}
+
+// null, wenn der Wert nicht mit diesem Schluessel verschluesselt wurde
+// oder veraendert ist (GCM prueft beides).
+function mail_v_entschluesseln(string $wert, string $schluessel): ?string
+{
+    if (!str_starts_with($wert, 'v1:')) { return null; }
+    $b = base64_decode(substr($wert, 3), true);
+    if (!is_string($b) || strlen($b) < 29) { return null; }
+    $klar = openssl_decrypt(substr($b, 28), 'aes-256-gcm', $schluessel, OPENSSL_RAW_DATA,
+                            substr($b, 0, 12), substr($b, 12, 16));
+    return $klar === false ? null : $klar;
+}
+
+// Prueft die Eingabe aus dem Formular. $alt ist der gespeicherte Stand:
+// Ein leeres Passwortfeld heisst "unveraendert", weil das Passwort nie an
+// den Browser zurueckgeht. Rueckgabe [stand, fehler]; das Passwort steht im
+// Stand noch im Klartext unter 'passwort_klar'.
+function mail_v_pruefen(array $roh, array $alt = []): array
+{
+    $fehler = [];
+    $typ = ($roh['typ'] ?? '') === 'eigen' ? 'eigen' : 'guardops';
+    if ($typ === 'guardops') { return [['typ' => 'guardops'], []]; }
+
+    $zeile = fn($w) => trim(preg_replace('/[\x00-\x1F\x7F]/', '', (string)$w));
+    $absender = $zeile($roh['absender'] ?? '');
+    $benutzer = $zeile($roh['benutzer'] ?? '');
+    $server = strtolower($zeile($roh['server'] ?? ''));
+    $port = (int)($roh['port'] ?? 0);
+    $versch = ($roh['verschluesselung'] ?? '') === 'starttls' ? 'starttls' : 'ssl';
+    $pw = (string)($roh['passwort'] ?? '');
+
+    if (!filter_var($absender, FILTER_VALIDATE_EMAIL)) { $fehler[] = 'Die Absenderadresse ist keine gültige E-Mail-Adresse.'; }
+    if ($benutzer === '' || strlen($benutzer) > 254) { $fehler[] = 'Der Benutzername fehlt.'; }
+    if (!preg_match('/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/', $server)) {
+        $fehler[] = 'Der Server muss ein Name wie mail.beispiel.ch sein.';
+    }
+    if (!in_array($port, MAIL_V_PORTS, true)) {
+        $fehler[] = 'Erlaubt sind die Ports ' . implode(', ', MAIL_V_PORTS) . '.';
+    }
+    if ($pw === '' && ($alt['passwort'] ?? '') === '') { $fehler[] = 'Das Passwort fehlt.'; }
+    if (preg_match('/[\r\n]/', $pw) || strlen($pw) > 500) { $fehler[] = 'Das Passwort enthält unzulässige Zeichen.'; }
+
+    return [['typ' => 'eigen', 'absender' => $absender, 'benutzer' => $benutzer, 'server' => $server,
+             'port' => $port, 'verschluesselung' => $versch, 'passwort_klar' => $pw], $fehler];
+}
+
+// Der gespeicherte Stand, so wie er in der Datenbank steht (Passwort
+// verschluesselt). Leer, solange nichts eingerichtet ist.
+function mail_v_laden(PDO $pdo): array
+{
+    try {
+        if (!hat_spalte($pdo, 'betrieb', 'mail_versand')) { return []; }
+        $roh = $pdo->query('SELECT mail_versand FROM betrieb WHERE id = 1')->fetchColumn();
+        $d = is_string($roh) && $roh !== '' ? json_decode($roh, true) : null;
+        return is_array($d) ? $d : [];
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+function mail_v_schreiben(PDO $pdo, array $stand): void
+{
+    $pdo->prepare('UPDATE betrieb SET mail_versand = ? WHERE id = 1')
+        ->execute([json_encode($stand, JSON_UNESCAPED_UNICODE)]);
+}
+
+// Was der Browser sehen darf: alles ausser dem Passwort.
+function mail_v_oeffentlich(array $stand): array
+{
+    $raus = ['typ' => ($stand['typ'] ?? '') === 'eigen' ? 'eigen' : 'guardops'];
+    foreach (['absender', 'benutzer', 'server', 'port', 'verschluesselung', 'letzter_fehler', 'zuletzt_ok'] as $k) {
+        if (isset($stand[$k])) { $raus[$k] = $stand[$k]; }
+    }
+    $raus['passwort_hinterlegt'] = ($stand['passwort'] ?? '') !== '';
+    return $raus;
+}
+
+// Baut aus dem Stand die Angaben fuer smtp_senden(). null heisst: ueber
+// GuardOpS. Ein eigener Server, der sich nicht benutzen laesst, liefert
+// ['fehler' => ...] -- smtp_senden() bricht dann ab, statt auszuweichen.
+function mail_v_server(array $stand, string $firma, ?string $schluessel, ?string $klarPasswort = null): ?array
+{
+    if (($stand['typ'] ?? '') !== 'eigen') { return null; }
+    if ($klarPasswort === null) {
+        if ($schluessel === null) {
+            return ['fehler' => 'Der eigene Mailserver ist eingerichtet, aber auf dieser Anlage fehlt der Schlüssel '
+                . 'für das Passwort. Bitte der Betreiberin melden.'];
+        }
+        $klarPasswort = mail_v_entschluesseln((string)($stand['passwort'] ?? ''), $schluessel);
+        if ($klarPasswort === null) {
+            return ['fehler' => 'Das Passwort des eigenen Mailservers lässt sich nicht mehr lesen. '
+                . 'Bitte unter Betrieb › E-Mail-Versand neu eingeben.'];
+        }
+    }
+    return ['eigen' => true, 'host' => (string)$stand['server'], 'port' => (int)$stand['port'],
+            'verschluesselung' => (string)$stand['verschluesselung'], 'user' => (string)$stand['benutzer'],
+            'pass' => $klarPasswort, 'absender' => (string)$stand['absender'], 'name' => $firma];
+}
+
+// Fuer die Versandstellen: der Server des Betriebs samt Rueckmeldung. Ein
+// Fehler beim Versand wird am Betrieb vermerkt und unter E-Mail-Versand
+// angezeigt -- viele dieser Mails gehen ohne jemanden vor dem Bildschirm
+// hinaus (Annahmebestaetigung, Portal-Link), und eine Stoerung soll nicht
+// unbemerkt bleiben.
+function mail_v_fuer_versand(PDO $pdo, string $firma): ?array
+{
+    $stand = mail_v_laden($pdo);
+    $s = mail_v_server($stand, $firma, mail_v_schluessel());
+    if ($s === null) { return null; }
+    $s['rueckmeldung'] = function (?string $fehler) use ($pdo): void {
+        try {
+            $st = mail_v_laden($pdo);
+            if (($st['typ'] ?? '') !== 'eigen') { return; }
+            $jetzt = date('Y-m-d H:i:s');
+            if ($fehler === null) {
+                if (empty($st['letzter_fehler']) && ($st['zuletzt_ok'] ?? '') > date('Y-m-d H:i:s', time() - 3600)) { return; }
+                unset($st['letzter_fehler']);
+                $st['zuletzt_ok'] = $jetzt;
+            } else {
+                $st['letzter_fehler'] = ['am' => $jetzt, 'text' => mb_substr($fehler, 0, 300)];
+            }
+            mail_v_schreiben($pdo, $st);
+        } catch (Throwable $e) {
+            // Die Rueckmeldung darf den Versand nicht stoeren.
+        }
+    };
+    return $s;
 }

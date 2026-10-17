@@ -258,6 +258,13 @@ jobs:
           S_VAPID_PRIVATE_PEM_B64: ${{ secrets.STAGING_VAPID_PRIVATE_PEM_B64 }}
           S_VAPID_KONTAKT: ${{ secrets.STAGING_VAPID_KONTAKT }}
           S_PUSH_CRON_SCHLUESSEL: ${{ secrets.STAGING_PUSH_CRON_SCHLUESSEL }}
+          # Schluessel fuer die Passwoerter der eigenen Mailserver der
+          # Betriebe (ENT-730): 32 Zufallsbytes, base64. NIE wechseln -- mit
+          # einem neuen Schluessel sind alle gespeicherten Passwoerter
+          # unlesbar. Nicht erforderlich: ohne ihn bleibt nur der eigene
+          # Server zu, die Oberflaeche sagt das.
+          P_MAIL_SCHLUESSEL: ${{ secrets.MAIL_SCHLUESSEL }}
+          S_MAIL_SCHLUESSEL: ${{ secrets.STAGING_MAIL_SCHLUESSEL }}
           # APNs (ENT-604). NUR Production: Die native Store-App ist EIN
           # Programm mit EINER Bundle-ID, das immer gegen die echte API
           # spricht -- anders als die Web-Bereiche gibt es fuer sie kein
@@ -295,6 +302,7 @@ jobs:
             EFF_VAPID_PRIVATE_PEM_B64="$P_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$P_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$P_PUSH_CRON_SCHLUESSEL"
+            EFF_MAIL_SCHLUESSEL="$P_MAIL_SCHLUESSEL"
             EFF_APNS_KEY_P8_B64="$P_APNS_KEY_P8_B64"
             EFF_APNS_KEY_ID="$P_APNS_KEY_ID"
             EFF_APNS_TEAM_ID="$P_APNS_TEAM_ID"
@@ -369,6 +377,7 @@ jobs:
             EFF_VAPID_PRIVATE_PEM_B64="$S_VAPID_PRIVATE_PEM_B64"
             EFF_VAPID_KONTAKT="$S_VAPID_KONTAKT"
             EFF_PUSH_CRON_SCHLUESSEL="$S_PUSH_CRON_SCHLUESSEL"
+            EFF_MAIL_SCHLUESSEL="$S_MAIL_SCHLUESSEL"
             EFF_APNS_KEY_P8_B64=""
             EFF_APNS_KEY_ID=""
             EFF_APNS_TEAM_ID=""
@@ -523,6 +532,7 @@ jobs:
             echo "EFF_VAPID_PRIVATE_PEM_B64=$EFF_VAPID_PRIVATE_PEM_B64"
             echo "EFF_VAPID_KONTAKT=$EFF_VAPID_KONTAKT"
             echo "EFF_PUSH_CRON_SCHLUESSEL=$EFF_PUSH_CRON_SCHLUESSEL"
+            echo "EFF_MAIL_SCHLUESSEL=$EFF_MAIL_SCHLUESSEL"
             echo "EFF_APNS_KEY_P8_B64=$EFF_APNS_KEY_P8_B64"
             echo "EFF_APNS_KEY_ID=$EFF_APNS_KEY_ID"
             echo "EFF_APNS_TEAM_ID=$EFF_APNS_TEAM_ID"
@@ -917,14 +927,8 @@ jobs:
           # Karte bleibt leer; test_deploy.mjs prueft das darum je Datei.
           sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist/dashboard.html
           sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist/portal.html
-          # Push-Benachrichtigungen (ENT-424). Wie bei SMTP bewusst NICHT
-          # erforderlich: Bleiben die Secrets ungesetzt, steht weiterhin
-          # woertlich "__VAPID_PRIVATE_PEM_B64__" in dist/push.php --
-          # push_konfiguriert() erkennt das und meldet "nicht eingerichtet",
-          # statt mit einem Platzhalter als Schluessel zu signieren.
-          # VAPID_PRIVATE_PEM_B64 ist base64 der PEM-Datei des privaten
-          # P-256-Schluessels, EINZEILIG (base64 -w0) -- sed vertraegt
-          # keine Zeilenumbrueche im Ersatzwert.
+          # Push (ENT-424): ohne Secrets meldet push_konfiguriert() "nicht
+          # eingerichtet". VAPID_PRIVATE_PEM_B64 einzeilig (base64 -w0).
           sed -i "s|__VAPID_PRIVATE_PEM_B64__|$EFF_VAPID_PRIVATE_PEM_B64|g" dist/push.php
           sed -i "s|__VAPID_KONTAKT__|$EFF_VAPID_KONTAKT|g" dist/push.php
           sed -i "s|__APNS_KEY_P8_B64__|$EFF_APNS_KEY_P8_B64|g" dist/push.php
@@ -936,6 +940,7 @@ jobs:
           # Mitteilungsseite im Cockpit.
           sed -i "s|__PUSH_CRON_SCHLUESSEL__|$EFF_PUSH_CRON_SCHLUESSEL|g" dist/api/push_versand.php
           sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist/app.html
+          sed -i "s|__MAIL_SCHLUESSEL__|$EFF_MAIL_SCHLUESSEL|g" dist/mail_gestaltung.php
 
       # Live-Version-Verifikation fuer den externen QA-Runner (ENT-435,
       # sop-qa-runner). Ausschliesslich fuer Staging, keine Secrets: Beide
@@ -1559,6 +1564,7 @@ jobs:
           fi
           sed -i "s|__STAGING_TESTMAIL__||g" dist-betreiber/mailer.php
           sed -i "s|__DEMO_TESTMAIL__||g" dist-betreiber/mailer.php
+          sed -i "s|__MAIL_SCHLUESSEL__||g" dist-betreiber/mail_gestaltung.php
           # Der Zeitgeber-Schluessel fuer den Ablauf der Demo-Zugaenge
           # (api/betreiber_demo_ablauf.php). Derselbe Wert wie beim
           # naechtlichen Demo-Reset -- es ist derselbe Cron-Dienst.
@@ -1730,6 +1736,7 @@ jobs:
           sed -i "s|__SMTP_ABSENDER__|$EFF_SMTP_ABSENDER|g" dist-portal/mailer.php
           sed -i "s|__MAIL_SIGNATUR__||g" dist-portal/mailer.php
           sed -i "s|__SMTP_ABSENDER_NAME__|$EFF_SMTP_ABSENDER_NAME|g" dist-portal/mailer.php
+          sed -i "s|__MAIL_SCHLUESSEL__|$EFF_MAIL_SCHLUESSEL|g" dist-portal/mail_gestaltung.php
           sed -i "s|__STAGING_TESTMAIL__||g" dist-portal/mailer.php
           sed -i "s|__DEMO_TESTMAIL__||g" dist-portal/mailer.php
 
@@ -2009,6 +2016,7 @@ jobs:
           # Demo-Platzhalter werden seit ENT-680 fest geleert, aus demselben
           # Grund wie dort.
           sed -i "s|__STAGING_TESTMAIL__|$EFF_STAGING_TESTMAIL|g" dist-cupi24/mailer.php
+          sed -i "s|__MAIL_SCHLUESSEL__|$EFF_MAIL_SCHLUESSEL|g" dist-cupi24/mail_gestaltung.php
           sed -i "s|__DEMO_TESTMAIL__||g" dist-cupi24/mailer.php
           sed -i "s|__DEMO_RESET_TOKEN__||g" dist-cupi24/api/demo_reset_ausfuehren.php
           # OP-526, dieselbe Begruendung wie im betreiber-Buendel: dieses
@@ -2467,19 +2475,15 @@ jobs:
             ersetze __APNS_KEY_P8_B64__ "" "dist-demo/$PLATZ/push.php"
             ersetze __APNS_KEY_ID__ "" "dist-demo/$PLATZ/push.php"
             ersetze __APNS_TEAM_ID__ "" "dist-demo/$PLATZ/push.php"
+            ersetze __MAIL_SCHLUESSEL__ "" "dist-demo/$PLATZ/mail_gestaltung.php"
 
             # ── Werte, die hier absichtlich LEER bleiben ─────────────────
             #
             # Empfaenger der Demo-ANFRAGEN: Das Kontaktformular steht auf
             # guardops.ch, nicht auf einem Platz.
             ersetze __DEMO_EMPFAENGER__ "" "dist-demo/$PLATZ/demo_anfrage.php"
-            # Seit ENT-622 steht derselbe Platzhalter auch in
-            # demo_zugang.php (Meldung an den Betreiber ueber jeden neuen
-            # Zugang). Auf einem Platz entsteht kein Zugang -- die
-            # Selbstbedienung laeuft auf guardops.ch --, also bleibt er
-            # auch hier leer. Beim Bau dieses Buendels uebersehen, was den
-            # Deploy-Lauf 590 rot gefaerbt hat -- gefunden von der Pruefung
-            # auf uebersehene Platzhalter am Ende dieses Schrittes.
+            # Auch in demo_zugang.php (ENT-622); kein Zugang auf einem
+            # Platz. Vergessen faerbte Lauf 590 rot.
             ersetze __DEMO_EMPFAENGER__ "" "dist-demo/$PLATZ/demo_zugang.php"
             # Die Adresse der Verkaufsseite fuer den Bestaetigungslink
             # (ENT-624). Auf einem Platz leer: Die Bestaetigung laeuft auf

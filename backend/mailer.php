@@ -331,9 +331,17 @@ function smtp_nachricht_bauen(string $von, string $an, string $betreff, string $
    der Bauart bei der Zusammensetzung weiter unten. Auch hier gilt: Ohne
    Bilder aendert sich am Aufbau nichts. */
 function smtp_senden(string $anEmail, string $anName, string $betreff, string $html, string $text,
-                     array $anhaenge = [], array $bilder = [], string $antwortAn = ''): void
+                     array $anhaenge = [], array $bilder = [], string $antwortAn = '',
+                     ?array $server = null): void
 {
-    if (!smtp_konfiguriert()) {
+    // $server: der eigene Mailserver eines Betriebs (ENT-730, gebaut von
+    // mail_v_server() in mail_gestaltung.php) oder null fuer GuardOpS. Ist
+    // er unbrauchbar, steht darin nur 'fehler' -- dann wird abgebrochen,
+    // nicht ueber GuardOpS ausgewichen.
+    if ($server !== null && isset($server['fehler'])) {
+        throw new RuntimeException((string)$server['fehler']);
+    }
+    if ($server === null && !smtp_konfiguriert()) {
         throw new RuntimeException('Der E-Mail-Versand ist noch nicht eingerichtet (SMTP-Zugangsdaten fehlen).');
     }
 
@@ -398,18 +406,100 @@ function smtp_senden(string $anEmail, string $anName, string $betreff, string $h
     $anEmail = $zielEmail;
     $anName = $zielName;
 
-    $host = '__SMTP_HOST__';
-    $port = (int)'__SMTP_PORT__';
-    $verschluesselung = strtolower(trim('__SMTP_VERSCHLUESSELUNG__')); // 'ssl', 'tls' oder leer
-    $user = '__SMTP_USER__';
-    $pass = '__SMTP_PASSWORD__';
-    $absenderEmail = smtp_absender_adresse();
-    $absenderName = smtp_absender_name('__SMTP_ABSENDER_NAME__', $produktion, $istDemo);
+    if ($server !== null) {
+        $zugang = $server;
+        $absenderEmail = (string)$server['absender'];
+        $absenderName = smtp_absender_name((string)($server['name'] ?? ''), $produktion, $istDemo);
+    } else {
+        $zugang = ['host' => '__SMTP_HOST__', 'port' => (int)'__SMTP_PORT__',
+                   'verschluesselung' => strtolower(trim('__SMTP_VERSCHLUESSELUNG__')), // 'ssl', 'tls' oder leer
+                   'user' => '__SMTP_USER__', 'pass' => '__SMTP_PASSWORD__'];
+        $absenderEmail = smtp_absender_adresse();
+        $absenderName = smtp_absender_name('__SMTP_ABSENDER_NAME__', $produktion, $istDemo);
+    }
 
-    $transport = $verschluesselung === 'ssl' ? 'ssl://' : '';
-    $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);
+    try {
+        $fp = smtp_verbinden($zugang);
+    } catch (Throwable $e) {
+        if (isset($server['rueckmeldung'])) { ($server['rueckmeldung'])($e->getMessage()); }
+        throw $e;
+    }
+
+    try {
+        smtp_befehl($fp, 'MAIL FROM:<' . $absenderEmail . '>', [250]);
+        smtp_befehl($fp, 'RCPT TO:<' . $anEmail . '>', [250, 251]);
+        smtp_befehl($fp, 'DATA', [354]);
+
+        $von = $absenderName !== ''
+            ? smtp_kopf_kodieren($absenderName) . ' <' . $absenderEmail . '>'
+            : $absenderEmail;
+        $an = $anName !== ''
+            ? smtp_kopf_kodieren($anName) . ' <' . $anEmail . '>'
+            : $anEmail;
+        $nachricht = smtp_nachricht_bauen($von, $an, $betreff, $html, $text,
+            $anhaenge, $bilder, null, $antwortAn);
+
+        fwrite($fp, $nachricht . "\r\n.\r\n");
+        $antwort = smtp_lesen($fp);
+        if ((int)substr($antwort, 0, 3) !== 250) {
+            throw new RuntimeException('Mailserver meldet: ' . trim($antwort));
+        }
+        smtp_befehl($fp, 'QUIT', [221]);
+    } catch (Throwable $e) {
+        if (isset($server['rueckmeldung'])) { ($server['rueckmeldung'])($e->getMessage()); }
+        throw $e;
+    } finally {
+        fclose($fp);
+    }
+    if (isset($server['rueckmeldung'])) { ($server['rueckmeldung'])(null); }
+}
+
+// Eigener Mailserver eines Betriebs (ENT-730): Hier und nicht in
+// mail_gestaltung.php, weil smtp_verbinden() sie braucht.
+// Nur Adressen im offenen Internet. Ein Name, der auf 127.0.0.1 oder ein
+// internes Netz zeigt, wird abgewiesen -- sonst spraeche der Server auf
+// Zuruf mit Diensten, die von aussen gar nicht erreichbar sein sollen.
+function mail_v_adresse_oeffentlich(string $ip): bool
+{
+    return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
+}
+
+// Loest den Servernamen auf und gibt die Adresse zurueck, mit der verbunden
+// wird. Verbunden wird mit genau dieser Adresse, nicht noch einmal mit dem
+// Namen: Sonst koennte der Name zwischen Pruefung und Verbindung auf eine
+// interne Adresse umschwenken.
+function mail_v_aufloesen(string $host): string
+{
+    $ips = filter_var($host, FILTER_VALIDATE_IP) ? [$host] : (gethostbynamel($host) ?: []);
+    if (!$ips) {
+        throw new RuntimeException('Der Server „' . $host . '“ wurde nicht gefunden. Bitte den Namen prüfen.');
+    }
+    foreach ($ips as $ip) {
+        if (!mail_v_adresse_oeffentlich($ip)) {
+            throw new RuntimeException('Der Server „' . $host . '“ zeigt auf eine interne Adresse und ist nicht erlaubt.');
+        }
+    }
+    return $ips[0];
+}
+
+// Baut die Verbindung auf und meldet sich an: Begruessung, EHLO,
+// Verschluesselung, Anmeldung. Gibt den offenen Strom zurueck.
+//
+// $z: host, port, verschluesselung ('ssl', 'tls'/'starttls' oder leer),
+// user, pass. Fuer den eigenen Server eines Betriebs (ENT-730) wird der
+// Name vorher aufgeloest und mit genau dieser Adresse verbunden (siehe
+// mail_v_aufloesen()); das Zertifikat wird trotzdem gegen den NAMEN
+// geprueft. Der GuardOpS-Server aus dem Deploy wird verbunden wie bisher.
+function smtp_verbinden(array $z)
+{
+    $host = (string)$z['host'];
+    $versch = (string)($z['verschluesselung'] ?? '');
+    $ziel = !empty($z['eigen']) ? mail_v_aufloesen($host) : $host;
+    $transport = $versch === 'ssl' ? 'ssl://' : '';
+    $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true,
+                                            'peer_name' => $host, 'SNI_enabled' => true]]);
     $fp = @stream_socket_client(
-        $transport . $host . ':' . $port, $errno, $errstr, 15.0, STREAM_CLIENT_CONNECT, $ctx
+        $transport . $ziel . ':' . (int)$z['port'], $errno, $errstr, 15.0, STREAM_CLIENT_CONNECT, $ctx
     );
     if (!$fp) {
         throw new RuntimeException('Verbindung zum Mailserver fehlgeschlagen: ' . $errstr);
@@ -429,7 +519,7 @@ function smtp_senden(string $anEmail, string $anName, string $betreff, string $h
             : 'localhost';
         smtp_befehl($fp, 'EHLO ' . $ehloName, [250]);
 
-        if ($verschluesselung === 'tls') {
+        if ($versch === 'tls' || $versch === 'starttls') {
             smtp_befehl($fp, 'STARTTLS', [220]);
             if (!stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
                 throw new RuntimeException('TLS-Verschluesselung liess sich nicht aufbauen.');
@@ -437,30 +527,29 @@ function smtp_senden(string $anEmail, string $anName, string $betreff, string $h
             smtp_befehl($fp, 'EHLO ' . $ehloName, [250]);
         }
 
-        if ($user !== '') {
+        if ((string)$z['user'] !== '') {
             smtp_befehl($fp, 'AUTH LOGIN', [334]);
-            smtp_befehl($fp, base64_encode($user), [334]);
-            smtp_befehl($fp, base64_encode($pass), [235]);
+            smtp_befehl($fp, base64_encode((string)$z['user']), [334]);
+            try {
+                smtp_befehl($fp, base64_encode((string)$z['pass']), [235]);
+            } catch (RuntimeException $e) {
+                throw new RuntimeException('Anmeldung abgelehnt. Benutzername oder Passwort stimmen nicht. ('
+                    . $e->getMessage() . ')');
+            }
         }
+    } catch (Throwable $e) {
+        fclose($fp);
+        throw $e;
+    }
+    return $fp;
+}
 
-        smtp_befehl($fp, 'MAIL FROM:<' . $absenderEmail . '>', [250]);
-        smtp_befehl($fp, 'RCPT TO:<' . $anEmail . '>', [250, 251]);
-        smtp_befehl($fp, 'DATA', [354]);
-
-        $von = $absenderName !== ''
-            ? smtp_kopf_kodieren($absenderName) . ' <' . $absenderEmail . '>'
-            : $absenderEmail;
-        $an = $anName !== ''
-            ? smtp_kopf_kodieren($anName) . ' <' . $anEmail . '>'
-            : $anEmail;
-        $nachricht = smtp_nachricht_bauen($von, $an, $betreff, $html, $text,
-            $anhaenge, $bilder, null, $antwortAn);
-
-        fwrite($fp, $nachricht . "\r\n.\r\n");
-        $antwort = smtp_lesen($fp);
-        if ((int)substr($antwort, 0, 3) !== 250) {
-            throw new RuntimeException('Mailserver meldet: ' . trim($antwort));
-        }
+// Meldet sich am Server an und gleich wieder ab, ohne etwas zu versenden.
+// Fuer "Speichern prueft die Angaben" beim eigenen Server (ENT-730).
+function smtp_anmeldung_pruefen(array $z): void
+{
+    $fp = smtp_verbinden($z);
+    try {
         smtp_befehl($fp, 'QUIT', [221]);
     } finally {
         fclose($fp);
