@@ -20,7 +20,8 @@
 //
 // GET                  -> eigene Vorgänge
 // GET  ?id=…           -> ein Vorgang mit Verlauf
-// POST { betreff, text, art?, bildschirm?, version? }  -> neuer Vorgang
+// POST { betreff, text, art?, bildschirm?, umgebung? } -> neuer Vorgang
+//                      (umgebung traegt seit ENT-696 den Software-Stand)
 // POST { id, text }                                    -> Antwort anhängen
 declare(strict_types=1);
 require __DIR__ . '/../db.php';
