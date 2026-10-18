@@ -273,7 +273,10 @@ check('KRITISCH: die AHV-Nummer laesst sich nicht mehr erfassen (ENT-348) -- Fel
       // streng untereinander stehen -- das ist die Ordnung, die vorher fehlte.
       const buendig = bloecke.every(b => new Set(b.map(x => x.x)).size === 1);
       const untereinander = bloecke.every(b => b.every((x, i) => i === 0 || x.y > b[i - 1].y));
-      return { spalten: sp.length, gemessen: bloecke.flat().length, buendig, untereinander,
+      // Sichtbar nebeneinander, nicht nur im Dokument: Kompakt stehen die
+      // Spalten untereinander (Zeilenfluss, 16.10.2026).
+      const xs = new Set(sp.map(c => Math.round(c.getBoundingClientRect().x)));
+      return { spalten: sp.length, nebeneinander: xs.size, gemessen: bloecke.flat().length, buendig, untereinander,
         erste: bloecke.map(b => b[0] && b[0].id),
         ueberbreit: document.documentElement.scrollWidth > document.documentElement.clientWidth };
     });
@@ -286,9 +289,61 @@ check('KRITISCH: die AHV-Nummer laesst sich nicht mehr erfassen (ENT-348) -- Fel
     Object.values(je).every(x => x.untereinander));
   check('Person und Adresse steht oben links -- der wichtigste Abschnitt zuerst',
     je.person.erste[0] === 'person');
-  check('Auf 1600 px stehen in "Person" zwei Spalten nebeneinander', je.person.spalten === 2);
+  // Seit 16.10.2026 ist kompakt der Standard, und kompakt steht die Flaeche
+  // im Zeilenfluss: eine Spalte, jede Zeile mit Platz fuer ihre Felder. In der
+  // grossen Darstellung bleiben es zwei Spalten (ENT-074) -- geprueft unten.
+  check('Kompakt auf 1600 px: "Person" steht in einer Spalte, die Abschnitte untereinander',
+    je.person.spalten === 2 && je.person.nebeneinander === 1);
   check('Nichts laeuft seitlich ueber', Object.values(je).every(x => !x.ueberbreit));
   await page.click('#mbtab-person');
+  await page.waitForTimeout(200);
+}
+
+// ══════════════ ZEILENFLUSS (kompakt, 16.10.2026)
+// Dieselbe Anordnung wie "Neuer Einsatz", "Neuer Kunde", "Neues Objekt":
+// 168-px-Beschriftung vorn, alle Zeilen beginnen ihre Felder an derselben
+// Kante, 46 px Zeilenabstand; Telefon und Mobil privat stehen genau unter
+// ihren geschaeftlichen Gegenstuecken. In der grossen Darstellung bleibt
+// es beim zweispaltigen Raster mit der Beschriftung oben (ENT-074).
+{
+  await page.click('#mbtab-person');
+  await page.waitForTimeout(200);
+  const z = await page.evaluate(() => {
+    const r = id => document.getElementById(id).getBoundingClientRect();
+    const lab = id => document.querySelector(`label[for="${id}"]`).getBoundingClientRect();
+    const erste = ['mb_anrede', 'mb_geschlecht', 'mb_strasse', 'mb_adresszusatz', 'mb_email', 'mb_email_privat', 'mb_geburtsdatum'];
+    return {
+      links: erste.map(id => r(id).left), labels: erste.map(id => lab(id).width),
+      abstand: [r('mb_geschlecht').top - r('mb_anrede').top, r('mb_strasse').top - r('mb_geschlecht').top],
+      eineZeile: [r('mb_anrede').top, r('mb_vorname').top, r('mb_nachname').top],
+      tel: [r('mb_telefon_geschaeft').left, r('mb_telefon').left],
+      mobil: [r('mb_mobil_geschaeft').left, r('mb_mobil').left],
+      datum: r('mb_geburtsdatum').width, hoehe: r('mb_vorname').height,
+      // Text der Beschriftung (Range, nicht der Kasten) mittig zum Feld.
+      mitte: ['mb_anrede', 'mb_strasse', 'mb_telefon', 'mb_geburtsdatum'].map(id => {
+        const rg = document.createRange(); rg.selectNodeContents(document.querySelector(`label[for="${id}"]`));
+        const t = rg.getBoundingClientRect(), f = r(id);
+        return Math.abs((t.top + t.bottom) / 2 - (f.top + f.bottom) / 2);
+      }),
+    };
+  });
+  check('Zeilenfluss: alle Zeilen beginnen ihre Felder an derselben Kante',
+    Math.max(...z.links) - Math.min(...z.links) < 0.5);
+  check('Zeilenfluss: die erste Beschriftung jeder Zeile ist 168 px breit', z.labels.every(b => Math.abs(b - 168) < 0.5));
+  check('Zeilenfluss: 46 px Zeilenabstand, 32 px Feldhoehe',
+    z.abstand.every(a => Math.abs(a - 46) < 0.5) && Math.abs(z.hoehe - 32) < 0.5);
+  check('Zeilenfluss: Telefon privat steht unter Telefon Geschaeft', Math.abs(z.tel[0] - z.tel[1]) < 0.5);
+  check('Zeilenfluss: Mobil privat steht unter Mobil Geschaeft', Math.abs(z.mobil[0] - z.mobil[1]) < 0.5);
+  check('Zeilenfluss: Anrede, Vorname und Nachname stehen in einer Zeile', Math.max(...z.eineZeile) - Math.min(...z.eineZeile) < 0.5);
+  check('Zeilenfluss: ein Datum ist 117 px breit', Math.abs(z.datum - 117) < 0.5);
+  check('Zeilenfluss: jede Beschriftung steht mittig neben ihrem Feld', z.mitte.every(d => d < 1.5));
+  // Grosse Darstellung: zwei Spalten nebeneinander, wie bisher.
+  await page.evaluate(() => dichteSetzen(false, false, false));
+  await page.waitForTimeout(200);
+  const n = await page.evaluate(() => new Set([...document.querySelectorAll('#mbKarten .mb-bereich.on > .ma-spalten > .ma-spalte')]
+    .map(c => Math.round(c.getBoundingClientRect().x))).size);
+  check('Grosse Darstellung auf 1600 px: "Person" steht in zwei Spalten nebeneinander (ENT-074)', n === 2);
+  await page.evaluate(() => dichteSetzen(true, false, false));
   await page.waitForTimeout(200);
 }
 
@@ -518,8 +573,11 @@ check('KRITISCH: die AHV-Nummer laesst sich nicht mehr erfassen (ENT-348) -- Fel
     band: !!document.getElementById('mbNeuName') && !!document.getElementById('mbNeuPass'),
     bandOben: document.getElementById('mbNeuKonto').getBoundingClientRect().y
             < document.querySelector('#mbKarten .ma-block').getBoundingClientRect().y,
-    bandBreit: Math.round(document.getElementById('mbNeuKonto').querySelector('.card').getBoundingClientRect().width)
-             > Math.round(document.querySelector('#mbKarten .ma-block').getBoundingClientRect().width) * 2,
+    // Gemessen gegen die Flaeche, nicht gegen einen Abschnitt: Seit dem
+    // Zeilenfluss (kompakt, 16.10.2026) ist ein Abschnitt selbst so breit wie
+    // die Flaeche -- "doppelt so breit wie ein Abschnitt" waere dort nie wahr.
+    bandBreit: document.getElementById('mbNeuKonto').querySelector('.card').getBoundingClientRect().width
+             >= document.getElementById('mbKarten').getBoundingClientRect().width - 1,
     fokus: document.activeElement.id,
     pw: !!document.getElementById('maPw'),
     weg: document.querySelectorAll('#mbKarten .btn-danger').length,

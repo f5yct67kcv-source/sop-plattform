@@ -37,7 +37,7 @@ async function seite(breite, hoehe, dichte, reinigung) {
   await page.goto(`file://${WURZEL}/dashboard.html`);
   // Die Wahl liegt vor dem Laden im Speicher -- so, wie sie nach einem
   // Neuladen ankommt. Prueft damit auch den Kopf-Block, nicht nur den Schalter.
-  await page.evaluate(d => localStorage.setItem('rv3_dichte', d), dichte);
+  await page.evaluate(d => { if (d) localStorage.setItem('rv3_dichte_wahl', d); }, dichte);
   await page.reload();
   await page.fill('#gName', 'adrian'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
   await page.waitForSelector('#shell.on'); await page.waitForTimeout(400);
@@ -87,8 +87,22 @@ check('normal: Schalter steht auf aus', n.schalter === 'false', n.schalter);
 await pn.evaluate(() => $('btnDichte').click()); await pn.waitForTimeout(150);
 const k1 = await mass(pn);
 check('Schalter setzt kompakt', k1.attr === 'kompakt' && k1.schalter === 'true', k1.attr + '/' + k1.schalter);
-check('Wahl wird gespeichert', (await pn.evaluate(() => localStorage.getItem('rv3_dichte'))) === 'kompakt');
+check('Wahl wird gespeichert', (await pn.evaluate(() => localStorage.getItem('rv3_dichte_wahl'))) === 'kompakt');
 await pn.close();
+
+// ── Standard seit 16.10.2026: ohne Wahl kompakt
+{
+  const p0 = await seite(1440, 900, null);
+  check('ohne gespeicherte Wahl: kompakt', (await p0.evaluate(() => document.documentElement.dataset.dichte)) === 'kompakt');
+  check('Laden allein speichert keine Wahl', (await p0.evaluate(() => localStorage.getItem('rv3_dichte_wahl'))) === null);
+  await p0.close();
+  // Der alte Schluessel wurde bei jedem Laden mit "normal" beschrieben, ohne
+  // dass jemand gewaehlt hatte. Er darf den Standard nicht kippen.
+  const p1 = await seite(1440, 900, null);
+  await p1.evaluate(() => localStorage.setItem('rv3_dichte', 'normal')); await p1.reload();
+  check('der alte Schluessel kippt den Standard nicht', (await p1.evaluate(() => document.documentElement.dataset.dichte)) === 'kompakt');
+  await p1.close();
+}
 
 // ── Desktop, kompakt (aus dem Speicher geladen)
 const pk = await seite(1440, 900, 'kompakt');
@@ -117,7 +131,7 @@ const fl = await pb.evaluate(() => {
     enNBedarf: 52, enNKontakt_vorname: 204, enNKontakt_nachname: 197, enNKontakt_telefon: 171 };
   const breiten = Object.entries(SOLL).filter(([id, w]) => Math.abs(r(id).width - w) > 0.5)
     .map(([id, w]) => `${id} ${r(id).width} statt ${w}`);
-  const zeit = [...document.querySelectorAll('.zeilenfluss .zeitwahl select')].map(e => e.getBoundingClientRect().width);
+  const zeit = [...document.querySelectorAll('#view-einsatzneu .zeilenfluss .zeitwahl select')].map(e => e.getBoundingClientRect().width);
   const links = ['enNKunde_name', 'enNVeranstaltung', 'enNDatum', 'enNStrasse', 'enNBedarf', 'enNWeg_km', 'enNKontakt_vorname'].map(id => r(id).x);
   const mitte = [];
   // Textfelder und die Personenliste tragen ihre Beschriftung oben (wie
