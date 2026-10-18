@@ -131,7 +131,12 @@ if (!demo_zugang_telefon_gueltig($telefon)) {
 // zehn knappen Plaetzen -- eine Adresse, die es nicht gibt, waere ein
 // Platz, den niemand je abholt. "Nicht pruefbar" (null) wird durchgelassen.
 if (demo_zugang_adresse_zustellbar($email) === false) {
-    json_response(['status' => 'error',
+    // MIT FELDANGABE, wie bei Telefon und Bedingungen darueber: Eine
+    // Meldung unter dem Formular sagt, DASS etwas nicht stimmt; erst das
+    // markierte Feld sagt, WO. Ohne sie sucht der Anfragende in vier
+    // Feldern. Das Kontaktformular (api/demo_senden.php) macht es seit
+    // jeher so -- hier fehlte es.
+    json_response(['status' => 'error', 'felder' => ['email' => true],
         'message' => 'Diese E-Mail-Adresse scheint es nicht zu geben. Bitte prüfen und erneut versuchen.'], 400);
 }
 

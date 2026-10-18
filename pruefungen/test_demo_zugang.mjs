@@ -140,6 +140,41 @@ check('KRITISCH: demo_anfordern.php prueft die Telefonnummer, bevor ein Platz ve
 check('KRITISCH: demo_anfordern.php prueft die Zustellbarkeit, bevor ein Platz verbraucht wird',
   /demo_zugang_adresse_zustellbar\(\$email\)\s*===\s*false/.test(anfordern)
   && anfordern.indexOf('demo_zugang_adresse_zustellbar') < anfordern.indexOf('demo_platz_waehlen'));
+
+// Eine Ablehnung, die an EINEM Feld haengt, muss dieses Feld auch nennen
+// (Anlass: der Projektinhaber gab am 2026-09-19 eine Adresse auf einer
+// nicht existierenden Domain ein -- die Meldung stand unter dem Formular,
+// das E-Mail-Feld blieb unmarkiert, und das Formular hat vier davon).
+// Geprueft wird nicht der Wortlaut der Meldung, sondern der Zusammenhang:
+// Nach jeder dieser drei Bedingungen folgt eine Antwort mit 'felder', und
+// der genannte Feldname existiert im Formular auf der Homepage tatsaechlich
+// -- sonst markiert die Antwort ein Feld, das es nicht gibt.
+{
+  const formular = lies('homepage.html');
+  const antwortNach = bedingung => {
+    const i = anfordern.indexOf(bedingung);
+    if (i < 0) { return ''; }
+    const j = anfordern.indexOf('json_response(', i);
+    return j < 0 ? '' : anfordern.slice(j, j + 400);
+  };
+  const feldbezogen = [
+    ['demo_zugang_telefon_gueltig', 'telefon'],
+    ['!$bedingungen', 'bedingungen'],
+    ['demo_zugang_adresse_zustellbar', 'email'],
+  ];
+  const ohneFeld = feldbezogen.filter(([bedingung, feld]) => {
+    const antwort = antwortNach(bedingung);
+    const genannt = new RegExp(`'felder'\\s*=>\\s*\\[[^\\]]*'${feld}'`).test(antwort);
+    const imFormular = new RegExp(`name="${feld}"`).test(formular)
+      || new RegExp(`id="f-${feld}"`).test(formular);
+    return !(genannt && imFormular);
+  });
+  check('KRITISCH: jede Ablehnung von demo_anfordern.php, die an einem Feld haengt, nennt dieses Feld -- und es gibt es im Formular',
+    ohneFeld.length === 0);
+  if (ohneFeld.length) {
+    bad.push('Ablehnung ohne brauchbare Feldangabe: ' + ohneFeld.map(f => f[1]).join(', '));
+  }
+}
 // Seit ENT-624 laeuft das Einrichten nicht mehr im Endpunkt, sondern in
 // demo_zugang_einrichten() -- zwei Endpunkte brauchen es, und zwei Kopien
 // waeren auseinandergelaufen. Die Aussagen darunter gelten unveraendert,
