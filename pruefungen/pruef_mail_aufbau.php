@@ -99,6 +99,17 @@ foreach (['schlicht' => $schlicht, 'mit Bild' => $mitBild,
     $pruef("KRITISCH: in der Nachricht ($name) wird jede Grenze wieder geschlossen", $offen === []);
 }
 
+// Message-ID: jede Mail eine eigene, mit der Domain des Absenders
+$kennung = function (string $n): ?string { return preg_match('/^Message-ID: (<[^\r\n]+>)\r?$/m', $n, $m) ? $m[1] : null; };
+$n1 = smtp_nachricht_bauen('Muster AG <offerten@beispiel.ch>', 'k@beispiel.org', 'B', '<p>x</p>', 'x');
+$n2 = smtp_nachricht_bauen('Muster AG <offerten@beispiel.ch>', 'k@beispiel.org', 'B', '<p>x</p>', 'x', [['name' => 'a.pdf', 'inhalt' => 'x']]);
+$k1 = $kennung($n1); $k2 = $kennung($n2);
+$pruef('Jede Mail traegt eine Message-ID, auch mit Anhang', $k1 !== null && $k2 !== null);
+$pruef('Die Message-ID ist je Mail verschieden', $k1 !== $k2);
+$pruef('Die Message-ID traegt die Domain des Absenders', $k1 !== null && str_ends_with($k1, '@beispiel.ch>'));
+$pruef('Ein Absender ohne brauchbare Domain gibt trotzdem eine gueltige Message-ID',
+    (bool)preg_match('/^<[0-9a-f]{32}@guardops\.ch>$/', smtp_nachricht_kennung('kaputt')));
+
 echo $ok . " bestanden, " . count($fehler) . " nicht bestanden\n";
 foreach ($fehler as $f) { echo "x $f\n"; }
 exit($fehler ? 1 : 0);

@@ -193,6 +193,16 @@ function smtp_befehl($fp, string $befehl, array $erwarteteCodes): string
 // steckte das bis hierher mitten zwischen zwei Socket-Befehlen und war
 // nur mit einem echten Mailserver zu pruefen. Hier laesst es sich fuer
 // sich ausfuehren (pruefungen/pruef_mail_aufbau.php).
+function smtp_nachricht_kennung(string $von): string
+{
+    $adresse = preg_match('/<([^<>]+)>\s*$/', $von, $m) ? $m[1] : $von;
+    $domain = strtolower((string)substr((string)strrchr($adresse, '@'), 1));
+    if (!preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/', $domain)) {
+        $domain = 'guardops.ch';
+    }
+    return '<' . bin2hex(random_bytes(16)) . '@' . $domain . '>';
+}
+
 function smtp_nachricht_bauen(string $von, string $an, string $betreff, string $html,
                               string $text, array $anhaenge = [], array $bilder = [],
                               ?string $grenze = null, string $antwortAn = ''): string
@@ -263,6 +273,11 @@ function smtp_nachricht_bauen(string $von, string $an, string $betreff, string $
         'To: ' . $an,
         'Subject: ' . smtp_kopf_kodieren($betreff),
         'MIME-Version: 1.0',
+        // Eine eigene Kennung je Mail. Ohne sie werten Outlook und andere
+        // Empfaenger die Mail eher als Spam; manche Server ergaenzen sie,
+        // verlassen kann man sich darauf nicht. Die Domain ist die des
+        // Absenders, damit sie zum Absender passt.
+        'Message-ID: ' . smtp_nachricht_kennung($von),
     ];
     // Antwortadresse (ENT-729): Absender bleibt die Plattform-Adresse
     // (noreply@...), eine Antwort der Kundin soll aber beim Betrieb landen.
