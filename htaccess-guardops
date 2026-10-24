@@ -62,9 +62,18 @@ DirectoryIndex index.html
 
 # ── 3. Schutzkopfzeilen ──────────────────────────────────────────────────
 <IfModule mod_headers.c>
-  # Die Seite darf nicht in einen fremden Rahmen gesetzt werden.
-  Header always set X-Frame-Options "DENY"
-  Header always set Content-Security-Policy "frame-ancestors 'none'"
+  # Die Seite darf nur in EINEN fremden Rahmen: formateins.ch zeigt sie im
+  # Pruefstand seiner Startseite live, als Referenz (24.10.2026). Jeder
+  # andere Rahmen bleibt gesperrt, der Schutz gegen Clickjacking damit
+  # erhalten. github.io ist die Vorschau von formateins vor dem Livegang.
+  #
+  # X-Frame-Options kennt nur DENY, SAMEORIGIN und (nicht mehr unterstuetzt)
+  # ALLOW-FROM mit genau einer Adresse. frame-ancestors regelt dasselbe
+  # genauer, und steht beides, gewinnt in heutigen Browsern frame-ancestors.
+  # "unset" statt weglassen: Hostpoint koennte den Header ausserhalb
+  # dieser Datei setzen, und ein DENY dort wuerde alte Browser doch sperren.
+  Header always unset X-Frame-Options
+  Header always set Content-Security-Policy "frame-ancestors 'self' https://www.formateins.ch https://formateins.ch https://f5yct67kcv-source.github.io"
 
   # Der Browser soll den Inhaltstyp nicht raten.
   Header always set X-Content-Type-Options "nosniff"

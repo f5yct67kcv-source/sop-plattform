@@ -1014,6 +1014,24 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
       && /RewriteCond %\{HTTP_HOST\} \^www\\\./.test(ht) && /\[R=301,L\]/.test(ht));
   }
 
+  // Rahmen (2026-10-24): formateins.ch zeigt guardops.ch als Referenz live
+  // im Rahmen. Erlaubt ist darum GENAU formateins (und seine Vorschau auf
+  // github.io), sonst niemand -- weder 'none' (dann bleibt der Pruefstand
+  // weiss) noch eine offene Liste. Ein X-Frame-Options "DENY" daneben
+  // wuerde in alten Browsern trotzdem sperren und darf nicht gesetzt sein.
+  {
+    const ht = readFileSync(`${WURZEL}/htaccess-guardops`, 'utf8');
+    const csp = (ht.match(/Header always set Content-Security-Policy "([^"]+)"/) || [])[1] || '';
+    const ahnen = (csp.match(/frame-ancestors ([^;]+)/) || [])[1] || '';
+    const quellen = ahnen.trim().split(/\s+/).filter(Boolean);
+    const erlaubt = /^(https:\/\/(www\.)?formateins\.ch|https:\/\/f5yct67kcv-source\.github\.io)$/;
+    check('KRITISCH: guardops.ch laesst sich nur von formateins (und seiner Vorschau) rahmen, von niemandem sonst',
+      quellen.includes("'self'") && quellen.some(x => /formateins\.ch$/.test(x))
+      && quellen.every(x => x === "'self'" || erlaubt.test(x)));
+    check('KRITISCH: kein X-Frame-Options "DENY" neben der Rahmen-Erlaubnis',
+      !/Header always set X-Frame-Options/.test(ht) && /Header always unset X-Frame-Options/.test(ht));
+  }
+
   // Die beiden Bündel dürfen sich nicht ins Gehege kommen: Der Upload des
   // Rapport-Tools räumt sein Zielverzeichnis auf.
   check('KRITISCH: die beiden Uploads haben verschiedene Quellverzeichnisse',
