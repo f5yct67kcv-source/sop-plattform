@@ -1,0 +1,114 @@
+# Schutzeinstellungen fuer pruefung.guardops.ch (ENT-732) -- der feste
+# Pruefzugang fuer die App-Store-Pruefung: ein eigener Mandant mit eigener
+# Datenbank und ausschliesslich erfundenen Daten. Diese Datei wird beim
+# Deploy als dist-pruefung/.htaccess ausgeliefert.
+#
+# KOPIE VON htaccess-cupi24: dist-pruefung/ bringt wie dist-cupi24/ den
+# VOLLEN Dateiumfang des Rapport-Tools mit -- also dieselbe Sperrliste an
+# Backend-Hilfsdateien und dieselben Schutzkopfzeilen. Wo sich
+# htaccess-cupi24 aendert, muss diese Datei nachgezogen werden --
+# test_deploy.mjs gleicht die Sperrliste gegen die tatsaechlich
+# mitgelieferten Backend-Dateien ab, fuer beide Buendel.
+#
+# EIN UNTERSCHIED: Suchmaschinen bleiben draussen (Abschnitt 3,
+# X-Robots-Tag). Die Adresse ist kein Angebot, sondern ein Zugang fuer
+# die Pruefer von Apple.
+#
+# ═══ WENN DIE SEITE NACH DEM DEPLOY EINEN SERVERFEHLER ZEIGT ═══
+# Dann liegt es an dieser Datei. Loeschen: Hostpoint-Verwaltung →
+# Dateimanager → im Ordner von pruefung.guardops.ch die Datei .htaccess
+# loeschen. Die Seite laeuft danach sofort wieder, nur ohne diese
+# Schutzeinstellungen.
+
+# ── 1. Startseite ────────────────────────────────────────────────────────
+# "/" gehoert dem Betreiber/Planer-Cockpit, nicht dem Waechter-Gate: Ohne
+# diese Regel liefert Apache seinen Standard (index.html) aus, und wer
+# pruefung.guardops.ch ohne Pfad aufruft, landet in der Waechter-Anmeldung
+# statt im Cockpit -- genau die Verwechslung, die ein Planer/Admin nicht
+# erwartet.
+# /app.html bleibt unveraendert erreichbar -- dort melden sich Waechter
+# auch vom Desktop aus an, bewusst so gebaut. /index.html, /portal.html und
+# /betreiber.html bleiben ebenfalls unter ihrem Pfad abrufbar; nur die
+# Zuordnung von "/" aendert sich.
+DirectoryIndex dashboard.html
+
+# ── 2. Hilfsdateien nicht direkt abrufbar ────────────────────────────────
+# db.php traegt das Datenbankpasswort, ai.php den Schluessel zur KI, mailer.php
+# das SMTP-Passwort. Alle liegen im Web-Verzeichnis, weil der Deploy per FTP
+# nicht darueber hinaus schreiben kann. PHP wird zwar ausgefuehrt statt
+# angezeigt -- aber wenn PHP einmal ausfaellt oder falsch eingestellt ist,
+# liefert der Server den Quelltext im Klartext aus. Dann waeren die
+# Zugangsdaten oeffentlich.
+# Diese Dateien werden nur von den Endpunkten unter /api eingebunden und nie
+# direkt aufgerufen; ein direkter Abruf ist also immer verkehrt.
+<FilesMatch "^(db|ai|planung|kunden|mitarbeiter|layout|anmeldung|zweifaktor|rechte|logbuch|ereignisse|auslagen|rundgang|fahrzeug|geofence_bereich|belege|belegpdf|fpdf|qrrechnung|produkte|mailer|ferien|lohn|gavzeit|lohnlauf|mitteilungen|push|kundenportal|betreiber|betreiber_finanzen|supportvorgang|support_sammeln|support|setup|demo_anfrage|demo_daten|demo_reset|demo_bremse|demo_zugang|demo_bestaetigung|mail_vorlage|demo_instanz|planung_einrichten_kern|tutorial|neuerungen|mail_gestaltung)\.php$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# Sicherungskopien und Reste, die beim Hochladen entstehen koennen.
+<FilesMatch "\.(sql|bak|old|orig|log|md|yml)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# ── 3. Schutzkopfzeilen ──────────────────────────────────────────────────
+<IfModule mod_headers.c>
+  # Die Seite darf nicht in einen fremden Rahmen gesetzt werden. Sonst legt
+  # jemand eine unsichtbare Kopie ueber seine eigene Seite und faengt Klicks
+  # ab -- der Benutzer glaubt, er klickt dort, und loest hier etwas aus.
+  Header always set X-Frame-Options "DENY"
+  Header always set Content-Security-Policy "frame-ancestors 'none'"
+
+  # Der Browser soll den Inhaltstyp nicht raten. Sonst kann eine hochgeladene
+  # Datei als Skript ausgefuehrt werden, obwohl sie als Bild deklariert war.
+  Header always set X-Content-Type-Options "nosniff"
+
+  # Beim Weggehen auf eine fremde Seite nicht verraten, von welcher Adresse
+  # aus -- die Adresse kann Hinweise auf den Betrieb enthalten.
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+  # Was diese Seite selbst benutzen darf -- und sonst niemand.
+  #
+  # "(self)" heisst: nur diese Seite, kein eingebetteter fremder Rahmen.
+  # app.html braucht navigator.geolocation an mehreren Stellen: Rundgang
+  # starten, Position mitschreiben, Wegstrecke, Naehe zum Kontrollpunkt --
+  # der Alleinarbeiterschutz haengt daran. Eine Schutzeinstellung, die eine
+  # Sicherheitsfunktion abschaltet, schuetzt niemanden.
+  Header always set Permissions-Policy "camera=(self), microphone=(self), geolocation=(self)"
+
+  # HSTS: Der Browser merkt sich, dass diese Seite nur verschluesselt zu
+  # erreichen ist. Wirkt ERST, wenn die Seite ueber HTTPS ausgeliefert wird.
+  Header always set Strict-Transport-Security "max-age=15552000"
+
+  # Nicht in Suchmaschinen (ENT-732): Die Adresse ist ein Pruefzugang,
+  # keine Seite fuer Besucher.
+  Header always set X-Robots-Tag "noindex, nofollow"
+</IfModule>
+
+# ── 4. Kein Verzeichnisinhalt ────────────────────────────────────────────
+# Ohne das listet Apache in einem Ordner ohne index-Datei alle Dateien auf.
+Options -Indexes
+
+# ── 5. HTTPS erzwingen -- BEWUSST AUSGESCHALTET (OP-67) ──────────────────
+# Der richtige Weg ist die Hostpoint-Verwaltung: Domain → automatische
+# Weiterleitung auf HTTPS einschalten. Nur falls das dort nicht geht, die
+# folgenden vier Zeilen entkommentieren. VORHER pruefen, dass
+# https://pruefung.guardops.ch im Browser ohne Zertifikatswarnung laedt --
+# sonst ist die Seite danach nicht mehr erreichbar.
+#
+# <IfModule mod_rewrite.c>
+#   RewriteEngine On
+#   RewriteCond %{HTTPS} !=on
+#   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>

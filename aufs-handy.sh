@@ -357,11 +357,15 @@ echo "        Buendel zurueckgesetzt (Schluessel nur noch im iOS-Bau)"
 # wird die Aussage, nicht ein Name: Jedes Paket unter node_modules/@capacitor/
 # mit eigener Package.swift IST ein natives Plugin und muss in der
 # Package.swift des Projekts auftauchen.
+#
+# Auch die Gemeinschafts-Plugins unter @capacitor-community/ (ENT-732:
+# keep-awake). Die alte Schleife sah nur @capacitor/ -- ein fehlendes
+# Wach-Halten waere hier gruen durchgegangen.
 FEHLEND=""
-for pfad in node_modules/@capacitor/*/; do
+for pfad in node_modules/@capacitor/*/ node_modules/@capacitor-community/*/; do
   [ -f "${pfad}Package.swift" ] || continue
-  name="$(basename "$pfad")"
-  grep -q "@capacitor/${name}" ios/App/CapApp-SPM/Package.swift || FEHLEND="$FEHLEND $name"
+  name="$(basename "$(dirname "$pfad")")/$(basename "$pfad")"
+  grep -q "${name}" ios/App/CapApp-SPM/Package.swift || FEHLEND="$FEHLEND $name"
 done
 if [ -n "$FEHLEND" ]; then
   echo ""
@@ -371,6 +375,24 @@ if [ -n "$FEHLEND" ]; then
   exit 1
 fi
 echo "        Plugins vollstaendig"
+
+# Nur vorbereiten, nicht aufs Geraet (ENT-732). store-hochladen.sh ruft
+# dieses Skript so auf, damit Holen, Signier-Team, Buendel, Schluessel und
+# Plugins EIN Weg bleiben und nicht zwei, die auseinanderlaufen.
+#
+# Und STRENG: Aufs eigene Telefon darf eine App ohne Karte -- die Warnung
+# steht am Schluss. In den Store darf sie nicht. Was hier gesammelt wurde,
+# bricht den Lauf darum ab, statt nur gemeldet zu werden.
+if [ "${AUFS_HANDY_NUR_VORBEREITEN:-}" = "1" ]; then
+  if [ -n "$WARNUNGEN" ]; then
+    echo ""
+    echo "  ABBRUCH: So geht keine App in den Store."
+    printf '%s\n' "$WARNUNGEN" | sed 's/^/    - /'
+    exit 1
+  fi
+  echo "        Vorbereitet fuer den Store-Bau"
+  exit 0
+fi
 
 if [ "$SAUBER" = "sauber" ]; then
   echo "── 3b/5 Zwischenspeicher leeren"

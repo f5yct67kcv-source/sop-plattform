@@ -70,7 +70,7 @@ const PROFIL = { status: 'ok', monat: { anzahl: 0, stunden: 0 },
 
 const browser = await chromium.launch({ executablePath: browserPfad() });
 
-async function seite(hoehe, breite = 390) {
+async function seite(hoehe, breite = 390, nativ = false) {
   const page = await browser.newPage({ viewport: { width: breite, height: hoehe }, deviceScaleFactor: 2,
     permissions: ['geolocation'], geolocation: { latitude: 47.35, longitude: 7.9, accuracy: 8 } });
   // Eigene Wachsperre statt der echten: So laesst sich zaehlen, ob
@@ -101,6 +101,21 @@ async function seite(hoehe, breite = 390) {
       return sperre;
     } } });
   });
+  // Die App-Huelle (ENT-732): Capacitor meldet sich als nativ, das Plugin
+  // KeepAwake zaehlt mit. Die Wachsperre des Browsers wird dabei ENTFERNT --
+  // haelt der Bildschirm trotzdem wach, kann es nur das Plugin gewesen sein.
+  if (nativ) {
+    await page.addInitScript(() => {
+      window.__nativ = { wach: 0, schlaf: 0 };
+      window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios',
+        Plugins: { KeepAwake: {
+          keepAwake: async () => { window.__nativ.wach++; },
+          allowSleep: async () => { window.__nativ.schlaf++; },
+        } } };
+      Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: undefined });
+      try { localStorage.setItem('sop_mandant', 'musterag'); } catch (e) {}
+    });
+  }
   page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
   await page.route('**/api/**', route => {
     const p = new URL(route.request().url()).pathname.split('/api/')[1];
@@ -613,6 +628,50 @@ for (const br of [320, 1280]) {
   check(`${br} px breit: die Reiterleiste bleibt senkrecht mittig`,
     Math.abs(mitte.o - mitte.u) <= 1);
   await page.close();
+}
+
+// ══════════ IN DER APP: DAS NATIVE PLUGIN (ENT-732) ════════════════════
+/* Ob navigator.wakeLock in der WKWebView der Huelle haelt, war nie
+   geprueft (OP-574). In der App laeuft das Wachhalten darum ueber das
+   Plugin KeepAwake. Geprueft wird das Verhalten, nicht der Wortlaut:
+   Die Nachbildung oben nimmt der Seite die Wachsperre des Browsers weg --
+   wird trotzdem wachgehalten, war es das Plugin. Und der Browser bleibt
+   beim Alten: Die Abschnitte weiter oben laufen ohne Capacitor und
+   zaehlen dort die Wachsperre des Browsers. */
+{
+  const p = await seite(844, 390, true);
+  await p.evaluate(() => ladeSchichten().then(() => rundgangFortsetzen(71)));
+  await p.waitForTimeout(1500);
+  await p.click('#rgsRt-karte'); await p.waitForTimeout(700);
+  await p.click('#rgsEinstKnopf'); await p.waitForTimeout(300);
+  // Ohne Schalter bricht der Klick unten mit einer Zeitueberschreitung ab,
+  // und eine abgestuerzte Suite meldet keine rote Pruefung, sondern nichts.
+  // Darum hier ausdruecklich rot und den Rest ueberspringen.
+  const schalterDa = await p.isVisible('#rgsEinstWach');
+  check('KRITISCH: App: der Schalter steht auch ohne Wachsperre des Browsers da -- das Plugin reicht',
+    schalterDa);
+  if (schalterDa) {
+  check('App: solange er aus ist, haelt das Plugin nichts wach',
+    await p.evaluate(() => window.__nativ.wach) === 0);
+  await p.click('#rgsEinstWach'); await p.waitForTimeout(500);
+  check('KRITISCH: App: Einschalten haelt den Bildschirm ueber das Plugin wach',
+    await p.evaluate(() => window.__nativ.wach) === 1);
+  // Die native Sperre faellt beim Wegschalten nicht von selbst weg. Ein
+  // Zurueckkommen darf darum nicht ein zweites Mal anfordern.
+  await p.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await p.waitForTimeout(300);
+  check('App: Zurueckkommen aus dem Hintergrund fordert nicht doppelt an',
+    await p.evaluate(() => window.__nativ.wach) === 1);
+  await p.click('#rgsEinstWach'); await p.waitForTimeout(400);
+  check('KRITISCH: App: Ausschalten laesst das Geraet wieder schlafen',
+    await p.evaluate(() => window.__nativ.schlaf) === 1);
+  await p.click('#rgsEinstWach'); await p.waitForTimeout(400);
+  await p.evaluate(() => rgSeiteZu()); await p.waitForTimeout(600);
+  check('KRITISCH: App: das Wachhalten ueberdauert die Runde nicht',
+    await p.evaluate(() => window.__nativ.schlaf) === 2
+    && await p.evaluate(() => window.__nativ.wach) === 2);
+  }
+  await p.close();
 }
 
 await browser.close();

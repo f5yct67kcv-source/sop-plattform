@@ -323,6 +323,21 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
 // ══════════ GERENDERT ════════════════════════════════════════════════
 const browser = await chromium.launch({ executablePath: browserPfad() });
 
+// ══════════ DATENSCHUTZ DER APP: ENTWURF BLEIBT DRAUSSEN (ENT-732) ════
+// Die Seite ist ein ungeprüfter Entwurf. Solange sie das von sich sagt,
+// darf der Deploy sie nirgends hin kopieren -- jeder Push auf main geht
+// sofort live, und Apple bekäme sonst einen Link auf einen Text, den
+// niemand freigegeben hat. Fällt der Vermerk weg, darf (und soll) sie in
+// den Deploy; diese Prüfung hält dann still.
+{
+  const app = lies('datenschutz-app.html');
+  const workflow = lies('.github/workflows/deploy-hostpoint.yml');
+  const entwurf = /ENTWURF/.test(app);
+  const ausgeliefert = /^\s*cp\s+datenschutz-app\.html\s/m.test(workflow);
+  check('KRITISCH: der Entwurf der App-Datenschutzerklärung wird nicht ausgeliefert',
+    !(entwurf && ausgeliefert));
+}
+
 // Farbwerte aus dem Cockpit, nicht aehnliche -- dieselbe Kopplung wie in
 // test_homepage.mjs.
 const dash = lies('dashboard.html');
@@ -333,7 +348,8 @@ const hell = block(':root {');
 const dunkel = block('html[data-thema="dunkel"] {');
 
 for (const [datei, titel] of [['impressum.html', 'Impressum'], ['datenschutz.html', 'Datenschutz'],
-                              ['datenschutz-demo.html', 'Datenschutz Demobereich']]) {
+                              ['datenschutz-demo.html', 'Datenschutz Demobereich'],
+                              ['datenschutz-app.html', 'Datenschutz App']]) {
   for (const [breite, hoehe, wo] of [[1440, 900, 'Desktop'], [390, 844, 'Handy']]) {
     const seite = await browser.newPage({ viewport: { width: breite, height: hoehe } });
     const fremde = [];

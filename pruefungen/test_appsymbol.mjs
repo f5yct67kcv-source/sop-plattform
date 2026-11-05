@@ -117,6 +117,22 @@ check('KRITISCH: er fuehrt genau die Datei, die hier geprueft wurde',
   !!js && (js.images || []).some(b => b.filename === 'AppIcon-512@2x.png'
     && String(b.size || '').startsWith('1024')));
 
+/* Deckend genuegt fuer den Store nicht (ENT-732). App Store Connect weist
+   das grosse Symbol ab, sobald die Datei einen ALPHAKANAL hat -- auch wenn
+   jeder Bildpunkt voll deckend ist. Die Pruefung oben misst die Deckung
+   im Bild und waere darum gruen geblieben. Gelesen wird der Farbtyp im
+   Kopf der PNG-Datei (IHDR, Byte 25): 4 und 6 tragen Alpha, 2 nicht. Ein
+   tRNS-Block wuerde einem RGB-Bild nachtraeglich Durchsicht geben und
+   zaehlt darum genauso. */
+{
+  const png = readFileSync(
+    `${WURZEL}/mobile/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png`);
+  const istPng = png.length > 26 && png.toString('ascii', 12, 16) === 'IHDR';
+  const farbtyp = istPng ? png[25] : -1;
+  check(`KRITISCH: das iOS-Symbol hat keinen Alphakanal (Farbtyp ${farbtyp}) -- sonst lehnt App Store Connect den Upload ab`,
+    istPng && farbtyp !== 4 && farbtyp !== 6 && !png.includes(Buffer.from('tRNS')));
+}
+
 await browser.close();
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { console.log(bad.map(n => '  ✗ ' + n).join('\n')); process.exit(1); }
