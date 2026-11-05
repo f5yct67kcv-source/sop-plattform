@@ -27,28 +27,18 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
 // ══════════ DIE UNFERTIGE SEITE DARF NICHT LIVE GEHEN ════════════════
 // Das Impressum traegt __IMPRESSUM_*__-Platzhalter, solange Firma, Adresse
 // und Unternehmensnummer fehlen. Ein Impressum mit erfundenen Angaben waere
-// schlimmer als keines -- also muss die Kopplung stimmen: entweder die
-// Platzhalter sind weg, ODER die Seite wird nicht ausgeliefert. Beides
-// zugleich ist der Fehler, den diese Pruefung verhindert.
+// schlimmer als keines.
+//
+// SEIT 2026-11 liefert formateins-guardops guardops.ch aus, nicht mehr
+// dieser Workflow. Die Kopplung "nur ausliefern, wenn fertig" und "nur
+// verlinken, was ausgeliefert wird" sitzt darum dort: werkzeuge/einsetzen.py
+// bricht bei jedem uebrig gebliebenen Platzhalter ab, test_buendel.mjs
+// findet jeden toten Link. Hier bleibt die Aussage ueber die Datei selbst,
+// solange ihre Kopie in diesem Repository liegt.
 {
   const offen = [...new Set([...impressum.matchAll(/__[A-Z][A-Z_]{2,}__/g)].map(m => m[0]))];
-  // Die echte cp-Zeile, nicht eine Erwaehnung im Kommentar daneben -- die
-  // Gegenprobe hat gezeigt, dass eine blosse Textsuche gruen bleibt, wenn
-  // nur der Kommentar den Dateinamen noch nennt.
-  const imBuendel = /^\s*cp\s+impressum\.html\s+dist-guardops\/\S+$/m.test(workflow);
-  check('KRITISCH: das Impressum wird nur ausgeliefert, wenn keine Angabe mehr fehlt',
-    offen.length === 0 || !imBuendel);
-  if (offen.length) { console.log(`  ! Impressum noch offen: ${offen.join(', ')} — darum nicht im Deploy`); }
-
-  // Dieselbe Kopplung fuer die Verweise: Eine Fusszeile, die auf eine Seite
-  // zeigt, die es auf dem Server nicht gibt, ist ein 404 auf einer
-  // Verkaufsseite. "Noch nicht da" darf nicht wie "da" aussehen.
-  const verweistAufImpressum = /href="impressum\.html"/.test(homepage);
-  check('KRITISCH: die Startseite verweist nur dann aufs Impressum, wenn es auch ausgeliefert wird',
-    verweistAufImpressum === imBuendel);
-  const verweistAufDatenschutz = /href="datenschutz\.html"/.test(homepage);
-  check('KRITISCH: die Startseite verweist nur dann auf den Datenschutz, wenn er auch ausgeliefert wird',
-    verweistAufDatenschutz === /^\s*cp\s+datenschutz\.html\s+dist-guardops\/\S+$/m.test(workflow));
+  check('KRITISCH: im Impressum fehlt keine Angabe mehr (kein offener Platzhalter)', offen.length === 0);
+  if (offen.length) { console.log(`  ! Impressum noch offen: ${offen.join(', ')}`); }
 }
 
 // ══════════ DIE AUSSAGEN GEGEN DEN CODE ══════════════════════════════
@@ -262,12 +252,9 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
   const resetKern = lies('backend/demo_reset.php');
   const flach = dsDemo.replace(/<!--[\s\S]*?-->/g, '').replace(/\s+/g, ' ');
 
-  // Die Kopplung "Verweis nur auf eine Seite, die es auf dem Server gibt".
-  // Der Demobereich verweist ABSOLUT auf guardops.ch -- ein 404 faende
-  // niemand von uns, sondern der Interessent auf der Anmeldemaske.
-  const imBuendel = /^\s*cp\s+datenschutz-demo\.html\s+dist-guardops\/\S+$/m.test(workflow);
-  check('KRITISCH: die Anmeldemaske verweist nur dann auf die Demo-Erklaerung, wenn sie ausgeliefert wird',
-    /datenschutz-demo\.html/.test(dash) === imBuendel);
+  // Der Demobereich verweist ABSOLUT auf guardops.ch/datenschutz-demo.html.
+  // Dass es die Seite dort gibt, prueft seit 2026-11 formateins-guardops
+  // (test_buendel.mjs, Liste VON_AUSSEN) -- von dort wird sie ausgeliefert.
 
   // "Er setzt keine Cookies": dashboard.html haelt die Sitzung im lokalen
   // Speicher. Ein setcookie/document.cookie waere die Falschaussage.
@@ -509,7 +496,11 @@ for (const [datei, titel] of [['impressum.html', 'Impressum'], ['datenschutz.htm
   // sonst geht die naechste neue Seite mit ihrem Kopf hinaus.
   //
   // GEPRUEFT WIRD DAS ZIEL, NICHT DER DATEINAME: nutzungsbedingungen.html
-  // geht in ZWEI Buendel, ins Homepage-Buendel und auf jeden Demo-Platz.
+  // ging in ZWEI Buendel, ins Homepage-Buendel und auf jeden Demo-Platz.
+  // Seit 2026-11 liefert formateins-guardops die Homepage aus und saeubert
+  // dort selbst (werkzeuge/bauen.py, geprueft in test_buendel.mjs); hier
+  // bleiben die Demo-Plaetze mit nutzungsbedingungen.html und
+  // datenschutz-demo-platz.html.
   // Eine Pruefung, die nur nach dem Dateinamen sucht, ist schon zufrieden,
   // wenn EINES der beiden gesaeubert wird -- das andere ginge mit seinem
   // Kopf hinaus, und sie bliebe gruen. Beim Schreiben dieser Suite genau
@@ -540,7 +531,7 @@ for (const [datei, titel] of [['impressum.html', 'Impressum'], ['datenschutz.htm
     .filter(m => /^(nutzungsbedingungen|datenschutz|impressum)/.test(m[1]))
     .map(m => m[2])
     .filter((z, i, a) => a.indexOf(z) === i);
-  check('die Suche findet ueberhaupt ausgelieferte Rechtsseiten', ziele.length >= 4);
+  check('die Suche findet ueberhaupt ausgelieferte Rechtsseiten', ziele.length >= 2);
   for (const ziel of ziele) {
     check(`KRITISCH: ${ziel} wird vor der Auslieferung gesaeubert`,
       gesaeubertePfade.has(ziel));

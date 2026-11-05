@@ -121,8 +121,9 @@ check('KRITISCH: im Register steht kein Passwort und kein Hash',
   // 404-Seite ohne CORS-Kopfzeile, sichtbar nur als abgebrochene
   // Verbindung.
   const deploy = lies('.github/workflows/deploy-hostpoint.yml');
-  check('KRITISCH: die Landeseite liegt im guardops-Buendel',
-    /cp demo-weiter\.html\s+dist-guardops\/demo-weiter\.html/.test(deploy));
+  // Die Landeseite demo-weiter.html liefert seit 2026-11 formateins-guardops
+  // auf guardops.ch aus; dessen test_buendel.mjs verlangt sie unter genau
+  // diesem Namen (Liste VON_AUSSEN). Hier bleibt der Endpunkt.
   check('KRITISCH: der Endpunkt liegt im Betreiber-Buendel',
     /cp backend\/api\/demo_weiter\.php\s+dist-betreiber\/api\/demo_weiter\.php/.test(deploy));
   // Ohne CORS-Freigabe bricht der POST von guardops.ch im Browser ab.

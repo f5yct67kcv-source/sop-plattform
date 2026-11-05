@@ -478,7 +478,8 @@ check('KRITISCH: auch mit offener Hilfe kommt kein Eingabefeld dazu',
   felderOffen === 4);
 
 // Rechtszeile. Relative Pfade waeren hier tot: impressum.html und
-// datenschutz.html liegen nur im guardops-Buendel (deploy-hostpoint.yml).
+// datenschutz.html liegen nur auf guardops.ch (ausgeliefert aus dem
+// Repository formateins-guardops).
 const rechtsLinks = await ev(fuss, () =>
   [...document.querySelectorAll('.gate-recht a')].map(a => a.getAttribute('href')));
 check('KRITISCH: Impressum und Datenschutz sind verlinkt',
