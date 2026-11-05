@@ -813,8 +813,8 @@ p{margin:0 0 1em}
 <div class="einwilligung" id="einwilligung" role="region" aria-label="Cookie-Hinweis" hidden>
   <div class="innen">
     <p><span data-brand>GuardOpS</span> verwendet Cookies und ähnliche Technologien, um das
-       Nutzererlebnis auf dieser Webseite zu verbessern, den Datenverkehr zu analysieren
-       und Werbung darauf abzustimmen.
+       Nutzererlebnis auf dieser Webseite zu verbessern und den Datenverkehr zu
+       analysieren.
        <a href="datenschutz.html">Mehr Infos in unserer Datenschutzerklärung</a></p>
     <div class="wahl">
       <button type="button" class="btn primaer" id="einwilligungJa">Zustimmen</button>
@@ -1041,14 +1041,16 @@ p{margin:0 0 1em}
 (function(){
   // Einwilligung und Messung (2026-10-14, Anordnung des Projektinhabers:
   // bezahlte Werbung braucht ein Ruecksignal). Grundsatz: Vor der Zustimmung
-  // laedt NICHTS von Google oder Meta -- test_homepage.mjs misst das am
+  // laedt NICHTS von Google -- test_homepage.mjs misst das am
   // Browser. Die Wahl liegt sechs Monate im lokalen Speicher; danach fragt
   // die Seite neu. Ohne JavaScript bleibt der Streifen verborgen und es
   // wird nichts geladen -- das ist dieselbe Aussage wie "abgelehnt".
   //
   // Eine leere Kennung heisst: dieser Dienst wird auch nach Zustimmung
-  // nicht geladen. Die Meta-Kennung bleibt leer, bis das Konto besteht.
-  var MESSUNG = { ga: 'G-DK3G9YGFB8', meta: '' };
+  // nicht geladen. Der Meta-Pixel ist vorerst ganz herausgenommen (Entscheid
+  // vom 2026-11-05: erst live, wenn die Pixel-ID da ist) -- Code, Hinweis und
+  // Datenschutzerklaerung kommen dann zusammen zurueck.
+  var MESSUNG = { ga: 'G-DK3G9YGFB8' };
   var SCHLUESSEL = 'go_einwilligung';
   var DAUER = 183 * 24 * 60 * 60 * 1000;
 
@@ -1086,16 +1088,9 @@ p{margin:0 0 1em}
       window.gtag('config', MESSUNG.ga, { anonymize_ip: true });
       skript('https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(MESSUNG.ga));
     }
-    if (MESSUNG.meta) {
-      var f = function(){ f.callMethod ? f.callMethod.apply(f, arguments) : f.queue.push(arguments); };
-      if (!window.fbq) { window.fbq = f; f.push = f; f.loaded = true; f.version = '2.0'; f.queue = []; }
-      window.fbq('init', MESSUNG.meta);
-      window.fbq('track', 'PageView');
-      skript('https://connect.facebook.net/en_US/fbevents.js');
-    }
   }
   function spurenLoeschen(){
-    // Was Google und Meta bei einer frueheren Zustimmung abgelegt haben.
+    // Was Google (und frueher allenfalls Meta) bei einer Zustimmung abgelegt hat.
     var teile = location.hostname.split('.');
     document.cookie.split(';').forEach(function(c){
       var name = c.split('=')[0].trim();
@@ -1114,14 +1109,10 @@ p{margin:0 0 1em}
   //                      (einmal je Abschnitt): wie weit liest jemand?
   //   formular_begonnen  Erste Eingabe im Demo-Formular.
   //   generate_lead      Demo-Zugang angefordert, Server hat angenommen
-  //                      (Googles Standardname fuer "Lead"; bei Meta "Lead").
+  //                      (Googles Standardname fuer "Lead").
   window.goMessen = function(name, daten){
     if (!laeuft) { return; }
     if (MESSUNG.ga && window.gtag) { window.gtag('event', name, daten || {}); }
-    if (MESSUNG.meta && window.fbq) {
-      if (name === 'generate_lead') { window.fbq('track', 'Lead'); }
-      else { window.fbq('trackCustom', name, daten || {}); }
-    }
   };
   if ('IntersectionObserver' in window) {
     var gesehen = {};

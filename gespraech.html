@@ -309,7 +309,7 @@ main{background:radial-gradient(ellipse 70% 60% at 15% 0%,#1a2236 0%,var(--nacht
   function melde(text){ meldung.textContent = text; meldung.classList.toggle('zeigen', !!text); }
 
   // ── Messung nur mit Zustimmung von der Startseite ─────────────
-  var MESSUNG = { ga: 'G-DK3G9YGFB8', meta: '' };
+  var MESSUNG = { ga: 'G-DK3G9YGFB8' };
   function zugestimmt(){
     try {
       var r = JSON.parse(localStorage.getItem('go_einwilligung') || 'null');
@@ -326,18 +326,10 @@ main{background:radial-gradient(ellipse 70% 60% at 15% 0%,#1a2236 0%,var(--nacht
       s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(MESSUNG.ga);
       document.head.appendChild(s);
     }
-    if (MESSUNG.meta) {
-      var f = function(){ f.callMethod ? f.callMethod.apply(f, arguments) : f.queue.push(arguments); };
-      if (!window.fbq) { window.fbq = f; f.push = f; f.loaded = true; f.version = '2.0'; f.queue = []; }
-      window.fbq('init', MESSUNG.meta); window.fbq('track', 'PageView');
-      var m = document.createElement('script'); m.async = true; m.src = 'https://connect.facebook.net/en_US/fbevents.js';
-      document.head.appendChild(m);
-    }
   }
   function messen(art){
     if (!zugestimmt()) { return; }
     if (window.gtag) { window.gtag('event', 'gespraech_gebucht', { art: art }); }
-    if (window.fbq) { window.fbq('track', 'Schedule'); }
   }
 
   // ── Zusammenfassung links ─────────────────────────────────────
