@@ -650,6 +650,34 @@ jedes Laufs namentlich, welche Plätze ohne Dateien geblieben sind.
 auch im Mandantenstamm fehlt; steht er dort und hat nur keine Dateien,
 greift diese Sperre **nicht**.
 
+## Prüfzugang für die App-Store-Prüfung (ENT-732)
+
+`https://pruefung.guardops.ch` ist ein eigener Mandant mit eigener Datenbank
+und **ausschliesslich erfundenen Daten**. Dort melden sich die Prüfer von
+Apple an (Kurzname in der App: `pruefung`). Er wird nie geleert und läuft nie
+ab, anders als die Demo-Plätze.
+
+Der Deploy baut ihn wie cupi24 mit dem vollen Dateiumfang, aber mit eigener
+Datenbank, dem Postfach der Betreiberin und ohne Mandanten-Branding. Nur
+Production; fehlen die FTP-Secrets, wird er übersprungen und der Lauf sagt
+das.
+
+Secrets im Environment **production**:
+
+| Secret | Inhalt |
+|---|---|
+| `PRUEFUNG_FTP_HOST`, `PRUEFUNG_FTP_USER`, `PRUEFUNG_FTP_PASSWORD` | FTP-Zugang, beschränkt auf das Verzeichnis der Subdomain |
+| `PRUEFUNG_DB_HOST`, `PRUEFUNG_DB_NAME`, `PRUEFUNG_DB_USER` | Datenbank des Prüfzugangs |
+| `MANDANT_SECRETS`, Eintrag `pruefung` | Datenbank-Passwort (über `bash mandant-secrets.sh`; das Skript ersetzt die ganze Tafel) |
+
+Sind die FTP-Secrets gesetzt, die Datenbankangaben aber nicht vollständig,
+**bricht der Bau ab**, statt eine Anlage ohne Datenbank hochzuladen.
+
+Danach im Betreiber-Bereich: Vorrat mit denselben Datenbankangaben und
+Secret-Name `pruefung` anlegen, zuteilen (Subdomain `pruefung`), Erstkonto
+per Einladung. Die Zugangsdaten des Prüferkontos gehören in App Store
+Connect, nicht ins Repository.
+
 ## Mandanten-Vorrat (ENT-686)
 
 Vorbereitete, leere Anlagen, aus denen bei Vertragsabschluss eine einem

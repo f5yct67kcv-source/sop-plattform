@@ -119,7 +119,7 @@ check('KRITISCH: und im Buendel der Anlage',
   /cp backend\/support_sammeln\.php dist\//.test(deploy));
 // Er wird nur eingebunden, nie aufgerufen -- also gesperrt wie die
 // uebrigen Rechenkerne.
-['htaccess-betreiber', 'htaccess-cupi24', 'htaccess-hostpoint'].forEach(f => {
+['htaccess-betreiber', 'htaccess-cupi24', 'htaccess-pruefung', 'htaccess-hostpoint'].forEach(f => {
   check(`${f} sperrt den Abholweg`, lies(f).includes('support_sammeln'));
 });
 

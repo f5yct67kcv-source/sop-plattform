@@ -209,6 +209,14 @@ jobs:
           P_CUPI24_FTP_HOST: ${{ secrets.CUPI24_FTP_HOST }}
           P_CUPI24_FTP_USER: ${{ secrets.CUPI24_FTP_USER }}
           P_CUPI24_FTP_PASSWORD: ${{ secrets.CUPI24_FTP_PASSWORD }}
+          # Pruefzugang pruefung.guardops.ch (ENT-732), optional. DB-Passwort
+          # in MANDANT_SECRETS unter "pruefung" -- Begruendung beim Bau-Schritt.
+          P_PRUEFUNG_FTP_HOST: ${{ secrets.PRUEFUNG_FTP_HOST }}
+          P_PRUEFUNG_FTP_USER: ${{ secrets.PRUEFUNG_FTP_USER }}
+          P_PRUEFUNG_FTP_PASSWORD: ${{ secrets.PRUEFUNG_FTP_PASSWORD }}
+          P_PRUEFUNG_DB_HOST: ${{ secrets.PRUEFUNG_DB_HOST }}
+          P_PRUEFUNG_DB_NAME: ${{ secrets.PRUEFUNG_DB_NAME }}
+          P_PRUEFUNG_DB_USER: ${{ secrets.PRUEFUNG_DB_USER }}
           # Staging -- eigene, von Produktion VERSCHIEDENE Secret-Namen.
           S_DB_HOST: ${{ secrets.STAGING_DB_HOST }}
           S_DB_NAME: ${{ secrets.STAGING_DB_NAME }}
@@ -329,6 +337,12 @@ jobs:
             EFF_CUPI24_FTP_HOST="$P_CUPI24_FTP_HOST"
             EFF_CUPI24_FTP_USER="$P_CUPI24_FTP_USER"
             EFF_CUPI24_FTP_PASSWORD="$P_CUPI24_FTP_PASSWORD"
+            EFF_PRUEFUNG_FTP_HOST="$P_PRUEFUNG_FTP_HOST"
+            EFF_PRUEFUNG_FTP_USER="$P_PRUEFUNG_FTP_USER"
+            EFF_PRUEFUNG_FTP_PASSWORD="$P_PRUEFUNG_FTP_PASSWORD"
+            EFF_PRUEFUNG_DB_HOST="$P_PRUEFUNG_DB_HOST"
+            EFF_PRUEFUNG_DB_NAME="$P_PRUEFUNG_DB_NAME"
+            EFF_PRUEFUNG_DB_USER="$P_PRUEFUNG_DB_USER"
             # Eigene Adresse der Anlage (ENT-501, siehe auch APP_ENV oben):
             # steckt in jedem Link, den der Server per E-Mail verschickt.
             # Bis ENT-501 kam sie aus dem Host-Kopf DER ANFRAGE -- ein Angriff
@@ -413,6 +427,13 @@ jobs:
             EFF_CUPI24_FTP_HOST=""
             EFF_CUPI24_FTP_USER=""
             EFF_CUPI24_FTP_PASSWORD=""
+            # pruefung.guardops.ch ebenso nur fuer Production (ENT-732).
+            EFF_PRUEFUNG_FTP_HOST=""
+            EFF_PRUEFUNG_FTP_USER=""
+            EFF_PRUEFUNG_FTP_PASSWORD=""
+            EFF_PRUEFUNG_DB_HOST=""
+            EFF_PRUEFUNG_DB_NAME=""
+            EFF_PRUEFUNG_DB_USER=""
             # Eigene Adresse (ENT-501, Begruendung im Production-Zweig).
             # STAGING_DOMAIN dient auch den Verifikationsschritten weiter
             # unten. Kein Rueckfall auf die produktive Adresse -- fehlt die
@@ -555,6 +576,12 @@ jobs:
             echo "EFF_CUPI24_FTP_HOST=$EFF_CUPI24_FTP_HOST"
             echo "EFF_CUPI24_FTP_USER=$EFF_CUPI24_FTP_USER"
             echo "EFF_CUPI24_FTP_PASSWORD=$EFF_CUPI24_FTP_PASSWORD"
+            echo "EFF_PRUEFUNG_FTP_HOST=$EFF_PRUEFUNG_FTP_HOST"
+            echo "EFF_PRUEFUNG_FTP_USER=$EFF_PRUEFUNG_FTP_USER"
+            echo "EFF_PRUEFUNG_FTP_PASSWORD=$EFF_PRUEFUNG_FTP_PASSWORD"
+            echo "EFF_PRUEFUNG_DB_HOST=$EFF_PRUEFUNG_DB_HOST"
+            echo "EFF_PRUEFUNG_DB_NAME=$EFF_PRUEFUNG_DB_NAME"
+            echo "EFF_PRUEFUNG_DB_USER=$EFF_PRUEFUNG_DB_USER"
           } >> "$GITHUB_ENV"
 
           # Mehrzeiliger Wert -- eigener Heredoc-Block statt einer einfachen
@@ -2131,6 +2158,250 @@ jobs:
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_CUPI24_FTP_HOST == '' }}
         run: |
           echo "::notice::cupi24.guardops.ch wurde NICHT beliefert -- die Secrets CUPI24_FTP_HOST/USER/PASSWORD fehlen im Environment production. Das Rapport-Tool auf der bisherigen Adresse ist davon nicht betroffen und wurde regulaer ausgeliefert."
+
+      # ══════════ PRUEFZUGANG FUER DIE APP-STORE-PRUEFUNG ════════════════
+      #
+      # ENT-732: Die Pruefer von Apple brauchen einen Zugang, der waehrend
+      # einer Pruefung (oft mehrere Tage, bei jedem Update erneut)
+      # funktioniert und nur ERFUNDENE Daten zeigt. Die Demo-Plaetze taugen
+      # dafuer nicht (naechtlich geleert, Ablauf nach 14 Tagen), ein Konto
+      # bei CUPI 24 zeigte echte Personendaten. Also ein eigener Mandant
+      # unter pruefung.guardops.ch -- Kurzname "pruefung" in der App.
+      #
+      # GLEICHER AUFBAU WIE DER cupi24-SCHRITT DARUEBER (voller Dateiumfang,
+      # eigene feste Adresse, eigener FTP-Zugang, nur Production, ohne
+      # Secrets uebersprungen). test_deploy.mjs prueft beide Buendel mit
+      # denselben Aussagen gegen den Hauptschritt -- eine Datei, die dort
+      # dazukommt, muss auch hier dazukommen.
+      #
+      # DREI UNTERSCHIEDE ZU cupi24, jeder mit Grund:
+      #   - EIGENE DATENBANK statt der Produktionsdatenbank: Host, Name und
+      #     Benutzer aus PRUEFUNG_DB_*, das Passwort aus MANDANT_SECRETS
+      #     unter dem Namen "pruefung" -- wie bei den Demo-Plaetzen, damit
+      #     es nur EINEN Ort fuer dieses Passwort gibt.
+      #   - POSTFACH DER BETREIBERIN (GUARDOPS_SMTP_*, info@guardops.ch)
+      #     statt des Postfachs der Mandantin: Der Pruefbetrieb gehoert der
+      #     pzu consulting gmbh, nicht CUPI 24.
+      #   - KEIN MANDANTEN-BRANDING: Die Anlage bleibt GuardOpS, und die
+      #     Sparte Reinigung bleibt aus wie bei jedem fremden Mandanten.
+      - name: Rapport-Tool-Buendel fuer pruefung.guardops.ch bauen
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_PRUEFUNG_FTP_HOST != '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist-pruefung/api dist-pruefung/icons dist-pruefung/fonts dist-pruefung/img dist-pruefung/handbuch
+
+          cp index.html dist-pruefung/index.html
+          cp dashboard.html dist-pruefung/dashboard.html
+          cp app.html dist-pruefung/app.html
+          cp portal.html dist-pruefung/portal.html
+          cp betreiber.html dist-pruefung/betreiber.html
+          cp gav.js dist-pruefung/gav.js
+          cp zeitwahl.js dist-pruefung/zeitwahl.js
+          cp qrcode.js dist-pruefung/qrcode.js
+          cp unterschrift.js dist-pruefung/unterschrift.js
+          cp testumgebung.js dist-pruefung/testumgebung.js
+          cp html2pdf.bundle.min.js dist-pruefung/html2pdf.bundle.min.js
+          cp manifest.json dist-pruefung/manifest.json
+          cp manifest-app.json dist-pruefung/manifest-app.json
+          cp sw.js dist-pruefung/sw.js
+          cp icons/*.png dist-pruefung/icons/
+          cp fonts/*.woff2 dist-pruefung/fonts/
+          cp fonts/inter-LICENSE.txt dist-pruefung/fonts/inter-LICENSE.txt
+          cp fonts/archivo-OFL.txt dist-pruefung/fonts/archivo-OFL.txt
+          cp fonts/ibm-plex-LICENSE.txt dist-pruefung/fonts/ibm-plex-LICENSE.txt
+          cp img/anmeldung-nacht.webp dist-pruefung/img/anmeldung-nacht.webp
+          cp img/anmeldung-nacht.webm dist-pruefung/img/anmeldung-nacht.webm
+          cp img/anmeldung-nacht.mp4 dist-pruefung/img/anmeldung-nacht.mp4
+          cp backend/db.php dist-pruefung/db.php
+          cp backend/kundenportal.php dist-pruefung/kundenportal.php
+          cp backend/betreiber.php dist-pruefung/betreiber.php
+          # Siehe dist/: betreiber.php braucht diesen Rechenkern (ENT-600).
+          cp backend/demo_zugang.php dist-pruefung/demo_zugang.php
+          cp backend/mail_vorlage.php dist-pruefung/mail_vorlage.php
+          cp backend/mail_gestaltung.php dist-pruefung/mail_gestaltung.php
+          cp backend/demo_bestaetigung.php dist-pruefung/demo_bestaetigung.php
+          cp backend/guardops-signatur.png dist-pruefung/guardops-signatur.png
+          cp backend/guardops-signatur-hell.png dist-pruefung/guardops-signatur-hell.png
+          cp backend/support.php dist-pruefung/support.php
+          cp backend/supportvorgang.php dist-pruefung/supportvorgang.php
+          # Der Abholweg des Betreibers (ENT-681) -- eingebunden von
+          # betreiber_support_vorgang.php, das hier ebenfalls liegt.
+          cp backend/support_sammeln.php dist-pruefung/support_sammeln.php
+          cp backend/demo_anfrage.php dist-pruefung/demo_anfrage.php
+          cp backend/demo_daten.php dist-pruefung/demo_daten.php
+          cp backend/demo_reset.php dist-pruefung/demo_reset.php
+          cp backend/demo_bremse.php dist-pruefung/demo_bremse.php
+          cp backend/ai.php dist-pruefung/ai.php
+          cp backend/planung.php dist-pruefung/planung.php
+          cp backend/kunden.php dist-pruefung/kunden.php
+          cp backend/mitarbeiter.php dist-pruefung/mitarbeiter.php
+          cp backend/layout.php dist-pruefung/layout.php
+          cp backend/anmeldung.php dist-pruefung/anmeldung.php
+          cp backend/zweifaktor.php dist-pruefung/zweifaktor.php
+          cp backend/rechte.php dist-pruefung/rechte.php
+          cp backend/neuerungen.php dist-pruefung/neuerungen.php
+          cp backend/logbuch.php dist-pruefung/logbuch.php
+          cp backend/betreiber_finanzen.php dist-pruefung/betreiber_finanzen.php
+          cp backend/ereignisse.php dist-pruefung/ereignisse.php
+          cp backend/auslagen.php dist-pruefung/auslagen.php
+          cp backend/rundgang.php dist-pruefung/rundgang.php
+          cp backend/fahrzeug.php dist-pruefung/fahrzeug.php
+          cp backend/geofence_bereich.php dist-pruefung/geofence_bereich.php
+          cp backend/belege.php dist-pruefung/belege.php
+          # Unterschriebenes PDF (ENT-688): Modul, FPDF, Schriften.
+          cp backend/belegpdf.php dist-pruefung/belegpdf.php
+          mkdir -p dist-pruefung/fpdf/font
+          cp backend/fpdf/fpdf.php dist-pruefung/fpdf/fpdf.php
+          cp backend/fpdf/font/*.json dist-pruefung/fpdf/font/
+          cp backend/qrrechnung.php dist-pruefung/qrrechnung.php
+          cp backend/produkte.php dist-pruefung/produkte.php
+          cp backend/mailer.php dist-pruefung/mailer.php
+          cp backend/ferien.php dist-pruefung/ferien.php
+          cp backend/lohn.php dist-pruefung/lohn.php
+          cp backend/gavzeit.php dist-pruefung/gavzeit.php
+          cp backend/lohnlauf.php dist-pruefung/lohnlauf.php
+          cp backend/mitteilungen.php dist-pruefung/mitteilungen.php
+          cp backend/push.php dist-pruefung/push.php
+          # Zwei Rechenkerne, die kein Endpunkt ist und die darum leicht
+          # vergessen gehen: Sie werden nur per require_once aus
+          # backend/api/*.php gezogen. Die Endpunkte selbst kommen unten
+          # pauschal mit ("cp backend/api/*.php"), die Module hier einzeln --
+          # fehlt eines, liegt der Endpunkt live da und bricht beim
+          # require_once mit einem PHP-Fatal ab, also mit HTTP 500 und ohne
+          # verwertbare Meldung. Genau das ist mit
+          # planung_einrichten_kern.php passiert (ENT-612 lagerte den Kern
+          # aus und trug nur die betreiber-Zeile nach): Das Cockpit rief
+          # api/planung_einrichten.php bei jedem Laden still im Hintergrund
+          # auf, bekam 500, und der Einrichtungs-Punkt blieb dauerhaft grau
+          # -- "unbekannt" sah aus wie "nichts nachzutragen".
+          cp backend/planung_einrichten_kern.php dist-pruefung/planung_einrichten_kern.php
+          cp backend/demo_instanz.php dist-pruefung/demo_instanz.php
+          # Ebenfalls kein Endpunkt, nur per require_once aus login.php und
+          # api/me.php gezogen (Cockpit-Tour und Demo-Hinweis) -- derselbe
+          # Grund wie bei planung_einrichten_kern.php zwei Zeilen darueber.
+          cp backend/tutorial.php dist-pruefung/tutorial.php
+          cp htaccess-pruefung dist-pruefung/.htaccess
+          cat htaccess-leistung >> dist-pruefung/.htaccess
+          cp backend/api/*.php dist-pruefung/api/
+          cp handbuch/*.php dist-pruefung/handbuch/
+          cp handbuch/*.css dist-pruefung/handbuch/
+          cp handbuch/*.js dist-pruefung/handbuch/
+          # setup.php / setup.html bewusst NICHT hier -- dieselbe Begruendung
+          # wie beim Hauptschritt oben.
+
+          # ── Eigene Datenbank ───────────────────────────────────────────
+          # Das Passwort aus MANDANT_SECRETS (base64-JSON, Schluessel
+          # "pruefung"). Fehlt etwas, bricht der Bau ab: Eine Adresse, die
+          # auf keine Datenbank zeigt, ist schlimmer als keine -- die Pruefer
+          # saehen einen Serverfehler statt einer Anmeldung.
+          PRUEFUNG_PASSWORT=$(printf '%s' "${EFF_MANDANT_SECRETS:-}" | base64 -d 2>/dev/null \
+                             | jq -r '.pruefung // ""' 2>/dev/null || true)
+          for WERT in "$EFF_PRUEFUNG_DB_HOST" "$EFF_PRUEFUNG_DB_NAME" "$EFF_PRUEFUNG_DB_USER" "$PRUEFUNG_PASSWORT"; do
+            [ -n "$WERT" ] && echo "::add-mask::$WERT"
+          done
+          LEER=""
+          [ -z "$EFF_PRUEFUNG_DB_HOST" ] && LEER="$LEER PRUEFUNG_DB_HOST"
+          [ -z "$EFF_PRUEFUNG_DB_NAME" ] && LEER="$LEER PRUEFUNG_DB_NAME"
+          [ -z "$EFF_PRUEFUNG_DB_USER" ] && LEER="$LEER PRUEFUNG_DB_USER"
+          [ -z "$PRUEFUNG_PASSWORT" ]     && LEER="$LEER MANDANT_SECRETS[pruefung]"
+          if [ -n "$LEER" ]; then
+            echo "::error::pruefung.guardops.ch: es fehlt$LEER. Der FTP-Zugang ist gesetzt, die Datenbank nicht -- so wird nichts hochgeladen."
+            exit 1
+          fi
+          # sed vertraegt im Ersatzwert weder "|" noch "&" noch "\\" -- ein
+          # Passwort kennt alle drei. Darum maskiert, wie bei den
+          # Demo-Plaetzen (dort nach einem echten Abbruch eingebaut).
+          ersetze() {
+            local platzhalter="$1" wert="$2" datei="$3" sicher
+            sicher=$(printf '%s' "$wert" | sed -e 's/[\\&|]/\\&/g')
+            sed -i "s|$platzhalter|$sicher|g" "$datei"
+          }
+          ersetze __DB_HOST__ "$EFF_PRUEFUNG_DB_HOST" "dist-pruefung/db.php"
+          ersetze __DB_NAME__ "$EFF_PRUEFUNG_DB_NAME" "dist-pruefung/db.php"
+          ersetze __DB_USER__ "$EFF_PRUEFUNG_DB_USER" "dist-pruefung/db.php"
+          ersetze __DB_PASS__ "$PRUEFUNG_PASSWORT" "dist-pruefung/db.php"
+          # Betreiber-Datenbank: dieselbe tote Einbindung wie im cupi24-Buendel.
+          sed -i "s|__BETREIBER_DB_HOST__|$EFF_BETREIBER_DB_HOST|g" dist-pruefung/betreiber.php
+          sed -i "s|__BETREIBER_DB_NAME__|$EFF_BETREIBER_DB_NAME|g" dist-pruefung/betreiber.php
+          sed -i "s|__BETREIBER_DB_USER__|$EFF_BETREIBER_DB_USER|g" dist-pruefung/betreiber.php
+          sed -i "s|__BETREIBER_DB_PASS__|$EFF_BETREIBER_DB_PASSWORD|g" dist-pruefung/betreiber.php
+          sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-pruefung/db.php
+          sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-pruefung/testumgebung.js
+          sed -i "s|__IST_DEMO_PLATZ__|0|g" dist-pruefung/testumgebung.js
+          sed -i "s|__IST_DEMO_PLATZ__|0|g" dist-pruefung/db.php
+          # Sparte Reinigung aus -- wie bei jedem Mandanten ausser CUPI 24
+          # (ENT-650, reinigung_angeboten() in backend/db.php).
+          sed -i "s|__SPARTE_REINIGUNG__|0|g" dist-pruefung/db.php
+
+          # Eigene Adresse (ENT-501) -- festes Literal wie bei cupi24.
+          sed -i "s|__APP_BASIS_URL__|https://pruefung.guardops.ch|g" dist-pruefung/db.php
+
+          sed -i "s|__ANTHROPIC_API_KEY__|$EFF_ANTHROPIC_API_KEY|g" dist-pruefung/ai.php
+
+          # Postfach der Betreiberin (siehe Kopf dieses Abschnitts).
+          sed -i "s|__SMTP_HOST__|$EFF_GUARDOPS_SMTP_HOST|g" dist-pruefung/mailer.php
+          sed -i "s|__SMTP_PORT__|$EFF_GUARDOPS_SMTP_PORT|g" dist-pruefung/mailer.php
+          sed -i "s|__SMTP_VERSCHLUESSELUNG__|$EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG|g" dist-pruefung/mailer.php
+          sed -i "s|__SMTP_USER__|$EFF_GUARDOPS_SMTP_USER|g" dist-pruefung/mailer.php
+          sed -i "s|__SMTP_PASSWORD__|$EFF_GUARDOPS_SMTP_PASSWORD|g" dist-pruefung/mailer.php
+          sed -i "s|__SMTP_ABSENDER__|info@guardops.ch|g" dist-pruefung/mailer.php
+          sed -i "s|__MAIL_SIGNATUR__||g" dist-pruefung/mailer.php
+          sed -i "s|__SMTP_ABSENDER_NAME__|GuardOpS|g" dist-pruefung/mailer.php
+          sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist-pruefung/demo_anfrage.php
+          sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist-pruefung/demo_zugang.php
+          sed -i "s|__GUARDOPS_BASIS_URL__|https://guardops.ch|g" dist-pruefung/demo_bestaetigung.php
+          # Nur Production (Bedingung oben): EFF_STAGING_TESTMAIL ist leer.
+          sed -i "s|__STAGING_TESTMAIL__|$EFF_STAGING_TESTMAIL|g" dist-pruefung/mailer.php
+          sed -i "s|__DEMO_TESTMAIL__||g" dist-pruefung/mailer.php
+          sed -i "s|__DEMO_RESET_TOKEN__||g" dist-pruefung/api/demo_reset_ausfuehren.php
+          sed -i "s|__MANDANT_SECRETS__|$EFF_MANDANT_SECRETS|g" dist-pruefung/betreiber.php
+          sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist-pruefung/dashboard.html
+          sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist-pruefung/portal.html
+          sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist-pruefung/app.html
+          # Push wie bei cupi24: dieselbe App, dieselben Schluessel. Die
+          # Store-Fassung meldet sich bei Apple in der Produktivumgebung an.
+          sed -i "s|__VAPID_PRIVATE_PEM_B64__|$EFF_VAPID_PRIVATE_PEM_B64|g" dist-pruefung/push.php
+          sed -i "s|__VAPID_KONTAKT__|$EFF_VAPID_KONTAKT|g" dist-pruefung/push.php
+          sed -i "s|__APNS_KEY_P8_B64__|$EFF_APNS_KEY_P8_B64|g" dist-pruefung/push.php
+          sed -i "s|__APNS_KEY_ID__|$EFF_APNS_KEY_ID|g" dist-pruefung/push.php
+          sed -i "s|__APNS_TEAM_ID__|$EFF_APNS_TEAM_ID|g" dist-pruefung/push.php
+          sed -i "s|__PUSH_CRON_SCHLUESSEL__|$EFF_PUSH_CRON_SCHLUESSEL|g" dist-pruefung/api/push_versand.php
+
+          # Kein uebersehener Platzhalter darf hochgeladen werden -- dieselben
+          # Ausnahmen wie im cupi24-Buendel, mit derselben Begruendung dort.
+          UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' dist-pruefung/ \
+                   | grep -v -e '^__DIR__$' -e '^__MAPS_IOS_KEY__$' -e '^__FILE__$' \
+                   | sort -u || true)
+          if [ -n "$UEBRIG" ]; then
+            echo "::error::Nicht ersetzte Platzhalter im pruefung-Buendel: $UEBRIG"
+            exit 1
+          fi
+
+          echo "Buendel fuer pruefung.guardops.ch:"
+          find dist-pruefung -type f | sort
+
+      - name: HTML verdichten (dist-pruefung)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_PRUEFUNG_FTP_HOST != '' }}
+        continue-on-error: true
+        run: node werkzeuge/verdichten/verdichten.mjs dist-pruefung
+
+      - name: Rapport-Tool nach pruefung.guardops.ch hochladen (FTPS)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_PRUEFUNG_FTP_HOST != '' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.EFF_PRUEFUNG_FTP_HOST }}
+          username: ${{ env.EFF_PRUEFUNG_FTP_USER }}
+          password: ${{ env.EFF_PRUEFUNG_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist-pruefung/
+          # Wie bei cupi24: Der Zugang ist auf das Document-Root der
+          # Subdomain beschraenkt, daher "/".
+          server-dir: /
+
+      - name: Hinweis, wenn pruefung.guardops.ch noch nicht eingerichtet ist
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_PRUEFUNG_FTP_HOST == '' }}
+        run: |
+          echo "::notice::pruefung.guardops.ch wurde NICHT beliefert -- die Secrets PRUEFUNG_FTP_HOST/USER/PASSWORD fehlen im Environment production. Ohne diese Adresse gibt es keinen Pruefzugang fuer Apple (ENT-732). Alles andere wurde regulaer ausgeliefert."
 
       # ══ Die zehn Demo-Plaetze (ENT-600/ENT-601/ENT-613) ═══════════════
       #

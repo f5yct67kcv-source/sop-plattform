@@ -1732,6 +1732,281 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   }
 }
 
+// ══════════ DER PRUEFZUGANG FUER APPLE (pruefung.guardops.ch, ENT-732) ════
+//
+// Dasselbe Muster wie cupi24 darueber, und darum DIESELBEN Aussagen: voller
+// Dateiumfang gegen den Hauptschritt, eigene .htaccess mit vollstaendiger
+// Sperrliste, eigene feste Adresse, jeder Platzhalter je Datei ersetzt,
+// eigener FTP-Zugang, nur Production. Uebernommen aus dem cupi24-Block mit
+// ersetzten Namen; was dort cupi24-eigen ist (Produktionsdatenbank,
+// Postfach der Mandantin, Branding), steht hier durch die Aussagen des
+// Pruefzugangs ersetzt -- im zweiten Block weiter unten.
+{
+  const schritt = (name) => {
+    const i = workflow.indexOf(`- name: ${name}`);
+    if (i < 0) { return ''; }
+    const j = workflow.indexOf('\n      - name:', i + 10);
+    return workflow.slice(i, j < 0 ? undefined : j);
+  };
+  const hauptschritt = schritt('Platzhalter durch echte Werte ersetzen');
+  const bauen = schritt('Rapport-Tool-Buendel fuer pruefung.guardops.ch bauen');
+  const laden = schritt('Rapport-Tool nach pruefung.guardops.ch hochladen (FTPS)');
+  const hinweis = schritt('Hinweis, wenn pruefung.guardops.ch noch nicht eingerichtet ist');
+
+  check('KRITISCH: es gibt einen Schritt, der das Bündel für pruefung.guardops.ch baut, und einen, der es hochlädt',
+    hauptschritt !== '' && bauen !== '' && laden !== '');
+
+  // Jede "cp QUELLE ZIEL"-Zeile aus beiden Schritten, ZIEL relativ zum
+  // jeweiligen dist-Ordner -- so lassen sich beide Listen direkt
+  // gegeneinander abgleichen, unabhängig von Kommentaren oder Reihenfolge.
+  const zielRelativ = (text, praefix) => [...text.matchAll(/^\s*cp\s+(\S+)\s+(\S+)\s*$/gm)]
+    .map(m => m[2])
+    .filter(z => z.startsWith(praefix))
+    .map(z => z.slice(praefix.length));
+
+  const hauptZiele  = new Set(zielRelativ(hauptschritt, 'dist/'));
+  const pruefungZiele = new Set(zielRelativ(bauen, 'dist-pruefung/'));
+
+  // robots.txt ist im Hauptschritt ausschliesslich Teil des
+  // "if UMGEBUNG = demo"-Zweigs (Production liefert dort gar keine aus) --
+  // der pruefung-Schritt läuft nie in Demo (siehe Gate weiter unten), braucht
+  // sie also folgerichtig nicht. Einzige bewusste Ausnahme von der
+  // Eins-zu-eins-Forderung, mit Begründung, nicht stillschweigend.
+  const fehltInPruefung = [...hauptZiele].filter(z => !pruefungZiele.has(z) && z !== 'robots.txt');
+  const zusaetzlichInPruefung = [...pruefungZiele].filter(z => !hauptZiele.has(z));
+
+  check('KRITISCH: jede Datei, die der Hauptschritt nach dist/ kopiert, landet auch im pruefung-Bündel (voller Dateiumfang, ENT-589)',
+    hauptZiele.size >= 20 && fehltInPruefung.length === 0);
+  if (fehltInPruefung.length) { bad.push('fehlt im pruefung-Bündel: ' + fehltInPruefung.join(', ')); }
+
+  check('KRITISCH: das pruefung-Bündel kopiert keine Datei, die der Hauptschritt nicht auch kopiert (sonst laufen die Listen auseinander)',
+    zusaetzlichInPruefung.length === 0);
+  if (zusaetzlichInPruefung.length) { bad.push('nur im pruefung-Bündel, nicht im Hauptschritt: ' + zusaetzlichInPruefung.join(', ')); }
+
+  check('KRITISCH: die eigene .htaccess der Adresse wird mitgeliefert',
+    pruefungZiele.has('.htaccess')
+    && /cp\s+htaccess-pruefung\s+dist-pruefung\/\.htaccess/.test(bauen)
+    && existsSync(`${WURZEL}/htaccess-pruefung`));
+
+  // Die Sperrliste der .htaccess muss genau die Backend-Dateien treffen,
+  // die dieses Bündel tatsächlich direkt unter dist-pruefung/ mitbringt (nicht
+  // unter dist-pruefung/api/, die Regel greift auf den Dateinamen).
+  {
+    const htC = readFileSync(`${WURZEL}/htaccess-pruefung`, 'utf8');
+    const gesperrt = new Set((htC.match(/<FilesMatch "\^\(([a-z_|]+)\)\\\.php\$">/) || [])[1]?.split('|') ?? []);
+    const mitgeliefertePhp = [...bauen.matchAll(/^\s*cp\s+(\S+)\s+(dist-pruefung\/\S+\.php)\s*$/gm)]
+      .map(m => m[2])
+      .filter(z => !z.startsWith('dist-pruefung/api/'))
+      // Der Dateiname ohne Unterordner -- so fragt FilesMatch (ENT-688).
+      .map(z => z.replace('dist-pruefung/', '').replace(/\.php$/, '').replace(/^.*\//, ''));
+    const ungeschuetzt = mitgeliefertePhp.filter(m => !gesperrt.has(m));
+    check('KRITISCH: die .htaccess von pruefung.guardops.ch sperrt jede mitgelieferte Backend-Hilfsdatei gegen direkten Abruf',
+      mitgeliefertePhp.length >= 15 && ungeschuetzt.length === 0);
+    if (ungeschuetzt.length) { bad.push('ungeschützt im pruefung-Bündel: ' + ungeschuetzt.join(', ')); }
+  }
+
+
+  // Eigene Adresse (ENT-501, ENT-589): festes Literal, keine Environment-
+  // Variable und kein Secret -- und bewusst NICHT über die globale
+  // EFF_APP_BASIS_URL (die trägt weiterhin die alte Adresse für den
+  // Hauptschritt), sondern eine lokale Ersetzung nur für dieses Bündel.
+  check('KRITISCH: pruefung.guardops.ch bekommt seine eigene, feste APP_BASIS_URL, unabhängig von der des Hauptschritts',
+    /__APP_BASIS_URL__\|https:\/\/pruefung\.guardops\.ch\|g"\s+dist-pruefung\/db\.php/.test(bauen));
+
+
+  check('KRITISCH: der Bau bricht ab, wenn ein nicht ersetzter Platzhalter im pruefung-Bündel bleibt',
+    /UEBRIG=/.test(bauen) && /::error::[^\n]*Platzhalter/.test(bauen) && /exit 1/.test(bauen));
+
+  // DIESELBE PRÜFUNG WIE AUF DEM RUNNER, NUR HIER (vgl. der guardops-Block
+  // weiter oben, der Lauf 474 zur Lehre hat). Lauf 521 hat dieselbe Lehre
+  // hier wiederholt: eine blosse Erwähnung eines Platzhalternamens in einem
+  // Kommentar (push.php: __DB_HOST__, demo_reset.php:
+  // __PUSH_CRON_SCHLUESSEL__, betreiber.php: __DB_PASS_MANDANT_2__) hat den
+  // Deploy abgebrochen, obwohl die volle Regression grün war -- der
+  // UEBRIG-Riegel oben läuft erst im echten Runner. Anders als beim
+  // guardops-Block kopiert dieser Schritt auch über Wildcards
+  // (backend/api/*.php, handbuch/*), darum werden die hier expandiert statt
+  // übersprungen.
+  {
+    const cpZeilenPruef = [...bauen.matchAll(/^\s*cp\s+(\S+)\s+(dist-pruefung\/\S*)\s*$/gm)]
+      .map(m => ({ von: m[1], nach: m[2] }));
+    const alsMusterPruef = m => new RegExp('^' + m.split('*')
+      .map(x => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$');
+    // { quelle, ziel } -- ZIEL bleibt erhalten, weil die Ersetzung unten
+    // pro ZIELDATEI gilt (sed -i wirkt nur auf die eine genannte Datei).
+    // Ohne diese Zuordnung würde ein "sed ... db.php" fälschlich auch eine
+    // blosse Kommentar-Erwähnung desselben Platzhalters in push.php decken
+    // -- genau die Lücke, die Lauf 521 durchgelassen hat.
+    const quellenPruef = [];
+    for (const { von, nach } of cpZeilenPruef) {
+      if (!von.includes('*')) { quellenPruef.push({ quelle: von, ziel: nach }); continue; }
+      const schraegstrich = von.lastIndexOf('/');
+      const verz = von.slice(0, schraegstrich);
+      const muster = alsMusterPruef(von.slice(schraegstrich + 1));
+      if (!existsSync(`${WURZEL}/${verz}`)) { continue; }
+      for (const datei of readdirSync(`${WURZEL}/${verz}`)) {
+        if (muster.test(datei)) { quellenPruef.push({ quelle: `${verz}/${datei}`, ziel: `${nach}${datei}` }); }
+      }
+    }
+    const textDateienPruef = quellenPruef.filter(q => /\.(php|html|js|css|txt|json)$/.test(q.quelle));
+    // Platzhalter je ZIELDATEI, nicht global -- derselbe sed-Aufruf betrifft
+    // nur die eine genannte Datei.
+    const ersetztJeZiel = new Map();
+    for (const m of bauen.matchAll(/sed -i "s\|(__[A-Z][A-Z0-9_]*__)\|[^"]*\|g"\s+(\S+)/g)) {
+      const [, platzhalter, ziel] = m;
+      if (!ersetztJeZiel.has(ziel)) { ersetztJeZiel.set(ziel, new Set()); }
+      ersetztJeZiel.get(ziel).add(platzhalter);
+    }
+    // Dazu die Form der Datenbankwerte (ersetze PLATZHALTER "WERT" "DATEI"),
+    // die ein Passwort mit "|" oder "&" vertraegt -- wie bei den Demo-Plaetzen.
+    for (const m of bauen.matchAll(/^\s*ersetze\s+(__[A-Z][A-Z0-9_]*__)\s+"[^"]*"\s+"([^"]+)"\s*$/gm)) {
+      const [, platzhalter, ziel] = m;
+      if (!ersetztJeZiel.has(ziel)) { ersetztJeZiel.set(ziel, new Set()); }
+      ersetztJeZiel.get(ziel).add(platzhalter);
+    }
+    // __MANDANT_SECRETS__ wird seit OP-526 auch hier per sed ersetzt (siehe
+    // Kommentar beim betreiber-Bündel oben). Zwei bleiben aus:
+    //   __DIR__          PHPs eigene Konstante, kein Platzhalter.
+    //   __MAPS_IOS_KEY__ der Schlüssel der NATIVEN Karte (ENT-609). Er
+    //                    gehört ins App-Bündel und wird dort von
+    //                    aufs-handy.sh eingesetzt; die Web-Fassung nimmt
+    //                    ihn nie in die Hand und zeichnet weiterhin mit
+    //                    der JavaScript-Karte. Ihn hier einzusetzen hiesse,
+    //                    einen Schlüssel zu veröffentlichen, den die Seite
+    //                    gar nicht braucht. Dass der Platzhalter stehen
+    //                    bleibt, ist im Code abgefangen:
+    //                    mapsSchluesselTauglich() erkennt ihn.
+    //   __FILE__         ebenso PHPs eigene Konstante (FPDF, ENT-688).
+    const absichtlichPruef = /^(__DIR__|__MAPS_IOS_KEY__|__FILE__)$/;
+
+    const offenPruef = [];
+    for (const { quelle, ziel } of textDateienPruef) {
+      if (!existsSync(`${WURZEL}/${quelle}`)) { offenPruef.push(`${quelle}: Datei fehlt`); continue; }
+      const inhalt = readFileSync(`${WURZEL}/${quelle}`, 'utf8');
+      const ersetztHier = ersetztJeZiel.get(ziel) ?? new Set();
+      for (const p of new Set([...inhalt.matchAll(/__[A-Z][A-Z0-9_]*__/g)].map(m => m[0]))) {
+        if (!ersetztHier.has(p) && !absichtlichPruef.test(p)) { offenPruef.push(`${ziel}: ${p}`); }
+      }
+    }
+    check('KRITISCH: jeder Platzhalter in jeder Datei des pruefung-Bündels (auch über Wildcards kopierte) wird GENAU IN DIESER DATEI ersetzt oder bleibt mit Grund stehen',
+      textDateienPruef.length >= 40 && offenPruef.length === 0);
+
+    // Der Deploy führt dieselbe Liste NOCH EINMAL, als eigene Prüfung im
+    // Arbeitsablauf. Das ist Absicht -- sie hält an, bevor etwas
+    // hochgeladen wird. Nur: Wer hier eine Ausnahme einträgt und dort
+    // nicht, bekommt eine grüne Regression und einen abgebrochenen Deploy.
+    // Genau so geschehen: __MAPS_IOS_KEY__ stand hier, nicht dort, und der
+    // Deploy brach nach dem Hauptbündel ab -- pruefung.guardops.ch blieb auf
+    // dem alten Stand, während alles andere schon live war.
+    {
+      const zeile = bauen.match(/dist-pruefung\/ \\\n\s*\| grep -v ([^\\\n]*)/);
+      const imDeploy = new Set(
+        [...(zeile ? zeile[1] : '').matchAll(/'\^?(__[A-Z0-9_]+__)\$?'/g)].map(m => m[1]));
+      const hier = ['__DIR__', '__MAPS_IOS_KEY__', '__FILE__'].filter(p => absichtlichPruef.test(p));
+      check('KRITISCH: der Deploy selbst kennt dieselben Ausnahmen wie diese Prüfung',
+        !!zeile && hier.length > 0 && hier.every(p => imDeploy.has(p)));
+    }
+    if (offenPruef.length) { bad.push('bricht den pruefung-Deploy: ' + offenPruef.join(', ')); }
+  }
+
+  // Eigener FTP-Zugang, eigene Secret-NAMEN -- keiner der vier bestehenden.
+  check('KRITISCH: pruefung.guardops.ch benutzt einen eigenen FTP-Zugang, keinen der vier bestehenden Bündel',
+    /server:\s*\$\{\{\s*env\.EFF_PRUEFUNG_FTP_HOST\s*\}\}/.test(laden)
+    && /secrets\.PRUEFUNG_FTP_HOST/.test(workflow)
+    && !/EFF_HOSTPOINT_FTP/.test(laden) && !/EFF_GUARDOPS_FTP/.test(laden)
+    && !/EFF_BETREIBER_FTP/.test(laden) && !/EFF_PORTAL_FTP/.test(laden)
+    && !/EFF_CUPI24_FTP/.test(laden));
+
+  // Ein Staging- oder Demo-Lauf hat auf dieser Adresse nichts verloren --
+  // dieselbe Begründung wie bei den vier anderen Bündeln.
+  check('KRITISCH: beide pruefung-Schritte laufen nur auf Production und nur mit vorhandenem Secret',
+    [bauen, laden].every(st =>
+      /env\.UMGEBUNG\s*==\s*'production'/.test(st) && /env\.EFF_PRUEFUNG_FTP_HOST\s*!=\s*''/.test(st)));
+  // Seit ENT-680 gibt es nur noch einen Zweig neben Production. Er muss
+  // das pruefung-Ziel leeren, ohne Rückfall auf die Production-Werte.
+  check('KRITISCH: der Staging-Zweig setzt das pruefung-Ziel leer, ohne Rückfall auf die Production-Werte',
+    (workflow.match(/EFF_PRUEFUNG_FTP_HOST=""/g) || []).length >= 1);
+
+  check('KRITISCH: ein übersprungener pruefung-Deploy sagt das ausdrücklich, statt lautlos auszufallen',
+    hinweis !== '' && /::notice::/.test(hinweis)
+    && /env\.EFF_PRUEFUNG_FTP_HOST\s*==\s*''/.test(hinweis));
+
+  // ── Was den Pruefzugang von cupi24 unterscheidet ─────────────────────
+  // EIGENE Datenbank: Host, Name und Benutzer aus PRUEFUNG_DB_*, das
+  // Passwort aus MANDANT_SECRETS unter "pruefung" -- nie die
+  // Produktionsdatenbank. Ein Pruefer von Apple saehe sonst echte Daten.
+  check('KRITISCH: pruefung.guardops.ch bekommt seine EIGENE Datenbank, nicht die Produktionsdatenbank',
+    /ersetze __DB_HOST__ "\$EFF_PRUEFUNG_DB_HOST" "dist-pruefung\/db\.php"/.test(bauen)
+    && /ersetze __DB_NAME__ "\$EFF_PRUEFUNG_DB_NAME" "dist-pruefung\/db\.php"/.test(bauen)
+    && /ersetze __DB_USER__ "\$EFF_PRUEFUNG_DB_USER" "dist-pruefung\/db\.php"/.test(bauen)
+    && /ersetze __DB_PASS__ "\$PRUEFUNG_PASSWORT" "dist-pruefung\/db\.php"/.test(bauen)
+    && !/\$EFF_DB_(HOST|NAME|USER|PASSWORD)\b/.test(bauen));
+  check('KRITISCH: die drei Datenbankangaben des Pruefzugangs werden an den Bau-Schritt weitergereicht',
+    ['EFF_PRUEFUNG_DB_HOST', 'EFF_PRUEFUNG_DB_NAME', 'EFF_PRUEFUNG_DB_USER']
+      .every(v => new RegExp(`echo "${v}=`).test(workflow)
+        && new RegExp(`${v}=""`).test(workflow)));
+
+  /* Ausgefuehrt, nicht gelesen: Der Datenbankteil des Schritts wird
+     herausgeschnitten und in bash laufen gelassen -- einmal vollstaendig,
+     einmal ohne Passwort in MANDANT_SECRETS. Ohne Passwort MUSS er mit
+     Fehler abbrechen, sonst laedt der Deploy eine Anlage hoch, die auf
+     keine Datenbank zeigt. Und mit einem Passwort voller "|", "&" und
+     "\\" muss genau dieses Passwort in db.php stehen. */
+  {
+    const { execFileSync } = await import('child_process');
+    const { mkdtempSync, mkdirSync: md, writeFileSync, rmSync } = await import('fs');
+    const { tmpdir } = await import('os');
+    const { join } = await import('path');
+    const von = bauen.indexOf('          PRUEFUNG_PASSWORT=$(');
+    const bis = bauen.indexOf('          # Betreiber-Datenbank:', von);
+    check('KRITISCH: der Datenbankteil des Pruefzugangs ist auffindbar', von !== -1 && bis !== -1);
+    if (von !== -1 && bis !== -1) {
+      const teil = bauen.slice(von, bis).split('\n').map(z => z.replace(/^ {10}/, '')).join('\n');
+      const lauf = (secrets) => {
+        const ordner = mkdtempSync(join(tmpdir(), 'pruefung-'));
+        try {
+          md(join(ordner, 'dist-pruefung'));
+          writeFileSync(join(ordner, 'dist-pruefung/db.php'),
+            "h='__DB_HOST__'; n='__DB_NAME__'; u='__DB_USER__'; p='__DB_PASS__';\n");
+          const b64 = Buffer.from(JSON.stringify(secrets)).toString('base64');
+          try {
+            execFileSync('bash', ['-c', 'set -euo pipefail\n' + teil], { cwd: ordner, encoding: 'utf8',
+              env: { ...process.env, EFF_MANDANT_SECRETS: b64, EFF_PRUEFUNG_DB_HOST: 'host.intern',
+                     EFF_PRUEFUNG_DB_NAME: 'db_pruefung', EFF_PRUEFUNG_DB_USER: 'u_pruefung' } });
+            return { ok: true, db: readFileSync(join(ordner, 'dist-pruefung/db.php'), 'utf8') };
+          } catch (e) { return { ok: false, aus: String(e.stdout || '') }; }
+        } finally { rmSync(ordner, { recursive: true, force: true }); }
+      };
+      const boese = 'a|b&c\\d';
+      const gut = lauf({ pruefung: boese, andere: 'x' });
+      check('KRITISCH: Pruefzugang: ein Passwort mit "|", "&" und "\\" steht danach unveraendert in db.php',
+        gut.ok && gut.db.includes(`p='${boese}'`) && gut.db.includes("h='host.intern'")
+        && !/__DB_[A-Z]+__/.test(gut.db));
+      const ohne = lauf({ andere: 'x' });
+      check('KRITISCH: Pruefzugang: fehlt das Passwort in MANDANT_SECRETS, bricht der Bau mit Fehler ab',
+        !ohne.ok && /MANDANT_SECRETS\[pruefung\]/.test(ohne.aus));
+    }
+  }
+
+  // Postfach der Betreiberin, nicht das der Mandantin CUPI 24.
+  check('KRITISCH: der Pruefzugang verschickt ueber das Postfach der Betreiberin (GUARDOPS_SMTP_*), nicht ueber das von CUPI 24',
+    /__SMTP_HOST__\|\$EFF_GUARDOPS_SMTP_HOST\|g"\s+dist-pruefung\/mailer\.php/.test(bauen)
+    && /__SMTP_USER__\|\$EFF_GUARDOPS_SMTP_USER\|g"\s+dist-pruefung\/mailer\.php/.test(bauen)
+    && /__SMTP_PASSWORD__\|\$EFF_GUARDOPS_SMTP_PASSWORD\|g"\s+dist-pruefung\/mailer\.php/.test(bauen)
+    && !/\$EFF_SMTP_(HOST|USER|PASSWORD)\b/.test(bauen));
+
+  // Kein Mandanten-Branding, keine Sparte Reinigung.
+  check('KRITISCH: der Pruefzugang bleibt GuardOpS -- kein CUPI-24-Branding im Bau-Schritt',
+    !/cupi24|CUPI 24/.test(bauen.replace(/^\s*#.*$/gm, '')));
+  check('KRITISCH: die Sparte Reinigung bleibt im Pruefzugang aus (ENT-650)',
+    /__SPARTE_REINIGUNG__\|0\|g"\s+dist-pruefung\/db\.php/.test(bauen));
+
+  // Nicht in Suchmaschinen.
+  check('Der Pruefzugang haelt Suchmaschinen fern (X-Robots-Tag noindex)',
+    /Header always set X-Robots-Tag "noindex, nofollow"/.test(readFileSync(`${WURZEL}/htaccess-pruefung`, 'utf8')));
+}
+
+
 /* GitHub selbst weist einen einzelnen "run:"-Block ab, sobald sein
    Rohtext eine bestimmte Laenge ueberschreitet -- ohne dass irgendeine
    YAML-Regel das anzeigt: die Datei bleibt gueltiges YAML, ein Duplikat-
