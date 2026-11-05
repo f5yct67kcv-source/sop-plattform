@@ -129,24 +129,15 @@ jobs:
           # ausdruecklich "noch nicht eingerichtet" (503), statt mit einem
           # Platzhalter zu arbeiten.
           P_DEMO_EMPFAENGER: ${{ secrets.DEMO_EMPFAENGER }}
-          # Eigener FTP-Zugang fuer guardops.ch, beschraenkt auf
-          # /home/itufeden/www/guardops.ch. Eigene Secret-NAMEN aus demselben
-          # Grund wie bei Staging (ENT-343 Punkt 1): kein stiller Rueckfall.
-          # NICHT erforderlich -- fehlen sie, wird die Homepage-Domain
-          # uebersprungen und das Rapport-Tool trotzdem ausgeliefert.
-          P_GUARDOPS_FTP_HOST: ${{ secrets.GUARDOPS_FTP_HOST }}
-          P_GUARDOPS_FTP_USER: ${{ secrets.GUARDOPS_FTP_USER }}
-          P_GUARDOPS_FTP_PASSWORD: ${{ secrets.GUARDOPS_FTP_PASSWORD }}
-          # Eigenes Postfach info@guardops.ch fuer die Demo-Anfrage-Mail
-          # (ENT-569/OP-569, sop-projekt), statt sie ueber das mit CUPI 24s
-          # eigenen Kunden-Mails geteilte Produktions-Postfach zu schicken
-          # (ENT-371). Eigene Secret-NAMEN aus demselben Grund wie bei
-          # GUARDOPS_FTP_* und Staging (ENT-343 Punkt 1): kein stiller
-          # Rueckfall auf die geteilten SMTP_*-Werte. NICHT erforderlich --
-          # fehlen sie, bleibt __SMTP_HOST__ im guardops-Buendel unersetzt,
-          # smtp_konfiguriert() erkennt das und das Formular sagt "noch
-          # nicht eingerichtet" (503), statt lautlos ueber das falsche
-          # Postfach zu senden.
+          # Eigenes Postfach info@guardops.ch der Betreiberin (ENT-569/
+          # OP-569, sop-projekt), statt des mit den Kunden-Mails der
+          # Mandantin geteilten Produktions-Postfachs (ENT-371). Gebraucht
+          # vom Betreiber-Bereich, vom Pruefzugang und von den Demo-Plaetzen
+          # (die Homepage guardops.ch traegt seit ihrem Umzug eigene Kopien
+          # dieser Werte in formateins-guardops). Eigene Secret-NAMEN wie bei
+          # Staging (ENT-343 Punkt 1): kein stiller Rueckfall auf die
+          # geteilten SMTP_*-Werte. NICHT erforderlich -- was ohne sie
+          # geschieht, steht bei den Schritten, die sie lesen.
           # Zeilen der persoenlichen Signatur unter Mails der Betreiberin,
           # mit Strichpunkt getrennt (Name; Funktion; Telefon). Aus dem
           # Deploy, weil ein Personenname nicht ins Repository gehoert
@@ -159,21 +150,13 @@ jobs:
           P_GUARDOPS_SMTP_VERSCHLUESSELUNG: ${{ secrets.GUARDOPS_SMTP_VERSCHLUESSELUNG }}
           P_GUARDOPS_SMTP_USER: ${{ secrets.GUARDOPS_SMTP_USER }}
           P_GUARDOPS_SMTP_PASSWORD: ${{ secrets.GUARDOPS_SMTP_PASSWORD }}
-          # Terminbuchung "Betrieb besprechen" (ENT-731, ENT-733): Zugang zum
-          # eigenen GuardOpS-Kalender in Hostpoint Cloud Office -- nicht der
-          # von formateins. Fehlt einer, ist die Buchung aus und
-          # gespraech.html sagt "nicht eingerichtet".
-          P_GUARDOPS_KALENDER_URL: ${{ secrets.GUARDOPS_KALENDER_URL }}
-          P_GUARDOPS_KALENDER_BENUTZER: ${{ secrets.GUARDOPS_KALENDER_BENUTZER }}
-          P_GUARDOPS_KALENDER_PASSWORT: ${{ secrets.GUARDOPS_KALENDER_PASSWORT }}
           # Eigener FTP-Zugang fuer betreiber.guardops.ch, beschraenkt auf
           # /home/itufeden/betreiber.guardops.ch (ENT-580, erste Etappe des
           # schrittweisen Umzugs weg von itufeden.myhostpoint.ch). Eigene
-          # Secret-NAMEN aus demselben Grund wie bei GUARDOPS_FTP_* und
-          # Staging (ENT-343 Punkt 1): kein stiller Rueckfall. NICHT
-          # erforderlich -- fehlen sie, wird diese Domain uebersprungen und
-          # das Rapport-Tool trotzdem ausgeliefert, genau wie bei
-          # GUARDOPS_FTP_* oben.
+          # Secret-NAMEN aus demselben Grund wie bei Staging (ENT-343
+          # Punkt 1): kein stiller Rueckfall. NICHT erforderlich -- fehlen
+          # sie, wird diese Domain uebersprungen und das Rapport-Tool
+          # trotzdem ausgeliefert.
           P_BETREIBER_FTP_HOST: ${{ secrets.BETREIBER_FTP_HOST }}
           P_BETREIBER_FTP_USER: ${{ secrets.BETREIBER_FTP_USER }}
           P_BETREIBER_FTP_PASSWORD: ${{ secrets.BETREIBER_FTP_PASSWORD }}
@@ -314,17 +297,11 @@ jobs:
             EFF_APNS_KEY_ID="$P_APNS_KEY_ID"
             EFF_APNS_TEAM_ID="$P_APNS_TEAM_ID"
             EFF_DEMO_EMPFAENGER="$P_DEMO_EMPFAENGER"
-            EFF_GUARDOPS_FTP_HOST="$P_GUARDOPS_FTP_HOST"
-            EFF_GUARDOPS_FTP_USER="$P_GUARDOPS_FTP_USER"
-            EFF_GUARDOPS_FTP_PASSWORD="$P_GUARDOPS_FTP_PASSWORD"
             EFF_GUARDOPS_SMTP_HOST="$P_GUARDOPS_SMTP_HOST"
             EFF_GUARDOPS_SMTP_PORT="$P_GUARDOPS_SMTP_PORT"
             EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG="$P_GUARDOPS_SMTP_VERSCHLUESSELUNG"
             EFF_GUARDOPS_SMTP_USER="$P_GUARDOPS_SMTP_USER"
             EFF_GUARDOPS_SMTP_PASSWORD="$P_GUARDOPS_SMTP_PASSWORD"
-            EFF_GUARDOPS_KALENDER_URL="$P_GUARDOPS_KALENDER_URL"
-            EFF_GUARDOPS_KALENDER_BENUTZER="$P_GUARDOPS_KALENDER_BENUTZER"
-            EFF_GUARDOPS_KALENDER_PASSWORT="$P_GUARDOPS_KALENDER_PASSWORT"
             EFF_BETREIBER_FTP_HOST="$P_BETREIBER_FTP_HOST"
             EFF_BETREIBER_FTP_USER="$P_BETREIBER_FTP_USER"
             EFF_BETREIBER_FTP_PASSWORD="$P_BETREIBER_FTP_PASSWORD"
@@ -397,27 +374,17 @@ jobs:
             EFF_APNS_KEY_ID=""
             EFF_APNS_TEAM_ID=""
             EFF_DEMO_EMPFAENGER="$S_DEMO_EMPFAENGER"
-            # guardops.ch ist die ECHTE Verkaufsdomain. Ein Staging-Lauf hat
-            # dort nichts verloren -- darum hier leer und KEIN Rueckfall auf
-            # die Production-Werte. Der Schritt unten ueberspringt sich damit
-            # von selbst.
-            EFF_GUARDOPS_FTP_HOST=""
-            EFF_GUARDOPS_FTP_USER=""
-            EFF_GUARDOPS_FTP_PASSWORD=""
-            # Dasselbe gilt fuer das eigene SMTP-Postfach von guardops.ch --
-            # ein Staging-Lauf baut das guardops-Buendel ohnehin nie (siehe
-            # Schritt unten), diese Zeilen sind nur die Absicherung dazu.
+            # Das eigene SMTP-Postfach der Betreiberin (info@guardops.ch)
+            # gehoert zu Production. Ein Staging-Lauf bekommt es nicht --
+            # leer und KEIN Rueckfall auf die Production-Werte.
             EFF_GUARDOPS_SMTP_HOST=""
             EFF_GUARDOPS_SMTP_PORT=""
             EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG=""
             EFF_GUARDOPS_SMTP_USER=""
             EFF_GUARDOPS_SMTP_PASSWORD=""
-            EFF_GUARDOPS_KALENDER_URL=""
-            EFF_GUARDOPS_KALENDER_BENUTZER=""
-            EFF_GUARDOPS_KALENDER_PASSWORT=""
-            # betreiber.guardops.ch ist wie guardops.ch nur fuer Production
-            # gedacht (ENT-580) -- dieselbe Begruendung wie bei
-            # EFF_GUARDOPS_FTP_* direkt darueber.
+            # betreiber.guardops.ch ist nur fuer Production gedacht
+            # (ENT-580) -- ein Staging-Lauf hat dort nichts verloren, darum
+            # leer und KEIN Rueckfall auf die Production-Werte.
             EFF_BETREIBER_FTP_HOST=""
             EFF_BETREIBER_FTP_USER=""
             EFF_BETREIBER_FTP_PASSWORD=""
@@ -562,17 +529,11 @@ jobs:
             echo "EFF_APNS_TEAM_ID=$EFF_APNS_TEAM_ID"
             echo "EFF_APP_BASIS_URL=$EFF_APP_BASIS_URL"
             echo "EFF_DEMO_EMPFAENGER=$EFF_DEMO_EMPFAENGER"
-            echo "EFF_GUARDOPS_FTP_HOST=$EFF_GUARDOPS_FTP_HOST"
-            echo "EFF_GUARDOPS_FTP_USER=$EFF_GUARDOPS_FTP_USER"
-            echo "EFF_GUARDOPS_FTP_PASSWORD=$EFF_GUARDOPS_FTP_PASSWORD"
             echo "EFF_GUARDOPS_SMTP_HOST=$EFF_GUARDOPS_SMTP_HOST"
             echo "EFF_GUARDOPS_SMTP_PORT=$EFF_GUARDOPS_SMTP_PORT"
             echo "EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG=$EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG"
             echo "EFF_GUARDOPS_SMTP_USER=$EFF_GUARDOPS_SMTP_USER"
             echo "EFF_GUARDOPS_SMTP_PASSWORD=$EFF_GUARDOPS_SMTP_PASSWORD"
-            echo "EFF_GUARDOPS_KALENDER_URL=$EFF_GUARDOPS_KALENDER_URL"
-            echo "EFF_GUARDOPS_KALENDER_BENUTZER=$EFF_GUARDOPS_KALENDER_BENUTZER"
-            echo "EFF_GUARDOPS_KALENDER_PASSWORT=$EFF_GUARDOPS_KALENDER_PASSWORT"
             echo "EFF_BETREIBER_FTP_HOST=$EFF_BETREIBER_FTP_HOST"
             echo "EFF_BETREIBER_FTP_USER=$EFF_BETREIBER_FTP_USER"
             echo "EFF_BETREIBER_FTP_PASSWORD=$EFF_BETREIBER_FTP_PASSWORD"
@@ -1067,229 +1028,15 @@ jobs:
       # (z. B. ein eigener, produktiver Auth-Mechanismus) waere kein Nachweis
       # fuer DIESEN Schutz. Netzwerkfehler und Timeouts zaehlen ausdruecklich
       # als Fehlschlag, nicht als "nicht pruefbar, also ok".
-      # ══════════ DIE HOMEPAGE AUF IHRER EIGENEN DOMAIN ══════════════════
+      # ══════════ DIE HOMEPAGE guardops.ch ══════════════════════════════
       #
-      # guardops.ch liegt bei Hostpoint unter /home/itufeden/www/guardops.ch
-      # -- NEBEN /home/itufeden/www/rapport, nicht darin. Der aufraeumende
-      # Upload oben kommt dort also nicht hin, und dieser hier nicht ans
-      # Rapport-Tool. Beide FTP-Zugaenge sind von Hostpoint auf ihr eigenes
-      # Verzeichnis beschraenkt; eigene Secret-NAMEN aus demselben Grund wie
-      # bei Staging (ENT-343 Punkt 1).
-      #
-      # NUR PRODUCTION: Ein Staging-Lauf hat auf der echten Verkaufsdomain
-      # nichts verloren -- der Staging-Zweig oben setzt EFF_GUARDOPS_FTP_HOST
-      # deshalb ausdruecklich leer, ohne Rueckfall.
-      #
-      # UEBERSPRINGT SICH, SOLANGE DIE SECRETS FEHLEN -- und sagt das dann
-      # auch (Schritt darunter). Der Deploy des Rapport-Tools darf nicht rot
-      # werden, nur weil die Homepage-Domain noch nicht eingerichtet ist;
-      # lautlos ausfallen darf er aber ebenso wenig.
-      - name: Homepage-Buendel fuer guardops.ch bauen
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_GUARDOPS_FTP_HOST != '' }}
-        run: |
-          set -euo pipefail
-          mkdir -p dist-guardops/api dist-guardops/icons dist-guardops/fonts
-
-          # Auf der eigenen Domain gehoert die Homepage auf "/", nicht auf
-          # "/homepage.html" -- darum hier index.html.
-          cp homepage.html dist-guardops/index.html
-
-          # Schriften: dieselben vier, die homepage.html per CSS-url() holt.
-          # Fehlt eine, faellt sie live lautlos auf den System-Stapel zurueck
-          # und lokal faellt es NICHT auf -- derselbe Fallstrick wie beim
-          # Rapport-Tool. test_deploy.mjs gleicht diese Liste gegen die
-          # tatsaechlich in homepage.html benutzten Dateien ab.
-          # Die Lizenzen muessen die Schriften begleiten (SIL OFL 1.1).
-          cp fonts/archivo-variable-latin.woff2   dist-guardops/fonts/
-          cp fonts/plex-sans-variable-latin.woff2 dist-guardops/fonts/
-          cp fonts/plex-mono-400-latin.woff2      dist-guardops/fonts/
-          cp fonts/plex-mono-500-latin.woff2      dist-guardops/fonts/
-          cp fonts/archivo-OFL.txt                dist-guardops/fonts/
-          cp fonts/ibm-plex-LICENSE.txt           dist-guardops/fonts/
-          cp icons/guardops-*.png                 dist-guardops/icons/
-          # Die beiden Bildschirmfotos der Homepage (Zurueckbau 2026-10-10):
-          # echte Aufnahmen aus der Demo-Umgebung, siehe Kopf von
-          # homepage.html. test_deploy.mjs leitet aus der Seite ab, welche
-          # Bilder mitmuessen -- fehlt eines, bleibt live ein leeres
-          # Rechteck, und lokal faellt es nicht auf.
-          mkdir -p dist-guardops/homepage-bilder
-          cp homepage-bilder/*.webp               dist-guardops/homepage-bilder/
-          cp homepage-bilder/vorschau.jpg         dist-guardops/homepage-bilder/
-
-          # Der Endpunkt und seine vier Einbindungen. KEIN anmeldung.php und
-          # kein Produktcode -- die Seite hat mit dem Rapport-Tool nichts zu
-          # tun ausser diesem einen Formular.
-          cp backend/api/demo_senden.php dist-guardops/api/demo_senden.php
-          cp backend/db.php              dist-guardops/db.php
-          cp backend/mailer.php          dist-guardops/mailer.php
-          cp backend/demo_anfrage.php    dist-guardops/demo_anfrage.php
-          cp backend/demo_bremse.php     dist-guardops/demo_bremse.php
-          # Terminbuchung "Betrieb besprechen" (ENT-731). Die Seite, der
-          # Endpunkt und seine Kalenderlogik -- die liegt NUR hier: Im Buendel
-          # der Software antwortet api/termine.php darum "nicht eingerichtet".
-          cp gespraech.html              dist-guardops/gespraech.html
-          cp backend/api/termine.php     dist-guardops/api/termine.php
-          cp backend/termine_kalender.php dist-guardops/termine_kalender.php
-          # Rechtsseiten (OP-564). Beide teilen sich recht.css -- zweimal
-          # derselbe Stil inline hiesse, dass beim naechsten Farbwechsel
-          # eine von beiden vergessen wird. test_deploy.mjs leitet aus den
-          # Seiten ab, welche Stilblaetter und Schriften mitmuessen.
-          cp impressum.html              dist-guardops/impressum.html
-          cp datenschutz.html            dist-guardops/datenschutz.html
-          # Eigene Erklaerung fuer den Demobereich (demo.guardops.ch). Sie
-          # liegt hier und nicht im Demo-Buendel: Alle Rechtsseiten sollen
-          # an EINER Adresse stehen, mit einem Stil und einem Deploy-Weg.
-          # Der Demobereich verweist absolut darauf (dashboard.html).
-          cp datenschutz-demo.html       dist-guardops/datenschutz-demo.html
-          # Eigene Erklaerung fuer die zehn Demo-Plaetze (ENT-653) -- ein
-          # anderes Modell als die ENT-523-Demo-Umgebung darueber, siehe
-          # Kopfkommentar der Datei. Aus demselben Grund hier: eine Adresse,
-          # ein Stil, ein Deploy-Weg fuer alle Rechtsseiten.
-          cp datenschutz-demo-platz.html dist-guardops/datenschutz-demo-platz.html
-          # Nutzungsbedingungen und Bestaetigungsseite (ENT-624). Beide
-          # teilen sich recht.css mit Impressum und Datenschutz -- darum
-          # steht der Stil dort und nicht zweimal inline.
-          #
-          # demo-bestaetigen.html ist die Seite, auf die der Link aus der
-          # Bestaetigungsmail zeigt. Sie liegt hier und nicht im
-          # Buendel des Betreiber-Bereichs, weil der Interessent von dieser
-          # Domain kam;
-          # der Endpunkt dahinter laeuft weiterhin auf
-          # betreiber.guardops.ch (siehe OEFFENTLICHE_DEMO_SKRIPTE in
-          # backend/db.php).
-          cp nutzungsbedingungen.html   dist-guardops/nutzungsbedingungen.html
-          cp demo-bestaetigen.html      dist-guardops/demo-bestaetigen.html
-          # demo-weiter.html ist die Seite, auf die der Knopf aus der
-          # Abschiedsmail zeigt (ENT-634). Sie liegt aus demselben Grund
-          # hier wie demo-bestaetigen.html: Der Interessent kam von dieser
-          # Domain, der Endpunkt dahinter laeuft auf betreiber.guardops.ch.
-          cp demo-weiter.html           dist-guardops/demo-weiter.html
-          # Die Kommentarkoepfe der Rechtsseiten sind Arbeitsnotizen --
-          # Entscheidungsnummern, interne Dateipfade, offene Pruefpunkte,
-          # und bei den Nutzungsbedingungen der Satz "ENTWURF. NICHT
-          # RECHTLICH GEPRUEFT". Dargestellt wird davon nichts, im
-          # Quelltext steht es trotzdem. Ansage des Projektinhabers
-          # (2026-09-22): aus der ausgelieferten Datei nehmen. Im
-          # Repository bleibt der Vermerk, wo ihn sieht, wer die Datei
-          # aendert. Gesaeubert wird die KOPIE, nach dem cp.
-          python3 rechtstexte-ausliefern.py \
-            dist-guardops/nutzungsbedingungen.html \
-            dist-guardops/datenschutz-demo.html \
-            dist-guardops/datenschutz-demo-platz.html \
-            dist-guardops/datenschutz.html \
-            dist-guardops/impressum.html
-          cp recht.css                   dist-guardops/recht.css
-          cp htaccess-guardops           dist-guardops/.htaccess
-          cat htaccess-leistung >>       dist-guardops/.htaccess
-          cp robots-guardops.txt         dist-guardops/robots.txt
-          cp sitemap-guardops.xml        dist-guardops/sitemap.xml
-
-          # HIER STEHEN ABSICHTLICH KEINE DATENBANK-ZUGANGSDATEN. db.php wird
-          # frisch aus backend/ kopiert und bekommt NUR APP_ENV -- die
-          # __DB_*__-Platzhalter bleiben stehen. db() ist traege und wird von
-          # diesem Endpunkt nie aufgerufen; wuerde es je jemand tun, scheitert
-          # es laut an einem unbrauchbaren DSN, statt sich still zu verbinden.
-          # Die Zugangsdaten der produktiven Datenbank liegen damit an genau
-          # einer Stelle statt an zweien.
-          sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-guardops/db.php
-          # Sparte Reinigung (ENT-650): aus. Die Marketingseite plant nichts,
-          # aber db.php traegt den Platzhalter, und die Pruefung auf
-          # uebrig gebliebene Platzhalter weiter unten wuerde ihn finden.
-          sed -i "s|__SPARTE_REINIGUNG__|0|g" dist-guardops/db.php
-          sed -i "s|__IST_DEMO_PLATZ__|0|g" dist-guardops/db.php  # kein Demo-Platz
-
-          # EIGENES POSTFACH, NICHT DAS GETEILTE PRODUKTIONS-POSTFACH
-          # (ENT-569/OP-569, sop-projekt). Bis hierher bekam mailer.php in
-          # diesem Buendel dieselben EFF_SMTP_*-Werte wie das Rapport-Tool --
-          # dasselbe Postfach, das CUPI 24s eigene Kunden-Mails verschickt
-          # (ENT-371). Die Demo-Anfrage-Mail geht aber an den Betreiber
-          # selbst und soll erkennbar UND beantwortbar als GuardOpS laufen.
-          # Host/Port/Verschluesselung/Benutzer/Passwort kommen darum aus
-          # EFF_GUARDOPS_SMTP_* (eigene Secret-Namen, kein stiller Rueckfall,
-          # ENT-343 Punkt 1); sind sie leer (Secrets noch nicht angelegt),
-          # bleibt __SMTP_HOST__ als Platzhalter stehen, smtp_konfiguriert()
-          # erkennt das und das Formular sagt "noch nicht eingerichtet"
-          # (503) -- kein Versand ueber die falsche Kennung.
-          #
-          # Absenderadresse und -name sind HIER bewusst feste Literale statt
-          # eines Secrets: info@guardops.ch und "GuardOpS" sind die oeffent-
-          # lich beworbene Adresse und Marke, keine Zugangsdaten (gleiche
-          # Einordnung wie bei APP_BASIS_URL, ENT-501). Gelten unabhaengig
-          # davon, ob die GUARDOPS_SMTP_*-Secrets schon gesetzt sind -- das
-          # allein sendet noch keine Mail, siehe smtp_konfiguriert() oben.
-          sed -i "s|__SMTP_HOST__|$EFF_GUARDOPS_SMTP_HOST|g"               dist-guardops/mailer.php
-          sed -i "s|__SMTP_PORT__|$EFF_GUARDOPS_SMTP_PORT|g"               dist-guardops/mailer.php
-          sed -i "s|__SMTP_VERSCHLUESSELUNG__|$EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG|g" dist-guardops/mailer.php
-          sed -i "s|__SMTP_USER__|$EFF_GUARDOPS_SMTP_USER|g"               dist-guardops/mailer.php
-          sed -i "s|__SMTP_PASSWORD__|$EFF_GUARDOPS_SMTP_PASSWORD|g"       dist-guardops/mailer.php
-          sed -i "s|__SMTP_ABSENDER__|info@guardops.ch|g"                 dist-guardops/mailer.php
-          sed -i "s|__MAIL_SIGNATUR__||g"                 dist-guardops/mailer.php
-          sed -i "s|__SMTP_ABSENDER_NAME__|GuardOpS|g"                    dist-guardops/mailer.php
-          sed -i "s|__STAGING_TESTMAIL__||g"                              dist-guardops/mailer.php
-          # Dieselbe Ueberlegung wie bei __STAGING_TESTMAIL__ direkt darueber:
-          # guardops.ch laeuft ausschliesslich als Production (siehe Pruefung
-          # weiter unten), smtp_ziel() fragt die Demo-Testadresse also nie ab
-          # -- der Platzhalter bleibt sonst woertlich stehen, weil dieser
-          # Bauschritt aelter ist als __DEMO_TESTMAIL__ in mailer.php
-          # (ENT-523, erst mit diesem Merge zusammengefuehrt).
-          sed -i "s|__DEMO_TESTMAIL__||g"                                 dist-guardops/mailer.php
-          sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g"           dist-guardops/demo_anfrage.php
-          # Kalenderzugang (ENT-731, ENT-733): eine eigene Datei aus den
-          # Secrets, kein Platzhalter im Quelltext. Per Python statt sed, weil
-          # ein Passwort "|", "&" oder "'" enthalten darf. Fehlt ein Secret,
-          # entsteht die Datei nicht -- dann ist die Buchung "nicht
-          # eingerichtet". Auch die Kalenderadresse kommt aus einem Secret:
-          # Sie gehoert zum GuardOpS-Postfach und steht nicht im Repository.
-          python3 -c 'import os
-          u=os.environ.get("EFF_GUARDOPS_KALENDER_URL","")
-          b=os.environ.get("EFF_GUARDOPS_KALENDER_BENUTZER",""); p=os.environ.get("EFF_GUARDOPS_KALENDER_PASSWORT","")
-          q=lambda w: chr(39)+w.replace(chr(92),chr(92)*2).replace(chr(39),chr(92)+chr(39))+chr(39)
-          if u and b and p:
-              open("dist-guardops/kalender_zugang.php","w",encoding="utf-8").write("<?php\nreturn [\x27url\x27 => "+q(u)+", \x27benutzer\x27 => "+q(b)+", \x27passwort\x27 => "+q(p)+"];\n")'
-
-          # Kein uebersehener Platzhalter darf hochgeladen werden. Erlaubt
-          # bleiben genau die zwei Familien, die HIER absichtlich stehen:
-          # __DB_*__ (siehe oben) und __APP_BASIS_URL__ -- basis_url_pruefen()
-          # erkennt den stehengebliebenen Platzhalter und liefert null, die
-          # Demo-Mail enthaelt ohnehin keinen Link auf die eigene Anlage.
-          UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' dist-guardops/ \
-                   | grep -v -e '^__DB_' -e '^__APP_BASIS_URL__$' -e '^__DIR__$' \
-                   | sort -u || true)
-          if [ -n "$UEBRIG" ]; then
-            echo "::error::Nicht ersetzte Platzhalter im guardops-Buendel: $UEBRIG"
-            exit 1
-          fi
-
-          echo "Buendel fuer guardops.ch:"
-          find dist-guardops -type f | sort
-
-      - name: HTML verdichten (dist-guardops)
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_GUARDOPS_FTP_HOST != '' }}
-        # Wie oben bei dist/ (werkzeuge/verdichten/verdichten.mjs).
-        continue-on-error: true
-        run: node werkzeuge/verdichten/verdichten.mjs dist-guardops
-
-      - name: Homepage nach guardops.ch hochladen (FTPS)
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_GUARDOPS_FTP_HOST != '' }}
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ env.EFF_GUARDOPS_FTP_HOST }}
-          username: ${{ env.EFF_GUARDOPS_FTP_USER }}
-          password: ${{ env.EFF_GUARDOPS_FTP_PASSWORD }}
-          protocol: ftps
-          local-dir: ./dist-guardops/
-          # Der Zugang ist von Hostpoint auf /home/itufeden/www/guardops.ch
-          # beschraenkt -- daher "/", nicht der volle Pfad. Genau wie beim
-          # Upload des Rapport-Tools weiter oben.
-          server-dir: /
-
-      # "NICHT EINGERICHTET" DARF NICHT WIE "NICHTS ZU TUN" AUSSEHEN: Ohne
-      # diesen Schritt waere ein Deploy ohne GUARDOPS_FTP_*-Secrets von einem
-      # erfolgreichen Homepage-Deploy im Protokoll nicht zu unterscheiden.
-      - name: Hinweis, wenn guardops.ch noch nicht eingerichtet ist
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_GUARDOPS_FTP_HOST == '' }}
-        run: |
-          echo "::notice::guardops.ch wurde NICHT beliefert -- die Secrets GUARDOPS_FTP_HOST/USER/PASSWORD fehlen im Environment production. Das Rapport-Tool ist davon nicht betroffen und wurde regulaer ausgeliefert."
+      # Wird hier nicht mehr gebaut. guardops.ch kommt seit dem Umzug vom
+      # November 2026 aus dem eigenen Repository formateins-guardops, mit
+      # eigenem Workflow und eigenen Secrets. Wo weiter unten ein Kommentar
+      # mit dem "guardops-Buendel" vergleicht, ist dieses gemeint.
+      # test_deploy.mjs prueft, dass von hier aus nichts mehr nach
+      # guardops.ch geht -- sonst ueberschriebe jeder Push auf main die Seite
+      # mit dem alten Stand.
 
       # ══════════ DER BETREIBER-BEREICH AUF SEINER EIGENEN ADRESSE ═══════
       #

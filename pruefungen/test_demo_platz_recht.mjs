@@ -46,11 +46,13 @@ for (const ziel of ['dist/testumgebung.js', 'dist-cupi24/testumgebung.js']) {
   check(`KRITISCH: __IST_DEMO_PLATZ__ wird in ${ziel} ausdruecklich auf "0" gesetzt`,
     nullGesetzt(ziel));
 }
-// db.php steckt in FUENF Buendeln (wie SPARTE_REINIGUNG) -- guardops,
-// betreiber und portal brauchen ist_demo_platz() serverseitig nie, aber
+// db.php steckt in VIER Buendeln (wie SPARTE_REINIGUNG; guardops.ch hat
+// seit seinem Umzug nach formateins-guardops eine eigene, schlanke db.php
+// ohne diesen Schalter) -- betreiber und portal brauchen
+// ist_demo_platz() serverseitig nie, aber
 // db.php reist dort mit, und ein unersetzter Platzhalter darin waere
 // eine Behauptung ohne Wert (dieselbe Regel wie bei SPARTE_REINIGUNG).
-for (const ziel of ['dist/db.php', 'dist-guardops/db.php', 'dist-betreiber/db.php',
+for (const ziel of ['dist/db.php', 'dist-betreiber/db.php',
                     'dist-portal/db.php', 'dist-cupi24/db.php']) {
   check(`KRITISCH: __IST_DEMO_PLATZ__ wird in ${ziel} ausdruecklich auf "0" gesetzt`,
     nullGesetzt(ziel));

@@ -165,9 +165,8 @@ const BUENDEL = [
   ['Platzhalter durch echte Werte ersetzen', 'dist',
     { 'index.html': 'index.html', 'dashboard.html': 'dashboard.html', 'app.html': 'app.html',
       'portal.html': 'portal.html', 'betreiber.html': 'betreiber.html' }],
-  ['Homepage-Buendel fuer guardops.ch bauen', 'dist-guardops',
-    { 'homepage.html': 'index.html', 'impressum.html': 'impressum.html',
-      'datenschutz.html': 'datenschutz.html' }],
+  // guardops.ch selbst kommt seit November 2026 aus formateins-guardops;
+  // dass dort jedes Icon im Buendel liegt, prueft dessen test_buendel.mjs.
   ['Betreiber-Buendel fuer betreiber.guardops.ch bauen', 'dist-betreiber',
     { 'betreiber.html': 'index.html' }],
   ['Portal-Buendel fuer portal.guardops.ch bauen', 'dist-portal',

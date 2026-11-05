@@ -12,7 +12,8 @@
 // juristisch genuegt. Das ist offen (OP-564).
 import { WURZEL, browserPfad } from './pfade.mjs';
 import { chromium } from 'playwright';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 const ok = [], bad = [];
 const check = (n, c) => (c ? ok : bad).push(n);
@@ -24,31 +25,42 @@ const dsDemo = lies('datenschutz-demo.html');
 const homepage = lies('homepage.html');
 const workflow = lies('.github/workflows/deploy-hostpoint.yml');
 
-// ══════════ DIE UNFERTIGE SEITE DARF NICHT LIVE GEHEN ════════════════
-// Das Impressum traegt __IMPRESSUM_*__-Platzhalter, solange Firma, Adresse
-// und Unternehmensnummer fehlen. Ein Impressum mit erfundenen Angaben waere
-// schlimmer als keines -- also muss die Kopplung stimmen: entweder die
-// Platzhalter sind weg, ODER die Seite wird nicht ausgeliefert. Beides
-// zugleich ist der Fehler, den diese Pruefung verhindert.
+// ══════════ DIE RECHTSSEITEN AUF guardops.ch ═════════════════════════
+// Impressum, Datenschutz, Demo-Erklaerungen und Nutzungsbedingungen liefert
+// seit November 2026 das Repository formateins-guardops aus. Was dort im
+// Buendel liegen muss und dass kein Platzhalter und kein Kommentarkopf
+// hinausgeht, prueft dessen pruefungen/test_buendel.mjs.
+//
+// Hier bleibt die Seite des Vertrags, die nur dieses Repository kennt:
+// Seiten und Mails von hier verlinken ABSOLUT auf guardops.ch. Jede so
+// verlinkte Seite muss in der Liste stehen, die formateins-guardops
+// festhaelt und unter ihrem Namen ausliefert (VON_AUSSEN in
+// test_buendel.mjs dort). Ein neuer Verweis auf eine andere Seite waere dort
+// ein 404, und von hier aus faende das niemand -- erst der Besucher.
+// Die beiden Listen muessen gleich bleiben.
 {
-  const offen = [...new Set([...impressum.matchAll(/__[A-Z][A-Z_]{2,}__/g)].map(m => m[0]))];
-  // Die echte cp-Zeile, nicht eine Erwaehnung im Kommentar daneben -- die
-  // Gegenprobe hat gezeigt, dass eine blosse Textsuche gruen bleibt, wenn
-  // nur der Kommentar den Dateinamen noch nennt.
-  const imBuendel = /^\s*cp\s+impressum\.html\s+dist-guardops\/\S+$/m.test(workflow);
-  check('KRITISCH: das Impressum wird nur ausgeliefert, wenn keine Angabe mehr fehlt',
-    offen.length === 0 || !imBuendel);
-  if (offen.length) { console.log(`  ! Impressum noch offen: ${offen.join(', ')} — darum nicht im Deploy`); }
-
-  // Dieselbe Kopplung fuer die Verweise: Eine Fusszeile, die auf eine Seite
-  // zeigt, die es auf dem Server nicht gibt, ist ein 404 auf einer
-  // Verkaufsseite. "Noch nicht da" darf nicht wie "da" aussehen.
-  const verweistAufImpressum = /href="impressum\.html"/.test(homepage);
-  check('KRITISCH: die Startseite verweist nur dann aufs Impressum, wenn es auch ausgeliefert wird',
-    verweistAufImpressum === imBuendel);
-  const verweistAufDatenschutz = /href="datenschutz\.html"/.test(homepage);
-  check('KRITISCH: die Startseite verweist nur dann auf den Datenschutz, wenn er auch ausgeliefert wird',
-    verweistAufDatenschutz === /^\s*cp\s+datenschutz\.html\s+dist-guardops\/\S+$/m.test(workflow));
+  const VON_AUSSEN = ['demo-bestaetigen.html', 'demo-weiter.html', 'impressum.html', 'datenschutz.html',
+    'datenschutz-demo.html', 'datenschutz-demo-platz.html', 'nutzungsbedingungen.html', 'gespraech.html'];
+  const quellen = [
+    ...readdirSync(WURZEL).filter(f => f.endsWith('.html') || f.endsWith('.js')),
+    ...readdirSync(join(WURZEL, 'backend')).filter(f => f.endsWith('.php')).map(f => `backend/${f}`),
+    ...readdirSync(join(WURZEL, 'backend', 'api')).filter(f => f.endsWith('.php')).map(f => `backend/api/${f}`),
+  ];
+  const verlinkt = new Map();
+  for (const datei of quellen) {
+    for (const m of lies(datei).matchAll(/https:\/\/guardops\.ch\/([a-z0-9_-]+\.html)/g)) {
+      // Die eigene kanonische Adresse einer Seite ist kein Verweis von
+      // aussen (datenschutz-app.html ist ein Entwurf, der erst nach der
+      // Freigabe nach guardops.ch geht).
+      if (m[1] === datei) { continue; }
+      if (!verlinkt.has(m[1])) { verlinkt.set(m[1], datei); }
+    }
+  }
+  check('die Suche findet ueberhaupt Verweise auf Seiten von guardops.ch', verlinkt.size >= 3);
+  const unbekannt = [...verlinkt].filter(([seite]) => !VON_AUSSEN.includes(seite));
+  check('KRITISCH: jede Seite von guardops.ch, auf die dieses Repository verweist, sichert formateins-guardops unter ihrem Namen zu',
+    unbekannt.length === 0);
+  unbekannt.forEach(([seite, datei]) => bad.push(`${datei} verweist auf https://guardops.ch/${seite} -- steht nicht in VON_AUSSEN (hier und in formateins-guardops nachtragen)`));
 }
 
 // ══════════ DIE AUSSAGEN GEGEN DEN CODE ══════════════════════════════
@@ -262,12 +274,8 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
   const resetKern = lies('backend/demo_reset.php');
   const flach = dsDemo.replace(/<!--[\s\S]*?-->/g, '').replace(/\s+/g, ' ');
 
-  // Die Kopplung "Verweis nur auf eine Seite, die es auf dem Server gibt".
-  // Der Demobereich verweist ABSOLUT auf guardops.ch -- ein 404 faende
-  // niemand von uns, sondern der Interessent auf der Anmeldemaske.
-  const imBuendel = /^\s*cp\s+datenschutz-demo\.html\s+dist-guardops\/\S+$/m.test(workflow);
-  check('KRITISCH: die Anmeldemaske verweist nur dann auf die Demo-Erklaerung, wenn sie ausgeliefert wird',
-    /datenschutz-demo\.html/.test(dash) === imBuendel);
+  // Dass die Demo-Erklaerung, auf die die Anmeldemaske ABSOLUT verweist, auf
+  // guardops.ch auch liegt, sichert der Vertrag oben (VON_AUSSEN).
 
   // "Er setzt keine Cookies": dashboard.html haelt die Sitzung im lokalen
   // Speicher. Ein setcookie/document.cookie waere die Falschaussage.
@@ -540,7 +548,9 @@ for (const [datei, titel] of [['impressum.html', 'Impressum'], ['datenschutz.htm
     .filter(m => /^(nutzungsbedingungen|datenschutz|impressum)/.test(m[1]))
     .map(m => m[2])
     .filter((z, i, a) => a.indexOf(z) === i);
-  check('die Suche findet ueberhaupt ausgelieferte Rechtsseiten', ziele.length >= 4);
+  // Seit guardops.ch aus formateins-guardops kommt, bleiben hier die
+  // beiden Seiten auf jedem Demo-Platz.
+  check('die Suche findet ueberhaupt ausgelieferte Rechtsseiten', ziele.length >= 2);
   for (const ziel of ziele) {
     check(`KRITISCH: ${ziel} wird vor der Auslieferung gesaeubert`,
       gesaeubertePfade.has(ziel));
