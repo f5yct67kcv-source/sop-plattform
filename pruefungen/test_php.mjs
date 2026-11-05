@@ -1539,7 +1539,13 @@ try {
   // bewusst nicht auf den Server (README, OP-17). Wer eine weitere Ausnahme
   // braucht, traegt sie hier ein und begruendet sie -- stillschweigend darf
   // keine dazukommen.
-  const bewusstDraussen = ['setup.php'];
+  //
+  // termine_kalender.php: Kalenderlogik der Terminbuchung auf guardops.ch.
+  // Ging nur ins Bündel von guardops.ch, und das liefert seit November 2026
+  // das Repository formateins-guardops aus (mit eigener Kopie). Hier liegt
+  // sie nur noch, bis die Kopien der Homepage aus diesem Repository
+  // verschwinden; dann fällt auch dieser Eintrag weg.
+  const bewusstDraussen = ['setup.php', 'termine_kalender.php'];
   fehltImDeploy = oben.filter(d => !bewusstDraussen.includes(d) && !yml.includes(`cp backend/${d} `));
   check('Die Ausnahme setup.php ist weiterhin nicht im Deploy',
     !yml.includes('cp backend/setup.php '));
