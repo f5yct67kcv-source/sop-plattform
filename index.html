@@ -591,7 +591,7 @@ let detailTargetId = null;
 // ── BACKEND API
 // nativeAppHuelle() steht im Kopf der Datei (siehe dort).
 // In der Huelle ist die Herkunft capacitor://localhost (iOS) bzw.
-// http://localhost (Android) -- ein relativer Pfad zeigte ins Buendel statt
+// https://localhost (Android) -- ein relativer Pfad zeigte ins Buendel statt
 // auf den Server (siehe app.html, API-Konstante).
 const API_BASE  = nativeAppHuelle() ? 'https://cupi24.guardops.ch/api/' : 'api/';
 let authToken   = localStorage.getItem('rv3_token') || '';

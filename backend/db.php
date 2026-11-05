@@ -30,13 +30,19 @@ function json_response($data, int $status = 200): void {
 // Web-App und Backend laufen unter derselben Herkunft -- ein Browser
 // schickt darum nie einen Origin-Kopf, der hier etwas veraendert. Die
 // Capacitor-Huelle ist eine FREMDE Herkunft (capacitor://localhost unter
-// iOS, http://localhost unter Android): ohne diese Kopfzeilen blockt der
+// iOS, https://localhost unter Android): ohne diese Kopfzeilen blockt der
 // eigene WebView jede Antwort, bevor ihr JavaScript sie sieht.
+//
+// Android ist https, nicht http: Seit Capacitor 6 ist "https" das
+// Vorgabeschema der Android-Huelle (server.androidScheme). Hier stand
+// frueher http://localhost -- das haette jede Antwort an die Android-App
+// blockiert, bemerkt erst beim ersten Geraetetest. test_appkennung.mjs
+// leitet den Sollwert aus mobile/capacitor.config.json ab.
 //
 // Nur eine feste, bekannte Liste wird erlaubt, nie ein Platzhalter oder ein
 // Stern: Die Sitzung haengt am Kopf X-Auth-Token, nicht an einem Cookie --
 // ein blind erlaubter fremder Ursprung koennte ihn sonst mitlesen.
-const APP_NATIVE_HERKUENFTE = ['capacitor://localhost', 'http://localhost'];
+const APP_NATIVE_HERKUENFTE = ['capacitor://localhost', 'https://localhost'];
 
 // Die eigene Marketingseite (ENT-601-Nachtrag, 2026-09-18): guardops.ch
 // traegt bewusst keine Datenbank-Zugangsdaten (siehe deploy-hostpoint.yml,

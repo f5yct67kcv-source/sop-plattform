@@ -194,7 +194,9 @@ pruef('Leere Bytes ergeben keinen Typ', logo_mime_am_inhalt('') === null);
 pruef('Die native App-Huelle wird erkannt (iOS)',
     cors_erlaubte_herkunft('capacitor://localhost') === 'capacitor://localhost');
 pruef('Die native App-Huelle wird erkannt (Android)',
-    cors_erlaubte_herkunft('http://localhost') === 'http://localhost');
+    cors_erlaubte_herkunft('https://localhost') === 'https://localhost');
+pruef('KRITISCH: http://localhost ist keine App-Huelle (Android laeuft unter https)',
+    cors_erlaubte_herkunft('http://localhost') === null);
 pruef('KRITISCH: eine fremde Herkunft wird abgewiesen',
     cors_erlaubte_herkunft('https://angreifer.example') === null);
 pruef('KRITISCH: leer wird abgewiesen', cors_erlaubte_herkunft('') === null);
