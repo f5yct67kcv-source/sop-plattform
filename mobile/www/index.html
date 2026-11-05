@@ -9686,7 +9686,45 @@ function rgNachtUm() {
 const RG_WACH_SCHLUESSEL = 'sop_rundgang_wachhalten';
 let rgsWachSperre = null;
 
+/* In der App (ENT-732): das native Plugin statt navigator.wakeLock.
+
+   Ob die Wachsperre des Browsers in der WKWebView der Huelle verlaesslich
+   haelt, war nie geprueft (OP-574) -- in Safari hat Apple sie fuer
+   Web-Apps erst spaet repariert. Das Plugin setzt auf iOS den Leerlauf-
+   Zeitgeber der App ausser Kraft; das ist der Weg, den native Apps gehen.
+
+   Die Sperre sieht fuer den Rest des Codes GLEICH aus wie die des
+   Browsers (release(), addEventListener('release')). So bleiben
+   Anfordern, Zurueckkommen und Freigeben ein einziger Weg und nicht zwei,
+   von denen der seltenere beim naechsten Umbau vergessen wird.
+
+   Unterschied zum Browser, und er ist gewollt: Die native Sperre faellt
+   beim Wegschalten nicht von selbst weg. Das Zurueckkommen fordert darum
+   nichts neu an -- rgsWachSperre steht noch, und das ist richtig so. */
+function rgWachNativ() {
+  try {
+    const P = nativeAppHuelle() && window.Capacitor.Plugins;
+    return (P && P.KeepAwake && typeof P.KeepAwake.keepAwake === 'function') ? P.KeepAwake : null;
+  } catch (e) { return null; }
+}
+
+async function rgWachNativAnfordern(KA) {
+  await KA.keepAwake();
+  const horcher = [];
+  return {
+    release: () => {
+      // allowSleep() ist ein Versprechen; ein Fehler dort darf nicht als
+      // unbehandelte Zurueckweisung durchschlagen. Das Geraet schlaeft dann
+      // eben nach seiner eigenen Frist -- kein Schaden fuer die Runde.
+      Promise.resolve().then(() => KA.allowSleep()).catch(() => {});
+      horcher.forEach(f => { try { f(); } catch (e) {} });
+    },
+    addEventListener: (name, f) => { if (name === 'release') { horcher.push(f); } },
+  };
+}
+
 function rgWachMoeglich() {
+  if (rgWachNativ()) { return true; }
   try { return !!(navigator.wakeLock && navigator.wakeLock.request); }
   catch (e) { return false; }
 }
@@ -9702,7 +9740,8 @@ async function rgWachAnfordern() {
   // auch auf der Uebersicht wachhaelt, waere ein Akkufresser ohne Zweck.
   if (rgsModus !== 'lauf' || !rundgangAktiv) { return; }
   try {
-    rgsWachSperre = await navigator.wakeLock.request('screen');
+    const KA = rgWachNativ();
+    rgsWachSperre = KA ? await rgWachNativAnfordern(KA) : await navigator.wakeLock.request('screen');
     rgsWachSperre.addEventListener('release', () => { rgsWachSperre = null; });
   } catch (e) { rgsWachSperre = null; }   // z.B. wenig Akku: das Geraet darf nein sagen
 }
