@@ -2049,6 +2049,102 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
   }
 }
 
+// ══════════ DER STORE-BAU (store-hochladen.sh, ENT-732) ═══════════════
+// Ausgefuehrt, nicht im Quelltext gesucht: Die Funktionen werden aus dem
+// Skript geschnitten und in bash laufen gelassen. Ohne Mac -- xcodebuild
+// selbst laesst sich hier nicht pruefen, das bleibt dem ersten Lauf am
+// Mac vorbehalten.
+{
+  const { execFileSync } = await import('child_process');
+  const { mkdtempSync, mkdirSync: md, writeFileSync, rmSync } = await import('fs');
+  const { tmpdir } = await import('os');
+  const { join } = await import('path');
+  const store = readFileSync(`${WURZEL}/store-hochladen.sh`, 'utf8');
+  const fn = (name) => {
+    const von = store.indexOf(`${name}() {`);
+    const bis = store.indexOf('\n}\n', von);
+    return von === -1 || bis === -1 ? null : store.slice(von, bis + 3);
+  };
+  const sh = (befehl, cwd) => {
+    try { return { ok: true, aus: execFileSync('bash', ['-c', befehl], { encoding: 'utf8', cwd }).trim() }; }
+    catch (e) { return { ok: false, aus: String(e.stdout || '').trim() }; }
+  };
+
+  const vg = fn('version_gueltig');
+  check('KRITISCH: store-hochladen.sh prueft die Versionsnummer in einer eigenen Funktion', !!vg);
+  if (vg) {
+    const nimmt = v => sh(`${vg}\nversion_gueltig '${v}'`).ok;
+    check('Store: 1.0, 1.0.1 und 2 sind Versionsnummern, wie Apple sie annimmt',
+      nimmt('1.0') && nimmt('1.0.1') && nimmt('2'));
+    check('KRITISCH: Store: Unsinn wird abgewiesen, bevor eine halbe Stunde gebaut wird',
+      !nimmt('') && !nimmt('1.0.1.2') && !nimmt('v1.0') && !nimmt('1.0 beta') && !nimmt('1..0'));
+  }
+
+  /* Die Buildnummer muss bei jedem Hochladen steigen, sonst weist Apple
+     den Build ab. Geprueft an zwei kuenstlichen Uhrzeiten: Die spaetere
+     muss als Versionsnummer GROESSER sein, Teil fuer Teil verglichen, wie
+     Apple es tut -- und nicht nur als Zeichenkette. */
+  const bn = fn('buildnummer');
+  check('KRITISCH: store-hochladen.sh bildet die Buildnummer in einer eigenen Funktion', !!bn);
+  if (bn) {
+    const um = t => sh(`date() { command date -d '${t}' "$@"; }\n${bn}\nbuildnummer`).aus;
+    const a = um('2026-11-05 09:59 UTC'), b = um('2026-11-05 10:00 UTC'), c = um('2027-01-01 00:00 UTC');
+    const teile = s => s.split('.').map(Number);
+    const groesser = (x, y) => { const [p, q] = [teile(x), teile(y)];
+      for (let i = 0; i < Math.max(p.length, q.length); i++) {
+        if ((p[i] || 0) !== (q[i] || 0)) { return (p[i] || 0) > (q[i] || 0); } } return false; };
+    check(`Store: die Buildnummer hat die Form, die Apple annimmt (${a})`,
+      /^\d+(\.\d+){0,2}$/.test(a));
+    check('KRITISCH: Store: eine Minute spaeter ist die Buildnummer groesser',
+      groesser(b, a));
+    check('KRITISCH: Store: auch ueber den Jahreswechsel steigt sie',
+      groesser(c, b));
+  }
+
+  /* Die Plugin-Pruefung in aufs-handy.sh muss auch die Gemeinschafts-
+     Plugins sehen -- keep-awake liegt unter @capacitor-community/. In
+     einem Wegwerf-Ordner nachgestellt: das Plugin ist installiert, steht
+     aber nicht in Package.swift. Dann muss es als fehlend gemeldet werden. */
+  const auf = readFileSync(`${WURZEL}/aufs-handy.sh`, 'utf8');
+  const von = auf.indexOf('FEHLEND=""');
+  const bis = auf.indexOf('\ndone\n', von);
+  check('KRITISCH: aufs-handy.sh prueft die nativen Plugins', von !== -1 && bis !== -1);
+  if (von !== -1 && bis !== -1) {
+    const schleife = auf.slice(von, bis + 6);
+    const ordner = mkdtempSync(join(tmpdir(), 'plugins-'));
+    try {
+      for (const p of ['@capacitor/push-notifications', '@capacitor-community/keep-awake']) {
+        md(join(ordner, 'node_modules', p), { recursive: true });
+        writeFileSync(join(ordner, 'node_modules', p, 'Package.swift'), '// x\n');
+      }
+      md(join(ordner, 'ios/App/CapApp-SPM'), { recursive: true });
+      writeFileSync(join(ordner, 'ios/App/CapApp-SPM/Package.swift'),
+        '.package(name: "CapacitorPushNotifications", path: "../../../node_modules/@capacitor/push-notifications")\n');
+      const r = sh(`${schleife}\necho "[$FEHLEND]"`, ordner);
+      check('KRITISCH: ein fehlendes Gemeinschafts-Plugin (keep-awake) wird gemeldet',
+        r.aus.includes('keep-awake'));
+      check('Ein vorhandenes Plugin wird dabei nicht faelschlich als fehlend gemeldet',
+        !r.aus.includes('push-notifications'));
+    } finally { rmSync(ordner, { recursive: true, force: true }); }
+  }
+
+  /* Und streng: Im Store-Modus bricht eine gesammelte Warnung (fehlender
+     Maps-Schluessel) den Lauf ab. Geprueft am Block selbst, mit einer
+     gesetzten Warnung -- der Abbruch muss mit Fehlerstatus enden. */
+  const sv = auf.indexOf('if [ "${AUFS_HANDY_NUR_VORBEREITEN:-}" = "1" ]; then');
+  const sb = auf.indexOf('\nfi\n', auf.indexOf('Vorbereitet fuer den Store-Bau', sv));
+  check('KRITISCH: aufs-handy.sh kennt den Store-Modus', sv !== -1 && sb !== -1);
+  if (sv !== -1 && sb !== -1) {
+    const block = auf.slice(sv, sb + 4);
+    const mit = sh(`AUFS_HANDY_NUR_VORBEREITEN=1; WARNUNGEN="KEINE Karte: x"\n${block}\necho weiter`);
+    const ohne = sh(`AUFS_HANDY_NUR_VORBEREITEN=1; WARNUNGEN=""\n${block}\necho weiter`);
+    check('KRITISCH: Store-Modus: ohne Maps-Schluessel bricht der Lauf mit Fehler ab',
+      !mit.ok && !mit.aus.includes('weiter'));
+    check('Store-Modus: ohne Warnung endet die Vorbereitung erfolgreich, ohne aufs Geraet zu gehen',
+      ohne.ok && !ohne.aus.includes('weiter'));
+  }
+}
+
 // ── Rapport-Tool (dist/) und cupi24 (dist-cupi24/): jede eingebundene
 // Backend-Datei muss mit ─────────────────────────────────────────────────
 //

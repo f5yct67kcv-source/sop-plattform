@@ -36,6 +36,9 @@ pruefungen/package-lock.json
 # bewusst versioniert -- das sind die nativen Projekte selbst, kein
 # Build-Output.
 mobile/node_modules/
+# Archive und Exporte von store-hochladen.sh (ENT-732). Jeder Lauf legt
+# einen eigenen Ordner an; nichts davon ist Quelle.
+mobile/build/
 
 # Maps-JS-Schluessel fuer den Geraete-Build. Im Buendel steht sonst der
 # Platzhalter __MAPS_JS_KEY__ -- fuer den Web-Deploy ersetzt ihn GitHub
