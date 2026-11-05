@@ -189,9 +189,9 @@ routerAntwort = [{ status: 'ok', bereich: 'kunde', felder: { name: 'Muster Immob
 await page.fill('#rtText', 'Neuer Kunde Muster Immobilien AG in Trimbach');
 await page.click('#rtBtn');
 await page.waitForTimeout(500);
-check('Kunden-Dialog geht auf', await page.isVisible('#dlgKunde.on'));
+check('Kunden-Dialog geht auf', await page.isVisible('#view-kundeform.on'));
 check('Firmenname ist vorbefüllt', (await page.inputValue('#ku_name')) === 'Muster Immobilien AG');
-await page.evaluate(() => closeDlg('dlgKunde'));
+await page.evaluate(() => kuFormSchliessen());
 routerAntwort = null;
 
 // ══════════ ROUTER: EINSATZ
@@ -230,7 +230,7 @@ for (const [fall, modell, darf, text] of [
   check(`${fall}: die Meldung des Servers wird gezeigt`,
     await page.isVisible('#rtErr') && (await page.textContent('#rtErr')) === antwort.message);
   check(`${fall}: kein Dialog öffnet sich`,
-    !(await page.isVisible('#mv-bearbeiten.on')) && !(await page.isVisible('#dlgKunde.on'))
+    !(await page.isVisible('#mv-bearbeiten.on')) && !(await page.isVisible('#view-kundeform.on'))
     && !(await page.isVisible('#view-einsatzneu.on')) && !(await page.isVisible('#view-offerte.on')));
   check(`${fall}: der Text bleibt für eine Korrektur stehen`, (await page.inputValue('#rtText')) === text);
 }

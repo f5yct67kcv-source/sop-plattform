@@ -177,18 +177,24 @@ const farben = page => page.evaluate(() => {
 let { browser, page } = await starte();
 
 // ══════════════════════════════════════════ 1. DER SCHALTER
-check('Der Schalter steht in der Kopfleiste', await page.isVisible('#btnGlas'));
+// Seit der Einstellungsseite (ENT-722) steht der Schalter nicht mehr in
+// der Kopfleiste, sondern unter Einstellungen > Darstellung -- gleich unter
+// dem Hell/Dunkel-Schalter, weil es dieselbe Art von Wahl ist.
+check('KRITISCH: der Schalter steht nicht mehr in der Kopfleiste',
+  await page.evaluate(() => !$('btnGlas').closest('.tb-rechts') && !$('btnGlas').offsetParent));
+await page.evaluate(() => go('einstellungen')); await page.waitForTimeout(250);
+check('Er steht auf der Einstellungsseite', await page.isVisible('#btnGlas'));
 check('Er ist als Schalter ausgezeichnet',
   await page.evaluate(() => $('btnGlas').getAttribute('role') === 'switch'));
-// LINKS vom Hell/Dunkel-Schalter, nicht rechts: Der bleibt das aeusserste
-// Element der Werkzeugleiste (ENT-067, gemessen von test_menue.mjs).
-check('Er steht unmittelbar neben dem Hell/Dunkel-Schalter, nicht irgendwo',
-  await page.evaluate(() => $('btnGlas').nextElementSibling === $('btnThema')));
-check('KRITISCH: und LINKS davon -- der Hell/Dunkel-Schalter bleibt aussen',
+check('Er steht im selben Abschnitt wie der Hell/Dunkel-Schalter, darunter',
   await page.evaluate(() => {
     const t = $('btnThema').getBoundingClientRect(), g = $('btnGlas').getBoundingClientRect();
-    return g.right <= t.left + 1;
+    return $('btnGlas').closest('.es-teil') === $('btnThema').closest('.es-teil') && g.top >= t.bottom;
   }));
+check('Beide Schalter stehen auf derselben senkrechten Linie',
+  await page.evaluate(() => Math.abs($('btnGlas').getBoundingClientRect().right
+    - $('btnThema').getBoundingClientRect().right) <= 1));
+await page.evaluate(() => go('uebersicht')); await page.waitForTimeout(250);
 check('Ohne Wahl ist er AN (ENT-419)',
   await page.evaluate(() => document.documentElement.getAttribute('data-glas') === 'an'));
 check('Und meldet das auch so', await page.getAttribute('#btnGlas', 'aria-checked') === 'true');
@@ -235,7 +241,7 @@ check('KRITISCH: die Glasflaeche berechnet sich zu rgba(), nicht zu color(srgb .
 // Seit ENT-419 ist "an" die Voreinstellung, also wird "aus" hier
 // hergestellt statt vorgefunden. Der Zustand selbst muss derselbe bleiben:
 // Wer abschaltet, bekommt die Fassung von vor ENT-418 unveraendert zurueck.
-await page.click('#btnGlas');
+await page.evaluate(() => $('btnGlas').click());
 await page.waitForTimeout(400);
 check('Ein Klick schaltet ab',
   await page.evaluate(() => document.documentElement.getAttribute('data-glas') === 'aus'));
@@ -262,7 +268,7 @@ const kontrastAus = {
 };
 
 // ══════════════════════════════════════════ 3. WIEDER EINSCHALTEN
-await page.click('#btnGlas');
+await page.evaluate(() => $('btnGlas').click());
 await page.waitForTimeout(400);
 check('Ein weiterer Klick schaltet wieder ein',
   await page.evaluate(() => document.documentElement.getAttribute('data-glas') === 'an'));
@@ -349,7 +355,7 @@ await page.screenshot({ path: OUT + '/95-glas-hell.png' });
 // ══════════════════════════════════════════ 7. DASSELBE IM DUNKELN
 // Das Glas mischt sich aus --surface. Waere irgendwo ein fester Weisswert
 // eingetragen, faellt es genau hier auf: eine milchige Kachel im Dunkeln.
-await page.click('#btnThema');
+await page.evaluate(() => $('btnThema').click());
 await page.waitForTimeout(400);
 const dunkelFarben = await farben(page);
 const dunkelMasse = await masse(page);
@@ -384,7 +390,7 @@ check('KRITISCH: im Dunkeln faellt kein Schatten nach aussen (ENT-227)',
       .every(t => t.includes('inset') || /rgba\([^)]*,\s*0\s*\)/.test(t));
   }));
 await page.screenshot({ path: OUT + '/96-glas-dunkel.png' });
-await page.click('#btnThema');
+await page.evaluate(() => $('btnThema').click());
 await page.waitForTimeout(300);
 
 // ══════════════════════════════════════════ 8. FENSTER SIND GLAS, MIT UNSCHAERFE
@@ -514,7 +520,7 @@ await page.click('#btnGlasMob');
 await page.waitForTimeout(350);
 check('Und er schaltet dort ebenfalls',
   (await page.evaluate(() => document.documentElement.getAttribute('data-glas'))) !== vorher);
-check('KRITISCH: der Schalter in der Kopfzeile zieht mit',
+check('KRITISCH: der Schalter auf der Einstellungsseite zieht mit',
   (await page.getAttribute('#btnGlas', 'aria-checked'))
   === (await page.getAttribute('#btnGlasMob', 'aria-checked')));
 await page.screenshot({ path: OUT + '/98-glas-handy.png' });

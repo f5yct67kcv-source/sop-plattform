@@ -1,0 +1,9 @@
+{
+  "name": "guardops-verdichten",
+  "private": true,
+  "type": "module",
+  "description": "Entfernt beim Deploy Kommentare aus den ausgelieferten HTML-Seiten (siehe verdichten.mjs).",
+  "dependencies": {
+    "html-minifier-terser": "7.2.0"
+  }
+}

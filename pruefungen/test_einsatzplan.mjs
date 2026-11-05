@@ -20,7 +20,7 @@ const HEUTE = tag(0), FRUEHER = tag(-5);
 // Woche" blendet den Fixtureinsatz sonst versehentlich aus).
 const MORGEN = tag(new Date(HEUTE + 'T12:00:00').getDay() === 0 ? -1 : 1);
 const ok = [], bad = [];
-const check = (n, c) => (c ? ok : bad).push(n);
+const check = (n, c, wert) => (c ? ok : bad).push(c || wert === undefined ? n : `${n} (gemessen: ${wert})`);
 
 const MA = [
   { id: 1, name: 'adrian', vorname: 'Adrian', nachname: 'Muster', aktiv: 1, ist_admin: 1 },
@@ -826,6 +826,59 @@ try {
   await page.evaluate(() => closeDlg('dlgSchicht'));
   await page.waitForTimeout(200);
 } catch (e) { bad.push('Verschieben: ' + String(e).split('\n')[0].slice(0, 110)); }
+
+// ══════════ KOMPAKT: SCHICHT BEARBEITEN (17.10.2026)
+// Bleibt ein Fenster ueber der Schichtliste. Innen dieselbe Ordnung wie die
+// Formularseiten: Beschriftung links in 168 px, Felder an einer Kante, 46 px
+// Zeilenabstand -- und die zwei Paare (Von/Bis, Stundenansatz/Pauschal) je
+// auf EINER Zeile, der zweite Wert buendig unter dem zweiten.
+try {
+  await page.evaluate(() => document.documentElement.setAttribute('data-dichte', 'kompakt'));
+  await page.click('#epRaster table.ep-gitter tbody tr:first-child .ep-werk button[title="Schicht bearbeiten"]');
+  await page.waitForTimeout(300);
+  const k = await page.evaluate(() => {
+    const r = sel => { const b = document.querySelector(sel).getBoundingClientRect();
+      return { l: Math.round(b.left), t: Math.round(b.top), r: Math.round(b.right), h: Math.round(b.height),
+               m: Math.round(b.top + b.height / 2) }; };
+    return {
+      dlg: r('#dlgSchicht .dlg'),
+      lVon: r('label[for=eps_von]'), lFu: r('label[for=eps_funktion]'), lStd: r('label[for=eps_std]'),
+      lBis: r('label[for=eps_bis]'), lPa: r('label[for=eps_pauschal]'),
+      von: r('[data-zeitwahl-fuer=eps_von]'), bis: r('[data-zeitwahl-fuer=eps_bis]'),
+      fu: r('#eps_funktion'), po: r('#eps_position'), std: r('#eps_std'), pa: r('#eps_pauschal'),
+      qu: r('#eps_qualifikation'),
+    };
+  });
+  check('Kompakt: das Fenster ist 720 px breit', k.dlg.r - k.dlg.l === 720, k.dlg.r - k.dlg.l);
+  check('KRITISCH kompakt: Von und Bis stehen auf EINER Zeile', k.von.m === k.bis.m && k.lBis.m === k.von.m);
+  check('KRITISCH kompakt: Stundenansatz und Pauschal stehen auf EINER Zeile', k.std.m === k.pa.m && k.lPa.m === k.std.m);
+  check('KRITISCH kompakt: alle Felder beginnen an derselben Kante',
+    [k.von, k.fu, k.po, k.std, k.qu].every(f => f.l === k.von.l));
+  check('Kompakt: die Feldkante liegt 182 px rechts der Beschriftung (168 + 14)', k.von.l - k.lVon.l === 182, k.von.l - k.lVon.l);
+  check('Kompakt: Bis und Pauschal stehen bündig untereinander', k.bis.l === k.pa.l && k.lBis.l === k.lPa.l);
+  check('Kompakt: Funktion, Bezeichnung, Qualifikation enden mit dem rechten Paar',
+    [k.fu, k.po, k.qu].every(f => f.r === k.bis.r) && k.pa.r === k.bis.r);
+  check('Kompakt: Beschriftung und Feld stehen auf einer Linie', k.lFu.m === k.fu.m && k.lStd.m === k.std.m);
+  const zeilen = [k.von, k.fu, k.po, k.std, k.qu].map(f => f.t);
+  check('Kompakt: 46 px Zeilenabstand', zeilen.slice(1).every((t, i) => t - zeilen[i] === 46), zeilen.join(','));
+  check('Kompakt: alle Felder 32 px hoch', [k.von, k.fu, k.std, k.pa, k.qu].every(f => f.h === 32));
+  // Die Eingabe muss auch im neuen Raster bei den richtigen Feldern landen.
+  await zeitSetzen(page, '#eps_bis', '15:45');
+  check('Kompakt: die Zeitwahl Bis schreibt ins Bis-Feld', (await page.inputValue('#eps_bis')) === '15:45');
+  await page.evaluate(() => { closeDlg('dlgSchicht'); document.documentElement.removeAttribute('data-dichte'); });
+  await page.waitForTimeout(200);
+  // Ohne "kompakt" bleibt das Fenster, wie es war.
+  await page.click('#epRaster table.ep-gitter tbody tr:first-child .ep-werk button[title="Schicht bearbeiten"]');
+  await page.waitForTimeout(300);
+  const n = await page.evaluate(() => {
+    const t = s => Math.round(document.querySelector(s).getBoundingClientRect().top);
+    return { breit: Math.round(document.querySelector('#dlgSchicht .dlg').getBoundingClientRect().width),
+             vonUeberBis: t('label[for=eps_von]') === t('label[for=eps_bis]') && t('label[for=eps_von]') < t('[data-zeitwahl-fuer=eps_von]') };
+  });
+  check('Normal: das Fenster bleibt schmaler, Beschriftung über dem Feld', n.breit < 720 && n.vonUeberBis, JSON.stringify(n));
+  await page.evaluate(() => closeDlg('dlgSchicht'));
+  await page.waitForTimeout(200);
+} catch (e) { bad.push('Kompakt Schicht: ' + String(e).split('\n')[0].slice(0, 110)); }
 
 // ══════════ EINE SCHICHT KLONEN
 const vorKlon = await zeilen();

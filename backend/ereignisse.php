@@ -61,6 +61,34 @@ const EREIGNIS_ARTEN = [
     // Mehr nicht. Ein andauernder Zustand ist kein Ereignis -- Festlegung 3.
 ];
 
+// Was jemand fuer SEINE Glocke ausschalten darf (Einstellungsseite,
+// 16.10.2026). Entscheid des Projektinhabers: Ein ausgeschalteter Schalter
+// blendet die Art in der eigenen Glocke aus und zaehlt sie nicht mit -- er
+// markiert nichts als gelesen (das gilt fuer alle, OP-90) und aendert die
+// Ereignisliste der Uebersicht nicht. Vorfall und Supportantwort stehen
+// absichtlich NICHT hier: Eine Brandgefahr-Meldung oder die Antwort, auf
+// die jemand wartet, soll niemand verpassen, weil er vor Wochen einen
+// Schalter umgelegt hat. Abwesenheitsantraege zeigt die Glocke gar nicht.
+//
+// Am Konto steht je Art der Schluessel "glocke_<art>" mit "an" oder "aus"
+// (weisse Liste in meine_einstellungen.php). Fehlt er, ist die Art an.
+const GLOCKE_SCHALTBAR = ['rapport', 'sperrtag', 'zusage', 'offerte', 'rundgang_spontan'];
+
+// Liest aus dem gespeicherten Wert der Spalte mitarbeiter.einstellungen,
+// welche Arten ausgeschaltet sind. Alles, was nicht eindeutig "aus" sagt --
+// kein Wert, kaputtes JSON, eine Art ausserhalb der Liste --, bleibt an:
+// Im Zweifel meldet die Glocke lieber eine Art zu viel als eine zu wenig.
+function glocke_ausgeschaltet(?string $gespeichert): array
+{
+    $roh = $gespeichert === null ? null : json_decode($gespeichert, true);
+    if (!is_array($roh)) { return []; }
+    $aus = [];
+    foreach (GLOCKE_SCHALTBAR as $art) {
+        if (($roh['glocke_' . $art] ?? null) === 'aus') { $aus[] = $art; }
+    }
+    return $aus;
+}
+
 function ereignis_abhakbar(string $typ): bool
 {
     return isset(EREIGNIS_ARTEN[$typ]);
@@ -150,7 +178,8 @@ function ereignis_zaehlen(PDO $pdo, string $sql, int $gelesen): int
 // er darf nicht davon abhaengen, dass die Betreiber-Ebene erreichbar ist.
 // Fehlt sie, fehlt genau diese eine Art, und das steht in 'unvollstaendig'.
 function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
-                            ?PDO $stamm = null, ?int $mandantId = null): array
+                            ?PDO $stamm = null, ?int $mandantId = null,
+                            array $glockeAus = []): array
 {
     $fehler = [];
     $liste  = [];
@@ -404,6 +433,18 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
     // (siehe ereignis_zaehlen).
     $gesamt = max(array_sum($jeArt), count($liste));
 
+    // Die Glocke bekommt eine EIGENE Liste, ohne die ausgeschalteten Arten
+    // (glocke_ausgeschaltet). Gefiltert wird VOR dem Abschneiden: Jede Art
+    // ist oben mit bis zu 20 Zeilen gelesen, mehr als die Grenze -- so
+    // stehen auch dann die neuesten eingeschalteten oben, wenn die zwoelf
+    // neuesten insgesamt alle zu einer ausgeschalteten Art gehoeren. Nur
+    // Arten aus GLOCKE_SCHALTBAR lassen sich wegfiltern, was immer der
+    // Aufrufer mitgibt.
+    $aus = array_values(array_intersect(GLOCKE_SCHALTBAR, $glockeAus));
+    $glListe = array_values(array_filter($liste, fn($x) => !in_array($x['typ'], $aus, true)));
+    $glJe = array_diff_key($jeArt, array_flip($aus));
+    $glGesamt = max(array_sum($glJe), count($glListe));
+
     return [
         'ereignisse' => array_slice($liste, 0, $grenze),
         'gesamt'     => $gesamt,
@@ -417,5 +458,12 @@ function ereignisse_sammeln(PDO $pdo, int $grenze = 12,
         // Welche Arten gar nicht abgefragt werden konnten. Leer ist gut;
         // nicht leer heisst: hier fehlt etwas, und zwar bekannt.
         'unvollstaendig' => $fehler,
+        'glocke' => [
+            'ereignisse' => array_slice($glListe, 0, $grenze),
+            'gesamt'     => $glGesamt,
+            'gekuerzt'   => $glGesamt > $grenze,
+            'je_art'     => $glJe,
+            'aus'        => $aus,
+        ],
     ];
 }

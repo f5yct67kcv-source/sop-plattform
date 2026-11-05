@@ -63,6 +63,10 @@ const OHNE_LOGBUCH = {
     'Merkt nur, bis zu welcher Neuerung das eigene Konto gelesen hat (ENT-698). '
     + 'Keine Aenderung am Bestand, nichts, das ein anderer je nachvollziehen muesste -- '
     + 'dasselbe wie das Wegklicken eines Hinweises.',
+  'betreiber_einstellungen.php':
+    'Merkt nur die eigene Darstellung (hell/dunkel, Glas) am eigenen Konto (ENT-722). '
+    + 'Keine Aenderung am Bestand, nichts, das ein anderer je nachvollziehen muesste -- '
+    + 'dieselbe Art Wahl wie bisher im Browser.',
   'betreiber_demo_beenden.php':
     'Demo-Instanzen sind Wegwerfumgebungen (ENT-523), kein Bestand dieser Ebene.',
   'betreiber_demo_ablauf.php':

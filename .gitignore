@@ -76,3 +76,6 @@ staging-htaccess-fertig.txt
 
 # Erzeugte Fassung des Deckblatt-Entwurfs (entwuerfe/deckblatt-buendeln.py)
 entwuerfe/*.eigenstaendig.html
+
+# Abhaengigkeit des Verdichters (werkzeuge/verdichten), kommt per npm ci.
+werkzeuge/verdichten/node_modules

@@ -81,7 +81,8 @@ const AUFBAU = () => {
      Ansicht NEBEN den Bereichen -- ofNeu() blendet sie darum aus. Fuer diese
      Suite sollen sie alle gleichzeitig dastehen, damit in einem Durchgang
      gemessen werden kann, was sonst auf fuenf Bildschirmen liegt. */
-  ['b-uebersicht', 'b-mandanten', 'b-adressen', 'b-offerten', 'b-rechnungen']
+  // Seit ENT-725 liegen die Rechnungen unter Finanzen, als eigener Reiter.
+  ['b-uebersicht', 'b-mandanten', 'b-adressen', 'b-offerten', 'b-finanzen', 'finv-rechnungen']
     .forEach(id => document.getElementById(id).classList.remove('versteckt'));
 };
 
@@ -148,7 +149,10 @@ const MESSEN = () => {
     })(),
     bandUeberlauf: getComputedStyle(document.getElementById('kopf-nav')).overflowX,
     // Der Katalog der Seite selbst -- nicht eine hier nachgefuehrte Zahl.
-    katalog: Object.keys(BEREICHE),
+    // Bereiche aus dem Kontomenue (ENT-722) stehen bewusst nicht im Band.
+    katalog: Object.keys(BEREICHE).filter(k => !BEREICHE_KONTOMENUE.includes(k)),
+    imMenue: BEREICHE_KONTOMENUE.map(k => ({ k, im: !!BEREICHE[k],
+      knopf: !!document.querySelector(`#kontoMenue [data-bereich="${k}"]`) })),
     reiterSchluessel: [...document.querySelectorAll('#kopf-nav .nav-item')]
       .map(b => b.dataset.bereich),
     reiter: [...document.querySelectorAll('#kopf-nav .nav-item')].map(b => ({
@@ -264,6 +268,8 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
   check(`${wie}: jeder Reiter fuehrt in einen Bereich, den es gibt`,
     m.reiterSchluessel.length === m.katalog.length
     && m.reiterSchluessel.every(k => m.katalog.includes(k)));
+  check(`${wie}: jeder Bereich ohne Reiter steht im Kontomenue (ENT-722)`,
+    m.imMenue.length >= 1 && m.imMenue.every(x => x.im && x.knopf));
   check(`KRITISCH ${wie}: jeder Reiter ist mindestens 44px hoch`,
     m.reiter.every(r => r.h >= 44));
   if (m.reiter.some(r => r.h < 44)) {
@@ -364,6 +370,8 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
     });
     await seite.goto(ADRESSE);
     await seite.evaluate(AUFBAU);
+    // Seit ENT-722 steht der Schalter unter Kontomenue > Einstellungen.
+    await seite.evaluate(() => bereichZeigen('einstellungen'));
     await seite.waitForTimeout(80);
     const vorher = await seite.evaluate(() => ({
       thema: document.documentElement.getAttribute('data-thema'),
@@ -430,7 +438,7 @@ for (const [wie, breite, hoehe] of [['Desktop', 1500, 900], ['Handy', 390, 844]]
   // Jeden Reiter anklicken, nicht nur einen: Ein vergessener Bereich
   // faellt sonst erst auf, wenn jemand ihn braucht.
   const titel = {};
-  for (const k of ['mandanten', 'adressen', 'offerten', 'rechnungen', 'konten', 'uebersicht']) {
+  for (const k of ['mandanten', 'adressen', 'offerten', 'finanzen', 'konten', 'uebersicht']) {
     await seite.click(`#kopf-nav .nav-item[data-bereich="${k}"]`);
     const l = await lage();
     titel[k] = l.titel;

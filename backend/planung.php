@@ -129,9 +129,9 @@ function feiertage_solothurn(int $jahr): array
 const FEIERTAG_QUELLE = 'Arbeitsinspektorat Kanton Solothurn (ohne Bezirk Bucheggberg), Art. 20a ArG';
 
 // Feiertage eines Kantons in einem Zeitraum, als Zuordnung Datum -> Name.
-function feiertage_im_zeitraum(string $kanton, string $von, string $bis): array
+function feiertage_im_zeitraum(string $kanton, string $von, string $bis, ?PDO $pdo = null): array
 {
-    $s = db()->prepare('SELECT datum, name, halbtags FROM feiertage WHERE kanton = ? AND datum BETWEEN ? AND ?');
+    $s = ($pdo ?? db())->prepare('SELECT datum, name, halbtags FROM feiertage WHERE kanton = ? AND datum BETWEEN ? AND ?');
     $s->execute([$kanton, $von, $bis]);
     $map = [];
     foreach ($s->fetchAll() as $r) {
@@ -143,16 +143,22 @@ function feiertage_im_zeitraum(string $kanton, string $von, string $bis): array
 // Welche Schichten wuerden im Zeitraum aus den Masterschichten eines Objekts
 // entstehen? Schreibt nichts -- das Ergebnis dient der Vorschau und wird von
 // schichten_erzeugen.php mit denselben Regeln noch einmal berechnet.
-function planung_bedarf(int $objektId, string $von, string $bis): array
+//
+// $pdo nur fuer den Testdaten-Erzeuger (api/testdaten.php, ENT-714) und
+// seine Pruefung gegen SQLite: Er legt die Schichten der Testseite aus
+// denselben Masterschichten an und braucht dafuer dieselbe Bedarfsregel,
+// keine nachgebaute. Alle Endpunkte lassen ihn weg und bekommen db().
+function planung_bedarf(int $objektId, string $von, string $bis, ?PDO $pdo = null): array
 {
-    $o = db()->prepare('SELECT * FROM objekte WHERE id = ?');
+    $pdo ??= db();
+    $o = $pdo->prepare('SELECT * FROM objekte WHERE id = ?');
     $o->execute([$objektId]);
     $objekt = $o->fetch();
     if (!$objekt) {
         return ['fehler' => 'Objekt nicht gefunden'];
     }
 
-    $ms = db()->prepare(
+    $ms = $pdo->prepare(
         'SELECT * FROM masterschichten
          WHERE objekt_id = ? AND gueltig_ab <= ? AND (gueltig_bis IS NULL OR gueltig_bis >= ?)
          ORDER BY von, name'
@@ -160,7 +166,7 @@ function planung_bedarf(int $objektId, string $von, string $bis): array
     $ms->execute([$objektId, $bis, $von]);
     $vorlagen = $ms->fetchAll();
 
-    $feiertage = feiertage_im_zeitraum((string)$objekt['kanton'], $von, $bis);
+    $feiertage = feiertage_im_zeitraum((string)$objekt['kanton'], $von, $bis, $pdo);
     $wochenfeld = [1 => 'bedarf_mo', 2 => 'bedarf_di', 3 => 'bedarf_mi', 4 => 'bedarf_do',
                    5 => 'bedarf_fr', 6 => 'bedarf_sa', 7 => 'bedarf_so'];
 
@@ -235,15 +241,16 @@ function planung_bedarf(int $objektId, string $von, string $bis): array
 
 // Was aus den Vorlagen im Zeitraum noch NICHT existiert. Baut auf
 // planung_bedarf() auf -- die Bedarfsregel steht nur an einer Stelle.
-function planung_vorschlag(int $objektId, string $von, string $bis): array
+function planung_vorschlag(int $objektId, string $von, string $bis, ?PDO $pdo = null): array
 {
-    $b = planung_bedarf($objektId, $von, $bis);
+    $pdo ??= db();
+    $b = planung_bedarf($objektId, $von, $bis, $pdo);
     if (isset($b['fehler'])) {
         return $b;
     }
 
     $vorhanden = [];
-    $ex = db()->prepare(
+    $ex = $pdo->prepare(
         'SELECT masterschicht_id, datum FROM einsaetze
          WHERE objekt_id = ? AND datum BETWEEN ? AND ? AND masterschicht_id IS NOT NULL'
     );

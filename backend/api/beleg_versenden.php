@@ -13,6 +13,7 @@ require_once __DIR__ . '/../rechte.php';
 require __DIR__ . '/../belege.php';
 require_once __DIR__ . '/../logbuch.php';
 require __DIR__ . '/../mailer.php';
+require_once __DIR__ . '/../mail_gestaltung.php';
 
 $user = require_session();
 require_recht($user, 'offerten_schreiben');
@@ -71,8 +72,6 @@ if (!$token) {
     $pdo->prepare('UPDATE belege SET versand_token = ? WHERE id = ?')->execute([$token, $id]);
 }
 
-$betrieb = $pdo->query("SELECT firma FROM betrieb WHERE id = 1")->fetch();
-$firma = trim((string)($betrieb['firma'] ?? ''));
 
 // Die Basisadresse kommt aus dem Deploy (ENT-501), nicht aus dem Host-Kopf
 // des Dashboard-Aufrufs. Hier war der Kopf zwar nie von aussen steuerbar --
@@ -116,56 +115,19 @@ if ($naechste['neu'] && beleg_unterschreibbar((string)$beleg['art']) && !$freiga
 }
 $fassungNr = $naechste['neu'] ? (int)$naechste['nummer']
            : max(1, (int)(beleg_letzte_fassung($pdo, $id)['nummer'] ?? 1));
-$angepasst = $fassungNr > 1;
 
 $titel = BELEG_ARTEN[$beleg['art']]['titel'] ?? 'Beleg';
-$absenderName = $firma !== '' ? $firma : 'Ihr Ansprechpartner';
-// Ab der zweiten Fassung "angepasst" statt "neu" -- dieselbe Offerte unter
-// derselben Nummer, keine zweite (ENT-688).
-$betreff = ($angepasst ? "Angepasste $titel" : "Neue $titel") . " {$beleg['nummer']}"
-         . ($firma !== '' ? " von $firma" : '');
-
-// Annehmen/Ablehnen gibt es nur bei der Offerte (siehe beleg_oeffentlich.php)
-// -- die Rechnung hat auf der Kundenseite keine Entscheidung, nur die Ansicht.
-$ansehenText = $beleg['art'] === 'offerte'
-    ? "Sie können die $titel hier ansehen und direkt beantworten:"
-    : "Sie können die $titel hier ansehen:";
-
-$text = "Guten Tag\n\n"
-    . ($angepasst ? "$absenderName hat die $titel {$beleg['nummer']} für Sie angepasst.\n\n"
-                  : "$absenderName hat Ihnen eine neue $titel erstellt: {$beleg['nummer']}.\n\n")
-    . "$ansehenText\n$link\n\n"
-    . "Freundliche Grüsse\n$absenderName";
-
-// Jedes textfuehrende Element bekommt sein EIGENES font-family (nicht nur
-// der aeusserste Rahmen): Outlook Desktop (Word-Rendermotor) vererbt
-// font-family in HTML-Mails nicht zuverlaessig an verschachtelte Elemente
-// und faellt sonst auf eine Serifenschrift zurueck -- genau die
-// uneinheitliche Schrift, die der Projektinhaber am 28.08.2026 bemaengelt
-// hat. Der CTA-Knopf traegt jetzt denselben Blauton wie der primaere
-// Aktions-Knopf im Dashboard (--accent, #2F5BD7), statt eines schwarzen
-// Knopfs ohne Bezug zum Erscheinungsbild.
-$schrift = "font-family:-apple-system,'Segoe UI',Arial,sans-serif";
-$html = '<div style="' . $schrift . ';color:#14161A;max-width:520px">'
-    . '<p style="' . $schrift . ';margin:0 0 16px">Guten Tag</p>'
-    . '<p style="' . $schrift . ';margin:0 0 16px"><strong>' . htmlspecialchars($absenderName, ENT_QUOTES, 'UTF-8') . '</strong> '
-    . ($angepasst
-        ? 'hat die ' . htmlspecialchars($titel, ENT_QUOTES, 'UTF-8') . ' <strong>'
-          . htmlspecialchars($beleg['nummer'], ENT_QUOTES, 'UTF-8') . '</strong> für Sie angepasst.</p>'
-        : 'hat Ihnen eine neue ' . htmlspecialchars(mb_strtolower($titel), ENT_QUOTES, 'UTF-8') . ' erstellt: <strong>'
-          . htmlspecialchars($beleg['nummer'], ENT_QUOTES, 'UTF-8') . '</strong>.</p>')
-    . '<p style="' . $schrift . ';margin:28px 0">'
-    . '<a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '" '
-    . 'style="' . $schrift . ';background:#2F5BD7;color:#fff;padding:12px 24px;border-radius:8px;'
-    . 'font-weight:700;text-decoration:none;display:inline-block">'
-    . htmlspecialchars("$titel anschauen", ENT_QUOTES, 'UTF-8') . '</a></p>'
-    . '<p style="' . $schrift . ';color:#6B7280;font-size:12px;margin:0 0 16px">Funktioniert der Knopf nicht? Diesen Link in den Browser kopieren:<br>'
-    . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '</p>'
-    . '<p style="' . $schrift . ';margin:0">Freundliche Grüsse<br>' . htmlspecialchars($absenderName, ENT_QUOTES, 'UTF-8') . '</p>'
-    . '</div>';
+// Gestaltung, Texte und Antwortadresse kommen aus dem E-Mail-Designer des
+// Betriebs (ENT-729). Ab der zweiten Fassung setzt die Huelle selbst den
+// Hinweis "angepasste Fassung" dazu (ENT-688).
+$mail = mail_betrieb($pdo, (string)$beleg['art'], [
+    'Titel' => $titel, 'Nummer' => (string)$beleg['nummer'], 'Kunde' => (string)$kunde['name'],
+    'Fassung' => (string)$fassungNr,
+], ['link' => $link, 'fassung' => $fassungNr]);
 
 try {
-    smtp_senden($anEmail, (string)$kunde['name'], $betreff, $html, $text);
+    smtp_senden($anEmail, (string)$kunde['name'], $mail['betreff'], $mail['html'], $mail['text'],
+        [], $mail['bilder'], $mail['antwort_an']);
 } catch (Throwable $e) {
     json_response(['status' => 'error', 'message' => 'Versand fehlgeschlagen: ' . $e->getMessage()], 502);
 }

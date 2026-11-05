@@ -108,7 +108,7 @@ check('Mit Bedarf wird gespeichert', rufe.filter(r => r.p.includes('masterschich
 
 // ══════════ ÄNDERN: DER HINWEIS SAGT DIE WAHRHEIT
 // Ueber den echten Weg: Objekt oeffnen laedt die Masterschichten
-await page.evaluate(() => { closeDlg('dlgMs'); openObjekt(1); });
+await page.evaluate(() => { msFormSchliessen(); openObjekt(1); });
 await page.waitForTimeout(600);
 await page.evaluate(() => openMs('aenderung', 1));
 await page.waitForTimeout(400);

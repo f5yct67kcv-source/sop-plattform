@@ -106,12 +106,16 @@ check('Zurück auf der Übersicht wieder versteckt', !(await page.isVisible('#bt
 // ══════════════════════════════════════════ PLATZIERUNG UND OPTIK
 await page.evaluate(() => go('mitarbeiter'));
 await page.waitForTimeout(200);
+// Bis zur Einstellungsseite stand rechts daneben der Hell/Dunkel-Schalter.
+// Der ist umgezogen (ENT-722); gemessen wird jetzt, dass der Knopf in
+// der rechten Haelfte der Werkzeugleiste steht und nicht aus ihr ragt.
 const lage = await page.evaluate(() => {
   const s = document.getElementById('btnSprechen').getBoundingClientRect();
-  const t = document.getElementById('btnThema').getBoundingClientRect();
-  return { sprechenRechts: s.right, themaLinks: t.left };
+  const t = document.querySelector('.topbar').getBoundingClientRect();
+  return { links: s.left, rechts: s.right, leisteMitte: t.left + t.width / 2, leisteRechts: t.right };
 });
-check('Der Knopf steht links vom Hell/Dunkel-Schalter', lage.sprechenRechts <= lage.themaLinks + 1);
+check('Der Knopf steht rechts in der Werkzeugleiste',
+  lage.links >= lage.leisteMitte && lage.rechts <= lage.leisteRechts + 1);
 check('Kein Standard-Knopf: eigene Klasse statt .btn-plain/.btn-quiet',
   await page.evaluate(() => {
     const c = document.getElementById('btnSprechen').className;
@@ -154,7 +158,7 @@ await page.click('#btnSprechen');
 await page.fill('#gsText', 'Neuer Kunde für die Firma');
 await page.click('#gsBtn');
 await page.waitForTimeout(400);
-check('„kunde“ öffnet den Kunden-Neu-Dialog', await page.evaluate(() => document.getElementById('dlgKunde').classList.contains('on')));
+check('„kunde“ öffnet den Kunden-Neu-Dialog', await page.evaluate(() => document.getElementById('view-kundeform').classList.contains('on')));
 check('Kundenname vorbefüllt', (await page.inputValue('#ku_name')) === 'Neue Firma AG');
 await page.keyboard.press('Escape');
 await page.waitForTimeout(200);

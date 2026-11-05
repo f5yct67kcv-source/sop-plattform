@@ -82,6 +82,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Abhaengigkeit fuer "HTML verdichten" weiter unten, mit fester Fassung
+      # aus der package-lock.json (npm ci installiert genau diese, nichts
+      # Neueres). continue-on-error: Ohne sie laufen die Verdichter-Schritte
+      # ins Leere und die Seiten gehen unverdichtet hoch -- kein Grund, den
+      # Deploy anzuhalten.
+      - name: Verdichter einrichten
+        continue-on-error: true
+        run: npm ci --prefix werkzeuge/verdichten --no-audit --no-fund
+
       # Erster Schritt, bewusst VOR jedem Kopieren oder Hochladen: waehlt
       # anhand des Refs (main-Branch oder qa-*-Tag, ENT-372) den richtigen
       # Satz Secrets und bricht den
@@ -654,10 +663,9 @@ jobs:
           # eingebunden, nie direkt aufgerufen -- steht darum auch in
           # der Sperrliste der .htaccess.
           cp backend/betreiber.php dist/betreiber.php
-          # Rechenkern der Demo-Zugaenge (ENT-600) -- betreiber.php bindet
-          # ihn per require_once ein. Fehlt er, stirbt jeder Aufruf, der
-          # betreiber.php laedt, nicht erst die Demo-Freigabe.
+          # Pflicht fuer betreiber.php (require_once, ENT-600 und ENT-725).
           cp backend/demo_zugang.php dist/demo_zugang.php
+          cp backend/betreiber_finanzen.php dist/betreiber_finanzen.php
           cp backend/mail_vorlage.php dist/mail_vorlage.php
           cp backend/demo_bestaetigung.php dist/demo_bestaetigung.php
           cp backend/guardops-signatur.png dist/guardops-signatur.png
@@ -717,6 +725,7 @@ jobs:
           cp backend/qrrechnung.php dist/qrrechnung.php
           cp backend/produkte.php dist/produkte.php
           cp backend/mailer.php dist/mailer.php
+          cp backend/mail_gestaltung.php dist/mail_gestaltung.php
           cp backend/ferien.php dist/ferien.php
           cp backend/lohn.php dist/lohn.php
           cp backend/gavzeit.php dist/gavzeit.php
@@ -967,6 +976,14 @@ jobs:
       # Demo-Plaetze brauchen ihn nicht, sie laufen im Produktions-Deploy
       # mit und tragen dessen Stand.)
 
+      - name: HTML verdichten (dist)
+        # Kommentare aus den HTML-Seiten, als letzter Schritt vor dem
+        # Hochladen -- siehe Kopf von werkzeuge/verdichten/verdichten.mjs.
+        # continue-on-error: Klappt es nicht, geht die Seite unverdichtet
+        # hoch (nur groesser), statt den ganzen Deploy anzuhalten.
+        continue-on-error: true
+        run: node werkzeuge/verdichten/verdichten.mjs dist
+
       - name: Nach Hostpoint hochladen (FTPS)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -1185,6 +1202,12 @@ jobs:
           echo "Buendel fuer guardops.ch:"
           find dist-guardops -type f | sort
 
+      - name: HTML verdichten (dist-guardops)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_GUARDOPS_FTP_HOST != '' }}
+        # Wie oben bei dist/ (werkzeuge/verdichten/verdichten.mjs).
+        continue-on-error: true
+        run: node werkzeuge/verdichten/verdichten.mjs dist-guardops
+
       - name: Homepage nach guardops.ch hochladen (FTPS)
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_GUARDOPS_FTP_HOST != '' }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -1287,6 +1310,7 @@ jobs:
           cp backend/demo_zugang.php   dist-betreiber/demo_zugang.php
           # Die gemeinsame Mailgestaltung -- demo_zugang.php bindet sie selbst ein.
           cp backend/mail_vorlage.php  dist-betreiber/mail_vorlage.php
+          cp backend/mail_gestaltung.php dist-betreiber/mail_gestaltung.php
           cp backend/demo_bestaetigung.php dist-betreiber/demo_bestaetigung.php
           # Das Logo der Signatur -- flach neben die Vorlage, die es von dort liest.
           cp backend/guardops-signatur.png     dist-betreiber/guardops-signatur.png
@@ -1316,6 +1340,7 @@ jobs:
           cp backend/gavzeit.php       dist-betreiber/gavzeit.php
           cp backend/lohnlauf.php      dist-betreiber/lohnlauf.php
           cp backend/logbuch.php       dist-betreiber/logbuch.php
+          cp backend/betreiber_finanzen.php dist-betreiber/betreiber_finanzen.php
           cp backend/lohn.php          dist-betreiber/lohn.php
           # Rechenkern der zentralen Mandanten-Einrichtung (ENT-612):
           # api/betreiber_schema_pruefen.php richtet ueber
@@ -1586,6 +1611,12 @@ jobs:
           echo "Buendel fuer betreiber.guardops.ch:"
           find dist-betreiber -type f | sort
 
+      - name: HTML verdichten (dist-betreiber)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_BETREIBER_FTP_HOST != '' }}
+        # Wie oben bei dist/ (werkzeuge/verdichten/verdichten.mjs).
+        continue-on-error: true
+        run: node werkzeuge/verdichten/verdichten.mjs dist-betreiber
+
       - name: Betreiber-Bereich nach betreiber.guardops.ch hochladen (FTPS)
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_BETREIBER_FTP_HOST != '' }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -1663,6 +1694,7 @@ jobs:
           cp backend/anmeldung.php     dist-portal/anmeldung.php
           cp backend/rundgang.php      dist-portal/rundgang.php
           cp backend/mailer.php        dist-portal/mailer.php
+          cp backend/mail_gestaltung.php dist-portal/mail_gestaltung.php
           cp backend/api/portal_*.php  dist-portal/api/
           cp htaccess-portal           dist-portal/.htaccess
           cat htaccess-leistung >>     dist-portal/.htaccess
@@ -1722,6 +1754,12 @@ jobs:
 
           echo "Buendel fuer portal.guardops.ch:"
           find dist-portal -type f | sort
+
+      - name: HTML verdichten (dist-portal)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_PORTAL_FTP_HOST != '' }}
+        # Wie oben bei dist/ (werkzeuge/verdichten/verdichten.mjs).
+        continue-on-error: true
+        run: node werkzeuge/verdichten/verdichten.mjs dist-portal
 
       - name: Kundenportal nach portal.guardops.ch hochladen (FTPS)
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_PORTAL_FTP_HOST != '' }}
@@ -1819,6 +1857,7 @@ jobs:
           # Siehe dist/: betreiber.php braucht diesen Rechenkern (ENT-600).
           cp backend/demo_zugang.php dist-cupi24/demo_zugang.php
           cp backend/mail_vorlage.php dist-cupi24/mail_vorlage.php
+          cp backend/mail_gestaltung.php dist-cupi24/mail_gestaltung.php
           cp backend/demo_bestaetigung.php dist-cupi24/demo_bestaetigung.php
           cp backend/guardops-signatur.png dist-cupi24/guardops-signatur.png
           cp backend/guardops-signatur-hell.png dist-cupi24/guardops-signatur-hell.png
@@ -1841,6 +1880,7 @@ jobs:
           cp backend/rechte.php dist-cupi24/rechte.php
           cp backend/neuerungen.php dist-cupi24/neuerungen.php
           cp backend/logbuch.php dist-cupi24/logbuch.php
+          cp backend/betreiber_finanzen.php dist-cupi24/betreiber_finanzen.php
           cp backend/ereignisse.php dist-cupi24/ereignisse.php
           cp backend/auslagen.php dist-cupi24/auslagen.php
           cp backend/rundgang.php dist-cupi24/rundgang.php
@@ -2062,6 +2102,12 @@ jobs:
 
           echo "Buendel fuer cupi24.guardops.ch:"
           find dist-cupi24 -type f | sort
+
+      - name: HTML verdichten (dist-cupi24)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_CUPI24_FTP_HOST != '' }}
+        # Wie oben bei dist/ (werkzeuge/verdichten/verdichten.mjs).
+        continue-on-error: true
+        run: node werkzeuge/verdichten/verdichten.mjs dist-cupi24
 
       - name: Rapport-Tool nach cupi24.guardops.ch hochladen (FTPS)
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_CUPI24_FTP_HOST != '' }}
@@ -2521,6 +2567,12 @@ jobs:
       # WIRKLICH auf <Elternordner>/demoN zeigen. Stimmt das nicht, laedt
       # der Upload erfolgreich an eine unbediente Stelle, und die Adresse
       # bleibt bei 403 -- ohne dass der Lauf etwas meldet.
+      - name: HTML verdichten (dist-demo)
+        if: ${{ env.UMGEBUNG == 'production' }}
+        # Wie oben bei dist/ (werkzeuge/verdichten/verdichten.mjs).
+        continue-on-error: true
+        run: node werkzeuge/verdichten/verdichten.mjs dist-demo
+
       - name: demo1.guardops.ch beliefern (FTPS)
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_DEMO1_ZIEL != '' }}
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5

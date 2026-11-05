@@ -449,7 +449,7 @@ await page.evaluate(() => kuGoTab('uebersicht'));
 await page.waitForSelector('#kuTable table');
 calls = [];
 await page.click('button:has-text("Neuer Kunde")');
-await page.waitForSelector('#dlgKunde.on');
+await page.waitForSelector('#view-kundeform.on');
 await page.fill('#ku_name', 'Testkunde AG');
 await page.click('#kuBtn');
 await page.waitForTimeout(200);
@@ -486,7 +486,7 @@ check('Detailseite zeigt die Kundennummer', (await page.textContent('#kdSub')).i
 // die frühere zweite Kundenmaske in der Schublade gibt es nicht mehr.
 calls = [];
 await page.click('#kv-detail button:has-text("Bearbeiten")');
-await page.waitForSelector('#dlgKunde.on');
+await page.waitForSelector('#view-kundeform.on');
 await page.waitForTimeout(250);
 check('Bearbeiten oeffnet denselben Dialog mit den Kundendaten', (await page.inputValue('#ku_name')) === 'Muster Immobilien AG');
 check('Bearbeiten zeigt die vergebene Kundennummer', (await page.inputValue('#ku_kundennummer')) === 'K0001');
@@ -535,9 +535,9 @@ await page.click('#btnSprechen');
 await page.waitForSelector('#dlgSprechen.on');
 await page.fill('#gsText', 'Neuer Kunde Muster Immobilien AG, Musterstrasse 12, 4632 Trimbach');
 await page.click('#gsBtn');
-await page.waitForSelector('#dlgKunde.on');
+await page.waitForSelector('#view-kundeform.on');
 await page.waitForTimeout(300);
-check('Kunden-Diktat oeffnet das Pruef-Formular', await page.isVisible('#dlgKunde.on'));
+check('Kunden-Diktat oeffnet das Pruef-Formular', await page.isVisible('#view-kundeform.on'));
 check('KRITISCH: Kunden-Diktat speichert nichts', writes().length === 0);
 check('Kunden-Titel weist auf Pruefung hin', (await page.textContent('#kuTitel')).includes('prüfen'));
 check('Kundenname uebernommen', (await page.inputValue('#ku_name')) === 'Muster Immobilien AG');
@@ -572,11 +572,12 @@ check('Diktat- und Handeingabe zusammen gesendet', kcd
 await page.screenshot({ path: `${OUT}/13-diktat-kunde.png` });
 // Ohne Diktat bleibt der Dialog sauber
 await page.click('#view-kunden button:has-text("Neuer Kunde")');
-await page.waitForSelector('#dlgKunde.on');
+await page.waitForSelector('#view-kundeform.on');
 check('Handeingabe ohne Diktat-Hinweis', !(await page.isVisible('#kuKiHint')));
-check('Handeingabe ohne blaue Markierungen', (await page.$$('#dlgKunde .inp.ki')).length === 0);
+check('Handeingabe ohne blaue Markierungen', (await page.$$('#view-kundeform .inp.ki')).length === 0);
 check('Handeingabe mit leeren Feldern', (await page.inputValue('#ku_name')) === '');
-await page.keyboard.press('Escape');
+// Seit 16.10.2026 eine Seite statt eines Dialogs: zurueck ueber den Knopf.
+await page.click('#kuZurueck');
 await page.waitForTimeout(200);
 
 // ══════════ KUNDEN-RECHERCHE (Websuche) -- seit ENT-042 ein Knopf im
@@ -584,7 +585,7 @@ await page.waitForTimeout(200);
 // Ergänzt nur leere Felder, was schon eingetragen ist, bleibt unangetastet.
 calls = [];
 await page.click('#view-kunden button:has-text("Neuer Kunde")');
-await page.waitForSelector('#dlgKunde.on');
+await page.waitForSelector('#view-kundeform.on');
 check('Kein Diktat-Hinweis vor jeder Eingabe', !(await page.isVisible('#kuKiHint')));
 await page.click('#kuRechercheBtn');
 await page.waitForTimeout(200);
@@ -604,7 +605,7 @@ check('Recherchiertes Telefon landet in einer Kommunikationszeile',
 check('Name bleibt unmarkiert -- eingegeben, nicht recherchiert', !(await page.getAttribute('#ku_name', 'class') || '').includes('web'));
 check('Recherchiertes Feld gelb markiert', (await page.getAttribute('#ku_strasse', 'class')).includes('web'));
 check('Auch die herausgeloeste PLZ gilt als recherchiert', (await page.getAttribute('#ku_plz', 'class')).includes('web'));
-check('Genau 4 gelbe Felder (Strasse, PLZ, Ort, Telefonzeile)', (await page.$$('#dlgKunde .inp.web')).length === 4);
+check('Genau 4 gelbe Felder (Strasse, PLZ, Ort, Telefonzeile)', (await page.$$('#view-kundeform .inp.web')).length === 4);
 check('Leere Zeile unmarkiert',
   !((await page.getAttribute('#kuWegeListe .kw-reihe:nth-child(1) [data-kw="wert"]', 'class')) || '').match(/\b(ki|web)\b/));
 const rHint = await page.textContent('#kuKiText');

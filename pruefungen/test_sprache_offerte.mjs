@@ -151,9 +151,9 @@ check('Der Hinweis steht unter dem Feld, bündig links (gemessen)', lage.unter &
 
 await page.click('button[onclick="ofNeueAdresse()"]');
 await page.waitForTimeout(300);
-check('„Neue Adresse erstellen" öffnet den Kundendialog', await page.isVisible('#dlgKunde.on'));
+check('„Neue Adresse erstellen" öffnet den Kundendialog', await page.isVisible('#view-kundeform.on'));
 check('KRITISCH: ... mit dem gesagten Namen vorbefüllt', (await page.inputValue('#ku_name')) === 'Beispiel Neubau AG');
-await page.evaluate(() => closeDlg('dlgKunde'));
+await page.evaluate(() => kuFormSchliessen());
 
 // Wird ein bekannter Kunde gewählt, ist die Warnung erledigt.
 await page.fill('#of_kunde', 'Muster GmbH');

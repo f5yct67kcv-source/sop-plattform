@@ -47,6 +47,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/demo_zugang.php';
 require_once __DIR__ . '/demo_bestaetigung.php';
 require_once __DIR__ . '/logbuch.php';
+require_once __DIR__ . '/betreiber_finanzen.php';
 
 // ── Logbuch der Betreiber-Ebene (ENT-614) ────────────────────────────
 //
@@ -2439,7 +2440,10 @@ function be_tabellen(): array
   archiviert_am DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_be_demo_nutzung_archiv_reiter (reiter)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
-    ];
+    ]
+    // Finanzen der Betreiberin (ENT-725). Die Definitionen stehen mit ihrer
+    // Begruendung in backend/betreiber_finanzen.php.
+    + be_aus_tabellen();
 }
 
 // Legt an, was fehlt. Loescht nichts, leert nichts -- gefahrlos mehrfach
@@ -2494,6 +2498,10 @@ function be_spalten(): array
         // hier "noch nichts gelesen": Betreiber-Konten sind wenige und intern,
         // die ganze Liste zu sehen schadet niemandem.
         ['betreiber', 'neuerungen_gesehen_bis', "ALTER TABLE betreiber ADD COLUMN neuerungen_gesehen_bis INT UNSIGNED NULL DEFAULT NULL"],
+        // Persoenliche Darstellung (hell/dunkel, Glas) am Betreiber-Konto,
+        // gleiche Bauart wie mitarbeiter.einstellungen im Cockpit (ENT-722).
+        // NULL heisst "noch nie gespeichert".
+        ['betreiber', 'einstellungen', "ALTER TABLE betreiber ADD COLUMN einstellungen TEXT NULL"],
         ['betreiber', 'anrede',   "ALTER TABLE betreiber ADD COLUMN anrede VARCHAR(20) NOT NULL DEFAULT '' AFTER name"],
         ['betreiber', 'nachname', "ALTER TABLE betreiber ADD COLUMN nachname VARCHAR(100) NOT NULL DEFAULT '' AFTER anrede"],
         ['betreiber', 'vorname',  "ALTER TABLE betreiber ADD COLUMN vorname VARCHAR(100) NOT NULL DEFAULT '' AFTER anrede"],
@@ -2715,6 +2723,11 @@ function be_spalten_anlegen(PDO $pdo, bool $nurPruefen = false): array
     if (!$nurPruefen) {
         $zahl = be_namen_nachtragen($pdo);
         if ($zahl > 0) { $getan[] = 'Namensteile fuer ' . $zahl . ' Betreiber-Konten nachgetragen'; }
+    }
+    // Die Startkategorien der Ausgaben (ENT-725), nur in eine leere Tabelle.
+    if (!$nurPruefen) {
+        $zahl = be_aus_kategorien_nachtragen($pdo);
+        if ($zahl > 0) { $getan[] = $zahl . ' Startkategorien fuer Ausgaben angelegt'; }
     }
     // Und die Auswahlwerte, die einer bestehenden Spalte fehlen (ENT-637).
     // NACH den Spalten: Eine Spalte, die dieser Lauf erst angelegt hat,

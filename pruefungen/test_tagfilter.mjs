@@ -324,7 +324,9 @@ const tabsD = await d.evaluate(() => [...document.querySelectorAll('#navg-planun
   .filter(x => x.getClientRects().length)
   .map(x => { const r = x.getBoundingClientRect(); return { t: x.textContent.trim(), l: r.left, w: r.width }; })
   .sort((a, b) => a.l - b.l));
-check('Desktop: Reiterreihenfolge unverändert', tabsD[0].t === 'Übersicht' && tabsD[3].t === 'Tagesplan');
+// Tagesplan direkt nach der Uebersicht (Projektinhaber, 2026-10-16).
+check('Desktop: Reiterreihenfolge Übersicht, Tagesplan, Einsätze, Objektplanung',
+  tabsD.map(x => x.t).join('|') === 'Übersicht|Tagesplan|Einsätze|Objektplanung');
 // Die "nicht gestreckt"-Pruefung (ENT-069) galt der frueheren .tabs-Zeile im
 // Seiteninhalt, die per flex ueber die volle Breite verteilte. Die neuen
 // .nav-kind-Knoepfe (ENT-233) sind Sidebar-/Kopfzeilen-Elemente ohne
