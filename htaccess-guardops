@@ -39,7 +39,7 @@ DirectoryIndex index.html
 # Datenbank-Zugangsdaten traegt (der Deploy laesst die __DB_*__-Platzhalter
 # stehen). Die Sperre ist trotzdem richtig: Sie darf nicht davon abhaengen,
 # dass jemand sich an diese Besonderheit erinnert.
-<FilesMatch "^(db|mailer|demo_anfrage|demo_bremse)\.php$">
+<FilesMatch "^(db|mailer|demo_anfrage|demo_bremse|termine_kalender|kalender_zugang)\.php$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>

@@ -778,6 +778,66 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     bilder.length >= 2 && fehlendeBilder.length === 0);
   if (fehlendeBilder.length) { bad.push('fehlt im guardops-Bündel: ' + fehlendeBilder.join(', ')); }
 
+  // Vorschaubild fuer geteilte Links (2026-10-14). Steht als absolute
+  // Adresse in og:image; die Datei dahinter muss im Repository liegen, ins
+  // Buendel kommen und die angegebenen Masse haben. Gelesen aus dem
+  // JPEG-Kopf, nicht aus den Metaangaben -- die koennten luegen.
+  const ogBild = (homepage.match(/<meta property="og:image" content="https:\/\/guardops\.ch\/([^"]+)"/) || [])[1];
+  const jpegMasse = pfad => {
+    const d = readFileSync(pfad);
+    for (let i = 2; i < d.length - 9;) {
+      if (d[i] !== 0xFF) { return null; }
+      const typ = d[i + 1], len = d.readUInt16BE(i + 2);
+      if (typ >= 0xC0 && typ <= 0xC3) { return { h: d.readUInt16BE(i + 5), w: d.readUInt16BE(i + 7) }; }
+      i += 2 + len;
+    }
+    return null;
+  };
+  const masse = ogBild && existsSync(`${WURZEL}/${ogBild}`) && /\.jpe?g$/.test(ogBild) ? jpegMasse(`${WURZEL}/${ogBild}`) : null;
+  const angegeben = { w: +(homepage.match(/og:image:width" content="(\d+)"/) || [])[1], h: +(homepage.match(/og:image:height" content="(\d+)"/) || [])[1] };
+  check('KRITISCH: das Vorschaubild steht als absolute Adresse auf guardops.ch, liegt im Repository und wird ins Bündel kopiert',
+    !!ogBild && existsSync(`${WURZEL}/${ogBild}`) && wirdKopiert(ogBild));
+  check('Das Vorschaubild hat die angegebenen Masse, und die sind 1200 x 630',
+    !!masse && masse.w === angegeben.w && masse.h === angegeben.h && masse.w === 1200 && masse.h === 630);
+  check('og:url ist die kanonische Adresse',
+    (homepage.match(/<meta property="og:url" content="([^"]+)"/) || [])[1] === (homepage.match(/<link rel="canonical" href="([^"]+)"/) || [])[1]);
+
+  // Terminbuchung (ENT-731): Seite, Endpunkt und Kalenderlogik kommen ins
+  // guardops-Buendel, und der Deploy schreibt die Zugangsdatei dorthin --
+  // sonst sagte die Seite live dauerhaft "nicht eingerichtet". Die
+  // Zugangsdatei ist gesperrt wie db.php und mailer.php.
+  {
+    const htGuardops = readFileSync(`${WURZEL}/htaccess-guardops`, 'utf8');
+    const gesperrt = (htGuardops.match(/<FilesMatch "\^\(([^)]+)\)\\\.php\$">/) || [])[1] || '';
+    check('KRITISCH: Buchungsseite, Termin-Endpunkt und Kalenderlogik kommen ins guardops-Bündel',
+      wirdKopiert('gespraech.html') && liegtImBuendel('dist-guardops/api/termine.php') && liegtImBuendel('dist-guardops/termine_kalender.php'));
+    check('KRITISCH: der Deploy schreibt den Kalenderzugang ins guardops-Bündel, aus den Secrets',
+      /dist-guardops\/kalender_zugang\.php/.test(bauen) && ['URL', 'BENUTZER', 'PASSWORT'].every(k => bauen.includes('EFF_GUARDOPS_KALENDER_' + k)));
+    check('KRITISCH: Kalenderlogik und Kalenderzugang sind auf guardops.ch nicht direkt abrufbar',
+      gesperrt.split('|').includes('termine_kalender') && gesperrt.split('|').includes('kalender_zugang'));
+  }
+
+  // Strukturierte Daten: gueltiges JSON, und Firma, Adresse und
+  // Unternehmensnummer sagen dasselbe wie das Impressum. Eine geaenderte
+  // Adresse im Impressum ohne Nachzug hier waere eine falsche Angabe an Google.
+  {
+    const roh = (homepage.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/) || [])[1];
+    let daten = null; try { daten = JSON.parse(roh); } catch (e) { /* bleibt null */ }
+    const knoten = daten && daten['@graph'] || [];
+    const firma = knoten.find(k => k['@type'] === 'Organization') || {};
+    const software = knoten.find(k => k['@type'] === 'SoftwareApplication') || {};
+    const impressum = readFileSync(`${WURZEL}/impressum.html`, 'utf8').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    const a = firma.address || {};
+    check('KRITISCH: die strukturierten Daten sind gültiges JSON mit Firma und Software',
+      !!daten && !!firma.name && !!software.name);
+    check('KRITISCH: Firma, Adresse und Unternehmensnummer in den strukturierten Daten stehen so im Impressum',
+      [firma.name, a.streetAddress, a.postalCode, a.addressLocality, firma.identifier, firma.email]
+        .every(w => typeof w === 'string' && w && impressum.includes(w)));
+    const bezuege = [firma.logo, software.image].map(u => (u || '').replace('https://guardops.ch/', ''));
+    check('Logo und Bild in den strukturierten Daten liegen im Repository und kommen ins Bündel',
+      bezuege.every(b => b && existsSync(`${WURZEL}/${b}`) && wirdKopiert(b)));
+  }
+
   // Die Einbindungen des Endpunkts, aus dem Endpunkt gelesen.
   const endpunkt = readFileSync(`${WURZEL}/backend/api/demo_senden.php`, 'utf8');
   const noetig = [...endpunkt.matchAll(/require __DIR__ \. '\/\.\.\/([a-z_]+\.php)'/g)].map(m => m[1]);
@@ -2464,8 +2524,17 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
       gelesen.add(pfad);
       const voll = `${WURZEL}/backend/${pfad}`;
       if (!existsSync(voll)) { continue; }
-      for (const m of readFileSync(voll, 'utf8')
-        .matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g)) {
+      const quelle = readFileSync(voll, 'utf8');
+      // Ein Modul, dessen Fehlen der Endpunkt SELBST abfaengt, ist hier keine
+      // Luecke (ENT-731: api/termine.php fragt is_file() und antwortet
+      // "nicht eingerichtet", die Kalenderlogik liegt nur auf guardops.ch).
+      // Zaehlt nur, wenn die Abfrage VOR dem require steht -- dahinter waere
+      // sie zu spaet.
+      const abgefangen = new Set([...quelle.matchAll(/if \(!is_file\(__DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'\)\)/g)]
+        .filter(m => { const r = quelle.indexOf(`require __DIR__ . '/../${m[1]}'`); return r < 0 || m.index < r; })
+        .map(m => m[1]));
+      for (const m of quelle.matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g)) {
+        if (abgefangen.has(m[1])) { continue; }
         gefunden.add(m[1]);
         zuLesen.push(m[1]);
       }
@@ -2831,6 +2900,42 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
   // ueberschreiben.
   check('KRITISCH: htaccess-leistung setzt keinen Cache-Kopf fuer PHP-Antworten',
     !/FilesMatch[^>]*php/i.test(regeln));
+}
+
+// ── Sitemap fuer guardops.ch ───────────────────────────────────────────
+// Die Sitemap nennt genau die Seiten, die (1) ins guardops-Buendel kopiert
+// werden, (2) nicht auf noindex stehen und (3) eine kanonische Adresse auf
+// guardops.ch tragen. Abgeleitet aus dem Workflow und den Dateien, nicht
+// aus einer zweiten Liste -- eine neue Rechtsseite ohne Sitemap-Eintrag
+// schlaegt hier an, eine geloeschte mit Eintrag ebenso.
+{
+  const karte = existsSync(`${WURZEL}/sitemap-guardops.xml`) ? readFileSync(`${WURZEL}/sitemap-guardops.xml`, 'utf8') : '';
+  const genannt = new Set([...karte.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1]));
+  const sollte = new Set();
+  for (const m of workflow.matchAll(/^\s*cp\s+(\S+\.html)\s+dist-guardops\/(\S+\.html)\s*$/gm)) {
+    const quelle = `${WURZEL}/${m[1]}`;
+    if (!existsSync(quelle)) { continue; }
+    const html = readFileSync(quelle, 'utf8');
+    if (/<meta name="robots" content="[^"]*noindex/i.test(html)) { continue; }
+    const kan = html.match(/<link rel="canonical" href="(https:\/\/guardops\.ch\/[^"]*)"/);
+    if (kan) { sollte.add(kan[1]); }
+  }
+  const fehlt = [...sollte].filter(u => !genannt.has(u));
+  const zuviel = [...genannt].filter(u => !sollte.has(u));
+  check('KRITISCH: die Sitemap nennt jede indexierbare Seite von guardops.ch', sollte.size > 0 && fehlt.length === 0);
+  if (fehlt.length) { bad.push('fehlt in der Sitemap: ' + fehlt.join(', ')); }
+  check('KRITISCH: die Sitemap nennt keine Seite, die nicht ausgeliefert oder auf noindex ist', zuviel.length === 0);
+  if (zuviel.length) { bad.push('zu viel in der Sitemap: ' + zuviel.join(', ')); }
+  // Gueltiges XML: "--" in einem Kommentar macht die Datei unlesbar, und
+  // Google verwirft sie dann ganz (so beim ersten Entwurf passiert).
+  const kommentare = [...karte.matchAll(/<!--([\s\S]*?)-->/g)].map(m => m[1]);
+  check('KRITISCH: die Sitemap ist wohlgeformt (XML-Kopf, urlset, kein "--" in Kommentaren)',
+    /^<\?xml version="1\.0" encoding="UTF-8"\?>/.test(karte) && /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">[\s\S]*<\/urlset>\s*$/.test(karte)
+    && kommentare.every(k => !k.includes('--')));
+  check('Die Sitemap wird als sitemap.xml ins guardops-Buendel kopiert',
+    /cp\s+sitemap-guardops\.xml\s+dist-guardops\/sitemap\.xml/.test(workflow));
+  check('robots.txt von guardops.ch verweist auf die Sitemap',
+    /^Sitemap:\s*https:\/\/guardops\.ch\/sitemap\.xml\s*$/m.test(readFileSync(`${WURZEL}/robots-guardops.txt`, 'utf8')));
 }
 
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);

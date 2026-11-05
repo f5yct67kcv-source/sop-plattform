@@ -1029,6 +1029,13 @@ const OHNE_ANMELDUNG = [
   // Betriebsstammdaten, Honigtopf-Feld, eigene Bremse. Eigene Pruefung:
   // pruef_demo_anfrage.php.
   'demo_senden.php',
+  // Terminbuchung "Betrieb besprechen" auf guardops.ch (ENT-731). Wer
+  // bucht, ist ein Interessent ohne Konto -- dieselbe Lage wie bei
+  // demo_senden.php und dieselben Riegel: Bremse (Namensraum "termin:"),
+  // Fallenfeld und Zeitfalle, feste Feldliste, Empfaenger und Kalender-
+  // zugang aus dem Deploy. Absagen nur mit der HMAC-Signatur aus der
+  // Bestaetigung. Eigene Pruefung: test_termine.mjs.
+  'termine.php',
   // Der Eingang der Betreiber-Ebene (ENT-524). Kann keine Sitzung
   // verlangen, die er erst erzeugt -- dieselbe Begruendung wie login.php.
   // Erbt Bremse (eigener Namensraum "betreiber:"), Blindpruefung gegen

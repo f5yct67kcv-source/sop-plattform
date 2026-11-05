@@ -159,6 +159,13 @@ jobs:
           P_GUARDOPS_SMTP_VERSCHLUESSELUNG: ${{ secrets.GUARDOPS_SMTP_VERSCHLUESSELUNG }}
           P_GUARDOPS_SMTP_USER: ${{ secrets.GUARDOPS_SMTP_USER }}
           P_GUARDOPS_SMTP_PASSWORD: ${{ secrets.GUARDOPS_SMTP_PASSWORD }}
+          # Terminbuchung "Betrieb besprechen" (ENT-731, ENT-733): Zugang zum
+          # eigenen GuardOpS-Kalender in Hostpoint Cloud Office -- nicht der
+          # von formateins. Fehlt einer, ist die Buchung aus und
+          # gespraech.html sagt "nicht eingerichtet".
+          P_GUARDOPS_KALENDER_URL: ${{ secrets.GUARDOPS_KALENDER_URL }}
+          P_GUARDOPS_KALENDER_BENUTZER: ${{ secrets.GUARDOPS_KALENDER_BENUTZER }}
+          P_GUARDOPS_KALENDER_PASSWORT: ${{ secrets.GUARDOPS_KALENDER_PASSWORT }}
           # Eigener FTP-Zugang fuer betreiber.guardops.ch, beschraenkt auf
           # /home/itufeden/betreiber.guardops.ch (ENT-580, erste Etappe des
           # schrittweisen Umzugs weg von itufeden.myhostpoint.ch). Eigene
@@ -315,6 +322,9 @@ jobs:
             EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG="$P_GUARDOPS_SMTP_VERSCHLUESSELUNG"
             EFF_GUARDOPS_SMTP_USER="$P_GUARDOPS_SMTP_USER"
             EFF_GUARDOPS_SMTP_PASSWORD="$P_GUARDOPS_SMTP_PASSWORD"
+            EFF_GUARDOPS_KALENDER_URL="$P_GUARDOPS_KALENDER_URL"
+            EFF_GUARDOPS_KALENDER_BENUTZER="$P_GUARDOPS_KALENDER_BENUTZER"
+            EFF_GUARDOPS_KALENDER_PASSWORT="$P_GUARDOPS_KALENDER_PASSWORT"
             EFF_BETREIBER_FTP_HOST="$P_BETREIBER_FTP_HOST"
             EFF_BETREIBER_FTP_USER="$P_BETREIBER_FTP_USER"
             EFF_BETREIBER_FTP_PASSWORD="$P_BETREIBER_FTP_PASSWORD"
@@ -402,6 +412,9 @@ jobs:
             EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG=""
             EFF_GUARDOPS_SMTP_USER=""
             EFF_GUARDOPS_SMTP_PASSWORD=""
+            EFF_GUARDOPS_KALENDER_URL=""
+            EFF_GUARDOPS_KALENDER_BENUTZER=""
+            EFF_GUARDOPS_KALENDER_PASSWORT=""
             # betreiber.guardops.ch ist wie guardops.ch nur fuer Production
             # gedacht (ENT-580) -- dieselbe Begruendung wie bei
             # EFF_GUARDOPS_FTP_* direkt darueber.
@@ -557,6 +570,9 @@ jobs:
             echo "EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG=$EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG"
             echo "EFF_GUARDOPS_SMTP_USER=$EFF_GUARDOPS_SMTP_USER"
             echo "EFF_GUARDOPS_SMTP_PASSWORD=$EFF_GUARDOPS_SMTP_PASSWORD"
+            echo "EFF_GUARDOPS_KALENDER_URL=$EFF_GUARDOPS_KALENDER_URL"
+            echo "EFF_GUARDOPS_KALENDER_BENUTZER=$EFF_GUARDOPS_KALENDER_BENUTZER"
+            echo "EFF_GUARDOPS_KALENDER_PASSWORT=$EFF_GUARDOPS_KALENDER_PASSWORT"
             echo "EFF_BETREIBER_FTP_HOST=$EFF_BETREIBER_FTP_HOST"
             echo "EFF_BETREIBER_FTP_USER=$EFF_BETREIBER_FTP_USER"
             echo "EFF_BETREIBER_FTP_PASSWORD=$EFF_BETREIBER_FTP_PASSWORD"
@@ -1098,6 +1114,7 @@ jobs:
           # Rechteck, und lokal faellt es nicht auf.
           mkdir -p dist-guardops/homepage-bilder
           cp homepage-bilder/*.webp               dist-guardops/homepage-bilder/
+          cp homepage-bilder/vorschau.jpg         dist-guardops/homepage-bilder/
 
           # Der Endpunkt und seine vier Einbindungen. KEIN anmeldung.php und
           # kein Produktcode -- die Seite hat mit dem Rapport-Tool nichts zu
@@ -1107,6 +1124,12 @@ jobs:
           cp backend/mailer.php          dist-guardops/mailer.php
           cp backend/demo_anfrage.php    dist-guardops/demo_anfrage.php
           cp backend/demo_bremse.php     dist-guardops/demo_bremse.php
+          # Terminbuchung "Betrieb besprechen" (ENT-731). Die Seite, der
+          # Endpunkt und seine Kalenderlogik -- die liegt NUR hier: Im Buendel
+          # der Software antwortet api/termine.php darum "nicht eingerichtet".
+          cp gespraech.html              dist-guardops/gespraech.html
+          cp backend/api/termine.php     dist-guardops/api/termine.php
+          cp backend/termine_kalender.php dist-guardops/termine_kalender.php
           # Rechtsseiten (OP-564). Beide teilen sich recht.css -- zweimal
           # derselbe Stil inline hiesse, dass beim naechsten Farbwechsel
           # eine von beiden vergessen wird. test_deploy.mjs leitet aus den
@@ -1159,6 +1182,7 @@ jobs:
           cp htaccess-guardops           dist-guardops/.htaccess
           cat htaccess-leistung >>       dist-guardops/.htaccess
           cp robots-guardops.txt         dist-guardops/robots.txt
+          cp sitemap-guardops.xml        dist-guardops/sitemap.xml
 
           # HIER STEHEN ABSICHTLICH KEINE DATENBANK-ZUGANGSDATEN. db.php wird
           # frisch aus backend/ kopiert und bekommt NUR APP_ENV -- die
@@ -1210,6 +1234,18 @@ jobs:
           # (ENT-523, erst mit diesem Merge zusammengefuehrt).
           sed -i "s|__DEMO_TESTMAIL__||g"                                 dist-guardops/mailer.php
           sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g"           dist-guardops/demo_anfrage.php
+          # Kalenderzugang (ENT-731, ENT-733): eine eigene Datei aus den
+          # Secrets, kein Platzhalter im Quelltext. Per Python statt sed, weil
+          # ein Passwort "|", "&" oder "'" enthalten darf. Fehlt ein Secret,
+          # entsteht die Datei nicht -- dann ist die Buchung "nicht
+          # eingerichtet". Auch die Kalenderadresse kommt aus einem Secret:
+          # Sie gehoert zum GuardOpS-Postfach und steht nicht im Repository.
+          python3 -c 'import os
+          u=os.environ.get("EFF_GUARDOPS_KALENDER_URL","")
+          b=os.environ.get("EFF_GUARDOPS_KALENDER_BENUTZER",""); p=os.environ.get("EFF_GUARDOPS_KALENDER_PASSWORT","")
+          q=lambda w: chr(39)+w.replace(chr(92),chr(92)*2).replace(chr(39),chr(92)+chr(39))+chr(39)
+          if u and b and p:
+              open("dist-guardops/kalender_zugang.php","w",encoding="utf-8").write("<?php\nreturn [\x27url\x27 => "+q(u)+", \x27benutzer\x27 => "+q(b)+", \x27passwort\x27 => "+q(p)+"];\n")'
 
           # Kein uebersehener Platzhalter darf hochgeladen werden. Erlaubt
           # bleiben genau die zwei Familien, die HIER absichtlich stehen:
