@@ -2088,16 +2088,16 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
   check('KRITISCH: store-hochladen.sh bildet die Buildnummer in einer eigenen Funktion', !!bn);
   if (bn) {
     const um = t => sh(`date() { command date -d '${t}' "$@"; }\n${bn}\nbuildnummer`).aus;
-    const a = um('2026-11-05 09:59 UTC'), b = um('2026-11-05 10:00 UTC'), c = um('2027-01-01 00:00 UTC');
+    const a = um('2031-12-31 23:59 UTC'), b = um('2032-01-01 00:00 UTC'), c = um('2032-01-01 00:01 UTC');
     const teile = s => s.split('.').map(Number);
     const groesser = (x, y) => { const [p, q] = [teile(x), teile(y)];
       for (let i = 0; i < Math.max(p.length, q.length); i++) {
         if ((p[i] || 0) !== (q[i] || 0)) { return (p[i] || 0) > (q[i] || 0); } } return false; };
     check(`Store: die Buildnummer hat die Form, die Apple annimmt (${a})`,
       /^\d+(\.\d+){0,2}$/.test(a));
-    check('KRITISCH: Store: eine Minute spaeter ist die Buildnummer groesser',
-      groesser(b, a));
     check('KRITISCH: Store: auch ueber den Jahreswechsel steigt sie',
+      groesser(b, a));
+    check('KRITISCH: Store: eine Minute spaeter ist die Buildnummer groesser',
       groesser(c, b));
   }
 
