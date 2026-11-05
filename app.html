@@ -5092,6 +5092,10 @@ function zeichneRapport() {
 // "Schluesselverwaltung" ist inhaltlich entschieden (ENT-149), aber noch
 // nicht gebaut -- gleicher Platzhalter-Umgang wie bei den Betrieb-Kacheln
 // in dashboard.html (onclick -> toast).
+// IN DER APP-HUELLE FEHLT SIE GANZ (ENT-732): Apple weist eine App ab, die
+// sichtbar Unfertiges zeigt (Richtlinie 2.1) -- eine Kachel, die nur
+// "folgt spaeter" sagt, ist genau das. Im Browser bleibt sie als ehrlicher
+// Hinweis stehen. Wird die Schluesselverwaltung gebaut, entfaellt die Weiche.
 function zeichneWaechter() {
   $('v-waechter').innerHTML = `
     <div class="mk-grid">
@@ -5107,10 +5111,11 @@ function zeichneWaechter() {
         <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 14 18 8z"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg></span>
         <span class="mk-kachel-txt" id="mk-revierinfo-txt"><span class="mk-kachel-lbl">${esc(w('mitWaechterKachel'))}</span></span>
       </button>
+      ${nativeAppHuelle() ? '' : `
       <button type="button" id="mk-schluessel" class="mk-kachel" onclick="toast('Folgt in einem späteren Schritt.')">
         <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="7" cy="15" r="4"/><line x1="10" y1="12" x2="20" y2="2"/><line x1="15" y1="7" x2="18" y2="10"/><line x1="18" y1="4" x2="21" y2="7"/></svg></span>
         <span class="mk-kachel-txt"><span class="mk-kachel-lbl">${esc(w('waechterSchluesselLbl'))}</span></span>
-      </button>
+      </button>`}
     </div>`;
   fzuKachelHinweisZeigen();
   mitKachelHinweisZeigen();

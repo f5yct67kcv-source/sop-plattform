@@ -23,11 +23,19 @@ const schicht = (overrides = {}) => ({
   im_team: 1, hat_kontrollpunkte: true, ...overrides,
 });
 
-async function neueSeite(schichten, extraRoutes, profilUeberschreibung) {
+async function neueSeite(schichten, extraRoutes, profilUeberschreibung, nativ) {
   const rufe = [];
   const browser = await chromium.launch({ executablePath: EXE });
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   page.on('pageerror', e => bad.push('JS-Fehler: ' + e.message));
+  // Die App-Huelle (ENT-732): Capacitor meldet sich als nativ, der Betrieb
+  // ist schon gewaehlt -- sonst verlangt die Anmeldung zuerst den Kurznamen.
+  if (nativ) {
+    await page.addInitScript(() => {
+      window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios', Plugins: {} };
+      try { localStorage.setItem('sop_mandant', 'musterag'); } catch (e) {}
+    });
+  }
   await page.route('**/api/**', route => {
     const req = route.request(), u = req.url(), p = u.split('/api/')[1].split('?')[0];
     let body = null;
@@ -55,6 +63,33 @@ async function neueSeite(schichten, extraRoutes, profilUeberschreibung) {
   await page.fill('#gName', 'a'); await page.fill('#gPass', 'x'); await page.click('#gBtn');
   await page.waitForSelector('#app.on'); await page.waitForTimeout(500);
   return { browser, page, rufe };
+}
+
+// ══════ IN DER APP-HUELLE: KEIN PLATZHALTER (ENT-732) ═════════════════
+// Apple weist Apps mit sichtbar Unfertigem ab (Richtlinie 2.1). In der
+// iOS-App darf der Waechter-Bereich darum keine Kachel zeigen, die nur
+// "folgt spaeter" meldet -- gemessen wird das Ergebnis, nicht eine Kachel-
+// ID: Kein Knopf im Bereich darf beim Antippen diesen Hinweis ausloesen.
+// Die uebrigen Kacheln muessen dabei bleiben, sonst waere "leer" gruen.
+{
+  const { browser, page } = await neueSeite([schicht()], null, null, true);
+  await page.click('#t-waechter'); await page.waitForTimeout(250);
+  check('App-Hülle: der Wächter-Bereich zeigt Rundgänge, Fahrzeug und Revier-Infos weiterhin',
+    await page.isVisible('#mk-rundgang') && await page.isVisible('#mk-fahrzeug') && await page.isVisible('#mk-revierinfo'));
+  const knoepfe = await page.locator('#v-waechter .mk-kachel').count();
+  let platzhalter = 0;
+  for (let i = 0; i < knoepfe; i++) {
+    const k = page.locator('#v-waechter .mk-kachel').nth(i);
+    const oc = await k.getAttribute('onclick') || '';
+    // Nur Kacheln antippen, die keinen Dialog oeffnen -- ein Platzhalter
+    // ist genau eine, die nichts tut ausser einer Meldung.
+    if (!/toast\(/.test(oc)) { continue; }
+    await k.click(); await page.waitForTimeout(150);
+    if (((await page.textContent('#toast')) || '').includes('späteren Schritt')) { platzhalter++; }
+  }
+  check('KRITISCH: App-Hülle: keine Kachel meldet „Folgt in einem späteren Schritt" — Apple lehnt sichtbar Unfertiges ab',
+    knoepfe >= 3 && platzhalter === 0);
+  await browser.close();
 }
 
 // ══════ TEIL 1: Wächter-Reiter erscheint mit Berechtigung, mit zwei Kacheln
