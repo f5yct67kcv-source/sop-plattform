@@ -93,6 +93,32 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
   check('KRITISCH: die Behauptung "ohne Zustimmung nichts von fremden Servern" stimmt mit dem Code ueberein',
     !holtFremd && /fremden Servern/i.test(datenschutz));
 
+  // Gespraechsbuchung (ENT-731): Gibt es die Seite, muss die Erklaerung sie
+  // beschreiben -- mit jedem Feld, das die Seite tatsaechlich an den Server
+  // schickt, und mit kMeet genau dann, wenn der Server kMeet-Raeume vergibt.
+  {
+    const seite = lies('gespraech.html');
+    const logik = lies('backend/termine_kalender.php');
+    const flachDs = datenschutz.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    // Das Fallenfeld "website" ist keine Angabe eines Menschen -- Abschnitt 3
+    // beschreibt es ("Ein unsichtbares Feld").
+    const gesendet = [...seite.matchAll(/feld\('([a-z]+)'\)\.value/g)].map(m => m[1]).filter(f => f !== 'website');
+    const benannt = { firma: /Betrieb/, name: /Name/, telefon: /Telefonnummer/, email: /E-Mail-Adresse/ };
+    const abschnitt = (flachDs.match(/Wenn Sie ein Gespräch buchen([\s\S]*?)Schutz vor Massenanfragen/) || [])[1] || '';
+    check('KRITISCH: die Erklaerung hat einen Abschnitt zur Gespraechsbuchung, sobald es die Seite gibt',
+      !seite || abschnitt.length > 200);
+    // Gezaehlt wird nur die hervorgehobene Liste unter "Was erhoben wird" --
+    // "Betrieb" steht im Abschnitt sonst schon im Link "Betrieb besprechen".
+    const erhoben = ((abschnitt.match(/Was erhoben wird([\s\S]*?)Was damit geschieht/) || [])[1] || '');
+    const liste = ((datenschutz.match(/Wenn Sie ein Gespräch buchen[\s\S]*?<strong>([\s\S]*?)<\/strong>/) || [])[1] || '').replace(/\s+/g, ' ');
+    const unbenannt = [...new Set(gesendet)].filter(f => !(benannt[f] && benannt[f].test(liste) && erhoben.includes(liste.trim())));
+    check('KRITISCH: jedes Feld, das die Buchungsseite schickt, nennt die Erklaerung',
+      gesendet.length >= 4 && unbenannt.length === 0);
+    if (unbenannt.length) { bad.push('nicht genannt: ' + unbenannt.join(', ')); }
+    check('KRITISCH: die Erklaerung nennt kMeet genau dann, wenn der Server kMeet-Raeume vergibt',
+      /kmeet\.infomaniak\.com/.test(logik) === /kMeet/.test(abschnitt));
+  }
+
   // Seit ENT-601 die Gegenrichtung: Der Endpunkt, an den das Formular
   // tatsaechlich geht, LEGT einen Datensatz an -- die Seite muss das genau
   // so sagen, nicht mehr das Gegenteil behaupten. Waere je kein INSERT mehr

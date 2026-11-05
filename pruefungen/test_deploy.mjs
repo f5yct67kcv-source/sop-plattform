@@ -802,6 +802,21 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   check('og:url ist die kanonische Adresse',
     (homepage.match(/<meta property="og:url" content="([^"]+)"/) || [])[1] === (homepage.match(/<link rel="canonical" href="([^"]+)"/) || [])[1]);
 
+  // Terminbuchung (ENT-731): Seite, Endpunkt und Kalenderlogik kommen ins
+  // guardops-Buendel, und der Deploy schreibt die Zugangsdatei dorthin --
+  // sonst sagte die Seite live dauerhaft "nicht eingerichtet". Die
+  // Zugangsdatei ist gesperrt wie db.php und mailer.php.
+  {
+    const htGuardops = readFileSync(`${WURZEL}/htaccess-guardops`, 'utf8');
+    const gesperrt = (htGuardops.match(/<FilesMatch "\^\(([^)]+)\)\\\.php\$">/) || [])[1] || '';
+    check('KRITISCH: Buchungsseite, Termin-Endpunkt und Kalenderlogik kommen ins guardops-Bündel',
+      wirdKopiert('gespraech.html') && liegtImBuendel('dist-guardops/api/termine.php') && liegtImBuendel('dist-guardops/termine_kalender.php'));
+    check('KRITISCH: der Deploy schreibt den Kalenderzugang ins guardops-Bündel, aus den Secrets',
+      /dist-guardops\/kalender_zugang\.php/.test(bauen) && /EFF_KALENDER_BENUTZER/.test(bauen) && /EFF_KALENDER_PASSWORT/.test(bauen));
+    check('KRITISCH: Kalenderlogik und Kalenderzugang sind auf guardops.ch nicht direkt abrufbar',
+      gesperrt.split('|').includes('termine_kalender') && gesperrt.split('|').includes('kalender_zugang'));
+  }
+
   // Strukturierte Daten: gueltiges JSON, und Firma, Adresse und
   // Unternehmensnummer sagen dasselbe wie das Impressum. Eine geaenderte
   // Adresse im Impressum ohne Nachzug hier waere eine falsche Angabe an Google.
@@ -2138,8 +2153,17 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
       gelesen.add(pfad);
       const voll = `${WURZEL}/backend/${pfad}`;
       if (!existsSync(voll)) { continue; }
-      for (const m of readFileSync(voll, 'utf8')
-        .matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g)) {
+      const quelle = readFileSync(voll, 'utf8');
+      // Ein Modul, dessen Fehlen der Endpunkt SELBST abfaengt, ist hier keine
+      // Luecke (ENT-731: api/termine.php fragt is_file() und antwortet
+      // "nicht eingerichtet", die Kalenderlogik liegt nur auf guardops.ch).
+      // Zaehlt nur, wenn die Abfrage VOR dem require steht -- dahinter waere
+      // sie zu spaet.
+      const abgefangen = new Set([...quelle.matchAll(/if \(!is_file\(__DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'\)\)/g)]
+        .filter(m => { const r = quelle.indexOf(`require __DIR__ . '/../${m[1]}'`); return r < 0 || m.index < r; })
+        .map(m => m[1]));
+      for (const m of quelle.matchAll(/require(?:_once)? __DIR__ \. '\/(?:\.\.\/)?([a-z_]+\.php)'/g)) {
+        if (abgefangen.has(m[1])) { continue; }
         gefunden.add(m[1]);
         zuLesen.push(m[1]);
       }

@@ -432,6 +432,9 @@ p{margin:0 0 1em}
 .fuss .unten{align-items:center}
 .fuss .unten button:hover{color:var(--stahl-hi)}
 
+.zuerst-reden{margin-top:28px}
+.zuerst-reden a{color:var(--stahl-hi);text-decoration:underline;text-underline-offset:3px}
+
 /* Fuss */
 .fuss{background:var(--nacht);color:var(--stahl);border-top:1px solid var(--nacht-linie);padding:64px 0 32px;font-size:14px}
 .fuss .oben{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;padding-bottom:40px;border-bottom:1px solid var(--nacht-linie)}
@@ -484,9 +487,9 @@ p{margin:0 0 1em}
       <a href="#gav">GAV</a>
       <a href="#sicherheit">Sicherheit</a>
       <a href="#faq">Fragen</a>
-      <a class="btn primaer" href="#demo">Demo anfragen</a>
+      <a class="btn primaer" href="gespraech.html">Betrieb besprechen</a>
     </nav>
-    <a class="btn primaer cta-desktop" href="#demo">Demo anfragen</a>
+    <a class="btn primaer cta-desktop" href="gespraech.html">Betrieb besprechen</a>
     <button class="menu-knopf" id="menuKnopf" aria-expanded="false" aria-controls="nav" aria-label="Menü öffnen"><svg><use href="#i-menu"/></svg></button>
   </div>
 </header>
@@ -501,8 +504,10 @@ p{margin:0 0 1em}
       <h1 class="display">Der ganze Betrieb.<span class="z2">Eine Software.</span></h1>
       <p class="lead">Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen – an einem Ort, mit dem GAV Sicherheit im Kern. Gebaut im laufenden Betrieb eines Schweizer Sicherheitsdienstes: Jede Funktion ist da, weil sie im Alltag gefehlt hat.</p>
       <div class="held-aktionen">
-        <a class="btn primaer" href="#demo">Demo anfragen <svg><use href="#i-pfeil"/></svg></a>
-        <a class="btn sekundaer" href="#ein-tag">Ein Tag im Betrieb</a>
+        <!-- Zwei Tore (ENT-731): reden oder selbst hineinschauen. Das Gespraech
+             ist der Hauptknopf, der Testzugang bleibt gleich oben sichtbar. -->
+        <a class="btn primaer" href="gespraech.html">Betrieb besprechen <svg><use href="#i-pfeil"/></svg></a>
+        <a class="btn sekundaer" href="#demo">Testzugang anfordern</a>
       </div>
     </div>
     <div class="held-fakten">
@@ -697,6 +702,7 @@ p{margin:0 0 1em}
           <li><svg><use href="#i-haken"/></svg><span><b>Ganz Ihre eigene Instanz.</b> 14 Tage lang, mit voller Verwaltungsrolle, niemand sonst sieht hinein.</span></li>
           <li><svg><use href="#i-haken"/></svg><span><b>Unverbindlich.</b> Läuft automatisch ab, keine Einrichtungsgebühr, keine Laufzeit.</span></li>
         </ul>
+        <p class="lead zuerst-reden">Lieber zuerst reden? <a href="gespraech.html">Betrieb besprechen</a> – 30 Minuten per Telefon oder Video.</p>
       </div>
       <!-- Absolute Adresse, nicht relativ (ENT-601-Nachtrag, 2026-09-18):
            guardops.ch traegt keine Datenbank-Zugangsdaten, der Endpunkt
@@ -789,7 +795,7 @@ p{margin:0 0 1em}
       </div>
       <div>
         <h4>Unternehmen</h4>
-        <ul><li><a href="#demo">Demo anfragen</a></li><li><a href="#faq">Fragen</a></li></ul>
+        <ul><li><a href="gespraech.html">Betrieb besprechen</a></li><li><a href="#demo">Testzugang anfordern</a></li><li><a href="#faq">Fragen</a></li></ul>
       </div>
       <div>
         <h4>Rechtliches</h4>
