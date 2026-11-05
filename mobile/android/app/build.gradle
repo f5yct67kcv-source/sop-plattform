@@ -9,6 +9,15 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        // Der Maps-Schluessel fuer die native Karte (ENT-609), fuer das
+        // AndroidManifest. Aus einer Datei neben package.json, die nie ins
+        // Repository kommt (.gitignore) -- dieselbe Ueberlegung wie bei
+        // mobile/.maps-ios-key. Fehlt sie, baut die App trotzdem, nur
+        // ohne Karte.
+        def mapsSchluesselDatei = rootProject.file('../.maps-android-key')
+        manifestPlaceholders = [
+            MAPS_API_KEY: mapsSchluesselDatei.exists() ? mapsSchluesselDatei.text.trim() : ''
+        ]
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

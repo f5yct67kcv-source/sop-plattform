@@ -24,6 +24,15 @@
 
         </activity>
 
+        <!-- Schluessel fuer die native Karte (ENT-609). Steht nie hier im
+             Klartext: app/build.gradle liest ihn beim Bauen aus
+             mobile/.maps-android-key (in .gitignore). Fehlt die Datei,
+             bleibt der Wert leer und die Karte in der Runde grau, alles
+             andere laeuft. aufs-android.sh warnt dann am Schluss. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -38,4 +47,13 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Standort fuer die Runde: Ohne ihn laesst sich kein Kontrollpunkt
+         bestaetigen. Nur im Vordergrund (ENT-588), darum bewusst KEIN
+         ACCESS_BACKGROUND_LOCATION. Gegenstueck zu
+         NSLocationWhenInUseUsageDescription in der iOS-Info.plist. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Fotobeleg und Ersatzscan (<input capture>). Ohne diese Zeile
+         oeffnet Android statt der Kamera nur die Dateiauswahl. -->
+    <uses-permission android:name="android.permission.CAMERA" />
 </manifest>

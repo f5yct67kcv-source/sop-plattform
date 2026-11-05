@@ -4,5 +4,8 @@
   "webDir": "www",
   "ios": {
     "zoomEnabled": true
+  },
+  "android": {
+    "includePlugins": ["@capacitor/google-maps"]
   }
 }

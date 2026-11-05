@@ -236,6 +236,93 @@ for (const [datei, feld, muster] of stellen) {
     !/NSLocationAlwaysAndWhenInUseUsageDescription|NSLocationAlwaysUsageDescription/.test(plist));
 }
 
+// ══════════ ANDROID: DIESELBEN GERÄTERECHTE, ANDERS ERKLÄRT ═══════════
+// Gegenstueck zum Block darueber. Android fragt nur nach dem, was im
+// Manifest steht -- fehlt die Zeile, lehnt es still ab, genau wie iOS ohne
+// Nutzungsbeschreibung. Der Sollwert kommt wieder aus app.html.
+{
+  const app = readFileSync(`${WURZEL}/app.html`, 'utf8');
+  const manifest = lies(`${M}/android/app/src/main/AndroidManifest.xml`);
+  const recht = (name) => new RegExp(`<uses-permission\\s+android:name="android\\.permission\\.${name}"`).test(manifest);
+
+  if (/navigator\.geolocation/.test(app)) {
+    check('KRITISCH: Android darf nach dem genauen Standort fragen (ACCESS_FINE_LOCATION)',
+      recht('ACCESS_FINE_LOCATION'));
+  }
+  if (/capture="(environment|user)"|getUserMedia/.test(app)) {
+    check('KRITISCH: Android darf die Kamera oeffnen (CAMERA)', recht('CAMERA'));
+  }
+  check('KRITISCH: Android bittet NICHT um Hintergrundortung (ENT-588)',
+    !recht('ACCESS_BACKGROUND_LOCATION'));
+  // Der Kartenschluessel steht als Platzhalter im Manifest, nie im Klartext.
+  check('KRITISCH: im Android-Manifest steht kein echter Maps-Schluessel',
+    !/AIza[0-9A-Za-z_-]{20,}/.test(manifest));
+  check('Das Android-Manifest bekommt den Maps-Schluessel beim Bauen eingesetzt',
+    /com\.google\.android\.geo\.API_KEY"[\s\S]*?android:value="\$\{MAPS_API_KEY\}"/.test(manifest)
+    && /MAPS_API_KEY\s*:/.test(lies(`${M}/android/app/build.gradle`)));
+}
+
+// ══════════ ANDROID: DER SERVER LÄSST DIE HÜLLE DURCH ══════════════════
+// Die Android-Huelle laeuft unter <androidScheme>://localhost, Vorgabe
+// seit Capacitor 6 ist https. Stand im Backend die andere Schreibweise,
+// blockte der WebView jede Antwort -- Anmelden scheiterte, ohne dass die
+// App einen Grund nennen konnte. Sollwert aus capacitor.config.json.
+{
+  const cfg = JSON.parse(lies(`${M}/capacitor.config.json`));
+  const schema = (cfg.server && cfg.server.androidScheme) || 'https';
+  const db = lies(`backend/db.php`);
+  const liste = (db.match(/const APP_NATIVE_HERKUENFTE\s*=\s*\[([^\]]*)\]/) || [])[1] || '';
+  check(`KRITISCH: das Backend laesst die Android-Huelle durch (${schema}://localhost)`,
+    liste.includes(`'${schema}://localhost'`));
+}
+
+// ══════════ ANDROID: KEIN ABSTURZ BEIM PUSH OHNE FIREBASE ═══════════════
+// Das Push-Plugin ruft auf Android FirebaseMessaging auf. Ohne
+// google-services.json ist Firebase nicht eingerichtet, der Aufruf wirft,
+// und Capacitor macht daraus einen Absturz der ganzen App -- beim Start,
+// weil app.html die Registrierung dann selbst anstoesst
+// (pushNativEinrichten). Bis der FCM-Weg gebaut ist (ENT-604, zweiter
+// Bauabschnitt), bleibt das Plugin darum aus dem Android-Bau
+// draussen (android.includePlugins in capacitor.config.json). Wer es
+// wieder aufnimmt, braucht vorher die Firebase-Datei.
+{
+  const cfg = JSON.parse(lies(`${M}/capacitor.config.json`));
+  const liste = (cfg.android && cfg.android.includePlugins) || cfg.includePlugins || null;
+  const pushImBau = liste === null || liste.includes('@capacitor/push-notifications');
+  check('KRITISCH: Push steht nur mit Firebase-Datei im Android-Bau',
+    !pushImBau || existsSync(`${M}/android/app/google-services.json`));
+  // Die Ausschlussliste ist eine POSITIVliste: Jedes Plugin, das nicht
+  // drinsteht, fehlt auf Android. Die Karte darf dabei nicht verloren gehen.
+  if (liste !== null) {
+    const pkg = JSON.parse(lies(`${M}/package.json`));
+    const GERUEST = ['@capacitor/core', '@capacitor/cli', '@capacitor/ios', '@capacitor/android'];
+    for (const p of Object.keys(pkg.dependencies || {}).filter(n => n.startsWith('@capacitor/') && !GERUEST.includes(n))) {
+      if (p === '@capacitor/push-notifications') { continue; }
+      check(`KRITISCH: das Plugin ${p} ist auch im Android-Bau`, liste.includes(p));
+    }
+  }
+}
+
+// ══════════ ANDROID: DIE XML-DATEIEN SIND WOHLGEFORMT ═════════════════
+// "--" ist in einem XML-Kommentar verboten. In den Kommentaren dieses
+// Projekts ist es die uebliche Schreibweise fuer einen Gedankenstrich --
+// im Manifest bricht es den Bau ab, und hier merkt es niemand, weil hier
+// niemand die App baut. Beim Einrichten der Android-Huelle fast so
+// passiert.
+{
+  const dateien = [
+    `${M}/android/app/src/main/AndroidManifest.xml`,
+    ...readdirSync(`${WURZEL}/${M}/android/app/src/main/res/values`)
+      .filter(n => n.endsWith('.xml')).map(n => `${M}/android/app/src/main/res/values/${n}`),
+  ];
+  for (const d of dateien) {
+    const text = lies(d);
+    const kommentare = [...text.matchAll(/<!--([\s\S]*?)-->/g)].map(m => m[1]);
+    check(`KRITISCH: kein "--" in einem XML-Kommentar (${d.split('/').pop()})`,
+      kommentare.every(k => !k.includes('--')));
+  }
+}
+
 console.log(`\n${ok.length} bestanden, ${bad.length} nicht bestanden\n`);
 if (bad.length) { bad.forEach(b => console.log('  ✗ ' + b)); process.exit(1); }
 console.log('Alle Pruefungen bestanden.');

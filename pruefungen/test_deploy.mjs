@@ -1767,6 +1767,12 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
   }
 }
 
+// Die beiden Skripte, die die App aufs Telefon bringen. Die Pruefungen
+// unten laufen fuer jedes: Was beim iPhone schon einmal schiefging, kann
+// beim Android-Skript genauso schiefgehen.
+const GERAETE_SKRIPTE = ['aufs-handy.sh', 'aufs-android.sh'];
+const checkAlle = check;
+
 // ══════════ DER SCHLÜSSEL FÜRS HANDY (aufs-handy.sh) ══════════════════
 // Fürs Web setzt der Deploy den Schlüssel ein (oben geprüft). Fürs Handy
 // macht das aufs-handy.sh -- und das ging still durch, wenn die Datei mit
@@ -1777,13 +1783,16 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
 // dem Skript herausgeschnitten und in einem Wegwerf-Verzeichnis auf eine
 // Kopie losgelassen. Eine Prüfung, die nur nach dem Wort "else" sucht,
 // bliebe grün, wenn der Zweig irgendwann nichts mehr sagt.
-{
+for (const SKRIPT of GERAETE_SKRIPTE) {
+  // Fuer beide Geraete-Skripte (iPhone und Android) -- dieselben Fehler
+  // koennen in beiden passieren.
+  const check = (n, c) => checkAlle(`${n} [${SKRIPT}]`, c);
   const { mkdtempSync, writeFileSync, readFileSync: lies, rmSync } = await import('fs');
   const { execFileSync } = await import('child_process');
   const { tmpdir } = await import('os');
   const { join } = await import('path');
 
-  const skript = lies(`${WURZEL}/aufs-handy.sh`, 'utf8');
+  const skript = lies(`${WURZEL}/${SKRIPT}`, 'utf8');
   const von = skript.indexOf('maps_schluessel_einsetzen() {');
   const bis = skript.indexOf('\n}\n', von);
   check('KRITISCH: das Einsetzen des Maps-Schlüssels steht als eigene, prüfbare Funktion da',
@@ -2000,13 +2009,16 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
 // Geprüft in einem echten Wegwerf-Repository, nicht am Quelltext: Eine
 // Prüfung, die nach "-u" sucht, bliebe grün, sobald jemand dasselbe anders
 // schreibt.
-{
+for (const SKRIPT of GERAETE_SKRIPTE) {
+  // Fuer beide Geraete-Skripte (iPhone und Android) -- dieselben Fehler
+  // koennen in beiden passieren.
+  const check = (n, c) => checkAlle(`${n} [${SKRIPT}]`, c);
   const { mkdtempSync, writeFileSync, existsSync: da, rmSync } = await import('fs');
   const { execFileSync } = await import('child_process');
   const { tmpdir } = await import('os');
   const { join } = await import('path');
 
-  const skript = readFileSync(`${WURZEL}/aufs-handy.sh`, 'utf8');
+  const skript = readFileSync(`${WURZEL}/${SKRIPT}`, 'utf8');
   const von = skript.indexOf('lokale_aenderungen_sichern() {');
   const bis = skript.indexOf('\n}\n', von);
   check('KRITISCH: das Beiseitelegen steht als eigene, prüfbare Funktion da',
@@ -2222,13 +2234,16 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
 // Funktionen werden aus dem Skript geschnitten und an einer Wegwerf-Datei
 // laufen gelassen. Eine Pruefung, die nach dem Wort "trap" sucht, bliebe
 // gruen, sobald jemand dasselbe anders schreibt.
-{
+for (const SKRIPT of GERAETE_SKRIPTE) {
+  // Fuer beide Geraete-Skripte (iPhone und Android) -- dieselben Fehler
+  // koennen in beiden passieren.
+  const check = (n, c) => checkAlle(`${n} [${SKRIPT}]`, c);
   const { mkdtempSync, writeFileSync, readFileSync: lies, rmSync } = await import('fs');
   const { execFileSync } = await import('child_process');
   const { tmpdir } = await import('os');
   const { join } = await import('path');
 
-  const skript = readFileSync(`${WURZEL}/aufs-handy.sh`, 'utf8');
+  const skript = readFileSync(`${WURZEL}/${SKRIPT}`, 'utf8');
   const stueck = (name) => {
     const von = skript.indexOf(`${name}() {`);
     if (von === -1) { return null; }
@@ -2299,6 +2314,10 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
     !istIgnoriert('mobile/www/index.html'));
   check('KRITISCH: die iOS-Kopie des Bündels ist dagegen ignoriert — dort darf der Schlüssel liegen bleiben',
     istIgnoriert('mobile/ios/App/App/public/index.html'));
+  check('KRITISCH: die Android-Kopie des Bündels ist ebenfalls ignoriert',
+    istIgnoriert('mobile/android/app/src/main/assets/public/index.html'));
+  check('KRITISCH: die Datei mit dem Android-Kartenschlüssel ist ignoriert',
+    istIgnoriert('mobile/.maps-android-key'));
 
   // Der Ordner, den Xcode beim Bauen anlegt (Swift-Package-Aufloesung),
   // gehoert ebenfalls nicht ins Repository -- er tauchte nach dem ersten
@@ -2331,9 +2350,11 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
     check('KRITISCH: der Neustart passiert VOR allem, was das Skript sonst noch tut',
       beiExec !== -1 && beiSichern !== -1 && beiExec < beiSichern);
     // Und er darf sich nicht endlos wiederholen.
+    // Geprueft wird, dass die Marke, die vor dem exec gesetzt wird, auch
+    // die ist, die den Neustart verhindert -- nicht ein bestimmter Name.
+    const marke = (skript.match(/export (\w+)=1\s*\n\s*exec "\$0"/) || [])[1];
     check('KRITISCH: der Neustart geschieht höchstens einmal, keine Schleife',
-      /AUFS_HANDY_NEUSTART/.test(skript)
-      && /export AUFS_HANDY_NEUSTART=1/.test(skript));
+      !!marke && new RegExp(`"\\$\\{${marke}:-\\}"\\s*!=\\s*"1"`).test(skript));
   }
 }
 
