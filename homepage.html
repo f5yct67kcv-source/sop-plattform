@@ -43,7 +43,64 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="GuardOpS – Betriebssoftware für Schweizer Sicherheitsdienste">
 <meta property="og:description" content="Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen in einer Software – mit dem GAV Sicherheit im Kern.">
-<meta property="og:image" content="icons/guardops-512.png">
+<meta property="og:url" content="https://guardops.ch/">
+<meta property="og:site_name" content="GuardOpS">
+<meta property="og:locale" content="de_CH">
+<!-- Vorschaubild fuer geteilte Links (LinkedIn, Facebook, WhatsApp, Anzeigen).
+     ABSOLUTE ADRESSE: Eine relative nimmt nicht jede Plattform an. 1200x630
+     ist das Format, das Facebook und LinkedIn ohne Beschnitt zeigen.
+     test_deploy.mjs prueft Masse, Datei und dass sie ins Buendel kommt. -->
+<meta property="og:image" content="https://guardops.ch/homepage-bilder/vorschau.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="GuardOpS: Der ganze Betrieb. Eine Software. Daneben das Cockpit mit Beispieldaten.">
+<meta name="twitter:card" content="summary_large_image">
+<!-- Strukturierte Daten fuer Suchmaschinen. Firma und Adresse stehen genau so
+     im Impressum; test_deploy.mjs haelt beides gegeneinander. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://guardops.ch/#firma",
+      "name": "pzu consulting gmbh",
+      "url": "https://guardops.ch/",
+      "email": "info@guardops.ch",
+      "logo": "https://guardops.ch/icons/guardops-512.png",
+      "identifier": "CHE-411.716.010",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Hochgasse 7",
+        "postalCode": "4632",
+        "addressLocality": "Trimbach",
+        "addressCountry": "CH"
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://guardops.ch/#seite",
+      "url": "https://guardops.ch/",
+      "name": "GuardOpS",
+      "inLanguage": "de-CH",
+      "publisher": { "@id": "https://guardops.ch/#firma" }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://guardops.ch/#software",
+      "name": "GuardOpS",
+      "url": "https://guardops.ch/",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "description": "Betriebssoftware für Sicherheitsdienste in der Schweiz: Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen, mit dem GAV Sicherheit im Kern.",
+      "image": "https://guardops.ch/homepage-bilder/vorschau.jpg",
+      "inLanguage": "de-CH",
+      "areaServed": "CH",
+      "publisher": { "@id": "https://guardops.ch/#firma" }
+    }
+  ]
+}
+</script>
 <style>
 /* Schriften selbst ausgeliefert (wie Inter fuer das Cockpit, ENT-223/OP-224):
    Kein Abruf bei Google von der oeffentlichen Seite aus. Lizenzen:
@@ -353,6 +410,31 @@ p{margin:0 0 1em}
 .formular .danke p{margin:0;color:var(--stahl);font-size:15px}
 @media (max-width:560px){.formular .reihe{grid-template-columns:minmax(0,1fr)}.formular{padding:20px}}
 
+/* Einwilligung (Cookie-Hinweis): Streifen am unteren Rand, kein Fenster.
+   Erscheint sofort beim ersten Besuch (Anordnung des Projektinhabers,
+   2026-10-14). Beide Knoepfe gleich gross und gleich auffaellig -- ein
+   grauer Ablehnen-Knopf waere ein Trick, keine Wahl. */
+.einwilligung{position:fixed;left:0;right:0;bottom:0;z-index:90;background:var(--nacht-2);border-top:1px solid var(--nacht-linie-2);box-shadow:0 -20px 50px -30px rgba(0,0,0,.8);color:var(--stahl)}
+.einwilligung[hidden]{display:none}
+.einwilligung .innen{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 32px;align-items:center;padding:18px var(--pad)}
+.einwilligung p{margin:0;font-size:14px;line-height:1.5;max-width:70ch}
+.einwilligung p a{color:var(--stahl-hi);text-decoration:underline;text-underline-offset:3px}
+.einwilligung .wahl{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.einwilligung .btn{height:44px;padding:0 20px;font-size:15px;justify-content:center;min-width:140px}
+.einwilligung .btn.sekundaer{color:var(--stahl-hi);border-color:var(--nacht-linie-2)}
+.einwilligung .btn.sekundaer:hover{border-color:var(--stahl)}
+@media (max-width:720px){
+  .einwilligung .innen{grid-template-columns:minmax(0,1fr)}
+  .einwilligung .wahl{grid-template-columns:1fr 1fr}
+  .einwilligung .btn{min-width:0}
+}
+.fuss .unten button{background:none;border:0;padding:0;min-height:44px;display:inline-flex;align-items:center;font:inherit;color:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.fuss .unten{align-items:center}
+.fuss .unten button:hover{color:var(--stahl-hi)}
+
+.zuerst-reden{margin-top:28px}
+.zuerst-reden a{color:var(--stahl-hi);text-decoration:underline;text-underline-offset:3px}
+
 /* Fuss */
 .fuss{background:var(--nacht);color:var(--stahl);border-top:1px solid var(--nacht-linie);padding:64px 0 32px;font-size:14px}
 .fuss .oben{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;padding-bottom:40px;border-bottom:1px solid var(--nacht-linie)}
@@ -405,9 +487,9 @@ p{margin:0 0 1em}
       <a href="#gav">GAV</a>
       <a href="#sicherheit">Sicherheit</a>
       <a href="#faq">Fragen</a>
-      <a class="btn primaer" href="#demo">Demo anfragen</a>
+      <a class="btn primaer" href="gespraech.html">Betrieb besprechen</a>
     </nav>
-    <a class="btn primaer cta-desktop" href="#demo">Demo anfragen</a>
+    <a class="btn primaer cta-desktop" href="gespraech.html">Betrieb besprechen</a>
     <button class="menu-knopf" id="menuKnopf" aria-expanded="false" aria-controls="nav" aria-label="Menü öffnen"><svg><use href="#i-menu"/></svg></button>
   </div>
 </header>
@@ -422,8 +504,10 @@ p{margin:0 0 1em}
       <h1 class="display">Der ganze Betrieb.<span class="z2">Eine Software.</span></h1>
       <p class="lead">Einsatzplanung, Mitarbeiter-App, Revierdienst, Kundenportal, Offerten und Rechnungen – an einem Ort, mit dem GAV Sicherheit im Kern. Gebaut im laufenden Betrieb eines Schweizer Sicherheitsdienstes: Jede Funktion ist da, weil sie im Alltag gefehlt hat.</p>
       <div class="held-aktionen">
-        <a class="btn primaer" href="#demo">Demo anfragen <svg><use href="#i-pfeil"/></svg></a>
-        <a class="btn sekundaer" href="#ein-tag">Ein Tag im Betrieb</a>
+        <!-- Zwei Tore (ENT-731): reden oder selbst hineinschauen. Das Gespraech
+             ist der Hauptknopf, der Testzugang bleibt gleich oben sichtbar. -->
+        <a class="btn primaer" href="gespraech.html">Betrieb besprechen <svg><use href="#i-pfeil"/></svg></a>
+        <a class="btn sekundaer" href="#demo">Testzugang anfordern</a>
       </div>
     </div>
     <div class="held-fakten">
@@ -618,6 +702,7 @@ p{margin:0 0 1em}
           <li><svg><use href="#i-haken"/></svg><span><b>Ganz Ihre eigene Instanz.</b> 14 Tage lang, mit voller Verwaltungsrolle, niemand sonst sieht hinein.</span></li>
           <li><svg><use href="#i-haken"/></svg><span><b>Unverbindlich.</b> Läuft automatisch ab, keine Einrichtungsgebühr, keine Laufzeit.</span></li>
         </ul>
+        <p class="lead zuerst-reden">Lieber zuerst reden? <a href="gespraech.html">Betrieb besprechen</a> – 30 Minuten per Telefon oder Video.</p>
       </div>
       <!-- Absolute Adresse, nicht relativ (ENT-601-Nachtrag, 2026-09-18):
            guardops.ch traegt keine Datenbank-Zugangsdaten, der Endpunkt
@@ -710,7 +795,7 @@ p{margin:0 0 1em}
       </div>
       <div>
         <h4>Unternehmen</h4>
-        <ul><li><a href="#demo">Demo anfragen</a></li><li><a href="#faq">Fragen</a></li></ul>
+        <ul><li><a href="gespraech.html">Betrieb besprechen</a></li><li><a href="#demo">Testzugang anfordern</a></li><li><a href="#faq">Fragen</a></li></ul>
       </div>
       <div>
         <h4>Rechtliches</h4>
@@ -720,9 +805,23 @@ p{margin:0 0 1em}
     <div class="unten">
       <span>© 2026 <span data-brand>GuardOpS</span> · Alle Angaben ohne Gewähr</span>
       <span class="ch"><i aria-hidden="true"></i>Entwickelt und betrieben in der Schweiz</span>
+      <button type="button" id="einwilligungAendern">Cookie-Einstellungen</button>
     </div>
   </div>
 </footer>
+
+<div class="einwilligung" id="einwilligung" role="region" aria-label="Cookie-Hinweis" hidden>
+  <div class="innen">
+    <p><span data-brand>GuardOpS</span> verwendet Cookies und ähnliche Technologien, um das
+       Nutzererlebnis auf dieser Webseite zu verbessern und den Datenverkehr zu
+       analysieren.
+       <a href="datenschutz.html">Mehr Infos in unserer Datenschutzerklärung</a></p>
+    <div class="wahl">
+      <button type="button" class="btn primaer" id="einwilligungJa">Zustimmen</button>
+      <button type="button" class="btn sekundaer" id="einwilligungNein">Ablehnen</button>
+    </div>
+  </div>
+</div>
 
 <script>
 (function(){
@@ -878,6 +977,7 @@ p{margin:0 0 1em}
       if (a.ok && a.json && a.json.status === 'ok') {
         if (a.json.message) document.getElementById('demoDankeText').textContent = a.json.message;
         formular.classList.add('gesendet');
+        if (window.goMessen) { window.goMessen('generate_lead'); }
         return;
       }
       if (a.json && a.json.felder) {
@@ -935,6 +1035,118 @@ p{margin:0 0 1em}
       }).then(function () { nKnopf.disabled = false; });
     });
   }
+})();
+</script>
+<script>
+(function(){
+  // Einwilligung und Messung (2026-10-14, Anordnung des Projektinhabers:
+  // bezahlte Werbung braucht ein Ruecksignal). Grundsatz: Vor der Zustimmung
+  // laedt NICHTS von Google -- test_homepage.mjs misst das am
+  // Browser. Die Wahl liegt sechs Monate im lokalen Speicher; danach fragt
+  // die Seite neu. Ohne JavaScript bleibt der Streifen verborgen und es
+  // wird nichts geladen -- das ist dieselbe Aussage wie "abgelehnt".
+  //
+  // Eine leere Kennung heisst: dieser Dienst wird auch nach Zustimmung
+  // nicht geladen. Der Meta-Pixel ist vorerst ganz herausgenommen (Entscheid
+  // vom 2026-11-05: erst live, wenn die Pixel-ID da ist) -- Code, Hinweis und
+  // Datenschutzerklaerung kommen dann zusammen zurueck.
+  var MESSUNG = { ga: 'G-DK3G9YGFB8' };
+  var SCHLUESSEL = 'go_einwilligung';
+  var DAUER = 183 * 24 * 60 * 60 * 1000;
+
+  var streifen = document.getElementById('einwilligung');
+  var ja = document.getElementById('einwilligungJa');
+  var nein = document.getElementById('einwilligungNein');
+  var aendern = document.getElementById('einwilligungAendern');
+  var laeuft = false;
+
+  function lesen(){
+    try {
+      var roh = JSON.parse(localStorage.getItem(SCHLUESSEL) || 'null');
+      if (!roh || typeof roh.bis !== 'number' || roh.bis < Date.now()) { return null; }
+      return roh.wahl === 'ja' ? 'ja' : 'nein';
+    } catch (e) { return null; }
+  }
+  function merken(wahl){
+    try { localStorage.setItem(SCHLUESSEL, JSON.stringify({ wahl: wahl, bis: Date.now() + DAUER })); }
+    catch (e) { /* privater Modus: dann fragt die Seite beim naechsten Mal neu */ }
+  }
+  function skript(url){
+    var s = document.createElement('script'); s.async = true; s.src = url;
+    document.head.appendChild(s);
+  }
+  function messungStarten(){
+    if (laeuft) { return; }
+    laeuft = true;
+    if (MESSUNG.ga) {
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = function(){ window.dataLayer.push(arguments); };
+      window.gtag('js', new Date());
+      // Einwilligungsmodus: Das Skript laedt erst NACH der Zustimmung, also
+      // ist "erteilt" hier die Wahrheit, nicht eine Vorgabe.
+      window.gtag('consent', 'default', { ad_storage: 'granted', analytics_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'granted' });
+      window.gtag('config', MESSUNG.ga, { anonymize_ip: true });
+      skript('https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(MESSUNG.ga));
+    }
+  }
+  function spurenLoeschen(){
+    // Was Google (und frueher allenfalls Meta) bei einer Zustimmung abgelegt hat.
+    var teile = location.hostname.split('.');
+    document.cookie.split(';').forEach(function(c){
+      var name = c.split('=')[0].trim();
+      if (!/^(_ga|_gid|_gat|_gcl|_fbp|_fbc)/.test(name)) { return; }
+      for (var i = 0; i < teile.length - 1; i++) {
+        var dom = teile.slice(i).join('.');
+        document.cookie = name + '=; Max-Age=0; path=/; domain=' + dom;
+        document.cookie = name + '=; Max-Age=0; path=/; domain=.' + dom;
+      }
+      document.cookie = name + '=; Max-Age=0; path=/';
+    });
+  }
+  // Ereignisse fuer die Auswertung -- nur solange die Messung laeuft.
+  // Ohne Zustimmung gehen sie verloren; es wird nichts nachgereicht.
+  //   abschnitt_gesehen  Ein Abschnitt hat die Bildschirmmitte erreicht
+  //                      (einmal je Abschnitt): wie weit liest jemand?
+  //   formular_begonnen  Erste Eingabe im Demo-Formular.
+  //   generate_lead      Demo-Zugang angefordert, Server hat angenommen
+  //                      (Googles Standardname fuer "Lead").
+  window.goMessen = function(name, daten){
+    if (!laeuft) { return; }
+    if (MESSUNG.ga && window.gtag) { window.gtag('event', name, daten || {}); }
+  };
+  if ('IntersectionObserver' in window) {
+    var gesehen = {};
+    var beobachter = new IntersectionObserver(function(eintraege){
+      eintraege.forEach(function(e){
+        if (!e.isIntersecting || gesehen[e.target.id]) { return; }
+        gesehen[e.target.id] = true;
+        window.goMessen('abschnitt_gesehen', { abschnitt: e.target.id });
+      });
+    }, { rootMargin: '-40% 0px -40% 0px', threshold: 0 });
+    Array.prototype.forEach.call(document.querySelectorAll('section[id]'), function(a){ beobachter.observe(a); });
+  }
+  var demoFormular = document.getElementById('demoFormular');
+  if (demoFormular) {
+    demoFormular.addEventListener('input', function einmal(){
+      demoFormular.removeEventListener('input', einmal);
+      window.goMessen('formular_begonnen');
+    });
+  }
+
+  function zeigen(){ streifen.hidden = false; }
+  function verbergen(){ streifen.hidden = true; }
+
+  ja.addEventListener('click', function(){ merken('ja'); verbergen(); messungStarten(); });
+  nein.addEventListener('click', function(){
+    var vorher = laeuft;
+    merken('nein'); verbergen(); spurenLoeschen();
+    if (vorher) { location.reload(); } // geladene Skripte lassen sich nicht entladen
+  });
+  aendern.addEventListener('click', function(){ zeigen(); ja.focus(); });
+
+  var wahl = lesen();
+  if (wahl === 'ja') { messungStarten(); }
+  else if (wahl === null) { zeigen(); }
 })();
 </script>
 </body>

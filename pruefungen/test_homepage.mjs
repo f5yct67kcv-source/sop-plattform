@@ -43,6 +43,11 @@ desktop.on('request', r => { if (/^https?:/.test(r.url())) { fremdeAbrufe.push(r
 // Browser weist den Aufruf vorher als Cross-Origin ab).
 const aufrufe = [];
 let antwort = { status: 200, body: { status: 'ok', message: 'Vielen Dank. Sie erhalten in Kürze eine E-Mail mit Ihren Zugangsdaten.' } };
+// Google und Meta werden nie wirklich erreicht: Die Prueflaeufe sollen in
+// keiner echten Statistik landen. Ihr Skript wird durch ein leeres ersetzt,
+// der Abruf selbst aber gezaehlt -- gemessen wird, OB die Seite holt.
+await desktop.route(/googletagmanager\.com|google-analytics\.com|connect\.facebook\.net|facebook\.com\/tr/, route =>
+  route.fulfill({ status: 200, contentType: 'application/javascript', body: '' }));
 await desktop.route('**/api/demo_anfordern.php', async route => {
   const r = route.request();
   aufrufe.push({ methode: r.method(), typ: r.headers()['content-type'] || '', daten: r.postDataJSON() });
@@ -54,6 +59,78 @@ await desktop.evaluate(() => document.fonts.ready);
 check('KRITISCH: die Seite laedt nichts von fremden Servern (keine Google-Schriften, kein CDN)',
   fremdeAbrufe.length === 0);
 if (fremdeAbrufe.length) { bad.push('fremd: ' + fremdeAbrufe.slice(0, 3).join(', ')); }
+
+// ── Einwilligung (2026-10-14) ──────────────────────────────────────────
+// Der Streifen erscheint sofort beim ersten Besuch; vor der Wahl liegt
+// nichts im Browser und nichts geht an Google oder Meta. Beide Knoepfe
+// gleich gross. Nach "Ablehnen" bleibt es dabei, auch nach Neuladen; der
+// Fusszeilen-Link holt den Streifen zurueck. Nach "Zustimmen" wuerde die
+// Messung laden -- mit leeren Kennungen passiert nichts, und genau das
+// wird hier als Grundzustand festgehalten (fremdeAbrufe bleibt leer).
+{
+  const vorher = await desktop.evaluate(() => ({
+    sichtbar: !document.getElementById('einwilligung').hidden
+      && getComputedStyle(document.getElementById('einwilligung')).display !== 'none',
+    gespeichert: localStorage.length, cookies: document.cookie,
+    ja: document.getElementById('einwilligungJa').getBoundingClientRect(),
+    nein: document.getElementById('einwilligungNein').getBoundingClientRect(),
+    unten: innerHeight - document.getElementById('einwilligung').getBoundingClientRect().bottom,
+  }));
+  check('KRITISCH: der Cookie-Hinweis erscheint sofort beim ersten Besuch', vorher.sichtbar);
+  check('KRITISCH: vor der Wahl liegt nichts im Browser (kein Cookie, kein lokaler Speicher)',
+    vorher.gespeichert === 0 && vorher.cookies === '');
+  check('Der Hinweis sitzt am unteren Rand (Streifen, kein Fenster)', Math.abs(vorher.unten) < 1);
+  check('Zustimmen und Ablehnen sind gleich gross und mindestens 44 px hoch',
+    Math.abs(vorher.ja.width - vorher.nein.width) < 1 && Math.abs(vorher.ja.height - vorher.nein.height) < 1
+    && vorher.ja.height >= 44);
+
+  await klick(desktop, '#einwilligungNein');
+  await desktop.reload({ waitUntil: 'load' });
+  const nachNein = await desktop.evaluate(() => ({
+    sichtbar: !document.getElementById('einwilligung').hidden,
+    wahl: (JSON.parse(localStorage.getItem('go_einwilligung') || '{}')).wahl,
+    cookies: document.cookie, gtag: typeof window.gtag, fbq: typeof window.fbq,
+  }));
+  check('KRITISCH: nach Ablehnen bleibt der Hinweis auch nach Neuladen weg', !nachNein.sichtbar && nachNein.wahl === 'nein');
+  check('KRITISCH: nach Ablehnen wird nichts geladen (kein gtag, kein fbq, kein Cookie, kein fremder Abruf)',
+    nachNein.gtag === 'undefined' && nachNein.fbq === 'undefined' && nachNein.cookies === '' && fremdeAbrufe.length === 0);
+
+  await klick(desktop, '#einwilligungAendern');
+  const wieder = await desktop.evaluate(() => !document.getElementById('einwilligung').hidden);
+  check('"Cookie-Einstellungen" in der Fusszeile holt den Hinweis zurueck', wieder);
+  await klick(desktop, '#einwilligungJa');
+  await desktop.waitForTimeout(300);
+  const nachJa = await desktop.evaluate(() => ({
+    sichtbar: !document.getElementById('einwilligung').hidden,
+    wahl: (JSON.parse(localStorage.getItem('go_einwilligung') || '{}')).wahl,
+  }));
+  check('Nach Zustimmen ist der Hinweis weg und die Wahl gespeichert', !nachJa.sichtbar && nachJa.wahl === 'ja');
+  // Nach Zustimmen laedt genau das, was die Datenschutzerklaerung nennt --
+  // und nichts sonst. test_recht.mjs koppelt die Nennung an den Code.
+  const ga = fremdeAbrufe.filter(u => /googletagmanager\.com\/gtag\/js\?id=G-[A-Z0-9]+/.test(u));
+  const meta = fremdeAbrufe.filter(u => /connect\.facebook\.net/.test(u));
+  const anderes = fremdeAbrufe.filter(u => !ga.includes(u) && !meta.includes(u));
+  const datenschutzText = readFileSync(new URL('../datenschutz.html', import.meta.url), 'utf8');
+  check('KRITISCH: nach Zustimmen laedt Google Analytics genau dann, wenn die Datenschutzerklaerung es nennt',
+    (ga.length === 1) === /<strong>Google Analytics 4<\/strong>/.test(datenschutzText));
+  check('KRITISCH: nach Zustimmen laedt der Meta-Pixel genau dann, wenn die Datenschutzerklaerung ihn nennt',
+    (meta.length === 1) === /<strong>Meta-Pixel<\/strong>/.test(datenschutzText));
+  check('KRITISCH: nach Zustimmen laedt nichts ausser den genannten Diensten', anderes.length === 0);
+  if (anderes.length) { bad.push('fremd nach Zustimmen: ' + anderes.slice(0, 3).join(', ')); }
+  // Wie weit jemand liest: Abschnitte melden sich, sobald sie die Mitte
+  // erreichen -- einmal je Abschnitt, auch beim zweiten Vorbeiscrollen.
+  for (const id of ['ausgangslage', 'gav', 'ausgangslage']) {
+    await desktop.evaluate(i => document.getElementById(i).scrollIntoView({ block: 'center', behavior: 'instant' }), id);
+    await desktop.waitForTimeout(250);
+  }
+  const abschnitte = await desktop.evaluate(() => (window.dataLayer || [])
+    .filter(e => e[0] === 'event' && e[1] === 'abschnitt_gesehen').map(e => e[2].abschnitt));
+  check('Gelesene Abschnitte werden gemeldet, jeder nur einmal',
+    abschnitte.includes('ausgangslage') && abschnitte.includes('gav')
+    && abschnitte.filter(a => a === 'ausgangslage').length === 1);
+  // Fuer die weiteren Pruefungen: Hinweis weg, damit er keinen Klick abfaengt.
+  await desktop.evaluate(() => document.fonts.ready);
+}
 
 const schriften = await desktop.evaluate(() => ({
   archivo: document.fonts.check('700 40px Archivo'),
@@ -339,6 +416,13 @@ check('Nach dem Erfolg steht die Antwort des Servers da und die Felder sind weg'
   && (await desktop.textContent('#demoDankeText')).includes('Zugangsdaten')
   && !(await desktop.isVisible('#demoKnopf')));
 await desktop.screenshot({ path: `${OUT}/homepage-02-gesendet.png`, fullPage: false });
+{
+  const ereignisse = await desktop.evaluate(() => (window.dataLayer || [])
+    .filter(e => e[0] === 'event').map(e => e[1]));
+  check('Nach Zustimmen werden "Formular begonnen" und "Demo angefragt" gemeldet, beides genau einmal',
+    ereignisse.filter(e => e === 'formular_begonnen').length === 1
+    && ereignisse.filter(e => e === 'generate_lead').length === 1);
+}
 
 // "Nicht eingerichtet" ist etwas anderes als "fehlgeschlagen": Die Meldung
 // des Servers muss WOERTLICH ankommen, nicht durch einen Einheitstext ersetzt.
@@ -373,6 +457,21 @@ await desktop.close();
 const handy = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 await handy.goto(SEITE, { waitUntil: 'load' });
 await handy.evaluate(() => document.fonts.ready);
+{
+  const h = await handy.evaluate(() => {
+    const r = s => document.querySelector(s).getBoundingClientRect();
+    const ja = r('#einwilligungJa'), nein = r('#einwilligungNein'), st = r('#einwilligung');
+    return { sichtbar: !document.getElementById('einwilligung').hidden, ja, nein,
+             nebeneinander: Math.abs(ja.top - nein.top) < 1, breiteSt: st.width, innerW: innerWidth,
+             ueberlauf: document.documentElement.scrollWidth > innerWidth };
+  });
+  check('Handy: der Cookie-Hinweis erscheint sofort', h.sichtbar);
+  check('Handy: Zustimmen und Ablehnen stehen nebeneinander, gleich breit, mindestens 44 px hoch',
+    h.nebeneinander && Math.abs(h.ja.width - h.nein.width) < 1 && h.ja.height >= 44 && h.nein.height >= 44);
+  check('Handy: der Hinweis erzeugt keinen horizontalen Ueberlauf', !h.ueberlauf && h.breiteSt <= h.innerW);
+  await handy.screenshot({ path: `${OUT}/homepage-04-handy-einwilligung.png` });
+  await klick(handy, '#einwilligungNein');
+}
 const masseHandy = await handy.evaluate(() => {
   const sichtbar = e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const knoepfe = [...document.querySelectorAll('.btn, button, .faq summary')].filter(sichtbar);

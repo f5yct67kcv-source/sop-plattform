@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+<!--
+  BETRIEB BESPRECHEN -- Terminbuchung fuer guardops.ch (ENT-731, ENT-733).
+
+  Der zweite Weg neben dem Testzugang: Wer zuerst reden will, statt selbst
+  hineinzuschauen, waehlt hier Art, Tag und Zeit. Aufbau und Logik nach
+  formateins.ch/gespraech, Gestaltung nach homepage.html. Der Kalender ist
+  ein eigener GuardOpS-Kalender, unabhaengig von formateins (ENT-733).
+
+  Der Server ist api/termine.php (backend/api/termine.php,
+  backend/termine_kalender.php). Vier Zustaende, vier Texte: nicht
+  eingerichtet, Kalender antwortet nicht, nichts frei, freie Zeiten.
+
+  Messung: Diese Seite zeigt keinen eigenen Cookie-Hinweis. Sie laedt Google
+  Analytics nur, wenn auf der Startseite bereits zugestimmt wurde
+  (go_einwilligung = ja). Ohne Wahl gilt: nichts laden.
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Betrieb besprechen – GuardOpS</title>
+<meta name="description" content="Ein Gespräch über Ihren Betrieb: 30 Minuten per Telefon oder Video, unverbindlich. Wählen Sie Tag und Zeit, die Bestätigung kommt sofort.">
+<link rel="icon" href="icons/guardops-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/guardops-180.png">
+<link rel="canonical" href="https://guardops.ch/gespraech.html">
+<meta name="robots" content="index,follow">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://guardops.ch/gespraech.html">
+<meta property="og:title" content="Betrieb besprechen – GuardOpS">
+<meta property="og:description" content="30 Minuten per Telefon oder Video, unverbindlich. Tag und Zeit selbst wählen.">
+<meta property="og:image" content="https://guardops.ch/homepage-bilder/vorschau.jpg">
+<style>
+@font-face{font-family:"Archivo";font-style:normal;font-weight:100 900;font-stretch:62% 125%;font-display:swap;src:url(fonts/archivo-variable-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:100 700;font-display:swap;src:url(fonts/plex-sans-variable-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/plex-mono-400-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/plex-mono-500-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+:root{
+  /* Dunkle Gruende = das dunkle Glas-Thema des Cockpits (dashboard.html, html[data-thema="dunkel"]),
+     helle Gruende = sein helles Thema. Dieselben Werte, nicht aehnliche -- test_homepage.mjs misst das. */
+  --nacht:#0F1117; --nacht-2:#161B27; --nacht-3:#1E2535; --nacht-linie:#2A3147; --nacht-linie-2:#3B4560;
+  --nebel:#F7F8FA; --weiss:#FFFFFF; --linie:#E5E8EC; --linie-soft:#EFF1F4;
+  --tinte:#14161A; --tinte-2:#545B67; --tinte-3:#8B919D;
+  --stahl:#B6BCC8; --stahl-2:#B6BCC8; --stahl-hi:#F2F4F8;
+  /* Blau bedient: Knoepfe, Verweise, Vorzeilen -- der Akzent des Cockpits (dunkel #7098F7, hell #2F5BD7). */
+  --blau:#7098F7; --blau-hi:#8DAEFA; --blau-tief:#2F5BD7; --knopf:#3B67E8; --knopf-hi:#2F5BD7;
+  /* Bernstein meldet: nur wo etwas laeuft oder Aufmerksamkeit will -- die Warnfarbe des Cockpits. */
+  --signal:#E2B156; --signal-tief:#9A6B08; --signal-soft:#2B2314;
+  /* Produktoberflaeche in den Bildschirmen: das dunkle Thema 1:1 */
+  --p-shell:#0B0D11; --p-shell-hi:#14171C; --p-shell-line:#23272F; --p-shell-txt:#8A919E; --p-shell-txt-hi:#F2F4F8;
+  --p-bg:#0F1117; --p-surface:#161B27; --p-surface-2:#1E2535; --p-surface-3:#242C3E; --p-line:#2A3147; --p-line-soft:#232A3B; --p-line-hi:#3B4560;
+  --p-ink:#F2F4F8; --p-ink2:#B6BCC8; --p-ink3:#868D9A;
+  --p-accent:#7098F7; --p-accent-hi:#8DAEFA; --p-accent-soft:#1A2440; --p-accent-line:#2D3D63; --p-knopf:#3B67E8;
+  --p-pos:#4FCE96; --p-pos-soft:#10281E; --p-neg:#F27F70; --p-neg-soft:#2E1A18; --p-warn:#E2B156; --p-warn-soft:#2B2314; --p-warn-line:#4A3C1C;
+
+  --display:"Archivo","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono","SFMono-Regular",Menlo,Consolas,monospace;
+
+  --w:1240px;
+  --pad:clamp(20px,4vw,48px);
+  --abs:clamp(80px,10vw,136px);
+
+  /* Abschnittsfarben, werden je Abschnitt neu gesetzt */
+  --g:var(--nacht); --t:var(--stahl-hi); --t2:var(--stahl); --t3:#868D9A; --rule:var(--nacht-linie); --acc-t:var(--blau);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--nacht);color:var(--stahl-hi);font-family:var(--body);font-size:17px;line-height:1.6;font-feature-settings:"ss01";-webkit-font-smoothing:antialiased;overflow-x:hidden}
+img,svg{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--blau);outline-offset:3px;border-radius:2px}
+.skip{position:absolute;left:-999px;top:8px;background:var(--knopf);color:#fff;padding:8px 12px;z-index:100}
+.skip:focus{left:8px}
+.wrap{max-width:var(--w);margin:0 auto;padding:0 var(--pad)}
+
+/* Typografie */
+.vorzeile{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc-t);margin:0 0 20px;display:flex;align-items:center;gap:12px}
+.vorzeile::before{content:"";width:22px;height:1px;background:currentColor;opacity:.8}
+.display{font-family:var(--display);font-stretch:72%;font-weight:700;text-transform:uppercase;line-height:.94;letter-spacing:-.005em;margin:0;text-wrap:balance;color:var(--t);overflow-wrap:anywhere;min-width:0}
+.btn{display:inline-flex;align-items:center;gap:10px;height:52px;padding:0 24px;border-radius:4px;font-weight:600;font-size:16px;border:1px solid transparent;cursor:pointer;transition:background .18s,border-color .18s,transform .18s;white-space:nowrap}
+.btn svg{width:18px;height:18px}
+.btn.primaer{background:var(--knopf);color:#fff;border-color:var(--knopf)}
+.btn.primaer:hover{background:var(--knopf-hi)}
+.btn.sekundaer{background:transparent;color:var(--t);border-color:var(--rule)}
+.btn.sekundaer:hover{border-color:var(--t2)}
+.btn:active{transform:translateY(1px)}
+
+/* ─────────────────────────────────────────────────────────────
+   Kopfleiste
+   ───────────────────────────────────────────────────────────── */
+.kopf{position:sticky;top:0;z-index:50;background:rgba(15,17,23,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid transparent;transition:border-color .2s}
+.kopf.fest{border-bottom-color:var(--nacht-linie)}
+.kopf .wrap{display:flex;align-items:center;justify-content:space-between;height:72px;gap:24px}
+.marke{display:inline-flex;align-items:center;gap:12px;color:var(--stahl-hi)}
+/* 460:593 aus dem Original -- Breite folgt der Hoehe, sonst staucht das Schild. */
+.marke svg{height:30px;width:23.3px}
+/* Gesetzt, nicht das Original (siehe Dateikopf): gemischt wie im Logo,
+   nicht in Versalien -- "GUARDOPS" waere neben der echten Marke falsch. */
+.wortmarke{font-family:var(--display);font-stretch:103%;font-weight:600;letter-spacing:.005em;font-size:20px}
+.kopf nav{display:flex;align-items:center;gap:4px}
+.kopf nav a{font-size:15px;color:var(--stahl-2);padding:10px 14px;border-radius:4px;transition:color .15s;white-space:nowrap}
+.kopf nav .btn{display:none}
+.kopf nav a:hover{color:var(--stahl-hi)}
+.kopf .btn{height:44px;padding:0 18px;font-size:15px}
+
+/* ── Terminwahl ────────────────────────────────────────────── */
+.kopf{position:static}
+.kopf .marke{min-height:44px}
+.kopf .zurueck{font-size:15px;color:var(--stahl-2);padding:10px 4px;min-height:44px;display:inline-flex;align-items:center}
+.kopf .zurueck:hover{color:var(--stahl-hi)}
+main{background:radial-gradient(ellipse 70% 60% at 15% 0%,#1a2236 0%,var(--nacht) 60%);padding:clamp(48px,7vw,96px) 0 clamp(64px,8vw,120px)}
+.titel h1{font-size:clamp(44px,5.6vw,80px)}
+.titel p:not(.vorzeile){margin:18px 0 0;max-width:56ch;color:var(--stahl);font-size:18px}
+.raster{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:clamp(28px,4vw,56px);margin-top:clamp(36px,5vw,56px);align-items:start}
+.wer{border:1px solid var(--nacht-linie);background:var(--nacht-2);border-radius:12px;padding:24px;position:sticky;top:24px}
+.wer .zeile1{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin:0 0 14px}
+.wer h2{margin:0;font-family:var(--display);font-stretch:90%;font-weight:600;font-size:24px;line-height:1.15}
+.wer ul{list-style:none;margin:18px 0 0;padding:18px 0 0;border-top:1px solid var(--nacht-linie);display:grid;gap:12px}
+.wer li{display:grid;grid-template-columns:20px minmax(0,1fr);gap:12px;align-items:start;color:var(--stahl);font-size:15px;line-height:1.45}
+.wer li svg{width:18px;height:18px;color:var(--blau);margin-top:2px}
+.wer li b{color:var(--stahl-hi);font-weight:600}
+.wer .klein{margin:18px 0 0;font-size:13px;color:var(--t3)}
+.wer .klein a{color:var(--stahl-hi);text-decoration:underline;text-underline-offset:3px}
+.schritt{margin:0 0 36px}
+.etikett{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--stahl);margin:0 0 14px;display:flex;align-items:center;gap:12px}
+.etikett b{color:var(--blau);font-weight:500}
+.etikett i{width:28px;height:1px;background:var(--blau);opacity:.8}
+.arten{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.art{text-align:left;background:var(--nacht-2);border:1px solid var(--nacht-linie);border-radius:8px;padding:18px 20px;cursor:pointer;min-height:44px;transition:border-color .15s,background .15s}
+.art strong{display:block;font-size:18px;font-weight:600;color:var(--stahl-hi)}
+.art span{display:block;margin-top:6px;font-size:15px;color:var(--stahl);line-height:1.45}
+.art:hover{border-color:var(--nacht-linie-2)}
+.art[aria-pressed="true"]{border-color:var(--blau);background:#18213a;box-shadow:inset 3px 0 0 var(--blau)}
+.tage{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
+.tag{background:var(--nacht-2);border:1px solid var(--nacht-linie);border-radius:6px;padding:12px 6px;text-align:center;cursor:pointer;min-height:44px;transition:border-color .15s,background .15s}
+.tag small{display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--t3)}
+.tag strong{display:block;font-family:var(--display);font-stretch:90%;font-weight:600;font-size:21px;margin:4px 0 2px;color:var(--stahl-hi)}
+.tag span{display:block;font-size:13px;color:var(--stahl)}
+.tag:hover{border-color:var(--nacht-linie-2)}
+.tag[aria-pressed="true"]{background:var(--knopf);border-color:var(--knopf)}
+.tag[aria-pressed="true"] small,.tag[aria-pressed="true"] span{color:#E6ECFF}
+.zeiten{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px;margin-top:14px}
+.zeit{background:transparent;border:1px solid var(--nacht-linie-2);border-radius:6px;height:52px;font-family:var(--mono);font-size:17px;cursor:pointer;color:var(--stahl-hi);transition:border-color .15s,background .15s}
+.zeit:hover{border-color:var(--stahl)}
+.zeit[aria-pressed="true"]{background:var(--knopf);border-color:var(--knopf)}
+.hinweis{border:1px dashed var(--nacht-linie-2);border-radius:8px;padding:18px 20px;color:var(--stahl);font-size:16px;line-height:1.55}
+.hinweis a{color:var(--stahl-hi);text-decoration:underline;text-underline-offset:3px}
+.felder{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 18px}
+.feld{display:grid;gap:8px;min-width:0}
+.feld.breit{grid-column:1/-1}
+.feld label{font-size:15px;font-weight:600;color:var(--stahl-hi)}
+.feld input{height:52px;border:1px solid var(--nacht-linie);background:var(--nacht-3);color:var(--stahl-hi);border-radius:6px;padding:0 14px;font-size:16px;width:100%}
+.feld input:focus{border-color:var(--blau);outline:none}
+.feld input[aria-invalid="true"]{border-color:#F27F70}
+.falle{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.senden{margin-top:26px;display:flex;flex-wrap:wrap;align-items:center;gap:16px}
+.leise{margin:16px 0 0;font-size:14px;color:var(--t3);line-height:1.55;max-width:64ch}
+.leise a{color:var(--stahl);text-decoration:underline;text-underline-offset:3px}
+.meldung{margin:14px 0 0;font-size:15px;color:#F27F70;display:none}
+.meldung.zeigen{display:block}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.ende{max-width:720px}
+.ende h2{font-family:var(--display);font-stretch:72%;font-weight:700;text-transform:uppercase;font-size:clamp(40px,5vw,64px);line-height:.95;margin:0}
+.ende p{color:var(--stahl);font-size:18px;margin:18px 0 0}
+.ende .karte{margin-top:26px;border:1px solid var(--nacht-linie);border-left:3px solid var(--blau);background:var(--nacht-2);border-radius:8px;padding:20px 22px}
+.ende .karte strong{display:block;font-size:22px;color:var(--stahl-hi)}
+.ende .karte span{display:block;margin-top:6px;color:var(--stahl)}
+[hidden]{display:none!important}
+.fuss{border-top:1px solid var(--nacht-linie);padding:28px 0;font-size:14px;color:var(--t3)}
+.fuss .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between}
+.fuss nav{display:flex;flex-wrap:wrap;gap:4px 18px}
+.fuss nav a{color:var(--stahl);min-height:44px;display:inline-flex;align-items:center}
+.fuss nav a:hover{color:var(--stahl-hi)}
+@media (max-width:860px){
+  .raster{grid-template-columns:minmax(0,1fr)}
+  .wer{position:static}
+}
+@media (max-width:560px){
+  .arten,.felder{grid-template-columns:minmax(0,1fr)}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#inhalt">Zum Inhalt</a>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="marke" viewBox="0 0 460 593">
+      <path fill="currentColor" d="M230 0 460 79 460 154 416 154 416 109.9 230 46 44 109.9 44 364.4 230 535 416 364.4 416 308 206 308 233 264 460 264 460 382 230 593 0 382 0 79Z"/>
+    </symbol>
+    <symbol id="i-pfeil" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-tel" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 10.5l5-3v9l-5-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-uhr" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-kalender" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 10h17M8 3v4M16 3v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<header class="kopf">
+  <div class="wrap">
+    <a class="marke" href="./" aria-label="GuardOpS – Startseite"><svg><use href="#marke"/></svg><span class="wortmarke" data-brand>GuardOpS</span></a>
+    <a class="zurueck" href="./">Zur Startseite</a>
+  </div>
+</header>
+
+<main id="inhalt">
+  <div class="wrap">
+    <section id="buchen" aria-labelledby="titel">
+      <div class="titel">
+        <p class="vorzeile">Betrieb besprechen</p>
+        <h1 class="display" id="titel">Wann passt es Ihnen?</h1>
+        <p>Wählen Sie Art, Tag und Zeit. 30 Minuten, unverbindlich. Sie erhalten sofort eine Bestätigung mit Kalendereintrag.</p>
+      </div>
+
+      <div class="raster">
+        <aside class="wer" aria-label="Ihr Gespräch">
+          <p class="zeile1">Ihr Gespräch</p>
+          <h2>Ihr Betrieb, Ihre Fragen.</h2>
+          <ul>
+            <li><svg><use id="artSymbol" href="#i-video"/></svg><span id="wieZeile"><b>Video</b>, per kMeet</span></li>
+            <li><svg><use href="#i-uhr"/></svg><span>30 Minuten</span></li>
+            <li><svg><use href="#i-kalender"/></svg><span id="wannZeile">Noch keine Zeit gewählt</span></li>
+          </ul>
+          <p class="klein">Lieber zuerst selbst hineinschauen? <a href="./#demo">Testzugang anfordern</a></p>
+        </aside>
+
+        <form id="formular" novalidate>
+          <div class="schritt">
+            <p class="etikett"><b>01</b><i aria-hidden="true"></i>Wie</p>
+            <div class="arten" role="group" aria-label="Art des Gesprächs">
+              <button type="button" class="art" data-art="telefon" aria-pressed="false"><strong>Telefon</strong><span>30 Minuten. Wir rufen Sie an.</span></button>
+              <button type="button" class="art" data-art="video" aria-pressed="true"><strong>Video</strong><span>30 Minuten per kMeet, im Browser, ohne Konto. Wir zeigen Ihnen die Software live.</span></button>
+            </div>
+          </div>
+
+          <div class="schritt">
+            <p class="etikett"><b>02</b><i aria-hidden="true"></i>Wann</p>
+            <div id="wann" aria-live="polite"><p class="hinweis" id="laden">Freie Zeiten werden geladen …</p></div>
+          </div>
+
+          <div class="schritt">
+            <p class="etikett"><b>03</b><i aria-hidden="true"></i>Wer</p>
+            <div class="felder">
+              <div class="feld breit"><label for="firma">Betrieb</label><input id="firma" name="firma" autocomplete="organization" placeholder="Name Ihres Sicherheitsdienstes" required></div>
+              <div class="feld"><label for="name">Name</label><input id="name" name="name" autocomplete="name" placeholder="Vor- und Nachname" required></div>
+              <div class="feld"><label for="telefon">Telefon</label><input id="telefon" name="telefon" type="tel" autocomplete="tel" placeholder="079 000 00 00" required></div>
+              <div class="feld breit"><label for="email">E-Mail</label><input id="email" name="email" type="email" autocomplete="email" placeholder="name@betrieb.ch" required></div>
+              <div class="falle" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
+            </div>
+            <div class="senden">
+              <button class="btn primaer" type="submit" id="buchenKnopf">Termin buchen <svg><use href="#i-pfeil"/></svg></button>
+            </div>
+            <p class="meldung" id="meldung" role="alert"></p>
+            <p class="leise">Absagen geht jederzeit über den Link in der Bestätigung. Ihre Angaben verwenden wir nur für dieses Gespräch, mehr dazu in der <a href="datenschutz.html">Datenschutzerklärung</a>.</p>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="ende" id="danke" hidden aria-labelledby="dankeTitel">
+      <p class="vorzeile">Gespräch gebucht</p>
+      <h2 id="dankeTitel">Danke. Wir sprechen uns.</h2>
+      <div class="karte"><strong id="dankeWann"></strong><span id="dankeWie"></span></div>
+      <p id="dankeText">Die Bestätigung mit Kalendereintrag ist unterwegs. Darin steht auch der Link, falls Sie absagen müssen.</p>
+      <p><a class="btn sekundaer" href="./">Zur Startseite</a></p>
+    </section>
+
+    <section class="ende" id="absage" hidden aria-labelledby="absageTitel">
+      <p class="vorzeile">Termin absagen</p>
+      <h2 id="absageTitel">Termin absagen?</h2>
+      <p id="absageText">Der Termin wird aus unserem Kalender entfernt, die Zeit ist danach wieder frei.</p>
+      <p class="meldung" id="absageMeldung" role="alert"></p>
+      <div class="senden">
+        <button class="btn primaer" type="button" id="absageKnopf">Ja, absagen</button>
+        <a class="btn sekundaer" href="gespraech.html">Neuen Termin wählen</a>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="fuss">
+  <div class="wrap">
+    <span>© 2026 <span data-brand>GuardOpS</span>, eine Marke der pzu consulting gmbh</span>
+    <nav aria-label="Rechtliches"><a href="./">Startseite</a><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a></nav>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var API = 'api/termine.php';
+  var KONTAKT = '<a href="mailto:info@guardops.ch">info@guardops.ch</a>';
+  var WT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  var WT_LANG = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+  var MON = ['Jan','Feb','März','Apr','Mai','Juni','Juli','Aug','Sept','Okt','Nov','Dez'];
+  var MON_LANG = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  var geoeffnet = Date.now();
+  var wahl = { art: 'video', datum: '', zeit: '' };
+  var tage = {};
+
+  var wann = document.getElementById('wann');
+  var formular = document.getElementById('formular');
+  var knopf = document.getElementById('buchenKnopf');
+  var meldung = document.getElementById('meldung');
+
+  function datum(s){ var t = s.split('-'); return new Date(+t[0], +t[1] - 1, +t[2]); }
+  function inWorten(d, z){ var x = datum(d); return WT_LANG[x.getDay()] + ', ' + x.getDate() + '. ' + MON_LANG[x.getMonth()] + ', ' + z + ' Uhr'; }
+  function melde(text){ meldung.textContent = text; meldung.classList.toggle('zeigen', !!text); }
+
+  // ── Messung nur mit Zustimmung von der Startseite ─────────────
+  var MESSUNG = { ga: 'G-DK3G9YGFB8' };
+  function zugestimmt(){
+    try {
+      var r = JSON.parse(localStorage.getItem('go_einwilligung') || 'null');
+      return !!r && r.wahl === 'ja' && typeof r.bis === 'number' && r.bis > Date.now();
+    } catch (e) { return false; }
+  }
+  if (zugestimmt()) {
+    if (MESSUNG.ga) {
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = function(){ window.dataLayer.push(arguments); };
+      window.gtag('js', new Date());
+      window.gtag('config', MESSUNG.ga, { anonymize_ip: true });
+      var s = document.createElement('script'); s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(MESSUNG.ga);
+      document.head.appendChild(s);
+    }
+  }
+  function messen(art){
+    if (!zugestimmt()) { return; }
+    if (window.gtag) { window.gtag('event', 'gespraech_gebucht', { art: art }); }
+  }
+
+  // ── Zusammenfassung links ─────────────────────────────────────
+  function zusammenfassen(){
+    var video = wahl.art === 'video';
+    document.getElementById('artSymbol').setAttribute('href', video ? '#i-video' : '#i-tel');
+    document.getElementById('wieZeile').innerHTML = video ? '<b>Video</b>, per kMeet' : '<b>Telefon</b>, wir rufen Sie an';
+    var w = document.getElementById('wannZeile');
+    if (wahl.datum && wahl.zeit) { w.innerHTML = '<b>' + inWorten(wahl.datum, wahl.zeit) + '</b>'; }
+    else { w.textContent = 'Noch keine Zeit gewählt'; }
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('.art'), function(b){
+    b.addEventListener('click', function(){
+      wahl.art = b.getAttribute('data-art');
+      Array.prototype.forEach.call(document.querySelectorAll('.art'), function(x){ x.setAttribute('aria-pressed', String(x === b)); });
+      zusammenfassen();
+    });
+  });
+
+  // ── Tage und Zeiten ───────────────────────────────────────────
+  function hinweis(html){ wann.innerHTML = '<p class="hinweis">' + html + '</p>'; knopf.disabled = true; }
+
+  function zeitenZeigen(){
+    var alt = wann.querySelector('.zeiten'); if (alt) { alt.remove(); }
+    if (!wahl.datum) { return; }
+    var box = document.createElement('div'); box.className = 'zeiten'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Uhrzeit');
+    (tage[wahl.datum] || []).forEach(function(z){
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'zeit'; b.textContent = z;
+      b.setAttribute('aria-pressed', String(z === wahl.zeit));
+      b.addEventListener('click', function(){
+        wahl.zeit = z;
+        Array.prototype.forEach.call(box.children, function(x){ x.setAttribute('aria-pressed', String(x === b)); });
+        zusammenfassen();
+      });
+      box.appendChild(b);
+    });
+    wann.appendChild(box);
+  }
+
+  function tageZeigen(){
+    var liste = Object.keys(tage).sort();
+    wann.innerHTML = '';
+    var box = document.createElement('div'); box.className = 'tage'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Tag');
+    liste.forEach(function(d){
+      var x = datum(d), n = tage[d].length;
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'tag';
+      b.setAttribute('aria-pressed', String(d === wahl.datum));
+      b.innerHTML = '<small>' + WT[x.getDay()] + '</small><strong>' + x.getDate() + '. ' + MON[x.getMonth()] + '</strong><span>' + n + ' frei</span>';
+      b.addEventListener('click', function(){
+        wahl.datum = d; wahl.zeit = '';
+        Array.prototype.forEach.call(box.children, function(y){ y.setAttribute('aria-pressed', String(y === b)); });
+        zusammenfassen(); zeitenZeigen();
+      });
+      box.appendChild(b);
+    });
+    wann.appendChild(box);
+    knopf.disabled = false;
+    zeitenZeigen();
+  }
+
+  // Vier Zustaende, vier Texte -- "nicht eingerichtet", "Kalender stumm"
+  // und "alles belegt" duerfen nicht gleich aussehen.
+  function laden(){
+    fetch(API, { headers: { 'Accept': 'application/json' } }).then(function(r){
+      return r.json().then(function(j){ return { status: r.status, json: j }; });
+    }).then(function(a){
+      if (a.status === 200 && a.json.tage) {
+        tage = a.json.tage;
+        if (Object.keys(tage).length === 0) {
+          hinweis('In den nächsten vier Wochen ist gerade alles belegt. Schreiben Sie an ' + KONTAKT + ', dann finden wir eine Zeit.');
+          return;
+        }
+        if (wahl.datum && !tage[wahl.datum]) { wahl.datum = ''; wahl.zeit = ''; }
+        tageZeigen();
+        return;
+      }
+      if (a.json && a.json.grund === 'nicht_eingerichtet') {
+        hinweis('Die Online-Terminwahl ist noch nicht eingerichtet. Schreiben Sie an ' + KONTAKT + ', wir melden uns mit Terminvorschlägen.');
+        return;
+      }
+      hinweis('Der Kalender antwortet gerade nicht. Bitte laden Sie die Seite in ein paar Minuten neu oder schreiben Sie an ' + KONTAKT + '.');
+    }).catch(function(){
+      hinweis('Keine Verbindung zum Server. Bitte laden Sie die Seite neu oder schreiben Sie an ' + KONTAKT + '.');
+    });
+  }
+
+  // ── Buchen ────────────────────────────────────────────────────
+  function feld(n){ return formular.elements[n]; }
+  function telGueltig(t){
+    if (!/^[+0-9 ()\/.\-]+$/.test(t)) { return false; }
+    var n = t.replace(/[^\d+]/g, '').replace(/^00/, '+');
+    return /^0[1-9]\d{8}$/.test(n) || /^\+410?[1-9]\d{8}$/.test(n) || /^\+(?!41)[1-9]\d{6,13}$/.test(n);
+  }
+
+  formular.addEventListener('submit', function(e){
+    e.preventDefault();
+    melde('');
+    var fehlt = [];
+    ['firma','name','telefon','email'].forEach(function(n){ feld(n).removeAttribute('aria-invalid'); });
+    if (!feld('firma').value.trim()) { fehlt.push('firma'); }
+    if (!feld('name').value.trim()) { fehlt.push('name'); }
+    if (!telGueltig(feld('telefon').value.trim())) { fehlt.push('telefon'); }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(feld('email').value.trim())) { fehlt.push('email'); }
+    fehlt.forEach(function(n){ feld(n).setAttribute('aria-invalid', 'true'); });
+    if (!wahl.datum || !wahl.zeit) { melde('Bitte wählen Sie Tag und Zeit.'); return; }
+    if (fehlt.length) { melde('Bitte die markierten Felder prüfen.'); feld(fehlt[0]).focus(); return; }
+
+    knopf.disabled = true;
+    fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aktion: 'buchen', art: wahl.art, datum: wahl.datum, zeit: wahl.zeit,
+        firma: feld('firma').value.trim(), name: feld('name').value.trim(),
+        telefon: feld('telefon').value.trim(), email: feld('email').value.trim(),
+        website: feld('website').value, dauer: Date.now() - geoeffnet })
+    }).then(function(r){
+      return r.json().then(function(j){ return { status: r.status, json: j }; });
+    }).then(function(a){
+      if (a.status === 200 && a.json.status === 'ok') {
+        document.getElementById('buchen').hidden = true;
+        document.getElementById('danke').hidden = false;
+        document.getElementById('dankeWann').textContent = a.json.wann || inWorten(wahl.datum, wahl.zeit);
+        document.getElementById('dankeWie').textContent = wahl.art === 'video'
+          ? 'Per Video über kMeet. Der Link steht in der Bestätigung.'
+          : 'Wir rufen Sie unter ' + feld('telefon').value.trim() + ' an.';
+        if (a.json.vorbehalt) {
+          document.getElementById('dankeTitel').textContent = 'Danke. Wir bestätigen von Hand.';
+          document.getElementById('dankeText').textContent = 'Unser Kalender war gerade nicht erreichbar. Ihr Wunsch ist bei uns angekommen, wir bestätigen ihn per E-Mail.';
+        } else if (a.json.bestaetigt === false) {
+          document.getElementById('dankeText').textContent = 'Der Termin steht in unserem Kalender. Die Bestätigungsmail konnte gerade nicht verschickt werden, wir melden uns per E-Mail.';
+        }
+        messen(wahl.art);
+        window.scrollTo(0, 0);
+        return;
+      }
+      if (a.json && a.json.felder) {
+        Object.keys(a.json.felder).forEach(function(n){ if (feld(n)) { feld(n).setAttribute('aria-invalid', 'true'); } });
+      }
+      melde((a.json && a.json.message) || 'Der Termin konnte nicht gebucht werden.');
+      if (a.status === 409) { wahl.zeit = ''; zusammenfassen(); laden(); }
+    }).catch(function(){
+      melde('Keine Verbindung zum Server. Bitte versuchen Sie es noch einmal.');
+    }).then(function(){ knopf.disabled = false; });
+  });
+
+  // ── Absage über den Link aus der Bestätigung ──────────────────
+  var p = new URLSearchParams(location.search);
+  if (p.get('absagen')) {
+    document.getElementById('buchen').hidden = true;
+    document.getElementById('absage').hidden = false;
+    var ak = document.getElementById('absageKnopf');
+    ak.addEventListener('click', function(){
+      ak.disabled = true;
+      fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aktion: 'absagen', uid: p.get('absagen'), t: p.get('t') || '' })
+      }).then(function(r){ return r.json().then(function(j){ return { status: r.status, json: j }; }); })
+      .then(function(a){
+        var am = document.getElementById('absageMeldung');
+        if (a.status === 200) {
+          document.getElementById('absageTitel').textContent = 'Abgesagt.';
+          document.getElementById('absageText').textContent = a.json.schon
+            ? 'Dieser Termin war bereits abgesagt.'
+            : 'Der Termin' + (a.json.wann ? ' am ' + a.json.wann : '') + ' ist abgesagt. Wählen Sie gerne eine neue Zeit.';
+          ak.hidden = true;
+          return;
+        }
+        am.textContent = (a.json && a.json.message) || 'Das hat nicht geklappt.'; am.classList.add('zeigen');
+        ak.disabled = false;
+      }).catch(function(){
+        var am = document.getElementById('absageMeldung');
+        am.textContent = 'Keine Verbindung zum Server. Bitte versuchen Sie es noch einmal.'; am.classList.add('zeigen');
+        ak.disabled = false;
+      });
+    });
+  } else {
+    zusammenfassen();
+    laden();
+  }
+})();
+</script>
+</body>
+</html>

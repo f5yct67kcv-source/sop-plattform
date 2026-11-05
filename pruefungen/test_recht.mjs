@@ -56,11 +56,25 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
 // ist die Seite eine falsche Auskunft an den Besucher -- nicht nur ein
 // veralteter Text.
 {
-  const setztCookies = /document\.cookie|localStorage|sessionStorage|indexedDB/.test(homepage)
-    || ['backend/api/demo_anfordern.php', 'backend/demo_bremse.php', 'backend/demo_zugang.php']
+  // Seit 2026-10-14 heisst die Aussage "OHNE Zustimmung keine Cookies":
+  // Der Server setzt keine, und die Seite legt vor der Wahl nichts ab.
+  // Was sie NACH der Zustimmung laedt, misst test_homepage.mjs am
+  // Browser; hier zaehlt, dass der Server keine Sitzung beginnt und die
+  // Erklaerung die Einwilligung samt Dauer nennt.
+  const serverSetztCookies = ['backend/api/demo_anfordern.php', 'backend/demo_bremse.php', 'backend/demo_zugang.php']
        .some(d => /setcookie|session_start/i.test(lies(d)));
-  check('KRITISCH: die Behauptung "keine Cookies" stimmt mit dem Code ueberein',
-    !setztCookies && /keine Cookies/i.test(datenschutz));
+  check('KRITISCH: die Behauptung "ohne Zustimmung keine Cookies" stimmt mit dem Code ueberein',
+    !serverSetztCookies && /Ohne Ihre Zustimmung setzt diese Seite\s+<strong>keine Cookies/i.test(datenschutz)
+    && /sechs\s+Monaten/i.test(datenschutz) && /Cookie-Einstellungen/.test(datenschutz)
+    && /id="einwilligungAendern"/.test(homepage));
+  // Die Erklaerung nennt genau die Dienste, die das Skript laden kann --
+  // nicht mehr und nicht weniger.
+  const laedtGoogle = /googletagmanager\.com\/gtag\/js/.test(homepage);
+  const laedtMeta = /connect\.facebook\.net/.test(homepage);
+  check('KRITISCH: die Erklaerung nennt Google Analytics genau dann, wenn die Seite es laden kann',
+    laedtGoogle === /<strong>Google Analytics 4<\/strong>/.test(datenschutz));
+  check('KRITISCH: die Erklaerung nennt den Meta-Pixel genau dann, wenn die Seite ihn laden kann',
+    laedtMeta === /<strong>Meta-Pixel<\/strong>/.test(datenschutz));
 
   // Fremde Abrufe: Die Seite behauptet, nichts von fremden Servern zu laden.
   // test_homepage.mjs misst das am Browser; hier wird die BEHAUPTUNG an
@@ -76,8 +90,34 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
     /\ssrc="https?:\/\//.test(ohneKommentare)                                  // Bild, Skript, iframe
     || /<link\b(?![^>]*rel="canonical")[^>]*href="https?:\/\//.test(ohneKommentare)  // Stilblatt, Icon, preload
     || /url\(\s*['"]?https?:\/\//.test(ohneKommentare);                        // CSS
-  check('KRITISCH: die Behauptung "nichts von fremden Servern" stimmt mit dem Code ueberein',
+  check('KRITISCH: die Behauptung "ohne Zustimmung nichts von fremden Servern" stimmt mit dem Code ueberein',
     !holtFremd && /fremden Servern/i.test(datenschutz));
+
+  // Gespraechsbuchung (ENT-731): Gibt es die Seite, muss die Erklaerung sie
+  // beschreiben -- mit jedem Feld, das die Seite tatsaechlich an den Server
+  // schickt, und mit kMeet genau dann, wenn der Server kMeet-Raeume vergibt.
+  {
+    const seite = lies('gespraech.html');
+    const logik = lies('backend/termine_kalender.php');
+    const flachDs = datenschutz.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    // Das Fallenfeld "website" ist keine Angabe eines Menschen -- Abschnitt 3
+    // beschreibt es ("Ein unsichtbares Feld").
+    const gesendet = [...seite.matchAll(/feld\('([a-z]+)'\)\.value/g)].map(m => m[1]).filter(f => f !== 'website');
+    const benannt = { firma: /Betrieb/, name: /Name/, telefon: /Telefonnummer/, email: /E-Mail-Adresse/ };
+    const abschnitt = (flachDs.match(/Wenn Sie ein Gespräch buchen([\s\S]*?)Schutz vor Massenanfragen/) || [])[1] || '';
+    check('KRITISCH: die Erklaerung hat einen Abschnitt zur Gespraechsbuchung, sobald es die Seite gibt',
+      !seite || abschnitt.length > 200);
+    // Gezaehlt wird nur die hervorgehobene Liste unter "Was erhoben wird" --
+    // "Betrieb" steht im Abschnitt sonst schon im Link "Betrieb besprechen".
+    const erhoben = ((abschnitt.match(/Was erhoben wird([\s\S]*?)Was damit geschieht/) || [])[1] || '');
+    const liste = ((datenschutz.match(/Wenn Sie ein Gespräch buchen[\s\S]*?<strong>([\s\S]*?)<\/strong>/) || [])[1] || '').replace(/\s+/g, ' ');
+    const unbenannt = [...new Set(gesendet)].filter(f => !(benannt[f] && benannt[f].test(liste) && erhoben.includes(liste.trim())));
+    check('KRITISCH: jedes Feld, das die Buchungsseite schickt, nennt die Erklaerung',
+      gesendet.length >= 4 && unbenannt.length === 0);
+    if (unbenannt.length) { bad.push('nicht genannt: ' + unbenannt.join(', ')); }
+    check('KRITISCH: die Erklaerung nennt kMeet genau dann, wenn der Server kMeet-Raeume vergibt',
+      /kmeet\.infomaniak\.com/.test(logik) === /kMeet/.test(abschnitt));
+  }
 
   // Seit ENT-601 die Gegenrichtung: Der Endpunkt, an den das Formular
   // tatsaechlich geht, LEGT einen Datensatz an -- die Seite muss das genau
