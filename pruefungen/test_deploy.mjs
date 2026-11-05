@@ -812,7 +812,7 @@ check('KRITISCH: setup wird nicht mitdeployt', !/cp\s+setup\.(php|html)\s+dist/.
     check('KRITISCH: Buchungsseite, Termin-Endpunkt und Kalenderlogik kommen ins guardops-Bündel',
       wirdKopiert('gespraech.html') && liegtImBuendel('dist-guardops/api/termine.php') && liegtImBuendel('dist-guardops/termine_kalender.php'));
     check('KRITISCH: der Deploy schreibt den Kalenderzugang ins guardops-Bündel, aus den Secrets',
-      /dist-guardops\/kalender_zugang\.php/.test(bauen) && /EFF_KALENDER_BENUTZER/.test(bauen) && /EFF_KALENDER_PASSWORT/.test(bauen));
+      /dist-guardops\/kalender_zugang\.php/.test(bauen) && ['URL', 'BENUTZER', 'PASSWORT'].every(k => bauen.includes('EFF_GUARDOPS_KALENDER_' + k)));
     check('KRITISCH: Kalenderlogik und Kalenderzugang sind auf guardops.ch nicht direkt abrufbar',
       gesperrt.split('|').includes('termine_kalender') && gesperrt.split('|').includes('kalender_zugang'));
   }

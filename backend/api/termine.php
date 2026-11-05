@@ -171,8 +171,8 @@ $beschreibung = 'Betrieb: ' . $w['firma'] . "\nTelefon: " . $w['telefon'] . "\nE
     . "\n\nGebucht über guardops.ch/gespraech.html";
 
 // Pruefen und Eintragen unter Sperre: zwei gleichzeitige Buchungen auf
-// DIESER Seite bekommen nicht dieselbe Zeit. Gegen formateins schuetzt
-// die Nachkontrolle weiter unten.
+// DIESER Seite bekommen nicht dieselbe Zeit. Gegen einen Eintrag von Hand
+// im selben Augenblick schuetzt die Nachkontrolle weiter unten.
 $sperrDatei = fopen(sys_get_temp_dir() . '/guardops-termine-sperre', 'c');
 if ($sperrDatei) { flock($sperrDatei, LOCK_EX); }
 $entsperren = function () use ($sperrDatei) { if ($sperrDatei) { flock($sperrDatei, LOCK_UN); } };
@@ -194,7 +194,7 @@ if ($termine !== null) {
     $eingetragen = in_array($code, [200, 201, 204], true);
 
     // Nachkontrolle: Hat sich in derselben Zeit etwas anderes eingetragen
-    // (formateins bucht in denselben Kalender)? Dann gibt diese Seite nach.
+    // (ein Termin von Hand)? Dann gibt diese Seite nach.
     if ($eingetragen) {
         $tag = $beginn->setTime(0, 0);
         $nachher = termine_holen($zugang, $tag, $tag->modify('+1 day'));

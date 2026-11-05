@@ -49,13 +49,13 @@ sort($wochentage);
 pruef('Eine woechentliche Freigabe Di/Do ergibt nur Dienstage und Donnerstage, ueber vier Wochen',
     array_values($wochentage) === ['2', '4'] && count($wz) >= 7 && count($wz) <= 9);
 
-// ── Nachkontrolle gegen die zweite Seite ──────────────────────────────
+// ── Nachkontrolle gegen einen gleichzeitigen Eintrag von Hand ──────────────────────────────
 $platz = new DateTimeImmutable($tag->format('Y-m-d') . ' 14:00', $zone);
 $eigene = termin_ics_lesen($ical("BEGIN:VEVENT\r\nUID:guardops-aaaaaaaaaaaaaaaaaaaa\r\nSUMMARY:GuardOpS: X\r\nDTSTART;TZID=Europe/Zurich:{$d}T140000\r\nDTEND;TZID=Europe/Zurich:{$d}T143000\r\nEND:VEVENT"));
-$fremde = termin_ics_lesen($ical("BEGIN:VEVENT\r\nUID:formateins-bbbbbbbbbbbbbbbbbbbb\r\nSUMMARY:Gespräch: Y\r\nDTSTART;TZID=Europe/Zurich:{$d}T140000\r\nDTEND;TZID=Europe/Zurich:{$d}T143000\r\nEND:VEVENT"));
+$fremde = termin_ics_lesen($ical("BEGIN:VEVENT\r\nUID:handeintrag-bbbbbbbbbbbbbbbbbbb\r\nSUMMARY:Besprechung Y\r\nDTSTART;TZID=Europe/Zurich:{$d}T140000\r\nDTEND;TZID=Europe/Zurich:{$d}T143000\r\nEND:VEVENT"));
 pruef('Die eigene Buchung allein ist keine Ueberschneidung',
     !termin_ueberschneidung(array_merge($frei, $eigene), $platz->getTimestamp(), 'guardops-aaaaaaaaaaaaaaaaaaaa', $bis));
-pruef('KRITISCH: eine gleichzeitige Buchung der anderen Seite wird erkannt',
+pruef('KRITISCH: ein gleichzeitiger anderer Termin im selben Platz wird erkannt',
     termin_ueberschneidung(array_merge($frei, $eigene, $fremde), $platz->getTimestamp(), 'guardops-aaaaaaaaaaaaaaaaaaaa', $bis));
 
 // ── Eingaben ──────────────────────────────────────────────────────────

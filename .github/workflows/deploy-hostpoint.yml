@@ -159,12 +159,13 @@ jobs:
           P_GUARDOPS_SMTP_VERSCHLUESSELUNG: ${{ secrets.GUARDOPS_SMTP_VERSCHLUESSELUNG }}
           P_GUARDOPS_SMTP_USER: ${{ secrets.GUARDOPS_SMTP_USER }}
           P_GUARDOPS_SMTP_PASSWORD: ${{ secrets.GUARDOPS_SMTP_PASSWORD }}
-          # Terminbuchung "Betrieb besprechen" (ENT-731): Zugang zum Kalender
-          # "Gespraeche" in Hostpoint Cloud Office -- derselbe Kalender wie
-          # bei formateins, darum dieselben Secret-Namen. Fehlen sie, ist die
-          # Buchung aus und gespraech.html sagt "nicht eingerichtet".
-          P_KALENDER_BENUTZER: ${{ secrets.KALENDER_BENUTZER }}
-          P_KALENDER_PASSWORT: ${{ secrets.KALENDER_PASSWORT }}
+          # Terminbuchung "Betrieb besprechen" (ENT-731, ENT-733): Zugang zum
+          # eigenen GuardOpS-Kalender in Hostpoint Cloud Office -- nicht der
+          # von formateins. Fehlt einer, ist die Buchung aus und
+          # gespraech.html sagt "nicht eingerichtet".
+          P_GUARDOPS_KALENDER_URL: ${{ secrets.GUARDOPS_KALENDER_URL }}
+          P_GUARDOPS_KALENDER_BENUTZER: ${{ secrets.GUARDOPS_KALENDER_BENUTZER }}
+          P_GUARDOPS_KALENDER_PASSWORT: ${{ secrets.GUARDOPS_KALENDER_PASSWORT }}
           # Eigener FTP-Zugang fuer betreiber.guardops.ch, beschraenkt auf
           # /home/itufeden/betreiber.guardops.ch (ENT-580, erste Etappe des
           # schrittweisen Umzugs weg von itufeden.myhostpoint.ch). Eigene
@@ -313,8 +314,9 @@ jobs:
             EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG="$P_GUARDOPS_SMTP_VERSCHLUESSELUNG"
             EFF_GUARDOPS_SMTP_USER="$P_GUARDOPS_SMTP_USER"
             EFF_GUARDOPS_SMTP_PASSWORD="$P_GUARDOPS_SMTP_PASSWORD"
-            EFF_KALENDER_BENUTZER="$P_KALENDER_BENUTZER"
-            EFF_KALENDER_PASSWORT="$P_KALENDER_PASSWORT"
+            EFF_GUARDOPS_KALENDER_URL="$P_GUARDOPS_KALENDER_URL"
+            EFF_GUARDOPS_KALENDER_BENUTZER="$P_GUARDOPS_KALENDER_BENUTZER"
+            EFF_GUARDOPS_KALENDER_PASSWORT="$P_GUARDOPS_KALENDER_PASSWORT"
             EFF_BETREIBER_FTP_HOST="$P_BETREIBER_FTP_HOST"
             EFF_BETREIBER_FTP_USER="$P_BETREIBER_FTP_USER"
             EFF_BETREIBER_FTP_PASSWORD="$P_BETREIBER_FTP_PASSWORD"
@@ -396,8 +398,9 @@ jobs:
             EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG=""
             EFF_GUARDOPS_SMTP_USER=""
             EFF_GUARDOPS_SMTP_PASSWORD=""
-            EFF_KALENDER_BENUTZER=""
-            EFF_KALENDER_PASSWORT=""
+            EFF_GUARDOPS_KALENDER_URL=""
+            EFF_GUARDOPS_KALENDER_BENUTZER=""
+            EFF_GUARDOPS_KALENDER_PASSWORT=""
             # betreiber.guardops.ch ist wie guardops.ch nur fuer Production
             # gedacht (ENT-580) -- dieselbe Begruendung wie bei
             # EFF_GUARDOPS_FTP_* direkt darueber.
@@ -546,8 +549,9 @@ jobs:
             echo "EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG=$EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG"
             echo "EFF_GUARDOPS_SMTP_USER=$EFF_GUARDOPS_SMTP_USER"
             echo "EFF_GUARDOPS_SMTP_PASSWORD=$EFF_GUARDOPS_SMTP_PASSWORD"
-            echo "EFF_KALENDER_BENUTZER=$EFF_KALENDER_BENUTZER"
-            echo "EFF_KALENDER_PASSWORT=$EFF_KALENDER_PASSWORT"
+            echo "EFF_GUARDOPS_KALENDER_URL=$EFF_GUARDOPS_KALENDER_URL"
+            echo "EFF_GUARDOPS_KALENDER_BENUTZER=$EFF_GUARDOPS_KALENDER_BENUTZER"
+            echo "EFF_GUARDOPS_KALENDER_PASSWORT=$EFF_GUARDOPS_KALENDER_PASSWORT"
             echo "EFF_BETREIBER_FTP_HOST=$EFF_BETREIBER_FTP_HOST"
             echo "EFF_BETREIBER_FTP_USER=$EFF_BETREIBER_FTP_USER"
             echo "EFF_BETREIBER_FTP_PASSWORD=$EFF_BETREIBER_FTP_PASSWORD"
@@ -1203,16 +1207,17 @@ jobs:
           # (ENT-523, erst mit diesem Merge zusammengefuehrt).
           sed -i "s|__DEMO_TESTMAIL__||g"                                 dist-guardops/mailer.php
           sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g"           dist-guardops/demo_anfrage.php
-          # Kalenderzugang (ENT-731): eine eigene Datei aus den Secrets, kein
-          # Platzhalter im Quelltext. Per Python statt sed, weil ein Passwort
-          # "|", "&" oder "'" enthalten darf. Fehlt ein Secret, entsteht die
-          # Datei nicht -- dann ist die Buchung "nicht eingerichtet". Die
-          # Adresse ist kein Geheimnis (formateins fuehrt sie im Klartext).
+          # Kalenderzugang (ENT-731, ENT-733): eine eigene Datei aus den
+          # Secrets, kein Platzhalter im Quelltext. Per Python statt sed, weil
+          # ein Passwort "|", "&" oder "'" enthalten darf. Fehlt ein Secret,
+          # entsteht die Datei nicht -- dann ist die Buchung "nicht
+          # eingerichtet". Auch die Kalenderadresse kommt aus einem Secret:
+          # Sie gehoert zum GuardOpS-Postfach und steht nicht im Repository.
           python3 -c 'import os
-          u="https://caldav.hostpoint.ch/caldav/Y2FsOi8vMC8xMDE/"
-          b=os.environ.get("EFF_KALENDER_BENUTZER",""); p=os.environ.get("EFF_KALENDER_PASSWORT","")
+          u=os.environ.get("EFF_GUARDOPS_KALENDER_URL","")
+          b=os.environ.get("EFF_GUARDOPS_KALENDER_BENUTZER",""); p=os.environ.get("EFF_GUARDOPS_KALENDER_PASSWORT","")
           q=lambda w: chr(39)+w.replace(chr(92),chr(92)*2).replace(chr(39),chr(92)+chr(39))+chr(39)
-          if b and p:
+          if u and b and p:
               open("dist-guardops/kalender_zugang.php","w",encoding="utf-8").write("<?php\nreturn [\x27url\x27 => "+q(u)+", \x27benutzer\x27 => "+q(b)+", \x27passwort\x27 => "+q(p)+"];\n")'
 
           # Kein uebersehener Platzhalter darf hochgeladen werden. Erlaubt

@@ -1,30 +1,31 @@
 <?php
 declare(strict_types=1);
-// Terminbuchung "Betrieb besprechen" fuer guardops.ch (ENT siehe Kopf von
-// gespraech.html). Liest freie Fenster aus dem Kalender "Gespraeche" in
-// Hostpoint Cloud Office (CalDAV) und traegt Buchungen dort ein.
+// Terminbuchung "Betrieb besprechen" fuer guardops.ch (ENT-731, ENT-733).
+// Liest freie Fenster aus dem eigenen GuardOpS-Kalender in Hostpoint Cloud
+// Office (CalDAV) und traegt Buchungen dort ein.
 //
-// DERSELBE KALENDER WIE BEI FORMATEINS (Entscheid des Projektinhabers,
-// 2026-10-23). Die Logik ist von formateins.ch/termine.php uebernommen und
-// an die Regeln dieses Repositorys angepasst. So steuert der Projektinhaber
-// die Termine, ohne eine der beiden Seiten anzufassen:
+// EIN EIGENER KALENDER FUER GUARDOPS (ENT-733): Ihn nutzen der
+// Projektinhaber und sein Partner, der Gespraeche ebenfalls uebernimmt. Er
+// ist unabhaengig von formateins -- deren Termine sperren hier nichts. Die
+// Logik selbst ist von formateins.ch/termine.php uebernommen und an die
+// Regeln dieses Repositorys angepasst. Gesteuert wird nur im Kalender:
 //   - Ein Termin mit dem Titel "frei" gibt ein Fenster zur Buchung frei.
 //     Feste Zeiten als wiederkehrender Termin.
 //   - Alles andere in diesem Kalender blockiert, auch ganztaegig, und die
-//     gebuchten Gespraeche BEIDER Seiten.
+//     gebuchten Gespraeche selbst.
 // Buchbar ist nur, was ausdruecklich freigegeben ist.
 //
-// ZWEI SEITEN, EIN KALENDER -- DIE LUECKE DER SPERRE: formateins schuetzt
-// sich gegen zwei gleichzeitige Buchungen mit einer Dateisperre auf dem
-// eigenen Server. Die gilt fuer diese Seite nicht. Darum liest
-// termin_buchen() nach dem Eintragen noch einmal und nimmt die eigene
-// Buchung zurueck, wenn sich etwas anderes ueberschneidet. Im schlimmsten
-// Fall verlieren beide und buchen neu -- nie sitzen zwei im selben Platz.
+// NACHKONTROLLE NACH DEM EINTRAGEN: Die Dateisperre in api/termine.php
+// schuetzt nur gegen zwei gleichzeitige Buchungen ueber DIESE Seite. Wer im
+// selben Augenblick von Hand einen Termin in den Kalender setzt -- der
+// Partner, der Projektinhaber --, faellt nicht darunter. Darum liest
+// api/termine.php nach dem Eintragen noch einmal und nimmt die eigene
+// Buchung zurueck, wenn sich etwas ueberschneidet.
 //
 // DIESE DATEI HAT KEINE DATENBANK und keine Sitzung: Sie laeuft auf
 // guardops.ch, neben api/termine.php. Der Zugang zum Kalender kommt aus dem
 // Deploy, nie aus der Anfrage: Der Deploy schreibt aus den GitHub-Secrets
-// KALENDER_* die Datei kalender_zugang.php daneben (gesperrt in
+// GUARDOPS_KALENDER_* die Datei kalender_zugang.php daneben (gesperrt in
 // htaccess-guardops). Im Repository gibt es sie nicht -- dann ist die
 // Buchung aus und die Seite sagt "nicht eingerichtet".
 
@@ -430,8 +431,8 @@ function termin_uid_gueltig(string $uid): bool
     return preg_match('/^' . preg_quote(TERMIN_UID_PRAEFIX, '/') . '[0-9a-f]{20}$/', $uid) === 1;
 }
 
-// Kalendertitel mit der Marke vorn: Im gemeinsamen Kalender muss man sehen,
-// ob ein Gespraech fuer GuardOpS oder fuer formateins ist.
+// Kalendertitel mit der Marke vorn: Wer den GuardOpS-Kalender neben anderen
+// eingeblendet hat, sieht auf einen Blick, wofuer das Gespraech ist.
 function termin_titel(array $w): string
 {
     return 'GuardOpS: ' . $w['name'] . ', ' . $w['firma'] . ' (' . TERMIN_ARTEN[$w['art']] . ')';

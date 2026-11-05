@@ -56,7 +56,7 @@ const dav = http.createServer((req, res) => {
         const zeit = (body.match(/DTSTART:\d{8}T(\d{4})/) || [])[1];
         // dieselbe Minute in Zuercher Zeit nachbauen: einfach die UTC-Zeit des Eintrags uebernehmen
         const dt = (body.match(/DTSTART:(\d{8}T\d{6}Z)/) || [])[1];
-        kal.set('formateins-zzzzzzzzzzzzzzzzzzzz', `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:formateins-zzzzzzzzzzzzzzzzzzzz\r\nSUMMARY:Gespräch: andere Seite\r\nDTSTART:${dt}\r\nDURATION:PT30M\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`);
+        kal.set('handeintrag-zzzzzzzzzzzzzzzzzzz', `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:handeintrag-zzzzzzzzzzzzzzzzzzz\r\nSUMMARY:Besprechung von Hand\r\nDTSTART:${dt}\r\nDURATION:PT30M\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`);
         schalter.fremdNachPut = false;
         void zeit;
       }
@@ -151,12 +151,12 @@ try {
   check('KRITISCH: dieselbe Zeit ein zweites Mal -> 409 "vergeben", kein zweiter Eintrag',
     a.status === 409 && [...kal.keys()].filter(k => k.startsWith('guardops-')).length === 1);
 
-  // Die andere Seite bucht im selben Augenblick denselben Platz.
+  // Im selben Augenblick traegt jemand von Hand denselben Platz ein.
   schalter.fremdNachPut = true;
   a = await senden({ aktion: 'buchen', art: 'telefon', datum: iso(T), zeit: '15:30', ...person, website: '', dauer: 9000 });
-  check('KRITISCH: bucht die andere Seite gleichzeitig denselben Platz, nimmt diese Seite ihre Buchung zurueck (409)',
+  check('KRITISCH: steht im selben Augenblick ein anderer Termin im Platz, nimmt die Seite ihre Buchung zurueck (409)',
     a.status === 409 && [...kal.keys()].filter(k => k.startsWith('guardops-')).length === 1
-    && kal.has('formateins-zzzzzzzzzzzzzzzzzzzz'));
+    && kal.has('handeintrag-zzzzzzzzzzzzzzzzzzz'));
 
   // Absagen.
   a = await senden({ aktion: 'absagen', uid: link ? link[1] : '', t: '0'.repeat(64) });
