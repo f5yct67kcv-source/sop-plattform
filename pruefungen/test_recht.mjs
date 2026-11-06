@@ -248,7 +248,6 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
 {
   const dash = lies('dashboard.html');
   const anmeldung = lies('backend/anmeldung.php');
-  const resetLauf = lies('.github/workflows/demo-reset.yml');
   const resetKern = lies('backend/demo_reset.php');
   const flach = dsDemo.replace(/<!--[\s\S]*?-->/g, '').replace(/\s+/g, ' ');
 
@@ -289,11 +288,11 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
     /INSERT INTO anmeldeversuche \(login_name, adresse\)/.test(anmeldung)
     && /im Klartext/i.test(flach));
 
-  // Das naechtliche Leeren: Uhrzeit und Umfang aus dem Zeitplan und dem
-  // Rechenkern, nicht aus der Erinnerung.
-  const cron = (resetLauf.match(/cron:\s*'(\d+)\s+(\d+)\s/) || []);
-  check('KRITISCH: die genannte Uhrzeit des naechtlichen Leerens ist die eingestellte',
-    cron.length === 3 && new RegExp(`${cron[2].padStart(2, '0')}:${cron[1].padStart(2, '0')} UTC`).test(flach));
+  // Das naechtliche Leeren: Umfang aus dem Rechenkern, nicht aus der
+  // Erinnerung. Die Pruefung der Uhrzeit ist mit dem Workflow
+  // demo-reset.yml weggefallen (2026-11): Die Umgebung, die er
+  // zuruecksetzte, ist seit ENT-680 abgeschaltet, und er lief seither jede
+  // Nacht rot. Diese Seite beschreibt dieselbe abgeschaltete Umgebung.
   check('KRITISCH: die Behauptung "jede Tabelle" stimmt mit dem Rechenkern ueberein',
     /DATABASE\(\)/.test(resetKern) && /jede Tabelle/i.test(flach));
 
