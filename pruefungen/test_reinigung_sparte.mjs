@@ -185,7 +185,9 @@ check('KRITISCH: db.php traegt den Platzhalter __SPARTE_REINIGUNG__',
 const ersetzt = (ziel) => new RegExp(
   `__SPARTE_REINIGUNG__\\|[01]\\|g"\\s+${ziel.replace(/[/$]/g, m => '\\' + m)}`).test(wf);
 
-for (const ziel of ['dist/db.php', 'dist-guardops/db.php', 'dist-betreiber/db.php',
+// guardops.ch (frueher dist-guardops) kommt seit 2026-11 aus
+// formateins-guardops, dessen db.php keine Sparte mehr kennt.
+for (const ziel of ['dist/db.php', 'dist-betreiber/db.php',
                     'dist-portal/db.php', 'dist-cupi24/db.php']) {
   check(`KRITISCH: __SPARTE_REINIGUNG__ wird in ${ziel} beim Deploy ersetzt`, ersetzt(ziel));
 }

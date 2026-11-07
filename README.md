@@ -15,7 +15,7 @@ kein Verkauf) — siehe Entscheidungsprotokoll im Projekt-Repository.
 | Erfassung | https://rapport.itufeden.myhostpoint.ch | alle Mitarbeitenden, mobil |
 | Dashboard | https://rapport.itufeden.myhostpoint.ch/dashboard.html | nur Admin, Desktop |
 | Kundenportal | https://rapport.itufeden.myhostpoint.ch/portal.html | Kunden, Handy und Desktop |
-| Homepage | https://rapport.itufeden.myhostpoint.ch/homepage.html | öffentlich, Interessenten |
+| Homepage | https://guardops.ch (eigenes Repository `formateins-guardops`) | öffentlich, Interessenten |
 | Betreiber-Bereich | https://rapport.itufeden.myhostpoint.ch/betreiber.html | nur der Plattform-Betreiber, Desktop |
 
 Erfassung und Dashboard teilen sich Anmeldung und Backend — wer angemeldet ist,
@@ -27,15 +27,26 @@ Kundenzugang ist keine Zeile in `mitarbeiter` und erreicht darum keinen einzigen
 Verwaltungsendpunkt — `require_session()` findet ihn schlicht nicht. Angelegt
 werden die Zugänge im Cockpit unter **Administration → Kundenzugänge**.
 
-Die **Homepage** (ENT-469) ist die öffentliche Verkaufsseite. Sie lädt
-keinen Produktcode; ihre einzige Verbindung zum Server ist das
-Demo-Formular (`backend/api/demo_anfrage.php`), das eine E-Mail an die
-Adresse des Betriebs schickt — Cockpit → Administration → Einstellungen →
-Betrieb. Fehlt die Adresse oder der SMTP-Zugang, sagt die Seite das beim
-Absenden. Produktname („Wachtwerk") und Logo sind Platzhalter (OP-18);
-Impressum, Datenschutz und AGB sind noch leere Verweise. Entwurf,
-Gestaltungsentscheide und Faktenbasis der Werbeaussagen: Projekt-Repository,
-`02-gate2-produkt-mvp/homepage-entwurf.md`.
+Die **Homepage** (ENT-469) ist die öffentliche Verkaufsseite auf
+`https://guardops.ch`. Seit dem 06.11.2026 liegt sie in einem eigenen
+Repository, `formateins-guardops`, mit eigenem Deploy («guardops.ch zu
+Hostpoint»). Dieses Repository liefert sie nicht mehr aus;
+`test_deploy.mjs` schlägt an, wenn ein Schritt wieder nach guardops.ch
+hochlädt. Dort liegen auch die Terminbuchung (`api/termine.php`) und die
+Rechtstexte, die von aussen verlinkt werden.
+
+Hier bleibt, was zur Software gehört: Das Formular «Testzugang anfordern»
+auf guardops.ch spricht mit `backend/api/demo_anfordern.php` und den
+Nachbarn auf `betreiber.guardops.ch`, freigegeben über
+`OEFFENTLICHE_DEMO_SKRIPTE` in `backend/db.php`. Ändert sich dort eine
+Antwort oder ein Feld, muss die Seite in `formateins-guardops` mitziehen.
+
+`homepage.html` und die Rechtstexte liegen hier noch als **Altkopie**. Die
+massgebende Fassung ist die in `formateins-guardops`. `test_recht.mjs`
+prüft die Aussagen der Altkopie weiter gegen den Code der Plattform; wer
+dort einen Fehler findet, korrigiert ihn in beiden Repositories.
+Entwurf, Gestaltungsentscheide und Faktenbasis der Werbeaussagen:
+Projekt-Repository, `02-gate2-produkt-mvp/homepage-entwurf.md`.
 
 Der **Betreiber-Bereich** (ENT-519) steht noch einmal daneben und gehört nicht
 diesem Betrieb, sondern dem Betreiber der Plattform. Eigene Tabellen (`betreiber`,
@@ -53,7 +64,7 @@ Schritt für Schritt: Abschnitt „Betreiber-Bereich in Betrieb nehmen“ weiter
 
 ```
 index.html         Erfassung (mobil, PWA-installierbar)
-homepage.html      Oeffentliche Homepage (ENT-469), ohne Produktcode
+homepage.html      Altkopie der Homepage, massgebend in formateins-guardops
 dashboard.html     Verwaltungsoberflaeche (Desktop, admin-only)
 manifest.json      PWA-Manifest
 sw.js              Service Worker (nur fuer die Installierbarkeit)
@@ -553,8 +564,8 @@ rm demo-plaetze.json              # die Datei gehört nicht ins Repository
   eines der sieben Felder, ist das ein Fehler und keine Warnung: Eine
   Adresse, die läuft, aber auf keine Datenbank zeigt, merkt erst der
   Interessent.
-- Das Rapport-Tool, die Homepage, der Betreiber-Bereich, das Portal und
-  die Adresse der Mandantin sind zu diesem Zeitpunkt bereits ausgeliefert.
+- Das Rapport-Tool, der Betreiber-Bereich, das Portal und die Adresse
+  der Mandantin sind zu diesem Zeitpunkt bereits ausgeliefert.
   Ein Fehler in `DEMO_PLAETZE` färbt den Lauf rot, hält aber keine der
   anderen Adressen auf.
 
@@ -649,6 +660,34 @@ jedes Laufs namentlich, welche Plätze ohne Dateien geblieben sind.
 `api/demo_anfordern.php` fängt den Fall serverseitig ab, wenn der Platz
 auch im Mandantenstamm fehlt; steht er dort und hat nur keine Dateien,
 greift diese Sperre **nicht**.
+
+## Prüfzugang für die App-Store-Prüfung (ENT-732)
+
+`https://pruefung.guardops.ch` ist ein eigener Mandant mit eigener Datenbank
+und **ausschliesslich erfundenen Daten**. Dort melden sich die Prüfer von
+Apple an (Kurzname in der App: `pruefung`). Er wird nie geleert und läuft nie
+ab, anders als die Demo-Plätze.
+
+Der Deploy baut ihn wie cupi24 mit dem vollen Dateiumfang, aber mit eigener
+Datenbank, dem Postfach der Betreiberin und ohne Mandanten-Branding. Nur
+Production; fehlen die FTP-Secrets, wird er übersprungen und der Lauf sagt
+das.
+
+Secrets im Environment **production**:
+
+| Secret | Inhalt |
+|---|---|
+| `PRUEFUNG_FTP_HOST`, `PRUEFUNG_FTP_USER`, `PRUEFUNG_FTP_PASSWORD` | FTP-Zugang, beschränkt auf das Verzeichnis der Subdomain |
+| `PRUEFUNG_DB_HOST`, `PRUEFUNG_DB_NAME`, `PRUEFUNG_DB_USER` | Datenbank des Prüfzugangs |
+| `MANDANT_SECRETS`, Eintrag `pruefung` | Datenbank-Passwort (über `bash mandant-secrets.sh`; das Skript ersetzt die ganze Tafel) |
+
+Sind die FTP-Secrets gesetzt, die Datenbankangaben aber nicht vollständig,
+**bricht der Bau ab**, statt eine Anlage ohne Datenbank hochzuladen.
+
+Danach im Betreiber-Bereich: Vorrat mit denselben Datenbankangaben und
+Secret-Name `pruefung` anlegen, zuteilen (Subdomain `pruefung`), Erstkonto
+per Einladung. Die Zugangsdaten des Prüferkontos gehören in App Store
+Connect, nicht ins Repository.
 
 ## Mandanten-Vorrat (ENT-686)
 

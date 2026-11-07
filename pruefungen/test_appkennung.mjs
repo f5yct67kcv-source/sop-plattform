@@ -234,6 +234,15 @@ for (const [datei, feld, muster] of stellen) {
   // im Store -- und gegenüber den Mitarbeitenden nicht zu rechtfertigen.
   check('KRITISCH: es wird NICHT um dauerhafte Hintergrundortung gebeten',
     !/NSLocationAlwaysAndWhenInUseUsageDescription|NSLocationAlwaysUsageDescription/.test(plist));
+
+  // Die Exportfrage zur Verschlüsselung (ENT-732). Ohne Eintrag fragt App
+  // Store Connect bei JEDEM Build nach, und bis die Frage beantwortet ist,
+  // steht der Build weder in TestFlight noch zur Prüfung bereit. Die App
+  // verschlüsselt nur über das, was iOS mitbringt (HTTPS) -- das ist von
+  // der Meldepflicht ausgenommen, also <false/>. Wer später eigene
+  // Kryptografie einbaut, muss diese Antwort ändern, nicht löschen.
+  check('KRITISCH: Info.plist beantwortet die Exportfrage (ITSAppUsesNonExemptEncryption = false)',
+    /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\s*\/>/.test(plist));
 }
 
 // ══════════ ANDROID: DIESELBEN GERÄTERECHTE, ANDERS ERKLÄRT ═══════════

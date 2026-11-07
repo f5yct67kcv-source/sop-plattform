@@ -1029,6 +1029,13 @@ const OHNE_ANMELDUNG = [
   // Betriebsstammdaten, Honigtopf-Feld, eigene Bremse. Eigene Pruefung:
   // pruef_demo_anfrage.php.
   'demo_senden.php',
+  // Terminbuchung "Betrieb besprechen" auf guardops.ch (ENT-731). Wer
+  // bucht, ist ein Interessent ohne Konto -- dieselbe Lage wie bei
+  // demo_senden.php und dieselben Riegel: Bremse (Namensraum "termin:"),
+  // Fallenfeld und Zeitfalle, feste Feldliste, Empfaenger und Kalender-
+  // zugang aus dem Deploy. Absagen nur mit der HMAC-Signatur aus der
+  // Bestaetigung. Eigene Pruefung: test_termine.mjs.
+  'termine.php',
   // Der Eingang der Betreiber-Ebene (ENT-524). Kann keine Sitzung
   // verlangen, die er erst erzeugt -- dieselbe Begruendung wie login.php.
   // Erbt Bremse (eigener Namensraum "betreiber:"), Blindpruefung gegen
@@ -1532,7 +1539,13 @@ try {
   // bewusst nicht auf den Server (README, OP-17). Wer eine weitere Ausnahme
   // braucht, traegt sie hier ein und begruendet sie -- stillschweigend darf
   // keine dazukommen.
-  const bewusstDraussen = ['setup.php'];
+  //
+  // termine_kalender.php (2026-11): Die Kalenderlogik der Terminbuchung
+  // gehoerte nur ins Buendel von guardops.ch, und das liefert seither
+  // formateins-guardops aus. Die Kopie hier liegt bis zum Aufraeumen; im
+  // Buendel der Software antwortet api/termine.php ohne sie ausdruecklich
+  // "nicht eingerichtet" (siehe dort).
+  const bewusstDraussen = ['setup.php', 'termine_kalender.php'];
   fehltImDeploy = oben.filter(d => !bewusstDraussen.includes(d) && !yml.includes(`cp backend/${d} `));
   check('Die Ausnahme setup.php ist weiterhin nicht im Deploy',
     !yml.includes('cp backend/setup.php '));

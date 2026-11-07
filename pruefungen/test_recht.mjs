@@ -27,28 +27,18 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
 // ══════════ DIE UNFERTIGE SEITE DARF NICHT LIVE GEHEN ════════════════
 // Das Impressum traegt __IMPRESSUM_*__-Platzhalter, solange Firma, Adresse
 // und Unternehmensnummer fehlen. Ein Impressum mit erfundenen Angaben waere
-// schlimmer als keines -- also muss die Kopplung stimmen: entweder die
-// Platzhalter sind weg, ODER die Seite wird nicht ausgeliefert. Beides
-// zugleich ist der Fehler, den diese Pruefung verhindert.
+// schlimmer als keines.
+//
+// SEIT 2026-11 liefert formateins-guardops guardops.ch aus, nicht mehr
+// dieser Workflow. Die Kopplung "nur ausliefern, wenn fertig" und "nur
+// verlinken, was ausgeliefert wird" sitzt darum dort: werkzeuge/einsetzen.py
+// bricht bei jedem uebrig gebliebenen Platzhalter ab, test_buendel.mjs
+// findet jeden toten Link. Hier bleibt die Aussage ueber die Datei selbst,
+// solange ihre Kopie in diesem Repository liegt.
 {
   const offen = [...new Set([...impressum.matchAll(/__[A-Z][A-Z_]{2,}__/g)].map(m => m[0]))];
-  // Die echte cp-Zeile, nicht eine Erwaehnung im Kommentar daneben -- die
-  // Gegenprobe hat gezeigt, dass eine blosse Textsuche gruen bleibt, wenn
-  // nur der Kommentar den Dateinamen noch nennt.
-  const imBuendel = /^\s*cp\s+impressum\.html\s+dist-guardops\/\S+$/m.test(workflow);
-  check('KRITISCH: das Impressum wird nur ausgeliefert, wenn keine Angabe mehr fehlt',
-    offen.length === 0 || !imBuendel);
-  if (offen.length) { console.log(`  ! Impressum noch offen: ${offen.join(', ')} — darum nicht im Deploy`); }
-
-  // Dieselbe Kopplung fuer die Verweise: Eine Fusszeile, die auf eine Seite
-  // zeigt, die es auf dem Server nicht gibt, ist ein 404 auf einer
-  // Verkaufsseite. "Noch nicht da" darf nicht wie "da" aussehen.
-  const verweistAufImpressum = /href="impressum\.html"/.test(homepage);
-  check('KRITISCH: die Startseite verweist nur dann aufs Impressum, wenn es auch ausgeliefert wird',
-    verweistAufImpressum === imBuendel);
-  const verweistAufDatenschutz = /href="datenschutz\.html"/.test(homepage);
-  check('KRITISCH: die Startseite verweist nur dann auf den Datenschutz, wenn er auch ausgeliefert wird',
-    verweistAufDatenschutz === /^\s*cp\s+datenschutz\.html\s+dist-guardops\/\S+$/m.test(workflow));
+  check('KRITISCH: im Impressum fehlt keine Angabe mehr (kein offener Platzhalter)', offen.length === 0);
+  if (offen.length) { console.log(`  ! Impressum noch offen: ${offen.join(', ')}`); }
 }
 
 // ══════════ DIE AUSSAGEN GEGEN DEN CODE ══════════════════════════════
@@ -56,11 +46,25 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
 // ist die Seite eine falsche Auskunft an den Besucher -- nicht nur ein
 // veralteter Text.
 {
-  const setztCookies = /document\.cookie|localStorage|sessionStorage|indexedDB/.test(homepage)
-    || ['backend/api/demo_anfordern.php', 'backend/demo_bremse.php', 'backend/demo_zugang.php']
+  // Seit 2026-10-14 heisst die Aussage "OHNE Zustimmung keine Cookies":
+  // Der Server setzt keine, und die Seite legt vor der Wahl nichts ab.
+  // Was sie NACH der Zustimmung laedt, misst test_homepage.mjs am
+  // Browser; hier zaehlt, dass der Server keine Sitzung beginnt und die
+  // Erklaerung die Einwilligung samt Dauer nennt.
+  const serverSetztCookies = ['backend/api/demo_anfordern.php', 'backend/demo_bremse.php', 'backend/demo_zugang.php']
        .some(d => /setcookie|session_start/i.test(lies(d)));
-  check('KRITISCH: die Behauptung "keine Cookies" stimmt mit dem Code ueberein',
-    !setztCookies && /keine Cookies/i.test(datenschutz));
+  check('KRITISCH: die Behauptung "ohne Zustimmung keine Cookies" stimmt mit dem Code ueberein',
+    !serverSetztCookies && /Ohne Ihre Zustimmung setzt diese Seite\s+<strong>keine Cookies/i.test(datenschutz)
+    && /sechs\s+Monaten/i.test(datenschutz) && /Cookie-Einstellungen/.test(datenschutz)
+    && /id="einwilligungAendern"/.test(homepage));
+  // Die Erklaerung nennt genau die Dienste, die das Skript laden kann --
+  // nicht mehr und nicht weniger.
+  const laedtGoogle = /googletagmanager\.com\/gtag\/js/.test(homepage);
+  const laedtMeta = /connect\.facebook\.net/.test(homepage);
+  check('KRITISCH: die Erklaerung nennt Google Analytics genau dann, wenn die Seite es laden kann',
+    laedtGoogle === /<strong>Google Analytics 4<\/strong>/.test(datenschutz));
+  check('KRITISCH: die Erklaerung nennt den Meta-Pixel genau dann, wenn die Seite ihn laden kann',
+    laedtMeta === /<strong>Meta-Pixel<\/strong>/.test(datenschutz));
 
   // Fremde Abrufe: Die Seite behauptet, nichts von fremden Servern zu laden.
   // test_homepage.mjs misst das am Browser; hier wird die BEHAUPTUNG an
@@ -76,8 +80,34 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
     /\ssrc="https?:\/\//.test(ohneKommentare)                                  // Bild, Skript, iframe
     || /<link\b(?![^>]*rel="canonical")[^>]*href="https?:\/\//.test(ohneKommentare)  // Stilblatt, Icon, preload
     || /url\(\s*['"]?https?:\/\//.test(ohneKommentare);                        // CSS
-  check('KRITISCH: die Behauptung "nichts von fremden Servern" stimmt mit dem Code ueberein',
+  check('KRITISCH: die Behauptung "ohne Zustimmung nichts von fremden Servern" stimmt mit dem Code ueberein',
     !holtFremd && /fremden Servern/i.test(datenschutz));
+
+  // Gespraechsbuchung (ENT-731): Gibt es die Seite, muss die Erklaerung sie
+  // beschreiben -- mit jedem Feld, das die Seite tatsaechlich an den Server
+  // schickt, und mit kMeet genau dann, wenn der Server kMeet-Raeume vergibt.
+  {
+    const seite = lies('gespraech.html');
+    const logik = lies('backend/termine_kalender.php');
+    const flachDs = datenschutz.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    // Das Fallenfeld "website" ist keine Angabe eines Menschen -- Abschnitt 3
+    // beschreibt es ("Ein unsichtbares Feld").
+    const gesendet = [...seite.matchAll(/feld\('([a-z]+)'\)\.value/g)].map(m => m[1]).filter(f => f !== 'website');
+    const benannt = { firma: /Betrieb/, name: /Name/, telefon: /Telefonnummer/, email: /E-Mail-Adresse/ };
+    const abschnitt = (flachDs.match(/Wenn Sie ein Gespräch buchen([\s\S]*?)Schutz vor Massenanfragen/) || [])[1] || '';
+    check('KRITISCH: die Erklaerung hat einen Abschnitt zur Gespraechsbuchung, sobald es die Seite gibt',
+      !seite || abschnitt.length > 200);
+    // Gezaehlt wird nur die hervorgehobene Liste unter "Was erhoben wird" --
+    // "Betrieb" steht im Abschnitt sonst schon im Link "Betrieb besprechen".
+    const erhoben = ((abschnitt.match(/Was erhoben wird([\s\S]*?)Was damit geschieht/) || [])[1] || '');
+    const liste = ((datenschutz.match(/Wenn Sie ein Gespräch buchen[\s\S]*?<strong>([\s\S]*?)<\/strong>/) || [])[1] || '').replace(/\s+/g, ' ');
+    const unbenannt = [...new Set(gesendet)].filter(f => !(benannt[f] && benannt[f].test(liste) && erhoben.includes(liste.trim())));
+    check('KRITISCH: jedes Feld, das die Buchungsseite schickt, nennt die Erklaerung',
+      gesendet.length >= 4 && unbenannt.length === 0);
+    if (unbenannt.length) { bad.push('nicht genannt: ' + unbenannt.join(', ')); }
+    check('KRITISCH: die Erklaerung nennt kMeet genau dann, wenn der Server kMeet-Raeume vergibt',
+      /kmeet\.infomaniak\.com/.test(logik) === /kMeet/.test(abschnitt));
+  }
 
   // Seit ENT-601 die Gegenrichtung: Der Endpunkt, an den das Formular
   // tatsaechlich geht, LEGT einen Datensatz an -- die Seite muss das genau
@@ -218,16 +248,12 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
 {
   const dash = lies('dashboard.html');
   const anmeldung = lies('backend/anmeldung.php');
-  const resetLauf = lies('.github/workflows/demo-reset.yml');
   const resetKern = lies('backend/demo_reset.php');
   const flach = dsDemo.replace(/<!--[\s\S]*?-->/g, '').replace(/\s+/g, ' ');
 
-  // Die Kopplung "Verweis nur auf eine Seite, die es auf dem Server gibt".
-  // Der Demobereich verweist ABSOLUT auf guardops.ch -- ein 404 faende
-  // niemand von uns, sondern der Interessent auf der Anmeldemaske.
-  const imBuendel = /^\s*cp\s+datenschutz-demo\.html\s+dist-guardops\/\S+$/m.test(workflow);
-  check('KRITISCH: die Anmeldemaske verweist nur dann auf die Demo-Erklaerung, wenn sie ausgeliefert wird',
-    /datenschutz-demo\.html/.test(dash) === imBuendel);
+  // Der Demobereich verweist ABSOLUT auf guardops.ch/datenschutz-demo.html.
+  // Dass es die Seite dort gibt, prueft seit 2026-11 formateins-guardops
+  // (test_buendel.mjs, Liste VON_AUSSEN) -- von dort wird sie ausgeliefert.
 
   // "Er setzt keine Cookies": dashboard.html haelt die Sitzung im lokalen
   // Speicher. Ein setcookie/document.cookie waere die Falschaussage.
@@ -262,11 +288,11 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
     /INSERT INTO anmeldeversuche \(login_name, adresse\)/.test(anmeldung)
     && /im Klartext/i.test(flach));
 
-  // Das naechtliche Leeren: Uhrzeit und Umfang aus dem Zeitplan und dem
-  // Rechenkern, nicht aus der Erinnerung.
-  const cron = (resetLauf.match(/cron:\s*'(\d+)\s+(\d+)\s/) || []);
-  check('KRITISCH: die genannte Uhrzeit des naechtlichen Leerens ist die eingestellte',
-    cron.length === 3 && new RegExp(`${cron[2].padStart(2, '0')}:${cron[1].padStart(2, '0')} UTC`).test(flach));
+  // Das naechtliche Leeren: Umfang aus dem Rechenkern, nicht aus der
+  // Erinnerung. Die Pruefung der Uhrzeit ist mit dem Workflow
+  // demo-reset.yml weggefallen (2026-11): Die Umgebung, die er
+  // zuruecksetzte, ist seit ENT-680 abgeschaltet, und er lief seither jede
+  // Nacht rot. Diese Seite beschreibt dieselbe abgeschaltete Umgebung.
   check('KRITISCH: die Behauptung "jede Tabelle" stimmt mit dem Rechenkern ueberein',
     /DATABASE\(\)/.test(resetKern) && /jede Tabelle/i.test(flach));
 
@@ -283,6 +309,21 @@ const workflow = lies('.github/workflows/deploy-hostpoint.yml');
 // ══════════ GERENDERT ════════════════════════════════════════════════
 const browser = await chromium.launch({ executablePath: browserPfad() });
 
+// ══════════ DATENSCHUTZ DER APP: ENTWURF BLEIBT DRAUSSEN (ENT-732) ════
+// Die Seite ist ein ungeprüfter Entwurf. Solange sie das von sich sagt,
+// darf der Deploy sie nirgends hin kopieren -- jeder Push auf main geht
+// sofort live, und Apple bekäme sonst einen Link auf einen Text, den
+// niemand freigegeben hat. Fällt der Vermerk weg, darf (und soll) sie in
+// den Deploy; diese Prüfung hält dann still.
+{
+  const app = lies('datenschutz-app.html');
+  const workflow = lies('.github/workflows/deploy-hostpoint.yml');
+  const entwurf = /ENTWURF/.test(app);
+  const ausgeliefert = /^\s*cp\s+datenschutz-app\.html\s/m.test(workflow);
+  check('KRITISCH: der Entwurf der App-Datenschutzerklärung wird nicht ausgeliefert',
+    !(entwurf && ausgeliefert));
+}
+
 // Farbwerte aus dem Cockpit, nicht aehnliche -- dieselbe Kopplung wie in
 // test_homepage.mjs.
 const dash = lies('dashboard.html');
@@ -293,7 +334,8 @@ const hell = block(':root {');
 const dunkel = block('html[data-thema="dunkel"] {');
 
 for (const [datei, titel] of [['impressum.html', 'Impressum'], ['datenschutz.html', 'Datenschutz'],
-                              ['datenschutz-demo.html', 'Datenschutz Demobereich']]) {
+                              ['datenschutz-demo.html', 'Datenschutz Demobereich'],
+                              ['datenschutz-app.html', 'Datenschutz App']]) {
   for (const [breite, hoehe, wo] of [[1440, 900, 'Desktop'], [390, 844, 'Handy']]) {
     const seite = await browser.newPage({ viewport: { width: breite, height: hoehe } });
     const fremde = [];
@@ -453,7 +495,11 @@ for (const [datei, titel] of [['impressum.html', 'Impressum'], ['datenschutz.htm
   // sonst geht die naechste neue Seite mit ihrem Kopf hinaus.
   //
   // GEPRUEFT WIRD DAS ZIEL, NICHT DER DATEINAME: nutzungsbedingungen.html
-  // geht in ZWEI Buendel, ins Homepage-Buendel und auf jeden Demo-Platz.
+  // ging in ZWEI Buendel, ins Homepage-Buendel und auf jeden Demo-Platz.
+  // Seit 2026-11 liefert formateins-guardops die Homepage aus und saeubert
+  // dort selbst (werkzeuge/bauen.py, geprueft in test_buendel.mjs); hier
+  // bleiben die Demo-Plaetze mit nutzungsbedingungen.html und
+  // datenschutz-demo-platz.html.
   // Eine Pruefung, die nur nach dem Dateinamen sucht, ist schon zufrieden,
   // wenn EINES der beiden gesaeubert wird -- das andere ginge mit seinem
   // Kopf hinaus, und sie bliebe gruen. Beim Schreiben dieser Suite genau
@@ -484,7 +530,7 @@ for (const [datei, titel] of [['impressum.html', 'Impressum'], ['datenschutz.htm
     .filter(m => /^(nutzungsbedingungen|datenschutz|impressum)/.test(m[1]))
     .map(m => m[2])
     .filter((z, i, a) => a.indexOf(z) === i);
-  check('die Suche findet ueberhaupt ausgelieferte Rechtsseiten', ziele.length >= 4);
+  check('die Suche findet ueberhaupt ausgelieferte Rechtsseiten', ziele.length >= 2);
   for (const ziel of ziele) {
     check(`KRITISCH: ${ziel} wird vor der Auslieferung gesaeubert`,
       gesaeubertePfade.has(ziel));

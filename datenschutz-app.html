@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<!--
+  DATENSCHUTZERKLAERUNG der Mitarbeiter-App GuardOpS (ENT-732, Punkt 7).
+
+  ENTWURF. NICHT RECHTLICH GEPRUEFT. NICHT OHNE FREIGABE LIVE NEHMEN.
+  Darum steht die Datei bewusst NICHT im Deploy (deploy-hostpoint.yml).
+  Nach der Freigabe: dort neben datenschutz.html nach dist-guardops/
+  kopieren und in die Liste fuer rechtstexte-ausliefern.py aufnehmen.
+  Apple verlangt den Link erst bei der Einreichung.
+
+  ROLLENVERTEILUNG (Entscheid des Projektinhabers, ENT-732): Fuer die
+  Daten der Wachpersonen ist der jeweilige Betrieb verantwortlich, die
+  pzu consulting gmbh bearbeitet sie in dessen Auftrag. Das setzt den
+  Auftragsbearbeitungsvertrag voraus, der noch offen ist (ENT-524).
+
+  JEDE AUSSAGE IST AUS DEM CODE ABGELEITET, nicht aus einer Vorlage:
+    - Standort nur waehrend einer laufenden Runde und beim Melden eines
+      Ereignisses (app.html: rgOrtungStarten, rdBestaetigen, evSenden);
+      keine Hintergrundortung (Info.plist fragt nur "WhenInUse",
+      test_appkennung.mjs haelt das fest).
+    - Bewegungsspur nur auf laufender Runde, 90 Tage
+      (RUNDGANG_SPUR_TAGE, backend/rundgang.php; mein_rundgang_position.php).
+    - Fotos von Ereignissen 90 Tage (EREIGNIS_FOTO_TAGE).
+    - Fehlversuche bei der Anmeldung, nach einem Tag geloescht
+      (backend/anmeldung.php).
+    - Sitzung: nur ein Pruefwert in der Datenbank (sitzung_abdruck()),
+      Hoechstdauer 30 Tage, 14 Tage ohne Nutzung (backend/db.php).
+    - Push ueber Apple (APNs, backend/push.php).
+    - Karte ueber Google Maps (natives SDK und Maps-JavaScript-API).
+    - Kein Analysewerkzeug, keine Werbung (in app.html nichts davon).
+  Aendert sich einer dieser Punkte im Code, wird diese Seite falsch.
+
+  KEINE RECHTSBERATUNG. Der Text beschreibt, was die Software tut.
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Datenschutz in der App – GuardOpS</title>
+<meta name="description" content="Welche Daten die Mitarbeiter-App GuardOpS bearbeitet: Schichten, Rundgänge, Standort nur während der Runde, Fotos und Mitteilungen.">
+<link rel="canonical" href="https://guardops.ch/datenschutz-app.html">
+<meta name="robots" content="index,follow">
+<link rel="icon" href="icons/guardops-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icons/guardops-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="icons/guardops-180.png">
+<link rel="stylesheet" href="recht.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="marke" viewBox="0 0 460 593">
+    <path fill="currentColor" d="M230 0 460 79 460 154 416 154 416 109.9 230 46 44 109.9 44 364.4 230 535 416 364.4 416 308 206 308 233 264 460 264 460 382 230 593 0 382 0 79Z"/>
+  </symbol>
+</svg>
+
+<header class="kopf">
+  <div class="innen">
+    <a class="marke" href="index.html">
+      <svg aria-hidden="true"><use href="#marke"></use></svg>
+      <span class="wortmarke" data-brand>GuardOpS</span>
+    </a>
+    <a class="zurueck" href="index.html">Zurück zur Startseite</a>
+  </div>
+</header>
+
+<main>
+  <p class="vorzeile">Rechtliches</p>
+  <h1>Datenschutz in der App</h1>
+  <p class="stand">Stand: 5. November 2026</p>
+
+  <h2>Kurz gefasst</h2>
+  <p>Die App <strong>GuardOpS</strong> ist das Arbeitswerkzeug für Mitarbeitende
+     von Sicherheits- und Bewachungsbetrieben. Sie zeigt Ihre Schichten, führt
+     Sie durch Rundgänge und nimmt Rapporte und Meldungen entgegen. Ein Konto
+     bekommen Sie von Ihrem Arbeitgeber; selbst anlegen lässt es sich nicht.</p>
+  <p>Ihr <strong>Standort</strong> wird nur während einer laufenden Runde und beim
+     Melden eines Ereignisses verwendet, nie im Hintergrund. Die App enthält
+     <strong>kein Analysewerkzeug und keine Werbung</strong>.</p>
+  <p>Für die Verkaufsseite guardops.ch gilt eine
+     <a href="datenschutz.html">eigene Datenschutzerklärung</a>.</p>
+
+  <h2>1. Wer verantwortlich ist</h2>
+  <p>Verantwortlich für Ihre Daten in der App ist <strong>Ihr Arbeitgeber</strong>,
+     also der Betrieb, der Ihnen den Zugang gegeben hat. Er legt fest, welche
+     Schichten und Rundgänge Sie sehen, und er verwendet die Rapporte, Meldungen
+     und Rundgangsdaten für die Organisation der Einsätze und die Abrechnung.
+     Fragen zu diesen Zwecken und Auskunftsbegehren richten Sie an ihn.</p>
+  <p>Die <strong>pzu consulting gmbh</strong>, Hochgasse 7, 4632 Trimbach, Schweiz,
+     stellt die App und die Server bereit und bearbeitet die Daten im Auftrag
+     Ihres Arbeitgebers. Sie verwendet sie nicht für eigene Zwecke. Die
+     vollständigen Angaben stehen im <a href="impressum.html">Impressum</a>.
+     Technische Fragen zum Datenschutz gehen an
+     <a href="mailto:info@guardops.ch">info@guardops.ch</a>.</p>
+
+  <h2>2. Bei der Anmeldung</h2>
+  <h3>Betrieb, Name und Passwort</h3>
+  <p>Beim ersten Start geben Sie den Kurznamen Ihres Betriebs ein. Er sagt der
+     App, mit welchem Server sie spricht, und bleibt auf dem Gerät gespeichert.
+     Danach melden Sie sich mit dem Namen und dem Passwort an, die Sie von Ihrem
+     Arbeitgeber erhalten haben.</p>
+  <h3>Schutz vor Passwort-Raten</h3>
+  <p>Jeder <strong>Fehl</strong>versuch wird mit dem eingegebenen Namen und der
+     Internetadresse Ihres Geräts festgehalten. Häufen sich Fehlversuche, wird
+     die Anmeldung vorübergehend gesperrt. Die Einträge werden nach einem Tag
+     gelöscht.</p>
+  <h3>Die Sitzung</h3>
+  <p>Nach der Anmeldung erhält die App eine zufällige Zeichenfolge, die sie
+     gegenüber dem Server ausweist. Auf dem Server liegt davon <strong>nur ein
+     Prüfwert</strong>, nie die Zeichenfolge selbst. Eine Sitzung endet spätestens
+     nach 30 Tagen, oder nach 14 Tagen, in denen Sie die App nicht benutzt haben.</p>
+
+  <h2>3. Was die App für Ihre Arbeit bearbeitet</h2>
+  <ul>
+    <li><strong>Schichten:</strong> Ihre Einsätze mit Ort, Zeit und Auftrag,
+        Ihre Zu- und Absagen, Ihre Verfügbarkeit und Abwesenheiten.</li>
+    <li><strong>Rapporte:</strong> was Sie erfassen, samt Ihrer Unterschrift auf dem
+        Gerät.</li>
+    <li><strong>Rundgänge:</strong> welche Kontrollpunkte Sie wann bestätigt haben,
+        mit den dabei erledigten Aufgaben.</li>
+    <li><strong>Meldungen und Fotos:</strong> Ereignisse, die Sie melden, mit Text,
+        Zeitpunkt und auf Wunsch einem Foto.</li>
+    <li><strong>Fahrzeuge:</strong> die Übernahme eines Dienstfahrzeugs mit
+        Kilometerstand und Foto des Tachos, falls Ihr Betrieb das nutzt.</li>
+    <li><strong>Mitteilungen:</strong> Nachrichten Ihres Arbeitgebers und Ihre
+        Antworten.</li>
+    <li><strong>Ihr Profil:</strong> Name, Personalnummer, Adresse, Telefon,
+        private E-Mail-Adresse und Notfallkontakt, soweit Ihr Arbeitgeber sie
+        hinterlegt hat. Adresse, Telefon, E-Mail und Notfallkontakt können Sie
+        selbst ändern.</li>
+  </ul>
+
+  <h2>4. Standort</h2>
+  <p>Die App fragt nach Ihrem Standort <strong>nur, während Sie die App
+     benutzen</strong>. Eine Erlaubnis für die Ortung im Hintergrund verlangt sie
+     nicht.</p>
+  <ul>
+    <li><strong>Während einer laufenden Runde</strong> prüft die App, ob Sie beim
+        Kontrollpunkt stehen, und überträgt in Abständen Ihre Position an den
+        Server. Daraus entsteht die Bewegungsspur der Runde. Wird die Runde
+        pausiert, beendet oder abgebrochen, nimmt der Server keine Positionen mehr
+        an.</li>
+    <li><strong>Beim Melden eines Ereignisses</strong> wird der Ort der Meldung
+        mitgeschickt.</li>
+  </ul>
+  <p>Die Bewegungsspur wird nach <strong>90 Tagen</strong> gelöscht. Ausserhalb
+     einer Runde und ausserhalb einer Meldung wird kein Standort erhoben.</p>
+
+  <h2>5. Kamera und Fotos</h2>
+  <p>Die Kamera und Ihre Fotos verwendet die App nur, wenn Sie selbst ein Foto
+     aufnehmen oder auswählen, etwa als Beleg zu einem Ereignis oder als Ersatz,
+     wenn ein Kontrollpunkt sich nicht scannen lässt. Fotos von Ereignissen werden
+     nach <strong>90 Tagen</strong> gelöscht.</p>
+
+  <h2>6. Mitteilungen aufs Gerät</h2>
+  <p>Erlauben Sie Mitteilungen, meldet sich die App beim Mitteilungsdienst von
+     <strong>Apple</strong> an und erhält eine Gerätekennung. Diese Kennung wird
+     auf dem Server gespeichert, damit Ihr Arbeitgeber Ihnen Nachrichten und
+     Schichtänderungen aufs Gerät schicken kann. Die Mitteilung selbst läuft über
+     die Server von Apple. Sie können Mitteilungen jederzeit in den Einstellungen
+     Ihres iPhones ausschalten.</p>
+
+  <h2>7. Die Karte</h2>
+  <p>Für die Karte im Rundgang verwendet die App den Kartendienst von
+     <strong>Google</strong> (Google Maps). Beim Anzeigen ruft das Gerät die
+     Kartendaten direkt bei Google ab. Google erhält dabei die Internetadresse
+     Ihres Geräts und den angezeigten Kartenausschnitt. Google kann diese Daten
+     auch ausserhalb der Schweiz bearbeiten, insbesondere in den USA. Es gelten
+     die Datenschutzbestimmungen von Google.</p>
+
+  <h2>8. Was die App auf dem Gerät speichert</h2>
+  <p>Auf Ihrem Gerät liegen der Kurzname Ihres Betriebs, die Sitzung, Ihr
+     Anmeldename und Ihre Einstellungen, etwa ob der Bildschirm während der Runde
+     wach bleiben soll. Fällt das Netz aus, werden bestätigte Kontrollpunkte und
+     gemeldete Ereignisse zwischengespeichert und nachgereicht, sobald das Netz
+     zurück ist. Mit der Abmeldung wird die Sitzung entfernt; beim Löschen der App
+     verschwindet alles.</p>
+
+  <h2>9. Was die App nicht tut</h2>
+  <ul>
+    <li>Sie enthält kein Analysewerkzeug und misst nicht, wie Sie die App
+        benutzen.</li>
+    <li>Sie zeigt keine Werbung und gibt nichts an Werbenetzwerke weiter.</li>
+    <li>Sie verfolgt Sie nicht über andere Apps oder Websites.</li>
+    <li>Sie ortet Sie nicht im Hintergrund.</li>
+  </ul>
+
+  <h2>10. Weitergabe und Speicherort</h2>
+  <p>Die Server und Datenbanken werden bei der <strong>Hostpoint AG</strong> in der
+     Schweiz betrieben. Ausser den in Abschnitt 6 und 7 genannten Diensten von
+     Apple und Google sind keine weiteren Empfänger beteiligt. Die Daten werden
+     weder verkauft noch zu Werbezwecken weitergegeben.</p>
+
+  <h2>11. Ihre Rechte</h2>
+  <p>Sie können Auskunft über Ihre Daten verlangen, ihre Berichtigung und, soweit
+     keine Aufbewahrungspflicht entgegensteht, ihre Löschung. Wenden Sie sich dafür
+     an Ihren Arbeitgeber. Wir unterstützen ihn dabei. Ihr Konto in der App
+     schliesst Ihr Arbeitgeber, etwa wenn das Arbeitsverhältnis endet.</p>
+
+  <h2>12. Änderungen</h2>
+  <p>Es gilt die jeweils auf dieser Seite veröffentlichte Fassung. Das oben
+     genannte Datum sagt, welche das ist.</p>
+</main>
+
+<footer class="fuss">
+  <div class="innen">
+    <span>© 2026 <span data-brand>GuardOpS</span></span>
+    <a href="impressum.html">Impressum</a>
+    <a href="datenschutz.html">Datenschutz (Verkaufsseite)</a>
+    <a href="index.html">Startseite</a>
+  </div>
+</footer>
+</body>
+</html>

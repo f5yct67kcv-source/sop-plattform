@@ -129,19 +129,11 @@ jobs:
           # ausdruecklich "noch nicht eingerichtet" (503), statt mit einem
           # Platzhalter zu arbeiten.
           P_DEMO_EMPFAENGER: ${{ secrets.DEMO_EMPFAENGER }}
-          # Eigener FTP-Zugang fuer guardops.ch, beschraenkt auf
-          # /home/itufeden/www/guardops.ch. Eigene Secret-NAMEN aus demselben
-          # Grund wie bei Staging (ENT-343 Punkt 1): kein stiller Rueckfall.
-          # NICHT erforderlich -- fehlen sie, wird die Homepage-Domain
-          # uebersprungen und das Rapport-Tool trotzdem ausgeliefert.
-          P_GUARDOPS_FTP_HOST: ${{ secrets.GUARDOPS_FTP_HOST }}
-          P_GUARDOPS_FTP_USER: ${{ secrets.GUARDOPS_FTP_USER }}
-          P_GUARDOPS_FTP_PASSWORD: ${{ secrets.GUARDOPS_FTP_PASSWORD }}
           # Eigenes Postfach info@guardops.ch fuer die Demo-Anfrage-Mail
           # (ENT-569/OP-569, sop-projekt), statt sie ueber das mit CUPI 24s
           # eigenen Kunden-Mails geteilte Produktions-Postfach zu schicken
           # (ENT-371). Eigene Secret-NAMEN aus demselben Grund wie bei
-          # GUARDOPS_FTP_* und Staging (ENT-343 Punkt 1): kein stiller
+          # Staging (ENT-343 Punkt 1): kein stiller
           # Rueckfall auf die geteilten SMTP_*-Werte. NICHT erforderlich --
           # fehlen sie, bleibt __SMTP_HOST__ im guardops-Buendel unersetzt,
           # smtp_konfiguriert() erkennt das und das Formular sagt "noch
@@ -162,11 +154,10 @@ jobs:
           # Eigener FTP-Zugang fuer betreiber.guardops.ch, beschraenkt auf
           # /home/itufeden/betreiber.guardops.ch (ENT-580, erste Etappe des
           # schrittweisen Umzugs weg von itufeden.myhostpoint.ch). Eigene
-          # Secret-NAMEN aus demselben Grund wie bei GUARDOPS_FTP_* und
-          # Staging (ENT-343 Punkt 1): kein stiller Rueckfall. NICHT
-          # erforderlich -- fehlen sie, wird diese Domain uebersprungen und
-          # das Rapport-Tool trotzdem ausgeliefert, genau wie bei
-          # GUARDOPS_FTP_* oben.
+          # Secret-NAMEN aus demselben Grund wie bei Staging (ENT-343
+          # Punkt 1): kein stiller Rueckfall. NICHT erforderlich -- fehlen
+          # sie, wird diese Domain uebersprungen und das Rapport-Tool
+          # trotzdem ausgeliefert.
           P_BETREIBER_FTP_HOST: ${{ secrets.BETREIBER_FTP_HOST }}
           P_BETREIBER_FTP_USER: ${{ secrets.BETREIBER_FTP_USER }}
           P_BETREIBER_FTP_PASSWORD: ${{ secrets.BETREIBER_FTP_PASSWORD }}
@@ -209,6 +200,14 @@ jobs:
           P_CUPI24_FTP_HOST: ${{ secrets.CUPI24_FTP_HOST }}
           P_CUPI24_FTP_USER: ${{ secrets.CUPI24_FTP_USER }}
           P_CUPI24_FTP_PASSWORD: ${{ secrets.CUPI24_FTP_PASSWORD }}
+          # Pruefzugang pruefung.guardops.ch (ENT-732), optional. DB-Passwort
+          # in MANDANT_SECRETS unter "pruefung" -- Begruendung beim Bau-Schritt.
+          P_PRUEFUNG_FTP_HOST: ${{ secrets.PRUEFUNG_FTP_HOST }}
+          P_PRUEFUNG_FTP_USER: ${{ secrets.PRUEFUNG_FTP_USER }}
+          P_PRUEFUNG_FTP_PASSWORD: ${{ secrets.PRUEFUNG_FTP_PASSWORD }}
+          P_PRUEFUNG_DB_HOST: ${{ secrets.PRUEFUNG_DB_HOST }}
+          P_PRUEFUNG_DB_NAME: ${{ secrets.PRUEFUNG_DB_NAME }}
+          P_PRUEFUNG_DB_USER: ${{ secrets.PRUEFUNG_DB_USER }}
           # Staging -- eigene, von Produktion VERSCHIEDENE Secret-Namen.
           S_DB_HOST: ${{ secrets.STAGING_DB_HOST }}
           S_DB_NAME: ${{ secrets.STAGING_DB_NAME }}
@@ -299,9 +298,6 @@ jobs:
             EFF_APNS_KEY_ID="$P_APNS_KEY_ID"
             EFF_APNS_TEAM_ID="$P_APNS_TEAM_ID"
             EFF_DEMO_EMPFAENGER="$P_DEMO_EMPFAENGER"
-            EFF_GUARDOPS_FTP_HOST="$P_GUARDOPS_FTP_HOST"
-            EFF_GUARDOPS_FTP_USER="$P_GUARDOPS_FTP_USER"
-            EFF_GUARDOPS_FTP_PASSWORD="$P_GUARDOPS_FTP_PASSWORD"
             EFF_GUARDOPS_SMTP_HOST="$P_GUARDOPS_SMTP_HOST"
             EFF_GUARDOPS_SMTP_PORT="$P_GUARDOPS_SMTP_PORT"
             EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG="$P_GUARDOPS_SMTP_VERSCHLUESSELUNG"
@@ -329,6 +325,12 @@ jobs:
             EFF_CUPI24_FTP_HOST="$P_CUPI24_FTP_HOST"
             EFF_CUPI24_FTP_USER="$P_CUPI24_FTP_USER"
             EFF_CUPI24_FTP_PASSWORD="$P_CUPI24_FTP_PASSWORD"
+            EFF_PRUEFUNG_FTP_HOST="$P_PRUEFUNG_FTP_HOST"
+            EFF_PRUEFUNG_FTP_USER="$P_PRUEFUNG_FTP_USER"
+            EFF_PRUEFUNG_FTP_PASSWORD="$P_PRUEFUNG_FTP_PASSWORD"
+            EFF_PRUEFUNG_DB_HOST="$P_PRUEFUNG_DB_HOST"
+            EFF_PRUEFUNG_DB_NAME="$P_PRUEFUNG_DB_NAME"
+            EFF_PRUEFUNG_DB_USER="$P_PRUEFUNG_DB_USER"
             # Eigene Adresse der Anlage (ENT-501, siehe auch APP_ENV oben):
             # steckt in jedem Link, den der Server per E-Mail verschickt.
             # Bis ENT-501 kam sie aus dem Host-Kopf DER ANFRAGE -- ein Angriff
@@ -373,24 +375,17 @@ jobs:
             EFF_APNS_KEY_ID=""
             EFF_APNS_TEAM_ID=""
             EFF_DEMO_EMPFAENGER="$S_DEMO_EMPFAENGER"
-            # guardops.ch ist die ECHTE Verkaufsdomain. Ein Staging-Lauf hat
-            # dort nichts verloren -- darum hier leer und KEIN Rueckfall auf
-            # die Production-Werte. Der Schritt unten ueberspringt sich damit
-            # von selbst.
-            EFF_GUARDOPS_FTP_HOST=""
-            EFF_GUARDOPS_FTP_USER=""
-            EFF_GUARDOPS_FTP_PASSWORD=""
-            # Dasselbe gilt fuer das eigene SMTP-Postfach von guardops.ch --
-            # ein Staging-Lauf baut das guardops-Buendel ohnehin nie (siehe
-            # Schritt unten), diese Zeilen sind nur die Absicherung dazu.
+            # Das eigene SMTP-Postfach der Betreiberin (info@guardops.ch) ist
+            # nur fuer Production -- Staging bekommt es nicht, KEIN Rueckfall
+            # auf die Production-Werte.
             EFF_GUARDOPS_SMTP_HOST=""
             EFF_GUARDOPS_SMTP_PORT=""
             EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG=""
             EFF_GUARDOPS_SMTP_USER=""
             EFF_GUARDOPS_SMTP_PASSWORD=""
-            # betreiber.guardops.ch ist wie guardops.ch nur fuer Production
-            # gedacht (ENT-580) -- dieselbe Begruendung wie bei
-            # EFF_GUARDOPS_FTP_* direkt darueber.
+            # betreiber.guardops.ch ist nur fuer Production gedacht
+            # (ENT-580) -- ein Staging-Lauf hat dort nichts verloren, darum
+            # leer und KEIN Rueckfall auf die Production-Werte.
             EFF_BETREIBER_FTP_HOST=""
             EFF_BETREIBER_FTP_USER=""
             EFF_BETREIBER_FTP_PASSWORD=""
@@ -413,6 +408,13 @@ jobs:
             EFF_CUPI24_FTP_HOST=""
             EFF_CUPI24_FTP_USER=""
             EFF_CUPI24_FTP_PASSWORD=""
+            # pruefung.guardops.ch ebenso nur fuer Production (ENT-732).
+            EFF_PRUEFUNG_FTP_HOST=""
+            EFF_PRUEFUNG_FTP_USER=""
+            EFF_PRUEFUNG_FTP_PASSWORD=""
+            EFF_PRUEFUNG_DB_HOST=""
+            EFF_PRUEFUNG_DB_NAME=""
+            EFF_PRUEFUNG_DB_USER=""
             # Eigene Adresse (ENT-501, Begruendung im Production-Zweig).
             # STAGING_DOMAIN dient auch den Verifikationsschritten weiter
             # unten. Kein Rueckfall auf die produktive Adresse -- fehlt die
@@ -528,9 +530,6 @@ jobs:
             echo "EFF_APNS_TEAM_ID=$EFF_APNS_TEAM_ID"
             echo "EFF_APP_BASIS_URL=$EFF_APP_BASIS_URL"
             echo "EFF_DEMO_EMPFAENGER=$EFF_DEMO_EMPFAENGER"
-            echo "EFF_GUARDOPS_FTP_HOST=$EFF_GUARDOPS_FTP_HOST"
-            echo "EFF_GUARDOPS_FTP_USER=$EFF_GUARDOPS_FTP_USER"
-            echo "EFF_GUARDOPS_FTP_PASSWORD=$EFF_GUARDOPS_FTP_PASSWORD"
             echo "EFF_GUARDOPS_SMTP_HOST=$EFF_GUARDOPS_SMTP_HOST"
             echo "EFF_GUARDOPS_SMTP_PORT=$EFF_GUARDOPS_SMTP_PORT"
             echo "EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG=$EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG"
@@ -555,6 +554,12 @@ jobs:
             echo "EFF_CUPI24_FTP_HOST=$EFF_CUPI24_FTP_HOST"
             echo "EFF_CUPI24_FTP_USER=$EFF_CUPI24_FTP_USER"
             echo "EFF_CUPI24_FTP_PASSWORD=$EFF_CUPI24_FTP_PASSWORD"
+            echo "EFF_PRUEFUNG_FTP_HOST=$EFF_PRUEFUNG_FTP_HOST"
+            echo "EFF_PRUEFUNG_FTP_USER=$EFF_PRUEFUNG_FTP_USER"
+            echo "EFF_PRUEFUNG_FTP_PASSWORD=$EFF_PRUEFUNG_FTP_PASSWORD"
+            echo "EFF_PRUEFUNG_DB_HOST=$EFF_PRUEFUNG_DB_HOST"
+            echo "EFF_PRUEFUNG_DB_NAME=$EFF_PRUEFUNG_DB_NAME"
+            echo "EFF_PRUEFUNG_DB_USER=$EFF_PRUEFUNG_DB_USER"
           } >> "$GITHUB_ENV"
 
           # Mehrzeiliger Wert -- eigener Heredoc-Block statt einer einfachen
@@ -1024,209 +1029,21 @@ jobs:
       # (z. B. ein eigener, produktiver Auth-Mechanismus) waere kein Nachweis
       # fuer DIESEN Schutz. Netzwerkfehler und Timeouts zaehlen ausdruecklich
       # als Fehlschlag, nicht als "nicht pruefbar, also ok".
-      # ══════════ DIE HOMEPAGE AUF IHRER EIGENEN DOMAIN ══════════════════
+      # ══════════ DIE HOMEPAGE guardops.ch: NICHT MEHR VON HIER ══════════
       #
-      # guardops.ch liegt bei Hostpoint unter /home/itufeden/www/guardops.ch
-      # -- NEBEN /home/itufeden/www/rapport, nicht darin. Der aufraeumende
-      # Upload oben kommt dort also nicht hin, und dieser hier nicht ans
-      # Rapport-Tool. Beide FTP-Zugaenge sind von Hostpoint auf ihr eigenes
-      # Verzeichnis beschraenkt; eigene Secret-NAMEN aus demselben Grund wie
-      # bei Staging (ENT-343 Punkt 1).
+      # Seit 2026-11 liefert das eigene Repository formateins-guardops die
+      # oeffentliche Seite guardops.ch aus (Workflow "guardops.ch zu
+      # Hostpoint" dort). Die vier Schritte, die hier das Buendel gebaut,
+      # verdichtet und hochgeladen haben, sind entfernt -- sonst ueberschriebe
+      # jeder Push auf main guardops.ch mit dem Stand aus DIESEM Repository.
+      # test_deploy.mjs achtet darauf, dass kein Schritt mehr dorthin laedt.
       #
-      # NUR PRODUCTION: Ein Staging-Lauf hat auf der echten Verkaufsdomain
-      # nichts verloren -- der Staging-Zweig oben setzt EFF_GUARDOPS_FTP_HOST
-      # deshalb ausdruecklich leer, ohne Rueckfall.
-      #
-      # UEBERSPRINGT SICH, SOLANGE DIE SECRETS FEHLEN -- und sagt das dann
-      # auch (Schritt darunter). Der Deploy des Rapport-Tools darf nicht rot
-      # werden, nur weil die Homepage-Domain noch nicht eingerichtet ist;
-      # lautlos ausfallen darf er aber ebenso wenig.
-      - name: Homepage-Buendel fuer guardops.ch bauen
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_GUARDOPS_FTP_HOST != '' }}
-        run: |
-          set -euo pipefail
-          mkdir -p dist-guardops/api dist-guardops/icons dist-guardops/fonts
-
-          # Auf der eigenen Domain gehoert die Homepage auf "/", nicht auf
-          # "/homepage.html" -- darum hier index.html.
-          cp homepage.html dist-guardops/index.html
-
-          # Schriften: dieselben vier, die homepage.html per CSS-url() holt.
-          # Fehlt eine, faellt sie live lautlos auf den System-Stapel zurueck
-          # und lokal faellt es NICHT auf -- derselbe Fallstrick wie beim
-          # Rapport-Tool. test_deploy.mjs gleicht diese Liste gegen die
-          # tatsaechlich in homepage.html benutzten Dateien ab.
-          # Die Lizenzen muessen die Schriften begleiten (SIL OFL 1.1).
-          cp fonts/archivo-variable-latin.woff2   dist-guardops/fonts/
-          cp fonts/plex-sans-variable-latin.woff2 dist-guardops/fonts/
-          cp fonts/plex-mono-400-latin.woff2      dist-guardops/fonts/
-          cp fonts/plex-mono-500-latin.woff2      dist-guardops/fonts/
-          cp fonts/archivo-OFL.txt                dist-guardops/fonts/
-          cp fonts/ibm-plex-LICENSE.txt           dist-guardops/fonts/
-          cp icons/guardops-*.png                 dist-guardops/icons/
-          # Die beiden Bildschirmfotos der Homepage (Zurueckbau 2026-10-10):
-          # echte Aufnahmen aus der Demo-Umgebung, siehe Kopf von
-          # homepage.html. test_deploy.mjs leitet aus der Seite ab, welche
-          # Bilder mitmuessen -- fehlt eines, bleibt live ein leeres
-          # Rechteck, und lokal faellt es nicht auf.
-          mkdir -p dist-guardops/homepage-bilder
-          cp homepage-bilder/*.webp               dist-guardops/homepage-bilder/
-
-          # Der Endpunkt und seine vier Einbindungen. KEIN anmeldung.php und
-          # kein Produktcode -- die Seite hat mit dem Rapport-Tool nichts zu
-          # tun ausser diesem einen Formular.
-          cp backend/api/demo_senden.php dist-guardops/api/demo_senden.php
-          cp backend/db.php              dist-guardops/db.php
-          cp backend/mailer.php          dist-guardops/mailer.php
-          cp backend/demo_anfrage.php    dist-guardops/demo_anfrage.php
-          cp backend/demo_bremse.php     dist-guardops/demo_bremse.php
-          # Rechtsseiten (OP-564). Beide teilen sich recht.css -- zweimal
-          # derselbe Stil inline hiesse, dass beim naechsten Farbwechsel
-          # eine von beiden vergessen wird. test_deploy.mjs leitet aus den
-          # Seiten ab, welche Stilblaetter und Schriften mitmuessen.
-          cp impressum.html              dist-guardops/impressum.html
-          cp datenschutz.html            dist-guardops/datenschutz.html
-          # Eigene Erklaerung fuer den Demobereich (demo.guardops.ch). Sie
-          # liegt hier und nicht im Demo-Buendel: Alle Rechtsseiten sollen
-          # an EINER Adresse stehen, mit einem Stil und einem Deploy-Weg.
-          # Der Demobereich verweist absolut darauf (dashboard.html).
-          cp datenschutz-demo.html       dist-guardops/datenschutz-demo.html
-          # Eigene Erklaerung fuer die zehn Demo-Plaetze (ENT-653) -- ein
-          # anderes Modell als die ENT-523-Demo-Umgebung darueber, siehe
-          # Kopfkommentar der Datei. Aus demselben Grund hier: eine Adresse,
-          # ein Stil, ein Deploy-Weg fuer alle Rechtsseiten.
-          cp datenschutz-demo-platz.html dist-guardops/datenschutz-demo-platz.html
-          # Nutzungsbedingungen und Bestaetigungsseite (ENT-624). Beide
-          # teilen sich recht.css mit Impressum und Datenschutz -- darum
-          # steht der Stil dort und nicht zweimal inline.
-          #
-          # demo-bestaetigen.html ist die Seite, auf die der Link aus der
-          # Bestaetigungsmail zeigt. Sie liegt hier und nicht im
-          # Buendel des Betreiber-Bereichs, weil der Interessent von dieser
-          # Domain kam;
-          # der Endpunkt dahinter laeuft weiterhin auf
-          # betreiber.guardops.ch (siehe OEFFENTLICHE_DEMO_SKRIPTE in
-          # backend/db.php).
-          cp nutzungsbedingungen.html   dist-guardops/nutzungsbedingungen.html
-          cp demo-bestaetigen.html      dist-guardops/demo-bestaetigen.html
-          # demo-weiter.html ist die Seite, auf die der Knopf aus der
-          # Abschiedsmail zeigt (ENT-634). Sie liegt aus demselben Grund
-          # hier wie demo-bestaetigen.html: Der Interessent kam von dieser
-          # Domain, der Endpunkt dahinter laeuft auf betreiber.guardops.ch.
-          cp demo-weiter.html           dist-guardops/demo-weiter.html
-          # Die Kommentarkoepfe der Rechtsseiten sind Arbeitsnotizen --
-          # Entscheidungsnummern, interne Dateipfade, offene Pruefpunkte,
-          # und bei den Nutzungsbedingungen der Satz "ENTWURF. NICHT
-          # RECHTLICH GEPRUEFT". Dargestellt wird davon nichts, im
-          # Quelltext steht es trotzdem. Ansage des Projektinhabers
-          # (2026-09-22): aus der ausgelieferten Datei nehmen. Im
-          # Repository bleibt der Vermerk, wo ihn sieht, wer die Datei
-          # aendert. Gesaeubert wird die KOPIE, nach dem cp.
-          python3 rechtstexte-ausliefern.py \
-            dist-guardops/nutzungsbedingungen.html \
-            dist-guardops/datenschutz-demo.html \
-            dist-guardops/datenschutz-demo-platz.html \
-            dist-guardops/datenschutz.html \
-            dist-guardops/impressum.html
-          cp recht.css                   dist-guardops/recht.css
-          cp htaccess-guardops           dist-guardops/.htaccess
-          cat htaccess-leistung >>       dist-guardops/.htaccess
-          cp robots-guardops.txt         dist-guardops/robots.txt
-
-          # HIER STEHEN ABSICHTLICH KEINE DATENBANK-ZUGANGSDATEN. db.php wird
-          # frisch aus backend/ kopiert und bekommt NUR APP_ENV -- die
-          # __DB_*__-Platzhalter bleiben stehen. db() ist traege und wird von
-          # diesem Endpunkt nie aufgerufen; wuerde es je jemand tun, scheitert
-          # es laut an einem unbrauchbaren DSN, statt sich still zu verbinden.
-          # Die Zugangsdaten der produktiven Datenbank liegen damit an genau
-          # einer Stelle statt an zweien.
-          sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-guardops/db.php
-          # Sparte Reinigung (ENT-650): aus. Die Marketingseite plant nichts,
-          # aber db.php traegt den Platzhalter, und die Pruefung auf
-          # uebrig gebliebene Platzhalter weiter unten wuerde ihn finden.
-          sed -i "s|__SPARTE_REINIGUNG__|0|g" dist-guardops/db.php
-          sed -i "s|__IST_DEMO_PLATZ__|0|g" dist-guardops/db.php  # kein Demo-Platz
-
-          # EIGENES POSTFACH, NICHT DAS GETEILTE PRODUKTIONS-POSTFACH
-          # (ENT-569/OP-569, sop-projekt). Bis hierher bekam mailer.php in
-          # diesem Buendel dieselben EFF_SMTP_*-Werte wie das Rapport-Tool --
-          # dasselbe Postfach, das CUPI 24s eigene Kunden-Mails verschickt
-          # (ENT-371). Die Demo-Anfrage-Mail geht aber an den Betreiber
-          # selbst und soll erkennbar UND beantwortbar als GuardOpS laufen.
-          # Host/Port/Verschluesselung/Benutzer/Passwort kommen darum aus
-          # EFF_GUARDOPS_SMTP_* (eigene Secret-Namen, kein stiller Rueckfall,
-          # ENT-343 Punkt 1); sind sie leer (Secrets noch nicht angelegt),
-          # bleibt __SMTP_HOST__ als Platzhalter stehen, smtp_konfiguriert()
-          # erkennt das und das Formular sagt "noch nicht eingerichtet"
-          # (503) -- kein Versand ueber die falsche Kennung.
-          #
-          # Absenderadresse und -name sind HIER bewusst feste Literale statt
-          # eines Secrets: info@guardops.ch und "GuardOpS" sind die oeffent-
-          # lich beworbene Adresse und Marke, keine Zugangsdaten (gleiche
-          # Einordnung wie bei APP_BASIS_URL, ENT-501). Gelten unabhaengig
-          # davon, ob die GUARDOPS_SMTP_*-Secrets schon gesetzt sind -- das
-          # allein sendet noch keine Mail, siehe smtp_konfiguriert() oben.
-          sed -i "s|__SMTP_HOST__|$EFF_GUARDOPS_SMTP_HOST|g"               dist-guardops/mailer.php
-          sed -i "s|__SMTP_PORT__|$EFF_GUARDOPS_SMTP_PORT|g"               dist-guardops/mailer.php
-          sed -i "s|__SMTP_VERSCHLUESSELUNG__|$EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG|g" dist-guardops/mailer.php
-          sed -i "s|__SMTP_USER__|$EFF_GUARDOPS_SMTP_USER|g"               dist-guardops/mailer.php
-          sed -i "s|__SMTP_PASSWORD__|$EFF_GUARDOPS_SMTP_PASSWORD|g"       dist-guardops/mailer.php
-          sed -i "s|__SMTP_ABSENDER__|info@guardops.ch|g"                 dist-guardops/mailer.php
-          sed -i "s|__MAIL_SIGNATUR__||g"                 dist-guardops/mailer.php
-          sed -i "s|__SMTP_ABSENDER_NAME__|GuardOpS|g"                    dist-guardops/mailer.php
-          sed -i "s|__STAGING_TESTMAIL__||g"                              dist-guardops/mailer.php
-          # Dieselbe Ueberlegung wie bei __STAGING_TESTMAIL__ direkt darueber:
-          # guardops.ch laeuft ausschliesslich als Production (siehe Pruefung
-          # weiter unten), smtp_ziel() fragt die Demo-Testadresse also nie ab
-          # -- der Platzhalter bleibt sonst woertlich stehen, weil dieser
-          # Bauschritt aelter ist als __DEMO_TESTMAIL__ in mailer.php
-          # (ENT-523, erst mit diesem Merge zusammengefuehrt).
-          sed -i "s|__DEMO_TESTMAIL__||g"                                 dist-guardops/mailer.php
-          sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g"           dist-guardops/demo_anfrage.php
-
-          # Kein uebersehener Platzhalter darf hochgeladen werden. Erlaubt
-          # bleiben genau die zwei Familien, die HIER absichtlich stehen:
-          # __DB_*__ (siehe oben) und __APP_BASIS_URL__ -- basis_url_pruefen()
-          # erkennt den stehengebliebenen Platzhalter und liefert null, die
-          # Demo-Mail enthaelt ohnehin keinen Link auf die eigene Anlage.
-          UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' dist-guardops/ \
-                   | grep -v -e '^__DB_' -e '^__APP_BASIS_URL__$' -e '^__DIR__$' \
-                   | sort -u || true)
-          if [ -n "$UEBRIG" ]; then
-            echo "::error::Nicht ersetzte Platzhalter im guardops-Buendel: $UEBRIG"
-            exit 1
-          fi
-
-          echo "Buendel fuer guardops.ch:"
-          find dist-guardops -type f | sort
-
-      - name: HTML verdichten (dist-guardops)
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_GUARDOPS_FTP_HOST != '' }}
-        # Wie oben bei dist/ (werkzeuge/verdichten/verdichten.mjs).
-        continue-on-error: true
-        run: node werkzeuge/verdichten/verdichten.mjs dist-guardops
-
-      - name: Homepage nach guardops.ch hochladen (FTPS)
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_GUARDOPS_FTP_HOST != '' }}
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ env.EFF_GUARDOPS_FTP_HOST }}
-          username: ${{ env.EFF_GUARDOPS_FTP_USER }}
-          password: ${{ env.EFF_GUARDOPS_FTP_PASSWORD }}
-          protocol: ftps
-          local-dir: ./dist-guardops/
-          # Der Zugang ist von Hostpoint auf /home/itufeden/www/guardops.ch
-          # beschraenkt -- daher "/", nicht der volle Pfad. Genau wie beim
-          # Upload des Rapport-Tools weiter oben.
-          server-dir: /
-
-      # "NICHT EINGERICHTET" DARF NICHT WIE "NICHTS ZU TUN" AUSSEHEN: Ohne
-      # diesen Schritt waere ein Deploy ohne GUARDOPS_FTP_*-Secrets von einem
-      # erfolgreichen Homepage-Deploy im Protokoll nicht zu unterscheiden.
-      - name: Hinweis, wenn guardops.ch noch nicht eingerichtet ist
-        if: ${{ env.UMGEBUNG == 'production' && env.EFF_GUARDOPS_FTP_HOST == '' }}
-        run: |
-          echo "::notice::guardops.ch wurde NICHT beliefert -- die Secrets GUARDOPS_FTP_HOST/USER/PASSWORD fehlen im Environment production. Das Rapport-Tool ist davon nicht betroffen und wurde regulaer ausgeliefert."
+      # Was hier bleibt: nutzungsbedingungen.html und
+      # datenschutz-demo-platz.html gehen weiter in die Demo-Plaetze (siehe
+      # dort), und die Mails der Plattform verlinken auf
+      # guardops.ch/demo-bestaetigen.html und demo-weiter.html. Wo in
+      # Kommentaren weiter unten vom "guardops-Buendel" die Rede ist, ist
+      # dieses fruehere Buendel gemeint.
 
       # ══════════ DER BETREIBER-BEREICH AUF SEINER EIGENEN ADRESSE ═══════
       #
@@ -2131,6 +1948,250 @@ jobs:
         if: ${{ env.UMGEBUNG == 'production' && env.EFF_CUPI24_FTP_HOST == '' }}
         run: |
           echo "::notice::cupi24.guardops.ch wurde NICHT beliefert -- die Secrets CUPI24_FTP_HOST/USER/PASSWORD fehlen im Environment production. Das Rapport-Tool auf der bisherigen Adresse ist davon nicht betroffen und wurde regulaer ausgeliefert."
+
+      # ══════════ PRUEFZUGANG FUER DIE APP-STORE-PRUEFUNG ════════════════
+      #
+      # ENT-732: Die Pruefer von Apple brauchen einen Zugang, der waehrend
+      # einer Pruefung (oft mehrere Tage, bei jedem Update erneut)
+      # funktioniert und nur ERFUNDENE Daten zeigt. Die Demo-Plaetze taugen
+      # dafuer nicht (naechtlich geleert, Ablauf nach 14 Tagen), ein Konto
+      # bei CUPI 24 zeigte echte Personendaten. Also ein eigener Mandant
+      # unter pruefung.guardops.ch -- Kurzname "pruefung" in der App.
+      #
+      # GLEICHER AUFBAU WIE DER cupi24-SCHRITT DARUEBER (voller Dateiumfang,
+      # eigene feste Adresse, eigener FTP-Zugang, nur Production, ohne
+      # Secrets uebersprungen). test_deploy.mjs prueft beide Buendel mit
+      # denselben Aussagen gegen den Hauptschritt -- eine Datei, die dort
+      # dazukommt, muss auch hier dazukommen.
+      #
+      # DREI UNTERSCHIEDE ZU cupi24, jeder mit Grund:
+      #   - EIGENE DATENBANK statt der Produktionsdatenbank: Host, Name und
+      #     Benutzer aus PRUEFUNG_DB_*, das Passwort aus MANDANT_SECRETS
+      #     unter dem Namen "pruefung" -- wie bei den Demo-Plaetzen, damit
+      #     es nur EINEN Ort fuer dieses Passwort gibt.
+      #   - POSTFACH DER BETREIBERIN (GUARDOPS_SMTP_*, info@guardops.ch)
+      #     statt des Postfachs der Mandantin: Der Pruefbetrieb gehoert der
+      #     pzu consulting gmbh, nicht CUPI 24.
+      #   - KEIN MANDANTEN-BRANDING: Die Anlage bleibt GuardOpS, und die
+      #     Sparte Reinigung bleibt aus wie bei jedem fremden Mandanten.
+      - name: Rapport-Tool-Buendel fuer pruefung.guardops.ch bauen
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_PRUEFUNG_FTP_HOST != '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist-pruefung/api dist-pruefung/icons dist-pruefung/fonts dist-pruefung/img dist-pruefung/handbuch
+
+          cp index.html dist-pruefung/index.html
+          cp dashboard.html dist-pruefung/dashboard.html
+          cp app.html dist-pruefung/app.html
+          cp portal.html dist-pruefung/portal.html
+          cp betreiber.html dist-pruefung/betreiber.html
+          cp gav.js dist-pruefung/gav.js
+          cp zeitwahl.js dist-pruefung/zeitwahl.js
+          cp qrcode.js dist-pruefung/qrcode.js
+          cp unterschrift.js dist-pruefung/unterschrift.js
+          cp testumgebung.js dist-pruefung/testumgebung.js
+          cp html2pdf.bundle.min.js dist-pruefung/html2pdf.bundle.min.js
+          cp manifest.json dist-pruefung/manifest.json
+          cp manifest-app.json dist-pruefung/manifest-app.json
+          cp sw.js dist-pruefung/sw.js
+          cp icons/*.png dist-pruefung/icons/
+          cp fonts/*.woff2 dist-pruefung/fonts/
+          cp fonts/inter-LICENSE.txt dist-pruefung/fonts/inter-LICENSE.txt
+          cp fonts/archivo-OFL.txt dist-pruefung/fonts/archivo-OFL.txt
+          cp fonts/ibm-plex-LICENSE.txt dist-pruefung/fonts/ibm-plex-LICENSE.txt
+          cp img/anmeldung-nacht.webp dist-pruefung/img/anmeldung-nacht.webp
+          cp img/anmeldung-nacht.webm dist-pruefung/img/anmeldung-nacht.webm
+          cp img/anmeldung-nacht.mp4 dist-pruefung/img/anmeldung-nacht.mp4
+          cp backend/db.php dist-pruefung/db.php
+          cp backend/kundenportal.php dist-pruefung/kundenportal.php
+          cp backend/betreiber.php dist-pruefung/betreiber.php
+          # Siehe dist/: betreiber.php braucht diesen Rechenkern (ENT-600).
+          cp backend/demo_zugang.php dist-pruefung/demo_zugang.php
+          cp backend/mail_vorlage.php dist-pruefung/mail_vorlage.php
+          cp backend/mail_gestaltung.php dist-pruefung/mail_gestaltung.php
+          cp backend/demo_bestaetigung.php dist-pruefung/demo_bestaetigung.php
+          cp backend/guardops-signatur.png dist-pruefung/guardops-signatur.png
+          cp backend/guardops-signatur-hell.png dist-pruefung/guardops-signatur-hell.png
+          cp backend/support.php dist-pruefung/support.php
+          cp backend/supportvorgang.php dist-pruefung/supportvorgang.php
+          # Der Abholweg des Betreibers (ENT-681) -- eingebunden von
+          # betreiber_support_vorgang.php, das hier ebenfalls liegt.
+          cp backend/support_sammeln.php dist-pruefung/support_sammeln.php
+          cp backend/demo_anfrage.php dist-pruefung/demo_anfrage.php
+          cp backend/demo_daten.php dist-pruefung/demo_daten.php
+          cp backend/demo_reset.php dist-pruefung/demo_reset.php
+          cp backend/demo_bremse.php dist-pruefung/demo_bremse.php
+          cp backend/ai.php dist-pruefung/ai.php
+          cp backend/planung.php dist-pruefung/planung.php
+          cp backend/kunden.php dist-pruefung/kunden.php
+          cp backend/mitarbeiter.php dist-pruefung/mitarbeiter.php
+          cp backend/layout.php dist-pruefung/layout.php
+          cp backend/anmeldung.php dist-pruefung/anmeldung.php
+          cp backend/zweifaktor.php dist-pruefung/zweifaktor.php
+          cp backend/rechte.php dist-pruefung/rechte.php
+          cp backend/neuerungen.php dist-pruefung/neuerungen.php
+          cp backend/logbuch.php dist-pruefung/logbuch.php
+          cp backend/betreiber_finanzen.php dist-pruefung/betreiber_finanzen.php
+          cp backend/ereignisse.php dist-pruefung/ereignisse.php
+          cp backend/auslagen.php dist-pruefung/auslagen.php
+          cp backend/rundgang.php dist-pruefung/rundgang.php
+          cp backend/fahrzeug.php dist-pruefung/fahrzeug.php
+          cp backend/geofence_bereich.php dist-pruefung/geofence_bereich.php
+          cp backend/belege.php dist-pruefung/belege.php
+          # Unterschriebenes PDF (ENT-688): Modul, FPDF, Schriften.
+          cp backend/belegpdf.php dist-pruefung/belegpdf.php
+          mkdir -p dist-pruefung/fpdf/font
+          cp backend/fpdf/fpdf.php dist-pruefung/fpdf/fpdf.php
+          cp backend/fpdf/font/*.json dist-pruefung/fpdf/font/
+          cp backend/qrrechnung.php dist-pruefung/qrrechnung.php
+          cp backend/produkte.php dist-pruefung/produkte.php
+          cp backend/mailer.php dist-pruefung/mailer.php
+          cp backend/ferien.php dist-pruefung/ferien.php
+          cp backend/lohn.php dist-pruefung/lohn.php
+          cp backend/gavzeit.php dist-pruefung/gavzeit.php
+          cp backend/lohnlauf.php dist-pruefung/lohnlauf.php
+          cp backend/mitteilungen.php dist-pruefung/mitteilungen.php
+          cp backend/push.php dist-pruefung/push.php
+          # Zwei Rechenkerne, die kein Endpunkt ist und die darum leicht
+          # vergessen gehen: Sie werden nur per require_once aus
+          # backend/api/*.php gezogen. Die Endpunkte selbst kommen unten
+          # pauschal mit ("cp backend/api/*.php"), die Module hier einzeln --
+          # fehlt eines, liegt der Endpunkt live da und bricht beim
+          # require_once mit einem PHP-Fatal ab, also mit HTTP 500 und ohne
+          # verwertbare Meldung. Genau das ist mit
+          # planung_einrichten_kern.php passiert (ENT-612 lagerte den Kern
+          # aus und trug nur die betreiber-Zeile nach): Das Cockpit rief
+          # api/planung_einrichten.php bei jedem Laden still im Hintergrund
+          # auf, bekam 500, und der Einrichtungs-Punkt blieb dauerhaft grau
+          # -- "unbekannt" sah aus wie "nichts nachzutragen".
+          cp backend/planung_einrichten_kern.php dist-pruefung/planung_einrichten_kern.php
+          cp backend/demo_instanz.php dist-pruefung/demo_instanz.php
+          # Ebenfalls kein Endpunkt, nur per require_once aus login.php und
+          # api/me.php gezogen (Cockpit-Tour und Demo-Hinweis) -- derselbe
+          # Grund wie bei planung_einrichten_kern.php zwei Zeilen darueber.
+          cp backend/tutorial.php dist-pruefung/tutorial.php
+          cp htaccess-pruefung dist-pruefung/.htaccess
+          cat htaccess-leistung >> dist-pruefung/.htaccess
+          cp backend/api/*.php dist-pruefung/api/
+          cp handbuch/*.php dist-pruefung/handbuch/
+          cp handbuch/*.css dist-pruefung/handbuch/
+          cp handbuch/*.js dist-pruefung/handbuch/
+          # setup.php / setup.html bewusst NICHT hier -- dieselbe Begruendung
+          # wie beim Hauptschritt oben.
+
+          # ── Eigene Datenbank ───────────────────────────────────────────
+          # Das Passwort aus MANDANT_SECRETS (base64-JSON, Schluessel
+          # "pruefung"). Fehlt etwas, bricht der Bau ab: Eine Adresse, die
+          # auf keine Datenbank zeigt, ist schlimmer als keine -- die Pruefer
+          # saehen einen Serverfehler statt einer Anmeldung.
+          PRUEFUNG_PASSWORT=$(printf '%s' "${EFF_MANDANT_SECRETS:-}" | base64 -d 2>/dev/null \
+                             | jq -r '.pruefung // ""' 2>/dev/null || true)
+          for WERT in "$EFF_PRUEFUNG_DB_HOST" "$EFF_PRUEFUNG_DB_NAME" "$EFF_PRUEFUNG_DB_USER" "$PRUEFUNG_PASSWORT"; do
+            [ -n "$WERT" ] && echo "::add-mask::$WERT"
+          done
+          LEER=""
+          [ -z "$EFF_PRUEFUNG_DB_HOST" ] && LEER="$LEER PRUEFUNG_DB_HOST"
+          [ -z "$EFF_PRUEFUNG_DB_NAME" ] && LEER="$LEER PRUEFUNG_DB_NAME"
+          [ -z "$EFF_PRUEFUNG_DB_USER" ] && LEER="$LEER PRUEFUNG_DB_USER"
+          [ -z "$PRUEFUNG_PASSWORT" ]     && LEER="$LEER MANDANT_SECRETS[pruefung]"
+          if [ -n "$LEER" ]; then
+            echo "::error::pruefung.guardops.ch: es fehlt$LEER. Der FTP-Zugang ist gesetzt, die Datenbank nicht -- so wird nichts hochgeladen."
+            exit 1
+          fi
+          # sed vertraegt im Ersatzwert weder "|" noch "&" noch "\\" -- ein
+          # Passwort kennt alle drei. Darum maskiert, wie bei den
+          # Demo-Plaetzen (dort nach einem echten Abbruch eingebaut).
+          ersetze() {
+            local platzhalter="$1" wert="$2" datei="$3" sicher
+            sicher=$(printf '%s' "$wert" | sed -e 's/[\\&|]/\\&/g')
+            sed -i "s|$platzhalter|$sicher|g" "$datei"
+          }
+          ersetze __DB_HOST__ "$EFF_PRUEFUNG_DB_HOST" "dist-pruefung/db.php"
+          ersetze __DB_NAME__ "$EFF_PRUEFUNG_DB_NAME" "dist-pruefung/db.php"
+          ersetze __DB_USER__ "$EFF_PRUEFUNG_DB_USER" "dist-pruefung/db.php"
+          ersetze __DB_PASS__ "$PRUEFUNG_PASSWORT" "dist-pruefung/db.php"
+          # Betreiber-Datenbank: dieselbe tote Einbindung wie im cupi24-Buendel.
+          sed -i "s|__BETREIBER_DB_HOST__|$EFF_BETREIBER_DB_HOST|g" dist-pruefung/betreiber.php
+          sed -i "s|__BETREIBER_DB_NAME__|$EFF_BETREIBER_DB_NAME|g" dist-pruefung/betreiber.php
+          sed -i "s|__BETREIBER_DB_USER__|$EFF_BETREIBER_DB_USER|g" dist-pruefung/betreiber.php
+          sed -i "s|__BETREIBER_DB_PASS__|$EFF_BETREIBER_DB_PASSWORD|g" dist-pruefung/betreiber.php
+          sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-pruefung/db.php
+          sed -i "s|__APP_ENV__|$UMGEBUNG|g" dist-pruefung/testumgebung.js
+          sed -i "s|__IST_DEMO_PLATZ__|0|g" dist-pruefung/testumgebung.js
+          sed -i "s|__IST_DEMO_PLATZ__|0|g" dist-pruefung/db.php
+          # Sparte Reinigung aus -- wie bei jedem Mandanten ausser CUPI 24
+          # (ENT-650, reinigung_angeboten() in backend/db.php).
+          sed -i "s|__SPARTE_REINIGUNG__|0|g" dist-pruefung/db.php
+
+          # Eigene Adresse (ENT-501) -- festes Literal wie bei cupi24.
+          sed -i "s|__APP_BASIS_URL__|https://pruefung.guardops.ch|g" dist-pruefung/db.php
+
+          sed -i "s|__ANTHROPIC_API_KEY__|$EFF_ANTHROPIC_API_KEY|g" dist-pruefung/ai.php
+
+          # Postfach der Betreiberin (siehe Kopf dieses Abschnitts).
+          sed -i "s|__SMTP_HOST__|$EFF_GUARDOPS_SMTP_HOST|g" dist-pruefung/mailer.php
+          sed -i "s|__SMTP_PORT__|$EFF_GUARDOPS_SMTP_PORT|g" dist-pruefung/mailer.php
+          sed -i "s|__SMTP_VERSCHLUESSELUNG__|$EFF_GUARDOPS_SMTP_VERSCHLUESSELUNG|g" dist-pruefung/mailer.php
+          sed -i "s|__SMTP_USER__|$EFF_GUARDOPS_SMTP_USER|g" dist-pruefung/mailer.php
+          sed -i "s|__SMTP_PASSWORD__|$EFF_GUARDOPS_SMTP_PASSWORD|g" dist-pruefung/mailer.php
+          sed -i "s|__SMTP_ABSENDER__|info@guardops.ch|g" dist-pruefung/mailer.php
+          sed -i "s|__MAIL_SIGNATUR__||g" dist-pruefung/mailer.php
+          sed -i "s|__SMTP_ABSENDER_NAME__|GuardOpS|g" dist-pruefung/mailer.php
+          sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist-pruefung/demo_anfrage.php
+          sed -i "s|__DEMO_EMPFAENGER__|$EFF_DEMO_EMPFAENGER|g" dist-pruefung/demo_zugang.php
+          sed -i "s|__GUARDOPS_BASIS_URL__|https://guardops.ch|g" dist-pruefung/demo_bestaetigung.php
+          # Nur Production (Bedingung oben): EFF_STAGING_TESTMAIL ist leer.
+          sed -i "s|__STAGING_TESTMAIL__|$EFF_STAGING_TESTMAIL|g" dist-pruefung/mailer.php
+          sed -i "s|__DEMO_TESTMAIL__||g" dist-pruefung/mailer.php
+          sed -i "s|__DEMO_RESET_TOKEN__||g" dist-pruefung/api/demo_reset_ausfuehren.php
+          sed -i "s|__MANDANT_SECRETS__|$EFF_MANDANT_SECRETS|g" dist-pruefung/betreiber.php
+          sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist-pruefung/dashboard.html
+          sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist-pruefung/portal.html
+          sed -i "s|__MAPS_JS_KEY__|$EFF_MAPS_JS_KEY|g" dist-pruefung/app.html
+          # Push wie bei cupi24: dieselbe App, dieselben Schluessel. Die
+          # Store-Fassung meldet sich bei Apple in der Produktivumgebung an.
+          sed -i "s|__VAPID_PRIVATE_PEM_B64__|$EFF_VAPID_PRIVATE_PEM_B64|g" dist-pruefung/push.php
+          sed -i "s|__VAPID_KONTAKT__|$EFF_VAPID_KONTAKT|g" dist-pruefung/push.php
+          sed -i "s|__APNS_KEY_P8_B64__|$EFF_APNS_KEY_P8_B64|g" dist-pruefung/push.php
+          sed -i "s|__APNS_KEY_ID__|$EFF_APNS_KEY_ID|g" dist-pruefung/push.php
+          sed -i "s|__APNS_TEAM_ID__|$EFF_APNS_TEAM_ID|g" dist-pruefung/push.php
+          sed -i "s|__PUSH_CRON_SCHLUESSEL__|$EFF_PUSH_CRON_SCHLUESSEL|g" dist-pruefung/api/push_versand.php
+
+          # Kein uebersehener Platzhalter darf hochgeladen werden -- dieselben
+          # Ausnahmen wie im cupi24-Buendel, mit derselben Begruendung dort.
+          UEBRIG=$(grep -rhos '__[A-Z_]\{3,\}__' dist-pruefung/ \
+                   | grep -v -e '^__DIR__$' -e '^__MAPS_IOS_KEY__$' -e '^__FILE__$' \
+                   | sort -u || true)
+          if [ -n "$UEBRIG" ]; then
+            echo "::error::Nicht ersetzte Platzhalter im pruefung-Buendel: $UEBRIG"
+            exit 1
+          fi
+
+          echo "Buendel fuer pruefung.guardops.ch:"
+          find dist-pruefung -type f | sort
+
+      - name: HTML verdichten (dist-pruefung)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_PRUEFUNG_FTP_HOST != '' }}
+        continue-on-error: true
+        run: node werkzeuge/verdichten/verdichten.mjs dist-pruefung
+
+      - name: Rapport-Tool nach pruefung.guardops.ch hochladen (FTPS)
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_PRUEFUNG_FTP_HOST != '' }}
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.EFF_PRUEFUNG_FTP_HOST }}
+          username: ${{ env.EFF_PRUEFUNG_FTP_USER }}
+          password: ${{ env.EFF_PRUEFUNG_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist-pruefung/
+          # Wie bei cupi24: Der Zugang ist auf das Document-Root der
+          # Subdomain beschraenkt, daher "/".
+          server-dir: /
+
+      - name: Hinweis, wenn pruefung.guardops.ch noch nicht eingerichtet ist
+        if: ${{ env.UMGEBUNG == 'production' && env.EFF_PRUEFUNG_FTP_HOST == '' }}
+        run: |
+          echo "::notice::pruefung.guardops.ch wurde NICHT beliefert -- die Secrets PRUEFUNG_FTP_HOST/USER/PASSWORD fehlen im Environment production. Ohne diese Adresse gibt es keinen Pruefzugang fuer Apple (ENT-732). Alles andere wurde regulaer ausgeliefert."
 
       # ══ Die zehn Demo-Plaetze (ENT-600/ENT-601/ENT-613) ═══════════════
       #

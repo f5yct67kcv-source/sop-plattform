@@ -8,12 +8,13 @@
   },
   "license": "UNLICENSED",
   "dependencies": {
+    "@capacitor-community/keep-awake": "^8.0.1",
     "@capacitor/android": "^8.5.0",
     "@capacitor/cli": "^8.5.0",
     "@capacitor/core": "^8.5.0",
+    "@capacitor/google-maps": "^8.0.1",
     "@capacitor/ios": "^8.5.0",
-    "@capacitor/push-notifications": "^8.1.2",
-    "@capacitor/google-maps": "^8.0.1"
+    "@capacitor/push-notifications": "^8.1.2"
   },
   "devDependencies": {
     "esbuild": "^0.25.0"

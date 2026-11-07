@@ -5092,6 +5092,10 @@ function zeichneRapport() {
 // "Schluesselverwaltung" ist inhaltlich entschieden (ENT-149), aber noch
 // nicht gebaut -- gleicher Platzhalter-Umgang wie bei den Betrieb-Kacheln
 // in dashboard.html (onclick -> toast).
+// IN DER APP-HUELLE FEHLT SIE GANZ (ENT-732): Apple weist eine App ab, die
+// sichtbar Unfertiges zeigt (Richtlinie 2.1) -- eine Kachel, die nur
+// "folgt spaeter" sagt, ist genau das. Im Browser bleibt sie als ehrlicher
+// Hinweis stehen. Wird die Schluesselverwaltung gebaut, entfaellt die Weiche.
 function zeichneWaechter() {
   $('v-waechter').innerHTML = `
     <div class="mk-grid">
@@ -5107,10 +5111,11 @@ function zeichneWaechter() {
         <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 14 18 8z"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg></span>
         <span class="mk-kachel-txt" id="mk-revierinfo-txt"><span class="mk-kachel-lbl">${esc(w('mitWaechterKachel'))}</span></span>
       </button>
+      ${nativeAppHuelle() ? '' : `
       <button type="button" id="mk-schluessel" class="mk-kachel" onclick="toast('Folgt in einem späteren Schritt.')">
         <span class="mk-kachel-ic"><svg class="i" viewBox="0 0 24 24"><circle cx="7" cy="15" r="4"/><line x1="10" y1="12" x2="20" y2="2"/><line x1="15" y1="7" x2="18" y2="10"/><line x1="18" y1="4" x2="21" y2="7"/></svg></span>
         <span class="mk-kachel-txt"><span class="mk-kachel-lbl">${esc(w('waechterSchluesselLbl'))}</span></span>
-      </button>
+      </button>`}
     </div>`;
   fzuKachelHinweisZeigen();
   mitKachelHinweisZeigen();
@@ -9686,7 +9691,45 @@ function rgNachtUm() {
 const RG_WACH_SCHLUESSEL = 'sop_rundgang_wachhalten';
 let rgsWachSperre = null;
 
+/* In der App (ENT-732): das native Plugin statt navigator.wakeLock.
+
+   Ob die Wachsperre des Browsers in der WKWebView der Huelle verlaesslich
+   haelt, war nie geprueft (OP-574) -- in Safari hat Apple sie fuer
+   Web-Apps erst spaet repariert. Das Plugin setzt auf iOS den Leerlauf-
+   Zeitgeber der App ausser Kraft; das ist der Weg, den native Apps gehen.
+
+   Die Sperre sieht fuer den Rest des Codes GLEICH aus wie die des
+   Browsers (release(), addEventListener('release')). So bleiben
+   Anfordern, Zurueckkommen und Freigeben ein einziger Weg und nicht zwei,
+   von denen der seltenere beim naechsten Umbau vergessen wird.
+
+   Unterschied zum Browser, und er ist gewollt: Die native Sperre faellt
+   beim Wegschalten nicht von selbst weg. Das Zurueckkommen fordert darum
+   nichts neu an -- rgsWachSperre steht noch, und das ist richtig so. */
+function rgWachNativ() {
+  try {
+    const P = nativeAppHuelle() && window.Capacitor.Plugins;
+    return (P && P.KeepAwake && typeof P.KeepAwake.keepAwake === 'function') ? P.KeepAwake : null;
+  } catch (e) { return null; }
+}
+
+async function rgWachNativAnfordern(KA) {
+  await KA.keepAwake();
+  const horcher = [];
+  return {
+    release: () => {
+      // allowSleep() ist ein Versprechen; ein Fehler dort darf nicht als
+      // unbehandelte Zurueckweisung durchschlagen. Das Geraet schlaeft dann
+      // eben nach seiner eigenen Frist -- kein Schaden fuer die Runde.
+      Promise.resolve().then(() => KA.allowSleep()).catch(() => {});
+      horcher.forEach(f => { try { f(); } catch (e) {} });
+    },
+    addEventListener: (name, f) => { if (name === 'release') { horcher.push(f); } },
+  };
+}
+
 function rgWachMoeglich() {
+  if (rgWachNativ()) { return true; }
   try { return !!(navigator.wakeLock && navigator.wakeLock.request); }
   catch (e) { return false; }
 }
@@ -9702,7 +9745,8 @@ async function rgWachAnfordern() {
   // auch auf der Uebersicht wachhaelt, waere ein Akkufresser ohne Zweck.
   if (rgsModus !== 'lauf' || !rundgangAktiv) { return; }
   try {
-    rgsWachSperre = await navigator.wakeLock.request('screen');
+    const KA = rgWachNativ();
+    rgsWachSperre = KA ? await rgWachNativAnfordern(KA) : await navigator.wakeLock.request('screen');
     rgsWachSperre.addEventListener('release', () => { rgsWachSperre = null; });
   } catch (e) { rgsWachSperre = null; }   // z.B. wenig Akku: das Geraet darf nein sagen
 }

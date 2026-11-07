@@ -4,6 +4,10 @@
 <dict>
   <key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
+	<!-- Exportfrage zur Verschluesselung (ENT-732): nur HTTPS aus iOS selbst,
+	     damit ausgenommen. Ohne Eintrag fragt App Store Connect bei jedem Build. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
