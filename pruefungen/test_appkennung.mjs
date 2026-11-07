@@ -245,6 +245,21 @@ for (const [datei, feld, muster] of stellen) {
     /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\s*\/>/.test(plist));
 }
 
+// Nur iPhone, kein iPad (Entscheid des Projektinhabers 2026-11-07, vor dem
+// ersten Hochladen). Mit "1,2" verlangt App Store Connect zusätzlich
+// iPad-Bildschirmfotos, und die Prüfer testen oft auf einem iPad. Wichtiger
+// ist die Einbahnstrasse: Ist eine Fassung mit iPad im Store, lässt Apple
+// keine spätere Fassung ohne iPad mehr zu. Wer das iPad dazunehmen will,
+// tut es bewusst und ändert diese Prüfung mit. Auf dem iPad läuft die App
+// trotzdem, im iPhone-Format.
+{
+  const pbxproj = lies(`${M}/ios/App/App.xcodeproj/project.pbxproj`);
+  const familien = [...pbxproj.matchAll(/TARGETED_DEVICE_FAMILY\s*=\s*"?([^";]+)"?;/g)].map(m => m[1].trim());
+  check('KRITISCH: das Xcode-Projekt baut nur fürs iPhone (TARGETED_DEVICE_FAMILY = 1, Debug UND Release)',
+    familien.length === 2 && familien.every(f => f === '1'));
+  if (familien.some(f => f !== '1')) { bad.push('  TARGETED_DEVICE_FAMILY: ' + familien.join(', ')); }
+}
+
 // ══════════ ANDROID: DIESELBEN GERÄTERECHTE, ANDERS ERKLÄRT ═══════════
 // Gegenstueck zum Block darueber. Android fragt nur nach dem, was im
 // Manifest steht -- fehlt die Zeile, lehnt es still ab, genau wie iOS ohne
