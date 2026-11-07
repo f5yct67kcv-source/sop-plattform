@@ -118,6 +118,23 @@ check('KRITISCH: und weist einen leeren Passwort-Hash ausdruecklich ab',
 check('KRITISCH: ein eingeladenes Konto laesst sich nicht von Hand freischalten',
   /be_einladung_offen/.test(status));
 
+// ENT-737: Reaktivieren bringt das alte Passwort NICHT zurueck. Ein
+// stillgelegtes Konto geht ueber be_konto_wieder_einladen() (deren Aussagen
+// prueft pruef_betreiber_einladung.php durch Ausfuehren); geprueft wird
+// hier, dass der Endpunkt diesen Weg nimmt, BEVOR er aktiv = 1 schreiben
+// koennte, und den Versand vorher prueft.
+{
+  const posWieder = status.indexOf('be_konto_wieder_einladen(');
+  const posSmtp   = status.indexOf('smtp_konfiguriert');
+  const posAktiv  = status.search(/UPDATE betreiber SET aktiv/);
+  check('KRITISCH: Reaktivieren laeuft ueber einen neuen Link, nicht ueber das alte Passwort',
+    posWieder > 0 && posAktiv > posWieder);
+  check('… und prueft den Versand, bevor es das Passwort leert',
+    posSmtp > 0 && posSmtp < posWieder);
+  check('… und der Link geht als "wieder freigeschaltet" hinaus',
+    /be_einladung_versenden\([\s\S]{0,300}?,\s*false,\s*true\)/.test(status));
+}
+
 // ── 5. Erst pruefen, ob sich verschicken laesst -- dann anlegen ───────
 //
 // Sonst bleibt bei kaputtem Versand ein Konto zurueck, das niemand nutzen

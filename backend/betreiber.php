@@ -699,8 +699,13 @@ const BE_EINLADUNG_STUNDEN = 48;
 // Den LINK baut der Aufrufer, nicht diese Funktion: Wo die Seite liegt,
 // haengt am Ort des Endpunkts im Buendel (siehe unten), und den kennt nur
 // er ueber sein eigenes __DIR__.
+//
+// $wieder: ein STILLGELEGTES Konto, das reaktiviert wird (ENT-737). Die
+// Person hatte schon einen Zugang; die Nachricht sagt ihr, dass ihr
+// bisheriges Passwort nicht mehr gilt -- sonst versuchte sie es weiter.
 function be_einladung_versenden(string $link, string $email, string $name,
-                                string $vorname, string $vonName, bool $erneut): void
+                                string $vorname, string $vonName, bool $erneut,
+                                bool $wieder = false): void
 {
     // KEINE eigene Seite: Der Link fuehrt in dasselbe Tor, das die Person
     // danach taeglich sieht -- dritter Zustand von betreiber.html, wie
@@ -729,10 +734,14 @@ function be_einladung_versenden(string $link, string $email, string $name,
     $anrede   = $vorname !== '' ? 'Guten Tag ' . $vorname : 'Guten Tag';
 
     $betreff = 'Ihr Zugang zum Betreiber-Bereich von GuardOpS';
-    $einleitung = $vonName . ' hat für Sie einen Zugang zum Betreiber-Bereich von GuardOpS eingerichtet.';
-    $nachsatz   = $erneut ? 'Das ist eine neue Einladung. Ein früherer Link gilt nicht mehr.' : '';
+    $einleitung = $wieder
+        ? $vonName . ' hat Ihren Zugang zum Betreiber-Bereich von GuardOpS wieder freigeschaltet.'
+        : $vonName . ' hat für Sie einen Zugang zum Betreiber-Bereich von GuardOpS eingerichtet.';
+    $nachsatz   = $wieder
+        ? 'Ihr bisheriges Passwort gilt nicht mehr, und die Zwei-Faktor-Anmeldung richten Sie neu ein.'
+        : ($erneut ? 'Das ist eine neue Einladung. Ein früherer Link gilt nicht mehr.' : '');
     $text = "$anrede\n\n"
-        . $einleitung . ($erneut ? ' ' . $nachsatz : '') . "\n\n"
+        . $einleitung . ($nachsatz !== '' ? ' ' . $nachsatz : '') . "\n\n"
         . "Über diesen Link setzen Sie Ihr Passwort selbst ($std Stunden gültig):\n$link\n\n"
         . "Im Anschluss richten Sie die Zwei-Faktor-Anmeldung ein. Sie ist auf dieser "
         . "Ebene Pflicht, nicht freiwillig.\n\n"
@@ -748,8 +757,10 @@ function be_einladung_versenden(string $link, string $email, string $name,
     $html = '<div style="' . $schrift . ';color:#14161A;max-width:520px">'
         . '<p style="' . $schrift . ';margin:0 0 16px">' . $e($anrede) . '</p>'
         . '<p style="' . $schrift . ';margin:0 0 16px">' . $e($vonName)
-        . ' hat für Sie einen Zugang zum <strong>Betreiber-Bereich von GuardOpS</strong> eingerichtet.'
-        . ($erneut ? ' ' . $e($nachsatz) : '') . '</p>'
+        . ($wieder
+            ? ' hat Ihren Zugang zum <strong>Betreiber-Bereich von GuardOpS</strong> wieder freigeschaltet.'
+            : ' hat für Sie einen Zugang zum <strong>Betreiber-Bereich von GuardOpS</strong> eingerichtet.')
+        . ($nachsatz !== '' ? ' ' . $e($nachsatz) : '') . '</p>'
         . '<p style="' . $schrift . ';margin:28px 0">'
         . '<a href="' . $e($link) . '" '
         . 'style="' . $schrift . ';background:#2F5BD7;color:#fff;padding:12px 24px;border-radius:8px;'
@@ -841,6 +852,61 @@ function be_einladung_ersetzen(PDO $pdo, int $betreiberId, string $tokenRoh,
     );
     $s->execute([hash('sha256', $tokenRoh), $vonId, $betreiberId]);
     return $s->rowCount() === 1;
+}
+
+// Ein STILLGELEGTES Konto wieder einladen (ENT-737).
+//
+// WARUM ES DAS GIBT: Wer sein Passwort verloren hatte, kam nicht mehr
+// hinein -- ein fremdes Passwort setzt auf dieser Ebene niemand (ENT-615),
+// und ein neues Konto scheiterte an der Adresse, die das stillgelegte auf
+// Dauer belegt (OP-673). Reaktivieren brachte nur das alte Passwort zurueck,
+// und das war ja das verlorene.
+//
+// WAS GESCHIEHT: Das Konto wird wieder zu einem EINGELADENEN. Das alte
+// Passwort und der zweite Faktor sind weg, eine neue Einladung geht an die
+// HINTERLEGTE Adresse, und erst das Einloesen macht das Konto wieder aktiv
+// (betreiber_einladung_einloesen.php). Der Aufrufer sieht dabei nie ein
+// Passwort und setzt keines -- er schickt nur einen Link an die Person, der
+// das Konto gehoert. Darum bleibt der Grundsatz aus ENT-615 stehen.
+//
+// NUR AM STILLGELEGTEN KONTO: Ein aktives haette sein Passwort noch, und
+// dieser Weg waere das Zuruecksetzen fremder Passwoerter durch die
+// Hintertuer. Der Zwischenschritt "erst stilllegen" ist der Riegel: Er
+// beendet die Sitzungen des Kontos, steht im Logbuch und ist am letzten
+// aktiven Konto unmoeglich.
+//
+// Gibt false zurueck, wenn das Konto nicht stillgelegt ist oder schon eine
+// offene Einladung hat (dann ist "Neu einladen" der Weg). Schreibt in
+// mehrere Tabellen; die Transaktion fuehrt der Aufrufer, weil der Versand
+// mit hineingehoert. $frist wie bei be_einladung_ersetzen().
+function be_konto_wieder_einladen(PDO $pdo, int $betreiberId, string $tokenRoh,
+                                  int $vonId, ?string $frist = null): bool
+{
+    if (!be_einladung_tabelle_da($pdo) || be_einladung_offen($pdo, $betreiberId)) {
+        return false;
+    }
+    $frist ??= 'DATE_ADD(NOW(), INTERVAL ' . BE_EINLADUNG_STUNDEN . ' HOUR)';
+
+    // Die Bedingung aktiv = 0 steht IN der Schreibanweisung, nicht in einer
+    // Abfrage davor: So kann zwischen Pruefen und Schreiben niemand das
+    // Konto aktiv schalten und es trotzdem ohne Passwort zuruecklassen.
+    $u = $pdo->prepare("UPDATE betreiber SET passwort_hash = '' WHERE id = ? AND aktiv = 0");
+    $u->execute([$betreiberId]);
+    if ($u->rowCount() !== 1) { return false; }
+
+    if (be_zf_tabelle_da($pdo)) {
+        $pdo->prepare('DELETE FROM betreiber_zwei_faktor WHERE betreiber_id = ?')
+            ->execute([$betreiberId]);
+    }
+    if (hat_tabelle($pdo, 'betreiber_sessions')) {
+        $pdo->prepare('DELETE FROM betreiber_sessions WHERE betreiber_id = ?')
+            ->execute([$betreiberId]);
+    }
+    $pdo->prepare(
+        'INSERT INTO betreiber_einladung (betreiber_id, token, gueltig_bis, erstellt_von)
+         VALUES (?, ?, ' . $frist . ', ?)'
+    )->execute([$betreiberId, hash('sha256', $tokenRoh), $vonId]);
+    return true;
 }
 
 // Sucht das Konto zu einem rohen Token -- oder gibt null zurueck.

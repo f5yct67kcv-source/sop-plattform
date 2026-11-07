@@ -5373,11 +5373,14 @@ function kdZugang(k) {
   }
   if (k.aktiv && !letztes) {
     tasten.push(`<button type="button" class="btn btn-danger btn-sm" onclick="kontoSchalten(${Number(k.id)}, false)">Stilllegen</button>`);
-  } else if (!k.aktiv && !k.eingeladen) {
+  } else if (!k.aktiv && !k.eingeladen && !k.archiviert) {
     /* Ein eingeladenes Konto wird von selbst aktiv, sobald die Person ihr
        Passwort setzt -- von Hand weist der Server es ab (409). Der Knopf
-       stuende neben "Neu einladen" und fuehrte nur zu dieser Meldung. */
-    tasten.push(`<button type="button" class="btn btn-plain btn-sm" onclick="kontoSchalten(${Number(k.id)}, true)">Aktivieren</button>`);
+       stuende neben "Neu einladen" und fuehrte nur zu dieser Meldung.
+       Reaktivieren schickt einen neuen Link (ENT-737): Das alte Passwort
+       kommt nicht zurueck. Ein archiviertes Konto holt man zuerst aus dem
+       Archiv -- der Server weist es sonst ab. */
+    tasten.push(`<button type="button" class="btn btn-plain btn-sm" onclick="kReaktivieren(${Number(k.id)})">Reaktivieren</button>`);
   }
   /* Archivieren nur am stillgelegten Konto (ENT-672) -- die Sperre sitzt im
      Server, das hier erspart nur den Umweg ueber einen Fehler. Und nur an
@@ -5404,8 +5407,9 @@ function kdZugang(k) {
           hat noch kein Passwort. „Neu einladen“ schickt einen frischen Link an die hinterlegte Adresse;
           ein früherer Link gilt danach nicht mehr.</div>` : ''}
         ${k.ich || k.eingeladen ? '' : `<div class="of-hinweis" style="margin-top:12px">Das Passwort eines fremden Kontos
-          lässt sich hier nicht setzen. Wer seines verloren hat, bekommt ein neues Konto und dieses
-          wird stillgelegt.</div>`}
+          lässt sich hier nicht setzen. Wer seines verloren hat: Konto stilllegen und reaktivieren.
+          Dann geht ein neuer Link an die hinterlegte Adresse, und die Person setzt Passwort und
+          Zwei-Faktor selbst neu.</div>`}
         ${k.archiviert ? `<div class="of-hinweis" style="margin-top:12px">Dieses Konto ist archiviert:
           Es steht nicht mehr in der Liste, ist aber nicht gelöscht — wer wann Zugang hatte, bleibt
           nachvollziehbar. Seine E-Mail-Adresse bleibt belegt.</div>` : ''}
@@ -5447,6 +5451,27 @@ async function kontoArchiv(id, archiv) {
      nichts geschehen -- darum zurueck in das Fach, in dem es jetzt liegt. */
   if (archiv) { kArchivTab = 'archiv'; kArchivReiterZeichnen(); kGoListe(); }
   kurzmeldung(archiv ? 'Konto archiviert.' : 'Konto aus dem Archiv geholt.');
+}
+
+/* Reaktivieren (ENT-737). Dieselbe Rueckfrage-Bauart wie "Neu einladen":
+   Die Adresse steht drin, weil der Link nur dorthin geht -- und gesagt
+   wird, was wegfaellt, weil es sich nicht rueckgaengig machen laesst. */
+async function kReaktivieren(id) {
+  const k = kFindet(id);
+  if (!k) { return; }
+  if (!confirm('Konto von ' + k.name + ' reaktivieren?\n\n'
+      + 'Ein neuer Link geht an ' + k.email + '. Das bisherige Passwort und die '
+      + 'Zwei-Faktor-Anmeldung gelten danach nicht mehr. Aktiv wird das Konto, '
+      + 'sobald das neue Passwort gesetzt ist.')) { return; }
+  const a = await ruf('betreiber_konto_status.php', { id: id, aktiv: true });
+  if (a.status !== 'ok') {
+    melde($('kdMeldung') || $('haus-meldung'), 'fehler', a.message);
+    return;
+  }
+  kdVerlaufFuer = 0;
+  await ladeKonten();
+  kurzmeldung('Link an ' + k.email + ' verschickt. Er gilt '
+    + Number(a.gueltig_stunden) + ' Stunden.');
 }
 
 async function kontoSchalten(id, aktiv) {

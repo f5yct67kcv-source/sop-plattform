@@ -201,6 +201,54 @@ $pruef('KRITISCH: GEGENPROBE — nach dem Einloesen traegt derselbe Link nicht m
 $pruef('… und das Konto gilt nicht mehr als eingeladen',
     be_einladung_offen($db, 1) === false);
 
+// ── 5b. Reaktivieren heisst neu einladen (ENT-737) ────────────────────
+//
+// Die Aussagen: Ein stillgelegtes Konto verliert dabei sein altes Passwort
+// und seinen zweiten Faktor, bekommt einen Link, und bleibt bis zum
+// Einloesen stillgelegt. Ein AKTIVES Konto laesst sich so nicht anfassen --
+// sonst waere das ein Zuruecksetzen fremder Passwoerter.
+$db->exec("CREATE TABLE betreiber_zwei_faktor (betreiber_id INTEGER PRIMARY KEY,
+  geheim TEXT NOT NULL, bestaetigt_am TEXT NULL)");
+$db->exec("CREATE TABLE betreiber_sessions (token TEXT PRIMARY KEY, betreiber_id INTEGER NOT NULL)");
+$db->exec("INSERT INTO betreiber (id, name, email, passwort_hash, aktiv) VALUES
+  (4, 'Wieder Da',  'wieder@example.org', '\$2y\$12\$altesaltesaltesaltesal', 0),
+  (5, 'Noch Aktiv', 'aktiv@example.org',  '\$2y\$12\$aktivaktivaktivaktivak', 1)");
+$db->exec("INSERT INTO betreiber_zwei_faktor (betreiber_id, geheim, bestaetigt_am) VALUES
+  (4, 'GEHEIM4', '2026-01-01 00:00:00'), (5, 'GEHEIM5', '2026-01-01 00:00:00')");
+$db->exec("INSERT INTO betreiber_sessions (token, betreiber_id) VALUES ('s4', 4), ('s5', 5)");
+
+$tokenWieder = 'dddd1111eeee2222ffff3333aaaa4444bbbb5555cccc6666dddd7777eeee8888';
+$pruef('ein stillgelegtes Konto laesst sich wieder einladen',
+    be_konto_wieder_einladen($db, 4, $tokenWieder, 3, $frist) === true);
+$z4 = $db->query('SELECT passwort_hash, aktiv FROM betreiber WHERE id = 4')->fetch();
+$pruef('KRITISCH: das alte Passwort gilt danach nicht mehr',
+    $z4['passwort_hash'] === '');
+$pruef('KRITISCH: das Konto bleibt stillgelegt, bis die Person ihr Passwort setzt',
+    (int)$z4['aktiv'] === 0);
+$pruef('KRITISCH: der zweite Faktor ist weg und wird neu eingerichtet',
+    be_zf_ist_an($db, 4) === false
+    && $db->query('SELECT COUNT(*) FROM betreiber_zwei_faktor WHERE betreiber_id = 4')->fetchColumn() == 0);
+$pruef('laufende Sitzungen des Kontos enden mit',
+    $db->query('SELECT COUNT(*) FROM betreiber_sessions WHERE betreiber_id = 4')->fetchColumn() == 0);
+$pruef('KRITISCH: der neue Link findet das Konto, unter seiner bisherigen Adresse',
+    ($t4 = be_einladung_konto($db, $tokenWieder)) !== null
+    && (int)$t4['id'] === 4 && $t4['email'] === 'wieder@example.org');
+$pruef('… und in der Tabelle steht nur der Abdruck',
+    $db->query('SELECT token FROM betreiber_einladung WHERE betreiber_id = 4')->fetchColumn()
+        === hash('sha256', $tokenWieder));
+$pruef('ein zweites Mal geht es nicht — dafuer gibt es "Neu einladen"',
+    be_konto_wieder_einladen($db, 4, $tokenWieder . 'x', 3, $frist) === false);
+
+// Gegenprobe: ein AKTIVES Konto. Passwort, Faktor und Sitzung muessen
+// unberuehrt bleiben, und es darf keine Einladung entstehen.
+$pruef('KRITISCH: GEGENPROBE — ein aktives Konto laesst sich so NICHT zuruecksetzen',
+    be_konto_wieder_einladen($db, 5, 'eeee' . str_repeat('1', 60), 3, $frist) === false
+    && $db->query('SELECT passwort_hash FROM betreiber WHERE id = 5')->fetchColumn()
+        === '$2y$12$aktivaktivaktivaktivak'
+    && be_zf_ist_an($db, 5) === true
+    && be_einladung_offen($db, 5) === false
+    && $db->query('SELECT COUNT(*) FROM betreiber_sessions WHERE betreiber_id = 5')->fetchColumn() == 1);
+
 // ── 6. Die Frist steht an einer Stelle ────────────────────────────────
 //
 // Keine Pruefung auf die Zahl selbst -- die darf sich aendern. Geprueft

@@ -30,6 +30,14 @@ function neuerungen_katalog(): array
 {
     return [
         [
+            'nr'    => 56,
+            'datum' => '2026-11-07',
+            'art'   => 'verbesserung',
+            'fuer'  => ['betreiber'],
+            'titel' => 'Konto reaktivieren mit neuem Link',
+            'text'  => 'Wer sein Passwort verloren hat, kommt jetzt unter derselben E-Mail-Adresse zurück: Konto stilllegen, dann „Reaktivieren“. Ein neuer Link geht an die hinterlegte Adresse, die Person setzt Passwort und Zwei-Faktor selbst neu. Das bisherige Passwort gilt danach nicht mehr. Konto und Verlauf bleiben dieselben.',
+        ],
+        [
             'nr'    => 54,
             'datum' => '2026-10-17',
             'art'   => 'neu',
