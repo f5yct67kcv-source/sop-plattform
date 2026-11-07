@@ -324,6 +324,25 @@ const browser = await chromium.launch({ executablePath: browserPfad() });
     !(entwurf && ausgeliefert));
 }
 
+// Der Kartenbaustein von Google im iOS-Paket meldet Google laut seinem
+// Datenschutz-Manifest Geräte-ID, Produktinteraktion, Absturz- und
+// Leistungsdaten (Privacy Report des ersten Store-Archivs, 2026-11-07).
+// Dieselbe Kopplung wie bei Google Analytics oben: Solange das SDK im Paket
+// steckt, muss die App-Erklärung das nennen und darf nicht behaupten, die
+// App enthalte gar kein Analysewerkzeug. In App Store Connect steht
+// dasselbe in der Nährwerttabelle; zwei verschiedene Aussagen wären ein
+// Ablehnungsgrund und vor allem falsch.
+{
+  const paket = lies('mobile/ios/App/CapApp-SPM/Package.swift');
+  const text = lies('datenschutz-app.html').replace(/<!--[\s\S]*?-->/g, '').replace(/<[^>]+>/g, ' ');
+  if (/CapacitorGoogleMaps/.test(paket)) {
+    check('KRITISCH: die App-Erklärung nennt die Diagnosedaten des Kartenbausteins von Google (Absturz- und Leistungsdaten, Gerätekennung)',
+      /Absturz/.test(text) && /Leistungsdaten/.test(text) && /Kennung des Geräts|Geräte-?(ID|kennung)/.test(text));
+    check('KRITISCH: die App-Erklärung behauptet nicht, die App enthalte überhaupt kein Analysewerkzeug',
+      !/enthält\s+kein\s+Analysewerkzeug/i.test(text.replace(/\s+/g, ' ')));
+  }
+}
+
 // Farbwerte aus dem Cockpit, nicht aehnliche -- dieselbe Kopplung wie in
 // test_homepage.mjs.
 const dash = lies('dashboard.html');

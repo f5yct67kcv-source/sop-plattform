@@ -29,7 +29,13 @@
       Hoechstdauer 30 Tage, 14 Tage ohne Nutzung (backend/db.php).
     - Push ueber Apple (APNs, backend/push.php).
     - Karte ueber Google Maps (natives SDK und Maps-JavaScript-API).
-    - Kein Analysewerkzeug, keine Werbung (in app.html nichts davon).
+    - Kein eigenes Analysewerkzeug, keine Werbung (in app.html nichts davon).
+      ABER: Das Google-Maps-SDK meldet laut seinem Datenschutz-Manifest
+      (Privacy Report von Xcode, erstes Store-Archiv 2026-11-07) eine
+      Geraete-ID, Produktinteraktion, Absturz- und Leistungsdaten und
+      sonstige Daten zu Analysezwecken an Google, ohne Tracking. Abschnitt 7
+      und 9 nennen das. Bei jedem SDK-Update den Bericht neu lesen
+      (sop-projekt, app-store-eintrag.md, Abschnitt 5).
   Aendert sich einer dieser Punkte im Code, wird diese Seite falsch.
 
   KEINE RECHTSBERATUNG. Der Text beschreibt, was die Software tut.
@@ -74,7 +80,9 @@
      bekommen Sie von Ihrem Arbeitgeber; selbst anlegen lässt es sich nicht.</p>
   <p>Ihr <strong>Standort</strong> wird nur während einer laufenden Runde und beim
      Melden eines Ereignisses verwendet, nie im Hintergrund. Die App enthält
-     <strong>kein Analysewerkzeug und keine Werbung</strong>.</p>
+     <strong>keine Werbung</strong> und misst nicht selbst, wie Sie sie
+     benutzen. Der eingebaute Kartendienst von Google übermittelt Google
+     jedoch Nutzungs- und Diagnosedaten (Abschnitt 7).</p>
   <p>Für die Verkaufsseite guardops.ch gilt eine
      <a href="datenschutz.html">eigene Datenschutzerklärung</a>.</p>
 
@@ -162,7 +170,15 @@
   <p>Für die Karte im Rundgang verwendet die App den Kartendienst von
      <strong>Google</strong> (Google Maps). Beim Anzeigen ruft das Gerät die
      Kartendaten direkt bei Google ab. Google erhält dabei die Internetadresse
-     Ihres Geräts und den angezeigten Kartenausschnitt. Google kann diese Daten
+     Ihres Geräts und den angezeigten Kartenausschnitt.</p>
+  <p>Der Kartenbaustein von Google ist fest in die App eingebaut. Nach Angaben
+     von Google übermittelt er zusätzlich, für Googles eigene Auswertungen und
+     für den Betrieb des Kartendienstes: eine Kennung des Geräts, Angaben dazu,
+     wie die Karte benutzt wird, sowie Absturz- und Leistungsdaten. Google
+     verwendet diese Daten nach eigenen Angaben nicht, um Sie über andere Apps
+     oder Websites zu verfolgen. Wir erhalten diese Daten nicht und können sie
+     nicht abschalten, ohne auf die Karte zu verzichten.</p>
+  <p>Google kann diese Daten
      auch ausserhalb der Schweiz bearbeiten, insbesondere in den USA. Es gelten
      die Datenschutzbestimmungen von Google.</p>
 
@@ -176,8 +192,9 @@
 
   <h2>9. Was die App nicht tut</h2>
   <ul>
-    <li>Sie enthält kein Analysewerkzeug und misst nicht, wie Sie die App
-        benutzen.</li>
+    <li>Sie enthält kein eigenes Analysewerkzeug; wir messen nicht, wie Sie
+        die App benutzen. (Was der Kartendienst von Google übermittelt, steht
+        in Abschnitt 7.)</li>
     <li>Sie zeigt keine Werbung und gibt nichts an Werbenetzwerke weiter.</li>
     <li>Sie verfolgt Sie nicht über andere Apps oder Websites.</li>
     <li>Sie ortet Sie nicht im Hintergrund.</li>
