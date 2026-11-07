@@ -55,30 +55,91 @@ if [ "$(cksum < "$0")" != "$SKRIPT_VORHER" ] && [ "${AUFS_ANDROID_NEUSTART:-}" !
 fi
 
 echo "── 1b/5 Android-Werkzeuge suchen"
-# Android Studio bringt ein eigenes Java mit. Ein anderes, zufaellig
-# installiertes Java passt oft nicht zur Gradle-Fassung und bricht den Bau
-# mit einer Meldung ab, die nicht nach Java klingt.
-if [ -z "${JAVA_HOME:-}" ]; then
-  for kandidat in \
-    "/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
-    "$HOME/Applications/Android Studio.app/Contents/jbr/Contents/Home"; do
-    if [ -x "$kandidat/bin/java" ]; then export JAVA_HOME="$kandidat"; break; fi
+# Welches Java gebaut wird, entscheidet die FASSUNG, nicht der Fundort.
+#
+# ANLASS: Beim ersten Lauf am Mac des Projektinhabers brach Gradle mit
+# "Unsupported class file major version 69" ab -- das ist Java 25. Das
+# Skript hatte ein schon gesetztes JAVA_HOME unbesehen uebernommen. Die
+# Meldung klingt nicht nach Java, und genau darum wird hier vorher
+# geprueft statt nachher gerätselt.
+#
+# Die Grenzen kommen von der Gradle-Fassung im Wrapper
+# (android/gradle/wrapper/gradle-wrapper.properties, 8.14): Sie laeuft mit
+# Java 17 bis 24. Wer Gradle hebt, hebt auch JAVA_MAX.
+JAVA_MIN=17
+JAVA_MAX=24
+
+# Hauptfassung eines Java-Ordners, z. B. 21 -- leer, wenn dort keines ist.
+# "1.8.0_x" (Java 8) wird zu 8, "25.0.1" zu 25.
+java_hauptversion() {
+  [ -x "$1/bin/java" ] || { echo ""; return; }
+  "$1/bin/java" -version 2>&1 | head -1 \
+    | sed -n 's/.*version "\([0-9]*\)\.\{0,1\}\([0-9]*\).*/\1 \2/p' \
+    | awk '{ print ($1 == 1 ? $2 : $1) }'
+}
+
+# Den ersten passenden Java-Ordner aus den Kandidaten nennen. Android
+# Studios eigenes Java zuerst (dafuer ist es da), ein gesetztes JAVA_HOME
+# danach, dann was macOS sonst kennt.
+java_waehlen() {
+  local k v
+  for k in "$@"; do
+    [ -n "$k" ] || continue
+    v="$(java_hauptversion "$k")"
+    [ -n "$v" ] || continue
+    if [ "$v" -ge "$JAVA_MIN" ] && [ "$v" -le "$JAVA_MAX" ]; then
+      echo "$k"; return
+    fi
+  done
+  echo ""
+}
+
+JAVA_KANDIDATEN=(
+  "/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+  "$HOME/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+  "${JAVA_HOME:-}"
+)
+if [ -x /usr/libexec/java_home ]; then
+  for v in 21 17 24 23 22; do
+    JAVA_KANDIDATEN+=("$(/usr/libexec/java_home -v "$v" 2>/dev/null || true)")
   done
 fi
+for k in /Library/Java/JavaVirtualMachines/*/Contents/Home; do
+  JAVA_KANDIDATEN+=("$k")
+done
+GEWAEHLT="$(java_waehlen "${JAVA_KANDIDATEN[@]}")"
+
 if [ -z "${ANDROID_HOME:-}" ] && [ -d "$HOME/Library/Android/sdk" ]; then
   export ANDROID_HOME="$HOME/Library/Android/sdk"
 fi
-if [ -z "${JAVA_HOME:-}" ] || [ -z "${ANDROID_HOME:-}" ]; then
+if [ -z "${ANDROID_HOME:-}" ]; then
   echo ""
-  echo "  Android Studio fehlt oder ist noch nicht eingerichtet."
-  [ -z "${JAVA_HOME:-}" ]    && echo "    - kein Java aus Android Studio gefunden"
-  [ -z "${ANDROID_HOME:-}" ] && echo "    - kein Android-SDK unter ~/Library/Android/sdk"
-  echo ""
-  echo "  Android Studio installieren (developer.android.com/studio), einmal"
-  echo "  oeffnen und den Einrichtungs-Assistenten durchlaufen lassen -- er"
-  echo "  laedt das SDK. Danach dieses Skript erneut starten."
+  echo "  Kein Android-SDK unter ~/Library/Android/sdk."
+  echo "  Android Studio einmal oeffnen und den Einrichtungs-Assistenten"
+  echo "  durchlaufen lassen -- er laedt das SDK. Danach erneut starten."
   exit 1
 fi
+if [ -z "$GEWAEHLT" ]; then
+  echo ""
+  echo "  Kein passendes Java gefunden (gebraucht: $JAVA_MIN bis $JAVA_MAX)."
+  for k in "${JAVA_KANDIDATEN[@]}"; do
+    v="$(java_hauptversion "$k")"
+    [ -n "$v" ] && echo "    gefunden, aber Java $v: $k"
+  done
+  echo ""
+  echo "  Abhilfe: Java 21 dazu installieren -- es ersetzt nichts, das"
+  echo "  vorhandene bleibt, wie es ist:"
+  echo "      brew install --cask temurin@21"
+  echo "  (ohne Homebrew: adoptium.net, \"Temurin 21\", macOS-Paket)"
+  echo "  Danach dieses Skript erneut starten."
+  exit 1
+fi
+if [ "${JAVA_HOME:-}" != "$GEWAEHLT" ] && [ -n "${JAVA_HOME:-}" ]; then
+  echo "        JAVA_HOME zeigt auf Java $(java_hauptversion "$JAVA_HOME") -- fuer diesen Bau"
+  echo "        wird stattdessen Java $(java_hauptversion "$GEWAEHLT") genommen (nur hier, sonst unveraendert)"
+fi
+export JAVA_HOME="$GEWAEHLT"
+echo "        Java $(java_hauptversion "$JAVA_HOME"): $JAVA_HOME"
 ADB="$ANDROID_HOME/platform-tools/adb"
 if [ ! -x "$ADB" ]; then
   echo ""

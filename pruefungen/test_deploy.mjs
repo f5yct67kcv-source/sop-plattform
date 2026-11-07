@@ -1997,6 +1997,63 @@ iPhone B  b.coredevice.local  BBBBBBBB-0000-0000-0000-000000000002  connected  i
   }
 }
 
+// ══════════ WELCHES JAVA GEBAUT WIRD (aufs-android.sh) ═════════════════
+// Beim ersten Lauf am Mac des Projektinhabers brach Gradle mit
+// "Unsupported class file major version 69" ab: Java 25, uebernommen aus
+// einem schon gesetzten JAVA_HOME. Die Gradle-Fassung im Wrapper laeuft
+// nur mit Java 17 bis 24.
+//
+// Geprueft durch AUSFUEHREN: Die Funktionen werden aus dem Skript
+// geschnitten und auf nachgebaute Java-Ordner losgelassen, die nur ihre
+// Fassung melden -- genau so, wie ein echtes java -version es tut.
+{
+  const { mkdtempSync, writeFileSync, mkdirSync, chmodSync, rmSync } = await import('fs');
+  const { execFileSync } = await import('child_process');
+  const { tmpdir } = await import('os');
+  const { join } = await import('path');
+
+  const skript = readFileSync(`${WURZEL}/aufs-android.sh`, 'utf8');
+  const stueck = (name) => {
+    const von = skript.indexOf(`${name}() {`);
+    if (von === -1) { return null; }
+    const bis = skript.indexOf('\n}\n', von);
+    return bis === -1 ? null : skript.slice(von, bis + 3);
+  };
+  const grenzen = (skript.match(/^JAVA_MIN=\d+\nJAVA_MAX=\d+$/m) || [])[0];
+  const fassung = stueck('java_hauptversion');
+  const wahl = stueck('java_waehlen');
+  check('KRITISCH: die Java-Wahl steht als eigene, prüfbare Funktion da',
+    !!grenzen && !!fassung && !!wahl);
+
+  if (grenzen && fassung && wahl) {
+    const ordner = mkdtempSync(join(tmpdir(), 'java-'));
+    try {
+      const java = (name, zeile) => {
+        const d = join(ordner, name, 'bin');
+        mkdirSync(d, { recursive: true });
+        writeFileSync(join(d, 'java'), `#!/bin/sh\necho '${zeile}' >&2\n`);
+        chmodSync(join(d, 'java'), 0o755);
+        return join(ordner, name);
+      };
+      const j25 = java('j25', 'openjdk version "25.0.1" 2025-10-21');
+      const j21 = java('j21', 'openjdk version "21.0.8" 2025-07-15 LTS');
+      const j8  = java('j8',  'java version "1.8.0_412"');
+      const lauf = (...k) => execFileSync('bash', ['-c',
+        [grenzen, fassung, wahl, 'java_waehlen "$@"'].join('\n'), '--', ...k],
+        { encoding: 'utf8' }).trim();
+
+      check('KRITISCH: Java 25 wird übergangen, wenn ein Java 21 daneben liegt',
+        lauf(j25, j21) === j21);
+      check('KRITISCH: nur Java 25 da -- dann wird KEINES gewählt, statt den Bau scheitern zu lassen',
+        lauf(j25) === '');
+      check('Java 8 (Schreibweise 1.8) gilt als zu alt',
+        lauf(j8) === '' && lauf(j8, j21) === j21);
+      check('Ein leerer oder fehlender Ordner bringt die Wahl nicht durcheinander',
+        lauf('', join(ordner, 'gibtsnicht'), j21) === j21);
+    } finally { rmSync(ordner, { recursive: true, force: true }); }
+  }
+}
+
 // ══════════ WAS GIT NICHT KENNT, BLEIBT LIEGEN (aufs-handy.sh) ════════
 // Zweimal echten Schaden angerichtet: Das Skript legte vor dem Pull alles
 // in den Stash, auch unversionierte Dateien ("git stash push -u"). Damit
